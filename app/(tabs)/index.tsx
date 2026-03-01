@@ -1,88 +1,83 @@
-import React, { useEffect, useState, useCallback } from 'react';
+// app/(tabs)/index.tsx
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  ScrollView,
-  Text,
   View,
-  TouchableOpacity,
+  Text,
   StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   RefreshControl,
   Platform,
   ActivityIndicator,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useColors } from '@/hooks/use-colors';
-import { ScreenContainer } from '@/components/screen-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { getLastRead, LastRead } from '@/lib/storage';
-import { fetchPrayerTimesByCoords, getNextPrayer, getTimeUntilPrayer, PrayerTimesData } from '@/lib/prayer-api';
-import { getPrayerLocation, savePrayerLocation } from '@/lib/storage';
-import * as Location from 'expo-location';
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "@/lib/theme-provider";
+import { IslamicBackground } from "@/components/ui/islamic-background";
+import { GlassCard } from "@/components/ui/glass-card";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BORDER_RADIUS, SPACING, FONT_SIZES } from "@/constants/theme";
+import { getLastRead } from "@/lib/storage";
 
+// آية اليوم
 const DAILY_VERSES = [
-  { arabic: 'إِنَّ مَعَ الْعُسْرِ يُسْرًا', translation: 'Indeed, with hardship comes ease.', surah: 'الشرح', ayah: 6 },
-  { arabic: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', translation: 'And whoever relies upon Allah – then He is sufficient for him.', surah: 'الطلاق', ayah: 3 },
-  { arabic: 'فَاذْكُرُونِي أَذْكُرْكُمْ', translation: 'So remember Me; I will remember you.', surah: 'البقرة', ayah: 152 },
-  { arabic: 'وَاللَّهُ يُحِبُّ الصَّابِرِينَ', translation: 'And Allah loves the steadfast.', surah: 'آل عمران', ayah: 146 },
-  { arabic: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ', translation: 'Indeed, Allah is with the patient.', surah: 'البقرة', ayah: 153 },
-  { arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً', translation: 'Our Lord, give us in this world good and in the Hereafter good.', surah: 'البقرة', ayah: 201 },
-  { arabic: 'وَقُل رَّبِّ زِدْنِي عِلْمًا', translation: 'And say: My Lord, increase me in knowledge.', surah: 'طه', ayah: 114 },
+  { arabic: "إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", translation: "Indeed, Allah is with the patient", surah: "البقرة", ayah: 153 },
+  { arabic: "وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ", translation: "And whoever relies upon Allah – then He is sufficient for him", surah: "الطلاق", ayah: 3 },
+  { arabic: "فَاذْكُرُونِي أَذْكُرْكُمْ", translation: "So remember Me; I will remember you", surah: "البقرة", ayah: 152 },
+  { arabic: "وَقُل رَّبِّ زِدْنِي عِلْمًا", translation: "And say: My Lord, increase me in knowledge", surah: "طه", ayah: 114 },
+  { arabic: "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً", translation: "Our Lord, give us good in this world and good in the Hereafter", surah: "البقرة", ayah: 201 },
+  { arabic: "إِنَّ مَعَ الْعُسْرِ يُسْرًا", translation: "Indeed, with hardship comes ease", surah: "الشرح", ayah: 6 },
+  { arabic: "وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ", translation: "And Allah loves the doers of good", surah: "آل عمران", ayah: 134 },
+];
+
+// أقسام الأذكار
+const ATHKAR_SECTIONS = [
+  { id: "morning", title: "أذكار الصباح", icon: "sun.max.fill", color: "#FFB800", count: 27 },
+  { id: "evening", title: "أذكار المساء", icon: "moon.fill", color: "#7C4DFF", count: 27 },
+  { id: "sleep", title: "أذكار النوم", icon: "bed.double.fill", color: "#00BFA5", count: 15 },
+  { id: "wakeup", title: "أذكار الاستيقاظ", icon: "alarm.fill", color: "#FF6D00", count: 8 },
+  { id: "prayer", title: "أذكار بعد الصلاة", icon: "hands.sparkles.fill", color: "#2979FF", count: 12 },
+  { id: "quran-duas", title: "أدعية من القرآن", icon: "book.fill", color: "#1B8A8A", count: 40 },
+];
+
+// الأدوات السريعة
+const QUICK_TOOLS = [
+  { id: "tasbih", title: "التسبيح", icon: "circle.grid.3x3.fill", route: "/tasbih" },
+  { id: "names", title: "أسماء الله", icon: "star.fill", route: "/names" },
+  { id: "ruqyah", title: "الرقية", icon: "shield.fill", route: "/ruqyah" },
+  { id: "qibla", title: "القبلة", icon: "location.north.fill", route: "/qibla" },
 ];
 
 export default function HomeScreen() {
-  const colors = useColors();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
-  const [lastRead, setLastReadState] = useState<LastRead | null>(null);
-  const [prayerData, setPrayerData] = useState<PrayerTimesData | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
-  const [cityName, setCityName] = useState('مكة المكرمة');
-  const [dailyVerse] = useState(() => DAILY_VERSES[new Date().getDate() % DAILY_VERSES.length]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dailyVerse, setDailyVerse] = useState(DAILY_VERSES[0]);
+  const [lastRead, setLastRead] = useState<any>(null);
 
   const loadData = useCallback(async () => {
-    // Load last read
     try {
-      const lr = await getLastRead();
-      setLastReadState(lr);
-    } catch {}
+      // آية اليوم بناءً على التاريخ
+      const today = new Date();
+      const dayIndex = today.getDate() % DAILY_VERSES.length;
+      setDailyVerse(DAILY_VERSES[dayIndex]);
 
-    // Load prayer times
-    try {
-      let location = await getPrayerLocation();
-      
-      if (!location && Platform.OS !== 'web') {
-        try {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status === 'granted') {
-            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Low });
-            location = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-            await savePrayerLocation(location);
-            try {
-              const geocode = await Location.reverseGeocodeAsync(loc.coords);
-              if (geocode.length > 0) setCityName(geocode[0].city || geocode[0].region || 'مكة المكرمة');
-            } catch {}
-          }
-        } catch {}
-      }
-      
-      if (!location) {
-        location = { latitude: 21.3891, longitude: 39.8579 };
-      }
-      
-      if (location) {
-        try {
-          const data = await fetchPrayerTimesByCoords(location.latitude, location.longitude);
-          setPrayerData(data);
-        } catch {}
-      }
-    } catch {}
-    
-    setIsLoading(false);
+      // آخر قراءة
+      try {
+        const lr = await getLastRead();
+        setLastRead(lr);
+      } catch {}
+    } catch (e) {
+      console.log("Error loading data:", e);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 5000); // Max 5 seconds loading
     loadData();
-    return () => clearTimeout(timer);
   }, [loadData]);
 
   const onRefresh = async () => {
@@ -91,132 +86,334 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const nextPrayer = prayerData ? getNextPrayer(prayerData.timings) : null;
-  const timeUntil = nextPrayer ? getTimeUntilPrayer(nextPrayer.time) : null;
-  const hijriDate = prayerData?.date?.hijri;
-  const hijriStr = hijriDate ? `${hijriDate.day} ${hijriDate.month.ar} ${hijriDate.year} هـ` : null;
-
-  const styles = StyleSheet.create({
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { fontSize: 24, color: colors.primary, marginBottom: 16, fontWeight: '600' },
-    header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-    bismillah: { fontSize: 28, color: colors.primary, textAlign: 'center', fontWeight: '600' },
-    hijriDate: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 4 },
-    cityDate: { fontSize: 12, color: colors.muted, textAlign: 'center', marginTop: 2 },
-    section: { paddingHorizontal: 20, marginTop: 20 },
-    sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.foreground, textAlign: 'right', marginBottom: 12 },
-    lastReadCard: { backgroundColor: colors.primary, borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    lastReadTitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right' },
-    lastReadSurah: { fontSize: 20, fontWeight: '700', color: '#fff', textAlign: 'right', marginTop: 4 },
-    lastReadAyah: { fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'right', marginTop: 2 },
-    continueBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
-    continueBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-    verseCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, borderLeftColor: colors.gold || '#D4AF37' },
-    verseArabic: { fontSize: 22, color: colors.foreground, textAlign: 'right', lineHeight: 42, fontWeight: '500' },
-    verseTranslation: { fontSize: 14, color: colors.muted, textAlign: 'left', marginTop: 10, lineHeight: 20, fontStyle: 'italic' },
-    verseRef: { fontSize: 12, color: colors.primary, textAlign: 'right', marginTop: 8, fontWeight: '600' },
-    prayerCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: colors.border },
-    prayerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    nextPrayerName: { fontSize: 22, fontWeight: '700', color: colors.primary },
-    nextPrayerTime: { fontSize: 16, color: colors.foreground, marginTop: 2 },
-    countdownLabel: { fontSize: 12, color: colors.muted, textAlign: 'right' },
-    countdown: { fontSize: 20, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    quickAccessGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    quickBtn: { flex: 1, minWidth: '45%', backgroundColor: colors.surface, borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    quickBtnText: { fontSize: 13, fontWeight: '600', color: colors.foreground, marginTop: 8 },
-  });
-
   if (isLoading) {
     return (
-      <ScreenContainer containerClassName="bg-background">
+      <IslamicBackground>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</Text>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingBismillah, { color: colors.primary }]}>
+            بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+          </Text>
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
+          <Text style={[styles.loadingText, { color: colors.muted }]}>جارٍ التحميل...</Text>
         </View>
-      </ScreenContainer>
+      </IslamicBackground>
     );
   }
 
   return (
-    <ScreenContainer containerClassName="bg-background">
+    <IslamicBackground>
       <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingTop: insets.top + 10, paddingBottom: 100 },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        contentContainerStyle={{ paddingBottom: 20 }}
       >
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.bismillah}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</Text>
-          {hijriStr && <Text style={styles.hijriDate}>{hijriStr}</Text>}
-          <Text style={styles.cityDate}>{cityName}</Text>
+          <Text style={[styles.appName, { color: colors.foreground }]}>أذكاري</Text>
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            حَصِّن نفسك بذكر الله
+          </Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>آخر قراءة</Text>
-          <TouchableOpacity
-            style={styles.lastReadCard}
-            onPress={() => router.push(lastRead ? { pathname: '/surah/[id]', params: { id: lastRead.surahNumber } } : '/(tabs)/quran' as any)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.continueBtn}>
-              <Text style={styles.continueBtnText}>{lastRead ? 'متابعة' : 'ابدأ'}</Text>
-            </View>
-            <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={styles.lastReadTitle}>{lastRead ? 'استمر في القراءة' : 'ابدأ رحلتك مع القرآن'}</Text>
-              <Text style={styles.lastReadSurah}>{lastRead?.surahName || 'الفاتحة'}</Text>
-              <Text style={styles.lastReadAyah}>{lastRead ? `الآية ${lastRead.ayahNumber}` : '7 آيات'}</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {nextPrayer && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>أوقات الصلاة</Text>
-            <TouchableOpacity style={styles.prayerCard} onPress={() => router.push('/(tabs)/prayer' as any)} activeOpacity={0.85}>
-              <View style={styles.prayerRow}>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.countdownLabel}>الوقت المتبقي</Text>
-                  <Text style={styles.countdown}>{timeUntil}</Text>
-                </View>
-                <View>
-                  <Text style={styles.nextPrayerName}>{nextPrayer.arabicName}</Text>
-                  <Text style={styles.nextPrayerTime}>{nextPrayer.time}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
+        {/* آية اليوم */}
+        <GlassCard style={styles.verseCard} variant="solid">
+          <View style={styles.verseHeader}>
+            <IconSymbol name="sparkles" size={18} color={colors.gold} />
+            <Text style={[styles.verseLabel, { color: colors.gold }]}>آية اليوم</Text>
           </View>
+          <Text style={[styles.verseArabic, { color: colors.foreground }]}>
+            {dailyVerse.arabic}
+          </Text>
+          <Text style={[styles.verseTranslation, { color: colors.foregroundSecondary }]}>
+            {dailyVerse.translation}
+          </Text>
+          <Text style={[styles.verseReference, { color: colors.muted }]}>
+            سورة {dailyVerse.surah} - آية {dailyVerse.ayah}
+          </Text>
+        </GlassCard>
+
+        {/* أقسام الأذكار */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>الأذكار</Text>
+        </View>
+
+        <View style={styles.athkarGrid}>
+          {ATHKAR_SECTIONS.map((section) => (
+            <TouchableOpacity
+              key={section.id}
+              activeOpacity={0.8}
+              onPress={() => router.push(`/athkar/${section.id}` as any)}
+              style={styles.athkarItemWrapper}
+            >
+              <GlassCard style={styles.athkarCard}>
+                <View
+                  style={[
+                    styles.athkarIconContainer,
+                    { backgroundColor: `${section.color}20` },
+                  ]}
+                >
+                  <IconSymbol name={section.icon} size={28} color={section.color} />
+                </View>
+                <Text style={[styles.athkarTitle, { color: colors.foreground }]}>
+                  {section.title}
+                </Text>
+                <Text style={[styles.athkarCount, { color: colors.muted }]}>
+                  {section.count} ذكر
+                </Text>
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* الأدوات السريعة */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>أدوات سريعة</Text>
+        </View>
+
+        <View style={styles.toolsGrid}>
+          {QUICK_TOOLS.map((tool) => (
+            <TouchableOpacity
+              key={tool.id}
+              activeOpacity={0.8}
+              onPress={() => router.push(tool.route as any)}
+              style={styles.toolItemWrapper}
+            >
+              <GlassCard style={styles.toolCard}>
+                <View
+                  style={[
+                    styles.toolIconContainer,
+                    { backgroundColor: `${colors.primary}20` },
+                  ]}
+                >
+                  <IconSymbol name={tool.icon} size={24} color={colors.primary} />
+                </View>
+                <Text style={[styles.toolTitle, { color: colors.foreground }]}>
+                  {tool.title}
+                </Text>
+              </GlassCard>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* آخر قراءة */}
+        {lastRead && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+                متابعة القراءة
+              </Text>
+            </View>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push(`/surah/${lastRead.surahNumber}?ayah=${lastRead.ayahNumber}` as any)
+              }
+            >
+              <GlassCard style={styles.lastReadCard}>
+                <View style={styles.lastReadContent}>
+                  <View>
+                    <Text style={[styles.lastReadSurah, { color: colors.foreground }]}>
+                      {lastRead.surahName || `سورة ${lastRead.surahNumber}`}
+                    </Text>
+                    <Text style={[styles.lastReadAyah, { color: colors.muted }]}>
+                      الآية {lastRead.ayahNumber}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.lastReadIconContainer,
+                      { backgroundColor: `${colors.primary}20` },
+                    ]}
+                  >
+                    <IconSymbol name="book.fill" size={24} color={colors.primary} />
+                  </View>
+                </View>
+              </GlassCard>
+            </TouchableOpacity>
+          </>
         )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>آية اليوم</Text>
-          <View style={styles.verseCard}>
-            <Text style={styles.verseArabic}>{dailyVerse.arabic}</Text>
-            <Text style={styles.verseTranslation}>{dailyVerse.translation}</Text>
-            <Text style={styles.verseRef}>سورة {dailyVerse.surah} - آية {dailyVerse.ayah}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>وصول سريع</Text>
-          <View style={styles.quickAccessGrid}>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/quran' as any)}>
-              <IconSymbol name="book.fill" size={28} color={colors.primary} />
-              <Text style={styles.quickBtnText}>السور</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/prayer' as any)}>
-              <IconSymbol name="clock.fill" size={28} color={colors.primary} />
-              <Text style={styles.quickBtnText}>الصلاة</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/qibla' as any)}>
-              <IconSymbol name="location.north.fill" size={28} color={colors.primary} />
-              <Text style={styles.quickBtnText}>القبلة</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/settings' as any)}>
-              <IconSymbol name="gearshape.fill" size={28} color={colors.primary} />
-              <Text style={styles.quickBtnText}>الإعدادات</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
-    </ScreenContainer>
+    </IslamicBackground>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: SPACING.md,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingBismillah: {
+    fontSize: FONT_SIZES["3xl"],
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.md,
+    marginTop: 12,
+  },
+
+  // Header
+  header: {
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+    marginTop: SPACING.md,
+  },
+  appName: {
+    fontSize: FONT_SIZES["4xl"],
+    fontWeight: "700",
+  },
+  subtitle: {
+    fontSize: FONT_SIZES.md,
+    marginTop: 4,
+  },
+
+  // Verse Card
+  verseCard: {
+    marginBottom: SPACING.lg,
+    padding: SPACING.lg,
+  },
+  verseHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  verseLabel: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: "600",
+  },
+  verseArabic: {
+    fontSize: FONT_SIZES.arabicLarge,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 50,
+    marginBottom: SPACING.sm,
+  },
+  verseTranslation: {
+    fontSize: FONT_SIZES.md,
+    textAlign: "center",
+    marginBottom: SPACING.sm,
+  },
+  verseReference: {
+    fontSize: FONT_SIZES.xs,
+    textAlign: "center",
+  },
+
+  // Section Header
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: "700",
+  },
+
+  // Athkar Grid
+  athkarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
+  athkarItemWrapper: {
+    width: "48%",
+  },
+  athkarCard: {
+    padding: SPACING.md,
+    alignItems: "center",
+  },
+  athkarIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.sm,
+  },
+  athkarTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: "600",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  athkarCount: {
+    fontSize: FONT_SIZES.xs,
+  },
+
+  // Tools Grid
+  toolsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  toolItemWrapper: {
+    width: "23%",
+  },
+  toolCard: {
+    padding: SPACING.sm,
+    alignItems: "center",
+  },
+  toolIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+  toolTitle: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // Last Read
+  lastReadCard: {
+    marginBottom: SPACING.lg,
+  },
+  lastReadContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: SPACING.md,
+  },
+  lastReadSurah: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  lastReadAyah: {
+    fontSize: FONT_SIZES.sm,
+  },
+  lastReadIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: BORDER_RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

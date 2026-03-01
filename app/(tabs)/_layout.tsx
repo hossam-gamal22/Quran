@@ -1,152 +1,160 @@
+// app/(tabs)/_layout.tsx
+
+import React from "react";
 import { Tabs } from "expo-router";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, ScrollView } from "react-native";
-import { useColors } from "@/hooks/use-colors";
-import { HapticTab } from "@/components/haptic-tab";
+import { useTheme } from "@/lib/theme-provider";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BlurView } from "expo-blur";
+import { BORDER_RADIUS } from "@/constants/theme";
 
 export default function TabLayout() {
-  const colors = useColors();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
-  const tabBarHeight = 62 + bottomPadding;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.muted,
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: {
-          paddingTop: 8,
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 70 + bottomPadding,
+          paddingTop: 10,
           paddingBottom: bottomPadding,
-          height: tabBarHeight,
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          paddingHorizontal: 10,
+          backgroundColor: Platform.OS === "ios" ? "transparent" : colors.tabBarBackground,
           borderTopWidth: 0.5,
+          borderTopColor: colors.border,
+          elevation: 0,
         },
+        tabBarBackground: () =>
+          Platform.OS === "ios" ? (
+            <BlurView
+              intensity={isDark ? 60 : 80}
+              tint={isDark ? "dark" : "light"}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+            />
+          ) : null,
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: "700",
-          marginTop: 2,
+          fontWeight: "600",
+          marginTop: 4,
+        },
+        tabBarIconStyle: {
+          marginTop: 4,
         },
       }}
     >
-      {/* ── Core ─────────────────────────────────── */}
+      {/* الأذكار - Home */}
       <Tabs.Screen
         name="index"
         options={{
-          title: "الرئيسية",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
+          title: "الأذكار",
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name={focused ? "text.book.closed.fill" : "text.book.closed"}
+              color={color}
+              focused={focused}
+              primaryColor={colors.primary}
+            />
+          ),
         }}
       />
+
+      {/* القرآن */}
       <Tabs.Screen
         name="quran"
         options={{
           title: "القرآن",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="book.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="quran-search"
-        options={{
-          title: "البحث",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="magnifyingglass" color={color} />,
-        }}
-      />
-
-      {/* ── Features ─────────────────────────────── */}
-      <Tabs.Screen
-        name="recitations"
-        options={{
-          title: "التلاوات",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="headphones" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="tafsir-search"
-        options={{
-          title: "التفسير",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="text.book.closed.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          title: "المفضلة",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="star.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="daily-ayah"
-        options={{
-          title: "آية اليوم",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="sparkles" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name={focused ? "book.fill" : "book"}
+              color={color}
+              focused={focused}
+              primaryColor={colors.primary}
+            />
+          ),
         }}
       />
 
-      {/* ── Worship ──────────────────────────────── */}
-      <Tabs.Screen
-        name="wird"
-        options={{
-          title: "الورد",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="scroll.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="tasbih"
-        options={{
-          title: "التسبيح",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="circle.grid.3x3.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="khatm"
-        options={{
-          title: "الختمة",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="checkmark.seal.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="hijri-calendar"
-        options={{
-          title: "التقويم",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="calendar" color={color} />,
-        }}
-      />
-
-      {/* ── Notifications ─────────────────────────── */}
-      <Tabs.Screen
-        name="notifications-center"
-        options={{
-          title: "الإشعارات",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.fill" color={color} />,
-        }}
-      />
-
-      {/* ── Prayer & Direction ────────────────────── */}
+      {/* الصلاة */}
       <Tabs.Screen
         name="prayer"
         options={{
           title: "الصلاة",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="clock.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name={focused ? "building.columns.fill" : "building.columns"}
+              color={color}
+              focused={focused}
+              primaryColor={colors.primary}
+            />
+          ),
         }}
       />
-      <Tabs.Screen
-        name="qibla"
-        options={{
-          title: "القبلة",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="location.north.fill" color={color} />,
-        }}
-      />
+
+      {/* الإعدادات */}
       <Tabs.Screen
         name="settings"
         options={{
           title: "الإعدادات",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="gearshape.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon
+              name={focused ? "gearshape.fill" : "gearshape"}
+              color={color}
+              focused={focused}
+              primaryColor={colors.primary}
+            />
+          ),
         }}
       />
+
+      {/* Hidden screens */}
+      <Tabs.Screen name="quran-search" options={{ href: null }} />
+      <Tabs.Screen name="recitations" options={{ href: null }} />
+      <Tabs.Screen name="tafsir-search" options={{ href: null }} />
+      <Tabs.Screen name="favorites" options={{ href: null }} />
+      <Tabs.Screen name="daily-ayah" options={{ href: null }} />
+      <Tabs.Screen name="wird" options={{ href: null }} />
+      <Tabs.Screen name="tasbih" options={{ href: null }} />
+      <Tabs.Screen name="khatm" options={{ href: null }} />
+      <Tabs.Screen name="hijri-calendar" options={{ href: null }} />
+      <Tabs.Screen name="notifications-center" options={{ href: null }} />
+      <Tabs.Screen name="qibla" options={{ href: null }} />
     </Tabs>
+  );
+}
+
+// Tab Icon Component with background when focused
+function TabIcon({
+  name,
+  color,
+  focused,
+  primaryColor,
+}: {
+  name: string;
+  color: string;
+  focused: boolean;
+  primaryColor: string;
+}) {
+  return (
+    <IconSymbol
+      name={name}
+      size={24}
+      color={focused ? primaryColor : color}
+    />
   );
 }

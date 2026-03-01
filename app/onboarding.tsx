@@ -1,235 +1,217 @@
-/**
- * Onboarding Screen — شاشة الترحيب
- * تظهر للمستخدم الجديد مرة واحدة فقط
- */
-
-import React, { useState, useRef } from 'react';
+// app/onboarding.tsx
+import React, { useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  Dimensions, FlatList, Animated, Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Haptics from 'expo-haptics';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Dimensions,
+  Animated,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { useTheme } from "@/lib/theme-provider";
+import { BORDER_RADIUS, SPACING, FONT_SIZES } from "@/constants/theme";
 
-const { width: W, height: H } = Dimensions.get('window');
-const ONBOARDING_KEY = '@onboarding_done_v1';
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const ONBOARDING_KEY = "@onboarding_done_v2";
 
+// دوال للتحقق من حالة الـ onboarding
 export async function isOnboardingDone(): Promise<boolean> {
-  const val = await AsyncStorage.getItem(ONBOARDING_KEY);
-  return val === 'true';
-}
-export async function markOnboardingDone(): Promise<void> {
-  await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+  try {
+    const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+    return value === "true";
+  } catch {
+    return true;
+  }
 }
 
-// ─── Slides data ──────────────────────────────────────────────────────────────
-const SLIDES = [
+export async function markOnboardingDone(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+  } catch {}
+}
+
+interface Slide {
+  id: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  gradient: [string, string, string];
+}
+
+const SLIDES: Slide[] = [
   {
-    id: '1',
-    emoji: '☪️',
-    bg: ['#0F2027', '#203A43', '#1B6B3A'],
-    title: 'القرآن الكريم',
-    subtitle: 'تطبيقك الإسلامي الشامل',
-    desc: 'اقرأ القرآن الكريم، استمع للتلاوات، وابحث في آياته الكريمة بسهولة تامة',
-    features: ['📖 114 سورة كاملة', '🎧 11 قارئاً مشهوراً', '🔍 بحث متقدم'],
+    id: "1",
+    emoji: "🕌",
+    title: "أهلاً بك في أذكاري",
+    subtitle: "رفيقك الإيماني اليومي",
+    description: "تطبيق شامل للأذكار والقرآن الكريم وأوقات الصلاة",
+    gradient: ["#0D2B2B", "#1B8A8A", "#0D2B2B"],
   },
   {
-    id: '2',
-    emoji: '🕌',
-    bg: ['#1a1a2e', '#16213e', '#0f3460'],
-    title: 'أوقات الصلاة',
-    subtitle: 'لا تفوت وقتاً واحداً',
-    desc: 'أوقات الصلاة الدقيقة حسب موقعك مع إشعارات الأذان التلقائية',
-    features: ['🔔 إشعارات الأذان', '🧭 اتجاه القبلة', '📍 GPS تلقائي'],
+    id: "2",
+    emoji: "📖",
+    title: "القرآن الكريم",
+    subtitle: "اقرأ واستمع وتدبر",
+    description: "قراءة سهلة مع تفسير وترجمات متعددة وتلاوات بأصوات مختلفة",
+    gradient: ["#1B4B5A", "#2DB3B3", "#1B4B5A"],
   },
   {
-    id: '3',
-    emoji: '📿',
-    bg: ['#2d1b69', '#11998e', '#1B6B3A'],
-    title: 'الأذكار والورد',
-    subtitle: 'احرص على ذكر الله',
-    desc: 'ورد صباحي ومسائي مكتمل، تسبيح رقمي، وتتبع ختمات القرآن',
-    features: ['🌅 ورد صباحي', '🌇 ورد مسائي', '✅ تتبع الختمة'],
+    id: "3",
+    emoji: "🤲",
+    title: "الأذكار والأدعية",
+    subtitle: "حصّن نفسك بذكر الله",
+    description: "أذكار الصباح والمساء والنوم وأدعية من القرآن والسنة",
+    gradient: ["#2D1B4B", "#7C4DFF", "#2D1B4B"],
   },
   {
-    id: '4',
-    emoji: '⭐',
-    bg: ['#78350F', '#92400E', '#B45309'],
-    title: 'حفظ وتصدير',
-    subtitle: 'شارك آيات القرآن',
-    desc: 'احفظ آياتك المفضلة وصدّرها كصور جميلة لمشاركتها مع أحبائك',
-    features: ['⭐ حفظ المفضلة', '🖼️ تصدير كصورة', '📤 مشاركة سهلة'],
+    id: "4",
+    emoji: "🕐",
+    title: "أوقات الصلاة",
+    subtitle: "لا تفوّت صلاة أبداً",
+    description: "مواقيت دقيقة مع تنبيهات واتجاه القبلة والتقويم الهجري",
+    gradient: ["#1B3D2F", "#00BFA5", "#1B3D2F"],
   },
   {
-    id: '5',
-    emoji: '🌙',
-    bg: ['#0F1A14', '#1B3A2F', '#1B6B3A'],
-    title: 'جاهز للبدء؟',
-    subtitle: 'بسم الله الرحمن الرحيم',
-    desc: 'انضم إلى ملايين المسلمين الذين يستخدمون هذا التطبيق يومياً',
-    features: ['🌙 وضع ليلي', '🗓️ تقويم هجري', '🔔 إشعارات ذكية'],
+    id: "5",
+    emoji: "✨",
+    title: "ابدأ رحلتك",
+    subtitle: "جاهز للانطلاق",
+    description: "اللهم اجعل هذا التطبيق نافعاً لي ولجميع المسلمين",
+    gradient: ["#3D2B1B", "#D4AF37", "#3D2B1B"],
   },
 ];
 
-type Slide = typeof SLIDES[0];
+export default function OnboardingScreen() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const flatListRef = useRef<FlatList>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollX = useRef(new Animated.Value(0)).current;
 
-// ─── Slide Component ──────────────────────────────────────────────────────────
-function SlideCard({ item }: { item: Slide }) {
-  return (
-    <View style={[sStyles.slide, { width: W }]}>
-      {/* Background gradient effect */}
-      <View style={[sStyles.bgGradient, { backgroundColor: item.bg[2] }]} />
+  const handleNext = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (currentIndex < SLIDES.length - 1) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      handleFinish();
+    }
+  };
 
-      <View style={sStyles.content}>
-        {/* Big Emoji */}
-        <View style={sStyles.emojiWrap}>
-          <Text style={sStyles.emoji}>{item.emoji}</Text>
-          <View style={[sStyles.emojiGlow, { backgroundColor: item.bg[1] }]} />
-        </View>
+  const handleSkip = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    handleFinish();
+  };
 
-        {/* Title */}
-        <Text style={sStyles.title}>{item.title}</Text>
-        <Text style={sStyles.subtitle}>{item.subtitle}</Text>
+  const handleFinish = async () => {
+    await markOnboardingDone();
+    router.replace("/(tabs)");
+  };
 
-        {/* Divider */}
-        <View style={sStyles.divider} />
-
-        {/* Description */}
-        <Text style={sStyles.desc}>{item.desc}</Text>
-
-        {/* Features */}
-        <View style={sStyles.featuresWrap}>
-          {item.features.map((f, i) => (
-            <View key={i} style={sStyles.featurePill}>
-              <Text style={sStyles.featureText}>{f}</Text>
-            </View>
-          ))}
-        </View>
+  const renderSlide = ({ item }: { item: Slide }) => (
+    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+      <LinearGradient
+        colors={item.gradient}
+        style={StyleSheet.absoluteFillObject}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <View style={styles.slideContent}>
+        <Text style={styles.emoji}>{item.emoji}</Text>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.subtitle}>{item.subtitle}</Text>
+        <Text style={styles.description}>{item.description}</Text>
       </View>
     </View>
   );
-}
 
-const sStyles = StyleSheet.create({
-  slide: { height: H, alignItems: 'center', justifyContent: 'center' },
-  bgGradient: { ...StyleSheet.absoluteFillObject, opacity: 0.95 },
-  content: { alignItems: 'center', paddingHorizontal: 32, zIndex: 1 },
-  emojiWrap: { position: 'relative', marginBottom: 28, alignItems: 'center' },
-  emoji: { fontSize: 80, textAlign: 'center' },
-  emojiGlow: { position: 'absolute', width: 100, height: 100, borderRadius: 50, opacity: 0.2, top: -10, zIndex: -1 },
-  title: { fontSize: 32, fontWeight: '900', color: '#FFFFFF', textAlign: 'center', marginBottom: 6 },
-  subtitle: { fontSize: 17, color: 'rgba(255,255,255,0.75)', textAlign: 'center', fontWeight: '600', marginBottom: 20 },
-  divider: { width: 50, height: 2, backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: 1, marginBottom: 20 },
-  desc: { fontSize: 16, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 28, marginBottom: 28 },
-  featuresWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  featurePill: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  featureText: { color: '#ffffff', fontWeight: '700', fontSize: 13 },
-});
+  const renderDots = () => (
+    <View style={styles.dotsContainer}>
+      {SLIDES.map((_, index) => {
+        const inputRange = [
+          (index - 1) * SCREEN_WIDTH,
+          index * SCREEN_WIDTH,
+          (index + 1) * SCREEN_WIDTH,
+        ];
+        const scale = scrollX.interpolate({
+          inputRange,
+          outputRange: [0.8, 1.2, 0.8],
+          extrapolate: "clamp",
+        });
+        const opacity = scrollX.interpolate({
+          inputRange,
+          outputRange: [0.4, 1, 0.4],
+          extrapolate: "clamp",
+        });
 
-// ─── Main Onboarding Screen ───────────────────────────────────────────────────
-export default function OnboardingScreen() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatRef = useRef<FlatList>(null);
-  const router = useRouter();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const handleFinish = async () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
-    ]).start();
-    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await markOnboardingDone();
-    router.replace('/(tabs)/');
-  };
-
-  const handleNext = () => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = currentIndex + 1;
-    if (next >= SLIDES.length) {
-      handleFinish();
-      return;
-    }
-    flatRef.current?.scrollToIndex({ index: next, animated: true });
-    setCurrentIndex(next);
-  };
-
-  const handleSkip = async () => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await markOnboardingDone();
-    router.replace('/(tabs)/');
-  };
-
-  const isLast = currentIndex === SLIDES.length - 1;
+        return (
+          <Animated.View
+            key={index}
+            style={[
+              styles.dot,
+              {
+                backgroundColor: "#FFFFFF",
+                transform: [{ scale }],
+                opacity,
+              },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0F1A14' }}>
-      {/* Slides */}
-      <FlatList
-        ref={flatRef}
+    <View style={styles.container}>
+      <Animated.FlatList
+        ref={flatListRef}
         data={SLIDES}
+        renderItem={renderSlide}
+        keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
-        scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => <SlideCard item={item} />}
-        getItemLayout={(_, index) => ({ length: W, offset: W * index, index })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true }
+        )}
+        onMomentumScrollEnd={(e) => {
+          const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          setCurrentIndex(index);
+        }}
+        scrollEventThrottle={16}
       />
 
-      {/* Bottom controls overlay */}
-      <View style={styles.controls}>
-        {/* Dots */}
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <TouchableOpacity
-              key={i}
-              onPress={() => {
-                flatRef.current?.scrollToIndex({ index: i, animated: true });
-                setCurrentIndex(i);
-              }}
-            >
-              <Animated.View style={[
-                styles.dot,
-                i === currentIndex ? styles.dotActive : styles.dotInactive,
-              ]} />
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Controls */}
+      <View style={[styles.controls, { paddingBottom: insets.bottom + 20 }]}>
+        {renderDots()}
 
-        {/* Buttons row */}
-        <View style={styles.btnsRow}>
-          {/* Skip */}
-          {!isLast ? (
-            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-              <Text style={styles.skipText}>تخطي</Text>
-            </TouchableOpacity>
+        <View style={styles.buttonsContainer}>
+          {currentIndex < SLIDES.length - 1 ? (
+            <>
+              <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
+                <Text style={styles.skipText}>تخطي</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+                <Text style={styles.nextText}>التالي</Text>
+              </TouchableOpacity>
+            </>
           ) : (
-            <View style={{ width: 80 }} />
-          )}
-
-          {/* Next / Start */}
-          <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-            <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-              {isLast ? (
-                <Text style={styles.nextText}>ابدأ الآن 🚀</Text>
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.nextText}>التالي</Text>
-                  <IconSymbol name="chevron.left" size={16} color="#fff" />
-                </View>
-              )}
+            <TouchableOpacity
+              style={[styles.startButton, { backgroundColor: "#D4AF37" }]}
+              onPress={handleFinish}
+            >
+              <Text style={styles.startText}>ابدأ الآن</Text>
             </TouchableOpacity>
-          </Animated.View>
+          )}
         </View>
       </View>
     </View>
@@ -237,53 +219,96 @@ export default function OnboardingScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#0A1F1F",
+  },
+  slide: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  slideContent: {
+    alignItems: "center",
+    paddingHorizontal: SPACING.xl,
+  },
+  emoji: {
+    fontSize: 80,
+    marginBottom: SPACING.lg,
+  },
+  title: {
+    fontSize: FONT_SIZES["3xl"],
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginBottom: SPACING.sm,
+  },
+  subtitle: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.85)",
+    textAlign: "center",
+    marginBottom: SPACING.md,
+  },
+  description: {
+    fontSize: FONT_SIZES.md,
+    color: "rgba(255, 255, 255, 0.7)",
+    textAlign: "center",
+    lineHeight: 24,
+  },
   controls: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    paddingHorizontal: 24,
-    backgroundColor: 'transparent',
+    paddingHorizontal: SPACING.lg,
   },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 24,
+  dotsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
   },
-  dot: { borderRadius: 10, height: 8 },
-  dotActive: { width: 28, backgroundColor: '#ffffff' },
-  dotInactive: { width: 8, backgroundColor: 'rgba(255,255,255,0.35)' },
-  btnsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
   },
-  skipBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    width: 80,
-    alignItems: 'center',
+  buttonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  skipText: { color: 'rgba(255,255,255,0.75)', fontWeight: '700', fontSize: 14 },
-  nextBtn: {
-    backgroundColor: '#1B6B3A',
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    shadowColor: '#1B6B3A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+  skipButton: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
   },
-  nextText: { color: '#ffffff', fontWeight: '900', fontSize: 16 },
+  skipText: {
+    fontSize: FONT_SIZES.md,
+    color: "rgba(255, 255, 255, 0.6)",
+    fontWeight: "600",
+  },
+  nextButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  nextText: {
+    fontSize: FONT_SIZES.md,
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  startButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: "center",
+  },
+  startText: {
+    fontSize: FONT_SIZES.lg,
+    color: "#1A1A1A",
+    fontWeight: "700",
+  },
 });
