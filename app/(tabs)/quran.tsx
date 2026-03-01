@@ -1,377 +1,661 @@
 // app/(tabs)/quran.tsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
+  SafeAreaView,
   TouchableOpacity,
-  TextInput,
-  ActivityIndicator,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@/lib/theme-provider";
-import { IslamicBackground } from "@/components/ui/islamic-background";
-import { GlassCard } from "@/components/ui/glass-card";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { BORDER_RADIUS, SPACING, FONT_SIZES } from "@/constants/theme";
-import { fetchSurahs, ARABIC_SURAH_NAMES } from "@/lib/quran-api";
+  FlatList,
+  Image,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Colors, Spacing, BorderRadius } from '../../constants/theme';
+
+type TabType = 'read' | 'learn' | 'progress';
+type ThemeType = 'modern' | 'paper' | 'dark';
 
 interface Surah {
   number: number;
   name: string;
-  englishName: string;
-  englishNameTranslation: string;
-  numberOfAyahs: number;
+  nameArabic: string;
+  ayahCount: number;
   revelationType: string;
 }
 
-const REVELATION_TYPE: Record<string, string> = {
-  Meccan: "مكية",
-  Medinan: "مدنية",
-};
+interface RecentRead {
+  surahName: string;
+  surahNameArabic: string;
+  ayah: number;
+  date: string;
+}
+
+interface Reciter {
+  id: string;
+  name: string;
+  nameArabic: string;
+  downloaded: number;
+  total: number;
+}
 
 export default function QuranScreen() {
-  const { colors } = useTheme();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const [surahs, setSurahs] = useState<Surah[]>([]);
-  const [filteredSurahs, setFilteredSurahs] = useState<Surah[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"surahs" | "juz">("surahs");
+  const [activeTab, setActiveTab] = useState<TabType>('read');
+  const [selectedTheme, setSelectedTheme] = useState<ThemeType>('modern');
+  const [showThemes, setShowThemes] = useState(false);
 
-  const loadSurahs = useCallback(async () => {
-    try {
-      const data = await fetchSurahs();
-      setSurahs(data);
-      setFilteredSurahs(data);
-    } catch (e) {
-      console.log("Error loading surahs:", e);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const recents: RecentRead[] = [
+    { surahName: 'Al-Baqara', surahNameArabic: 'البَقَرَة', ayah: 26, date: 'الآن' },
+    { surahName: 'Al-Fatiha', surahNameArabic: 'الفَاتِحَة', ayah: 3, date: 'أمس' },
+    { surahName: 'Al-Baqara', surahNameArabic: 'البَقَرَة', ayah: 7, date: '٠٣/١٢' },
+    { surahName: 'Al-Fatiha', surahNameArabic: 'الفَاتِحَة', ayah: 2, date: '٠٣/١٢' },
+  ];
 
-  useEffect(() => {
-    loadSurahs();
-  }, [loadSurahs]);
+  const surahs: Surah[] = [
+    { number: 1, name: 'Al-Fatiha', nameArabic: 'الفَاتِحَة', ayahCount: 7, revelationType: 'مكية' },
+    { number: 2, name: 'Al-Baqara', nameArabic: 'البَقَرَة', ayahCount: 286, revelationType: 'مدنية' },
+    { number: 3, name: 'Aal-Imran', nameArabic: 'آل عِمرَان', ayahCount: 200, revelationType: 'مدنية' },
+    { number: 4, name: 'An-Nisa', nameArabic: 'النِّسَاء', ayahCount: 176, revelationType: 'مدنية' },
+    { number: 5, name: 'Al-Maida', nameArabic: 'المَائِدَة', ayahCount: 120, revelationType: 'مدنية' },
+    { number: 6, name: 'Al-Anam', nameArabic: 'الأَنعَام', ayahCount: 165, revelationType: 'مكية' },
+    { number: 7, name: 'Al-Araf', nameArabic: 'الأَعرَاف', ayahCount: 206, revelationType: 'مكية' },
+    { number: 8, name: 'Al-Anfal', nameArabic: 'الأَنفَال', ayahCount: 75, revelationType: 'مدنية' },
+  ];
 
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredSurahs(surahs);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = surahs.filter(
-        (s) =>
-          s.name.includes(searchQuery) ||
-          s.englishName.toLowerCase().includes(query) ||
-          ARABIC_SURAH_NAMES[s.number - 1]?.includes(searchQuery) ||
-          s.number.toString() === searchQuery
-      );
-      setFilteredSurahs(filtered);
-    }
-  }, [searchQuery, surahs]);
+  const reciters: Reciter[] = [
+    { id: '1', name: 'Abdul Rahman As-Sudais', nameArabic: 'عبدالرحمن السديس', downloaded: 0, total: 114 },
+    { id: '2', name: 'Mishary Rashid Alafasy', nameArabic: 'مشاري راشد العفاسي', downloaded: 0, total: 114 },
+    { id: '3', name: 'Saad Al-Ghamdi', nameArabic: 'سعد الغامدي', downloaded: 2, total: 114 },
+  ];
 
-  const renderSurahItem = ({ item }: { item: Surah }) => {
-    const arabicName = ARABIC_SURAH_NAMES[item.number - 1] || item.name;
-    
-    return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => router.push(`/surah/${item.number}` as any)}
-      >
-        <GlassCard style={styles.surahCard}>
-          <View style={styles.surahContent}>
-            {/* رقم السورة */}
-            <View style={[styles.surahNumber, { backgroundColor: `${colors.primary}15` }]}>
-              <Text style={[styles.surahNumberText, { color: colors.primary }]}>
-                {item.number}
-              </Text>
-            </View>
+  const themes: { key: ThemeType; label: string }[] = [
+    { key: 'modern', label: 'عصري' },
+    { key: 'paper', label: 'ورقي' },
+    { key: 'dark', label: 'داكن' },
+  ];
 
-            {/* معلومات السورة */}
-            <View style={styles.surahInfo}>
-              <Text style={[styles.surahName, { color: colors.foreground }]}>
-                {arabicName}
-              </Text>
-              <Text style={[styles.surahMeta, { color: colors.muted }]}>
-                {REVELATION_TYPE[item.revelationType]} • {item.numberOfAyahs} آية
-              </Text>
-            </View>
-
-            {/* اسم السورة بالعربي المزخرف */}
-            <Text style={[styles.surahArabicName, { color: colors.foregroundSecondary }]}>
-              {item.name}
-            </Text>
-          </View>
-        </GlassCard>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderJuzItem = ({ item }: { item: number }) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => router.push(`/juz/${item}` as any)}
-    >
-      <GlassCard style={styles.juzCard}>
-        <View style={[styles.juzNumber, { backgroundColor: `${colors.primary}15` }]}>
-          <Text style={[styles.juzNumberText, { color: colors.primary }]}>{item}</Text>
-        </View>
-        <Text style={[styles.juzTitle, { color: colors.foreground }]}>
-          الجزء {item}
-        </Text>
-      </GlassCard>
+  const renderRecentItem = ({ item }: { item: RecentRead }) => (
+    <TouchableOpacity style={styles.recentCard}>
+      <Text style={styles.recentSurahArabic}>{item.surahNameArabic}</Text>
+      <Text style={styles.recentSurah}>{item.surahName}</Text>
+      <Text style={styles.recentAyah}>آية {item.ayah}</Text>
+      <Text style={styles.recentDate}>{item.date}</Text>
     </TouchableOpacity>
   );
 
-  if (isLoading) {
-    return (
-      <IslamicBackground>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.muted }]}>
-            جارٍ تحميل السور...
-          </Text>
-        </View>
-      </IslamicBackground>
-    );
-  }
+  const renderSurahItem = ({ item }: { item: Surah }) => (
+    <TouchableOpacity style={styles.surahCard}>
+      <View style={styles.surahNumber}>
+        <Text style={styles.surahNumberText}>{item.number}</Text>
+      </View>
+      <View style={styles.surahInfo}>
+        <Text style={styles.surahNameArabic}>{item.nameArabic}</Text>
+        <Text style={styles.surahName}>{item.name}</Text>
+      </View>
+      <View style={styles.surahMeta}>
+        <Text style={styles.surahAyahCount}>{item.ayahCount} آية</Text>
+        <Text style={styles.surahType}>{item.revelationType}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderReciterItem = ({ item }: { item: Reciter }) => (
+    <TouchableOpacity style={styles.reciterCard}>
+      <View style={styles.reciterAvatar}>
+        <Ionicons name="person" size={24} color={Colors.primary} />
+      </View>
+      <View style={styles.reciterInfo}>
+        <Text style={styles.reciterName}>{item.nameArabic}</Text>
+        <Text style={styles.reciterDownloaded}>
+          {item.downloaded}/{item.total} تم التحميل
+        </Text>
+      </View>
+      <TouchableOpacity style={styles.downloadBtn}>
+        <Ionicons name="cloud-download-outline" size={24} color={Colors.primary} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
 
   return (
-    <IslamicBackground>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.foreground }]}>القرآن الكريم</Text>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>القرآن الكريم</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerBtn}>
+            <Ionicons name="bookmark-outline" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerBtn}
+            onPress={() => setShowThemes(!showThemes)}
+          >
+            <Ionicons name="color-palette-outline" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerBtn}>
+            <Ionicons name="headset-outline" size={24} color={Colors.text} />
+          </TouchableOpacity>
         </View>
-
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <GlassCard style={styles.searchCard}>
-            <View style={styles.searchContent}>
-              <IconSymbol name="magnifyingglass" size={20} color={colors.muted} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.foreground }]}
-                placeholder="ابحث عن سورة..."
-                placeholderTextColor={colors.muted}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                textAlign="right"
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery("")}>
-                  <IconSymbol name="xmark.circle.fill" size={20} color={colors.muted} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </GlassCard>
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabsContainer}>
-          <GlassCard style={styles.tabsCard}>
-            <View style={styles.tabsContent}>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  activeTab === "surahs" && { backgroundColor: colors.primary },
-                ]}
-                onPress={() => setActiveTab("surahs")}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: activeTab === "surahs" ? "#FFFFFF" : colors.muted },
-                  ]}
-                >
-                  السور
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.tab,
-                  activeTab === "juz" && { backgroundColor: colors.primary },
-                ]}
-                onPress={() => setActiveTab("juz")}
-              >
-                <Text
-                  style={[
-                    styles.tabText,
-                    { color: activeTab === "juz" ? "#FFFFFF" : colors.muted },
-                  ]}
-                >
-                  الأجزاء
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </GlassCard>
-        </View>
-
-        {/* Content */}
-        {activeTab === "surahs" ? (
-          <FlatList
-            data={filteredSurahs}
-            keyExtractor={(item) => item.number.toString()}
-            renderItem={renderSurahItem}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ItemSeparatorComponent={() => <View style={{ height: SPACING.sm }} />}
-          />
-        ) : (
-          <FlatList
-            data={Array.from({ length: 30 }, (_, i) => i + 1)}
-            keyExtractor={(item) => item.toString()}
-            renderItem={renderJuzItem}
-            numColumns={3}
-            contentContainerStyle={styles.juzListContent}
-            showsVerticalScrollIndicator={false}
-            columnWrapperStyle={styles.juzRow}
-          />
-        )}
       </View>
-    </IslamicBackground>
+
+      {/* Theme Selector */}
+      {showThemes && (
+        <View style={styles.themesContainer}>
+          <Text style={styles.themesTitle}>المظهر</Text>
+          <View style={styles.themesRow}>
+            {themes.map((theme) => (
+              <TouchableOpacity
+                key={theme.key}
+                style={[
+                  styles.themeOption,
+                  selectedTheme === theme.key && styles.themeOptionActive,
+                  theme.key === 'dark' && styles.themeOptionDark,
+                ]}
+                onPress={() => setSelectedTheme(theme.key)}
+              >
+                <Text
+                  style={[
+                    styles.themeText,
+                    theme.key === 'dark' && styles.themeTextDark,
+                  ]}
+                >
+                  بِسْمِ اللَّهِ
+                </Text>
+                <Text
+                  style={[
+                    styles.themeLabel,
+                    selectedTheme === theme.key && styles.themeLabelActive,
+                  ]}
+                >
+                  {theme.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'read' && styles.tabActive]}
+          onPress={() => setActiveTab('read')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'read' && styles.tabTextActive,
+            ]}
+          >
+            القراءة
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'learn' && styles.tabActive]}
+          onPress={() => setActiveTab('learn')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'learn' && styles.tabTextActive,
+            ]}
+          >
+            التعلم
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'progress' && styles.tabActive]}
+          onPress={() => setActiveTab('progress')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'progress' && styles.tabTextActive,
+            ]}
+          >
+            تقدمي
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {activeTab === 'read' && (
+          <>
+            {/* Reading Goal */}
+            <View style={styles.goalCard}>
+              <View style={styles.goalInfo}>
+                <Ionicons name="time-outline" size={20} color={Colors.primary} />
+                <Text style={styles.goalText}>هدف القراءة: ٠/٥ دقائق</Text>
+              </View>
+              <View style={styles.goalProgress}>
+                <View style={[styles.goalBar, { width: '0%' }]} />
+              </View>
+            </View>
+
+            {/* Recents */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>القراءات الأخيرة</Text>
+                <Ionicons name="information-circle-outline" size={18} color={Colors.textMuted} />
+              </View>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={recents}
+                renderItem={renderRecentItem}
+                keyExtractor={(_, index) => index.toString()}
+                contentContainerStyle={styles.recentsList}
+              />
+            </View>
+
+            {/* Surah List */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>قائمة السور</Text>
+                <TouchableOpacity style={styles.viewToggle}>
+                  <Text style={styles.viewToggleText}>عرض: سورة</Text>
+                  <Ionicons name="chevron-down" size={16} color={Colors.primary} />
+                </TouchableOpacity>
+              </View>
+              {surahs.map((surah) => (
+                <View key={surah.number}>{renderSurahItem({ item: surah })}</View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {activeTab === 'learn' && (
+          <View style={styles.section}>
+            {/* Reciters */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>القراء</Text>
+              <TouchableOpacity>
+                <Text style={styles.seeAll}>عرض الكل</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.offlineNotice}>
+              <Ionicons name="wifi-outline" size={20} color={Colors.error} />
+              <Text style={styles.offlineText}>حمّل للاستماع بدون إنترنت</Text>
+            </View>
+            {reciters.map((reciter) => (
+              <View key={reciter.id}>{renderReciterItem({ item: reciter })}</View>
+            ))}
+          </View>
+        )}
+
+        {activeTab === 'progress' && (
+          <View style={styles.section}>
+            <View style={styles.progressCard}>
+              <Ionicons name="trophy" size={48} color={Colors.gold} />
+              <Text style={styles.progressTitle}>تقدمك في القراءة</Text>
+              <Text style={styles.progressStats}>٠ صفحة هذا الأسبوع</Text>
+              <View style={styles.progressDetails}>
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressNumber}>٠</Text>
+                  <Text style={styles.progressLabel}>ختمات</Text>
+                </View>
+                <View style={styles.progressDivider} />
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressNumber}>٠</Text>
+                  <Text style={styles.progressLabel}>صفحات</Text>
+                </View>
+                <View style={styles.progressDivider} />
+                <View style={styles.progressItem}>
+                  <Text style={styles.progressNumber}>٠</Text>
+                  <Text style={styles.progressLabel}>ساعات</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        <View style={{ height: Spacing.xxl }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: FONT_SIZES.md,
-    marginTop: 12,
-  },
-
-  // Header
   header: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
   },
-  title: {
-    fontSize: FONT_SIZES["3xl"],
-    fontWeight: "700",
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.text,
   },
-
-  // Search
-  searchContainer: {
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+  headerActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
-  searchCard: {
-    padding: 0,
+  headerBtn: {
+    padding: Spacing.xs,
   },
-  searchContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    gap: SPACING.sm,
+  themesContainer: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    elevation: 4,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: FONT_SIZES.md,
-    paddingVertical: 8,
+  themesTitle: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
-
-  // Tabs
-  tabsContainer: {
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
+  themesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
-  tabsCard: {
-    padding: 4,
+  themeOption: {
+    backgroundColor: Colors.background,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 90,
   },
-  tabsContent: {
-    flexDirection: "row",
+  themeOptionActive: {
+    borderColor: Colors.primary,
+  },
+  themeOptionDark: {
+    backgroundColor: Colors.primaryDark,
+  },
+  themeText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  themeTextDark: {
+    color: Colors.textLight,
+  },
+  themeLabel: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: Spacing.xs,
+  },
+  themeLabelActive: {
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  tabs: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
   },
   tab: {
     flex: 1,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surface,
+  },
+  tabActive: {
+    backgroundColor: Colors.primary,
   },
   tabText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textMuted,
   },
-
-  // Surah List
-  listContent: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: 120,
+  tabTextActive: {
+    color: Colors.textLight,
+  },
+  goalCard: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  goalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  goalText: {
+    fontSize: 14,
+    color: Colors.text,
+  },
+  goalProgress: {
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+  },
+  goalBar: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+  },
+  section: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  seeAll: {
+    fontSize: 14,
+    color: Colors.primary,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  viewToggleText: {
+    fontSize: 12,
+    color: Colors.primary,
+  },
+  recentsList: {
+    gap: Spacing.sm,
+  },
+  recentCard: {
+    backgroundColor: Colors.primaryDark,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  recentSurahArabic: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.accent,
+    marginBottom: 4,
+  },
+  recentSurah: {
+    fontSize: 12,
+    color: Colors.textLight,
+  },
+  recentAyah: {
+    fontSize: 12,
+    color: Colors.textLight,
+    opacity: 0.8,
+    marginTop: 4,
+  },
+  recentDate: {
+    fontSize: 10,
+    color: Colors.textLight,
+    opacity: 0.6,
+    marginTop: 4,
   },
   surahCard: {
-    padding: SPACING.md,
-  },
-  surahContent: {
-    flexDirection: "row",
-    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   surahNumber: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: SPACING.md,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
   },
   surahNumberText: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.textLight,
   },
   surahInfo: {
     flex: 1,
   },
+  surahNameArabic: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
   surahName: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: "600",
-    marginBottom: 2,
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   surahMeta: {
-    fontSize: FONT_SIZES.xs,
+    alignItems: 'flex-end',
   },
-  surahArabicName: {
-    fontSize: FONT_SIZES.arabic,
-    fontWeight: "500",
+  surahAyahCount: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
-
-  // Juz List
-  juzListContent: {
-    paddingHorizontal: SPACING.md,
-    paddingBottom: 120,
+  surahType: {
+    fontSize: 10,
+    color: Colors.primary,
+    marginTop: 2,
   },
-  juzRow: {
-    justifyContent: "space-between",
-    marginBottom: SPACING.sm,
+  offlineNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: '#FEE2E2',
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
   },
-  juzCard: {
-    width: "100%",
-    padding: SPACING.md,
-    alignItems: "center",
+  offlineText: {
+    fontSize: 14,
+    color: Colors.error,
   },
-  juzNumber: {
+  reciterCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  reciterAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: SPACING.xs,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
   },
-  juzNumberText: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: "700",
+  reciterInfo: {
+    flex: 1,
   },
-  juzTitle: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: "600",
+  reciterName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  reciterDownloaded: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  downloadBtn: {
+    padding: Spacing.sm,
+  },
+  progressCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  progressTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginTop: Spacing.md,
+  },
+  progressStats: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    marginTop: Spacing.xs,
+  },
+  progressDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  progressItem: {
+    alignItems: 'center',
+  },
+  progressNumber: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  progressDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
   },
 });
