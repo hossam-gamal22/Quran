@@ -1,0 +1,102 @@
+{
+  "folders": [
+    {
+      "name": "القرآن الكريم",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.wordWrap": "on",
+    "files.associations": {
+      "*.tsx": "typescriptreact",
+      "*.ts": "typescript"
+    },
+    "typescript.preferences.importModuleSpecifier": "non-relative",
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.unicodeHighlight.allowedLocales": {
+      "ar": true
+    },
+    "files.exclude": {
+      ".expo": true,
+      "node_modules": true,
+      "dist": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "expo.vscode-expo-tools",
+      "dsznajder.es7-react-js-snippets",
+      "bradlc.vscode-tailwindcss",
+      "ms-vscode.vscode-typescript-next"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Expo: Android",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/node_modules/expo/bin/cli",
+        "args": ["start", "--android"],
+        "console": "integratedTerminal"
+      },
+      {
+        "name": "Expo: iOS",
+        "type": "node",
+        "request": "launch",
+        "program": "${workspaceFolder}/node_modules/expo/bin/cli",
+        "args": ["start", "--ios"],
+        "console": "integratedTerminal"
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "تشغيل التطبيق (Dev)",
+        "type": "shell",
+        "command": "pnpm dev",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "panel": "new"
+        }
+      },
+      {
+        "label": "Android",
+        "type": "shell",
+        "command": "pnpm android",
+        "presentation": {
+          "panel": "new"
+        }
+      },
+      {
+        "label": "iOS",
+        "type": "shell",
+        "command": "pnpm ios",
+        "presentation": {
+          "panel": "new"
+        }
+      },
+      {
+        "label": "تثبيت المكتبات (pnpm install)",
+        "type": "shell",
+        "command": "pnpm install",
+        "presentation": {
+          "panel": "new"
+        }
+      }
+    ]
+  }
+}
