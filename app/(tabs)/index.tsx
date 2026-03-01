@@ -19,6 +19,8 @@ import * as Location from 'expo-location';
 import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
 import { fetchPrayerTimesByCoords, getNextPrayer, formatTime, PRAYER_NAMES } from '../../lib/prayer-api';
 import { useAppConfig } from '../../lib/app-config-context';
+import { useAds } from '../../lib/ads-context';
+import BannerAd from '../../components/ads/BannerAd';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -84,15 +86,13 @@ const DAILY_AZKAR = [
 export default function HomeScreen() {
   const router = useRouter();
   
-  // ============================================
-  // جلب إعدادات التطبيق من Firebase عبر Context
-  // ============================================
+  // جلب إعدادات التطبيق
   const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
   
-  // ============================================
-  // الحالات (States)
-  // ============================================
+  // جلب إعدادات الإعلانات
+  const { onPageView } = useAds();
   
+  // الحالات
   const [darkMode, setDarkMode] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState('');
@@ -112,41 +112,32 @@ export default function HomeScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  // الألوان حسب الوضع
   const currentColors = darkMode ? DarkColors : Colors;
 
-  // ============================================
-  // تحميل البيانات
-  // ============================================
+  // تسجيل مشاهدة الصفحة
+  useEffect(() => {
+    onPageView();
+  }, []);
 
   useEffect(() => {
     initializeApp();
   }, []);
 
-  // تحديث الصلاة التالية كل دقيقة
   useEffect(() => {
     const timer = setInterval(() => {
       if (prayerTimes) {
         setNextPrayer(getNextPrayer(prayerTimes.timings));
       }
     }, 60000);
-
     return () => clearInterval(timer);
   }, [prayerTimes]);
 
   const initializeApp = async () => {
     setIsLoading(true);
-    
-    // تحميل الإعدادات المحلية
     await loadSettings();
-    
-    // ضبط التحية
     setGreetingMessage();
-    
-    // تحميل البيانات
     await loadData();
     
-    // بدء الأنيميشن
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
@@ -233,10 +224,6 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refreshConfig]);
 
-  // ============================================
-  // المشاركة
-  // ============================================
-
   const getShareSignature = () => {
     return `\n\n📱 تطبيق ${appConfig.name}`;
   };
@@ -281,23 +268,15 @@ export default function HomeScreen() {
     }
   };
 
-  // ============================================
-  // فلترة الميزات حسب الإعدادات من الأدمن بانل
-  // ============================================
-
   const getEnabledFeatures = () => {
     if (!appConfig.features) return FEATURES;
-    
     return FEATURES.filter(feature => {
       const featureKey = feature.id as keyof typeof appConfig.features;
       return appConfig.features[featureKey] !== false;
     });
   };
 
-  // ============================================
   // شاشة التحميل
-  // ============================================
-
   if (isLoading || configLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: currentColors.background }]}>
@@ -309,10 +288,7 @@ export default function HomeScreen() {
     );
   }
 
-  // ============================================
   // شاشة الصيانة
-  // ============================================
-
   if (appConfig.maintenanceMode) {
     return (
       <View style={[styles.maintenanceContainer, { backgroundColor: currentColors.background }]}>
@@ -333,10 +309,7 @@ export default function HomeScreen() {
     );
   }
 
-  // ============================================
   // العرض الرئيسي
-  // ============================================
-
   return (
     <View style={[styles.container, { backgroundColor: currentColors.background }]}>
       {/* الهيدر */}
@@ -411,7 +384,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* بطاقة بديلة إذا لم تتوفر مواقيت الصلاة */}
+          {/* بطاقة بديلة */}
           {!nextPrayer && (
             <TouchableOpacity 
               style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
@@ -556,48 +529,14 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 120 }} />
         </Animated.View>
       </ScrollView>
-      // في أعلى الملف أضف:
-import BannerAd from '../../components/ads/BannerAd';
-import { useAds } from '../../lib/ads-context';
-
-// داخل المكون:
-export default function HomeScreen() {
-  const { onPageView } = useAds();
-  
-  // ... باقي الكود
-
-  // سجل مشاهدة الصفحة عند التحميل
-  useEffect(() => {
-    onPageView();
-  }, []);
-
-  return (
-    <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-      {/* ... كل المحتوى الموجود ... */}
 
       {/* البانر في الأسفل */}
       <View style={styles.bannerContainer}>
         <BannerAd screen="home" />
       </View>
-    </View>
-  );
-}
-
-// أضف للـ styles:
-const styles = StyleSheet.create({
-  // ... الأنماط الموجودة ...
-  
-  bannerContainer: {
-    position: 'absolute',
-    bottom: 80, // فوق التاب بار
-    left: 0,
-    right: 0,
-  },
-});
-
     </View>
   );
 }
@@ -619,8 +558,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: Typography.sizes.md,
   },
-  
-  // شاشة الصيانة
   maintenanceContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -649,8 +586,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: '600',
   },
-  
-  // الهيدر
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -676,8 +611,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.md,
   },
-  
-  // بطاقة الصلاة التالية
   nextPrayerCard: {
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
@@ -754,8 +687,6 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: 4,
   },
-  
-  // بطاقة آية اليوم
   verseCard: {
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
@@ -788,8 +719,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     textAlign: 'center',
   },
-  
-  // بطاقة ذكر اليوم
   zikrCard: {
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
@@ -819,8 +748,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     textAlign: 'center',
   },
-  
-  // قسم الميزات
   sectionTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: '600',
@@ -850,8 +777,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     textAlign: 'center',
   },
-  
-  // الأذكار السريعة
   azkarQuick: {
     gap: Spacing.sm,
   },
@@ -868,8 +793,6 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
-  
-  // معلومات التطبيق
   appInfoCard: {
     alignItems: 'center',
     padding: Spacing.lg,
@@ -883,5 +806,11 @@ const styles = StyleSheet.create({
   appInfoVersion: {
     fontSize: Typography.sizes.xs,
     marginTop: 4,
+  },
+  bannerContainer: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
+    right: 0,
   },
 });
