@@ -1,108 +1,197 @@
-// app/(tabs)/_layout.tsx
+import React, { useState, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, DarkColors, Spacing, Typography } from '../../constants/theme';
 
-type TabIconProps = {
+// ============================================
+// مكون أيقونة التاب
+// ============================================
+
+interface TabIconProps {
   name: keyof typeof Ionicons.glyphMap;
-  label: string;
   focused: boolean;
-};
+  label: string;
+  color: string;
+  darkMode: boolean;
+}
 
-function TabIcon({ name, label, focused }: TabIconProps) {
+const TabIcon = ({ name, focused, label, color, darkMode }: TabIconProps) => {
+  const currentColors = darkMode ? DarkColors : Colors;
+  
   return (
-    <View style={styles.tabItem}>
-      <Ionicons
-        name={name}
-        size={24}
-        color={focused ? Colors.primary : Colors.textMuted}
-      />
-      <Text
-        style={[
-          styles.tabLabel,
-          { color: focused ? Colors.primary : Colors.textMuted },
-        ]}
-      >
+    <View style={styles.tabIconContainer}>
+      <View style={[
+        styles.tabIconWrapper,
+        focused && { backgroundColor: currentColors.primary + '15' }
+      ]}>
+        <Ionicons 
+          name={focused ? name : `${name}-outline` as keyof typeof Ionicons.glyphMap} 
+          size={24} 
+          color={focused ? currentColors.primary : currentColors.textLight} 
+        />
+      </View>
+      <Text style={[
+        styles.tabLabel,
+        { color: focused ? currentColors.primary : currentColors.textLight }
+      ]}>
         {label}
       </Text>
     </View>
   );
-}
+};
+
+// ============================================
+// المكون الرئيسي
+// ============================================
 
 export default function TabsLayout() {
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const settings = await AsyncStorage.getItem('app_settings');
+      if (settings) {
+        const parsed = JSON.parse(settings);
+        setDarkMode(parsed.darkMode ?? false);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const currentColors = darkMode ? DarkColors : Colors;
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
         tabBarShowLabel: false,
+        tabBarStyle: {
+          backgroundColor: currentColors.surface,
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 85 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+          paddingTop: 10,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+        },
+        tabBarActiveTintColor: currentColors.primary,
+        tabBarInactiveTintColor: currentColors.textLight,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="today-outline" label="اليوم" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="prayers"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="moon-outline" label="الصلاة" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="quran"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="book-outline" label="القرآن" focused={focused} />
-          ),
-        }}
-      />
+      {/* تاب الأذكار */}
       <Tabs.Screen
         name="azkar"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="heart-outline" label="أذكار" focused={focused} />
+          title: 'الأذكار',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              name="leaf" 
+              focused={focused} 
+              label="الأذكار" 
+              color={color}
+              darkMode={darkMode}
+            />
           ),
         }}
       />
+
+      {/* تاب القرآن */}
       <Tabs.Screen
-        name="qibla"
+        name="quran"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="compass-outline" label="القبلة" focused={focused} />
+          title: 'القرآن',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              name="book" 
+              focused={focused} 
+              label="القرآن الكريم" 
+              color={color}
+              darkMode={darkMode}
+            />
           ),
+        }}
+      />
+
+      {/* تاب الصلاة */}
+      <Tabs.Screen
+        name="prayer"
+        options={{
+          title: 'الصلاة',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              name="time" 
+              focused={focused} 
+              label="الصلاة" 
+              color={color}
+              darkMode={darkMode}
+            />
+          ),
+        }}
+      />
+
+      {/* تاب الإعدادات */}
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'الإعدادات',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon 
+              name="settings" 
+              focused={focused} 
+              label="الإعدادات" 
+              color={color}
+              darkMode={darkMode}
+            />
+          ),
+        }}
+      />
+
+      {/* الصفحة الرئيسية - مخفية من التابز لكن موجودة */}
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null, // إخفاء من التابز
+        }}
+      />
+
+      {/* صفحة المزيد - مخفية */}
+      <Tabs.Screen
+        name="more"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
   );
 }
 
+// ============================================
+// الأنماط
+// ============================================
+
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: Colors.surface,
-    borderTopWidth: 0,
-    elevation: 10,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    height: 70,
-    paddingBottom: 8,
-    paddingTop: 8,
-  },
-  tabItem: {
+  tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    paddingTop: 5,
+  },
+  tabIconWrapper: {
+    padding: 8,
+    borderRadius: 12,
+    marginBottom: 2,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
 });

@@ -1,28 +1,31 @@
-// Prayer Times Service
-const _P = 'https://api.aladhan.com/v1';
+// ============================================
+// API مواقيت الصلاة
+// ============================================
+
+const ALADHAN_API_BASE = 'https://api.aladhan.com/v1';
+
+// ============================================
+// الأنواع
+// ============================================
 
 export interface PrayerTimes {
   Fajr: string;
   Sunrise: string;
   Dhuhr: string;
   Asr: string;
-  Sunset: string;
   Maghrib: string;
   Isha: string;
-  Imsak: string;
-  Midnight: string;
-  Firstthird: string;
-  Lastthird: string;
+  Imsak?: string;
+  Midnight?: string;
 }
 
-export interface PrayerTimesData {
+export interface PrayerTimesResponse {
   timings: PrayerTimes;
   date: {
     readable: string;
     timestamp: string;
     gregorian: {
       date: string;
-      format: string;
       day: string;
       weekday: { en: string };
       month: { number: number; en: string };
@@ -30,12 +33,11 @@ export interface PrayerTimesData {
     };
     hijri: {
       date: string;
-      format: string;
       day: string;
       weekday: { en: string; ar: string };
       month: { number: number; en: string; ar: string };
       year: string;
-      holidays: string[];
+      designation: { abbreviated: string; expanded: string };
     };
   };
   meta: {
@@ -49,134 +51,245 @@ export interface PrayerTimesData {
   };
 }
 
-export interface QiblaData {
-  latitude: number;
-  longitude: number;
-  bearing: number;
+export interface CalculationMethod {
+  id: number;
+  name: string;
+  nameAr: string;
+  params: {
+    Fajr: number;
+    Isha: number | string;
+  };
 }
 
-// Calculation methods
-export const CALCULATION_METHODS = [
-  { id: 1, name: 'University of Islamic Sciences, Karachi' },
-  { id: 2, name: 'Islamic Society of North America (ISNA)' },
-  { id: 3, name: 'Muslim World League' },
-  { id: 4, name: 'Umm Al-Qura University, Makkah' },
-  { id: 5, name: 'Egyptian General Authority of Survey' },
-  { id: 7, name: 'Institute of Geophysics, University of Tehran' },
-  { id: 8, name: 'Gulf Region' },
-  { id: 9, name: 'Kuwait' },
-  { id: 10, name: 'Qatar' },
-  { id: 11, name: 'Majlis Ugama Islam Singapura, Singapore' },
-  { id: 12, name: 'Union Organization islamic de France' },
-  { id: 13, name: 'Diyanet İşleri Başkanlığı, Turkey' },
-  { id: 14, name: 'Spiritual Administration of Muslims of Russia' },
+export interface Location {
+  latitude: number;
+  longitude: number;
+  city?: string;
+  country?: string;
+  timezone?: string;
+}
+
+// ============================================
+// طرق الحساب
+// ============================================
+
+export const CALCULATION_METHODS: CalculationMethod[] = [
+  { id: 0, name: 'Shia Ithna-Ansari', nameAr: 'شيعة إثنا عشرية', params: { Fajr: 16, Isha: 14 } },
+  { id: 1, name: 'University of Islamic Sciences, Karachi', nameAr: 'جامعة العلوم الإسلامية - كراتشي', params: { Fajr: 18, Isha: 18 } },
+  { id: 2, name: 'Islamic Society of North America', nameAr: 'الجمعية الإسلامية لأمريكا الشمالية', params: { Fajr: 15, Isha: 15 } },
+  { id: 3, name: 'Muslim World League', nameAr: 'رابطة العالم الإسلامي', params: { Fajr: 18, Isha: 17 } },
+  { id: 4, name: 'Umm Al-Qura University, Makkah', nameAr: 'جامعة أم القرى - مكة', params: { Fajr: 18.5, Isha: '90 min' } },
+  { id: 5, name: 'Egyptian General Authority of Survey', nameAr: 'الهيئة المصرية العامة للمساحة', params: { Fajr: 19.5, Isha: 17.5 } },
+  { id: 7, name: 'Institute of Geophysics, University of Tehran', nameAr: 'معهد الجيوفيزياء - طهران', params: { Fajr: 17.7, Isha: 14 } },
+  { id: 8, name: 'Gulf Region', nameAr: 'منطقة الخليج', params: { Fajr: 19.5, Isha: '90 min' } },
+  { id: 9, name: 'Kuwait', nameAr: 'الكويت', params: { Fajr: 18, Isha: 17.5 } },
+  { id: 10, name: 'Qatar', nameAr: 'قطر', params: { Fajr: 18, Isha: '90 min' } },
+  { id: 11, name: 'Majlis Ugama Islam Singapura', nameAr: 'سنغافورة', params: { Fajr: 20, Isha: 18 } },
+  { id: 12, name: 'Union Organization Islamic de France', nameAr: 'الاتحاد الإسلامي الفرنسي', params: { Fajr: 12, Isha: 12 } },
+  { id: 13, name: 'Diyanet İşleri Başkanlığı, Turkey', nameAr: 'رئاسة الشؤون الدينية التركية', params: { Fajr: 18, Isha: 17 } },
+  { id: 14, name: 'Spiritual Administration of Muslims of Russia', nameAr: 'الإدارة الروحية لمسلمي روسيا', params: { Fajr: 16, Isha: 15 } },
 ];
 
-// Fetch prayer times by coordinates
+// ============================================
+// أسماء الصلوات
+// ============================================
+
+export const PRAYER_NAMES: { [key: string]: { ar: string; en: string } } = {
+  Fajr: { ar: 'الفجر', en: 'Fajr' },
+  Sunrise: { ar: 'الشروق', en: 'Sunrise' },
+  Dhuhr: { ar: 'الظهر', en: 'Dhuhr' },
+  Asr: { ar: 'العصر', en: 'Asr' },
+  Maghrib: { ar: 'المغرب', en: 'Maghrib' },
+  Isha: { ar: 'العشاء', en: 'Isha' },
+  Imsak: { ar: 'الإمساك', en: 'Imsak' },
+  Midnight: { ar: 'منتصف الليل', en: 'Midnight' },
+};
+
+// ============================================
+// دوال API
+// ============================================
+
 export async function fetchPrayerTimesByCoords(
   latitude: number,
   longitude: number,
   method: number = 4,
-  date?: string
-): Promise<PrayerTimesData> {
-  const dateStr = date || new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
-  const response = await fetch(
-    `${_P}/timings/${dateStr}?latitude=${latitude}&longitude=${longitude}&method=${method}`
-  );
-  const data = await response.json();
-  if (data.code === 200) {
-    return data.data;
+  date?: Date
+): Promise<PrayerTimesResponse> {
+  try {
+    const dateStr = date 
+      ? `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`
+      : undefined;
+    
+    let url = `${ALADHAN_API_BASE}/timings`;
+    if (dateStr) {
+      url += `/${dateStr}`;
+    }
+    url += `?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.code === 200) {
+      return data.data;
+    }
+    throw new Error('Failed to fetch prayer times');
+  } catch (error) {
+    console.error('Error fetching prayer times:', error);
+    throw error;
   }
-  throw new Error('Failed to fetch prayer times');
 }
 
-// Fetch prayer times by city
 export async function fetchPrayerTimesByCity(
   city: string,
   country: string,
-  method: number = 4
-): Promise<PrayerTimesData> {
-  const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
-  const response = await fetch(
-    `${_P}/timingsByCity/${dateStr}?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${method}`
-  );
-  const data = await response.json();
-  if (data.code === 200) {
-    return data.data;
+  method: number = 4,
+  date?: Date
+): Promise<PrayerTimesResponse> {
+  try {
+    const dateStr = date 
+      ? `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`
+      : undefined;
+    
+    let url = `${ALADHAN_API_BASE}/timingsByCity`;
+    if (dateStr) {
+      url += `/${dateStr}`;
+    }
+    url += `?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${method}`;
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.code === 200) {
+      return data.data;
+    }
+    throw new Error('Failed to fetch prayer times');
+  } catch (error) {
+    console.error('Error fetching prayer times:', error);
+    throw error;
   }
-  throw new Error('Failed to fetch prayer times by city');
 }
 
-// Fetch Qibla direction
-export async function fetchQiblaDirection(
+export async function fetchMonthlyPrayerTimes(
   latitude: number,
-  longitude: number
-): Promise<QiblaData> {
-  const response = await fetch(`${_P}/qibla/${latitude}/${longitude}`);
-  const data = await response.json();
-  if (data.code === 200) {
-    return data.data;
+  longitude: number,
+  month: number,
+  year: number,
+  method: number = 4
+): Promise<PrayerTimesResponse[]> {
+  try {
+    const url = `${ALADHAN_API_BASE}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.code === 200) {
+      return data.data;
+    }
+    throw new Error('Failed to fetch monthly prayer times');
+  } catch (error) {
+    console.error('Error fetching monthly prayer times:', error);
+    throw error;
   }
-  throw new Error('Failed to fetch Qibla direction');
 }
 
-// Prayer names in Arabic
-export const PRAYER_NAMES_AR: Record<string, string> = {
-  Fajr: 'الفجر',
-  Sunrise: 'الشروق',
-  Dhuhr: 'الظهر',
-  Asr: 'العصر',
-  Maghrib: 'المغرب',
-  Isha: 'العشاء',
-};
+export async function fetchHijriDate(date?: Date): Promise<{
+  hijri: PrayerTimesResponse['date']['hijri'];
+  gregorian: PrayerTimesResponse['date']['gregorian'];
+}> {
+  try {
+    const dateStr = date 
+      ? `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`
+      : new Date().toLocaleDateString('en-GB').split('/').join('-');
+    
+    const url = `${ALADHAN_API_BASE}/gpiToH/${dateStr}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
 
-// Get next prayer
-export function getNextPrayer(timings: PrayerTimes): { name: string; time: string; arabicName: string } | null {
-  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    if (data.code === 200) {
+      return data.data;
+    }
+    throw new Error('Failed to fetch hijri date');
+  } catch (error) {
+    console.error('Error fetching hijri date:', error);
+    throw error;
+  }
+}
+
+// ============================================
+// مساعدات
+// ============================================
+
+export function formatTime(time: string, format: '12h' | '24h' = '12h'): string {
+  if (!time) return '';
+  
+  const [hours, minutes] = time.split(':').map(Number);
+  
+  if (format === '24h') {
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  }
+  
+  const period = hours >= 12 ? 'م' : 'ص';
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`;
+}
+
+export function getNextPrayer(prayerTimes: PrayerTimes): {
+  name: string;
+  time: string;
+  remaining: string;
+} | null {
   const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
+  const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
+  
   for (const prayer of prayers) {
-    const timeStr = timings[prayer as keyof PrayerTimes];
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    const prayerTimeInMinutes = hours * 60 + minutes;
-
-    if (prayerTimeInMinutes > currentTimeInMinutes) {
+    const [hours, minutes] = prayerTimes[prayer].split(':').map(Number);
+    const prayerTime = new Date(now);
+    prayerTime.setHours(hours, minutes, 0, 0);
+    
+    if (prayerTime > now) {
+      const diff = prayerTime.getTime() - now.getTime();
+      const hoursRemaining = Math.floor(diff / (1000 * 60 * 60));
+      const minutesRemaining = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
       return {
         name: prayer,
-        time: timeStr,
-        arabicName: PRAYER_NAMES_AR[prayer] || prayer,
+        time: prayerTimes[prayer],
+        remaining: hoursRemaining > 0 
+          ? `${hoursRemaining} ساعة و ${minutesRemaining} دقيقة`
+          : `${minutesRemaining} دقيقة`,
       };
     }
   }
-
-  // If all prayers have passed, next is Fajr tomorrow
+  
+  // إذا مرت كل الصلوات، الصلاة التالية هي الفجر
   return {
     name: 'Fajr',
-    time: timings.Fajr,
-    arabicName: 'الفجر',
+    time: prayerTimes.Fajr,
+    remaining: 'غداً',
   };
 }
 
-// Calculate time remaining until next prayer
-export function getTimeUntilPrayer(prayerTime: string): string {
-  const now = new Date();
-  const [hours, minutes] = prayerTime.split(':').map(Number);
-  const prayerDate = new Date();
-  prayerDate.setHours(hours, minutes, 0, 0);
+export function getPrayerIcon(prayerName: string): string {
+  const icons: { [key: string]: string } = {
+    Fajr: 'partly-sunny-outline',
+    Sunrise: 'sunny-outline',
+    Dhuhr: 'sunny',
+    Asr: 'sunny-outline',
+    Maghrib: 'cloudy-night-outline',
+    Isha: 'moon-outline',
+  };
+  return icons[prayerName] || 'time-outline';
+}
 
-  if (prayerDate < now) {
-    prayerDate.setDate(prayerDate.getDate() + 1);
-  }
-
-  const diffMs = prayerDate.getTime() - now.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-  if (diffHours > 0) {
-    return `${diffHours}س ${diffMinutes}د`;
-  }
-  return `${diffMinutes} دقيقة`;
+export function getPrayerColor(prayerName: string): string {
+  const colors: { [key: string]: string } = {
+    Fajr: '#6366F1',
+    Sunrise: '#F59E0B',
+    Dhuhr: '#EAB308',
+    Asr: '#F97316',
+    Maghrib: '#EC4899',
+    Isha: '#8B5CF6',
+  };
+  return colors[prayerName] || '#059669';
 }

@@ -1,493 +1,633 @@
-// app/(tabs)/qibla.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
+  Animated,
+  Alert,
   Dimensions,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius } from '../../constants/theme';
+import { useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import { Magnetometer } from 'expo-sensors';
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../constants/theme';
+import { APP_CONFIG } from '../constants/app';
+import { Share } from 'react-native';
+import { copyToClipboard } from '../lib/share-service';
 
-const { width } = Dimensions.get('window');
-const COMPASS_SIZE = width * 0.75;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const COMPASS_SIZE = SCREEN_WIDTH * 0.75;
 
-type CompassStyle = 'default' | 'modern' | 'classic' | 'minimal';
+// إحداثيات الكعبة المشرفة
+const KAABA_LATITUDE = 21.4225;
+const KAABA_LONGITUDE = 39.8262;
 
-interface CompassStyleOption {
-  id: CompassStyle;
-  icon: string;
-}
+// ============================================
+// المكون الرئيسي
+// ============================================
 
 export default function QiblaScreen() {
-  const [qiblaDirection, setQiblaDirection] = useState(292);
-  const [currentHeading, setCurrentHeading] = useState(0);
-  const [isFacingQibla, setIsFacingQibla] = useState(false);
-  const [selectedStyle, setSelectedStyle] = useState<CompassStyle>('default');
-  const [locationName, setLocationName] = useState('القاهرة، مصر');
+  const router = useRouter();
+  
+  // الحالات
+  const [loading, setLoading] = useState(true);
+  const [hasPermission, setHasPermission] = useState(false);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; city?: string } | null>(null);
+  const [qiblaDirection, setQiblaDirection] = useState(0);
+  const [compassHeading, setCompassHeading] = useState(0);
+  const [accuracy, setAccuracy] = useState<'low' | 'medium' | 'high'>('low');
+  const [showShareModal, setShowShareModal] = useState(false);
+  
+  // الأنيميشن
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const qiblaRotateAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const compassStyles: CompassStyleOption[] = [
-    { id: 'default', icon: 'compass' },
-    { id: 'modern', icon: 'navigate' },
-    { id: 'classic', icon: 'compass-outline' },
-    { id: 'minimal', icon: 'locate' },
-  ];
+  // ============================================
+  // حساب اتجاه القبلة
+  // ============================================
+
+  const calculateQiblaDirection = (latitude: number, longitude: number): number => {
+    const lat1 = (latitude * Math.PI) / 180;
+    const lat2 = (KAABA_LATITUDE * Math.PI) / 180;
+    const lonDiff = ((KAABA_LONGITUDE - longitude) * Math.PI) / 180;
+
+    const y = Math.sin(lonDiff);
+    const x = Math.cos(lat1) * Math.tan(lat2) - Math.sin(lat1) * Math.cos(lonDiff);
+
+    let qibla = (Math.atan2(y, x) * 180) / Math.PI;
+    qibla = (qibla + 360) % 360;
+
+    return qibla;
+  };
+
+  const calculateDistance = (latitude: number, longitude: number): number => {
+    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const lat1 = (latitude * Math.PI) / 180;
+    const lat2 = (KAABA_LATITUDE * Math.PI) / 180;
+    const dLat = lat2 - lat1;
+    const dLon = ((KAABA_LONGITUDE - longitude) * Math.PI) / 180;
+
+    const a = Math.sin(dLat / 2) ** 2 + 
+              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
+
+  // ============================================
+  // تحميل البيانات
+  // ============================================
 
   useEffect(() => {
-    // Simulate compass movement for demo
-    const interval = setInterval(() => {
-      setCurrentHeading((prev) => {
-        const newHeading = (prev + Math.random() * 2 - 1) % 360;
-        const diff = Math.abs(newHeading - qiblaDirection);
-        setIsFacingQibla(diff < 5 || diff > 355);
-        return newHeading;
-      });
-    }, 100);
+    let magnetometerSubscription: any;
 
-    return () => clearInterval(interval);
-  }, [qiblaDirection]);
+    const initializeQibla = async () => {
+      try {
+        // طلب إذن الموقع
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('خطأ', 'يرجى السماح بالوصول إلى الموقع لتحديد اتجاه القبلة');
+          setLoading(false);
+          return;
+        }
+        setHasPermission(true);
 
-  const getRotation = () => {
-    return `${-currentHeading}deg`;
+        // الحصول على الموقع
+        const loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        const { latitude, longitude } = loc.coords;
+
+        // الحصول على اسم المدينة
+        const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const city = address?.city || address?.region || 'موقعك';
+
+        setLocation({ latitude, longitude, city });
+
+        // حساب اتجاه القبلة
+        const qibla = calculateQiblaDirection(latitude, longitude);
+        setQiblaDirection(qibla);
+
+        // الاشتراك في بوصلة المغناطيسية
+        const isAvailable = await Magnetometer.isAvailableAsync();
+        if (isAvailable) {
+          Magnetometer.setUpdateInterval(100);
+          
+          magnetometerSubscription = Magnetometer.addListener((data) => {
+            let heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
+            heading = (heading + 360) % 360;
+            
+            setCompassHeading(heading);
+            
+            // تحديث دقة البوصلة
+            const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
+            if (magnitude > 45) {
+              setAccuracy('high');
+            } else if (magnitude > 25) {
+              setAccuracy('medium');
+            } else {
+              setAccuracy('low');
+            }
+          });
+        } else {
+          Alert.alert('تنبيه', 'البوصلة غير متوفرة على هذا الجهاز');
+        }
+
+        setLoading(false);
+        startPulseAnimation();
+
+      } catch (error) {
+        console.error('Error initializing qibla:', error);
+        Alert.alert('خطأ', 'حدث خطأ أثناء تحديد اتجاه القبلة');
+        setLoading(false);
+      }
+    };
+
+    initializeQibla();
+
+    return () => {
+      if (magnetometerSubscription) {
+        magnetometerSubscription.remove();
+      }
+    };
+  }, []);
+
+  // تحديث الأنيميشن عند تغير اتجاه البوصلة
+  useEffect(() => {
+    Animated.timing(rotateAnim, {
+      toValue: -compassHeading,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.timing(qiblaRotateAnim, {
+      toValue: qiblaDirection - compassHeading,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  }, [compassHeading, qiblaDirection]);
+
+  const startPulseAnimation = () => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   };
 
-  const getQiblaRotation = () => {
-    return `${qiblaDirection - currentHeading}deg`;
+  // ============================================
+  // المشاركة
+  // ============================================
+
+  const formatQiblaForShare = () => {
+    if (!location) return '';
+    
+    const distance = calculateDistance(location.latitude, location.longitude);
+    
+    let shareText = `🕋 اتجاه القبلة\n\n`;
+    shareText += `📍 الموقع: ${location.city}\n`;
+    shareText += `🧭 الاتجاه: ${Math.round(qiblaDirection)}°\n`;
+    shareText += `📏 المسافة إلى الكعبة: ${Math.round(distance)} كم\n\n`;
+    shareText += `${APP_CONFIG.getShareSignature()}`;
+    
+    return shareText;
   };
+
+  const handleShare = async () => {
+    try {
+      const shareText = formatQiblaForShare();
+      await Share.share({ message: shareText });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    }
+  };
+
+  const handleCopy = async () => {
+    const shareText = formatQiblaForShare();
+    await copyToClipboard(shareText);
+    Alert.alert('تم النسخ', 'تم نسخ معلومات القبلة');
+  };
+
+  // ============================================
+  // حساب ما إذا كان المستخدم يواجه القبلة
+  // ============================================
+
+  const qiblaOffset = Math.abs(((qiblaDirection - compassHeading + 180) % 360) - 180);
+  const isFacingQibla = qiblaOffset < 5;
+  const isCloseToQibla = qiblaOffset < 15;
+
+  // ============================================
+  // العرض
+  // ============================================
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="compass-outline" size={48} color={Colors.primary} />
+        <Text style={styles.loadingText}>جاري تحديد اتجاه القبلة...</Text>
+      </View>
+    );
+  }
+
+  const rotateInterpolate = rotateAnim.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['-360deg', '360deg'],
+  });
+
+  const qiblaRotateInterpolate = qiblaRotateAnim.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ['-360deg', '360deg'],
+  });
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <View style={styles.container}>
+      {/* الهيدر */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn}>
-          <Ionicons name="location-outline" size={24} color={Colors.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-forward" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>القبلة: {qiblaDirection}°</Text>
-          <Text style={styles.headerSubtitle}>{locationName}</Text>
-        </View>
-        <TouchableOpacity style={styles.headerBtn}>
-          <Ionicons name="settings-outline" size={24} color={Colors.text} />
+        
+        <Text style={styles.headerTitle}>اتجاه القبلة</Text>
+        
+        <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
+          <Ionicons name="share-outline" size={24} color={Colors.text} />
         </TouchableOpacity>
       </View>
 
-      {/* Map Preview */}
-      <View style={styles.mapContainer}>
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map" size={48} color={Colors.textMuted} />
-          <Text style={styles.mapText}>خريطة اتجاه القبلة</Text>
-          <View style={styles.mapLine} />
-          <View style={styles.kaabaIcon}>
-            <Text style={styles.kaabaEmoji}>🕋</Text>
-          </View>
-          <View style={styles.userIcon}>
-            <Ionicons name="person-circle" size={32} color={Colors.primary} />
-          </View>
-        </View>
-      </View>
-
-      {/* Compass */}
-      <View style={styles.compassContainer}>
-        <View
-          style={[
-            styles.compass,
-            isFacingQibla && styles.compassFacingQibla,
-          ]}
-        >
-          {/* Compass Rose */}
-          <View
-            style={[
-              styles.compassRose,
-              { transform: [{ rotate: getRotation() }] },
-            ]}
-          >
-            {/* Cardinal Directions */}
-            <Text style={[styles.direction, styles.directionN]}>N</Text>
-            <Text style={[styles.direction, styles.directionE]}>E</Text>
-            <Text style={[styles.direction, styles.directionS]}>S</Text>
-            <Text style={[styles.direction, styles.directionW]}>W</Text>
-
-            {/* Compass Ticks */}
-            {[...Array(72)].map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.tick,
-                  i % 6 === 0 ? styles.tickMajor : styles.tickMinor,
-                  {
-                    transform: [
-                      { rotate: `${i * 5}deg` },
-                      { translateY: -COMPASS_SIZE / 2 + 20 },
-                    ],
-                  },
-                ]}
-              />
-            ))}
-
-            {/* Qibla Indicator */}
-            <View
-              style={[
-                styles.qiblaIndicator,
-                {
-                  transform: [
-                    { rotate: `${qiblaDirection}deg` },
-                    { translateY: -COMPASS_SIZE / 2 + 40 },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.kaabaSmall}>🕋</Text>
-            </View>
-          </View>
-
-          {/* Center Needle */}
-          <View style={styles.needleContainer}>
-            <View style={styles.needle}>
-              <View style={styles.needleTop} />
-              <View style={styles.needleBottom} />
-            </View>
-            <View style={styles.needleCenter} />
-          </View>
-        </View>
-
-        {/* Status Text */}
-        <View style={styles.statusContainer}>
-          {isFacingQibla ? (
-            <View style={styles.statusSuccess}>
-              <Ionicons name="checkmark-circle" size={24} color={Colors.success} />
-              <Text style={styles.statusTextSuccess}>أنت تواجه القبلة الآن</Text>
-            </View>
-          ) : (
-            <Text style={styles.statusText}>
-              أدر هاتفك حتى يشير السهم إلى الكعبة
+      <View style={styles.content}>
+        {/* معلومات الموقع */}
+        <View style={styles.locationCard}>
+          <Ionicons name="location" size={20} color={Colors.primary} />
+          <Text style={styles.locationText}>{location?.city || 'موقعك'}</Text>
+          {location && (
+            <Text style={styles.distanceText}>
+              {Math.round(calculateDistance(location.latitude, location.longitude))} كم من الكعبة
             </Text>
           )}
         </View>
-      </View>
 
-      {/* Compass Style Selector */}
-      <View style={styles.styleSelector}>
-        {compassStyles.map((style) => (
-          <TouchableOpacity
-            key={style.id}
+        {/* البوصلة */}
+        <View style={styles.compassContainer}>
+          {/* خلفية البوصلة */}
+          <Animated.View 
             style={[
-              styles.styleOption,
-              selectedStyle === style.id && styles.styleOptionActive,
+              styles.compassBackground,
+              { transform: [{ rotate: rotateInterpolate }] }
             ]}
-            onPress={() => setSelectedStyle(style.id)}
           >
-            <Ionicons
-              name={style.icon as any}
-              size={24}
-              color={selectedStyle === style.id ? Colors.textLight : Colors.text}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
+            {/* علامات الاتجاهات */}
+            <View style={styles.directionMarkers}>
+              <Text style={[styles.directionText, styles.northText]}>ش</Text>
+              <Text style={[styles.directionText, styles.eastText]}>شر</Text>
+              <Text style={[styles.directionText, styles.southText]}>ج</Text>
+              <Text style={[styles.directionText, styles.westText]}>غ</Text>
+            </View>
+            
+            {/* الدوائر */}
+            <View style={styles.compassCircle} />
+            <View style={[styles.compassCircle, { width: COMPASS_SIZE * 0.7, height: COMPASS_SIZE * 0.7 }]} />
+            <View style={[styles.compassCircle, { width: COMPASS_SIZE * 0.4, height: COMPASS_SIZE * 0.4 }]} />
+          </Animated.View>
 
-      {/* Info Card */}
-      <View style={styles.infoCard}>
-        <View style={styles.infoRow}>
-          <View style={styles.infoItem}>
-            <Ionicons name="compass" size={20} color={Colors.primary} />
-            <Text style={styles.infoLabel}>الاتجاه</Text>
-            <Text style={styles.infoValue}>{Math.round(currentHeading)}°</Text>
-          </View>
-          <View style={styles.infoDivider} />
-          <View style={styles.infoItem}>
-            <Ionicons name="navigate" size={20} color={Colors.primary} />
-            <Text style={styles.infoLabel}>القبلة</Text>
-            <Text style={styles.infoValue}>{qiblaDirection}°</Text>
-          </View>
-          <View style={styles.infoDivider} />
-          <View style={styles.infoItem}>
-            <Ionicons name="airplane" size={20} color={Colors.primary} />
-            <Text style={styles.infoLabel}>المسافة</Text>
-            <Text style={styles.infoValue}>٣٬٥٠٠ كم</Text>
+          {/* سهم القبلة */}
+          <Animated.View 
+            style={[
+              styles.qiblaArrowContainer,
+              { 
+                transform: [
+                  { rotate: qiblaRotateInterpolate },
+                  { scale: pulseAnim }
+                ] 
+              }
+            ]}
+          >
+            <View style={[
+              styles.qiblaArrow,
+              isFacingQibla && styles.qiblaArrowActive,
+              isCloseToQibla && !isFacingQibla && styles.qiblaArrowClose,
+            ]}>
+              <Ionicons 
+                name="caret-up" 
+                size={60} 
+                color={isFacingQibla ? Colors.success : isCloseToQibla ? Colors.warning : Colors.primary} 
+              />
+            </View>
+            
+            {/* أيقونة الكعبة */}
+            <View style={styles.kaabaIcon}>
+              <Text style={styles.kaabaEmoji}>🕋</Text>
+            </View>
+          </Animated.View>
+
+          {/* مؤشر الاتجاه الثابت */}
+          <View style={styles.fixedIndicator}>
+            <Ionicons name="navigate" size={24} color={Colors.error} />
           </View>
         </View>
-      </View>
 
-      {/* Calibration Notice */}
-      <TouchableOpacity style={styles.calibrationNotice}>
-        <Ionicons name="information-circle" size={20} color={Colors.primary} />
-        <Text style={styles.calibrationText}>
-          حرّك هاتفك بشكل ∞ لمعايرة البوصلة
-        </Text>
-      </TouchableOpacity>
-    </SafeAreaView>
+        {/* معلومات الاتجاه */}
+        <View style={[
+          styles.directionCard,
+          isFacingQibla && styles.directionCardSuccess,
+        ]}>
+          {isFacingQibla ? (
+            <>
+              <Ionicons name="checkmark-circle" size={32} color={Colors.success} />
+              <Text style={styles.directionCardTitle}>أنت تواجه القبلة!</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.directionDegree}>{Math.round(qiblaDirection)}°</Text>
+              <Text style={styles.directionCardText}>
+                {qiblaOffset < 90 
+                  ? `أدر ${Math.round(qiblaOffset)}° ${qiblaDirection > compassHeading ? 'يميناً' : 'يساراً'}`
+                  : `القبلة خلفك، أدر ${Math.round(180 - qiblaOffset)}°`
+                }
+              </Text>
+            </>
+          )}
+        </View>
+
+        {/* دقة البوصلة */}
+        <View style={styles.accuracyCard}>
+          <Text style={styles.accuracyLabel}>دقة البوصلة:</Text>
+          <View style={styles.accuracyIndicator}>
+            <View style={[styles.accuracyDot, accuracy !== 'low' && styles.accuracyDotActive]} />
+            <View style={[styles.accuracyDot, accuracy === 'high' && styles.accuracyDotActive]} />
+            <View style={[styles.accuracyDot, accuracy === 'high' && styles.accuracyDotActive]} />
+          </View>
+          <Text style={styles.accuracyText}>
+            {accuracy === 'high' ? 'ممتازة' : accuracy === 'medium' ? 'جيدة' : 'ضعيفة'}
+          </Text>
+        </View>
+
+        {accuracy === 'low' && (
+          <View style={styles.calibrationTip}>
+            <Ionicons name="information-circle" size={20} color={Colors.warning} />
+            <Text style={styles.calibrationText}>
+              حرّك هاتفك بشكل رقم 8 لمعايرة البوصلة
+            </Text>
+          </View>
+        )}
+
+        {/* أزرار الإجراءات */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+            <Ionicons name="share-outline" size={22} color={Colors.primary} />
+            <Text style={styles.actionButtonText}>مشاركة</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
+            <Ionicons name="copy-outline" size={22} color={Colors.secondary} />
+            <Text style={styles.actionButtonText}>نسخ</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
 }
+
+// ============================================
+// الأنماط
+// ============================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    fontSize: Typography.sizes.md,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
+  },
   header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.xl + 20,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    ...Shadows.sm,
   },
-  headerBtn: {
-    padding: Spacing.xs,
-  },
-  headerCenter: {
-    alignItems: 'center',
+  backButton: {
+    padding: Spacing.sm,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: Typography.sizes.xl,
+    fontWeight: '700',
     color: Colors.text,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
+  headerButton: {
+    padding: Spacing.sm,
   },
-  mapContainer: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  mapPlaceholder: {
-    height: 120,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    justifyContent: 'center',
+  content: {
+    flex: 1,
     alignItems: 'center',
-    position: 'relative',
-    overflow: 'hidden',
+    paddingHorizontal: Spacing.md,
   },
-  mapText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: Spacing.xs,
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+    ...Shadows.sm,
   },
-  mapLine: {
-    position: 'absolute',
-    width: 2,
-    height: '100%',
-    backgroundColor: Colors.accent,
-    opacity: 0.5,
-    transform: [{ rotate: '45deg' }],
+  locationText: {
+    fontSize: Typography.sizes.md,
+    fontWeight: '600',
+    color: Colors.text,
   },
-  kaabaIcon: {
-    position: 'absolute',
-    top: 20,
-    right: 40,
-  },
-  kaabaEmoji: {
-    fontSize: 24,
-  },
-  userIcon: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
+  distanceText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textLight,
+    marginLeft: 'auto',
   },
   compassContainer: {
+    width: COMPASS_SIZE,
+    height: COMPASS_SIZE,
+    marginTop: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: Spacing.md,
   },
-  compass: {
+  compassBackground: {
+    width: COMPASS_SIZE,
+    height: COMPASS_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+  },
+  compassCircle: {
     width: COMPASS_SIZE,
     height: COMPASS_SIZE,
     borderRadius: COMPASS_SIZE / 2,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    borderWidth: 4,
+    borderWidth: 1,
     borderColor: Colors.border,
-  },
-  compassFacingQibla: {
-    borderColor: Colors.success,
-    borderWidth: 4,
-  },
-  compassRose: {
-    width: '100%',
-    height: '100%',
     position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  direction: {
+  directionMarkers: {
+    width: COMPASS_SIZE,
+    height: COMPASS_SIZE,
     position: 'absolute',
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.text,
   },
-  directionN: {
-    top: 30,
+  directionText: {
+    position: 'absolute',
+    fontSize: Typography.sizes.lg,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  northText: {
+    top: 10,
+    left: COMPASS_SIZE / 2 - 10,
     color: Colors.error,
   },
-  directionE: {
-    right: 30,
+  eastText: {
+    right: 10,
+    top: COMPASS_SIZE / 2 - 12,
   },
-  directionS: {
-    bottom: 30,
+  southText: {
+    bottom: 10,
+    left: COMPASS_SIZE / 2 - 8,
   },
-  directionW: {
-    left: 30,
+  westText: {
+    left: 10,
+    top: COMPASS_SIZE / 2 - 12,
   },
-  tick: {
-    position: 'absolute',
-    width: 2,
-    backgroundColor: Colors.textMuted,
-  },
-  tickMajor: {
-    height: 15,
-    backgroundColor: Colors.text,
-  },
-  tickMinor: {
-    height: 8,
-  },
-  qiblaIndicator: {
-    position: 'absolute',
-  },
-  kaabaSmall: {
-    fontSize: 28,
-  },
-  needleContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+  qiblaArrowContainer: {
+    alignItems: 'center',
     justifyContent: 'center',
+  },
+  qiblaArrow: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  needle: {
-    alignItems: 'center',
+  qiblaArrowActive: {
+    // تأثير عند مواجهة القبلة
   },
-  needleTop: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 60,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: Colors.primary,
+  qiblaArrowClose: {
+    // تأثير عند الاقتراب
   },
-  needleBottom: {
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderTopWidth: 60,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: Colors.textMuted,
+  kaabaIcon: {
+    marginTop: -10,
   },
-  needleCenter: {
+  kaabaEmoji: {
+    fontSize: 40,
+  },
+  fixedIndicator: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: 0,
+  },
+  directionCard: {
     backgroundColor: Colors.surface,
-    borderWidth: 3,
-    borderColor: Colors.primary,
-  },
-  statusContainer: {
-    marginTop: Spacing.lg,
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
-  statusSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    backgroundColor: '#E8F5E9',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
+    marginTop: Spacing.xl,
+    alignItems: 'center',
+    minWidth: 200,
+    ...Shadows.sm,
   },
-  statusTextSuccess: {
-    fontSize: 14,
-    fontWeight: '600',
+  directionCardSuccess: {
+    backgroundColor: Colors.success + '10',
+    borderColor: Colors.success,
+    borderWidth: 2,
+  },
+  directionCardTitle: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: '700',
     color: Colors.success,
+    marginTop: Spacing.sm,
   },
-  styleSelector: {
+  directionDegree: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  directionCardText: {
+    fontSize: Typography.sizes.md,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+  },
+  accuracyCard: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.md,
-    marginVertical: Spacing.md,
-  },
-  styleOption: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
   },
-  styleOptionActive: {
-    backgroundColor: Colors.primary,
+  accuracyLabel: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textLight,
   },
-  infoCard: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    elevation: 2,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  infoRow: {
+  accuracyIndicator: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
+    gap: 4,
   },
-  infoItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 4,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 2,
-  },
-  infoDivider: {
-    width: 1,
-    height: 40,
+  accuracyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: Colors.border,
   },
-  calibrationNotice: {
+  accuracyDotActive: {
+    backgroundColor: Colors.success,
+  },
+  accuracyText: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+  },
+  calibrationTip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-    marginHorizontal: Spacing.md,
+    backgroundColor: Colors.warning + '10',
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
   },
   calibrationText: {
-    fontSize: 12,
-    color: Colors.primary,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.lg,
+    marginTop: Spacing.xl,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+    ...Shadows.sm,
+  },
+  actionButtonText: {
+    fontSize: Typography.sizes.md,
+    color: Colors.text,
   },
 });
