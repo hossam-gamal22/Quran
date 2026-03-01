@@ -18,47 +18,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
 import { fetchPrayerTimesByCoords, getNextPrayer, formatTime, PRAYER_NAMES } from '../../lib/prayer-api';
+import { useAppConfig } from '../../lib/app-config-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ============================================
-// إعدادات التطبيق من السيرفر
-// ============================================
-
-const API_BASE_URL = 'https://your-admin-panel-api.com'; // ← ضع رابط API الخاص بك
-
-interface AppConfig {
-  name: string;
-  nameEn: string;
-  description: string;
-  version: string;
-  primaryColor: string;
-  contact: {
-    email: string;
-    website: string;
-  };
-  downloadLinks: {
-    android: string;
-    ios: string;
-  };
-}
-
-// القيم الافتراضية (تُستخدم إذا فشل الاتصال بالسيرفر)
-const DEFAULT_APP_CONFIG: AppConfig = {
-  name: 'رُوح المسلم',
-  nameEn: 'Rooh Al-Muslim',
-  description: 'تطبيق إسلامي شامل للقرآن والأذكار والصلاة',
-  version: '1.0.0',
-  primaryColor: '#1B4332',
-  contact: {
-    email: 'hossamgamal290@gmail.com',
-    website: '',
-  },
-  downloadLinks: {
-    android: '',
-    ios: '',
-  },
-};
 
 // ============================================
 // أيقونات الميزات
@@ -70,7 +32,6 @@ interface Feature {
   icon: string;
   color: string;
   route: string;
-  description?: string;
 }
 
 const FEATURES: Feature[] = [
@@ -124,17 +85,15 @@ export default function HomeScreen() {
   const router = useRouter();
   
   // ============================================
+  // جلب إعدادات التطبيق من Firebase عبر Context
+  // ============================================
+  const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
+  
+  // ============================================
   // الحالات (States)
   // ============================================
   
-  // إعدادات التطبيق من السيرفر
-  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
-  const [configLoading, setConfigLoading] = useState(true);
-  
-  // الوضع الداكن
   const [darkMode, setDarkMode] = useState(false);
-  
-  // حالات عامة
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -157,64 +116,6 @@ export default function HomeScreen() {
   const currentColors = darkMode ? DarkColors : Colors;
 
   // ============================================
-  // جلب إعدادات التطبيق من السيرفر
-  // ============================================
-
-  const fetchAppConfig = useCallback(async () => {
-    try {
-      setConfigLoading(true);
-      
-      // أولاً: حاول جلب من السيرفر
-      const response = await fetch(`${API_BASE_URL}/api/app-config`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // timeout بعد 5 ثواني
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        
-        // حفظ في AsyncStorage للاستخدام offline
-        await AsyncStorage.setItem('remote_app_config', JSON.stringify(data));
-        
-        setAppConfig({
-          ...DEFAULT_APP_CONFIG,
-          ...data,
-        });
-        
-        console.log('✅ تم جلب إعدادات التطبيق من السيرفر');
-        return;
-      }
-    } catch (error) {
-      console.log('⚠️ فشل الاتصال بالسيرفر، جاري استخدام النسخة المحفوظة...');
-    }
-    
-    // ثانياً: حاول القراءة من AsyncStorage (النسخة المحفوظة)
-    try {
-      const cached = await AsyncStorage.getItem('remote_app_config');
-      if (cached) {
-        const data = JSON.parse(cached);
-        setAppConfig({
-          ...DEFAULT_APP_CONFIG,
-          ...data,
-        });
-        console.log('✅ تم استخدام إعدادات التطبيق المحفوظة');
-        return;
-      }
-    } catch (error) {
-      console.log('⚠️ فشل قراءة الإعدادات المحفوظة');
-    }
-    
-    // ثالثاً: استخدم القيم الافتراضية
-    setAppConfig(DEFAULT_APP_CONFIG);
-    console.log('ℹ️ تم استخدام الإعدادات الافتراضية');
-    
-    setConfigLoading(false);
-  }, []);
-
-  // ============================================
   // تحميل البيانات
   // ============================================
 
@@ -235,9 +136,6 @@ export default function HomeScreen() {
 
   const initializeApp = async () => {
     setIsLoading(true);
-    
-    // جلب إعدادات التطبيق من السيرفر
-    await fetchAppConfig();
     
     // تحميل الإعدادات المحلية
     await loadSettings();
@@ -284,15 +182,9 @@ export default function HomeScreen() {
 
   const loadData = async () => {
     try {
-      // تحميل مواقيت الصلاة
       await loadPrayerTimes();
-      
-      // تحميل آية اليوم
       loadDailyVerse();
-      
-      // تحميل ذكر اليوم
       loadDailyZikr();
-
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -309,11 +201,9 @@ export default function HomeScreen() {
         });
         const { latitude, longitude } = loc.coords;
         
-        // الحصول على اسم المدينة
         const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
         setLocation(address?.city || address?.region || address?.country || '');
 
-        // جلب مواقيت الصلاة
         const data = await fetchPrayerTimesByCoords(latitude, longitude);
         if (data) {
           setPrayerTimes(data);
@@ -336,11 +226,12 @@ export default function HomeScreen() {
     setDailyZikr(DAILY_AZKAR[dayOfYear % DAILY_AZKAR.length]);
   };
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    fetchAppConfig(); // تحديث إعدادات التطبيق
-    loadData();
-  }, [fetchAppConfig]);
+    await refreshConfig();
+    await loadData();
+    setRefreshing(false);
+  }, [refreshConfig]);
 
   // ============================================
   // المشاركة
@@ -352,7 +243,7 @@ export default function HomeScreen() {
 
   const getShareWithDownload = () => {
     let signature = `\n\n📱 تطبيق ${appConfig.name}`;
-    if (appConfig.downloadLinks.android) {
+    if (appConfig.downloadLinks?.android) {
       signature += `\n📥 حمّل التطبيق: ${appConfig.downloadLinks.android}`;
     }
     return signature;
@@ -391,16 +282,53 @@ export default function HomeScreen() {
   };
 
   // ============================================
+  // فلترة الميزات حسب الإعدادات من الأدمن بانل
+  // ============================================
+
+  const getEnabledFeatures = () => {
+    if (!appConfig.features) return FEATURES;
+    
+    return FEATURES.filter(feature => {
+      const featureKey = feature.id as keyof typeof appConfig.features;
+      return appConfig.features[featureKey] !== false;
+    });
+  };
+
+  // ============================================
   // شاشة التحميل
   // ============================================
 
-  if (isLoading) {
+  if (isLoading || configLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: currentColors.background }]}>
         <ActivityIndicator size="large" color={currentColors.primary} />
         <Text style={[styles.loadingText, { color: currentColors.textLight }]}>
           جاري التحميل...
         </Text>
+      </View>
+    );
+  }
+
+  // ============================================
+  // شاشة الصيانة
+  // ============================================
+
+  if (appConfig.maintenanceMode) {
+    return (
+      <View style={[styles.maintenanceContainer, { backgroundColor: currentColors.background }]}>
+        <Ionicons name="construct" size={80} color={currentColors.primary} />
+        <Text style={[styles.maintenanceTitle, { color: currentColors.text }]}>
+          التطبيق تحت الصيانة
+        </Text>
+        <Text style={[styles.maintenanceText, { color: currentColors.textLight }]}>
+          نعمل على تحسين التطبيق، يرجى المحاولة لاحقاً
+        </Text>
+        <TouchableOpacity 
+          style={[styles.retryButton, { backgroundColor: currentColors.primary }]}
+          onPress={onRefresh}
+        >
+          <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -415,7 +343,6 @@ export default function HomeScreen() {
       <View style={[styles.header, { backgroundColor: currentColors.surface }]}>
         <View style={styles.headerLeft}>
           <Text style={[styles.greeting, { color: currentColors.textLight }]}>{greeting}</Text>
-          {/* ← هنا يُعرض اسم التطبيق من السيرفر */}
           <Text style={[styles.appName, { color: currentColors.primary }]}>
             {appConfig.name}
           </Text>
@@ -443,7 +370,7 @@ export default function HomeScreen() {
           {/* بطاقة الصلاة التالية */}
           {nextPrayer && (
             <TouchableOpacity 
-              style={[styles.nextPrayerCard, { backgroundColor: currentColors.primary }]}
+              style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
               onPress={() => router.push('/(tabs)/prayer')}
               activeOpacity={0.8}
             >
@@ -466,7 +393,6 @@ export default function HomeScreen() {
                 </View>
               </View>
               
-              {/* التاريخ الهجري والموقع */}
               {(hijriDate || location) && (
                 <View style={styles.hijriContainer}>
                   {hijriDate && (
@@ -488,7 +414,7 @@ export default function HomeScreen() {
           {/* بطاقة بديلة إذا لم تتوفر مواقيت الصلاة */}
           {!nextPrayer && (
             <TouchableOpacity 
-              style={[styles.nextPrayerCard, { backgroundColor: currentColors.primary }]}
+              style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
               onPress={() => router.push('/(tabs)/prayer')}
               activeOpacity={0.8}
             >
@@ -551,7 +477,7 @@ export default function HomeScreen() {
           {/* الميزات */}
           <Text style={[styles.sectionTitle, { color: currentColors.text }]}>الميزات</Text>
           <View style={styles.featuresGrid}>
-            {FEATURES.map((feature) => (
+            {getEnabledFeatures().map((feature) => (
               <TouchableOpacity
                 key={feature.id}
                 style={styles.featureItem}
@@ -622,7 +548,7 @@ export default function HomeScreen() {
 
           {/* معلومات التطبيق */}
           <View style={[styles.appInfoCard, { backgroundColor: currentColors.surface }]}>
-            <Text style={[styles.appInfoName, { color: currentColors.primary }]}>
+            <Text style={[styles.appInfoName, { color: appConfig.primaryColor || currentColors.primary }]}>
               {appConfig.name}
             </Text>
             <Text style={[styles.appInfoVersion, { color: currentColors.textLight }]}>
@@ -633,6 +559,45 @@ export default function HomeScreen() {
           <View style={{ height: 100 }} />
         </Animated.View>
       </ScrollView>
+      // في أعلى الملف أضف:
+import BannerAd from '../../components/ads/BannerAd';
+import { useAds } from '../../lib/ads-context';
+
+// داخل المكون:
+export default function HomeScreen() {
+  const { onPageView } = useAds();
+  
+  // ... باقي الكود
+
+  // سجل مشاهدة الصفحة عند التحميل
+  useEffect(() => {
+    onPageView();
+  }, []);
+
+  return (
+    <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+      {/* ... كل المحتوى الموجود ... */}
+
+      {/* البانر في الأسفل */}
+      <View style={styles.bannerContainer}>
+        <BannerAd screen="home" />
+      </View>
+    </View>
+  );
+}
+
+// أضف للـ styles:
+const styles = StyleSheet.create({
+  // ... الأنماط الموجودة ...
+  
+  bannerContainer: {
+    position: 'absolute',
+    bottom: 80, // فوق التاب بار
+    left: 0,
+    right: 0,
+  },
+});
+
     </View>
   );
 }
@@ -654,6 +619,38 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     fontSize: Typography.sizes.md,
   },
+  
+  // شاشة الصيانة
+  maintenanceContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  maintenanceTitle: {
+    fontSize: Typography.sizes.xxl,
+    fontWeight: '700',
+    marginTop: Spacing.lg,
+    textAlign: 'center',
+  },
+  maintenanceText: {
+    fontSize: Typography.sizes.md,
+    marginTop: Spacing.sm,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: Typography.sizes.md,
+    fontWeight: '600',
+  },
+  
+  // الهيدر
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -694,13 +691,13 @@ const styles = StyleSheet.create({
   },
   nextPrayerLabel: {
     fontSize: Typography.sizes.sm,
-    color: Colors.white,
+    color: '#fff',
     opacity: 0.9,
   },
   nextPrayerName: {
     fontSize: Typography.sizes.xxl,
     fontWeight: '700',
-    color: Colors.white,
+    color: '#fff',
     marginTop: 4,
   },
   nextPrayerTimeContainer: {
@@ -709,11 +706,11 @@ const styles = StyleSheet.create({
   nextPrayerTime: {
     fontSize: Typography.sizes.xxl,
     fontWeight: '700',
-    color: Colors.white,
+    color: '#fff',
   },
   nextPrayerRemaining: {
     fontSize: Typography.sizes.sm,
-    color: Colors.white,
+    color: '#fff',
     opacity: 0.9,
     marginTop: 4,
   },
@@ -728,7 +725,7 @@ const styles = StyleSheet.create({
   },
   hijriText: {
     fontSize: Typography.sizes.md,
-    color: Colors.white,
+    color: '#fff',
     opacity: 0.9,
   },
   locationContainer: {
@@ -738,7 +735,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: Typography.sizes.sm,
-    color: Colors.white,
+    color: '#fff',
     opacity: 0.8,
   },
   noPrayerContainer: {
@@ -747,13 +744,13 @@ const styles = StyleSheet.create({
   },
   noPrayerText: {
     fontSize: Typography.sizes.lg,
-    color: Colors.white,
+    color: '#fff',
     fontWeight: '600',
     marginTop: Spacing.sm,
   },
   noPrayerSubtext: {
     fontSize: Typography.sizes.sm,
-    color: Colors.white,
+    color: '#fff',
     opacity: 0.8,
     marginTop: 4,
   },
@@ -786,7 +783,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 36,
     marginVertical: Spacing.md,
-    fontFamily: 'System',
   },
   verseRef: {
     fontSize: Typography.sizes.sm,

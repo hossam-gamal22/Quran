@@ -1,28 +1,41 @@
 // lib/app-config-context.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAppConfig, RemoteAppConfig } from './app-config-api';
-import { APP_CONFIG } from '../constants/app';
 
 interface AppConfigContextType {
-  config: typeof APP_CONFIG;
+  config: RemoteAppConfig;
   isLoading: boolean;
   refresh: () => Promise<void>;
 }
 
+const DEFAULT_CONFIG: RemoteAppConfig = {
+  name: 'رُوح المسلم',
+  nameEn: 'Rooh Al-Muslim',
+  description: 'تطبيق إسلامي شامل للقرآن والأذكار والصلاة',
+  version: '1.0.0',
+  primaryColor: '#1B4332',
+  maintenanceMode: false,
+  forceUpdate: false,
+  minVersion: '1.0.0',
+  contact: { email: 'hossamgamal290@gmail.com', website: '' },
+  downloadLinks: { android: '', ios: '' },
+  features: {
+    quran: true, azkar: true, prayer: true, qibla: true,
+    tasbih: true, names: true, ruqyah: true, hijri: true,
+  },
+};
+
 const AppConfigContext = createContext<AppConfigContextType | undefined>(undefined);
 
 export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
-  const [config, setConfig] = useState(APP_CONFIG);
+  const [config, setConfig] = useState<RemoteAppConfig>(DEFAULT_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadConfig = async () => {
     setIsLoading(true);
     try {
       const remoteConfig = await getAppConfig();
-      setConfig({
-        ...APP_CONFIG,
-        ...remoteConfig,
-      });
+      setConfig(remoteConfig);
     } catch (error) {
       console.error('Error loading config:', error);
     } finally {
