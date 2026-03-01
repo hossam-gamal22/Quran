@@ -34,7 +34,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     
     async function loadSettings() {
       try {
-        // Add timeout - max 3 seconds
         const timeoutPromise = new Promise<AppSettings>(resolve => 
           setTimeout(() => resolve(DEFAULT_SETTINGS), 3000)
         );
@@ -46,7 +45,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
           setSettings(s);
         }
       } catch (e) {
-        // Use default settings if error
         if (mounted) {
           setSettings(DEFAULT_SETTINGS);
         }
