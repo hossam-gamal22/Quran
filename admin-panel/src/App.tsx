@@ -1,6 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Ads from './pages/Ads';
+import Subscriptions from './pages/Subscriptions';
+import Content from './pages/Content';
+import Notifications from './pages/Notifications';
+import Users from './pages/Users';
 
 function App() {
   return (
@@ -8,6 +13,11 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Dashboard />} />
+        <Route path="/ads" element={<Ads />} />
+        <Route path="/subscriptions" element={<Subscriptions />} />
+        <Route path="/content" element={<Content />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/users" element={<Users />} />
       </Routes>
     </BrowserRouter>
   );
