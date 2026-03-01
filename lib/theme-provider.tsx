@@ -1,5 +1,4 @@
 // lib/theme-provider.tsx
-
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Appearance, useColorScheme as useSystemColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -69,9 +68,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Show nothing until theme is loaded to prevent flash
-  if (!isLoaded) {
-    return null;
-  }
+  if (!isLoaded) return null;
 
   return (
     <ThemeContext.Provider value={value}>
@@ -82,9 +79,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
-  if (!ctx) {
-    throw new Error("useTheme must be used within ThemeProvider");
-  }
+  if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
 
