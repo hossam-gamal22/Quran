@@ -11,38 +11,24 @@
       "resizeMode": "contain",
       "backgroundColor": "#1B4332"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rooh.almuslim",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "نحتاج موقعك لتحديد اتجاه القبلة ومواقيت الصلاة",
-        "NSMotionUsageDescription": "نحتاج الوصول للبوصلة لتحديد اتجاه القبلة"
-      }
+      "bundleIdentifier": "com.rooh.almuslim"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1B4332"
       },
-      "package": "com.rooh.almuslim",
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "VIBRATE"
-      ]
+      "package": "com.rooh.almuslim"
     },
-    "plugins": [
-      "expo-router",
-      "expo-location",
-      "expo-sensors"
-    ],
+    "plugins": ["expo-router"],
     "extra": {
       "router": {
         "origin": false
       }
-    }
+    },
+    "scheme": "rooh-almuslim"
   }
 }
