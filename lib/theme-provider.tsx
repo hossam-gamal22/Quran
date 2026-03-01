@@ -21,7 +21,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("dark");
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load saved theme
   useEffect(() => {
     async function loadTheme() {
       try {
@@ -67,7 +66,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [colorScheme, colors, setColorScheme, toggleTheme, isDark]
   );
 
-  // Show nothing until theme is loaded to prevent flash
   if (!isLoaded) return null;
 
   return (
@@ -83,5 +81,4 @@ export function useTheme(): ThemeContextValue {
   return ctx;
 }
 
-// Alias for backward compatibility
 export const useThemeContext = useTheme;
