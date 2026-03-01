@@ -80,3 +80,4 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 export function useSettings() {
   return useContext(SettingsContext);
 }
+//change
