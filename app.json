@@ -25,6 +25,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-splash-screen",
       [
         "react-native-google-mobile-ads",
         {
