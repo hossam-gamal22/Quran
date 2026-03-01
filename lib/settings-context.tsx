@@ -30,16 +30,46 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    getSettings().then(s => {
-      setSettings(s);
-      setIsLoaded(true);
-    });
+    let mounted = true;
+    
+    async function loadSettings() {
+      try {
+        // Add timeout - max 3 seconds
+        const timeoutPromise = new Promise<AppSettings>(resolve => 
+          setTimeout(() => resolve(DEFAULT_SETTINGS), 3000)
+        );
+        const settingsPromise = getSettings();
+        
+        const s = await Promise.race([settingsPromise, timeoutPromise]);
+        
+        if (mounted) {
+          setSettings(s);
+        }
+      } catch (e) {
+        // Use default settings if error
+        if (mounted) {
+          setSettings(DEFAULT_SETTINGS);
+        }
+      } finally {
+        if (mounted) {
+          setIsLoaded(true);
+        }
+      }
+    }
+    
+    loadSettings();
+    
+    return () => { mounted = false; };
   }, []);
 
   const updateSettings = async (updates: Partial<AppSettings>) => {
     const updated = { ...settings, ...updates };
     setSettings(updated);
-    await saveSettings(updates);
+    try {
+      await saveSettings(updates);
+    } catch (e) {
+      // Ignore save errors
+    }
   };
 
   return (
