@@ -86,7 +86,7 @@ const DAILY_AZKAR = [
 export default function HomeScreen() {
   const router = useRouter();
   
-  // جلب إعدادات التطبيق
+  // جلب إعدادات التطبيق من Firebase
   const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
   
   // جلب إعدادات الإعلانات
@@ -114,7 +114,7 @@ export default function HomeScreen() {
 
   const currentColors = darkMode ? DarkColors : Colors;
 
-  // تسجيل مشاهدة الصفحة
+  // تسجيل مشاهدة الصفحة للإعلانات
   useEffect(() => {
     onPageView();
   }, []);
@@ -123,6 +123,7 @@ export default function HomeScreen() {
     initializeApp();
   }, []);
 
+  // تحديث الصلاة التالية كل دقيقة
   useEffect(() => {
     const timer = setInterval(() => {
       if (prayerTimes) {
@@ -224,6 +225,7 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refreshConfig]);
 
+  // المشاركة
   const getShareSignature = () => {
     return `\n\n📱 تطبيق ${appConfig.name}`;
   };
@@ -268,6 +270,7 @@ export default function HomeScreen() {
     }
   };
 
+  // فلترة الميزات حسب الإعدادات
   const getEnabledFeatures = () => {
     if (!appConfig.features) return FEATURES;
     return FEATURES.filter(feature => {
