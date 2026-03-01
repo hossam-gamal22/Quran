@@ -15,9 +15,6 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-emerald-900 to-emerald-950 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">🕌</span>
-          </div>
           <h1 className="text-2xl font-bold text-gray-800">رُوح المسلم</h1>
           <p className="text-gray-500">لوحة التحكم</p>
         </div>
