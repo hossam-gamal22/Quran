@@ -1,4 +1,3 @@
-// lib/theme-provider.tsx
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Appearance, useColorScheme as useSystemColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
