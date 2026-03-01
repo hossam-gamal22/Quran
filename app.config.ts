@@ -18,8 +18,8 @@ const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  appName: "القرآن الكريم",
-  appSlug: "quran-app",
+  appName: "رُوح المسلم",  // ✅ تغيير الاسم
+  appSlug: "rooh-almuslim",
   logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663393232290/nB8TKc7brdvHH2ymJsdNTR/icon-jFExXVCzFpuGyqt35TFcdR.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,

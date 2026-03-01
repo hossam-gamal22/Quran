@@ -7,7 +7,11 @@ import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../constants/theme';
 import { APP_NAME } from '../constants/app';
+import { AppConfigProvider } from '../lib/app-config-context';
 
+export default function RootLayout() {
+  return (
+    <AppConfigProvider>
 // منع إخفاء شاشة البداية تلقائياً
 SplashScreen.preventAutoHideAsync();
 
@@ -151,4 +155,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.background,
   },
+  </AppConfigProvider>
 });
