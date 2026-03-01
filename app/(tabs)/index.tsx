@@ -19,8 +19,6 @@ import * as Location from 'expo-location';
 import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
 import { fetchPrayerTimesByCoords, getNextPrayer, formatTime, PRAYER_NAMES } from '../../lib/prayer-api';
 import { useAppConfig } from '../../lib/app-config-context';
-import { useAds } from '../../lib/ads-context';
-import BannerAd from '../../components/ads/BannerAd';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -90,7 +88,6 @@ export default function HomeScreen() {
   const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
   
   // جلب إعدادات الإعلانات
-  const { onPageView } = useAds();
   
   // الحالات
   const [darkMode, setDarkMode] = useState(false);
@@ -537,8 +534,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* البانر في الأسفل */}
-      <View style={styles.bannerContainer}>
-        <BannerAd screen="home" />
+      
       </View>
     </View>
   );
