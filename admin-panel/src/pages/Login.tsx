@@ -1,4 +1,3 @@
-cat > src/pages/Login.tsx << 'EOF'
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -43,4 +42,3 @@ export default function Login() {
     </div>
   );
 }
-EOF

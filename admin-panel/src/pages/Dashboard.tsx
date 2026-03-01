@@ -1,4 +1,3 @@
-cat > src/pages/Dashboard.tsx << 'EOF'
 import { useState } from 'react';
 
 export default function Dashboard() {
@@ -66,4 +65,3 @@ export default function Dashboard() {
     </div>
   );
 }
-EOF
