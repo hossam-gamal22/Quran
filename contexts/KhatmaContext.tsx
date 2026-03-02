@@ -19,7 +19,17 @@ import {
   recordDailyProgress as recordProgressStorage,
   getTodayWird,
   getKhatmaStats,
+  getKhatma,
+  updateKhatma,
 } from '../lib/khatma-storage';
+import {
+  scheduleKhatmaReminder,
+  cancelKhatmaReminder,
+  updateKhatmaReminder,
+  sendKhatmaCompletionNotification,
+  sendWirdCompletionNotification,
+  requestNotificationPermissions,
+} from '../lib/khatma-notifications';
 
 // ===== TYPES =====
 interface KhatmaContextType {
@@ -36,6 +46,7 @@ interface KhatmaContextType {
   completeTodayWird: () => Promise<boolean>;
   recordProgress: (pages: number) => Promise<boolean>;
   refreshKhatmas: () => Promise<void>;
+  updateKhatmaReminder: (khatmaId: string, reminderTime: string | null, enabled: boolean) => Promise<boolean>;
   
   // Helpers
   getTodayWirdInfo: () => { startPage: number; endPage: number; pagesRemaining: number; isCompleted: boolean } | null;
@@ -66,6 +77,8 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
   // Load khatmas on mount
   useEffect(() => {
     loadKhatmas();
+    // Request notification permissions on app start
+    requestNotificationPermissions();
   }, []);
 
   const loadKhatmas = async () => {
@@ -91,6 +104,10 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     async (name: string, duration: KhatmaDuration, reminderTime: string | null = null) => {
       const newKhatma = await createKhatmaStorage(name, duration, reminderTime);
       if (newKhatma) {
+        // Schedule reminder if enabled
+        if (reminderTime) {
+          await scheduleKhatmaReminder(newKhatma);
+        }
         await refreshKhatmas();
         return newKhatma;
       }
@@ -101,6 +118,9 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
 
   const deleteKhatma = useCallback(
     async (id: string) => {
+      // Cancel reminder before deleting
+      await cancelKhatmaReminder(id);
+      
       const success = await deleteKhatmaStorage(id);
       if (success) {
         await refreshKhatmas();
@@ -126,6 +146,17 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     
     const updated = await completeTodayWirdStorage(activeKhatma.id);
     if (updated) {
+      // Send wird completion notification
+      await sendWirdCompletionNotification();
+      
+      // Check if khatma is now completed
+      if (updated.isCompleted) {
+        // Send completion notification
+        await sendKhatmaCompletionNotification(updated.name);
+        // Cancel the daily reminder
+        await cancelKhatmaReminder(updated.id);
+      }
+      
       await refreshKhatmas();
       return true;
     }
@@ -138,12 +169,42 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
       
       const updated = await recordProgressStorage(activeKhatma.id, pages);
       if (updated) {
+        // Check if khatma is now completed
+        if (updated.isCompleted) {
+          await sendKhatmaCompletionNotification(updated.name);
+          await cancelKhatmaReminder(updated.id);
+        }
+        
         await refreshKhatmas();
         return true;
       }
       return false;
     },
     [activeKhatma, refreshKhatmas]
+  );
+
+  const handleUpdateKhatmaReminder = useCallback(
+    async (khatmaId: string, reminderTime: string | null, enabled: boolean) => {
+      try {
+        const khatma = await getKhatma(khatmaId);
+        if (!khatma) return false;
+
+        // Update khatma with new reminder settings
+        khatma.reminderTime = reminderTime;
+        khatma.reminderEnabled = enabled;
+        await updateKhatma(khatma);
+
+        // Update the scheduled notification
+        await updateKhatmaReminder(khatma);
+
+        await refreshKhatmas();
+        return true;
+      } catch (error) {
+        console.error('Error updating khatma reminder:', error);
+        return false;
+      }
+    },
+    [refreshKhatmas]
   );
 
   const getTodayWirdInfo = useCallback(() => {
@@ -167,6 +228,7 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     completeTodayWird,
     recordProgress,
     refreshKhatmas,
+    updateKhatmaReminder: handleUpdateKhatmaReminder,
     getTodayWirdInfo,
     getActiveKhatmaStats,
   };
