@@ -1,5 +1,5 @@
 // config/firebase.ts
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
@@ -14,7 +14,8 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID"
 };
 
-const app = initializeApp(firebaseConfig);
+// تأكد إن Firebase مش initialized قبل كده
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
