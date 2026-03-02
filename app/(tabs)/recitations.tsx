@@ -1,7 +1,5 @@
 /**
  * Full Recitations Screen — التلاوات الكاملة
- * يعرض: قائمة السور مع زر الاستماع الكامل، اختيار القارئ،
- * تشغيل متواصل للجزء أو للقرآن كله، شريط تشغيل ثابت
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -13,22 +11,13 @@ import {
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Audio } from 'expo-av';
+// ✅ استخدم expo-audio بدلاً من expo-av
+import { useAudioPlayer } from 'expo-audio';
 import { SURAH_NAMES_AR, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const SURAH_AYAH_COUNTS = [
-  7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,
-  112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,
-  89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,14,11,11,18,12,12,
-  30,52,52,44,28,28,20,56,40,31,50,45,33,27,57,29,19,18,12,11,82,8,11,98,
-  135,112,78,118,64,77,227,93,88,7,286,200,176,120,165,206,75,129,109,123,
-  111,43,52,99,128,
-];
-
-// Fix to exactly 114
 const AYAH_COUNTS_114 = [
   7,286,200,176,120,165,206,75,129,109,
   123,111,43,52,99,128,111,110,98,135,
@@ -39,12 +28,11 @@ const AYAH_COUNTS_114 = [
   14,11,11,18,12,12,30,52,52,44,
   28,28,20,56,40,31,50,45,33,27,
   57,29,19,18,12,11,82,8,11,98,
-  135,112,78,118,64,77,227,93,88,7,
-  286,200,176,120,165,206,75,129,109,123,
-  111,43,52,99,128,
+  5,8,8,19,5,8,8,11,11,8,
+  3,9,5,4,7,3,6,3,5,4,
+  5,6,4,4
 ];
 
-// Juz info
 const JUZ_INFO: { juz: number; surah: number; ayah: number }[] = [
   {juz:1,surah:1,ayah:1},{juz:2,surah:2,ayah:142},{juz:3,surah:2,ayah:253},
   {juz:4,surah:3,ayah:92},{juz:5,surah:4,ayah:24},{juz:6,surah:4,ayah:148},
@@ -77,16 +65,16 @@ export default function RecitationsScreen() {
   const [showReciterModal, setShowReciterModal] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [currentSurahIdx, setCurrentSurahIdx] = useState(0);
   const [view, setView] = useState<'surahs' | 'juz'>('surahs');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<number[]>([]);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const playerRef = useRef<any>(null);
 
-  const player = Audio.Sound.createAsync('');
+  // ✅ استخدم expo-audio hook
+  const player = useAudioPlayer(audioUrl || '');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY_RECITER).then(v => {
@@ -127,8 +115,7 @@ export default function RecitationsScreen() {
     setLoadingItem(key);
     try {
       const url = getSurahAudioUrl(surahNum, selectedReciter.identifier);
-      player.replace({ uri: url });
-      player.play();
+      setAudioUrl(url);
       setIsPlaying(true);
       setCurrentSurahIdx(surahNum - 1);
       setNowPlaying({
@@ -138,8 +125,12 @@ export default function RecitationsScreen() {
         reciterAr: selectedReciter.nameAr,
         mode, juzNum,
       });
+      // انتظر قليلاً ثم شغّل
+      setTimeout(() => {
+        try { player.play(); } catch {}
+      }, 100);
     } catch (e) {
-      // silent error — handled by UI state
+      console.warn('Play error:', e);
     } finally {
       setLoadingItem(null);
     }
@@ -154,14 +145,15 @@ export default function RecitationsScreen() {
     try { player.pause(); } catch {}
     setIsPlaying(false);
     setNowPlaying(null);
+    setAudioUrl(null);
   }, [player]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      player.pause();
+      try { player.pause(); } catch {}
       setIsPlaying(false);
     } else {
-      player.play();
+      try { player.play(); } catch {}
       setIsPlaying(true);
     }
   }, [isPlaying, player]);
@@ -176,7 +168,6 @@ export default function RecitationsScreen() {
     playSurah(prev + 1, nowPlaying?.mode || 'surah');
   }, [currentSurahIdx, playSurah, nowPlaying]);
 
-  // Filter surahs
   const surahs = Array.from({ length: 114 }, (_, i) => ({
     num: i + 1,
     name: SURAH_NAMES_AR[i],
@@ -194,7 +185,6 @@ export default function RecitationsScreen() {
     },
     title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
     iconBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-    // Reciter bar
     reciterBar: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -205,20 +195,17 @@ export default function RecitationsScreen() {
     reciterName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
     changeBtn: { backgroundColor: colors.primary + '18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
     changeBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-    // View toggle
     viewToggle: { flexDirection: 'row', margin: 12, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center' },
     toggleBtnActive: { backgroundColor: colors.primary },
     toggleBtnText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     toggleBtnTextActive: { color: '#fff' },
-    // Search
     searchWrap: {
       flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginBottom: 8,
       backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border,
       paddingHorizontal: 12, height: 42,
     },
     searchInput: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: 'right', height: 42 },
-    // Surah item
     surahItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border,
@@ -236,7 +223,6 @@ export default function RecitationsScreen() {
       marginLeft: 8,
     },
     favBtn: { padding: 6, marginLeft: 4 },
-    // Juz item
     juzItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border,
@@ -249,22 +235,17 @@ export default function RecitationsScreen() {
     juzInfo: { flex: 1 },
     juzName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
     juzMeta: { fontSize: 11, color: colors.muted, textAlign: 'right', marginTop: 2 },
-    // Now playing bar
     nowPlayingBar: {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       backgroundColor: '#1B6B3A',
       paddingVertical: 10, paddingHorizontal: 16,
       flexDirection: 'row', alignItems: 'center', gap: 10,
-      shadowColor: '#000', shadowOffset: { width: 0, height: -3 },
-      shadowOpacity: 0.2, shadowRadius: 6, elevation: 10,
     },
     nowPlayingInfo: { flex: 1 },
     nowPlayingName: { fontSize: 14, fontWeight: '800', color: '#fff', textAlign: 'right' },
     nowPlayingReciter: { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'right' },
     controlBtn: { padding: 8 },
-    // Section title
     sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: 'right' },
-    // Reciter modal
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10 },
@@ -308,7 +289,6 @@ export default function RecitationsScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']}>
-      {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.iconBtn} onPress={() => setShowReciterModal(true)}>
           <IconSymbol name="music.microphone" size={18} color={colors.foreground} />
@@ -317,7 +297,6 @@ export default function RecitationsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* Reciter Bar */}
       <View style={s.reciterBar}>
         <TouchableOpacity style={s.changeBtn} onPress={() => setShowReciterModal(true)}>
           <Text style={s.changeBtnText}>تغيير</Text>
@@ -329,13 +308,12 @@ export default function RecitationsScreen() {
         <Animated.View style={[{
           width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary,
           justifyContent: 'center', alignItems: 'center',
-          transform: [{ scale: isPlaying ? pulseAnim : new Animated.Value(1) }],
+          transform: [{ scale: isPlaying ? pulseAnim : 1 }],
         }]}>
           <Text style={{ fontSize: 18 }}>🎙️</Text>
         </Animated.View>
       </View>
 
-      {/* View Toggle */}
       <View style={s.viewToggle}>
         <TouchableOpacity style={[s.toggleBtn, view === 'surahs' && s.toggleBtnActive]} onPress={() => setView('surahs')}>
           <Text style={[s.toggleBtnText, view === 'surahs' && s.toggleBtnTextActive]}>📖 السور (114)</Text>
@@ -347,7 +325,6 @@ export default function RecitationsScreen() {
 
       {view === 'surahs' ? (
         <>
-          {/* Search */}
           <View style={s.searchWrap}>
             <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
             <TextInput
@@ -401,7 +378,6 @@ export default function RecitationsScreen() {
         />
       )}
 
-      {/* Now Playing Bar */}
       {nowPlaying && (
         <View style={s.nowPlayingBar}>
           <TouchableOpacity style={s.controlBtn} onPress={stopPlayback}>
@@ -426,7 +402,6 @@ export default function RecitationsScreen() {
         </View>
       )}
 
-      {/* Reciter Modal */}
       <Modal visible={showReciterModal} transparent animationType="slide" onRequestClose={() => setShowReciterModal(false)}>
         <TouchableOpacity style={s.modalWrap} activeOpacity={1} onPress={() => setShowReciterModal(false)}>
           <View style={s.modalSheet}>
@@ -441,7 +416,7 @@ export default function RecitationsScreen() {
                   activeOpacity={0.7}
                 >
                   {selectedReciter.identifier === r.identifier && (
-                    <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} style={{ marginLeft: 10 }} />
+                    <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
                   )}
                   <View style={s.reciterItemInfo}>
                     <Text style={[s.reciterItemAr, selectedReciter.identifier === r.identifier && { color: colors.primary }]}>{r.nameAr}</Text>
