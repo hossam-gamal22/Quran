@@ -1,925 +1,584 @@
-import React, { useState, useEffect, useRef } from 'react';
+// app/(tabs)/prayer.tsx
+// صفحة مواقيت الصلاة الرئيسية - روح المسلم
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Modal,
-  Alert,
-  Animated,
   RefreshControl,
+  TouchableOpacity,
+  Alert,
   Platform,
+  StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
-import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
-import { APP_CONFIG } from '../../constants/app';
-import { Share } from 'react-native';
-import { copyToClipboard } from '../../lib/share-service';
-import {
-  fetchPrayerTimesByCoords,
-  fetchHijriDate,
-  PrayerTimesResponse,
-  PrayerTimes,
-  CALCULATION_METHODS,
-  PRAYER_NAMES,
-  formatTime,
-  getNextPrayer,
-  getPrayerIcon,
-  getPrayerColor,
-} from '../../lib/prayer-api';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 
-// ============================================
+import {
+  PrayerTimes,
+  PrayerName,
+  PrayerSettings,
+  Location as LocationType,
+  fetchPrayerTimes,
+  parsePrayerTimes,
+  applyAdjustments,
+  getPrayerSettings,
+  savePrayerSettings,
+  saveLocation,
+  getStoredLocation,
+  cachePrayerTimes,
+  getCachedPrayerTimes,
+  getTodayDateString,
+  isInLastThird,
+  formatTime12h,
+} from '@/lib/prayer-times';
+import { getHijriDate } from '@/lib/hijri-date';
+import { t } from '@/data/translations';
+
+import PrayerCard from '@/components/ui/prayer/PrayerCard';
+import PrayerList from '@/components/ui/prayer/PrayerList';
+import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
+
+// ========================================
 // المكون الرئيسي
-// ============================================
+// ========================================
 
 export default function PrayerScreen() {
-  const router = useRouter();
-  
   // الحالات
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [prayerData, setPrayerData] = useState<PrayerTimesResponse | null>(null);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number; city?: string } | null>(null);
-  const [calculationMethod, setCalculationMethod] = useState(4); // أم القرى
-  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('12h');
-  const [notifications, setNotifications] = useState<{ [key: string]: boolean }>({
-    Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true,
-  });
-  const [showMethodModal, setShowMethodModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  
-  // الأنيميشن
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
+  const [location, setLocation] = useState<LocationType | null>(null);
+  const [settings, setSettings] = useState<PrayerSettings | null>(null);
+  const [hijriDate, setHijriDate] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'card' | 'circular'>('card');
 
-  // ============================================
+  // إعدادات العرض
+  const language = 'ar';
+  const isDarkMode = false;
+
+  // ========================================
   // تحميل البيانات
-  // ============================================
+  // ========================================
 
+  // جلب الموقع
+  const fetchLocation = async (): Promise<LocationType | null> => {
+    try {
+      // التحقق من الإذن
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        // محاولة جلب الموقع المحفوظ
+        const stored = await getStoredLocation();
+        if (stored) return stored;
+        
+        throw new Error('لم يتم منح إذن الموقع');
+      }
+
+      // جلب الموقع الحالي
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      // جلب اسم المدينة
+      const [geocode] = await Location.reverseGeocodeAsync({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+
+      const locationData: LocationType = {
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        city: geocode?.city || geocode?.subregion || '',
+        country: geocode?.country || '',
+      };
+
+      // حفظ الموقع
+      await saveLocation(locationData);
+
+      return locationData;
+    } catch (err) {
+      console.error('Error fetching location:', err);
+      
+      // محاولة جلب الموقع المحفوظ
+      const stored = await getStoredLocation();
+      if (stored) return stored;
+
+      // استخدام موقع افتراضي (مكة)
+      return {
+        latitude: 21.4225,
+        longitude: 39.8262,
+        city: 'مكة المكرمة',
+        country: 'السعودية',
+      };
+    }
+  };
+
+  // جلب مواقيت الصلاة
+  const loadPrayerTimes = async (forceRefresh = false) => {
+    try {
+      setError(null);
+      
+      // جلب الإعدادات
+      const prayerSettings = await getPrayerSettings();
+      setSettings(prayerSettings);
+
+      // التحقق من الكاش أولاً
+      const today = getTodayDateString();
+      if (!forceRefresh) {
+        const cached = await getCachedPrayerTimes(today);
+        if (cached) {
+          setPrayerTimes(cached);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // جلب الموقع
+      const loc = await fetchLocation();
+      setLocation(loc);
+
+      if (!loc) {
+        throw new Error('تعذر تحديد الموقع');
+      }
+
+      // جلب المواقيت من API
+      const response = await fetchPrayerTimes(loc, new Date(), prayerSettings);
+      let times = parsePrayerTimes(response);
+
+      // تطبيق التعديلات
+      times = applyAdjustments(times, prayerSettings.adjustments);
+
+      // حفظ في الكاش
+      await cachePrayerTimes(today, times);
+
+      setPrayerTimes(times);
+
+      // تحديث التاريخ الهجري
+      if (response.date?.hijri) {
+        const { day, month, year } = response.date.hijri;
+        setHijriDate(`${day} ${month.ar} ${year}`);
+      }
+    } catch (err: any) {
+      console.error('Error loading prayer times:', err);
+      setError(err.message || 'حدث خطأ في جلب مواقيت الصلاة');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  // التحميل الأولي
   useEffect(() => {
-    loadSettings();
     loadPrayerTimes();
-    
-    // تحديث الوقت كل دقيقة
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
 
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
-    ]).start();
-
-    return () => clearInterval(timer);
+    // تحديث التاريخ الهجري
+    const hijri = getHijriDate();
+    if (hijri) {
+      setHijriDate(hijri);
+    }
   }, []);
 
-  const loadSettings = async () => {
-    try {
-      const settings = await AsyncStorage.getItem('prayer_settings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setCalculationMethod(parsed.method ?? 4);
-        setTimeFormat(parsed.timeFormat ?? '12h');
-        setNotifications(parsed.notifications ?? {
-          Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
+  // السحب للتحديث
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    loadPrayerTimes(true);
+  }, []);
+
+  // ========================================
+  // معالجات الأحداث
+  // ========================================
+
+  // تبديل وضع العرض
+  const toggleViewMode = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setViewMode(prev => prev === 'card' ? 'circular' : 'card');
   };
 
-  const saveSettings = async () => {
-    try {
-      await AsyncStorage.setItem('prayer_settings', JSON.stringify({
-        method: calculationMethod,
-        timeFormat,
-        notifications,
-      }));
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
-  };
+  // تبديل إشعار صلاة
+  const handleToggleNotification = async (prayer: PrayerName, enabled: boolean) => {
+    if (!settings) return;
 
-  const loadPrayerTimes = async () => {
-    try {
-      setLoading(true);
-      
-      // طلب إذن الموقع
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('خطأ', 'يرجى السماح بالوصول إلى الموقع لعرض مواقيت الصلاة');
-        setLoading(false);
-        return;
-      }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      // الحصول على الموقع
-      const loc = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = loc.coords;
-
-      // الحصول على اسم المدينة
-      const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
-      const city = address?.city || address?.region || 'موقعك الحالي';
-
-      setLocation({ latitude, longitude, city });
-
-      // جلب مواقيت الصلاة
-      const data = await fetchPrayerTimesByCoords(latitude, longitude, calculationMethod);
-      setPrayerData(data);
-
-      // حفظ البيانات للاستخدام offline
-      await AsyncStorage.setItem('cached_prayer_times', JSON.stringify({
-        data,
-        location: { latitude, longitude, city },
-        timestamp: Date.now(),
-      }));
-
-    } catch (error) {
-      console.error('Error loading prayer times:', error);
-      
-      // محاولة استخدام البيانات المحفوظة
-      try {
-        const cached = await AsyncStorage.getItem('cached_prayer_times');
-        if (cached) {
-          const { data, location: cachedLoc } = JSON.parse(cached);
-          setPrayerData(data);
-          setLocation(cachedLoc);
-          Alert.alert('تنبيه', 'تم عرض آخر مواقيت محفوظة');
-        }
-      } catch (e) {
-        Alert.alert('خطأ', 'فشل في تحميل مواقيت الصلاة');
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadPrayerTimes();
-  };
-
-  // ============================================
-  // الإشعارات
-  // ============================================
-
-  const toggleNotification = async (prayer: string) => {
-    const newNotifications = {
-      ...notifications,
-      [prayer]: !notifications[prayer],
+    const newSettings: PrayerSettings = {
+      ...settings,
+      notifications: {
+        ...settings.notifications,
+        [prayer]: enabled,
+      },
     };
-    setNotifications(newNotifications);
-    
-    await AsyncStorage.setItem('prayer_settings', JSON.stringify({
-      method: calculationMethod,
-      timeFormat,
-      notifications: newNotifications,
-    }));
 
-    // TODO: جدولة/إلغاء الإشعار
+    setSettings(newSettings);
+    await savePrayerSettings(newSettings);
   };
 
-  // ============================================
-  // المشاركة
-  // ============================================
-
-  const formatPrayerTimesForShare = () => {
-    if (!prayerData) return '';
-    
-    const { timings, date } = prayerData;
-    const prayers = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
-    
-    let shareText = `🕌 مواقيت الصلاة\n`;
-    shareText += `📍 ${location?.city || 'موقعي'}\n`;
-    shareText += `📅 ${date.hijri.day} ${date.hijri.month.ar} ${date.hijri.year}هـ\n`;
-    shareText += `📆 ${date.gregorian.day} ${date.gregorian.month.en} ${date.gregorian.year}م\n\n`;
-    
-    prayers.forEach(prayer => {
-      const icon = prayer === 'Fajr' ? '🌙' : 
-                   prayer === 'Sunrise' ? '🌅' :
-                   prayer === 'Dhuhr' ? '☀️' :
-                   prayer === 'Asr' ? '🌤️' :
-                   prayer === 'Maghrib' ? '🌇' : '🌃';
-      shareText += `${icon} ${PRAYER_NAMES[prayer].ar}: ${formatTime(timings[prayer], timeFormat)}\n`;
-    });
-    
-    shareText += `\n${APP_CONFIG.getShareSignature()}`;
-    
-    return shareText;
+  // فتح الإعدادات
+  const openSettings = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // TODO: فتح صفحة إعدادات الصلاة
+    Alert.alert('قريباً', 'إعدادات مواقيت الصلاة قريباً');
   };
 
-  const handleShare = async () => {
-    try {
-      const shareText = formatPrayerTimesForShare();
-      await Share.share({ message: shareText });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const handleCopy = async () => {
-    const shareText = formatPrayerTimesForShare();
-    await copyToClipboard(shareText);
-    Alert.alert('تم النسخ', 'تم نسخ مواقيت الصلاة');
-    setShowShareModal(false);
-  };
-
-  // ============================================
-  // حساب الصلاة التالية
-  // ============================================
-
-  const nextPrayer = prayerData ? getNextPrayer(prayerData.timings) : null;
-
-  // ============================================
+  // ========================================
   // العرض
-  // ============================================
+  // ========================================
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Ionicons name="time-outline" size={48} color={Colors.primary} />
-        <Text style={styles.loadingText}>جاري تحميل مواقيت الصلاة...</Text>
-      </View>
-    );
-  }
+  // اسم المدينة للعرض
+  const locationName = location
+    ? `${location.city}${location.country ? `, ${location.country}` : ''}`
+    : '';
+
+  // هل نحن في الثلث الأخير؟
+  const inLastThird = prayerTimes ? isInLastThird(prayerTimes) : false;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, isDarkMode && styles.containerDark]}
+      edges={['top']}
+    >
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+      />
+
       {/* الهيدر */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/qibla')} style={styles.headerButton}>
-          <Ionicons name="compass-outline" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>مواقيت الصلاة</Text>
-        
-        <TouchableOpacity onPress={() => setShowShareModal(true)} style={styles.headerButton}>
-          <Ionicons name="share-outline" size={24} color={Colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+      <Animated.View
+        entering={FadeInDown.duration(500)}
+        style={styles.header}
       >
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
-          {/* بطاقة الموقع والتاريخ */}
-          <View style={styles.locationCard}>
-            <View style={styles.locationInfo}>
-              <Ionicons name="location" size={20} color={Colors.primary} />
-              <Text style={styles.locationText}>{location?.city || 'موقعك'}</Text>
-            </View>
-            
-            {prayerData && (
-              <View style={styles.dateInfo}>
-                <Text style={styles.hijriDate}>
-                  {prayerData.date.hijri.day} {prayerData.date.hijri.month.ar} {prayerData.date.hijri.year}هـ
-                </Text>
-                <Text style={styles.gregorianDate}>
-                  {prayerData.date.gregorian.day} {prayerData.date.gregorian.month.en} {prayerData.date.gregorian.year}
-                </Text>
-              </View>
-            )}
-
-            <TouchableOpacity 
-              style={styles.methodButton}
-              onPress={() => setShowMethodModal(true)}
-            >
-              <Ionicons name="settings-outline" size={18} color={Colors.textLight} />
-            </TouchableOpacity>
-          </View>
-
-          {/* بطاقة الصلاة التالية */}
-          {nextPrayer && (
-            <View style={styles.nextPrayerCard}>
-              <View style={styles.nextPrayerHeader}>
-                <Text style={styles.nextPrayerLabel}>الصلاة القادمة</Text>
-                <Text style={styles.nextPrayerRemaining}>{nextPrayer.remaining}</Text>
-              </View>
-              
-              <View style={styles.nextPrayerContent}>
-                <View style={[styles.nextPrayerIcon, { backgroundColor: getPrayerColor(nextPrayer.name) + '20' }]}>
-                  <Ionicons 
-                    name={getPrayerIcon(nextPrayer.name) as any} 
-                    size={32} 
-                    color={getPrayerColor(nextPrayer.name)} 
-                  />
-                </View>
-                <View style={styles.nextPrayerInfo}>
-                  <Text style={styles.nextPrayerName}>
-                    {PRAYER_NAMES[nextPrayer.name]?.ar || nextPrayer.name}
-                  </Text>
-                  <Text style={styles.nextPrayerTime}>
-                    {formatTime(nextPrayer.time, timeFormat)}
-                  </Text>
-                </View>
-              </View>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
+            {t('ui.nav.prayer', language)}
+          </Text>
+          {locationName && (
+            <View style={styles.locationBadge}>
+              <MaterialCommunityIcons
+                name="map-marker"
+                size={14}
+                color={isDarkMode ? '#aaa' : '#666'}
+              />
+              <Text style={[styles.locationText, isDarkMode && styles.textMuted]}>
+                {locationName}
+              </Text>
             </View>
           )}
+        </View>
 
-          {/* قائمة الصلوات */}
-          <View style={styles.prayersList}>
-            {prayerData && ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].map((prayer) => {
-              const isNext = nextPrayer?.name === prayer;
-              const prayerTime = prayerData.timings[prayer as keyof PrayerTimes];
-              
-              return (
-                <View 
-                  key={prayer} 
-                  style={[styles.prayerItem, isNext && styles.prayerItemActive]}
-                >
-                  <View style={styles.prayerItemLeft}>
-                    <View style={[
-                      styles.prayerIcon, 
-                      { backgroundColor: getPrayerColor(prayer) + '15' }
-                    ]}>
-                      <Ionicons 
-                        name={getPrayerIcon(prayer) as any} 
-                        size={22} 
-                        color={getPrayerColor(prayer)} 
-                      />
-                    </View>
-                    <View>
-                      <Text style={[styles.prayerName, isNext && styles.prayerNameActive]}>
-                        {PRAYER_NAMES[prayer]?.ar || prayer}
-                      </Text>
-                      {isNext && (
-                        <Text style={styles.prayerNextBadge}>التالية</Text>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.prayerItemRight}>
-                    <Text style={[styles.prayerTime, isNext && styles.prayerTimeActive]}>
-                      {formatTime(prayerTime, timeFormat)}
-                    </Text>
-                    
-                    {prayer !== 'Sunrise' && (
-                      <TouchableOpacity 
-                        style={styles.notificationButton}
-                        onPress={() => toggleNotification(prayer)}
-                      >
-                        <Ionicons 
-                          name={notifications[prayer] ? 'notifications' : 'notifications-outline'} 
-                          size={20} 
-                          color={notifications[prayer] ? Colors.primary : Colors.textLight} 
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* أزرار سريعة */}
-          <View style={styles.quickActions}>
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/qibla')}
-            >
-              <Ionicons name="compass" size={24} color={Colors.primary} />
-              <Text style={styles.quickActionText}>القبلة</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/hijri')}
-            >
-              <Ionicons name="calendar" size={24} color={Colors.secondary} />
-              <Text style={styles.quickActionText}>التقويم</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={handleShare}
-            >
-              <Ionicons name="share-social" size={24} color={Colors.success} />
-              <Text style={styles.quickActionText}>مشاركة</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* طريقة الحساب */}
-          <TouchableOpacity 
-            style={styles.methodCard}
-            onPress={() => setShowMethodModal(true)}
+        <View style={styles.headerRight}>
+          {/* زر تبديل العرض */}
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={toggleViewMode}
           >
-            <Ionicons name="calculator-outline" size={20} color={Colors.textLight} />
-            <Text style={styles.methodText}>
-              طريقة الحساب: {CALCULATION_METHODS.find(m => m.id === calculationMethod)?.nameAr}
-            </Text>
-            <Ionicons name="chevron-back" size={20} color={Colors.textLight} />
+            <MaterialCommunityIcons
+              name={viewMode === 'card' ? 'clock-outline' : 'card-text-outline'}
+              size={24}
+              color={isDarkMode ? '#fff' : '#333'}
+            />
           </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
 
-      {/* ============================================ */}
-      {/* نافذة طريقة الحساب */}
-      {/* ============================================ */}
-      <Modal
-        visible={showMethodModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowMethodModal(false)}
+          {/* زر الإعدادات */}
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={openSettings}
+          >
+            <MaterialCommunityIcons
+              name="cog-outline"
+              size={24}
+              color={isDarkMode ? '#fff' : '#333'}
+            />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#2f7659']}
+            tintColor="#2f7659"
+          />
+        }
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>طريقة الحساب</Text>
-              <TouchableOpacity onPress={() => setShowMethodModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
+        {/* رسالة الخطأ */}
+        {error && (
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            style={styles.errorContainer}
+          >
+            <MaterialCommunityIcons name="alert-circle" size={24} color="#ef5350" />
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => loadPrayerTimes(true)}
+            >
+              <Text style={styles.retryText}>{t('ui.button.retry', language)}</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
-            <ScrollView style={styles.methodsList}>
-              {CALCULATION_METHODS.map((method) => (
-                <TouchableOpacity
-                  key={method.id}
-                  style={[
-                    styles.methodItem,
-                    calculationMethod === method.id && styles.methodItemSelected,
-                  ]}
-                  onPress={async () => {
-                    setCalculationMethod(method.id);
-                    setShowMethodModal(false);
-                    await saveSettings();
-                    loadPrayerTimes();
-                  }}
-                >
-                  <View style={styles.methodItemContent}>
-                    <Text style={styles.methodItemName}>{method.nameAr}</Text>
-                    <Text style={styles.methodItemParams}>
-                      الفجر: {method.params.Fajr}° | العشاء: {method.params.Isha}
-                    </Text>
-                  </View>
-                  {calculationMethod === method.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        {/* كارت الصلاة القادمة أو المؤقت الدائري */}
+        {viewMode === 'card' ? (
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <PrayerCard
+              prayerTimes={prayerTimes}
+              hijriDate={hijriDate}
+              location={locationName}
+              language={language}
+              isDarkMode={isDarkMode}
+            />
+          </Animated.View>
+        ) : (
+          <Animated.View
+            entering={FadeInDown.delay(100).duration(500)}
+            style={styles.circularContainer}
+          >
+            <CountdownTimer
+              prayerTimes={prayerTimes}
+              language={language}
+              isDarkMode={isDarkMode}
+            />
+          </Animated.View>
+        )}
 
-            {/* تنسيق الوقت */}
-            <View style={styles.timeFormatSection}>
-              <Text style={styles.timeFormatLabel}>تنسيق الوقت</Text>
-              <View style={styles.timeFormatButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.timeFormatButton,
-                    timeFormat === '12h' && styles.timeFormatButtonActive,
-                  ]}
-                  onPress={() => {
-                    setTimeFormat('12h');
-                    saveSettings();
-                  }}
-                >
-                  <Text style={[
-                    styles.timeFormatButtonText,
-                    timeFormat === '12h' && styles.timeFormatButtonTextActive,
-                  ]}>12 ساعة</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.timeFormatButton,
-                    timeFormat === '24h' && styles.timeFormatButtonActive,
-                  ]}
-                  onPress={() => {
-                    setTimeFormat('24h');
-                    saveSettings();
-                  }}
-                >
-                  <Text style={[
-                    styles.timeFormatButtonText,
-                    timeFormat === '24h' && styles.timeFormatButtonTextActive,
-                  ]}>24 ساعة</Text>
-                </TouchableOpacity>
+        {/* تنبيه الثلث الأخير */}
+        {inLastThird && (
+          <Animated.View
+            entering={FadeInDown.delay(200).duration(500)}
+            style={styles.lastThirdBanner}
+          >
+            <MaterialCommunityIcons name="star-crescent" size={20} color="#ffd700" />
+            <Text style={styles.lastThirdText}>
+              أنت الآن في الثلث الأخير من الليل - وقت استجابة الدعاء
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* قائمة الصلوات */}
+        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+          <PrayerList
+            prayerTimes={prayerTimes}
+            language={language}
+            isDarkMode={isDarkMode}
+            notificationSettings={settings?.notifications}
+            onToggleNotification={handleToggleNotification}
+            showNotificationToggle={true}
+          />
+        </Animated.View>
+
+        {/* معلومات إضافية */}
+        {prayerTimes && (
+          <Animated.View
+            entering={FadeInDown.delay(400).duration(500)}
+            style={[styles.extraInfo, isDarkMode && styles.extraInfoDark]}
+          >
+            <Text style={[styles.extraTitle, isDarkMode && styles.textLight]}>
+              أوقات إضافية
+            </Text>
+
+            <View style={styles.extraRow}>
+              <View style={styles.extraItem}>
+                <MaterialCommunityIcons
+                  name="weather-night"
+                  size={20}
+                  color={isDarkMode ? '#aaa' : '#666'}
+                />
+                <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
+                  منتصف الليل
+                </Text>
+                <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
+                  {formatTime12h(prayerTimes.midnight)}
+                </Text>
+              </View>
+
+              <View style={styles.extraItem}>
+                <MaterialCommunityIcons
+                  name="star-crescent"
+                  size={20}
+                  color={isDarkMode ? '#aaa' : '#666'}
+                />
+                <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
+                  الثلث الأخير
+                </Text>
+                <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
+                  {formatTime12h(prayerTimes.lastThird)}
+                </Text>
               </View>
             </View>
-          </View>
-        </View>
-      </Modal>
+          </Animated.View>
+        )}
 
-      {/* ============================================ */}
-      {/* نافذة المشاركة */}
-      {/* ============================================ */}
-      <Modal
-        visible={showShareModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowShareModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>مشاركة المواقيت</Text>
-              <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.sharePreview}>
-              <Ionicons name="time" size={40} color={Colors.primary} />
-              <Text style={styles.sharePreviewTitle}>مواقيت الصلاة</Text>
-              <Text style={styles.sharePreviewSubtitle}>{location?.city}</Text>
-            </View>
-
-            <View style={styles.shareOptions}>
-              <TouchableOpacity 
-                style={styles.shareOption} 
-                onPress={() => {
-                  handleShare();
-                  setShowShareModal(false);
-                }}
-              >
-                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.primary }]}>
-                  <Ionicons name="share-outline" size={24} color={Colors.white} />
-                </View>
-                <Text style={styles.shareOptionText}>مشاركة</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.shareOption} onPress={handleCopy}>
-                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.secondary }]}>
-                  <Ionicons name="copy-outline" size={24} color={Colors.white} />
-                </View>
-                <Text style={styles.shareOptionText}>نسخ</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.shareOption} 
-                onPress={async () => {
-                  const text = formatPrayerTimesForShare();
-                  await Share.share({ message: text });
-                  setShowShareModal(false);
-                }}
-              >
-                <View style={[styles.shareOptionIcon, { backgroundColor: '#25D366' }]}>
-                  <Ionicons name="logo-whatsapp" size={24} color={Colors.white} />
-                </View>
-                <Text style={styles.shareOptionText}>واتساب</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+        {/* مسافة في الأسفل */}
+        <View style={styles.bottomSpace} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-// ============================================
+// ========================================
 // الأنماط
-// ============================================
+// ========================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#f5f5f5',
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.background,
-  },
-  loadingText: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
+  containerDark: {
+    backgroundColor: '#11151c',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  headerButton: {
-    padding: Spacing.sm,
+  headerLeft: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
-    color: Colors.text,
+    fontSize: 24,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
+  textLight: {
+    color: '#fff',
   },
-  locationCard: {
+  textMuted: {
+    color: '#999',
+  },
+  locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.md,
-    ...Shadows.sm,
-  },
-  locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  locationText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  dateInfo: {
-    alignItems: 'center',
-  },
-  hijriDate: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  gregorianDate: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textLight,
-  },
-  methodButton: {
-    padding: Spacing.sm,
-  },
-  nextPrayerCard: {
-    backgroundColor: Colors.primary,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.md,
-    ...Shadows.md,
-  },
-  nextPrayerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  nextPrayerLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.white,
-    opacity: 0.9,
-  },
-  nextPrayerRemaining: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.white,
-    fontWeight: '600',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: BorderRadius.sm,
-  },
-  nextPrayerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  nextPrayerIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  nextPrayerInfo: {
-    flex: 1,
-  },
-  nextPrayerName: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  nextPrayerTime: {
-    fontSize: Typography.sizes.xl,
-    color: Colors.white,
-    opacity: 0.9,
-    marginTop: 4,
-  },
-  prayersList: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginTop: Spacing.md,
-    overflow: 'hidden',
-    ...Shadows.sm,
-  },
-  prayerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  prayerItemActive: {
-    backgroundColor: Colors.primary + '10',
-  },
-  prayerItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  prayerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  prayerName: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  prayerNameActive: {
-    color: Colors.primary,
-  },
-  prayerNextBadge: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.primary,
+    gap: 4,
     marginTop: 2,
   },
-  prayerItemRight: {
+  locationText: {
+    fontSize: 13,
+    fontFamily: 'Cairo-Regular',
+    color: '#666',
+  },
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
+    gap: 8,
   },
-  prayerTime: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  prayerTimeActive: {
-    color: Colors.primary,
-  },
-  notificationButton: {
-    padding: Spacing.xs,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  quickActionButton: {
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  quickActionText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
-    marginTop: Spacing.xs,
-  },
-  methodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xl,
-    gap: Spacing.sm,
-    ...Shadows.sm,
-  },
-  methodText: {
-    flex: 1,
-    fontSize: Typography.sizes.sm,
-    color: Colors.textSecondary,
-    textAlign: 'right',
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    height: '70%',
-    padding: Spacing.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
-  },
-  modalTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  methodsList: {
-    flex: 1,
-  },
-  methodItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
-  },
-  methodItemSelected: {
-    borderColor: Colors.primary,
-    borderWidth: 2,
-  },
-  methodItemContent: {
-    flex: 1,
-  },
-  methodItemName: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'right',
-  },
-  methodItemParams: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.textLight,
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  timeFormatSection: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  timeFormatLabel: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: Spacing.md,
-    textAlign: 'right',
-  },
-  timeFormatButtons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  timeFormatButton: {
-    flex: 1,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    ...Shadows.sm,
-  },
-  timeFormatButtonActive: {
-    backgroundColor: Colors.primary,
-  },
-  timeFormatButtonText: {
-    fontSize: Typography.sizes.md,
-    color: Colors.text,
-  },
-  timeFormatButtonTextActive: {
-    color: Colors.white,
-    fontWeight: '600',
-  },
-  sharePreview: {
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  sharePreviewTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
-    color: Colors.text,
-    marginTop: Spacing.sm,
-  },
-  sharePreviewSubtitle: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textLight,
-    marginTop: 4,
-  },
-  shareOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: Spacing.lg,
-  },
-  shareOption: {
-    alignItems: 'center',
-  },
-  shareOptionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
   },
-  shareOptionText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingVertical: 10,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    marginHorizontal: 16,
+    marginVertical: 10,
+    padding: 15,
+    borderRadius: 12,
+    gap: 10,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Cairo-Medium',
+    color: '#c62828',
+  },
+  retryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#ef5350',
+    borderRadius: 8,
+  },
+  retryText: {
+    fontSize: 12,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#fff',
+  },
+  circularContainer: {
+    paddingVertical: 30,
+  },
+  lastThirdBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1a237e',
+    marginHorizontal: 16,
+    marginVertical: 10,
+    padding: 15,
+    borderRadius: 12,
+    gap: 10,
+  },
+  lastThirdText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Cairo-Medium',
+    color: '#fff',
+  },
+  extraInfo: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  extraInfoDark: {
+    backgroundColor: '#1a1a2e',
+  },
+  extraTitle: {
+    fontSize: 16,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  extraRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  extraItem: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  extraLabel: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#666',
+  },
+  extraValue: {
+    fontSize: 16,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+  },
+  bottomSpace: {
+    height: 100,
   },
 });
