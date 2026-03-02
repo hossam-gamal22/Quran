@@ -13,10 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
-import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../constants/theme';
-import { APP_CONFIG } from '../constants/app';
+import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
+import { APP_CONFIG } from '../../constants/app';
 import { Share } from 'react-native';
-import { copyToClipboard } from '../lib/share-service';
+import { copyToClipboard } from '../../lib/share-service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COMPASS_SIZE = SCREEN_WIDTH * 0.75;

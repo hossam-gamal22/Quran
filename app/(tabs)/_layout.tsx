@@ -5,8 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors } from '../constants/theme';
-import { AppConfigProvider } from '../lib/app-config-context';
+import { Colors } from '../../constants/theme';
+import { AppConfigProvider } from '../../lib/app-config-context';
 
 SplashScreen.preventAutoHideAsync();
 
