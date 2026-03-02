@@ -6,24 +6,15 @@ import {
   Eye,
   Clock,
   TrendingUp,
-  Calendar,
   Smartphone,
   Globe,
   BookOpen,
   Moon,
-  Star,
-  Share2,
   Download,
-  RefreshCw,
   Loader2,
   Activity,
-  Target,
-  Zap,
-  Award,
-  MapPin
+  Target
 } from 'lucide-react';
-
-// ==================== المكون الرئيسي ====================
 
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
