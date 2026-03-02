@@ -1,473 +1,557 @@
 // app/(tabs)/index.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// الصفحة الرئيسية - الأذكار - روح المسلم
+
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Animated,
+  TouchableOpacity,
   RefreshControl,
   Dimensions,
-  Share,
-  ActivityIndicator,
+  StatusBar,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
-import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
-import { fetchPrayerTimesByCoords, getNextPrayer, formatTime, PRAYER_NAMES } from '../../lib/prayer-api';
-import { useAppConfig } from '../../lib/app-config-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { useSettings } from '@/contexts/SettingsContext';
+import { useSeasonal } from '@/contexts/SeasonalContext';
+import { getHijriDate } from '@/lib/hijri-date';
+import GlassCard from '@/components/ui/GlassCard';
 
-interface Feature {
-  id: string;
-  title: string;
-  icon: string;
-  color: string;
-  route: string;
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2;
+
+// ========================================
+// الثوابت
+// ========================================
+
+const AZKAR_CATEGORIES = [
+  { id: 'morning', name: 'أذكار الصباح', icon: 'weather-sunny', color: '#f5a623', count: 33 },
+  { id: 'evening', name: 'أذكار المساء', icon: 'weather-night', color: '#5d4e8c', count: 33 },
+  { id: 'sleep', name: 'أذكار النوم', icon: 'bed', color: '#3a7ca5', count: 15 },
+  { id: 'wake', name: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
+  { id: 'prayer', name: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', count: 20 },
+  { id: 'misc', name: 'أذكار متنوعة', icon: 'format-list-text', color: '#e91e63', count: 50 },
+];
+
+const QUICK_ACCESS = [
+  { id: 'ayat_kursi', name: 'آية الكرسي', icon: 'shield-star', color: '#DAA520' },
+  { id: 'tasbih', name: 'التسبيح', icon: 'circle-multiple', color: '#2f7659' },
+  { id: 'istighfar', name: 'الاستغفار', icon: 'heart', color: '#e91e63' },
+  { id: 'salawat', name: 'الصلاة على النبي', icon: 'star-crescent', color: '#3a7ca5' },
+];
+
+const DUA_CATEGORIES = [
+  { id: 'quran', name: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5' },
+  { id: 'sunnah', name: 'أدعية من السنة', icon: 'book-cross', color: '#2f7659' },
+  { id: 'ruqya', name: 'الرقية الشرعية', icon: 'shield-check', color: '#5d4e8c' },
+];
+
+// ========================================
+// مكونات فرعية
+// ========================================
+
+interface CategoryCardProps {
+  category: typeof AZKAR_CATEGORIES[0];
+  onPress: () => void;
+  isDarkMode: boolean;
+  index: number;
 }
 
-const FEATURES: Feature[] = [
-  { id: 'quran', title: 'القرآن الكريم', icon: 'book', color: '#059669', route: '/(tabs)/quran' },
-  { id: 'azkar', title: 'الأذكار', icon: 'leaf', color: '#10B981', route: '/azkar/morning' },
-  { id: 'prayer', title: 'مواقيت الصلاة', icon: 'time', color: '#0284C7', route: '/(tabs)/prayer' },
-  { id: 'qibla', title: 'القبلة', icon: 'compass', color: '#6366F1', route: '/qibla' },
-  { id: 'tasbih', title: 'التسبيح', icon: 'radio-button-on', color: '#8B5CF6', route: '/tasbih' },
-  { id: 'names', title: 'أسماء الله', icon: 'sparkles', color: '#D4AF37', route: '/names' },
-{ id: 'ruqyah', title: 'الرقية', icon: 'shield-checkmark', color: '#EF4444', route: '/ruqya' },
-  { id: 'hijri', title: 'التقويم', icon: 'calendar', color: '#F59E0B', route: '/hijri' },
-];
+const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMode, index }) => {
+  return (
+    <Animated.View
+      entering={FadeInRight.delay(index * 80).duration(400)}
+      style={styles.categoryCardContainer}
+    >
+      <TouchableOpacity
+        style={[styles.categoryCard, isDarkMode && styles.categoryCardDark]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.categoryIcon, { backgroundColor: `${category.color}20` }]}>
+          <MaterialCommunityIcons name={category.icon as any} size={28} color={category.color} />
+        </View>
+        <Text style={[styles.categoryName, isDarkMode && styles.textLight]} numberOfLines={1}>
+          {category.name}
+        </Text>
+        <Text style={[styles.categoryCount, isDarkMode && styles.textMuted]}>
+          {category.count} ذكر
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
 
-const DAILY_VERSES = [
-  { text: 'إِنَّ مَعَ الْعُسْرِ يُسْرًا', surah: 'الشرح', ayah: 6 },
-  { text: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', surah: 'الطلاق', ayah: 3 },
-  { text: 'فَاذْكُرُونِي أَذْكُرْكُمْ', surah: 'البقرة', ayah: 152 },
-  { text: 'وَاصْبِرْ وَمَا صَبْرُكَ إِلَّا بِاللَّهِ', surah: 'النحل', ayah: 127 },
-  { text: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً', surah: 'البقرة', ayah: 201 },
-  { text: 'وَقُل رَّبِّ زِدْنِي عِلْمًا', surah: 'طه', ayah: 114 },
-  { text: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ', surah: 'البقرة', ayah: 153 },
-  { text: 'وَمَا تَوْفِيقِي إِلَّا بِاللَّهِ', surah: 'هود', ayah: 88 },
-  { text: 'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي', surah: 'طه', ayah: 25 },
-  { text: 'وَعَسَىٰ أَن تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَّكُمْ', surah: 'البقرة', ayah: 216 },
-];
+interface QuickAccessItemProps {
+  item: typeof QUICK_ACCESS[0];
+  onPress: () => void;
+  isDarkMode: boolean;
+  index: number;
+}
 
-const DAILY_AZKAR = [
-  { text: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ', source: 'متفق عليه' },
-  { text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللهِ', source: 'متفق عليه' },
-  { text: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ', source: 'رواه مسلم' },
-  { text: 'أَسْتَغْفِرُ اللهَ الْعَظِيمَ وَأَتُوبُ إِلَيْهِ', source: 'رواه البخاري' },
-  { text: 'الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ', source: 'القرآن الكريم' },
-  { text: 'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ', source: 'متفق عليه' },
-  { text: 'سُبْحَانَ اللهِ وَالْحَمْدُ لِلَّهِ وَلَا إِلَهَ إِلَّا اللهُ وَاللهُ أَكْبَرُ', source: 'رواه مسلم' },
-  { text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ', source: 'رواه الترمذي' },
-];
+const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDarkMode, index }) => {
+  return (
+    <Animated.View entering={FadeInDown.delay(200 + index * 60).duration(400)}>
+      <TouchableOpacity
+        style={[styles.quickAccessItem, isDarkMode && styles.quickAccessItemDark]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.quickAccessIcon, { backgroundColor: `${item.color}20` }]}>
+          <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
+        </View>
+        <Text style={[styles.quickAccessName, isDarkMode && styles.textLight]} numberOfLines={1}>
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// ========================================
+// المكون الرئيسي
+// ========================================
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
+  const { isDarkMode } = useSettings();
+  const { currentSeason, dailyData } = useSeasonal();
   
-  const [darkMode, setDarkMode] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [greeting, setGreeting] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [prayerTimes, setPrayerTimes] = useState<any>(null);
-  const [nextPrayer, setNextPrayer] = useState<any>(null);
-  const [hijriDate, setHijriDate] = useState<any>(null);
-  const [location, setLocation] = useState<string>('');
-  const [dailyVerse, setDailyVerse] = useState<{ text: string; surah: string; ayah: number } | null>(null);
-  const [dailyZikr, setDailyZikr] = useState<{ text: string; source: string } | null>(null);
-  
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const currentColors = darkMode ? DarkColors : Colors;
+  // التاريخ الهجري
+  const hijriDate = useMemo(() => getHijriDate(), []);
 
-  useEffect(() => {
-    initializeApp();
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // تحديث البيانات
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsRefreshing(false);
   }, []);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (prayerTimes) {
-        setNextPrayer(getNextPrayer(prayerTimes.timings));
-      }
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [prayerTimes]);
-
-  const initializeApp = async () => {
-    setIsLoading(true);
-    await loadSettings();
-    setGreetingMessage();
-    await loadData();
-    
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-    ]).start();
-    
-    setIsLoading(false);
+  const navigateToCategory = (categoryId: string) => {
+    router.push(`/azkar/${categoryId}`);
   };
 
-  const loadSettings = async () => {
-    try {
-      const settings = await AsyncStorage.getItem('app_settings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setDarkMode(parsed.darkMode ?? false);
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
+  const navigateToQuickAccess = (itemId: string) => {
+    router.push(`/azkar/${itemId}`);
   };
 
-  const setGreetingMessage = () => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) {
-      setGreeting('صباح الخير');
-    } else if (hour >= 12 && hour < 17) {
-      setGreeting('مساء الخير');
-    } else if (hour >= 17 && hour < 21) {
-      setGreeting('مساء النور');
-    } else {
-      setGreeting('تصبح على خير');
-    }
+  const navigateToDuas = (categoryId: string) => {
+    router.push(`/duas/${categoryId}`);
   };
-
-  const loadData = async () => {
-    try {
-      await loadPrayerTimes();
-      loadDailyVerse();
-      loadDailyZikr();
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const loadPrayerTimes = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        const { latitude, longitude } = loc.coords;
-        
-        const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        setLocation(address?.city || address?.region || address?.country || '');
-
-        const data = await fetchPrayerTimesByCoords(latitude, longitude);
-        if (data) {
-          setPrayerTimes(data);
-          setNextPrayer(getNextPrayer(data.timings));
-          setHijriDate(data.date?.hijri);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading prayer times:', error);
-    }
-  };
-
-  const loadDailyVerse = () => {
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-    setDailyVerse(DAILY_VERSES[dayOfYear % DAILY_VERSES.length]);
-  };
-
-  const loadDailyZikr = () => {
-    const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-    setDailyZikr(DAILY_AZKAR[dayOfYear % DAILY_AZKAR.length]);
-  };
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refreshConfig();
-    await loadData();
-    setRefreshing(false);
-  }, [refreshConfig]);
-
-  const getShareSignature = () => `\n\n📱 تطبيق ${appConfig.name}`;
-
-  const getShareWithDownload = () => {
-    let signature = `\n\n📱 تطبيق ${appConfig.name}`;
-    if (appConfig.downloadLinks?.android) {
-      signature += `\n📥 حمّل التطبيق: ${appConfig.downloadLinks.android}`;
-    }
-    return signature;
-  };
-
-  const shareApp = async () => {
-    try {
-      await Share.share({ message: `${appConfig.description}${getShareWithDownload()}` });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const shareVerse = async () => {
-    if (!dailyVerse) return;
-    try {
-      await Share.share({
-        message: `﴿ ${dailyVerse.text} ﴾\n📖 ${dailyVerse.surah} - آية ${dailyVerse.ayah}${getShareSignature()}`,
-      });
-    } catch (error) {
-      console.error('Error sharing verse:', error);
-    }
-  };
-
-  const shareZikr = async () => {
-    if (!dailyZikr) return;
-    try {
-      await Share.share({
-        message: `📿 ذكر اليوم\n\n「 ${dailyZikr.text} 」\n\n📚 ${dailyZikr.source}${getShareSignature()}`,
-      });
-    } catch (error) {
-      console.error('Error sharing zikr:', error);
-    }
-  };
-
-  const getEnabledFeatures = () => {
-    if (!appConfig.features) return FEATURES;
-    return FEATURES.filter(feature => {
-      const featureKey = feature.id as keyof typeof appConfig.features;
-      return appConfig.features[featureKey] !== false;
-    });
-  };
-
-  if (isLoading || configLoading) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: currentColors.background }]}>
-        <ActivityIndicator size="large" color={currentColors.primary} />
-        <Text style={[styles.loadingText, { color: currentColors.textLight }]}>جاري التحميل...</Text>
-      </View>
-    );
-  }
-
-  if (appConfig.maintenanceMode) {
-    return (
-      <View style={[styles.maintenanceContainer, { backgroundColor: currentColors.background }]}>
-        <Ionicons name="construct" size={80} color={currentColors.primary} />
-        <Text style={[styles.maintenanceTitle, { color: currentColors.text }]}>التطبيق تحت الصيانة</Text>
-        <Text style={[styles.maintenanceText, { color: currentColors.textLight }]}>نعمل على تحسين التطبيق، يرجى المحاولة لاحقاً</Text>
-        <TouchableOpacity style={[styles.retryButton, { backgroundColor: currentColors.primary }]} onPress={onRefresh}>
-          <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
-    <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-      <View style={[styles.header, { backgroundColor: currentColors.surface }]}>
-        <View style={styles.headerLeft}>
-          <Text style={[styles.greeting, { color: currentColors.textLight }]}>{greeting}</Text>
-          <Text style={[styles.appName, { color: currentColors.primary }]}>{appConfig.name}</Text>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <View style={styles.headerContent}>
+          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>روح المسلم</Text>
+          <Text style={[styles.headerDate, isDarkMode && styles.textMuted]}>
+            {hijriDate.day} {hijriDate.monthName} {hijriDate.year}
+          </Text>
         </View>
-        <TouchableOpacity onPress={shareApp} style={styles.shareButton}>
-          <Ionicons name="share-social-outline" size={24} color={currentColors.text} />
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => router.push('/seasonal')}
+        >
+          <MaterialCommunityIcons
+            name="calendar-star"
+            size={26}
+            color={isDarkMode ? '#fff' : '#333'}
+          />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <ScrollView
-        style={styles.content}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentColors.primary]} tintColor={currentColors.primary} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={isDarkMode ? '#fff' : '#2f7659'}
+            colors={['#2f7659']}
+          />
         }
       >
-        <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          
-          {nextPrayer && (
-            <TouchableOpacity 
-              style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
-              onPress={() => router.push('/(tabs)/prayer')}
-              activeOpacity={0.8}
+        {/* بطاقة الموسم */}
+        {currentSeason && (
+          <Animated.View entering={FadeIn.duration(600)}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push(`/seasonal/${currentSeason.type}`)}
             >
-              <View style={styles.nextPrayerHeader}>
-                <View>
-                  <Text style={styles.nextPrayerLabel}>الصلاة القادمة</Text>
-                  <Text style={styles.nextPrayerName}>{PRAYER_NAMES[nextPrayer.name]?.ar || nextPrayer.name}</Text>
-                </View>
-                <View style={styles.nextPrayerTimeContainer}>
-                  <Text style={styles.nextPrayerTime}>{formatTime(nextPrayer.time)}</Text>
-                  {nextPrayer.remaining && <Text style={styles.nextPrayerRemaining}>{nextPrayer.remaining}</Text>}
-                </View>
-              </View>
-              {(hijriDate || location) && (
-                <View style={styles.hijriContainer}>
-                  {hijriDate && <Text style={styles.hijriText}>{hijriDate.day} {hijriDate.month?.ar} {hijriDate.year}هـ</Text>}
-                  {location && (
-                    <View style={styles.locationContainer}>
-                      <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
-                      <Text style={styles.locationText}>{location}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          )}
-
-          {!nextPrayer && (
-            <TouchableOpacity 
-              style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
-              onPress={() => router.push('/(tabs)/prayer')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.noPrayerContainer}>
-                <Ionicons name="time-outline" size={32} color="rgba(255,255,255,0.9)" />
-                <Text style={styles.noPrayerText}>اضغط لعرض مواقيت الصلاة</Text>
-                <Text style={styles.noPrayerSubtext}>يتطلب تفعيل الموقع</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-
-          {dailyVerse && (
-            <TouchableOpacity 
-              style={[styles.verseCard, { backgroundColor: currentColors.surface }]}
-              onPress={() => router.push('/(tabs)/quran')}
-              onLongPress={shareVerse}
-              activeOpacity={0.8}
-            >
-              <View style={styles.verseHeader}>
-                <Ionicons name="book" size={20} color={Colors.quranGreen} />
-                <Text style={[styles.verseLabel, { color: Colors.quranGreen }]}>آية اليوم</Text>
-                <TouchableOpacity onPress={shareVerse} style={styles.shareIconButton}>
-                  <Ionicons name="share-outline" size={18} color={currentColors.textLight} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.verseText, { color: currentColors.text }]}>﴿ {dailyVerse.text} ﴾</Text>
-              <Text style={[styles.verseRef, { color: currentColors.textLight }]}>{dailyVerse.surah} - آية {dailyVerse.ayah}</Text>
-            </TouchableOpacity>
-          )}
-
-          {dailyZikr && (
-            <TouchableOpacity 
-              style={[styles.zikrCard, { backgroundColor: currentColors.surface }]}
-              onPress={() => router.push('/azkar/morning')}
-              onLongPress={shareZikr}
-              activeOpacity={0.8}
-            >
-              <View style={styles.zikrHeader}>
-                <Ionicons name="leaf" size={20} color={Colors.success} />
-                <Text style={[styles.zikrLabel, { color: Colors.success }]}>ذكر اليوم</Text>
-                <TouchableOpacity onPress={shareZikr} style={styles.shareIconButton}>
-                  <Ionicons name="share-outline" size={18} color={currentColors.textLight} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.zikrText, { color: currentColors.text }]}>{dailyZikr.text}</Text>
-              <Text style={[styles.zikrSource, { color: currentColors.textLight }]}>{dailyZikr.source}</Text>
-            </TouchableOpacity>
-          )}
-
-          <Text style={[styles.sectionTitle, { color: currentColors.text }]}>الميزات</Text>
-          <View style={styles.featuresGrid}>
-            {getEnabledFeatures().map((feature) => (
-              <TouchableOpacity
-                key={feature.id}
-                style={styles.featureItem}
-                onPress={() => router.push(feature.route as any)}
-                activeOpacity={0.7}
+              <LinearGradient
+                colors={[currentSeason.color, `${currentSeason.color}cc`]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.seasonCard}
               >
-                <View style={[styles.featureIcon, { backgroundColor: feature.color + '15' }]}>
-                  <Ionicons name={feature.icon as any} size={28} color={feature.color} />
+                <View style={styles.seasonContent}>
+                  <MaterialCommunityIcons name={currentSeason.icon as any} size={32} color="#fff" />
+                  <View style={styles.seasonInfo}>
+                    <Text style={styles.seasonName}>{currentSeason.nameAr}</Text>
+                    <Text style={styles.seasonGreeting}>{dailyData.greeting}</Text>
+                  </View>
                 </View>
-                <Text style={[styles.featureTitle, { color: currentColors.text }]}>{feature.title}</Text>
-              </TouchableOpacity>
+                <View style={styles.seasonBadge}>
+                  <Text style={styles.seasonDay}>اليوم {currentSeason.currentDay}</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
+        {/* الوصول السريع */}
+        <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>وصول سريع</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickAccessContainer}
+          >
+            {QUICK_ACCESS.map((item, index) => (
+              <QuickAccessItem
+                key={item.id}
+                item={item}
+                onPress={() => navigateToQuickAccess(item.id)}
+                isDarkMode={isDarkMode}
+                index={index}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
+
+        {/* أقسام الأذكار */}
+        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الأذكار</Text>
+          <View style={styles.categoriesGrid}>
+            {AZKAR_CATEGORIES.map((category, index) => (
+              <CategoryCard
+                key={category.id}
+                category={category}
+                onPress={() => navigateToCategory(category.id)}
+                isDarkMode={isDarkMode}
+                index={index}
+              />
             ))}
           </View>
-
-          <Text style={[styles.sectionTitle, { color: currentColors.text }]}>الأذكار</Text>
-          <View style={styles.azkarQuick}>
-            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#F59E0B15' }]} onPress={() => router.push('/azkar/morning')} activeOpacity={0.7}>
-              <Ionicons name="sunny" size={24} color="#F59E0B" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار الصباح</Text>
-              <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#6366F115' }]} onPress={() => router.push('/azkar/evening')} activeOpacity={0.7}>
-              <Ionicons name="moon" size={24} color="#6366F1" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار المساء</Text>
-              <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#10B98115' }]} onPress={() => router.push('/azkar/after-prayer')} activeOpacity={0.7}>
-              <Ionicons name="checkmark-done" size={24} color="#10B981" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار بعد الصلاة</Text>
-              <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#8B5CF615' }]} onPress={() => router.push('/azkar/sleep')} activeOpacity={0.7}>
-              <Ionicons name="bed" size={24} color="#8B5CF6" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار النوم</Text>
-              <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={[styles.appInfoCard, { backgroundColor: currentColors.surface }]}>
-            <Text style={[styles.appInfoName, { color: appConfig.primaryColor || currentColors.primary }]}>{appConfig.name}</Text>
-            <Text style={[styles.appInfoVersion, { color: currentColors.textLight }]}>الإصدار {appConfig.version}</Text>
-          </View>
-
-          <View style={{ height: 100 }} />
         </Animated.View>
+
+        {/* الأدعية والرقية */}
+        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الأدعية والرقية</Text>
+          <View style={styles.duasContainer}>
+            {DUA_CATEGORIES.map((category, index) => (
+              <Animated.View
+                key={category.id}
+                entering={FadeInRight.delay(300 + index * 80).duration(400)}
+              >
+                <TouchableOpacity
+                  style={[styles.duaCard, isDarkMode && styles.duaCardDark]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    navigateToDuas(category.id);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.duaIcon, { backgroundColor: `${category.color}20` }]}>
+                    <MaterialCommunityIcons name={category.icon as any} size={24} color={category.color} />
+                  </View>
+                  <Text style={[styles.duaName, isDarkMode && styles.textLight]}>{category.name}</Text>
+                  <MaterialCommunityIcons
+                    name="chevron-left"
+                    size={22}
+                    color={isDarkMode ? '#666' : '#ccc'}
+                  />
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* روابط إضافية */}
+        <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+          <View style={styles.extraLinks}>
+            <TouchableOpacity
+              style={[styles.extraLinkCard, isDarkMode && styles.extraLinkCardDark]}
+              onPress={() => router.push('/worship-tracker')}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#2f7659', '#1d5a3a']}
+                style={styles.extraLinkGradient}
+              >
+                <MaterialCommunityIcons name="chart-line" size={24} color="#fff" />
+                <Text style={styles.extraLinkText}>تتبع العبادات</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.extraLinkCard, isDarkMode && styles.extraLinkCardDark]}
+              onPress={() => router.push('/khatma')}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#3a7ca5', '#2a5a7a']}
+                style={styles.extraLinkGradient}
+              >
+                <MaterialCommunityIcons name="book-check" size={24} color="#fff" />
+                <Text style={styles.extraLinkText}>ختمة القرآن</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+
+        <View style={styles.bottomSpace} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
+// ========================================
+// الأنماط
+// ========================================
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: Spacing.md, fontSize: Typography.sizes.md },
-  maintenanceContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-  maintenanceTitle: { fontSize: Typography.sizes.xxl, fontWeight: '700', marginTop: Spacing.lg, textAlign: 'center' },
-  maintenanceText: { fontSize: Typography.sizes.md, marginTop: Spacing.sm, textAlign: 'center' },
-  retryButton: { marginTop: Spacing.xl, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: BorderRadius.lg },
-  retryButtonText: { color: '#fff', fontSize: Typography.sizes.md, fontWeight: '600' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingTop: Spacing.xl + 20, paddingBottom: Spacing.md, ...Shadows.sm },
-  headerLeft: {},
-  greeting: { fontSize: Typography.sizes.sm },
-  appName: { fontSize: Typography.sizes.xxl, fontWeight: '700' },
-  shareButton: { padding: Spacing.sm, borderRadius: BorderRadius.full },
-  content: { flex: 1, paddingHorizontal: Spacing.md },
-  nextPrayerCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginTop: Spacing.md, ...Shadows.lg },
-  nextPrayerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  nextPrayerLabel: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.9 },
-  nextPrayerName: { fontSize: Typography.sizes.xxl, fontWeight: '700', color: '#fff', marginTop: 4 },
-  nextPrayerTimeContainer: { alignItems: 'flex-end' },
-  nextPrayerTime: { fontSize: Typography.sizes.xxl, fontWeight: '700', color: '#fff' },
-  nextPrayerRemaining: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.9, marginTop: 4 },
-  hijriContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
-  hijriText: { fontSize: Typography.sizes.md, color: '#fff', opacity: 0.9 },
-  locationContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationText: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.8 },
-  noPrayerContainer: { alignItems: 'center', paddingVertical: Spacing.md },
-  noPrayerText: { fontSize: Typography.sizes.lg, color: '#fff', fontWeight: '600', marginTop: Spacing.sm },
-  noPrayerSubtext: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.8, marginTop: 4 },
-  verseCard: { borderRadius: BorderRadius.lg, padding: Spacing.lg, marginTop: Spacing.md, borderRightWidth: 4, borderRightColor: Colors.quranGreen, ...Shadows.sm },
-  verseHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  verseLabel: { fontSize: Typography.sizes.sm, fontWeight: '600', flex: 1 },
-  shareIconButton: { padding: 4 },
-  verseText: { fontSize: Typography.sizes.xl, textAlign: 'center', lineHeight: 36, marginVertical: Spacing.md },
-  verseRef: { fontSize: Typography.sizes.sm, textAlign: 'center' },
-  zikrCard: { borderRadius: BorderRadius.lg, padding: Spacing.lg, marginTop: Spacing.md, borderRightWidth: 4, borderRightColor: Colors.success, ...Shadows.sm },
-  zikrHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  zikrLabel: { fontSize: Typography.sizes.sm, fontWeight: '600', flex: 1 },
-  zikrText: { fontSize: Typography.sizes.lg, textAlign: 'center', lineHeight: 30, marginVertical: Spacing.sm },
-  zikrSource: { fontSize: Typography.sizes.xs, textAlign: 'center' },
-  sectionTitle: { fontSize: Typography.sizes.lg, fontWeight: '600', marginTop: Spacing.xl, marginBottom: Spacing.md, textAlign: 'right' },
-  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  featureItem: { width: (SCREEN_WIDTH - Spacing.md * 2 - Spacing.sm * 3) / 4, alignItems: 'center', padding: Spacing.sm },
-  featureIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
-  featureTitle: { fontSize: Typography.sizes.xs, textAlign: 'center' },
-  azkarQuick: { gap: Spacing.sm },
-  azkarQuickItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.md, gap: Spacing.md },
-  azkarQuickText: { fontSize: Typography.sizes.md, fontWeight: '500', flex: 1, textAlign: 'right' },
-  appInfoCard: { alignItems: 'center', padding: Spacing.lg, marginTop: Spacing.xl, borderRadius: BorderRadius.lg },
-  appInfoName: { fontSize: Typography.sizes.lg, fontWeight: '700' },
-  appInfoVersion: { fontSize: Typography.sizes.xs, marginTop: 4 },
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  containerDark: {
+    backgroundColor: '#11151c',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerContent: {},
+  headerTitle: {
+    fontSize: 28,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+  },
+  headerDate: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#666',
+    marginTop: 2,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(47,118,89,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textLight: {
+    color: '#fff',
+  },
+  textMuted: {
+    color: '#999',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+  },
+
+  // بطاقة الموسم
+  seasonCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  },
+  seasonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  seasonInfo: {
+    flex: 1,
+  },
+  seasonName: {
+    fontSize: 20,
+    fontFamily: 'Cairo-Bold',
+    color: '#fff',
+  },
+  seasonGreeting: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  seasonBadge: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  seasonDay: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Medium',
+    color: '#fff',
+  },
+
+  // العناوين
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+
+  // الوصول السريع
+  quickAccessContainer: {
+    paddingRight: 16,
+    gap: 10,
+  },
+  quickAccessItem: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    width: 90,
+  },
+  quickAccessItemDark: {
+    backgroundColor: '#1a1a2e',
+  },
+  quickAccessIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickAccessName: {
+    fontSize: 11,
+    fontFamily: 'Cairo-Medium',
+    color: '#333',
+    textAlign: 'center',
+  },
+
+  // شبكة الأقسام
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -6,
+  },
+  categoryCardContainer: {
+    width: '50%',
+    padding: 6,
+  },
+  categoryCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    alignItems: 'center',
+  },
+  categoryCardDark: {
+    backgroundColor: '#1a1a2e',
+  },
+  categoryIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+    textAlign: 'center',
+  },
+  categoryCount: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#999',
+    marginTop: 4,
+  },
+
+  // الأدعية
+  duasContainer: {
+    gap: 10,
+  },
+  duaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+  },
+  duaCardDark: {
+    backgroundColor: '#1a1a2e',
+  },
+  duaIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  duaName: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+    marginHorizontal: 14,
+  },
+
+  // روابط إضافية
+  extraLinks: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  extraLinkCard: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  extraLinkCardDark: {},
+  extraLinkGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  extraLinkText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Bold',
+    color: '#fff',
+  },
+
+  bottomSpace: {
+    height: 100,
+  },
 });
