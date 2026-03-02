@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/layout/widget_next_prayer_large.xml -->
+<!-- تخطيط ويدجت مواقيت الصلاة الكبير - روح المسلم -->
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background">
+
+    <!-- الهيدر -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="مواقيت الصلاة"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="2dp">
+
+                <ImageView
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:src="@drawable/ic_location"
+                    android:tint="#CCFFFFFF" />
+
+                <TextView
+                    android:id="@+id/tv_location"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:textColor="#CCFFFFFF"
+                    android:textSize="11sp"
+                    tools:text="مكة المكرمة" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:id="@+id/tv_hijri_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#EEFFFFFF"
+                android:textSize="12sp"
+                tools:text="15 رمضان 1446" />
+
+            <TextView
+                android:id="@+id/tv_gregorian_date"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#CCFFFFFF"
+                android:textSize="10sp"
+                tools:text="الأحد 2 مارس" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- الصلاة القادمة -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:padding="12dp"
+        android:background="@drawable/card_background_transparent"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="الصلاة القادمة"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tv_prayer_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                tools:text="الظهر" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:id="@+id/tv_prayer_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                tools:text="12:15 م" />
+
+            <TextView
+                android:id="@+id/tv_time_remaining"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="3dp"
+                android:background="@drawable/badge_background"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                tools:text="متبقي 2:30" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- قائمة الصلوات -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:orientation="vertical">
+
+        <!-- الفجر -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_fajr" />
+
+        <!-- الشروق -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_sunrise" />
+
+        <!-- الظهر -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_dhuhr" />
+
+        <!-- العصر -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_asr" />
+
+        <!-- المغرب -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_maghrib" />
+
+        <!-- العشاء -->
+        <include
+            layout="@layout/widget_prayer_item"
+            android:id="@+id/prayer_isha" />
+
+    </LinearLayout>
+
+</LinearLayout>
