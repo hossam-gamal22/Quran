@@ -1,1385 +1,667 @@
-import React, { useState, useEffect } from 'react';
+// app/(tabs)/settings.tsx
+// صفحة الإعدادات الرئيسية - روح المسلم
+
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
-  Modal,
+  TouchableOpacity,
   Switch,
+  StatusBar,
   Alert,
   Linking,
-  Dimensions,
+  Share,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, BorderRadius, Shadows, Typography, DarkColors } from '../../constants/theme';
-import { APP_CONFIG, APP_NAME } from '../../constants/app';
-import { Share } from 'react-native';
+import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Application from 'expo-application';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { useSettings, Language, ThemeMode } from '@/contexts/SettingsContext';
+import GlassCard from '@/components/ui/GlassCard';
 
-// ============================================
-// الأنواع
-// ============================================
+// ========================================
+// الثوابت
+// ========================================
 
-interface SettingItem {
-  id: string;
+const LANGUAGES: { code: Language; name: string; nativeName: string }[] = [
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
+  { code: 'en', name: 'English', nativeName: 'English' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو' },
+  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe' },
+  { code: 'fr', name: 'French', nativeName: 'Français' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' },
+  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español' },
+];
+
+const THEMES: { mode: ThemeMode; name: string; icon: string }[] = [
+  { mode: 'light', name: 'فاتح', icon: 'white-balance-sunny' },
+  { mode: 'dark', name: 'داكن', icon: 'moon-waning-crescent' },
+  { mode: 'system', name: 'تلقائي', icon: 'theme-light-dark' },
+];
+
+// ========================================
+// مكونات فرعية
+// ========================================
+
+interface SettingItemProps {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  iconColor?: string;
   title: string;
   subtitle?: string;
-  icon: string;
-  iconColor: string;
-  type: 'navigate' | 'toggle' | 'select' | 'action';
-  value?: any;
-  options?: { label: string; value: any }[];
+  value?: string;
+  showArrow?: boolean;
+  showSwitch?: boolean;
+  switchValue?: boolean;
   onPress?: () => void;
+  onSwitchChange?: (value: boolean) => void;
+  isDarkMode?: boolean;
 }
 
-interface SettingSection {
-  id: string;
+const SettingItem: React.FC<SettingItemProps> = ({
+  icon,
+  iconColor = '#2f7659',
+  title,
+  subtitle,
+  value,
+  showArrow = true,
+  showSwitch = false,
+  switchValue = false,
+  onPress,
+  onSwitchChange,
+  isDarkMode = false,
+}) => {
+  return (
+    <TouchableOpacity
+      style={[styles.settingItem, isDarkMode && styles.settingItemDark]}
+      onPress={() => {
+        if (onPress) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }
+      }}
+      activeOpacity={showSwitch ? 1 : 0.7}
+      disabled={showSwitch}
+    >
+      <View style={[styles.settingIconBg, { backgroundColor: `${iconColor}15` }]}>
+        <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
+      </View>
+      
+      <View style={styles.settingContent}>
+        <Text style={[styles.settingTitle, isDarkMode && styles.textLight]}>
+          {title}
+        </Text>
+        {subtitle && (
+          <Text style={[styles.settingSubtitle, isDarkMode && styles.textMuted]}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+      
+      {value && (
+        <Text style={[styles.settingValue, isDarkMode && styles.textMuted]}>
+          {value}
+        </Text>
+      )}
+      
+      {showSwitch && (
+        <Switch
+          value={switchValue}
+          onValueChange={(val) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onSwitchChange?.(val);
+          }}
+          trackColor={{ false: '#ddd', true: '#2f7659' }}
+          thumbColor={switchValue ? '#fff' : '#f4f3f4'}
+        />
+      )}
+      
+      {showArrow && !showSwitch && (
+        <MaterialCommunityIcons
+          name="chevron-left"
+          size={24}
+          color={isDarkMode ? '#666' : '#ccc'}
+        />
+      )}
+    </TouchableOpacity>
+  );
+};
+
+interface SettingSectionProps {
   title: string;
-  items: SettingItem[];
+  children: React.ReactNode;
+  index: number;
+  isDarkMode?: boolean;
 }
 
-// ============================================
+const SettingSection: React.FC<SettingSectionProps> = ({
+  title,
+  children,
+  index,
+  isDarkMode = false,
+}) => {
+  return (
+    <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
+      <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
+        {title}
+      </Text>
+      <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+        {children}
+      </View>
+    </Animated.View>
+  );
+};
+
+// ========================================
 // المكون الرئيسي
-// ============================================
+// ========================================
 
 export default function SettingsScreen() {
   const router = useRouter();
-  
-  // ============================================
-  // الحالات
-  // ============================================
-  
-  // إعدادات عامة
-  const [darkMode, setDarkMode] = useState(false);
-  const [hapticEnabled, setHapticEnabled] = useState(true);
-  const [language, setLanguage] = useState('ar');
-  
-  // إعدادات الأذكار
-  const [azkarViewMode, setAzkarViewMode] = useState<'grid' | 'list'>('grid');
-  const [showAzkarCount, setShowAzkarCount] = useState(true);
-  const [azkarVibration, setAzkarVibration] = useState(true);
-  const [showAzkarSource, setShowAzkarSource] = useState(true);
-  const [showAzkarBenefit, setShowAzkarBenefit] = useState(true);
-  const [azkarFontSize, setAzkarFontSize] = useState<'small' | 'medium' | 'large'>('medium');
-  
-  // إعدادات القرآن
-  const [quranFontSize, setQuranFontSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium');
-  const [showTranslation, setShowTranslation] = useState(false);
-  const [quranTheme, setQuranTheme] = useState<'auto' | 'light' | 'dark'>('auto');
-  const [selectedReciter, setSelectedReciter] = useState('ar.alafasy');
-  const [autoPlayNext, setAutoPlayNext] = useState(true);
-  
-  // إعدادات الصلاة
-  const [calculationMethod, setCalculationMethod] = useState(4);
-  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('12h');
-  const [prayerNotifications, setPrayerNotifications] = useState({
-    Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true,
-  });
-  const [adhanSound, setAdhanSound] = useState('default');
-  const [fajrAlarm, setFajrAlarm] = useState(false);
-  const [preAdhanReminder, setPreAdhanReminder] = useState(0);
-  
-  // تنبيهات الأذكار
-  const [morningAzkarReminder, setMorningAzkarReminder] = useState(true);
-  const [eveningAzkarReminder, setEveningAzkarReminder] = useState(true);
-  const [sleepAzkarReminder, setSleepAzkarReminder] = useState(false);
-  const [istighfarReminder, setIstighfarReminder] = useState(false);
-  const [salatAlaNabiReminder, setSalatAlaNabiReminder] = useState(false);
-  
-  // النوافذ
-  const [showAzkarSettings, setShowAzkarSettings] = useState(false);
-  const [showQuranSettings, setShowQuranSettings] = useState(false);
-  const [showPrayerSettings, setShowPrayerSettings] = useState(false);
-  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  const [showReminderSettings, setShowReminderSettings] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [showThemeModal, setShowThemeModal] = useState(false);
-  const [showAboutModal, setShowAboutModal] = useState(false);
-  const [showReciterModal, setShowReciterModal] = useState(false);
-  const [showCalculationModal, setShowCalculationModal] = useState(false);
+  const {
+    settings,
+    isDarkMode,
+    updateLanguage,
+    updateTheme,
+    updateNotifications,
+    resetSettings,
+  } = useSettings();
 
-  // ============================================
-  // تحميل وحفظ الإعدادات
-  // ============================================
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
 
-  useEffect(() => {
-    loadAllSettings();
-  }, []);
+  // الحصول على اسم اللغة الحالية
+  const currentLanguage = LANGUAGES.find(l => l.code === settings.language);
+  const currentTheme = THEMES.find(t => t.mode === settings.theme);
 
-  const loadAllSettings = async () => {
-    try {
-      const settings = await AsyncStorage.getItem('app_settings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setDarkMode(parsed.darkMode ?? false);
-        setHapticEnabled(parsed.hapticEnabled ?? true);
-        setLanguage(parsed.language ?? 'ar');
-        setAzkarViewMode(parsed.azkarViewMode ?? 'grid');
-        setShowAzkarCount(parsed.showAzkarCount ?? true);
-        setAzkarVibration(parsed.azkarVibration ?? true);
-        setShowAzkarSource(parsed.showAzkarSource ?? true);
-        setShowAzkarBenefit(parsed.showAzkarBenefit ?? true);
-        setAzkarFontSize(parsed.azkarFontSize ?? 'medium');
-        setQuranFontSize(parsed.quranFontSize ?? 'medium');
-        setShowTranslation(parsed.showTranslation ?? false);
-        setQuranTheme(parsed.quranTheme ?? 'auto');
-        setSelectedReciter(parsed.selectedReciter ?? 'ar.alafasy');
-        setAutoPlayNext(parsed.autoPlayNext ?? true);
-        setCalculationMethod(parsed.calculationMethod ?? 4);
-        setTimeFormat(parsed.timeFormat ?? '12h');
-        setPrayerNotifications(parsed.prayerNotifications ?? {
-          Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true,
-        });
-        setAdhanSound(parsed.adhanSound ?? 'default');
-        setFajrAlarm(parsed.fajrAlarm ?? false);
-        setPreAdhanReminder(parsed.preAdhanReminder ?? 0);
-        setMorningAzkarReminder(parsed.morningAzkarReminder ?? true);
-        setEveningAzkarReminder(parsed.eveningAzkarReminder ?? true);
-        setSleepAzkarReminder(parsed.sleepAzkarReminder ?? false);
-        setIstighfarReminder(parsed.istighfarReminder ?? false);
-        setSalatAlaNabiReminder(parsed.salatAlaNabiReminder ?? false);
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
-
-  const saveAllSettings = async () => {
-    try {
-      const settings = {
-        darkMode,
-        hapticEnabled,
-        language,
-        azkarViewMode,
-        showAzkarCount,
-        azkarVibration,
-        showAzkarSource,
-        showAzkarBenefit,
-        azkarFontSize,
-        quranFontSize,
-        showTranslation,
-        quranTheme,
-        selectedReciter,
-        autoPlayNext,
-        calculationMethod,
-        timeFormat,
-        prayerNotifications,
-        adhanSound,
-        fajrAlarm,
-        preAdhanReminder,
-        morningAzkarReminder,
-        eveningAzkarReminder,
-        sleepAzkarReminder,
-        istighfarReminder,
-        salatAlaNabiReminder,
-      };
-      await AsyncStorage.setItem('app_settings', JSON.stringify(settings));
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
-  };
-
-  // حفظ تلقائي عند تغيير أي إعداد
-  useEffect(() => {
-    saveAllSettings();
-  }, [
-    darkMode, hapticEnabled, language, azkarViewMode, showAzkarCount,
-    azkarVibration, showAzkarSource, showAzkarBenefit, azkarFontSize,
-    quranFontSize, showTranslation, quranTheme, selectedReciter, autoPlayNext,
-    calculationMethod, timeFormat, prayerNotifications, adhanSound, fajrAlarm,
-    preAdhanReminder, morningAzkarReminder, eveningAzkarReminder,
-    sleepAzkarReminder, istighfarReminder, salatAlaNabiReminder,
-  ]);
-
-  // ============================================
-  // الدوال المساعدة
-  // ============================================
-
-  const triggerHaptic = () => {
-    if (hapticEnabled) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
-  const handleToggle = (setter: (value: boolean) => void, currentValue: boolean) => {
-    triggerHaptic();
-    setter(!currentValue);
-  };
-
-  const shareApp = async () => {
+  // مشاركة التطبيق
+  const handleShare = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await Share.share({
-        message: APP_CONFIG.getShareWithDownload(),
+        message: 'تطبيق روح المسلم - أذكار وأدعية ومواقيت الصلاة\n\nحمّله الآن من:\nhttps://roohmuslim.app',
+        title: 'روح المسلم',
       });
     } catch (error) {
       console.error('Error sharing:', error);
     }
   };
 
-  const openURL = (url: string) => {
-    Linking.openURL(url).catch(err => console.error('Error opening URL:', err));
+  // تقييم التطبيق
+  const handleRate = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // فتح صفحة التطبيق في المتجر
+    Linking.openURL('https://apps.apple.com/app/rooh-muslim/id123456789');
   };
 
-  const resetAllSettings = () => {
+  // التواصل معنا
+  const handleContact = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL('mailto:support@roohmuslim.app?subject=تطبيق روح المسلم');
+  };
+
+  // إعادة تعيين الإعدادات
+  const handleReset = () => {
     Alert.alert(
       'إعادة تعيين الإعدادات',
-      'هل تريد إعادة جميع الإعدادات إلى الوضع الافتراضي؟',
+      'هل أنت متأكد من إعادة تعيين جميع الإعدادات إلى الافتراضية؟',
       [
         { text: 'إلغاء', style: 'cancel' },
         {
           text: 'إعادة تعيين',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.removeItem('app_settings');
-            loadAllSettings();
-            Alert.alert('تم', 'تم إعادة تعيين جميع الإعدادات');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            await resetSettings();
+            Alert.alert('تم', 'تم إعادة تعيين الإعدادات بنجاح');
           },
         },
       ]
     );
   };
 
-  // ============================================
-  // القراء
-  // ============================================
+  // اختيار اللغة
+  const handleSelectLanguage = async (code: Language) => {
+    await updateLanguage(code);
+    setShowLanguagePicker(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
-  const RECITERS = [
-    { id: 'ar.alafasy', name: 'مشاري العفاسي' },
-    { id: 'ar.abdulbasitmurattal', name: 'عبد الباسط - مرتل' },
-    { id: 'ar.husary', name: 'محمود خليل الحصري' },
-    { id: 'ar.minshawi', name: 'محمد صديق المنشاوي' },
-    { id: 'ar.ahmedajamy', name: 'أحمد العجمي' },
-    { id: 'ar.mahermuaiqly', name: 'ماهر المعيقلي' },
-    { id: 'ar.sudais', name: 'عبدالرحمن السديس' },
-    { id: 'ar.shuraim', name: 'سعود الشريم' },
-  ];
-
-  // ============================================
-  // طرق الحساب
-  // ============================================
-
-  const CALCULATION_METHODS = [
-    { id: 4, name: 'جامعة أم القرى - مكة' },
-    { id: 5, name: 'الهيئة المصرية العامة للمساحة' },
-    { id: 3, name: 'رابطة العالم الإسلامي' },
-    { id: 2, name: 'الجمعية الإسلامية لأمريكا الشمالية' },
-    { id: 1, name: 'جامعة العلوم الإسلامية - كراتشي' },
-    { id: 9, name: 'الكويت' },
-    { id: 10, name: 'قطر' },
-    { id: 8, name: 'منطقة الخليج' },
-  ];
-
-  // ============================================
-  // اللغات
-  // ============================================
-
-  const LANGUAGES = [
-    { id: 'ar', name: 'العربية', nameNative: 'العربية' },
-    { id: 'en', name: 'الإنجليزية', nameNative: 'English' },
-    { id: 'ur', name: 'الأردية', nameNative: 'اردو' },
-    { id: 'id', name: 'الإندونيسية', nameNative: 'Bahasa Indonesia' },
-    { id: 'tr', name: 'التركية', nameNative: 'Türkçe' },
-    { id: 'fr', name: 'الفرنسية', nameNative: 'Français' },
-  ];
-
-  // ============================================
-  // ألوان الثيم
-  // ============================================
-
-  const currentColors = darkMode ? DarkColors : Colors;
-
-  // ============================================
-  // العرض
-  // ============================================
+  // اختيار الثيم
+  const handleSelectTheme = async (mode: ThemeMode) => {
+    await updateTheme(mode);
+    setShowThemePicker(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: currentColors.background }]}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+      />
+
       {/* الهيدر */}
-      <View style={[styles.header, { backgroundColor: currentColors.surface }]}>
-        <Text style={[styles.headerTitle, { color: currentColors.text }]}>الإعدادات</Text>
-      </View>
-
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* ============================================ */}
-        {/* قسم الأذكار */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowAzkarSettings(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#10B981' + '20' }]}>
-              <Ionicons name="leaf" size={24} color="#10B981" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>الأذكار</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                إعدادات العرض والخط والتنبيهات
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ============================================ */}
-        {/* قسم الصلاة */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowPrayerSettings(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#0284C7' + '20' }]}>
-              <Ionicons name="time" size={24} color="#0284C7" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>إشعارات الأذان</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                تفعيل وإدارة إشعارات الصلاة
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowCalculationModal(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#6366F1' + '20' }]}>
-              <Ionicons name="calculator" size={24} color="#6366F1" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>ضبط أوقات الصلاة</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                {CALCULATION_METHODS.find(m => m.id === calculationMethod)?.name}
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ============================================ */}
-        {/* تنبيهات الاستغفار */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowReminderSettings(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#F59E0B' + '20' }]}>
-              <Ionicons name="notifications" size={24} color="#F59E0B" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>تنبيهات الاستغفار</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                الصلاة على النبي، سبحان الله، أستغفر الله
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ============================================ */}
-        {/* الحس اللمسي */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <View style={[styles.settingCard, { backgroundColor: currentColors.surface }]}>
-            <View style={[styles.settingIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
-              <Ionicons name="hand-left" size={24} color="#8B5CF6" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>الحس اللمسي</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                {hapticEnabled ? 'مفعّل' : 'معطّل'}
-              </Text>
-            </View>
-            <Switch
-              value={hapticEnabled}
-              onValueChange={() => handleToggle(setHapticEnabled, hapticEnabled)}
-              trackColor={{ false: currentColors.border, true: currentColors.primary }}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
-
-        {/* ============================================ */}
-        {/* قسم المظهر */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentColors.textLight }]}>المظهر</Text>
-          
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowLanguageModal(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#059669' + '20' }]}>
-              <Ionicons name="globe" size={24} color="#059669" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>لغة التطبيق</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                {LANGUAGES.find(l => l.id === language)?.name}
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowThemeModal(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#EC4899' + '20' }]}>
-              <Ionicons name="color-palette" size={24} color="#EC4899" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>خلفية التطبيق</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                خلفيات مميزة وأنماط رائعة
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <View style={[styles.settingCard, { backgroundColor: currentColors.surface }]}>
-            <View style={[styles.settingIcon, { backgroundColor: '#1F2937' + '20' }]}>
-              <Ionicons name="moon" size={24} color="#1F2937" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>الوضع الليلي</Text>
-            </View>
-            <Switch
-              value={darkMode}
-              onValueChange={() => handleToggle(setDarkMode, darkMode)}
-              trackColor={{ false: currentColors.border, true: currentColors.primary }}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
-
-        {/* ============================================ */}
-        {/* إدارة التذكيرات */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowNotificationSettings(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#EF4444' + '20' }]}>
-              <Ionicons name="alarm" size={24} color="#EF4444" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>إدارة التذكيرات</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                إدارة كل التذكيرات وإضافة تذكيرات جديدة
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {/* ============================================ */}
-        {/* قسم القرآن */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentColors.textLight }]}>القرآن الكريم</Text>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowQuranSettings(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#059669' + '20' }]}>
-              <Text style={{ fontSize: 18, color: '#059669', fontWeight: '700' }}>عع</Text>
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>إعدادات الخط</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                حجم الخط: {quranFontSize === 'small' ? 'صغير' : quranFontSize === 'medium' ? 'متوسط' : quranFontSize === 'large' ? 'كبير' : 'كبير جداً'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowReciterModal(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#10B981' + '20' }]}>
-              <Ionicons name="mic" size={24} color="#10B981" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>القارئ</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                {RECITERS.find(r => r.id === selectedReciter)?.name}
-              </Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <View style={[styles.settingCard, { backgroundColor: currentColors.surface }]}>
-            <View style={[styles.settingIcon, { backgroundColor: '#6366F1' + '20' }]}>
-              <Ionicons name="language" size={24} color="#6366F1" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>الترجمة</Text>
-              <Text style={[styles.settingSubtitle, { color: currentColors.textLight }]}>
-                عرض التفسير الميسر
-              </Text>
-            </View>
-            <Switch
-              value={showTranslation}
-              onValueChange={() => handleToggle(setShowTranslation, showTranslation)}
-              trackColor={{ false: currentColors.border, true: currentColors.primary }}
-              thumbColor={Colors.white}
-            />
-          </View>
-        </View>
-
-        {/* ============================================ */}
-        {/* حول التطبيق */}
-        {/* ============================================ */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: currentColors.textLight }]}>عن التطبيق</Text>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={shareApp}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#0284C7' + '20' }]}>
-              <Ionicons name="share-social" size={24} color="#0284C7" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>مشاركة التطبيق</Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => setShowAboutModal(true)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#059669' + '20' }]}>
-              <Ionicons name="information-circle" size={24} color="#059669" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>حول التطبيق</Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => openURL(`mailto:${APP_CONFIG.contact.email}`)}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#F59E0B' + '20' }]}>
-              <Ionicons name="mail" size={24} color="#F59E0B" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>تواصل معنا</Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.settingCard, { backgroundColor: currentColors.surface }]}
-            onPress={() => openURL('https://example.com/privacy')}
-          >
-            <View style={[styles.settingIcon, { backgroundColor: '#EF4444' + '20' }]}>
-              <Ionicons name="shield-checkmark" size={24} color="#EF4444" />
-            </View>
-            <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: currentColors.text }]}>سياسة الخصوصية</Text>
-            </View>
-            <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-          </TouchableOpacity>
-        </View>
-
-        {/* إصدار التطبيق */}
-        <Text style={[styles.versionText, { color: currentColors.textLight }]}>
-          {APP_NAME} - الإصدار {APP_CONFIG.version}
+      <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, isDarkMode && styles.headerDark]}>
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
+          الإعدادات
         </Text>
+      </Animated.View>
 
-        <View style={{ height: 100 }} />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* بطاقة الملف الشخصي */}
+        <Animated.View entering={FadeInDown.delay(50).duration(500)}>
+          <LinearGradient
+            colors={isDarkMode ? ['#1a1a2e', '#16213e'] : ['#2f7659', '#1d4a3a']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.profileCard}
+          >
+            <View style={styles.profileIcon}>
+              <MaterialCommunityIcons name="account-circle" size={60} color="#fff" />
+            </View>
+            <Text style={styles.profileName}>روح المسلم</Text>
+            <Text style={styles.profileVersion}>
+              الإصدار {Application.nativeApplicationVersion || '1.0.0'}
+            </Text>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* الإعدادات العامة */}
+        <SettingSection title="الإعدادات العامة" index={1} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="translate"
+            iconColor="#3a7ca5"
+            title="اللغة"
+            value={currentLanguage?.nativeName}
+            onPress={() => router.push('/settings/language')}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="theme-light-dark"
+            iconColor="#5d4e8c"
+            title="المظهر"
+            value={currentTheme?.name}
+            onPress={() => setShowThemePicker(true)}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="format-size"
+            iconColor="#c17f59"
+            title="حجم الخط"
+            subtitle="تخصيص حجم النص العربي والترجمة"
+            onPress={() => router.push('/settings/display')}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* الإشعارات */}
+        <SettingSection title="الإشعارات" index={2} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="bell"
+            iconColor="#2f7659"
+            title="الإشعارات"
+            showSwitch
+            switchValue={settings.notifications.enabled}
+            onSwitchChange={(value) => updateNotifications({ enabled: value })}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="bell-cog"
+            iconColor="#f5a623"
+            title="إعدادات الإشعارات"
+            subtitle="تنبيهات الصلاة والأذكار"
+            onPress={() => router.push('/settings/notifications')}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* مواقيت الصلاة */}
+        <SettingSection title="مواقيت الصلاة" index={3} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="mosque"
+            iconColor="#2f7659"
+            title="طريقة الحساب"
+            subtitle="أم القرى، رابطة العالم الإسلامي..."
+            onPress={() => router.push('/settings/prayer-calculation')}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="clock-edit"
+            iconColor="#3a7ca5"
+            title="تعديل المواقيت"
+            subtitle="ضبط دقائق لكل صلاة"
+            onPress={() => router.push('/settings/prayer-adjustments')}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* البيانات */}
+        <SettingSection title="البيانات والخصوصية" index={4} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="cloud-upload"
+            iconColor="#5d4e8c"
+            title="النسخ الاحتياطي"
+            subtitle="حفظ واستعادة بياناتك"
+            onPress={() => router.push('/settings/backup')}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="delete-sweep"
+            iconColor="#ef5350"
+            title="مسح البيانات"
+            subtitle="حذف جميع البيانات المحلية"
+            onPress={handleReset}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* الويدجت */}
+        <SettingSection title="الويدجت" index={5} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="widgets"
+            iconColor="#c17f59"
+            title="إعدادات الويدجت"
+            subtitle="تخصيص ويدجت الشاشة الرئيسية"
+            onPress={() => router.push('/widget-settings')}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* حول التطبيق */}
+        <SettingSection title="حول التطبيق" index={6} isDarkMode={isDarkMode}>
+          <SettingItem
+            icon="share-variant"
+            iconColor="#2f7659"
+            title="مشاركة التطبيق"
+            subtitle="شارك التطبيق مع أصدقائك"
+            onPress={handleShare}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="star"
+            iconColor="#f5a623"
+            title="تقييم التطبيق"
+            subtitle="قيّم التطبيق على المتجر"
+            onPress={handleRate}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="email"
+            iconColor="#3a7ca5"
+            title="تواصل معنا"
+            subtitle="أرسل لنا ملاحظاتك واقتراحاتك"
+            onPress={handleContact}
+            isDarkMode={isDarkMode}
+          />
+          <SettingItem
+            icon="information"
+            iconColor="#5d4e8c"
+            title="عن التطبيق"
+            onPress={() => router.push('/settings/about')}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* الفوتر */}
+        <Animated.View entering={FadeInDown.delay(700).duration(500)} style={styles.footer}>
+          <Text style={[styles.footerText, isDarkMode && styles.textMuted]}>
+            صُنع بـ ❤️ لخدمة المسلمين
+          </Text>
+          <Text style={[styles.footerVersion, isDarkMode && styles.textMuted]}>
+            روح المسلم v{Application.nativeApplicationVersion || '1.0.0'}
+          </Text>
+        </Animated.View>
+
+        <View style={styles.bottomSpace} />
       </ScrollView>
 
-      {/* ============================================ */}
-      {/* نافذة إعدادات الأذكار */}
-      {/* ============================================ */}
-      <Modal
-        visible={showAzkarSettings}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAzkarSettings(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowAzkarSettings(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>إعدادات الأذكار</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {/* عرض الأذكار */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>طريقة العرض</Text>
-              <View style={[styles.segmentControl, { backgroundColor: currentColors.surface }]}>
-                <TouchableOpacity 
-                  style={[
-                    styles.segmentButton, 
-                    azkarViewMode === 'grid' && styles.segmentButtonActive
-                  ]}
-                  onPress={() => { triggerHaptic(); setAzkarViewMode('grid'); }}
-                >
-                  <Ionicons name="grid" size={18} color={azkarViewMode === 'grid' ? Colors.white : currentColors.text} />
-                  <Text style={[
-                    styles.segmentButtonText,
-                    { color: azkarViewMode === 'grid' ? Colors.white : currentColors.text }
-                  ]}>شبكة</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[
-                    styles.segmentButton, 
-                    azkarViewMode === 'list' && styles.segmentButtonActive
-                  ]}
-                  onPress={() => { triggerHaptic(); setAzkarViewMode('list'); }}
-                >
-                  <Ionicons name="list" size={18} color={azkarViewMode === 'list' ? Colors.white : currentColors.text} />
-                  <Text style={[
-                    styles.segmentButtonText,
-                    { color: azkarViewMode === 'list' ? Colors.white : currentColors.text }
-                  ]}>قائمة</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* حجم الخط */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>حجم الخط</Text>
-              <View style={[styles.segmentControl, { backgroundColor: currentColors.surface }]}>
-                {(['small', 'medium', 'large'] as const).map((size) => (
-                  <TouchableOpacity 
-                    key={size}
-                    style={[
-                      styles.segmentButton, 
-                      azkarFontSize === size && styles.segmentButtonActive
-                    ]}
-                    onPress={() => { triggerHaptic(); setAzkarFontSize(size); }}
-                  >
-                    <Text style={[
-                      styles.segmentButtonText,
-                      { color: azkarFontSize === size ? Colors.white : currentColors.text }
-                    ]}>
-                      {size === 'small' ? 'صغير' : size === 'medium' ? 'متوسط' : 'كبير'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* إعدادات إضافية */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>خيارات العرض</Text>
-              
-              <View style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}>
-                <Text style={[styles.modalSettingText, { color: currentColors.text }]}>عرض العداد</Text>
-                <Switch
-                  value={showAzkarCount}
-                  onValueChange={() => handleToggle(setShowAzkarCount, showAzkarCount)}
-                  trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-
-              <View style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}>
-                <Text style={[styles.modalSettingText, { color: currentColors.text }]}>عرض المصدر والتخريج</Text>
-                <Switch
-                  value={showAzkarSource}
-                  onValueChange={() => handleToggle(setShowAzkarSource, showAzkarSource)}
-                  trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-
-              <View style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}>
-                <Text style={[styles.modalSettingText, { color: currentColors.text }]}>عرض الفضل</Text>
-                <Switch
-                  value={showAzkarBenefit}
-                  onValueChange={() => handleToggle(setShowAzkarBenefit, showAzkarBenefit)}
-                  trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-
-              <View style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}>
-                <Text style={[styles.modalSettingText, { color: currentColors.text }]}>الاهتزاز عند الضغط</Text>
-                <Switch
-                  value={azkarVibration}
-                  onValueChange={() => handleToggle(setAzkarVibration, azkarVibration)}
-                  trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة إشعارات الأذان */}
-      {/* ============================================ */}
-      <Modal
-        visible={showPrayerSettings}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPrayerSettings(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowPrayerSettings(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>إشعارات الأذان</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].map((prayer) => {
-                const names: { [key: string]: string } = {
-                  Fajr: 'الفجر', Dhuhr: 'الظهر', Asr: 'العصر', 
-                  Maghrib: 'المغرب', Isha: 'العشاء'
-                };
-                return (
-                  <View 
-                    key={prayer} 
-                    style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}
-                  >
-                    <View style={styles.prayerNotifRow}>
-                      <Ionicons 
-                        name={prayerNotifications[prayer as keyof typeof prayerNotifications] ? 'notifications' : 'notifications-off-outline'} 
-                        size={22} 
-                        color={prayerNotifications[prayer as keyof typeof prayerNotifications] ? currentColors.primary : currentColors.textLight} 
-                      />
-                      <Text style={[styles.modalSettingText, { color: currentColors.text }]}>
-                        إشعار {names[prayer]}
-                      </Text>
-                    </View>
-                    <TouchableOpacity 
-                      style={styles.notifStatus}
-                      onPress={() => {
-                        triggerHaptic();
-                        setPrayerNotifications(prev => ({
-                          ...prev,
-                          [prayer]: !prev[prayer as keyof typeof prayerNotifications]
-                        }));
-                      }}
-                    >
-                      <Text style={[styles.notifStatusText, { color: currentColors.textLight }]}>
-                        {prayerNotifications[prayer as keyof typeof prayerNotifications] ? 'مفعّل' : 'معطّل'}
-                      </Text>
-                      <Ionicons name="chevron-back" size={16} color={currentColors.textLight} />
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
-
-              {/* منبه الفجر */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight, marginTop: 20 }]}>
-                منبه الفجر
-              </Text>
-              <View style={[styles.modalSettingItem, { backgroundColor: currentColors.surface }]}>
-                <View style={styles.prayerNotifRow}>
-                  <Ionicons name="alarm" size={22} color="#059669" />
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>منبه الفجر</Text>
-                </View>
-                <Switch
-                  value={fajrAlarm}
-                  onValueChange={() => handleToggle(setFajrAlarm, fajrAlarm)}
-                  trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                  thumbColor={Colors.white}
-                />
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة تنبيهات الاستغفار */}
-      {/* ============================================ */}
-      <Modal
-        visible={showReminderSettings}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReminderSettings(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowReminderSettings(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>تنبيهات الاستغفار</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {/* الصلاة على النبي */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>
-                تنبيه الصلاة على محمد ﷺ
-              </Text>
-              <View style={[styles.reminderCard, { backgroundColor: currentColors.surface }]}>
-                <View style={[styles.modalSettingItem, { backgroundColor: 'transparent', marginBottom: 0 }]}>
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>تفعيل</Text>
-                  <Switch
-                    value={salatAlaNabiReminder}
-                    onValueChange={() => handleToggle(setSalatAlaNabiReminder, salatAlaNabiReminder)}
-                    trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-                {salatAlaNabiReminder && (
-                  <>
-                    <TouchableOpacity style={styles.reminderOption}>
-                      <Text style={[styles.reminderOptionText, { color: currentColors.text }]}>موعد الإرسال</Text>
-                      <View style={styles.reminderOptionValue}>
-                        <Text style={[styles.reminderOptionValueText, { color: currentColors.textLight }]}>مرتين في اليوم</Text>
-                        <Ionicons name="chevron-back" size={16} color={currentColors.textLight} />
-                      </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.reminderOption}>
-                      <Text style={[styles.reminderOptionText, { color: currentColors.text }]}>صوت التنبيه</Text>
-                      <View style={styles.reminderOptionValue}>
-                        <Text style={[styles.reminderOptionValueText, { color: currentColors.textLight }]}>إفتراضي</Text>
-                        <Ionicons name="chevron-back" size={16} color={currentColors.textLight} />
-                      </View>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-
-              {/* سبحان الله وبحمده */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>
-                تنبيه سبحان الله وبحمده
-              </Text>
-              <View style={[styles.reminderCard, { backgroundColor: currentColors.surface }]}>
-                <View style={[styles.modalSettingItem, { backgroundColor: 'transparent', marginBottom: 0 }]}>
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>تفعيل</Text>
-                  <Switch
-                    value={istighfarReminder}
-                    onValueChange={() => handleToggle(setIstighfarReminder, istighfarReminder)}
-                    trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-              </View>
-
-              {/* أذكار الصباح والمساء */}
-              <Text style={[styles.modalSectionTitle, { color: currentColors.textLight }]}>
-                تذكيرات الأذكار
-              </Text>
-              <View style={[styles.reminderCard, { backgroundColor: currentColors.surface }]}>
-                <View style={[styles.modalSettingItem, { backgroundColor: 'transparent' }]}>
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>أذكار الصباح</Text>
-                  <Switch
-                    value={morningAzkarReminder}
-                    onValueChange={() => handleToggle(setMorningAzkarReminder, morningAzkarReminder)}
-                    trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-                <View style={[styles.modalSettingItem, { backgroundColor: 'transparent' }]}>
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>أذكار المساء</Text>
-                  <Switch
-                    value={eveningAzkarReminder}
-                    onValueChange={() => handleToggle(setEveningAzkarReminder, eveningAzkarReminder)}
-                    trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-                <View style={[styles.modalSettingItem, { backgroundColor: 'transparent', marginBottom: 0 }]}>
-                  <Text style={[styles.modalSettingText, { color: currentColors.text }]}>أذكار النوم</Text>
-                  <Switch
-                    value={sleepAzkarReminder}
-                    onValueChange={() => handleToggle(setSleepAzkarReminder, sleepAzkarReminder)}
-                    trackColor={{ false: currentColors.border, true: currentColors.primary }}
-                    thumbColor={Colors.white}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة اختيار اللغة */}
-      {/* ============================================ */}
-      <Modal
-        visible={showLanguageModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowLanguageModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>لغة التطبيق</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {LANGUAGES.map((lang) => (
-                <TouchableOpacity
-                  key={lang.id}
-                  style={[
-                    styles.selectItem,
-                    { backgroundColor: currentColors.surface },
-                    language === lang.id && styles.selectItemActive,
-                  ]}
-                  onPress={() => {
-                    triggerHaptic();
-                    setLanguage(lang.id);
-                    setShowLanguageModal(false);
-                  }}
-                >
-                  <View>
-                    <Text style={[styles.selectItemText, { color: currentColors.text }]}>{lang.nameNative}</Text>
-                    <Text style={[styles.selectItemSubtext, { color: currentColors.textLight }]}>{lang.name}</Text>
-                  </View>
-                  {language === lang.id && (
-                    <Ionicons name="checkmark" size={24} color={currentColors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة اختيار القارئ */}
-      {/* ============================================ */}
-      <Modal
-        visible={showReciterModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReciterModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowReciterModal(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>اختر القارئ</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {RECITERS.map((reciter) => (
-                <TouchableOpacity
-                  key={reciter.id}
-                  style={[
-                    styles.selectItem,
-                    { backgroundColor: currentColors.surface },
-                    selectedReciter === reciter.id && styles.selectItemActive,
-                  ]}
-                  onPress={() => {
-                    triggerHaptic();
-                    setSelectedReciter(reciter.id);
-                    setShowReciterModal(false);
-                  }}
-                >
-                  <Text style={[styles.selectItemText, { color: currentColors.text }]}>{reciter.name}</Text>
-                  {selectedReciter === reciter.id && (
-                    <Ionicons name="checkmark" size={24} color={currentColors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة طريقة الحساب */}
-      {/* ============================================ */}
-      <Modal
-        visible={showCalculationModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCalculationModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowCalculationModal(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>طريقة الحساب</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              {CALCULATION_METHODS.map((method) => (
-                <TouchableOpacity
-                  key={method.id}
-                  style={[
-                    styles.selectItem,
-                    { backgroundColor: currentColors.surface },
-                    calculationMethod === method.id && styles.selectItemActive,
-                  ]}
-                  onPress={() => {
-                    triggerHaptic();
-                    setCalculationMethod(method.id);
-                    setShowCalculationModal(false);
-                  }}
-                >
-                  <Text style={[styles.selectItemText, { color: currentColors.text }]}>{method.name}</Text>
-                  {calculationMethod === method.id && (
-                    <Ionicons name="checkmark" size={24} color={currentColors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة حول التطبيق */}
-      {/* ============================================ */}
-      <Modal
-        visible={showAboutModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowAboutModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: currentColors.background }]}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowAboutModal(false)}>
-                <Ionicons name="arrow-forward" size={24} color={currentColors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: currentColors.text }]}>حول التطبيق</Text>
-              <View style={{ width: 24 }} />
-            </View>
-
-            <ScrollView style={styles.modalBody} contentContainerStyle={styles.aboutContainer}>
-              <View style={styles.aboutLogo}>
-                <Ionicons name="book" size={60} color={currentColors.primary} />
-              </View>
-              <Text style={[styles.aboutAppName, { color: currentColors.text }]}>{APP_NAME}</Text>
-              <Text style={[styles.aboutVersion, { color: currentColors.textLight }]}>
-                الإصدار {APP_CONFIG.version}
-              </Text>
-              <Text style={[styles.aboutDescription, { color: currentColors.textSecondary }]}>
-                {APP_CONFIG.description}
-              </Text>
-
-              <View style={styles.aboutFeatures}>
-                <Text style={[styles.aboutFeaturesTitle, { color: currentColors.text }]}>المميزات:</Text>
-                {[
-                  'القرآن الكريم كاملاً مع التفسير',
-                  'أذكار الصباح والمساء والنوم',
-                  'مواقيت الصلاة حسب موقعك',
-                  'اتجاه القبلة',
-                  'عداد التسبيح',
-                  'أسماء الله الحسنى',
-                  'الرقية الشرعية',
-                  'التقويم الهجري',
-                  'مشاركة الآيات والأذكار',
-                ].map((feature, index) => (
-                  <View key={index} style={styles.aboutFeatureItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={currentColors.primary} />
-                    <Text style={[styles.aboutFeatureText, { color: currentColors.textSecondary }]}>
-                      {feature}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <TouchableOpacity 
-                style={[styles.aboutButton, { backgroundColor: currentColors.primary }]}
-                onPress={shareApp}
+      {/* نافذة اختيار الثيم */}
+      {showThemePicker && (
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowThemePicker(false)}
+        >
+          <Animated.View
+            entering={FadeInDown.duration(300)}
+            style={[styles.themePickerModal, isDarkMode && styles.themePickerModalDark]}
+          >
+            <Text style={[styles.modalTitle, isDarkMode && styles.textLight]}>
+              اختر المظهر
+            </Text>
+            {THEMES.map((theme) => (
+              <TouchableOpacity
+                key={theme.mode}
+                style={[
+                  styles.themeOption,
+                  settings.theme === theme.mode && styles.themeOptionSelected,
+                ]}
+                onPress={() => handleSelectTheme(theme.mode)}
               >
-                <Ionicons name="share-social" size={20} color={Colors.white} />
-                <Text style={styles.aboutButtonText}>مشاركة التطبيق</Text>
+                <MaterialCommunityIcons
+                  name={theme.icon as any}
+                  size={24}
+                  color={settings.theme === theme.mode ? '#2f7659' : isDarkMode ? '#aaa' : '#666'}
+                />
+                <Text
+                  style={[
+                    styles.themeOptionText,
+                    isDarkMode && styles.textLight,
+                    settings.theme === theme.mode && styles.themeOptionTextSelected,
+                  ]}
+                >
+                  {theme.name}
+                </Text>
+                {settings.theme === theme.mode && (
+                  <MaterialCommunityIcons name="check" size={24} color="#2f7659" />
+                )}
               </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-    </View>
+            ))}
+          </Animated.View>
+        </TouchableOpacity>
+      )}
+    </SafeAreaView>
   );
 }
 
-// ============================================
+// ========================================
 // الأنماط
-// ============================================
+// ========================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  containerDark: {
+    backgroundColor: '#11151c',
   },
   header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.md,
-    alignItems: 'center',
-    ...Shadows.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  headerDark: {
+    backgroundColor: '#1a1a2e',
+    borderBottomColor: '#2a2a3e',
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
+    fontSize: 28,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
   },
-  content: {
+  textLight: {
+    color: '#fff',
+  },
+  textMuted: {
+    color: '#999',
+  },
+  scrollView: {
     flex: 1,
-    paddingHorizontal: Spacing.md,
   },
-  section: {
-    marginTop: Spacing.md,
+  scrollContent: {
+    paddingVertical: 15,
   },
+  // بطاقة الملف الشخصي
+  profileCard: {
+    marginHorizontal: 16,
+    borderRadius: 20,
+    padding: 25,
+    alignItems: 'center',
+  },
+  profileIcon: {
+    marginBottom: 10,
+  },
+  profileName: {
+    fontSize: 22,
+    fontFamily: 'Cairo-Bold',
+    color: '#fff',
+  },
+  profileVersion: {
+    fontSize: 13,
+    fontFamily: 'Cairo-Regular',
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  // الأقسام
   sectionTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    marginBottom: Spacing.sm,
-    marginRight: Spacing.sm,
-    textAlign: 'right',
+    fontSize: 14,
+    fontFamily: 'Cairo-Bold',
+    color: '#666',
+    paddingHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 10,
   },
-  settingCard: {
+  sectionContent: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  sectionContentDark: {
+    backgroundColor: '#1a1a2e',
+  },
+  // عنصر الإعداد
+  settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  settingIcon: {
-    width: 44,
-    height: 44,
+  settingItemDark: {
+    borderBottomColor: '#2a2a3e',
+  },
+  settingIconBg: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  settingInfo: {
+  settingContent: {
     flex: 1,
-    marginHorizontal: Spacing.md,
+    marginHorizontal: 15,
   },
   settingTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    textAlign: 'right',
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#333',
   },
   settingSubtitle: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#999',
     marginTop: 2,
-    textAlign: 'right',
   },
-  versionText: {
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center',
-    marginTop: Spacing.xl,
+  settingValue: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Medium',
+    color: '#999',
+    marginRight: 5,
   },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    height: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
+  // الفوتر
+  footer: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 30,
+  },
+  footerText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    color: '#999',
+  },
+  footerVersion: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#ccc',
+    marginTop: 5,
+  },
+  // Modal
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themePickerModal: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    width: '85%',
+    maxWidth: 350,
+  },
+  themePickerModalDark: {
+    backgroundColor: '#1a1a2e',
   },
   modalTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '700',
-  },
-  modalBody: {
-    flex: 1,
-    padding: Spacing.lg,
-  },
-  modalSectionTitle: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.md,
-    textAlign: 'right',
-  },
-  modalSettingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-  },
-  modalSettingText: {
-    fontSize: Typography.sizes.md,
-    textAlign: 'right',
-  },
-  segmentControl: {
-    flexDirection: 'row',
-    borderRadius: BorderRadius.md,
-    padding: 4,
-    gap: 4,
-  },
-  segmentButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    gap: Spacing.xs,
-  },
-  segmentButtonActive: {
-    backgroundColor: Colors.primary,
-  },
-  segmentButtonText: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '500',
-  },
-  selectItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-  },
-  selectItemActive: {
-    borderColor: Colors.primary,
-    borderWidth: 2,
-  },
-  selectItemText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '500',
-    textAlign: 'right',
-  },
-  selectItemSubtext: {
-    fontSize: Typography.sizes.xs,
-    marginTop: 2,
-    textAlign: 'right',
-  },
-  prayerNotifRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  notifStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  notifStatusText: {
-    fontSize: Typography.sizes.sm,
-  },
-  reminderCard: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  reminderOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  reminderOptionText: {
-    fontSize: Typography.sizes.md,
-  },
-  reminderOptionValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  reminderOptionValueText: {
-    fontSize: Typography.sizes.sm,
-  },
-  // About modal
-  aboutContainer: {
-    alignItems: 'center',
-    paddingBottom: Spacing.xl,
-  },
-  aboutLogo: {
-    width: 100,
-    height: 100,
-    borderRadius: 25,
-    backgroundColor: Colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  aboutAppName: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-  },
-  aboutVersion: {
-    fontSize: Typography.sizes.sm,
-    marginTop: 4,
-  },
-  aboutDescription: {
-    fontSize: Typography.sizes.md,
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
     textAlign: 'center',
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    lineHeight: 24,
+    marginBottom: 20,
   },
-  aboutFeatures: {
-    width: '100%',
-    marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.md,
-  },
-  aboutFeaturesTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '600',
-    marginBottom: Spacing.md,
-    textAlign: 'right',
-  },
-  aboutFeatureItem: {
+  themeOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
   },
-  aboutFeatureText: {
-    fontSize: Typography.sizes.md,
+  themeOptionSelected: {
+    backgroundColor: '#2f765915',
+  },
+  themeOptionText: {
     flex: 1,
-    textAlign: 'right',
+    fontSize: 16,
+    fontFamily: 'Cairo-Medium',
+    color: '#333',
+    marginLeft: 15,
   },
-  aboutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.xl,
-    gap: Spacing.sm,
+  themeOptionTextSelected: {
+    color: '#2f7659',
   },
-  aboutButtonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.white,
+  bottomSpace: {
+    height: 100,
   },
 });
