@@ -1,6 +1,4 @@
 // lib/notification-types.ts
-// ملف منفصل للـ Types لتجنب الـ Require Cycle
-
 export type PrayerKey = 'Fajr' | 'Dhuhr' | 'Asr' | 'Maghrib' | 'Isha';
 
 export interface NotificationSettings {

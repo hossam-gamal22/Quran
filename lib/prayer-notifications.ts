@@ -58,22 +58,6 @@ const PRAYER_MESSAGES: Record<PrayerKey, string> = {
 // مدة التنبيه المسبق بالدقائق
 export const ADHAN_ADVANCE_MINUTES = 0; // 0 = عند الوقت بالضبط
 
-export interface NotificationSettings {
-  enabled: boolean;
-  prayers: Record<PrayerKey, boolean>;
-  advanceMinutes: number; // دقائق قبل الأذان
-  adhanSound: boolean;
-}
-
-export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  enabled: false,
-  prayers: {
-    Fajr: true,
-    Dhuhr: true,
-    Asr: true,
-    Maghrib: true,
-    Isha: true,
-  },
   advanceMinutes: 0,
   adhanSound: false,
 };
