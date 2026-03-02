@@ -1,4 +1,4 @@
-// app/surah/[id].tsx
+// app/(tabs)/surah/[id].tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -19,7 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, BorderRadius, Shadows } from '../../constants/theme';
+import { Colors, Spacing, BorderRadius, Shadows } from '@/constants/theme';
 import {
   fetchSurah,
   fetchSurahWithTranslation,
@@ -30,13 +30,13 @@ import {
   TAFSIR_EDITIONS,
   Ayah,
   SurahDetail,
-} from '../../lib/quran-api';
+} from '@/lib/quran-api';
 import {
   shareAyah,
   copyToClipboard,
   formatAyahForShare,
   ShareContent,
-} from '../../lib/share-service';
+} from '@/lib/share-service';
 
 // ===============================
 // الثوابت والأنواع
