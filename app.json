@@ -29,7 +29,8 @@
       "expo-router",
       "expo-asset",
       "expo-audio",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font"
     ],
     "extra": {
       "router": {
