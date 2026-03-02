@@ -1,50 +1,49 @@
 // admin-panel/src/pages/Dashboard.tsx
-// لوحة التحكم الرئيسية - روح المسلم
+// لوحة التحكم الرئيسية - محدثة مع بيانات
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Users,
-  Eye,
-  TrendingUp,
-  Clock,
-  BookOpen,
-  Star,
-  Bell,
-  Settings,
-  Smartphone,
-  Globe,
-  Calendar,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  ChevronRight,
   Activity,
-  PieChart,
-  BarChart3,
-  Zap,
+  Clock,
+  Eye,
+  BookOpen,
+  Moon,
+  TrendingUp,
+  RefreshCw,
+  Sparkles,
+  FileText,
+  Bell,
+  Palette,
+  Calendar,
+  Settings,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  Star,
+  Globe
 } from 'lucide-react';
 
-// ========================================
-// الأنواع
-// ========================================
+// ==================== الأنواع ====================
 
 interface DashboardStats {
   totalUsers: number;
   activeUsers: number;
   dailyActiveUsers: number;
-  totalSessions: number;
   avgSessionDuration: number;
   totalAzkarRead: number;
   totalQuranPages: number;
   totalPrayers: number;
+  totalSessions: number;
 }
 
 interface RecentActivity {
   id: string;
-  type: 'user' | 'azkar' | 'quran' | 'prayer' | 'error';
-  message: string;
-  timestamp: string;
+  type: 'user' | 'azkar' | 'quran' | 'prayer' | 'share';
+  description: string;
+  time: string;
+  country?: string;
 }
 
 interface SystemStatus {
@@ -56,376 +55,315 @@ interface SystemStatus {
 
 interface QuickAction {
   id: string;
-  label: string;
-  icon: any;
+  title: string;
+  icon: React.ReactNode;
+  path: string;
   color: string;
-  link: string;
 }
 
-// ========================================
-// البيانات الافتراضية
-// ========================================
+// ==================== البيانات ====================
 
-const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'splash', label: 'شاشات البداية', icon: Smartphone, color: '#3b82f6', link: '/splash-screens' },
-  { id: 'content', label: 'إدارة المحتوى', icon: BookOpen, color: '#2f7659', link: '/content' },
-  { id: 'notifications', label: 'الإشعارات', icon: Bell, color: '#f59e0b', link: '/notifications' },
-  { id: 'themes', label: 'الثيمات', icon: Star, color: '#8b5cf6', link: '/themes' },
-  { id: 'seasonal', label: 'المحتوى الموسمي', icon: Calendar, color: '#ec4899', link: '/seasonal' },
-  { id: 'settings', label: 'الإعدادات', icon: Settings, color: '#6b7280', link: '/settings' },
+const INITIAL_STATS: DashboardStats = {
+  totalUsers: 15420,
+  activeUsers: 8750,
+  dailyActiveUsers: 2340,
+  avgSessionDuration: 8.5,
+  totalAzkarRead: 125000,
+  totalQuranPages: 89000,
+  totalPrayers: 156000,
+  totalSessions: 45600
+};
+
+const INITIAL_ACTIVITY: RecentActivity[] = [
+  { id: '1', type: 'user', description: 'مستخدم جديد من مصر', time: 'منذ دقيقة', country: '🇪🇬' },
+  { id: '2', type: 'azkar', description: 'أذكار الصباح الأكثر قراءة اليوم', time: 'منذ 5 دقائق' },
+  { id: '3', type: 'quran', description: '50 مستخدم أكملوا سورة الكهف', time: 'منذ 15 دقيقة' },
+  { id: '4', type: 'prayer', description: 'زيادة 15% في تسجيل الصلوات', time: 'منذ ساعة' },
+  { id: '5', type: 'share', description: '200 مشاركة لآية الكرسي', time: 'منذ ساعتين' },
 ];
 
-// ========================================
-// المكونات الفرعية
-// ========================================
+const INITIAL_STATUS: SystemStatus = {
+  api: 'online',
+  database: 'online',
+  notifications: 'online',
+  cdn: 'online'
+};
 
-interface StatCardProps {
+const QUICK_ACTIONS: QuickAction[] = [
+  { id: '1', title: 'شاشات البداية', icon: <Sparkles className="w-5 h-5" />, path: '/splash-screens', color: 'bg-purple-100 text-purple-600' },
+  { id: '2', title: 'إدارة المحتوى', icon: <FileText className="w-5 h-5" />, path: '/content', color: 'bg-blue-100 text-blue-600' },
+  { id: '3', title: 'الإشعارات', icon: <Bell className="w-5 h-5" />, path: '/notifications', color: 'bg-amber-100 text-amber-600' },
+  { id: '4', title: 'الثيمات', icon: <Palette className="w-5 h-5" />, path: '/themes', color: 'bg-pink-100 text-pink-600' },
+  { id: '5', title: 'المحتوى الموسمي', icon: <Calendar className="w-5 h-5" />, path: '/seasonal', color: 'bg-emerald-100 text-emerald-600' },
+  { id: '6', title: 'الإعدادات', icon: <Settings className="w-5 h-5" />, path: '/settings', color: 'bg-gray-100 text-gray-600' },
+];
+
+// ==================== المكونات ====================
+
+const StatCard: React.FC<{
   title: string;
-  value: string | number;
-  change?: number;
-  icon: any;
+  value: number | string;
+  icon: React.ReactNode;
   color: string;
-}
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, change, icon: Icon, color }) => (
-  <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 hover:border-gray-600 transition-all">
+  change?: number;
+  suffix?: string;
+}> = ({ title, value, icon, color, change, suffix }) => (
+  <div className="bg-white p-5 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-gray-400 text-sm mb-1">{title}</p>
-        <p className="text-2xl font-bold text-white">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+        <p className="text-sm text-gray-500">{title}</p>
+        <p className="text-2xl font-bold text-gray-800 mt-1">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+          {suffix && <span className="text-lg text-gray-500 mr-1">{suffix}</span>}
+        </p>
         {change !== undefined && (
-          <div className={`flex items-center gap-1 mt-2 text-sm ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            <TrendingUp size={14} className={change < 0 ? 'rotate-180' : ''} />
+          <div className={`flex items-center gap-1 mt-2 text-sm ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <TrendingUp className={`w-4 h-4 ${change < 0 ? 'rotate-180' : ''}`} />
             <span>{Math.abs(change)}% من الأسبوع الماضي</span>
           </div>
         )}
       </div>
-      <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}20` }}>
-        <Icon size={24} style={{ color }} />
+      <div className={`p-3 rounded-xl ${color}`}>
+        {icon}
       </div>
     </div>
   </div>
 );
 
-interface StatusIndicatorProps {
-  name: string;
-  status: 'online' | 'offline' | 'degraded';
-}
-
-const StatusIndicator: React.FC<StatusIndicatorProps> = ({ name, status }) => {
-  const statusConfig = {
-    online: { color: 'text-green-500', bg: 'bg-green-500', icon: CheckCircle, label: 'يعمل' },
-    offline: { color: 'text-red-500', bg: 'bg-red-500', icon: XCircle, label: 'متوقف' },
-    degraded: { color: 'text-yellow-500', bg: 'bg-yellow-500', icon: AlertTriangle, label: 'بطيء' },
+const StatusIndicator: React.FC<{ status: 'online' | 'offline' | 'degraded'; label: string }> = ({ status, label }) => {
+  const colors = {
+    online: 'bg-green-500',
+    offline: 'bg-red-500',
+    degraded: 'bg-amber-500'
+  };
+  const labels = {
+    online: 'يعمل',
+    offline: 'متوقف',
+    degraded: 'بطيء'
   };
 
-  const config = statusConfig[status];
-  const Icon = config.icon;
-
   return (
-    <div className="flex items-center justify-between py-3 border-b border-gray-700 last:border-0">
-      <span className="text-gray-300">{name}</span>
-      <div className={`flex items-center gap-2 ${config.color}`}>
-        <Icon size={16} />
-        <span className="text-sm">{config.label}</span>
+    <div className="flex items-center justify-between py-2">
+      <span className="text-gray-600">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${colors[status]}`} />
+        <span className={`text-sm ${status === 'online' ? 'text-green-600' : status === 'offline' ? 'text-red-600' : 'text-amber-600'}`}>
+          {labels[status]}
+        </span>
       </div>
     </div>
   );
 };
 
-// ========================================
-// المكون الرئيسي
-// ========================================
+// ==================== المكون الرئيسي ====================
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalUsers: 0,
-    activeUsers: 0,
-    dailyActiveUsers: 0,
-    totalSessions: 0,
-    avgSessionDuration: 0,
-    totalAzkarRead: 0,
-    totalQuranPages: 0,
-    totalPrayers: 0,
-  });
+  const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
+  const [activity, setActivity] = useState<RecentActivity[]>(INITIAL_ACTIVITY);
+  const [status, setStatus] = useState<SystemStatus>(INITIAL_STATUS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-  const [systemStatus, setSystemStatus] = useState<SystemStatus>({
-    api: 'online',
-    database: 'online',
-    notifications: 'online',
-    cdn: 'online',
-  });
-
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-
-  // تحميل البيانات
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const refreshData = async () => {
     setIsLoading(true);
-    
-    // TODO: استبدال بـ API calls حقيقية
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    setStats({
-      totalUsers: 15420,
-      activeUsers: 8750,
-      dailyActiveUsers: 2340,
-      totalSessions: 45600,
-      avgSessionDuration: 8.5,
-      totalAzkarRead: 125000,
-      totalQuranPages: 89000,
-      totalPrayers: 156000,
-    });
-
-    setRecentActivity([
-      { id: '1', type: 'user', message: 'مستخدم جديد من مصر', timestamp: '2026-03-02T22:30:00Z' },
-      { id: '2', type: 'azkar', message: 'أذكار الصباح الأكثر قراءة اليوم', timestamp: '2026-03-02T22:25:00Z' },
-      { id: '3', type: 'quran', message: '50 ختمة مكتملة هذا الأسبوع', timestamp: '2026-03-02T22:20:00Z' },
-      { id: '4', type: 'prayer', message: 'ارتفاع تسجيل الصلوات 15%', timestamp: '2026-03-02T22:15:00Z' },
-    ]);
-
-    setLastUpdate(new Date());
+    await new Promise(resolve => setTimeout(resolve, 800));
+    // هنا يمكن إضافة API call حقيقي
+    setLastUpdated(new Date());
     setIsLoading(false);
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'user': return Users;
-      case 'azkar': return Star;
-      case 'quran': return BookOpen;
-      case 'prayer': return Clock;
-      default: return Activity;
-    }
-  };
-
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case 'user': return '#3b82f6';
-      case 'azkar': return '#2f7659';
-      case 'quran': return '#f59e0b';
-      case 'prayer': return '#8b5cf6';
-      default: return '#6b7280';
-    }
-  };
-
-  const formatTime = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 60000);
-    
-    if (diff < 1) return 'الآن';
-    if (diff < 60) return `منذ ${diff} دقيقة`;
-    if (diff < 1440) return `منذ ${Math.floor(diff / 60)} ساعة`;
-    return `منذ ${Math.floor(diff / 1440)} يوم`;
-  };
-
   return (
-    <div className="p-6 bg-gray-900 min-h-screen" dir="rtl">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">لوحة التحكم</h1>
-          <p className="text-gray-400 mt-1">مرحباً بك في لوحة تحكم روح المسلم</p>
+          <h1 className="text-2xl font-bold text-gray-800">لوحة التحكم</h1>
+          <p className="text-gray-500 mt-1">مرحباً بك في لوحة تحكم روح المسلم</p>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-gray-400 text-sm">
-            آخر تحديث: {lastUpdate.toLocaleTimeString('ar-EG')}
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">
+            آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
           </span>
           <button
-            onClick={loadDashboardData}
+            onClick={refreshData}
             disabled={isLoading}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
           >
-            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-            <span>تحديث</span>
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            تحديث
           </button>
         </div>
       </div>
 
-      {/* الإحصائيات الرئيسية */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Stats Cards - Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="إجمالي المستخدمين"
           value={stats.totalUsers}
+          icon={<Users className="w-6 h-6 text-blue-600" />}
+          color="bg-blue-100"
           change={12}
-          icon={Users}
-          color="#3b82f6"
         />
         <StatCard
           title="المستخدمين النشطين"
           value={stats.activeUsers}
+          icon={<Activity className="w-6 h-6 text-green-600" />}
+          color="bg-green-100"
           change={8}
-          icon={Activity}
-          color="#2f7659"
         />
         <StatCard
           title="المستخدمين اليوم"
           value={stats.dailyActiveUsers}
-          change={-3}
-          icon={Eye}
-          color="#f59e0b"
+          icon={<Eye className="w-6 h-6 text-amber-600" />}
+          color="bg-amber-100"
+          change={3}
         />
         <StatCard
           title="متوسط مدة الجلسة"
-          value={`${stats.avgSessionDuration} د`}
+          value={stats.avgSessionDuration}
+          suffix="د"
+          icon={<Clock className="w-6 h-6 text-purple-600" />}
+          color="bg-purple-100"
           change={5}
-          icon={Clock}
-          color="#8b5cf6"
         />
       </div>
 
-      {/* إحصائيات العبادات */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      {/* Stats Cards - Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title="الأذكار المقروءة"
           value={stats.totalAzkarRead}
-          icon={Star}
-          color="#2f7659"
+          icon={<Star className="w-6 h-6 text-emerald-600" />}
+          color="bg-emerald-100"
         />
         <StatCard
           title="صفحات القرآن"
           value={stats.totalQuranPages}
-          icon={BookOpen}
-          color="#f59e0b"
+          icon={<BookOpen className="w-6 h-6 text-amber-600" />}
+          color="bg-amber-100"
         />
         <StatCard
           title="الصلوات المسجلة"
           value={stats.totalPrayers}
-          icon={Clock}
-          color="#8b5cf6"
+          icon={<Clock className="w-6 h-6 text-blue-600" />}
+          color="bg-blue-100"
         />
       </div>
 
+      {/* Quick Actions & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* الإجراءات السريعة */}
+        {/* Quick Actions */}
         <div className="lg:col-span-2">
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-            <h2 className="text-lg font-bold text-white mb-4">إجراءات سريعة</h2>
+          <div className="bg-white p-6 rounded-xl shadow-sm border">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">إجراءات سريعة</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {QUICK_ACTIONS.map(action => (
-                <a
+                <Link
                   key={action.id}
-                  href={action.link}
-                  className="flex items-center gap-3 p-4 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-all group"
+                  to={action.path}
+                  className="flex items-center gap-3 p-4 rounded-xl border hover:shadow-md transition-all hover:-translate-y-1"
                 >
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: `${action.color}20` }}
-                  >
-                    <action.icon size={20} style={{ color: action.color }} />
+                  <div className={`p-2 rounded-lg ${action.color}`}>
+                    {action.icon}
                   </div>
-                  <span className="text-white text-sm">{action.label}</span>
-                  <ChevronRight
-                    size={16}
-                    className="text-gray-500 mr-auto group-hover:translate-x-[-4px] transition-transform"
-                  />
-                </a>
+                  <span className="font-medium text-gray-700">{action.title}</span>
+                </Link>
               ))}
-            </div>
-          </div>
-
-          {/* النشاط الأخير */}
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 mt-6">
-            <h2 className="text-lg font-bold text-white mb-4">النشاط الأخير</h2>
-            <div className="space-y-3">
-              {recentActivity.map(activity => {
-                const Icon = getActivityIcon(activity.type);
-                const color = getActivityColor(activity.type);
-                
-                return (
-                  <div
-                    key={activity.id}
-                    className="flex items-center gap-3 p-3 bg-gray-700/30 rounded-lg"
-                  >
-                    <div
-                      className="p-2 rounded-lg"
-                      style={{ backgroundColor: `${color}20` }}
-                    >
-                      <Icon size={18} style={{ color }} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-white text-sm">{activity.message}</p>
-                      <p className="text-gray-400 text-xs mt-1">
-                        {formatTime(activity.timestamp)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
 
-        {/* حالة النظام */}
-        <div>
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">حالة النظام</h2>
-              <div className="flex items-center gap-2 text-green-500 text-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span>كل شيء يعمل</span>
-              </div>
-            </div>
-            <div>
-              <StatusIndicator name="API" status={systemStatus.api} />
-              <StatusIndicator name="قاعدة البيانات" status={systemStatus.database} />
-              <StatusIndicator name="الإشعارات" status={systemStatus.notifications} />
-              <StatusIndicator name="CDN" status={systemStatus.cdn} />
-            </div>
-          </div>
-
-          {/* معلومات التطبيق */}
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 mt-6">
-            <h2 className="text-lg font-bold text-white mb-4">معلومات التطبيق</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                <span className="text-gray-400">الإصدار الحالي</span>
-                <span className="text-white font-mono">1.0.0</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                <span className="text-gray-400">آخر تحديث</span>
-                <span className="text-white">2 مارس 2026</span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                <span className="text-gray-400">وضع الصيانة</span>
-                <span className="text-green-500">معطل</span>
-              </div>
-              <div className="flex justify-between items-center py-2">
-                <span className="text-gray-400">الإعلانات</span>
-                <span className="text-green-500">مفعّلة</span>
-              </div>
-            </div>
-          </div>
-
-          {/* توزيع المستخدمين */}
-          <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 mt-6">
-            <h2 className="text-lg font-bold text-white mb-4">توزيع المستخدمين</h2>
-            <div className="space-y-3">
-              {[
-                { platform: 'iOS', count: 8500, color: '#3b82f6' },
-                { platform: 'Android', count: 6920, color: '#2f7659' },
-              ].map(item => (
-                <div key={item.platform}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-300">{item.platform}</span>
-                    <span className="text-white">{item.count.toLocaleString()}</span>
-                  </div>
-                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${(item.count / stats.totalUsers) * 100}%`,
-                        backgroundColor: item.color,
-                      }}
-                    />
-                  </div>
+        {/* Recent Activity */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">النشاط الأخير</h2>
+          <div className="space-y-3">
+            {activity.map(item => (
+              <div key={item.id} className="flex items-start gap-3 py-2 border-b last:border-0">
+                <div className="mt-1">
+                  {item.type === 'user' && <Users className="w-4 h-4 text-blue-500" />}
+                  {item.type === 'azkar' && <Moon className="w-4 h-4 text-purple-500" />}
+                  {item.type === 'quran' && <BookOpen className="w-4 h-4 text-emerald-500" />}
+                  {item.type === 'prayer' && <Clock className="w-4 h-4 text-amber-500" />}
+                  {item.type === 'share' && <Globe className="w-4 h-4 text-pink-500" />}
                 </div>
-              ))}
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700">{item.description}</p>
+                  <p className="text-xs text-gray-400 mt-1">{item.time}</p>
+                </div>
+                {item.country && <span className="text-lg">{item.country}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* System Status & App Info */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* System Status */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800">حالة النظام</h2>
+            <span className="flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              كل شيء يعمل
+            </span>
+          </div>
+          <div className="space-y-1">
+            <StatusIndicator status={status.api} label="API" />
+            <StatusIndicator status={status.database} label="قاعدة البيانات" />
+            <StatusIndicator status={status.notifications} label="الإشعارات" />
+            <StatusIndicator status={status.cdn} label="CDN" />
+          </div>
+        </div>
+
+        {/* App Info */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">معلومات التطبيق</h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-gray-600">الإصدار الحالي</span>
+              <span className="font-medium text-gray-800">1.0.0</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-gray-600">آخر تحديث</span>
+              <span className="font-medium text-gray-800">2 مارس 2026</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-gray-600">وضع الصيانة</span>
+              <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-sm">معطل</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-gray-600">الإعلانات</span>
+              <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">مفعّلة</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* User Distribution */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <h2 className="text-lg font-bold text-gray-800 mb-4">توزيع المستخدمين</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-600 flex items-center gap-2">
+                 iOS
+              </span>
+              <span className="font-medium">8,500 (55%)</span>
+            </div>
+            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full" style={{ width: '55%' }} />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-600 flex items-center gap-2">
+                🤖 Android
+              </span>
+              <span className="font-medium">6,920 (45%)</span>
+            </div>
+            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full" style={{ width: '45%' }} />
             </div>
           </div>
         </div>
