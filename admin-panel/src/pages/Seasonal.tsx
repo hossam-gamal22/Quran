@@ -1,595 +1,756 @@
-// إضافات على ملف Seasonal.tsx
-// ================================
+// admin-panel/src/pages/Seasonal.tsx
+import React, { useState, useEffect } from 'react';
+import {
+  Calendar,
+  Plus,
+  Edit2,
+  Trash2,
+  Save,
+  Moon,
+  Sun,
+  Star,
+  Gift,
+  Heart,
+  BookOpen,
+  Clock,
+  Users,
+  Eye,
+  EyeOff,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Loader2,
+  RefreshCw,
+  Check,
+  X,
+  Bell,
+  Target,
+  Zap,
+  Award
+} from 'lucide-react';
 
-// 1. إضافة خيارات التوقيت في الأنواع
-type TimezoneOption = 'user_local' | 'makkah' | 'utc' | 'custom';
+// ==================== الأنواع ====================
 
-interface TimeSettings {
-  enabled: boolean;
-  startHour: number;
-  endHour: number;
-  timezone: TimezoneOption;
-  customTimezone?: string;
-  // إضافة دعم أوقات الصلاة
-  relativeTo?: 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha' | 'none';
-  offsetMinutes?: number; // قبل أو بعد وقت الصلاة
+type SeasonType = 'ramadan' | 'eid_fitr' | 'eid_adha' | 'hajj' | 'mawlid' | 'ashura' | 'isra_miraj' | 'friday' | 'custom';
+type ContentType = 'greeting' | 'azkar' | 'dua' | 'reminder' | 'challenge' | 'fact' | 'quote';
+
+interface SeasonalContent {
+  id: string;
+  seasonType: SeasonType;
+  contentType: ContentType;
+  titleAr: string;
+  titleEn: string;
+  contentAr: string;
+  contentEn: string;
+  icon: string;
+  backgroundColor: string;
+  textColor: string;
+  accentColor: string;
+  backgroundImage?: string;
+  startDate: string;
+  endDate: string;
+  isHijriDate: boolean;
+  priority: number;
+  isActive: boolean;
+  showTime?: {
+    enabled: boolean;
+    startHour: number;
+    endHour: number;
+  };
+  targetScreen?: string;
+  actionButton?: {
+    textAr: string;
+    textEn: string;
+    action: string;
+  };
+  stats: {
+    views: number;
+    interactions: number;
+    shares: number;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
-// 2. الثوابت الجديدة
-const TIMEZONE_OPTIONS: { value: TimezoneOption; label: string }[] = [
-  { value: 'user_local', label: 'توقيت المستخدم المحلي' },
-  { value: 'makkah', label: 'توقيت مكة المكرمة' },
-  { value: 'utc', label: 'التوقيت العالمي UTC' },
-  { value: 'custom', label: 'توقيت مخصص' },
+// ==================== الثوابت ====================
+
+const SEASON_TYPES: { value: SeasonType; labelAr: string; labelEn: string; icon: string }[] = [
+  { value: 'ramadan', labelAr: 'رمضان', labelEn: 'Ramadan', icon: '🌙' },
+  { value: 'eid_fitr', labelAr: 'عيد الفطر', labelEn: 'Eid al-Fitr', icon: '🎉' },
+  { value: 'eid_adha', labelAr: 'عيد الأضحى', labelEn: 'Eid al-Adha', icon: '🐑' },
+  { value: 'hajj', labelAr: 'موسم الحج', labelEn: 'Hajj Season', icon: '🕋' },
+  { value: 'mawlid', labelAr: 'المولد النبوي', labelEn: 'Mawlid', icon: '✨' },
+  { value: 'ashura', labelAr: 'عاشوراء', labelEn: 'Ashura', icon: '📿' },
+  { value: 'isra_miraj', labelAr: 'الإسراء والمعراج', labelEn: 'Isra and Miraj', icon: '🌟' },
+  { value: 'friday', labelAr: 'يوم الجمعة', labelEn: 'Friday', icon: '🕌' },
+  { value: 'custom', labelAr: 'مخصص', labelEn: 'Custom', icon: '⚙️' },
 ];
 
-const PRAYER_TIMES: { value: string; label: string }[] = [
-  { value: 'none', label: 'بدون ربط بوقت صلاة' },
-  { value: 'fajr', label: 'الفجر' },
-  { value: 'sunrise', label: 'الشروق' },
-  { value: 'dhuhr', label: 'الظهر' },
-  { value: 'asr', label: 'العصر' },
-  { value: 'maghrib', label: 'المغرب (الإفطار)' },
-  { value: 'isha', label: 'العشاء' },
+const CONTENT_TYPES: { value: ContentType; labelAr: string; icon: string }[] = [
+  { value: 'greeting', labelAr: 'تحية', icon: '👋' },
+  { value: 'azkar', labelAr: 'أذكار', icon: '📿' },
+  { value: 'dua', labelAr: 'دعاء', icon: '🤲' },
+  { value: 'reminder', labelAr: 'تذكير', icon: '🔔' },
+  { value: 'challenge', labelAr: 'تحدي', icon: '🎯' },
+  { value: 'fact', labelAr: 'معلومة', icon: '💡' },
+  { value: 'quote', labelAr: 'اقتباس', icon: '💬' },
 ];
 
-// 3. مكون معاينة الجهاز المحسّن
-const DevicePreview: React.FC<{
-  content: SeasonalContent;
-  deviceType: 'iphone' | 'android';
-  colorScheme: 'light' | 'dark';
-  language: 'ar' | 'en';
-}> = ({ content, deviceType, colorScheme, language }) => {
-  const isRTL = language === 'ar';
-  const title = language === 'ar' ? content.titleAr : content.titleEn;
-  const text = language === 'ar' ? content.contentAr : content.contentEn;
-  const buttonText = language === 'ar' 
-    ? content.actionButton?.textAr 
-    : content.actionButton?.textEn;
+const APP_SCREENS = [
+  { value: 'home', label: 'الرئيسية' },
+  { value: 'azkar', label: 'الأذكار' },
+  { value: 'quran', label: 'القرآن' },
+  { value: 'prayer', label: 'الصلاة' },
+  { value: 'qibla', label: 'القبلة' },
+  { value: 'dua', label: 'الأدعية' },
+];
+
+// ==================== البيانات التجريبية ====================
+
+const INITIAL_CONTENT: SeasonalContent[] = [
+  {
+    id: '1',
+    seasonType: 'ramadan',
+    contentType: 'greeting',
+    titleAr: 'رمضان كريم',
+    titleEn: 'Ramadan Kareem',
+    contentAr: 'أهلاً بك في شهر الخير والبركة',
+    contentEn: 'Welcome to the month of goodness',
+    icon: '🌙',
+    backgroundColor: '#1a1a2e',
+    textColor: '#ffffff',
+    accentColor: '#ffd700',
+    startDate: '9-1',
+    endDate: '9-30',
+    isHijriDate: true,
+    priority: 1,
+    isActive: true,
+    stats: { views: 25000, interactions: 15000, shares: 3500 },
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-02-28T00:00:00Z'
+  },
+  {
+    id: '2',
+    seasonType: 'friday',
+    contentType: 'azkar',
+    titleAr: 'أذكار يوم الجمعة',
+    titleEn: 'Friday Azkar',
+    contentAr: 'أكثر من الصلاة على النبي ﷺ',
+    contentEn: 'Increase prayers upon the Prophet ﷺ',
+    icon: '🕌',
+    backgroundColor: '#006400',
+    textColor: '#ffffff',
+    accentColor: '#90EE90',
+    startDate: 'friday',
+    endDate: 'friday',
+    isHijriDate: false,
+    priority: 1,
+    isActive: true,
+    stats: { views: 35000, interactions: 28000, shares: 8000 },
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-02-28T00:00:00Z'
+  }
+];
+
+// ==================== المكون الرئيسي ====================
+
+const Seasonal: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics'>('content');
+  const [contents, setContents] = useState<SeasonalContent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedSeason, setSelectedSeason] = useState<SeasonType | 'all'>('all');
+  const [showModal, setShowModal] = useState(false);
+  const [editingContent, setEditingContent] = useState<SeasonalContent | null>(null);
+  const [modalTab, setModalTab] = useState<'content' | 'design' | 'schedule' | 'action'>('content');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setContents(INITIAL_CONTENT);
+    setIsLoading(false);
+  };
+
+  const filteredContents = selectedSeason === 'all' 
+    ? contents 
+    : contents.filter(c => c.seasonType === selectedSeason);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsSaving(false);
+    alert('تم حفظ التغييرات بنجاح!');
+  };
+
+  const handleAddContent = () => {
+    setEditingContent({
+      id: '',
+      seasonType: 'ramadan',
+      contentType: 'greeting',
+      titleAr: '',
+      titleEn: '',
+      contentAr: '',
+      contentEn: '',
+      icon: '🌙',
+      backgroundColor: '#1a1a2e',
+      textColor: '#ffffff',
+      accentColor: '#ffd700',
+      startDate: '',
+      endDate: '',
+      isHijriDate: true,
+      priority: 1,
+      isActive: true,
+      stats: { views: 0, interactions: 0, shares: 0 },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    setShowModal(true);
+  };
+
+  const handleEditContent = (content: SeasonalContent) => {
+    setEditingContent({ ...content });
+    setShowModal(true);
+  };
+
+  const handleDeleteContent = (id: string) => {
+    if (confirm('هل أنت متأكد من حذف هذا المحتوى؟')) {
+      setContents(prev => prev.filter(c => c.id !== id));
+    }
+  };
+
+  const handleToggleActive = (id: string) => {
+    setContents(prev => prev.map(c => 
+      c.id === id ? { ...c, isActive: !c.isActive } : c
+    ));
+  };
+
+  const handleSaveContent = () => {
+    if (!editingContent) return;
+    
+    if (editingContent.id) {
+      setContents(prev => prev.map(c => 
+        c.id === editingContent.id ? { ...editingContent, updatedAt: new Date().toISOString() } : c
+      ));
+    } else {
+      setContents(prev => [...prev, { ...editingContent, id: Date.now().toString() }]);
+    }
+    setShowModal(false);
+    setEditingContent(null);
+  };
+
+  const totalViews = contents.reduce((sum, c) => sum + c.stats.views, 0);
+  const totalInteractions = contents.reduce((sum, c) => sum + c.stats.interactions, 0);
+  const avgEngagement = totalViews > 0 ? ((totalInteractions / totalViews) * 100).toFixed(1) : '0';
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        <span className="mr-2 text-gray-600">جاري تحميل المحتوى الموسمي...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col items-center">
-      {/* إطار الجهاز */}
-      <div 
-        className={`relative ${
-          deviceType === 'iphone' 
-            ? 'w-[280px] h-[580px] rounded-[45px]' 
-            : 'w-[270px] h-[560px] rounded-[25px]'
-        } bg-black p-2 shadow-2xl`}
-      >
-        {/* الشاشة */}
-        <div 
-          className={`w-full h-full overflow-hidden ${
-            deviceType === 'iphone' ? 'rounded-[38px]' : 'rounded-[20px]'
-          }`}
-          style={{ 
-            backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5' 
-          }}
-        >
-          {/* Notch للآيفون */}
-          {deviceType === 'iphone' && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 w-[120px] h-[30px] bg-black rounded-full z-10" />
-          )}
-          
-          {/* Status Bar */}
-          <div 
-            className={`flex items-center justify-between px-6 pt-3 pb-2 ${
-              colorScheme === 'dark' ? 'text-white' : 'text-black'
-            }`}
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <Calendar className="w-7 h-7 text-emerald-600" />
+            إدارة المحتوى الموسمي
+          </h1>
+          <p className="text-gray-500 mt-1">إدارة المحتوى الخاص بالمناسبات الإسلامية</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
           >
-            <span className="text-xs font-medium">9:41</span>
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-2 border border-current rounded-sm">
-                <div className="w-3/4 h-full bg-current rounded-sm" />
-              </div>
+            <RefreshCw className="w-4 h-4" />
+            تحديث
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            حفظ الكل
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Calendar className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">إجمالي المحتوى</p>
+              <p className="text-xl font-bold text-gray-800">{contents.length}</p>
             </div>
           </div>
-
-          {/* محتوى Splash Screen */}
-          <div 
-            className="flex-1 flex flex-col items-center justify-center p-6 mx-2 mt-2 rounded-2xl"
-            style={{
-              backgroundColor: content.backgroundColor,
-              backgroundImage: content.backgroundImage 
-                ? `linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.5)), url(${content.backgroundImage})`
-                : undefined,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              minHeight: '420px'
-            }}
-            dir={isRTL ? 'rtl' : 'ltr'}
-          >
-            {/* الأيقونة */}
-            <div 
-              className="text-6xl mb-4 animate-bounce"
-              style={{ animationDuration: '2s' }}
-            >
-              {content.icon}
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Eye className="w-5 h-5 text-green-600" />
             </div>
-            
-            {/* العنوان */}
-            <h2 
-              className="text-2xl font-bold text-center mb-3"
-              style={{ color: content.textColor }}
+            <div>
+              <p className="text-sm text-gray-500">المشاهدات</p>
+              <p className="text-xl font-bold text-gray-800">{totalViews.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Target className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">التفاعلات</p>
+              <p className="text-xl font-bold text-gray-800">{totalInteractions.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Zap className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">نسبة التفاعل</p>
+              <p className="text-xl font-bold text-gray-800">{avgEngagement}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 border-b pb-2">
+        <button
+          onClick={() => setActiveTab('content')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+            activeTab === 'content' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          المحتوى الموسمي
+        </button>
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+            activeTab === 'analytics' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <Target className="w-4 h-4" />
+          التحليلات
+        </button>
+      </div>
+
+      {/* Content Tab */}
+      {activeTab === 'content' && (
+        <div>
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-4">
+            <select
+              value={selectedSeason}
+              onChange={(e) => setSelectedSeason(e.target.value as SeasonType | 'all')}
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
             >
-              {title || 'العنوان'}
-            </h2>
-            
-            {/* المحتوى */}
-            <p 
-              className="text-center text-sm leading-relaxed mb-6 px-2"
-              style={{ color: content.textColor, opacity: 0.9 }}
-            >
-              {text || 'نص المحتوى يظهر هنا...'}
-            </p>
-            
-            {/* زر الإجراء */}
-            {buttonText && (
-              <button
-                className="px-8 py-3 rounded-xl font-bold text-sm shadow-lg"
-                style={{ 
-                  backgroundColor: content.accentColor,
-                  color: content.backgroundColor
-                }}
-              >
-                {buttonText}
-              </button>
-            )}
-            
-            {/* زر الإغلاق */}
+              <option value="all">جميع المواسم</option>
+              {SEASON_TYPES.map(s => (
+                <option key={s.value} value={s.value}>{s.icon} {s.labelAr}</option>
+              ))}
+            </select>
             <button
-              className="absolute top-20 left-4 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ 
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: content.textColor
-              }}
+              onClick={handleAddContent}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
             >
-              ✕
+              <Plus className="w-4 h-4" />
+              إضافة محتوى
             </button>
           </div>
 
-          {/* Home Indicator للآيفون */}
-          {deviceType === 'iphone' && (
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-32 h-1 bg-gray-400 rounded-full" />
-          )}
-        </div>
-      </div>
-
-      {/* معلومات الجهاز */}
-      <div className="mt-3 text-center">
-        <p className="text-sm font-medium text-gray-700">
-          {deviceType === 'iphone' ? 'iPhone 14 Pro' : 'Samsung Galaxy S23'}
-        </p>
-        <p className="text-xs text-gray-500">
-          {colorScheme === 'dark' ? 'الوضع الداكن' : 'الوضع الفاتح'} • {language === 'ar' ? 'عربي' : 'English'}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-// 4. مكون نافذة المعاينة الكاملة
-const FullPreviewModal: React.FC<{
-  content: SeasonalContent;
-  onClose: () => void;
-}> = ({ content, onClose }) => {
-  const [deviceType, setDeviceType] = useState<'iphone' | 'android'>('iphone');
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light');
-  const [language, setLanguage] = useState<'ar' | 'en'>('ar');
-  const [showNotification, setShowNotification] = useState(false);
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden">
-        {/* الرأس */}
-        <div className="p-4 border-b flex items-center justify-between bg-gray-50">
-          <div>
-            <h2 className="text-lg font-bold">معاينة المحتوى</h2>
-            <p className="text-sm text-gray-500">شاهد كيف سيظهر المحتوى للمستخدمين</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* أدوات التحكم */}
-        <div className="p-4 border-b flex flex-wrap items-center gap-4 bg-gray-50">
-          {/* نوع الجهاز */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">الجهاز:</span>
-            <div className="flex bg-gray-200 rounded-lg p-1">
-              <button
-                onClick={() => setDeviceType('iphone')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  deviceType === 'iphone' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                 iPhone
-              </button>
-              <button
-                onClick={() => setDeviceType('android')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  deviceType === 'android' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                🤖 Android
-              </button>
-            </div>
-          </div>
-
-          {/* الوضع */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">الوضع:</span>
-            <div className="flex bg-gray-200 rounded-lg p-1">
-              <button
-                onClick={() => setColorScheme('light')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  colorScheme === 'light' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                ☀️ فاتح
-              </button>
-              <button
-                onClick={() => setColorScheme('dark')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  colorScheme === 'dark' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                🌙 داكن
-              </button>
-            </div>
-          </div>
-
-          {/* اللغة */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">اللغة:</span>
-            <div className="flex bg-gray-200 rounded-lg p-1">
-              <button
-                onClick={() => setLanguage('ar')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  language === 'ar' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                عربي
-              </button>
-              <button
-                onClick={() => setLanguage('en')}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  language === 'en' 
-                    ? 'bg-white text-gray-800 shadow-sm' 
-                    : 'text-gray-600'
-                }`}
-              >
-                English
-              </button>
-            </div>
-          </div>
-
-          {/* عرض كإشعار */}
-          <button
-            onClick={() => setShowNotification(!showNotification)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              showNotification 
-                ? 'bg-blue-100 text-blue-700' 
-                : 'bg-gray-200 text-gray-600'
-            }`}
-          >
-            <Bell className="w-4 h-4" />
-            معاينة كإشعار
-          </button>
-        </div>
-
-        {/* منطقة المعاينة */}
-        <div className="p-8 bg-gradient-to-br from-gray-100 to-gray-200 min-h-[500px] flex items-center justify-center gap-8 overflow-auto">
-          {/* معاينة Splash Screen */}
-          <DevicePreview
-            content={content}
-            deviceType={deviceType}
-            colorScheme={colorScheme}
-            language={language}
-          />
-
-          {/* معاينة الإشعار */}
-          {showNotification && (
-            <div className="flex flex-col items-center">
-              <div 
-                className={`w-[320px] p-4 rounded-2xl shadow-lg ${
-                  colorScheme === 'dark' 
-                    ? 'bg-gray-800 text-white' 
-                    : 'bg-white text-gray-800'
-                }`}
-                dir={language === 'ar' ? 'rtl' : 'ltr'}
-              >
-                <div className="flex items-start gap-3">
-                  <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
-                    style={{ backgroundColor: content.backgroundColor }}
-                  >
-                    {content.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm">روح المسلم</span>
-                      <span className="text-xs opacity-50">الآن</span>
+          {/* Content List */}
+          <div className="grid gap-4">
+            {filteredContents.map(content => {
+              const season = SEASON_TYPES.find(s => s.value === content.seasonType);
+              const contentType = CONTENT_TYPES.find(c => c.value === content.contentType);
+              
+              return (
+                <div
+                  key={content.id}
+                  className={`bg-white rounded-xl shadow-sm border overflow-hidden ${!content.isActive ? 'opacity-60' : ''}`}
+                >
+                  <div className="flex">
+                    {/* Preview */}
+                    <div
+                      className="w-48 p-4 flex flex-col items-center justify-center text-center"
+                      style={{ backgroundColor: content.backgroundColor, color: content.textColor }}
+                    >
+                      <span className="text-4xl mb-2">{content.icon}</span>
+                      <p className="text-sm font-bold">{content.titleAr}</p>
                     </div>
-                    <p className="font-medium text-sm mt-1">
-                      {language === 'ar' ? content.titleAr : content.titleEn}
-                    </p>
-                    <p className="text-xs opacity-70 mt-1 line-clamp-2">
-                      {language === 'ar' ? content.contentAr : content.contentEn}
-                    </p>
+                    
+                    {/* Details */}
+                    <div className="flex-1 p-4">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-700">
+                              {season?.icon} {season?.labelAr}
+                            </span>
+                            <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
+                              {contentType?.icon} {contentType?.labelAr}
+                            </span>
+                            <span className={`px-2 py-1 text-xs rounded-full ${content.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {content.isActive ? 'نشط' : 'غير نشط'}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-gray-800">{content.titleAr}</h3>
+                          <p className="text-sm text-gray-500 mt-1">{content.contentAr}</p>
+                        </div>
+                        
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEditContent(content)}
+                            className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleActive(content.id)}
+                            className={`p-2 rounded-lg ${content.isActive ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`}
+                          >
+                            {content.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteContent(content.id)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Stats */}
+                      <div className="flex items-center gap-6 mt-4 pt-4 border-t">
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Eye className="w-4 h-4" />
+                          <span>{content.stats.views.toLocaleString()} مشاهدة</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Target className="w-4 h-4" />
+                          <span>{content.stats.interactions.toLocaleString()} تفاعل</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm text-gray-500">
+                          <Clock className="w-4 h-4" />
+                          <span>{content.isHijriDate ? 'هجري' : 'ميلادي'}: {content.startDate}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <p className="mt-3 text-sm text-gray-600">شكل الإشعار على الهاتف</p>
-            </div>
-          )}
-        </div>
-
-        {/* معلومات إضافية */}
-        <div className="p-4 border-t bg-gray-50">
-          <div className="grid grid-cols-4 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-500">الموسم</p>
-              <p className="font-medium">
-                {SEASON_TYPES.find(s => s.value === content.seasonType)?.labelAr}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">نوع المحتوى</p>
-              <p className="font-medium">
-                {CONTENT_TYPES.find(c => c.value === content.contentType)?.labelAr}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">الفترة</p>
-              <p className="font-medium">
-                {content.startDate} - {content.endDate}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500">وقت العرض</p>
-              <p className="font-medium">
-                {content.showTime?.enabled 
-                  ? `${content.showTime.startHour}:00 - ${content.showTime.endHour}:00`
-                  : 'طوال اليوم'}
-              </p>
-            </div>
+              );
+            })}
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
+      )}
 
-// 5. تحديث قسم الجدولة في المودال الرئيسي
-// استبدال محتوى {modalTab === 'schedule'} بالتالي:
-
-{modalTab === 'schedule' && (
-  <div className="space-y-4">
-    {/* نوع التاريخ */}
-    <div className="flex items-center gap-4">
-      <label className="flex items-center gap-2">
-        <input
-          type="radio"
-          checked={editingContent.isHijriDate}
-          onChange={() => setEditingContent({ ...editingContent, isHijriDate: true })}
-          className="w-4 h-4 text-emerald-600"
-        />
-        <span>تاريخ هجري</span>
-      </label>
-      <label className="flex items-center gap-2">
-        <input
-          type="radio"
-          checked={!editingContent.isHijriDate}
-          onChange={() => setEditingContent({ ...editingContent, isHijriDate: false })}
-          className="w-4 h-4 text-emerald-600"
-        />
-        <span>تاريخ ميلادي / يوم أسبوعي</span>
-      </label>
-    </div>
-    
-    {/* التواريخ */}
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          تاريخ البداية {editingContent.isHijriDate ? '(شهر-يوم)' : ''}
-        </label>
-        <input
-          type="text"
-          value={editingContent.startDate}
-          onChange={(e) => setEditingContent({ ...editingContent, startDate: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
-          placeholder={editingContent.isHijriDate ? '9-1 (1 رمضان)' : 'friday أو 2026-03-15'}
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          تاريخ النهاية
-        </label>
-        <input
-          type="text"
-          value={editingContent.endDate}
-          onChange={(e) => setEditingContent({ ...editingContent, endDate: e.target.value })}
-          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
-          placeholder={editingContent.isHijriDate ? '9-30 (30 رمضان)' : 'friday أو 2026-03-20'}
-        />
-      </div>
-    </div>
-
-    {/* إعدادات الوقت */}
-    <div className="p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center gap-2 mb-3">
-        <input
-          type="checkbox"
-          checked={editingContent.showTime?.enabled || false}
-          onChange={(e) => setEditingContent({
-            ...editingContent,
-            showTime: { 
-              enabled: e.target.checked, 
-              startHour: editingContent.showTime?.startHour || 0,
-              endHour: editingContent.showTime?.endHour || 24,
-              timezone: editingContent.showTime?.timezone || 'user_local'
-            }
-          })}
-          className="w-5 h-5 text-emerald-600 rounded"
-        />
-        <span className="font-medium">تحديد وقت العرض</span>
-      </div>
-      
-      {editingContent.showTime?.enabled && (
-        <div className="space-y-4">
-          {/* المنطقة الزمنية */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">المنطقة الزمنية</label>
-            <select
-              value={editingContent.showTime.timezone || 'user_local'}
-              onChange={(e) => setEditingContent({
-                ...editingContent,
-                showTime: { 
-                  ...editingContent.showTime!, 
-                  timezone: e.target.value as TimezoneOption 
-                }
-              })}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              {TIMEZONE_OPTIONS.map(tz => (
-                <option key={tz.value} value={tz.value}>{tz.label}</option>
+      {/* Analytics Tab */}
+      {activeTab === 'analytics' && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Award className="w-5 h-5 text-amber-500" />
+            أفضل المحتوى أداءً
+          </h3>
+          <div className="space-y-3">
+            {[...contents]
+              .sort((a, b) => b.stats.views - a.stats.views)
+              .map((content, i) => (
+                <div key={content.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                    i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <span className="text-2xl">{content.icon}</span>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-800">{content.titleAr}</p>
+                    <p className="text-sm text-gray-500">
+                      {SEASON_TYPES.find(s => s.value === content.seasonType)?.labelAr}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-bold text-gray-800">{content.stats.views.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">مشاهدة</p>
+                  </div>
+                </div>
               ))}
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              {editingContent.showTime.timezone === 'user_local' && 
-                '⏰ سيظهر المحتوى حسب التوقيت المحلي لكل مستخدم'}
-              {editingContent.showTime.timezone === 'makkah' && 
-                '🕋 سيظهر المحتوى حسب توقيت مكة المكرمة (UTC+3)'}
-            </p>
           </div>
+        </div>
+      )}
 
-          {/* الربط بأوقات الصلاة */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">الربط بوقت صلاة</label>
-            <select
-              value={editingContent.showTime.relativeTo || 'none'}
-              onChange={(e) => setEditingContent({
-                ...editingContent,
-                showTime: { 
-                  ...editingContent.showTime!, 
-                  relativeTo: e.target.value as any
-                }
-              })}
-              className="w-full px-3 py-2 border rounded-lg"
-            >
-              {PRAYER_TIMES.map(pt => (
-                <option key={pt.value} value={pt.value}>{pt.label}</option>
+      {/* Modal */}
+      {showModal && editingContent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold">
+                {editingContent.id ? 'تعديل المحتوى' : 'إضافة محتوى جديد'}
+              </h2>
+              <button
+                onClick={() => { setShowModal(false); setEditingContent(null); }}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex gap-2 p-4 border-b">
+              {[
+                { id: 'content', label: 'المحتوى' },
+                { id: 'design', label: 'التصميم' },
+                { id: 'schedule', label: 'الجدولة' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setModalTab(tab.id as typeof modalTab)}
+                  className={`px-3 py-2 rounded-lg text-sm ${
+                    modalTab === tab.id ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab.label}
+                </button>
               ))}
-            </select>
+            </div>
+
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {/* Content Tab */}
+              {modalTab === 'content' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">الموسم</label>
+                      <select
+                        value={editingContent.seasonType}
+                        onChange={(e) => setEditingContent({ ...editingContent, seasonType: e.target.value as SeasonType })}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      >
+                        {SEASON_TYPES.map(s => (
+                          <option key={s.value} value={s.value}>{s.icon} {s.labelAr}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">نوع المحتوى</label>
+                      <select
+                        value={editingContent.contentType}
+                        onChange={(e) => setEditingContent({ ...editingContent, contentType: e.target.value as ContentType })}
+                        className="w-full px-3 py-2 border rounded-lg"
+                      >
+                        {CONTENT_TYPES.map(c => (
+                          <option key={c.value} value={c.value}>{c.icon} {c.labelAr}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">العنوان (عربي)</label>
+                    <input
+                      type="text"
+                      value={editingContent.titleAr}
+                      onChange={(e) => setEditingContent({ ...editingContent, titleAr: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="أدخل العنوان"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">العنوان (إنجليزي)</label>
+                    <input
+                      type="text"
+                      value={editingContent.titleEn}
+                      onChange={(e) => setEditingContent({ ...editingContent, titleEn: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      dir="ltr"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">المحتوى (عربي)</label>
+                    <textarea
+                      value={editingContent.contentAr}
+                      onChange={(e) => setEditingContent({ ...editingContent, contentAr: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">المحتوى (إنجليزي)</label>
+                    <textarea
+                      value={editingContent.contentEn}
+                      onChange={(e) => setEditingContent({ ...editingContent, contentEn: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Design Tab */}
+              {modalTab === 'design' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">الأيقونة</label>
+                    <input
+                      type="text"
+                      value={editingContent.icon}
+                      onChange={(e) => setEditingContent({ ...editingContent, icon: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-2xl text-center"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">لون الخلفية</label>
+                      <input
+                        type="color"
+                        value={editingContent.backgroundColor}
+                        onChange={(e) => setEditingContent({ ...editingContent, backgroundColor: e.target.value })}
+                        className="w-full h-10 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">لون النص</label>
+                      <input
+                        type="color"
+                        value={editingContent.textColor}
+                        onChange={(e) => setEditingContent({ ...editingContent, textColor: e.target.value })}
+                        className="w-full h-10 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">اللون المميز</label>
+                      <input
+                        type="color"
+                        value={editingContent.accentColor}
+                        onChange={(e) => setEditingContent({ ...editingContent, accentColor: e.target.value })}
+                        className="w-full h-10 rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Preview */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">معاينة</label>
+                    <div
+                      className="p-6 rounded-xl text-center"
+                      style={{ backgroundColor: editingContent.backgroundColor, color: editingContent.textColor }}
+                    >
+                      <span className="text-5xl mb-3 block">{editingContent.icon}</span>
+                      <h3 className="text-xl font-bold mb-2">{editingContent.titleAr || 'العنوان'}</h3>
+                      <p className="opacity-90">{editingContent.contentAr || 'المحتوى...'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Schedule Tab */}
+              {modalTab === 'schedule' && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={editingContent.isHijriDate}
+                        onChange={(e) => setEditingContent({ ...editingContent, isHijriDate: e.target.checked })}
+                        className="w-5 h-5 text-emerald-600 rounded"
+                      />
+                      <span>استخدام التاريخ الهجري</span>
+                    </label>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">تاريخ البداية</label>
+                      <input
+                        type="text"
+                        value={editingContent.startDate}
+                        onChange={(e) => setEditingContent({ ...editingContent, startDate: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="9-1 أو friday"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">تاريخ النهاية</label>
+                      <input
+                        type="text"
+                        value={editingContent.endDate}
+                        onChange={(e) => setEditingContent({ ...editingContent, endDate: e.target.value })}
+                        className="w-full px-3 py-2 border rounded-lg"
+                        placeholder="9-30 أو friday"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
+                    <input
+                      type="number"
+                      value={editingContent.priority}
+                      onChange={(e) => setEditingContent({ ...editingContent, priority: parseInt(e.target.value) })}
+                      min={1}
+                      max={100}
+                      className="w-full px-3 py-2 border rounded-lg"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={editingContent.isActive}
+                      onChange={(e) => setEditingContent({ ...editingContent, isActive: e.target.checked })}
+                      className="w-5 h-5 text-emerald-600 rounded"
+                    />
+                    <span>نشط</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button
+                onClick={() => { setShowModal(false); setEditingContent(null); }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleSaveContent}
+                className="px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+              >
+                حفظ
+              </button>
+            </div>
           </div>
-
-          {editingContent.showTime.relativeTo && editingContent.showTime.relativeTo !== 'none' && (
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                الفرق بالدقائق (- قبل، + بعد)
-              </label>
-              <input
-                type="number"
-                value={editingContent.showTime.offsetMinutes || 0}
-                onChange={(e) => setEditingContent({
-                  ...editingContent,
-                  showTime: { 
-                    ...editingContent.showTime!, 
-                    offsetMinutes: parseInt(e.target.value) 
-                  }
-                })}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="0"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                مثال: -30 يعني قبل {PRAYER_TIMES.find(p => p.value === editingContent.showTime?.relativeTo)?.label} بـ 30 دقيقة
-              </p>
-            </div>
-          )}
-
-          {/* أو تحديد ساعات محددة */}
-          {(!editingContent.showTime.relativeTo || editingContent.showTime.relativeTo === 'none') && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">من الساعة</label>
-                <select
-                  value={editingContent.showTime.startHour}
-                  onChange={(e) => setEditingContent({
-                    ...editingContent,
-                    showTime: { ...editingContent.showTime!, startHour: parseInt(e.target.value) }
-                  })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i.toString().padStart(2, '0')}:00 {i < 12 ? 'ص' : 'م'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600 mb-1">إلى الساعة</label>
-                <select
-                  value={editingContent.showTime.endHour}
-                  onChange={(e) => setEditingContent({
-                    ...editingContent,
-                    showTime: { ...editingContent.showTime!, endHour: parseInt(e.target.value) }
-                  })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  {Array.from({ length: 24 }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {(i + 1).toString().padStart(2, '0')}:00 {(i + 1) < 12 ? 'ص' : 'م'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
-    
-    {/* الأولوية والحالة */}
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">الأولوية</label>
-        <input
-          type="number"
-          value={editingContent.priority}
-          onChange={(e) => setEditingContent({ ...editingContent, priority: parseInt(e.target.value) })}
-          min={1}
-          max={100}
-          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
-        />
-        <p className="text-xs text-gray-500 mt-1">1 = الأعلى أولوية</p>
-      </div>
-      <div className="flex items-center pt-6">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={editingContent.isActive}
-            onChange={(e) => setEditingContent({ ...editingContent, isActive: e.target.checked })}
-            className="w-5 h-5 text-emerald-600 rounded"
-          />
-          <span className="font-medium">نشط</span>
-        </label>
-      </div>
-    </div>
-  </div>
-)}
+  );
+};
+
+export default Seasonal;

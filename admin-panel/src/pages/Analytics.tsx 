@@ -1,6 +1,4 @@
 // admin-panel/src/pages/Analytics.tsx
-// صفحة التحليلات والإحصائيات الشاملة
-
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
@@ -8,455 +6,58 @@ import {
   Eye,
   Clock,
   TrendingUp,
-  TrendingDown,
   Calendar,
   Smartphone,
   Globe,
   BookOpen,
   Moon,
-  Sun,
   Star,
-  Heart,
   Share2,
   Download,
   RefreshCw,
-  Filter,
-  ChevronDown,
-  ArrowUp,
-  ArrowDown,
   Loader2,
-  MapPin,
   Activity,
   Target,
   Zap,
   Award,
-  Flame,
-  BookMarked,
-  Headphones,
-  Bell,
-  Settings,
-  PieChart,
-  LineChart,
-  Map
+  MapPin
 } from 'lucide-react';
-
-// ==================== الأنواع ====================
-
-interface OverviewStats {
-  totalUsers: number;
-  activeUsers: number;
-  newUsersToday: number;
-  newUsersThisWeek: number;
-  newUsersThisMonth: number;
-  totalSessions: number;
-  avgSessionDuration: number; // بالدقائق
-  avgDailySessions: number;
-  retentionRate: number; // نسبة مئوية
-  churnRate: number;
-}
-
-interface EngagementStats {
-  totalAzkarRead: number;
-  totalAzkarCompleted: number;
-  avgAzkarPerUser: number;
-  totalQuranPages: number;
-  totalQuranMinutes: number;
-  avgQuranPagesPerUser: number;
-  totalPrayersLogged: number;
-  avgPrayersPerUser: number;
-  totalTasbihCount: number;
-  totalDuasRead: number;
-  totalShares: number;
-}
-
-interface ContentStats {
-  mostReadAzkar: { id: string; name: string; count: number; percentage: number }[];
-  mostReadSurahs: { id: number; name: string; count: number }[];
-  mostUsedFeatures: { feature: string; name: string; count: number; percentage: number }[];
-  peakUsageHours: { hour: number; count: number }[];
-  peakUsageDays: { day: string; count: number }[];
-}
-
-interface UserDemographics {
-  byCountry: { country: string; countryAr: string; count: number; percentage: number }[];
-  byLanguage: { language: string; count: number; percentage: number }[];
-  byPlatform: { platform: string; count: number; percentage: number }[];
-  byAppVersion: { version: string; count: number; percentage: number }[];
-  byDevice: { device: string; count: number }[];
-}
-
-interface GrowthData {
-  daily: { date: string; users: number; sessions: number }[];
-  weekly: { week: string; users: number; sessions: number }[];
-  monthly: { month: string; users: number; sessions: number }[];
-}
-
-interface RealtimeData {
-  activeNow: number;
-  lastHourSessions: number;
-  currentlyReading: {
-    quran: number;
-    azkar: number;
-    dua: number;
-  };
-  recentEvents: {
-    type: string;
-    description: string;
-    time: string;
-    country?: string;
-  }[];
-}
-
-type DateRange = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom';
-
-// ==================== البيانات التجريبية ====================
-
-const MOCK_OVERVIEW: OverviewStats = {
-  totalUsers: 45680,
-  activeUsers: 12450,
-  newUsersToday: 234,
-  newUsersThisWeek: 1580,
-  newUsersThisMonth: 5420,
-  totalSessions: 156000,
-  avgSessionDuration: 8.5,
-  avgDailySessions: 2.3,
-  retentionRate: 68.5,
-  churnRate: 12.3
-};
-
-const MOCK_ENGAGEMENT: EngagementStats = {
-  totalAzkarRead: 2450000,
-  totalAzkarCompleted: 890000,
-  avgAzkarPerUser: 53.6,
-  totalQuranPages: 1250000,
-  totalQuranMinutes: 4500000,
-  avgQuranPagesPerUser: 27.4,
-  totalPrayersLogged: 3200000,
-  avgPrayersPerUser: 70.1,
-  totalTasbihCount: 45000000,
-  totalDuasRead: 680000,
-  totalShares: 125000
-};
-
-const MOCK_CONTENT: ContentStats = {
-  mostReadAzkar: [
-    { id: 'morning', name: 'أذكار الصباح', count: 450000, percentage: 28.5 },
-    { id: 'evening', name: 'أذكار المساء', count: 420000, percentage: 26.6 },
-    { id: 'sleep', name: 'أذكار النوم', count: 280000, percentage: 17.7 },
-    { id: 'prayer', name: 'أذكار الصلاة', count: 195000, percentage: 12.3 },
-    { id: 'wake', name: 'أذكار الاستيقاظ', count: 156000, percentage: 9.9 },
-    { id: 'misc', name: 'أذكار متنوعة', count: 79000, percentage: 5.0 },
-  ],
-  mostReadSurahs: [
-    { id: 36, name: 'يس', count: 125000 },
-    { id: 67, name: 'الملك', count: 98000 },
-    { id: 18, name: 'الكهف', count: 89000 },
-    { id: 55, name: 'الرحمن', count: 76000 },
-    { id: 56, name: 'الواقعة', count: 68000 },
-    { id: 2, name: 'البقرة', count: 54000 },
-    { id: 1, name: 'الفاتحة', count: 48000 },
-    { id: 112, name: 'الإخلاص', count: 45000 },
-  ],
-  mostUsedFeatures: [
-    { feature: 'azkar', name: 'الأذكار', count: 2450000, percentage: 35 },
-    { feature: 'quran', name: 'القرآن الكريم', count: 1800000, percentage: 26 },
-    { feature: 'prayer', name: 'مواقيت الصلاة', count: 1200000, percentage: 17 },
-    { feature: 'qibla', name: 'اتجاه القبلة', count: 650000, percentage: 9 },
-    { feature: 'tasbih', name: 'المسبحة', count: 520000, percentage: 7 },
-    { feature: 'dua', name: 'الأدعية', count: 380000, percentage: 6 },
-  ],
-  peakUsageHours: [
-    { hour: 5, count: 8500 },
-    { hour: 6, count: 15200 },
-    { hour: 7, count: 12800 },
-    { hour: 12, count: 9200 },
-    { hour: 13, count: 8900 },
-    { hour: 17, count: 11500 },
-    { hour: 18, count: 14200 },
-    { hour: 19, count: 16800 },
-    { hour: 20, count: 18500 },
-    { hour: 21, count: 15600 },
-    { hour: 22, count: 12400 },
-    { hour: 23, count: 8900 },
-  ],
-  peakUsageDays: [
-    { day: 'الجمعة', count: 28500 },
-    { day: 'السبت', count: 22400 },
-    { day: 'الأحد', count: 19800 },
-    { day: 'الإثنين', count: 18200 },
-    { day: 'الثلاثاء', count: 17600 },
-    { day: 'الأربعاء', count: 18100 },
-    { day: 'الخميس', count: 21300 },
-  ]
-};
-
-const MOCK_DEMOGRAPHICS: UserDemographics = {
-  byCountry: [
-    { country: 'EG', countryAr: 'مصر', count: 12500, percentage: 27.4 },
-    { country: 'SA', countryAr: 'السعودية', count: 9800, percentage: 21.5 },
-    { country: 'AE', countryAr: 'الإمارات', count: 4200, percentage: 9.2 },
-    { country: 'KW', countryAr: 'الكويت', count: 3100, percentage: 6.8 },
-    { country: 'QA', countryAr: 'قطر', count: 2400, percentage: 5.3 },
-    { country: 'JO', countryAr: 'الأردن', count: 2200, percentage: 4.8 },
-    { country: 'MA', countryAr: 'المغرب', count: 2100, percentage: 4.6 },
-    { country: 'DZ', countryAr: 'الجزائر', count: 1800, percentage: 3.9 },
-    { country: 'US', countryAr: 'أمريكا', count: 1500, percentage: 3.3 },
-    { country: 'GB', countryAr: 'بريطانيا', count: 1200, percentage: 2.6 },
-    { country: 'OTHER', countryAr: 'أخرى', count: 4880, percentage: 10.6 },
-  ],
-  byLanguage: [
-    { language: 'العربية', count: 38000, percentage: 83.2 },
-    { language: 'English', count: 5200, percentage: 11.4 },
-    { language: 'Français', count: 1200, percentage: 2.6 },
-    { language: 'اردو', count: 800, percentage: 1.8 },
-    { language: 'Other', count: 480, percentage: 1.0 },
-  ],
-  byPlatform: [
-    { platform: 'iOS', count: 24800, percentage: 54.3 },
-    { platform: 'Android', count: 20880, percentage: 45.7 },
-  ],
-  byAppVersion: [
-    { version: '1.5.0', count: 18500, percentage: 40.5 },
-    { version: '1.4.2', count: 12400, percentage: 27.2 },
-    { version: '1.4.1', count: 8200, percentage: 17.9 },
-    { version: '1.4.0', count: 4100, percentage: 9.0 },
-    { version: 'older', count: 2480, percentage: 5.4 },
-  ],
-  byDevice: [
-    { device: 'iPhone 14 Pro', count: 4500 },
-    { device: 'iPhone 13', count: 3800 },
-    { device: 'Samsung S23', count: 3200 },
-    { device: 'iPhone 15 Pro', count: 2900 },
-    { device: 'Samsung A54', count: 2400 },
-    { device: 'Xiaomi 13', count: 1800 },
-    { device: 'Other', count: 27080 },
-  ]
-};
-
-const MOCK_GROWTH: GrowthData = {
-  daily: [
-    { date: '2026-02-24', users: 45012, sessions: 142000 },
-    { date: '2026-02-25', users: 45156, sessions: 144500 },
-    { date: '2026-02-26', users: 45298, sessions: 148200 },
-    { date: '2026-02-27', users: 45389, sessions: 151000 },
-    { date: '2026-02-28', users: 45512, sessions: 153400 },
-    { date: '2026-03-01', users: 45680, sessions: 156000 },
-    { date: '2026-03-02', users: 45914, sessions: 158500 },
-  ],
-  weekly: [
-    { week: 'الأسبوع 5', users: 42500, sessions: 128000 },
-    { week: 'الأسبوع 6', users: 43200, sessions: 132000 },
-    { week: 'الأسبوع 7', users: 44100, sessions: 138000 },
-    { week: 'الأسبوع 8', users: 45012, sessions: 145000 },
-    { week: 'الأسبوع 9', users: 45680, sessions: 156000 },
-  ],
-  monthly: [
-    { month: 'أكتوبر', users: 28000, sessions: 85000 },
-    { month: 'نوفمبر', users: 32500, sessions: 98000 },
-    { month: 'ديسمبر', users: 36800, sessions: 112000 },
-    { month: 'يناير', users: 40200, sessions: 128000 },
-    { month: 'فبراير', users: 45680, sessions: 156000 },
-  ]
-};
-
-const MOCK_REALTIME: RealtimeData = {
-  activeNow: 342,
-  lastHourSessions: 1250,
-  currentlyReading: {
-    quran: 89,
-    azkar: 156,
-    dua: 34
-  },
-  recentEvents: [
-    { type: 'azkar', description: 'أكمل أذكار الصباح', time: 'منذ ثوانٍ', country: 'EG' },
-    { type: 'quran', description: 'بدأ قراءة سورة الكهف', time: 'منذ دقيقة', country: 'SA' },
-    { type: 'prayer', description: 'سجّل صلاة الفجر', time: 'منذ دقيقتين', country: 'AE' },
-    { type: 'share', description: 'شارك آية الكرسي', time: 'منذ 3 دقائق', country: 'KW' },
-    { type: 'signup', description: 'مستخدم جديد انضم', time: 'منذ 5 دقائق', country: 'JO' },
-    { type: 'azkar', description: 'أكمل أذكار المساء', time: 'منذ 6 دقائق', country: 'MA' },
-    { type: 'tasbih', description: 'أكمل 1000 تسبيحة', time: 'منذ 8 دقائق', country: 'EG' },
-    { type: 'quran', description: 'ختم جزء عمّ', time: 'منذ 10 دقائق', country: 'SA' },
-  ]
-};
-
-// ==================== المكونات المساعدة ====================
-
-const StatCard: React.FC<{
-  title: string;
-  value: string | number;
-  change?: number;
-  changeLabel?: string;
-  icon: React.ReactNode;
-  color: string;
-}> = ({ title, value, change, changeLabel, icon, color }) => (
-  <div className="bg-white p-5 rounded-xl shadow-sm border hover:shadow-md transition-shadow">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm text-gray-500">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-1">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-        </p>
-        {change !== undefined && (
-          <div className={`flex items-center gap-1 mt-2 text-sm ${
-            change >= 0 ? 'text-green-600' : 'text-red-600'
-          }`}>
-            {change >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-            <span>{Math.abs(change)}%</span>
-            {changeLabel && <span className="text-gray-500">{changeLabel}</span>}
-          </div>
-        )}
-      </div>
-      <div className={`p-3 rounded-xl ${color}`}>
-        {icon}
-      </div>
-    </div>
-  </div>
-);
-
-const ProgressBar: React.FC<{
-  value: number;
-  max: number;
-  color: string;
-  showPercentage?: boolean;
-}> = ({ value, max, color, showPercentage = true }) => {
-  const percentage = (value / max) * 100;
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-      {showPercentage && (
-        <span className="text-sm text-gray-600 w-12 text-left">{percentage.toFixed(1)}%</span>
-      )}
-    </div>
-  );
-};
-
-const SimpleBarChart: React.FC<{
-  data: { label: string; value: number }[];
-  color: string;
-  maxValue?: number;
-}> = ({ data, color, maxValue }) => {
-  const max = maxValue || Math.max(...data.map(d => d.value));
-  return (
-    <div className="space-y-2">
-      {data.map((item, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <span className="text-sm text-gray-600 w-20 truncate">{item.label}</span>
-          <div className="flex-1 h-6 bg-gray-100 rounded overflow-hidden">
-            <div
-              className={`h-full ${color} flex items-center justify-end px-2`}
-              style={{ width: `${(item.value / max) * 100}%` }}
-            >
-              <span className="text-xs text-white font-medium">
-                {item.value.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const EventIcon: React.FC<{ type: string }> = ({ type }) => {
-  const icons: Record<string, React.ReactNode> = {
-    azkar: <Moon className="w-4 h-4 text-purple-500" />,
-    quran: <BookOpen className="w-4 h-4 text-emerald-500" />,
-    prayer: <Clock className="w-4 h-4 text-blue-500" />,
-    share: <Share2 className="w-4 h-4 text-pink-500" />,
-    signup: <Users className="w-4 h-4 text-green-500" />,
-    tasbih: <Star className="w-4 h-4 text-amber-500" />,
-  };
-  return icons[type] || <Activity className="w-4 h-4 text-gray-500" />;
-};
-
-const CountryFlag: React.FC<{ code: string }> = ({ code }) => {
-  const flags: Record<string, string> = {
-    EG: '🇪🇬', SA: '🇸🇦', AE: '🇦🇪', KW: '🇰🇼', QA: '🇶🇦',
-    JO: '🇯🇴', MA: '🇲🇦', DZ: '🇩🇿', US: '🇺🇸', GB: '🇬🇧',
-    OTHER: '🌍'
-  };
-  return <span>{flags[code] || '🌍'}</span>;
-};
 
 // ==================== المكون الرئيسي ====================
 
-const AnalyticsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'engagement' | 'content' | 'users' | 'realtime'>('overview');
-  const [dateRange, setDateRange] = useState<DateRange>('month');
+const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  
-  // البيانات
-  const [overview, setOverview] = useState<OverviewStats>(MOCK_OVERVIEW);
-  const [engagement, setEngagement] = useState<EngagementStats>(MOCK_ENGAGEMENT);
-  const [content, setContent] = useState<ContentStats>(MOCK_CONTENT);
-  const [demographics, setDemographics] = useState<UserDemographics>(MOCK_DEMOGRAPHICS);
-  const [growth, setGrowth] = useState<GrowthData>(MOCK_GROWTH);
-  const [realtime, setRealtime] = useState<RealtimeData>(MOCK_REALTIME);
+  const [dateRange, setDateRange] = useState('month');
 
-  // تحميل البيانات
   useEffect(() => {
-    loadData();
-  }, [dateRange]);
+    const timer = setTimeout(() => setIsLoading(false), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
-  // تحديث البيانات الفورية
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (activeTab === 'realtime') {
-        updateRealtimeData();
-      }
-    }, 5000); // كل 5 ثواني
-
-    return () => clearInterval(interval);
-  }, [activeTab]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    // محاكاة API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    setLastUpdated(new Date());
+  const stats = {
+    totalUsers: 45680,
+    activeUsers: 12450,
+    avgSessionDuration: 8.5,
+    retentionRate: 68.5,
+    totalAzkar: 2450000,
+    totalQuran: 1250000,
+    totalPrayers: 3200000
   };
 
-  const refreshData = async () => {
-    setIsRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsRefreshing(false);
-    setLastUpdated(new Date());
-  };
+  const topCountries = [
+    { country: 'مصر', flag: '🇪🇬', users: 12500, percentage: 27.4 },
+    { country: 'السعودية', flag: '🇸🇦', users: 9800, percentage: 21.5 },
+    { country: 'الإمارات', flag: '🇦🇪', users: 4200, percentage: 9.2 },
+    { country: 'الكويت', flag: '🇰🇼', users: 3100, percentage: 6.8 },
+    { country: 'الأردن', flag: '🇯🇴', users: 2200, percentage: 4.8 },
+  ];
 
-  const updateRealtimeData = () => {
-    // محاكاة تحديث البيانات الفورية
-    setRealtime(prev => ({
-      ...prev,
-      activeNow: prev.activeNow + Math.floor(Math.random() * 10) - 5,
-      lastHourSessions: prev.lastHourSessions + Math.floor(Math.random() * 20),
-    }));
-  };
-
-  const exportData = () => {
-    const data = {
-      overview,
-      engagement,
-      content,
-      demographics,
-      growth,
-      exportDate: new Date().toISOString(),
-      dateRange
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics-${dateRange}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-  };
+  const topAzkar = [
+    { name: 'أذكار الصباح', count: 450000, percentage: 28.5 },
+    { name: 'أذكار المساء', count: 420000, percentage: 26.6 },
+    { name: 'أذكار النوم', count: 280000, percentage: 17.7 },
+    { name: 'أذكار الصلاة', count: 195000, percentage: 12.3 },
+  ];
 
   if (isLoading) {
     return (
@@ -468,643 +69,207 @@ const AnalyticsPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto" dir="rtl">
-      {/* الرأس */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <BarChart3 className="w-7 h-7 text-emerald-600" />
             التحليلات والإحصائيات
           </h1>
-          <p className="text-gray-500 mt-1">
-            آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
-          </p>
+          <p className="text-gray-500 mt-1">نظرة شاملة على أداء التطبيق</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* فلتر الفترة */}
           <select
             value={dateRange}
-            onChange={(e) => setDateRange(e.target.value as DateRange)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+            onChange={(e) => setDateRange(e.target.value)}
+            className="px-4 py-2 border rounded-lg"
           >
             <option value="today">اليوم</option>
-            <option value="yesterday">أمس</option>
             <option value="week">آخر 7 أيام</option>
             <option value="month">آخر 30 يوم</option>
-            <option value="quarter">آخر 3 أشهر</option>
             <option value="year">آخر سنة</option>
-            <option value="all">الكل</option>
           </select>
-          
-          <button
-            onClick={refreshData}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            تحديث
-          </button>
-          
-          <button
-            onClick={exportData}
-            className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
-          >
+          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
             <Download className="w-4 h-4" />
             تصدير
           </button>
         </div>
       </div>
 
-      {/* التبويبات */}
-      <div className="flex gap-2 mb-6 border-b pb-2 overflow-x-auto">
-        {[
-          { id: 'overview', label: 'نظرة عامة', icon: PieChart },
-          { id: 'engagement', label: 'التفاعل', icon: Activity },
-          { id: 'content', label: 'المحتوى', icon: BookOpen },
-          { id: 'users', label: 'المستخدمين', icon: Users },
-          { id: 'realtime', label: 'الوقت الفعلي', icon: Zap },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-              activeTab === tab.id
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
-            {tab.id === 'realtime' && (
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            )}
-          </button>
-        ))}
+      {/* Main Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-500">إجمالي المستخدمين</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.totalUsers.toLocaleString()}</p>
+              <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
+                <TrendingUp className="w-4 h-4" />
+                <span>12.5% من الشهر الماضي</span>
+              </div>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <Users className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-500">المستخدمين النشطين</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.activeUsers.toLocaleString()}</p>
+              <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
+                <TrendingUp className="w-4 h-4" />
+                <span>8.3% من الأسبوع الماضي</span>
+              </div>
+            </div>
+            <div className="p-3 bg-green-100 rounded-xl">
+              <Activity className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-500">متوسط الجلسة</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.avgSessionDuration} د</p>
+              <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
+                <TrendingUp className="w-4 h-4" />
+                <span>5.2%</span>
+              </div>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-xl">
+              <Clock className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-500">معدل الاحتفاظ</p>
+              <p className="text-2xl font-bold text-gray-800 mt-1">{stats.retentionRate}%</p>
+              <div className="flex items-center gap-1 mt-2 text-sm text-green-600">
+                <TrendingUp className="w-4 h-4" />
+                <span>2.1%</span>
+              </div>
+            </div>
+            <div className="p-3 bg-pink-100 rounded-xl">
+              <Target className="w-6 h-6 text-pink-600" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* تبويب نظرة عامة */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* البطاقات الرئيسية */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              title="إجمالي المستخدمين"
-              value={overview.totalUsers}
-              change={12.5}
-              changeLabel="من الشهر الماضي"
-              icon={<Users className="w-6 h-6 text-blue-600" />}
-              color="bg-blue-100"
-            />
-            <StatCard
-              title="المستخدمين النشطين"
-              value={overview.activeUsers}
-              change={8.3}
-              changeLabel="من الأسبوع الماضي"
-              icon={<Activity className="w-6 h-6 text-green-600" />}
-              color="bg-green-100"
-            />
-            <StatCard
-              title="متوسط الجلسة"
-              value={`${overview.avgSessionDuration} د`}
-              change={5.2}
-              icon={<Clock className="w-6 h-6 text-purple-600" />}
-              color="bg-purple-100"
-            />
-            <StatCard
-              title="معدل الاحتفاظ"
-              value={`${overview.retentionRate}%`}
-              change={2.1}
-              icon={<Heart className="w-6 h-6 text-pink-600" />}
-              color="bg-pink-100"
-            />
-          </div>
-
-          {/* المستخدمين الجدد */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-5 rounded-xl shadow-sm border">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-emerald-600" />
-                </div>
-                <span className="text-gray-600">مستخدمين جدد اليوم</span>
-              </div>
-              <p className="text-3xl font-bold text-gray-800">{overview.newUsersToday}</p>
-            </div>
-            <div className="bg-white p-5 rounded-xl shadow-sm border">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                </div>
-                <span className="text-gray-600">هذا الأسبوع</span>
-              </div>
-              <p className="text-3xl font-bold text-gray-800">{overview.newUsersThisWeek.toLocaleString()}</p>
-            </div>
-            <div className="bg-white p-5 rounded-xl shadow-sm border">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-purple-600" />
-                </div>
-                <span className="text-gray-600">هذا الشهر</span>
-              </div>
-              <p className="text-3xl font-bold text-gray-800">{overview.newUsersThisMonth.toLocaleString()}</p>
-            </div>
-          </div>
-
-          {/* رسم بياني للنمو */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <LineChart className="w-5 h-5 text-emerald-600" />
-              نمو المستخدمين
-            </h3>
-            <div className="h-64 flex items-end justify-between gap-2">
-              {growth.daily.map((day, i) => {
-                const maxUsers = Math.max(...growth.daily.map(d => d.users));
-                const height = (day.users / maxUsers) * 100;
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <div
-                      className="w-full bg-emerald-500 rounded-t-lg transition-all hover:bg-emerald-600"
-                      style={{ height: `${height}%` }}
-                      title={`${day.users.toLocaleString()} مستخدم`}
-                    />
-                    <span className="text-xs text-gray-500">
-                      {new Date(day.date).toLocaleDateString('ar-EG', { weekday: 'short' })}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* توزيع المنصات */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Smartphone className="w-5 h-5 text-blue-600" />
-                توزيع المنصات
-              </h3>
-              <div className="space-y-4">
-                {demographics.byPlatform.map((platform, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium">
-                        {platform.platform === 'iOS' ? ' iOS' : '🤖 Android'}
-                      </span>
-                      <span className="text-gray-600">{platform.count.toLocaleString()}</span>
-                    </div>
-                    <ProgressBar
-                      value={platform.percentage}
-                      max={100}
-                      color={platform.platform === 'iOS' ? 'bg-blue-500' : 'bg-green-500'}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-emerald-600" />
-                أعلى الدول
-              </h3>
-              <div className="space-y-3">
-                {demographics.byCountry.slice(0, 6).map((country, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className="text-xl"><CountryFlag code={country.country} /></span>
-                    <span className="flex-1 font-medium">{country.countryAr}</span>
-                    <span className="text-gray-600">{country.count.toLocaleString()}</span>
-                    <span className="text-sm text-gray-500 w-12 text-left">{country.percentage}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* تبويب التفاعل */}
-      {activeTab === 'engagement' && (
-        <div className="space-y-6">
-          {/* إحصائيات العبادات */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <StatCard
-              title="الأذكار المقروءة"
-              value={engagement.totalAzkarRead}
-              change={15.3}
-              icon={<Moon className="w-6 h-6 text-purple-600" />}
-              color="bg-purple-100"
-            />
-            <StatCard
-              title="صفحات القرآن"
-              value={engagement.totalQuranPages}
-              change={22.1}
-              icon={<BookOpen className="w-6 h-6 text-emerald-600" />}
-              color="bg-emerald-100"
-            />
-            <StatCard
-              title="الصلوات المسجلة"
-              value={engagement.totalPrayersLogged}
-              change={18.7}
-              icon={<Clock className="w-6 h-6 text-blue-600" />}
-              color="bg-blue-100"
-            />
-            <StatCard
-              title="التسبيحات"
-              value={engagement.totalTasbihCount}
-              change={28.4}
-              icon={<Star className="w-6 h-6 text-amber-600" />}
-              color="bg-amber-100"
-            />
-            <StatCard
-              title="الأدعية المقروءة"
-              value={engagement.totalDuasRead}
-              change={12.8}
-              icon={<Heart className="w-6 h-6 text-pink-600" />}
-              color="bg-pink-100"
-            />
-            <StatCard
-              title="المشاركات"
-              value={engagement.totalShares}
-              change={35.2}
-              icon={<Share2 className="w-6 h-6 text-indigo-600" />}
-              color="bg-indigo-100"
-            />
-          </div>
-
-          {/* متوسطات المستخدم */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Target className="w-5 h-5 text-emerald-600" />
-              متوسط التفاعل لكل مستخدم
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="text-center p-4 bg-purple-50 rounded-xl">
-                <Moon className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-gray-800">{engagement.avgAzkarPerUser}</p>
-                <p className="text-sm text-gray-500">ذكر / مستخدم</p>
-              </div>
-              <div className="text-center p-4 bg-emerald-50 rounded-xl">
-                <BookOpen className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-gray-800">{engagement.avgQuranPagesPerUser}</p>
-                <p className="text-sm text-gray-500">صفحة / مستخدم</p>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-xl">
-                <Clock className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-gray-800">{engagement.avgPrayersPerUser}</p>
-                <p className="text-sm text-gray-500">صلاة / مستخدم</p>
-              </div>
-              <div className="text-center p-4 bg-amber-50 rounded-xl">
-                <Flame className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-gray-800">{overview.avgDailySessions}</p>
-                <p className="text-sm text-gray-500">جلسة / يوم</p>
-              </div>
-            </div>
-          </div>
-
-          {/* أوقات الذروة */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-600" />
-                أوقات الذروة (بالساعات)
-              </h3>
-              <div className="h-48 flex items-end justify-between gap-1">
-                {content.peakUsageHours.map((hour, i) => {
-                  const max = Math.max(...content.peakUsageHours.map(h => h.count));
-                  const height = (hour.count / max) * 100;
-                  const isPeak = hour.count === max;
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center">
-                      <div
-                        className={`w-full rounded-t transition-all ${
-                          isPeak ? 'bg-emerald-500' : 'bg-gray-300 hover:bg-gray-400'
-                        }`}
-                        style={{ height: `${height}%` }}
-                        title={`${hour.count.toLocaleString()} جلسة`}
-                      />
-                      <span className="text-xs text-gray-500 mt-1">{hour.hour}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-purple-600" />
-                الاستخدام حسب اليوم
-              </h3>
-              <SimpleBarChart
-                data={content.peakUsageDays.map(d => ({ label: d.day, value: d.count }))}
-                color="bg-purple-500"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* تبويب المحتوى */}
-      {activeTab === 'content' && (
-        <div className="space-y-6">
-          {/* أكثر الأذكار قراءة */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+      {/* Engagement Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-100 rounded-lg">
               <Moon className="w-5 h-5 text-purple-600" />
-              أكثر الأذكار قراءة
-            </h3>
-            <div className="space-y-3">
-              {content.mostReadAzkar.map((azkar, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                    i === 0 ? 'bg-amber-100 text-amber-700' :
-                    i === 1 ? 'bg-gray-200 text-gray-700' :
-                    i === 2 ? 'bg-orange-100 text-orange-700' :
-                    'bg-gray-100 text-gray-600'
-                  }`}>
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 font-medium">{azkar.name}</span>
-                  <div className="w-48">
-                    <ProgressBar
-                      value={azkar.percentage}
-                      max={30}
-                      color="bg-purple-500"
-                    />
-                  </div>
-                  <span className="text-gray-600 w-24 text-left">{azkar.count.toLocaleString()}</span>
-                </div>
-              ))}
             </div>
+            <span className="text-gray-600">الأذكار المقروءة</span>
           </div>
+          <p className="text-3xl font-bold text-gray-800">{stats.totalAzkar.toLocaleString()}</p>
+        </div>
 
-          {/* أكثر السور قراءة */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-emerald-100 rounded-lg">
               <BookOpen className="w-5 h-5 text-emerald-600" />
-              أكثر السور قراءة
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {content.mostReadSurahs.map((surah, i) => (
-                <div 
-                  key={i} 
-                  className={`p-4 rounded-xl text-center ${
-                    i === 0 ? 'bg-emerald-100' :
-                    i === 1 ? 'bg-emerald-50' :
-                    'bg-gray-50'
-                  }`}
-                >
-                  <p className="text-xs text-gray-500 mb-1">#{i + 1}</p>
-                  <p className="font-bold text-gray-800">{surah.name}</p>
-                  <p className="text-sm text-emerald-600 mt-1">{surah.count.toLocaleString()}</p>
+            </div>
+            <span className="text-gray-600">صفحات القرآن</span>
+          </div>
+          <p className="text-3xl font-bold text-gray-800">{stats.totalQuran.toLocaleString()}</p>
+        </div>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Clock className="w-5 h-5 text-blue-600" />
+            </div>
+            <span className="text-gray-600">الصلوات المسجلة</span>
+          </div>
+          <p className="text-3xl font-bold text-gray-800">{stats.totalPrayers.toLocaleString()}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Countries */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Globe className="w-5 h-5 text-emerald-600" />
+            أعلى الدول
+          </h3>
+          <div className="space-y-3">
+            {topCountries.map((country, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="text-xl">{country.flag}</span>
+                <span className="flex-1 font-medium">{country.country}</span>
+                <span className="text-gray-600">{country.users.toLocaleString()}</span>
+                <span className="text-sm text-gray-500 w-12 text-left">{country.percentage}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Top Azkar */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Moon className="w-5 h-5 text-purple-600" />
+            أكثر الأذكار قراءة
+          </h3>
+          <div className="space-y-3">
+            {topAzkar.map((azkar, i) => (
+              <div key={i}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium">{azkar.name}</span>
+                  <span className="text-gray-600">{azkar.count.toLocaleString()}</span>
                 </div>
-              ))}
+                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded-full"
+                    style={{ width: `${azkar.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Platform Distribution */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border">
+        <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-blue-600" />
+          توزيع المنصات
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-600"> iOS</span>
+              <span className="font-medium">24,800 (54%)</span>
+            </div>
+            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full" style={{ width: '54%' }} />
             </div>
           </div>
-
-          {/* أكثر الخصائص استخداماً */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-amber-600" />
-              أكثر الخصائص استخداماً
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {content.mostUsedFeatures.map((feature, i) => {
-                const icons: Record<string, React.ReactNode> = {
-                  azkar: <Moon className="w-6 h-6" />,
-                  quran: <BookOpen className="w-6 h-6" />,
-                  prayer: <Clock className="w-6 h-6" />,
-                  qibla: <MapPin className="w-6 h-6" />,
-                  tasbih: <Star className="w-6 h-6" />,
-                  dua: <Heart className="w-6 h-6" />,
-                };
-                const colors = ['bg-purple-100 text-purple-600', 'bg-emerald-100 text-emerald-600', 'bg-blue-100 text-blue-600', 'bg-red-100 text-red-600', 'bg-amber-100 text-amber-600', 'bg-pink-100 text-pink-600'];
-                
-                return (
-                  <div key={i} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                    <div className={`p-2 rounded-lg ${colors[i]}`}>
-                      {icons[feature.feature]}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-800">{feature.name}</p>
-                      <p className="text-sm text-gray-500">{feature.count.toLocaleString()}</p>
-                    </div>
-                    <span className="text-lg font-bold text-gray-400">{feature.percentage}%</span>
-                  </div>
-                );
-              })}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-600">🤖 Android</span>
+              <span className="font-medium">20,880 (46%)</span>
+            </div>
+            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-green-500 rounded-full" style={{ width: '46%' }} />
             </div>
           </div>
         </div>
-      )}
-
-      {/* تبويب المستخدمين */}
-      {activeTab === 'users' && (
-        <div className="space-y-6">
-          {/* التوزيع الجغرافي */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Map className="w-5 h-5 text-emerald-600" />
-              التوزيع الجغرافي
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {demographics.byCountry.slice(0, 8).map((country, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                  <span className="text-2xl"><CountryFlag code={country.country} /></span>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{country.countryAr}</p>
-                    <p className="text-xs text-gray-500">{country.percentage}%</p>
-                  </div>
-                  <span className="font-bold text-gray-700">{country.count.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* اللغات */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Globe className="w-5 h-5 text-blue-600" />
-                اللغات
-              </h3>
-              <div className="space-y-3">
-                {demographics.byLanguage.map((lang, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium">{lang.language}</span>
-                      <span className="text-sm text-gray-500">{lang.percentage}%</span>
-                    </div>
-                    <ProgressBar
-                      value={lang.percentage}
-                      max={100}
-                      color={i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-500' : 'bg-gray-400'}
-                      showPercentage={false}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
-              <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Settings className="w-5 h-5 text-purple-600" />
-                إصدارات التطبيق
-              </h3>
-              <div className="space-y-3">
-                {demographics.byAppVersion.map((version, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      i === 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      v{version.version}
-                    </span>
-                    <div className="flex-1">
-                      <ProgressBar
-                        value={version.percentage}
-                        max={50}
-                        color={i === 0 ? 'bg-green-500' : 'bg-gray-400'}
-                        showPercentage={false}
-                      />
-                    </div>
-                    <span className="text-sm text-gray-600">{version.count.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* الأجهزة الأكثر استخداماً */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Smartphone className="w-5 h-5 text-indigo-600" />
-              الأجهزة الأكثر استخداماً
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {demographics.byDevice.slice(0, 6).map((device, i) => (
-                <div key={i} className="p-4 bg-gray-50 rounded-xl text-center">
-                  <p className="font-medium text-gray-800">{device.device}</p>
-                  <p className="text-sm text-gray-500 mt-1">{device.count.toLocaleString()}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* تبويب الوقت الفعلي */}
-      {activeTab === 'realtime' && (
-        <div className="space-y-6">
-          {/* المؤشرات الحية */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-emerald-100">نشط الآن</p>
-                  <p className="text-4xl font-bold mt-2">{realtime.activeNow}</p>
-                </div>
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <Activity className="w-8 h-8" />
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-4">
-                <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                <span className="text-sm text-emerald-100">مباشر</span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-blue-100">جلسات آخر ساعة</p>
-                  <p className="text-4xl font-bold mt-2">{realtime.lastHourSessions.toLocaleString()}</p>
-                </div>
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <Clock className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-100">يقرأون الآن</p>
-                  <div className="flex items-center gap-4 mt-2">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{realtime.currentlyReading.quran}</p>
-                      <p className="text-xs text-purple-200">قرآن</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{realtime.currentlyReading.azkar}</p>
-                      <p className="text-xs text-purple-200">أذكار</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold">{realtime.currentlyReading.dua}</p>
-                      <p className="text-xs text-purple-200">دعاء</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-                  <BookOpen className="w-8 h-8" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* الأحداث الأخيرة */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-600" />
-                الأحداث الأخيرة
-              </h3>
-              <span className="flex items-center gap-2 text-sm text-green-600">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                تحديث مباشر
-              </span>
-            </div>
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {realtime.recentEvents.map((event, i) => (
-                <div 
-                  key={i} 
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                    i === 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50'
-                  }`}
-                >
-                  <div className="p-2 bg-white rounded-lg shadow-sm">
-                    <EventIcon type={event.type} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{event.description}</p>
-                    <p className="text-xs text-gray-500">{event.time}</p>
-                  </div>
-                  {event.country && (
-                    <span className="text-xl">
-                      <CountryFlag code={event.country} />
-                    </span>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* خريطة النشاط (placeholder) */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Map className="w-5 h-5 text-emerald-600" />
-              خريطة النشاط الحي
-            </h3>
-            <div className="h-64 bg-gradient-to-br from-emerald-50 to-blue-50 rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                <Globe className="w-16 h-16 text-emerald-300 mx-auto mb-4" />
-                <p className="text-gray-500">خريطة تفاعلية للمستخدمين النشطين</p>
-                <p className="text-sm text-gray-400 mt-1">يمكن دمج Google Maps أو Mapbox هنا</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
 
-export default AnalyticsPage;
+export default Analytics;
