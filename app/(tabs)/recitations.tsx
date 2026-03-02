@@ -13,7 +13,7 @@ import {
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { useAudioPlayer } from 'expo-audio';
+import { Audio } from 'expo-av';
 import { SURAH_NAMES_AR, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -86,7 +86,7 @@ export default function RecitationsScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const playerRef = useRef<any>(null);
 
-  const player = useAudioPlayer('');
+  const player = Audio.Sound.createAsync('');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY_RECITER).then(v => {
