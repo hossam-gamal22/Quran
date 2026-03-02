@@ -8,33 +8,48 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // ============================================
 
 export const Colors = {
-  primary: '#10B981',
-  primaryLight: '#34D399',
-  primaryDark: '#059669',
+  // الألوان الأساسية
+  primary: '#2f7659',
+  primaryLight: '#3d9970',
+  primaryDark: '#245c47',
+  
+  // الألوان الثانوية
   secondary: '#6366F1',
   secondaryLight: '#818CF8',
   secondaryDark: '#4F46E5',
-  background: '#F2F2F7',
+  
+  // الخلفيات والأسطح
+  background: '#FFFFFF',
   surface: '#FFFFFF',
   surfaceVariant: '#F3F4F6',
+  
+  // النصوص
   text: '#1C1C1E',
   textSecondary: '#3A3A3C',
   textLight: '#8E8E93',
   textOnPrimary: '#FFFFFF',
+  
+  // حالات
   success: '#34C759',
   warning: '#FF9500',
   error: '#FF3B30',
   info: '#007AFF',
+  
+  // ألوان أساسية
   white: '#FFFFFF',
   black: '#000000',
+  
+  // الحدود والفواصل
   border: 'rgba(0,0,0,0.1)',
   divider: 'rgba(0,0,0,0.05)',
   overlay: 'rgba(0, 0, 0, 0.4)',
+  
+  // ألوان خاصة
   gold: '#FFD700',
-  quranGreen: '#10B981',
+  quranGreen: '#2f7659',
   prayerBlue: '#007AFF',
   
-  // ✅ ألوان زجاجية جديدة
+  // ألوان زجاجية
   glass: 'rgba(255, 255, 255, 0.7)',
   glassDark: 'rgba(255, 255, 255, 0.5)',
   glassLight: 'rgba(255, 255, 255, 0.85)',
@@ -47,38 +62,53 @@ export const Colors = {
 // ============================================
 
 export const DarkColors = {
-  primary: '#34D399',
-  primaryLight: '#6EE7B7',
-  primaryDark: '#10B981',
+  // الألوان الأساسية
+  primary: '#3d9970',
+  primaryLight: '#4db380',
+  primaryDark: '#2f7659',
+  
+  // الألوان الثانوية
   secondary: '#818CF8',
   secondaryLight: '#A5B4FC',
   secondaryDark: '#6366F1',
-  background: '#000000',
-  surface: '#1C1C1E',
-  surfaceVariant: '#2C2C2E',
+  
+  // الخلفيات والأسطح
+  background: '#11151c',
+  surface: '#1a1f2b',
+  surfaceVariant: '#242b3a',
+  
+  // النصوص
   text: '#FFFFFF',
   textSecondary: '#EBEBF5',
   textLight: '#8E8E93',
-  textOnPrimary: '#000000',
+  textOnPrimary: '#FFFFFF',
+  
+  // حالات
   success: '#30D158',
   warning: '#FF9F0A',
   error: '#FF453A',
   info: '#0A84FF',
+  
+  // ألوان أساسية
   white: '#FFFFFF',
   black: '#000000',
+  
+  // الحدود والفواصل
   border: 'rgba(255,255,255,0.1)',
   divider: 'rgba(255,255,255,0.05)',
   overlay: 'rgba(0, 0, 0, 0.6)',
+  
+  // ألوان خاصة
   gold: '#FFD60A',
-  quranGreen: '#30D158',
+  quranGreen: '#3d9970',
   prayerBlue: '#0A84FF',
   
-  // ✅ ألوان زجاجية للدارك مود
-  glass: 'rgba(28, 28, 30, 0.8)',
-  glassDark: 'rgba(28, 28, 30, 0.6)',
-  glassLight: 'rgba(44, 44, 46, 0.9)',
+  // ألوان زجاجية للدارك مود
+  glass: 'rgba(26, 31, 43, 0.8)',
+  glassDark: 'rgba(26, 31, 43, 0.6)',
+  glassLight: 'rgba(36, 43, 58, 0.9)',
   glassBorder: 'rgba(255, 255, 255, 0.1)',
-  cardGlass: 'rgba(28, 28, 30, 0.85)',
+  cardGlass: 'rgba(26, 31, 43, 0.85)',
 };
 
 // ============================================
@@ -166,6 +196,37 @@ export const FONT_SIZES = {
 };
 
 // ============================================
+// الخطوط
+// ============================================
+
+export const Typography = {
+  sizes: {
+    xs: 11,
+    sm: 13,
+    md: 15,
+    lg: 17,
+    xl: 20,
+    xxl: 28,
+    xxxl: 34,
+    display: 48,
+  },
+  weights: {
+    light: '300' as const,
+    regular: '400' as const,
+    medium: '500' as const,
+    semibold: '600' as const,
+    bold: '700' as const,
+    heavy: '800' as const,
+  },
+  lineHeights: {
+    tight: 1.2,
+    normal: 1.4,
+    relaxed: 1.6,
+    loose: 1.8,
+  },
+};
+
+// ============================================
 // الظلال - Apple Style
 // ============================================
 
@@ -204,12 +265,11 @@ export const Shadows = {
   md: createShadow(4, 0.12, 16, 4),
   lg: createShadow(8, 0.16, 24, 8),
   xl: createShadow(12, 0.2, 32, 12),
-  // ✅ ظل زجاجي
   glass: createShadow(8, 0.1, 32, 8),
 };
 
 // ============================================
-// ✅ أنماط الزجاج - Glassmorphism
+// أنماط الزجاج - Glassmorphism
 // ============================================
 
 export const GlassStyles = {
@@ -220,7 +280,7 @@ export const GlassStyles = {
     ...Shadows.glass,
   },
   dark: {
-    backgroundColor: 'rgba(28, 28, 30, 0.8)',
+    backgroundColor: 'rgba(26, 31, 43, 0.8)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     ...Shadows.glass,
@@ -233,7 +293,7 @@ export const GlassStyles = {
     ...Shadows.md,
   },
   cardDark: {
-    backgroundColor: 'rgba(44, 44, 46, 0.85)',
+    backgroundColor: 'rgba(36, 43, 58, 0.85)',
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -264,37 +324,6 @@ export const GlassStyles = {
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     ...Shadows.sm,
-  },
-};
-
-// ============================================
-// الخطوط
-// ============================================
-
-export const Typography = {
-  sizes: {
-    xs: 11,
-    sm: 13,
-    md: 15,
-    lg: 17,
-    xl: 20,
-    xxl: 28,
-    xxxl: 34,
-    display: 48,
-  },
-  weights: {
-    light: '300' as const,
-    regular: '400' as const,
-    medium: '500' as const,
-    semibold: '600' as const,
-    bold: '700' as const,
-    heavy: '800' as const,
-  },
-  lineHeights: {
-    tight: 1.2,
-    normal: 1.4,
-    relaxed: 1.6,
-    loose: 1.8,
   },
 };
 
@@ -334,6 +363,21 @@ export const Animation = {
 };
 
 // ============================================
+// الألوان الثانوية المتاحة للتخصيص
+// ============================================
+
+export const AvailableAccentColors = [
+  { name: 'أخضر', nameEn: 'Green', value: '#2f7659' },
+  { name: 'أزرق', nameEn: 'Blue', value: '#007AFF' },
+  { name: 'بنفسجي', nameEn: 'Purple', value: '#5856D6' },
+  { name: 'وردي', nameEn: 'Pink', value: '#FF2D55' },
+  { name: 'برتقالي', nameEn: 'Orange', value: '#FF9500' },
+  { name: 'أحمر', nameEn: 'Red', value: '#FF3B30' },
+  { name: 'ذهبي', nameEn: 'Gold', value: '#FFD700' },
+  { name: 'تركواز', nameEn: 'Teal', value: '#5AC8FA' },
+];
+
+// ============================================
 // دوال مساعدة
 // ============================================
 
@@ -350,4 +394,16 @@ export const getGlassStyle = (isDark: boolean, type: keyof typeof GlassStyles = 
   if (type === 'input') return isDark ? GlassStyles.inputDark : GlassStyles.input;
   if (type === 'button') return isDark ? GlassStyles.buttonDark : GlassStyles.button;
   return isDark ? GlassStyles.dark : GlassStyles.light;
+};
+
+// دالة لتحديث اللون الثانوي (للاستخدام في الإعدادات)
+export const getColorsWithAccent = (isDark: boolean, accentColor: string) => {
+  const baseColors = isDark ? { ...DarkColors } : { ...Colors };
+  return {
+    ...baseColors,
+    primary: accentColor,
+    primaryLight: accentColor + 'CC',
+    primaryDark: accentColor,
+    quranGreen: accentColor,
+  };
 };
