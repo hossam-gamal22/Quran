@@ -1,6 +1,4 @@
 // admin-panel/src/App.tsx
-// الملف الرئيسي مع كل الـ Routes
-
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import {
@@ -20,11 +18,11 @@ import {
   Smartphone
 } from 'lucide-react';
 
-// استيراد الصفحات
+// استيراد الصفحات - تصحيح أسماء الاستيراد
 import Dashboard from './pages/Dashboard';
 import Content from './pages/Content';
 import Notifications from './pages/Notifications';
-import Settings as SettingsPage from './pages/Settings';
+import SettingsPage from './pages/Settings';  // ✅ تغيير الاسم هنا
 import Themes from './pages/Themes';
 import Seasonal from './pages/Seasonal';
 import Analytics from './pages/Analytics';
@@ -133,12 +131,6 @@ const Header: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
       </div>
       
       <div className="flex items-center gap-3">
-        {/* Device Preview Button */}
-        <button className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-700">
-          <Smartphone className="w-4 h-4" />
-          <span className="hidden sm:inline">معاينة الموبايل</span>
-        </button>
-        
         {/* User Avatar */}
         <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
           <span className="text-emerald-600 font-bold">م</span>
@@ -148,204 +140,10 @@ const Header: React.FC<{ onMenuClick: () => void }> = ({ onMenuClick }) => {
   );
 };
 
-// ==================== Mobile Preview Modal ====================
-
-const MobilePreviewModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  previewUrl?: string;
-}> = ({ isOpen, onClose, previewUrl }) => {
-  const [device, setDevice] = useState<'iphone' | 'android'>('iphone');
-  const [colorScheme, setColorScheme] = useState<'light' | 'dark'>('light');
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden">
-        {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="text-lg font-bold">معاينة التطبيق</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Controls */}
-        <div className="p-4 border-b flex items-center gap-4 bg-gray-50">
-          <div className="flex bg-gray-200 rounded-lg p-1">
-            <button
-              onClick={() => setDevice('iphone')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                device === 'iphone' ? 'bg-white shadow-sm' : ''
-              }`}
-            >
-               iPhone
-            </button>
-            <button
-              onClick={() => setDevice('android')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                device === 'android' ? 'bg-white shadow-sm' : ''
-              }`}
-            >
-              🤖 Android
-            </button>
-          </div>
-
-          <div className="flex bg-gray-200 rounded-lg p-1">
-            <button
-              onClick={() => setColorScheme('light')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                colorScheme === 'light' ? 'bg-white shadow-sm' : ''
-              }`}
-            >
-              ☀️ فاتح
-            </button>
-            <button
-              onClick={() => setColorScheme('dark')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium ${
-                colorScheme === 'dark' ? 'bg-white shadow-sm' : ''
-              }`}
-            >
-              🌙 داكن
-            </button>
-          </div>
-        </div>
-
-        {/* Preview */}
-        <div className="p-8 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center min-h-[500px]">
-          <div 
-            className={`relative ${
-              device === 'iphone' 
-                ? 'w-[300px] h-[620px] rounded-[50px]' 
-                : 'w-[290px] h-[600px] rounded-[30px]'
-            } bg-black p-3 shadow-2xl`}
-          >
-            {/* Screen */}
-            <div 
-              className={`w-full h-full overflow-hidden ${
-                device === 'iphone' ? 'rounded-[40px]' : 'rounded-[24px]'
-              } ${colorScheme === 'dark' ? 'bg-gray-900' : 'bg-white'}`}
-            >
-              {/* Notch for iPhone */}
-              {device === 'iphone' && (
-                <div className="absolute top-5 left-1/2 -translate-x-1/2 w-32 h-8 bg-black rounded-full z-10" />
-              )}
-
-              {/* App Preview Content */}
-              <div className="h-full flex flex-col" dir="rtl">
-                {/* Status Bar */}
-                <div className={`flex items-center justify-between px-6 pt-4 pb-2 ${
-                  colorScheme === 'dark' ? 'text-white' : 'text-black'
-                }`}>
-                  <span className="text-xs font-medium">9:41</span>
-                  <div className="flex items-center gap-1">
-                    <div className="w-6 h-3 border border-current rounded-sm">
-                      <div className="w-4 h-full bg-current rounded-sm" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* App Header */}
-                <div className={`px-4 py-3 ${colorScheme === 'dark' ? 'bg-gray-800' : 'bg-emerald-600'}`}>
-                  <h1 className="text-white text-lg font-bold text-center">روح المسلم</h1>
-                </div>
-
-                {/* App Content */}
-                <div className={`flex-1 p-4 ${colorScheme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
-                  {/* Hijri Date */}
-                  <div className={`text-center mb-4 ${colorScheme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
-                    <p className="text-sm">٣ رمضان ١٤٤٧</p>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {['أذكار الصباح', 'أذكار المساء', 'القرآن'].map((item, i) => (
-                      <div 
-                        key={i}
-                        className={`p-3 rounded-xl text-center ${
-                          colorScheme === 'dark' ? 'bg-gray-800' : 'bg-white'
-                        } shadow-sm`}
-                      >
-                        <div className="text-2xl mb-1">
-                          {i === 0 ? '🌅' : i === 1 ? '🌆' : '📖'}
-                        </div>
-                        <p className={`text-xs ${colorScheme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                          {item}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Categories */}
-                  <div className={`p-4 rounded-xl ${colorScheme === 'dark' ? 'bg-gray-800' : 'bg-white'} shadow-sm`}>
-                    <h3 className={`font-bold mb-3 ${colorScheme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
-                      الأذكار
-                    </h3>
-                    <div className="space-y-2">
-                      {['أذكار الصباح', 'أذكار المساء', 'أذكار النوم'].map((item, i) => (
-                        <div 
-                          key={i}
-                          className={`flex items-center justify-between p-2 rounded-lg ${
-                            colorScheme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                          }`}
-                        >
-                          <span className={`text-sm ${colorScheme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
-                            {item}
-                          </span>
-                          <ChevronLeft className={`w-4 h-4 ${colorScheme === 'dark' ? 'text-gray-400' : 'text-gray-400'}`} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tab Bar */}
-                <div className={`flex items-center justify-around py-3 border-t ${
-                  colorScheme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                }`}>
-                  {[
-                    { icon: '📿', label: 'الأذكار', active: true },
-                    { icon: '📖', label: 'القرآن' },
-                    { icon: '🕌', label: 'الصلاة' },
-                    { icon: '🧭', label: 'القبلة' },
-                    { icon: '⚙️', label: 'الإعدادات' },
-                  ].map((tab, i) => (
-                    <div key={i} className="text-center">
-                      <div className={`text-xl ${tab.active ? '' : 'opacity-50'}`}>{tab.icon}</div>
-                      <p className={`text-xs mt-1 ${
-                        tab.active 
-                          ? 'text-emerald-500' 
-                          : colorScheme === 'dark' ? 'text-gray-500' : 'text-gray-400'
-                      }`}>
-                        {tab.label}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Home Indicator */}
-                {device === 'iphone' && (
-                  <div className="flex justify-center pb-2">
-                    <div className={`w-32 h-1 rounded-full ${
-                      colorScheme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'
-                    }`} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ==================== Main App ====================
 
 const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
     <Router>
@@ -373,21 +171,6 @@ const App: React.FC = () => {
             </Routes>
           </main>
         </div>
-
-        {/* Mobile Preview Modal */}
-        <MobilePreviewModal
-          isOpen={previewOpen}
-          onClose={() => setPreviewOpen(false)}
-        />
-
-        {/* Floating Preview Button */}
-        <button
-          onClick={() => setPreviewOpen(true)}
-          className="fixed bottom-6 left-6 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 z-40"
-          title="معاينة التطبيق"
-        >
-          <Smartphone className="w-6 h-6" />
-        </button>
       </div>
     </Router>
   );
