@@ -7,85 +7,96 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 // ============================================
 
 export const Colors = {
-  // الألوان الأساسية
-  primary: '#059669',        // أخضر إسلامي
+  primary: '#059669',
   primaryLight: '#10B981',
   primaryDark: '#047857',
-  
-  secondary: '#6366F1',      // بنفسجي
+  secondary: '#6366F1',
   secondaryLight: '#818CF8',
   secondaryDark: '#4F46E5',
-  
-  // ألوان الخلفية
   background: '#F9FAFB',
   surface: '#FFFFFF',
   surfaceVariant: '#F3F4F6',
-  
-  // ألوان النص
   text: '#111827',
   textSecondary: '#4B5563',
   textLight: '#9CA3AF',
   textOnPrimary: '#FFFFFF',
-  
-  // ألوان الحالة
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
   info: '#3B82F6',
-  
-  // ألوان إضافية
   white: '#FFFFFF',
   black: '#000000',
   border: '#E5E7EB',
   divider: '#F3F4F6',
   overlay: 'rgba(0, 0, 0, 0.5)',
-  
-  // ألوان خاصة
   gold: '#D4AF37',
   quranGreen: '#0D9488',
   prayerBlue: '#0284C7',
 };
 
-// ============================================
-// الوضع الليلي
-// ============================================
-
 export const DarkColors = {
   primary: '#10B981',
   primaryLight: '#34D399',
   primaryDark: '#059669',
-  
   secondary: '#818CF8',
   secondaryLight: '#A5B4FC',
   secondaryDark: '#6366F1',
-  
   background: '#111827',
   surface: '#1F2937',
   surfaceVariant: '#374151',
-  
   text: '#F9FAFB',
   textSecondary: '#D1D5DB',
   textLight: '#9CA3AF',
   textOnPrimary: '#FFFFFF',
-  
   success: '#34D399',
   warning: '#FBBF24',
   error: '#F87171',
   info: '#60A5FA',
-  
   white: '#FFFFFF',
   black: '#000000',
   border: '#374151',
   divider: '#1F2937',
   overlay: 'rgba(0, 0, 0, 0.7)',
-  
   gold: '#FCD34D',
   quranGreen: '#14B8A6',
   prayerBlue: '#38BDF8',
 };
 
 // ============================================
-// المسافات
+// SchemeColors للـ theme-lab
+// ============================================
+
+export type ColorScheme = 'light' | 'dark';
+
+export const SchemeColors = {
+  light: {
+    primary: '#059669',
+    secondary: '#6366F1',
+    background: '#F9FAFB',
+    surface: '#FFFFFF',
+    foreground: '#111827',
+    muted: '#9CA3AF',
+    border: '#E5E7EB',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+  },
+  dark: {
+    primary: '#10B981',
+    secondary: '#818CF8',
+    background: '#111827',
+    surface: '#1F2937',
+    foreground: '#F9FAFB',
+    muted: '#9CA3AF',
+    border: '#374151',
+    success: '#34D399',
+    warning: '#FBBF24',
+    error: '#F87171',
+  },
+};
+
+// ============================================
+// المسافات (SPACING)
 // ============================================
 
 export const Spacing = {
@@ -97,8 +108,11 @@ export const Spacing = {
   xxl: 48,
 };
 
+// Alias for onboarding.tsx
+export const SPACING = Spacing;
+
 // ============================================
-// الزوايا المستديرة
+// الزوايا المستديرة (BORDER_RADIUS)
 // ============================================
 
 export const BorderRadius = {
@@ -108,6 +122,25 @@ export const BorderRadius = {
   lg: 16,
   xl: 24,
   full: 9999,
+};
+
+// Alias for onboarding.tsx
+export const BORDER_RADIUS = BorderRadius;
+
+// ============================================
+// أحجام الخطوط (FONT_SIZES)
+// ============================================
+
+export const FONT_SIZES = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  lg: 16,
+  xl: 18,
+  '2xl': 20,
+  '3xl': 24,
+  '4xl': 32,
+  '5xl': 48,
 };
 
 // ============================================
