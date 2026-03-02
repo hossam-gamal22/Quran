@@ -1,7 +1,7 @@
 # ✅ CHECKLIST - روح المسلم
 > آخر تحديث: 2 مارس 2026
 
-## 📊 نسبة الإنجاز الكلية: 80%
+## 📊 نسبة الإنجاز الكلية: 73%
 
 ---
 
@@ -86,26 +86,54 @@
 ## ⏳ Phase 9 – Seasonal Content (0%)
 - [ ] `lib/seasonal-content.ts`
 - [ ] `contexts/SeasonalContext.tsx`
+- [ ] `app/seasonal/index.tsx`
 - [ ] `app/seasonal/ramadan.tsx`
 - [ ] `app/seasonal/hajj.tsx`
 - [ ] `app/seasonal/ashura.tsx`
 - [ ] `app/seasonal/mawlid.tsx`
+- [ ] `data/seasonal/ramadan.ts`
+- [ ] `data/seasonal/hajj.ts`
 
 ## ⏳ Phase 10 – Onboarding (0%)
+- [ ] `contexts/OnboardingContext.tsx`
 - [ ] `app/onboarding/index.tsx`
+- [ ] `app/onboarding/welcome.tsx`
 - [ ] `app/onboarding/language.tsx`
 - [ ] `app/onboarding/location.tsx`
 - [ ] `app/onboarding/notifications.tsx`
 - [ ] `app/onboarding/complete.tsx`
 
 ## ⏳ Phase 11 – Final Polish (0%)
-- [ ] `app/(tabs)/home.tsx` (الصفحة الرئيسية)
+- [ ] `app/(tabs)/index.tsx` (الصفحة الرئيسية)
 - [ ] `app/(tabs)/_layout.tsx` (تخطيط التابات)
 - [ ] `app/_layout.tsx` (التخطيط الرئيسي)
-- [ ] `app/index.tsx` (نقطة الدخول)
+- [ ] `components/ui/ErrorBoundary.tsx`
+- [ ] `lib/analytics.ts`
 - [ ] Performance optimization
-- [ ] Error boundaries
-- [ ] Analytics integration
+- [ ] Testing & Bug fixes
+
+## ⏳ Phase 12 – Admin Panel Integration (0%)
+> Admin Panel URL: https://splendorous-biscochitos-6e7d7c.netlify.app/
+
+### API & Remote Config
+- [ ] `lib/api-client.ts`
+- [ ] `lib/remote-config.ts`
+- [ ] `contexts/RemoteConfigContext.tsx`
+
+### Admin Panel Features (to review)
+- [ ] إدارة المحتوى (أذكار، أدعية، رقية)
+- [ ] الثيمات والألوان
+- [ ] الإشعارات (Push Notifications)
+- [ ] المحتوى الموسمي
+- [ ] الإعدادات العامة
+- [ ] التحليلات والإحصائيات
+- [ ] إدارة المستخدمين
+
+### Database Setup
+- [ ] اختيار Database (Firebase/Supabase/MongoDB)
+- [ ] تصميم Schema
+- [ ] ربط Admin Panel بالـ Database
+- [ ] إنشاء API endpoints
 
 ---
 
@@ -122,7 +150,11 @@
 | Phase 6 | 6 | ✅ |
 | Phase 7 | 10 | ✅ |
 | Phase 8 | 6 | ✅ |
-| **المجموع** | **54** | **✅** |
+| Phase 9 | 0/9 | ⏳ |
+| Phase 10 | 0/7 | ⏳ |
+| Phase 11 | 0/6 | ⏳ |
+| Phase 12 | 0/10+ | ⏳ |
+| **المجموع** | **54/~86** | **73%** |
 
 ### الترجمات
 | الملف | المفاتيح | اللغات | المجموع |
@@ -141,6 +173,14 @@
 ---
 
 ## 🎯 الخطوات التالية
-1. Phase 9: المحتوى الموسمي (رمضان، الحج، عاشوراء)
-2. Phase 10: شاشات الترحيب للمستخدم الجديد
-3. Phase 11: التحسينات النهائية والصفحة الرئيسية
+1. ✅ Phase 1-8: مكتمل
+2. ⏳ Phase 9: المحتوى الموسمي
+3. ⏳ Phase 10: شاشات الترحيب
+4. ⏳ Phase 11: التحسينات النهائية
+5. ⏳ Phase 12: ربط Admin Panel
+
+---
+
+## 🔗 روابط مهمة
+- **Admin Panel**: https://splendorous-biscochitos-6e7d7c.netlify.app/
+- **GitHub Repo**: https://github.com/hossam-gamal22/Quran
