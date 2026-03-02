@@ -14,12 +14,10 @@ SplashScreen.preventAutoHideAsync();
 function RootLayoutContent() {
   const [appIsReady, setAppIsReady] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('جاري التحميل...');
 
   useEffect(() => {
     async function prepare() {
       try {
-        setLoadingMessage('جاري تحميل الإعدادات...');
         const settings = await AsyncStorage.getItem('app_settings');
         if (settings) {
           const parsed = JSON.parse(settings);
@@ -44,7 +42,7 @@ function RootLayoutContent() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>{loadingMessage}</Text>
+        <Text style={styles.loadingText}>جاري التحميل...</Text>
       </View>
     );
   }
@@ -96,7 +94,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.primary,
     fontWeight: '500',
   },
 });

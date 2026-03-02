@@ -5,6 +5,7 @@ import {
   CachedSurah, 
   Reciter,
   getCachedSurah,
+  fetchAndCacheSurahsList,
 } from '@/lib/quran-cache';
 import { audioPlayer, PlaybackState } from '@/lib/audio-player';
 
@@ -47,12 +48,14 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
       try {
         setIsLoading(true);
         setError(null);
+        console.log('📥 Loading Quran data...');
         const { surahs, reciters } = await initializeQuranCache();
         setSurahs(surahs);
         setReciters(reciters);
+        console.log('✅ Quran data loaded successfully');
       } catch (err) {
         setError('فشل في تحميل بيانات القرآن');
-        console.error(err);
+        console.error('❌ Error loading Quran data:', err);
       } finally {
         setIsLoading(false);
       }
@@ -99,8 +102,12 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getSurah = useCallback(async (number: number) => {
+    // أولاً نحاول من الـ state
+    const fromState = surahs.find(s => s.number === number);
+    if (fromState) return fromState;
+    // إذا مش موجود، نجيبه من الكاش
     return await getCachedSurah(number);
-  }, []);
+  }, [surahs]);
 
   return (
     <QuranContext.Provider
