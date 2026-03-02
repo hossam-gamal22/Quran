@@ -1,331 +1,280 @@
-[[# روح المسلم - قائمة المهام
-## Rooh Al-Muslim - Project Checklist
+## روح المسلم - قائمة المهام
 
-**آخر تحديث:** 2 مارس 2026
-**نسبة الإنجاز الكلية:** 40%
+> آخر تحديث: 2 مارس 2026
+> نسبة الإنجاز الكلية: **60%**
 
 ---
 
-## 📊 ملخص سريع
+## ✅ Phase 1: Core Setup (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `constants/theme.ts` | ✅ | ثوابت التصميم |
+| `constants/colors.ts` | ✅ | الألوان |
+| `components/ui/GlassCard.tsx` | ✅ | مكون البطاقة الزجاجية |
+| `lib/hijri-date.ts` | ✅ | التاريخ الهجري |
+| `lib/storage.ts` | ✅ | التخزين المحلي |
+| `lib/notifications.ts` | ✅ | الإشعارات |
+
+---
+
+## ✅ Phase 2: Quran Module (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `lib/quran-cache.ts` | ✅ | كاش القرآن |
+| `lib/audio-player.ts` | ✅ | مشغل الصوت |
+| `contexts/QuranContext.tsx` | ✅ | سياق القرآن |
+| `components/ui/quran/VerseDisplay.tsx` | ✅ | عرض الآيات |
+| `components/ui/quran/PlayerBar.tsx` | ✅ | شريط التشغيل |
+| `app/(tabs)/quran.tsx` | ✅ | صفحة القرآن |
+| `app/surah/[id].tsx` | ✅ | صفحة السورة |
+
+---
+
+## ✅ Phase 3: Khatma System (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `lib/khatma-storage.ts` | ✅ | تخزين الختمات |
+| `contexts/KhatmaContext.tsx` | ✅ | سياق الختمة |
+| `app/khatma/index.tsx` | ✅ | قائمة الختمات |
+| `app/khatma/create.tsx` | ✅ | إنشاء ختمة |
+| `app/khatma/[id].tsx` | ✅ | تفاصيل الختمة |
+
+---
+
+## ✅ Phase 4: Azkar & Duas (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `data/azkar.ts` | ✅ | بيانات الأذكار (55 ذكر) |
+| `data/duas.ts` | ✅ | بيانات الأدعية (38 دعاء) |
+| `data/ruqya.ts` | ✅ | بيانات الرقية (10 رقية) |
+| `data/translations/index.ts` | ✅ | فهرس الترجمات |
+| `data/translations/azkar.ts` | ✅ | ترجمات الأذكار |
+| `data/translations/categories.ts` | ✅ | ترجمات الفئات |
+| `data/translations/benefits.ts` | ✅ | ترجمات الفوائد |
+| `data/translations/duas.ts` | ✅ | ترجمات الأدعية |
+| `data/translations/ruqya.ts` | ✅ | ترجمات الرقية |
+| `data/translations/ui.ts` | ✅ | ترجمات الواجهة |
+
+### إحصائيات الترجمات
+| الملف | المفاتيح | × 12 لغة | الإجمالي |
+|-------|----------|----------|----------|
+| azkar.ts | 55 | × 12 | 660 |
+| categories.ts | 31 | × 12 | 372 |
+| benefits.ts | 18 | × 12 | 216 |
+| duas.ts | 38 | × 12 | 456 |
+| ruqya.ts | 10 | × 12 | 120 |
+| ui.ts | 88 | × 12 | 1,056 |
+| **الإجمالي** | **240** | | **2,880** |
+
+### اللغات المدعومة
+`ar` `en` `ur` `id` `tr` `fr` `de` `hi` `bn` `ms` `ru` `es`
+
+---
+
+## ✅ Phase 5: Prayer Times (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `lib/prayer-times.ts` | ✅ | API مواقيت الصلاة |
+| `components/ui/prayer/PrayerCard.tsx` | ✅ | كارت الصلاة القادمة |
+| `components/ui/prayer/PrayerList.tsx` | ✅ | قائمة الصلوات |
+| `components/ui/prayer/CountdownTimer.tsx` | ✅ | العد التنازلي الدائري |
+| `app/(tabs)/prayer.tsx` | ✅ | صفحة المواقيت |
+
+---
+
+## ✅ Phase 6: Worship Tracker (100%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `lib/worship-storage.ts` | ✅ | تخزين متتبع العبادات |
+| `contexts/WorshipContext.tsx` | ✅ | سياق العبادات |
+| `app/worship-tracker/index.tsx` | ✅ | الصفحة الرئيسية |
+| `app/worship-tracker/prayer.tsx` | ✅ | متتبع الصلاة |
+| `app/worship-tracker/fasting.tsx` | ✅ | متتبع الصيام |
+| `app/worship-tracker/quran.tsx` | ✅ | متتبع القرآن |
+
+---
+
+## ⏳ Phase 7: Widgets (0%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `widgets/ios/NextPrayerWidget.swift` | ⏳ | ويدجت الصلاة iOS |
+| `widgets/ios/AzkarWidget.swift` | ⏳ | ويدجت الأذكار iOS |
+| `widgets/android/NextPrayerWidget.kt` | ⏳ | ويدجت الصلاة Android |
+| `widgets/android/AzkarWidget.kt` | ⏳ | ويدجت الأذكار Android |
+| `app/widget-settings.tsx` | ⏳ | إعدادات الويدجت |
+
+---
+
+## ⏳ Phase 8: Settings (0%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `app/(tabs)/settings.tsx` | ⏳ | صفحة الإعدادات |
+| `contexts/SettingsContext.tsx` | ⏳ | سياق الإعدادات |
+| `app/settings/language.tsx` | ⏳ | إعدادات اللغة |
+| `app/settings/notifications.tsx` | ⏳ | إعدادات الإشعارات |
+| `app/settings/backup.tsx` | ⏳ | النسخ الاحتياطي |
+| `app/settings/about.tsx` | ⏳ | عن التطبيق |
+
+---
+
+## ⏳ Phase 9: Seasonal Content (0%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `data/ramadan-duas.ts` | ⏳ | أدعية رمضان |
+| `data/hajj-duas.ts` | ⏳ | أدعية الحج |
+| `app/seasonal/ramadan.tsx` | ⏳ | صفحة رمضان |
+| `app/seasonal/hajj.tsx` | ⏳ | صفحة الحج |
+
+---
+
+## ⏳ Phase 10: Admin Panel (0%)
+
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `admin-panel/login.tsx` | ⏳ | تسجيل الدخول |
+| `admin-panel/dashboard.tsx` | ⏳ | لوحة التحكم |
+| `admin-panel/azkar-manager.tsx` | ⏳ | إدارة الأذكار |
+| `admin-panel/notifications.tsx` | ⏳ | إرسال الإشعارات |
+
+---
+
+## ⏳ Phase 11: Final Polish (0%)
+
+| المهمة | الحالة |
+|--------|--------|
+| اختبار شامل | ⏳ |
+| تحسين الأداء | ⏳ |
+| إصلاح الأخطاء | ⏳ |
+| رفع للمتاجر | ⏳ |
+
+---
+
+## 📊 ملخص الإنجاز
 
 | المرحلة | الحالة | النسبة |
 |---------|--------|--------|
-| Phase 1: Core Setup | ✅ مكتمل | 100% |
-| Phase 2: Quran Module | ✅ مكتمل | 100% |
-| Phase 3: Khatma System | ✅ مكتمل | 100% |
-| Phase 4: Azkar & Duas | ✅ مكتمل | 100% |
-| Phase 5: Prayer Times | ⏳ قيد التنفيذ | 0% |
-| Phase 6: Worship Tracker | ⏳ معلق | 0% |
-| Phase 7: Widgets | ⏳ معلق | 0% |
-| Phase 8: Settings | ⏳ معلق | 0% |
-| Phase 9: Seasonal Content | ⏳ معلق | 0% |
-| Phase 10: Admin Panel | ⏳ معلق | 0% |
-| Phase 11: Final Polish | ⏳ معلق | 0% |
+| Phase 1: Core Setup | ✅ | 100% |
+| Phase 2: Quran Module | ✅ | 100% |
+| Phase 3: Khatma System | ✅ | 100% |
+| Phase 4: Azkar & Duas | ✅ | 100% |
+| Phase 5: Prayer Times | ✅ | 100% |
+| Phase 6: Worship Tracker | ✅ | 100% |
+| Phase 7: Widgets | ⏳ | 0% |
+| Phase 8: Settings | ⏳ | 0% |
+| Phase 9: Seasonal | ⏳ | 0% |
+| Phase 10: Admin Panel | ⏳ | 0% |
+| Phase 11: Final Polish | ⏳ | 0% |
+
+### الإحصائيات العامة
+- **الملفات المكتملة:** 33 ملف
+- **الترجمات:** 2,880 ترجمة
+- **اللغات:** 12 لغة
+- **الأذكار:** 55 ذكر
+- **الأدعية:** 38 دعاء
+- **الرقية:** 10 رقية
+- **مفاتيح UI:** 88 مفتاح
 
 ---
 
-## ✅ Phase 1: Core Setup (مكتمل)
-
-- [x] إعداد المشروع بـ Expo
-- [x] تثبيت المكتبات الأساسية
-- [x] إعداد الثيمات (Light/Dark)
-- [x] مكون GlassCard
-- [x] التاريخ الهجري
-- [x] الحافظة (Clipboard)
-- [x] إشعارات الصلاة
-- [x] التخزين المحلي (AsyncStorage)
-- [x] إعداد Firebase
-
-**الملفات:**
-- `constants/theme.ts` ✅
-- `constants/colors.ts` ✅
-- `components/ui/GlassCard.tsx` ✅
-- `lib/hijri-date.ts` ✅
-- `lib/storage.ts` ✅
-- `lib/notifications.ts` ✅
-
----
-
-## ✅ Phase 2: Quran Module (مكتمل)
-
-- [x] نظام الكاش للقرآن
-- [x] مشغل الصوت
-- [x] QuranContext
-- [x] عرض الآيات
-- [x] شريط المشغل
-- [x] التخطيط الرئيسي
-- [x] صفحة القرآن
-- [x] صفحة السورة
-- [x] اختيار القارئ
-- [x] البحث
-- [x] الترجمات (11 لغة)
-- [x] التفاسير (3 تفاسير)
-- [x] تمييز الآيات
-
-**الملفات:**
-- `lib/quran-cache.ts` ✅
-- `lib/audio-player.ts` ✅
-- `contexts/QuranContext.tsx` ✅
-- `components/ui/quran/VerseDisplay.tsx` ✅
-- `components/ui/quran/PlayerBar.tsx` ✅
-- `app/(tabs)/quran.tsx` ✅
-- `app/surah/[id].tsx` ✅
-
----
-
-## ✅ Phase 3: Khatma System (مكتمل)
-
-- [x] تخزين الختمة
-- [x] KhatmaContext
-- [x] صفحة الختمات
-- [x] إنشاء ختمة جديدة
-- [x] الورد اليومي
-- [x] إشعارات التذكير
-
-**الملفات:**
-- `lib/khatma-storage.ts` ✅
-- `contexts/KhatmaContext.tsx` ✅
-- `app/khatma/index.tsx` ✅
-- `app/khatma/new.tsx` ✅
-- `app/khatma/daily.tsx` ✅
-
----
-
-## ✅ Phase 4: Azkar & Duas (مكتمل)
-
-### البيانات الأساسية:
-- [x] `data/azkar.ts` - 55 ذكر (6 فئات)
-- [x] `data/duas.ts` - 38 دعاء (3 فئات)
-- [x] `data/ruqya.ts` - 10 رقية (2 فئات)
-
-### نظام الترجمات (12 لغة):
-- [x] `data/translations/index.ts` - النظام المركزي
-- [x] `data/translations/azkar.ts` - 660 ترجمة
-- [x] `data/translations/categories.ts` - 372 ترجمة
-- [x] `data/translations/benefits.ts` - 216 ترجمة
-- [x] `data/translations/duas.ts` - 456 ترجمة
-- [x] `data/translations/ruqya.ts` - 120 ترجمة
-- [x] `data/translations/ui.ts` - 1,056 ترجمة
-
-### اللغات المدعومة:
-ar - العربية | en - English | ur - اردو id - Indonesia | tr - Türkçe | fr - Français de - Deutsch | hi - हिन्दी | bn - বাংলা ms - Melayu | ru - Русский | es - Español
-
-
-### إحصائيات الترجمات:
-| الملف | المفاتيح | اللغات | الإجمالي |
-|-------|---------|--------|----------|
-| azkar.ts | 55 | 12 | 660 |
-| categories.ts | 31 | 12 | 372 |
-| benefits.ts | 18 | 12 | 216 |
-| duas.ts | 38 | 12 | 456 |
-| ruqya.ts | 10 | 12 | 120 |
-| ui.ts | 88 | 12 | 1,056 |
-| **الإجمالي** | **240** | **12** | **2,880** |
-
----
-
-## ⏳ Phase 5: Prayer Times (التالي)
-
-- [ ] صفحة مواقيت الصلاة
-- [ ] API مواقيت الصلاة (AlAdhan)
-- [ ] تحديد الموقع التلقائي
-- [ ] العد التنازلي للصلاة القادمة
-- [ ] إعدادات طريقة الحساب
-- [ ] تعديل الدقائق يدوياً
-- [ ] منبه الفجر
-- [ ] الوضع الصامت
-- [ ] التقويم الشهري
-- [ ] الثلث الأخير ومنتصف الليل
-- [ ] مشاركة المواقيت كصورة
-
-**الملفات المطلوبة:**
-- `app/(tabs)/prayer.tsx`
-- `lib/prayer-times.ts`
-- `components/ui/prayer/PrayerCard.tsx`
-- `components/ui/prayer/PrayerList.tsx`
-- `components/ui/prayer/CountdownTimer.tsx`
-
----
-
-## ⏳ Phase 6: Worship Tracker
-
-- [ ] متتبع الصلاة
-- [ ] متتبع الصيام
-- [ ] متتبع القرآن
-- [ ] دعاء رمضان اليومي (30 دعاء)
-- [ ] الإحصائيات الأسبوعية/الشهرية
-- [ ] الرسوم البيانية
-
-**الملفات المطلوبة:**
-- `app/worship-tracker/index.tsx`
-- `app/worship-tracker/prayer.tsx`
-- `app/worship-tracker/fasting.tsx`
-- `app/worship-tracker/quran.tsx`
-- `contexts/WorshipContext.tsx`
-
----
-
-## ⏳ Phase 7: Widgets
-
-- [ ] ويدجت iOS (expo-widgets)
-- [ ] ويدجت Android (react-native-android-widget)
-- [ ] ويدجت الصلاة القادمة
-- [ ] ويدجت ذكر عشوائي
-- [ ] ويدجت التاريخ الهجري
-- [ ] ويدجت آية اليوم
-- [ ] ويدجت تقدم الختمة
-- [ ] ويدجت يوم رمضان
-
-**الملفات المطلوبة:**
-- `widgets/ios/PrayerWidget.tsx`
-- `widgets/ios/AzkarWidget.tsx`
-- `widgets/android/PrayerWidget.tsx`
-- `widgets/android/AzkarWidget.tsx`
-- `app/widget-settings.tsx`
-
----
-
-## ⏳ Phase 8: Settings
-
-- [ ] صفحة الإعدادات الرئيسية
-- [ ] اختيار اللغة
-- [ ] المظهر (فاتح/داكن)
-- [ ] إشعارات الأذكار
-- [ ] إعدادات الصلاة
-- [ ] إعدادات القرآن
-- [ ] النسخ الاحتياطي (iCloud)
-- [ ] الاستعادة
-- [ ] مشاركة التطبيق
-- [ ] حول التطبيق
-
-**الملفات المطلوبة:**
-- `app/(tabs)/settings.tsx`
-- `contexts/SettingsContext.tsx`
-
----
-
-## ⏳ Phase 9: Seasonal Content
-
-- [ ] قسم رمضان (دعاء، صيام، ستيكرات)
-- [ ] قسم ذو الحجة
-- [ ] قسم الجمعة
-- [ ] المحتوى الموسمي الديناميكي
-
----
-
-## ⏳ Phase 10: Admin Panel
-
-- [ ] تسجيل الدخول
-- [ ] إدارة الأقسام
-- [ ] إدارة الأذكار
-- [ ] إعدادات إزالة الإعلانات
-- [ ] إدارة المحتوى الموسمي
-- [ ] إحصائيات الاستخدام
-
-**الملفات المطلوبة:**
-- `admin-panel/login.tsx`
-- `admin-panel/dashboard.tsx`
-- `admin-panel/sections.tsx`
-- `admin-panel/azkar.tsx`
-
----
-
-## ⏳ Phase 11: Final Polish
-
-- [ ] اختبار جميع الميزات
-- [ ] تحسين الأداء
-- [ ] إصلاح الأخطاء
-- [ ] إعداد App Store
-- [ ] إعداد Google Play
-- [ ] الإطلاق
-
----
-
-## 📚 APIs المستخدمة
+## 🔗 APIs المستخدمة
 
 | API | الحالة | الاستخدام |
-|-----|--------|----------|
-| AlQuran.cloud | ✅ جاهز | القرآن، الترجمات، التفاسير |
-| AlAdhan.com | ⏳ معلق | مواقيت الصلاة |
-| Islamic.Network CDN | ✅ جاهز | ملفات الصوت |
+|-----|--------|-----------|
+| AlQuran.cloud | ✅ | القرآن الكريم |
+| AlAdhan.com | ✅ | مواقيت الصلاة |
+| Islamic.Network | ✅ | الصوتيات |
 
 ---
 
-## 📦 المكتبات المطلوبة
+## 📦 المكتبات الأساسية
 
-```json
-{
-  "expo-widgets": "للويدجات iOS",
-  "react-native-android-widget": "للويدجات Android",
-  "expo-av": "تشغيل الصوت",
-  "expo-blur": "تأثير الزجاج",
-  "react-native-reanimated": "الأنيميشن",
-  "expo-notifications": "الإشعارات",
-  "expo-location": "الموقع",
-  "expo-clipboard": "الحافظة",
-  "expo-haptics": "الاهتزاز",
-  "@react-native-async-storage/async-storage": "التخزين"
-}
-📁 هيكل المجلدات
+```
+expo-av
+expo-blur
+expo-location
+expo-notifications
+expo-clipboard
+expo-haptics
+react-native-reanimated
+react-native-svg
+@react-native-async-storage/async-storage
+expo-linear-gradient
+```
+
+---
+
+## 📁 هيكل المجلدات
+
+```
 rooh-al-muslim/
 ├── app/
 │   ├── (tabs)/
-│   │   ├── index.tsx        # الرئيسية
-│   │   ├── quran.tsx        # القرآن
-│   │   ├── prayer.tsx       # الصلاة (⏳)
-│   │   └── settings.tsx     # الإعدادات (⏳)
-│   ├── azkar/
-│   │   └── [type].tsx       # صفحة الأذكار
-│   ├── surah/
-│   │   └── [id].tsx         # صفحة السورة
-│   ├── khatma/
 │   │   ├── index.tsx
-│   │   ├── new.tsx
-│   │   └── daily.tsx
-│   ├── worship-tracker/     # (⏳)
-│   └── widget-settings.tsx  # (⏳)
-├── components/
-│   └── ui/
-│       ├── GlassCard.tsx
-│       ├── quran/
-│       ├── azkar/
-│       ├── prayer/          # (⏳)
-│       └── widgets/         # (⏳)
+│   │   ├── quran.tsx
+│   │   ├── prayer.tsx
+│   │   └── settings.tsx
+│   ├── surah/[id].tsx
+│   ├── khatma/
+│   ├── worship-tracker/
+│   │   ├── index.tsx
+│   │   ├── prayer.tsx
+│   │   ├── fasting.tsx
+│   │   └── quran.tsx
+│   └── settings/
+├── components/ui/
+│   ├── GlassCard.tsx
+│   ├── quran/
+│   └── prayer/
 ├── contexts/
 │   ├── QuranContext.tsx
 │   ├── KhatmaContext.tsx
-│   ├── SettingsContext.tsx  # (⏳)
-│   └── WorshipContext.tsx   # (⏳)
+│   └── WorshipContext.tsx
 ├── data/
-│   ├── azkar.ts             ✅
-│   ├── duas.ts              ✅
-│   ├── ruqya.ts             ✅
+│   ├── azkar.ts
+│   ├── duas.ts
+│   ├── ruqya.ts
 │   └── translations/
-│       ├── index.ts         ✅
-│       ├── azkar.ts         ✅
-│       ├── categories.ts    ✅
-│       ├── benefits.ts      ✅
-│       ├── duas.ts          ✅
-│       ├── ruqya.ts         ✅
-│       └── ui.ts            ✅
 ├── lib/
-│   ├── quran-cache.ts
-│   ├── audio-player.ts
+│   ├── prayer-times.ts
+│   ├── worship-storage.ts
 │   ├── hijri-date.ts
-│   ├── prayer-times.ts      # (⏳)
-│   ├── storage.ts
-│   ├── khatma-storage.ts
-│   └── notifications.ts
-├── constants/
-│   ├── theme.ts
-│   ├── colors.ts
-│   └── icons.ts
-├── widgets/                  # (⏳)
-│   ├── ios/
-│   └── android/
-├── admin-panel/              # (⏳)
-└── assets/
-    ├── icons/
-    ├── images/
-    └── fonts/
-](https://www.genspark.ai/)](https://www.genspark.ai/)
+│   └── storage.ts
+└── constants/
+    ├── theme.ts
+    └── colors.ts
+```
+
+---
+
+## 🚀 المرحلة التالية
+
+**Phase 7: Widgets** أو **Phase 8: Settings**
+
+اختر المرحلة للبدء!
+```
+
+**ملخص Phase 6:**
+
+| الملف | الوصف |
+|-------|-------|
+| `lib/worship-storage.ts` | تخزين + CRUD + إحصائيات |
+| `contexts/WorshipContext.tsx` | سياق + hooks متخصصة |
+| `app/worship-tracker/index.tsx` | الصفحة الرئيسية |
+| `app/worship-tracker/prayer.tsx` | متتبع الصلاة |
+| `app/worship-tracker/fasting.tsx` | متتبع الصيام |
+| `app/worship-tracker/quran.tsx` | متتبع القرآن |
+
+**المطلوب:**
+1. ارفع ملف `CHECKLIST.md` على GitHub
+2. قل **"تم"** واختر المرحلة التالية:
+   - **Phase 7:** Widgets (iOS & Android)
+   - **Phase 8:** Settings (إعدادات التطبيق)
