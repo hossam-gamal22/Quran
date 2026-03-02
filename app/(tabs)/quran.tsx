@@ -1,754 +1,473 @@
-// app/(tabs)/quran.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
-  TextInput,
   FlatList,
-  Modal,
+  TouchableOpacity,
+  TextInput,
   ActivityIndicator,
-  Alert,
+  Modal,
+  StyleSheet,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Shadows } from '../../constants/theme';
 import { useQuran } from '../../contexts/QuranContext';
-import { AudioPlayerBar } from '../../components/quran/AudioPlayerBar';
+import { useColors } from '../../lib/theme-provider';
+import GlassCard from '../../components/ui/GlassCard';
+import AudioPlayerBar from '../../components/quran/AudioPlayerBar';
 import {
-  RECITERS,
-  SURAH_NAMES_AR,
-} from '../../lib/quran-api';
-import { copyToClipboard } from '../../lib/clipboard';
+  Spacing,
+  BorderRadius,
+  FONT_SIZES,
+  Typography,
+  Shadows,
+} from '../../constants/theme';
 
-// ===============================
-// الأنواع
-// ===============================
-type TabType = 'surah' | 'juz' | 'bookmarks';
+// أرقام الصفحات لكل سورة
+const SURAH_PAGES: { [key: number]: number } = {
+  1: 1, 2: 2, 3: 50, 4: 77, 5: 106, 6: 128, 7: 151, 8: 177, 9: 187,
+  10: 208, 11: 221, 12: 235, 13: 249, 14: 255, 15: 262, 16: 267,
+  17: 282, 18: 293, 19: 305, 20: 312, 21: 322, 22: 332, 23: 342,
+  24: 350, 25: 359, 26: 367, 27: 377, 28: 385, 29: 396, 30: 404,
+  31: 411, 32: 415, 33: 418, 34: 428, 35: 434, 36: 440, 37: 446,
+  38: 453, 39: 458, 40: 467, 41: 477, 42: 483, 43: 489, 44: 496,
+  45: 499, 46: 502, 47: 507, 48: 511, 49: 515, 50: 518, 51: 520,
+  52: 523, 53: 526, 54: 528, 55: 531, 56: 534, 57: 537, 58: 542,
+  59: 545, 60: 549, 61: 551, 62: 553, 63: 554, 64: 556, 65: 558,
+  66: 560, 67: 562, 68: 564, 69: 566, 70: 568, 71: 570, 72: 572,
+  73: 574, 74: 575, 75: 577, 76: 578, 77: 580, 78: 582, 79: 583,
+  80: 585, 81: 586, 82: 587, 83: 587, 84: 589, 85: 590, 86: 591,
+  87: 591, 88: 592, 89: 593, 90: 594, 91: 595, 92: 595, 93: 596,
+  94: 596, 95: 597, 96: 597, 97: 598, 98: 598, 99: 599, 100: 599,
+  101: 600, 102: 600, 103: 601, 104: 601, 105: 601, 106: 602,
+  107: 602, 108: 602, 109: 603, 110: 603, 111: 603, 112: 604,
+  113: 604, 114: 604,
+};
 
-interface BookmarkItem {
-  id: string;
-  surahNumber: number;
-  surahName: string;
-  ayahNumber: number;
-  ayahText: string;
-  timestamp: number;
+// تحويل الأرقام للعربية
+const toArabicNumber = (num: number): string => {
+  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return num
+    .toString()
+    .split('')
+    .map((d) => arabicNumerals[parseInt(d)])
+    .join('');
+};
+
+// أنواع السور
+const getRevelationType = (type: string): string => {
+  return type === 'Meccan' ? 'مكية' : 'مدنية';
+};
+
+interface Surah {
+  number: number;
+  name: string;
+  englishName: string;
+  englishNameTranslation: string;
+  numberOfAyahs: number;
+  revelationType: string;
 }
 
-interface LastRead {
-  surahNumber: number;
-  surahName: string;
-  ayahNumber: number;
-  timestamp: number;
+interface Reciter {
+  identifier: string;
+  name: string;
+  englishName: string;
 }
 
-// ===============================
-// المكون الرئيسي
-// ===============================
 export default function QuranScreen() {
   const router = useRouter();
-  
-  // ✅ استخدام QuranContext - البيانات محملة مسبقاً
-  const { 
-    surahs, 
-    reciters, 
-    isLoading: quranLoading,
+  const colors = useColors();
+  const {
+    surahs,
+    reciters,
+    isLoading,
+    error,
     playbackState,
     currentReciter,
     setReciter,
-    resumePlayback,
   } = useQuran();
-  
-  // الحالة
-  const [activeTab, setActiveTab] = useState<TabType>('surah');
-  const [filteredSurahs, setFilteredSurahs] = useState(surahs);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
-  const [lastRead, setLastRead] = useState<LastRead | null>(null);
-  const [selectedReciter, setSelectedReciter] = useState(RECITERS[0]);
+  const [activeTab, setActiveTab] = useState<'read' | 'listen'>('read');
   const [showReciterModal, setShowReciterModal] = useState(false);
-  const [verseOfDay, setVerseOfDay] = useState<{
-    surah: string;
-    ayahNumber: number;
-    text: string;
-    surahNumber: number;
-  } | null>(null);
 
-  // ===============================
-  // تحميل البيانات من الكاش
-  // ===============================
-  useEffect(() => {
-    if (surahs.length > 0) {
-      setFilteredSurahs(surahs);
-      loadVerseOfDay();
-    }
-  }, [surahs]);
+  // فلترة السور حسب البحث
+  const filteredSurahs = useMemo(() => {
+    if (!searchQuery.trim()) return surahs;
+    const query = searchQuery.toLowerCase().trim();
+    return surahs.filter(
+      (surah: Surah) =>
+        surah.name.includes(query) ||
+        surah.englishName.toLowerCase().includes(query) ||
+        surah.number.toString() === query
+    );
+  }, [surahs, searchQuery]);
 
-  useEffect(() => {
-    loadSavedData();
-  }, []);
+  // الحصول على اسم القارئ الحالي
+  const currentReciterName = useMemo(() => {
+    const reciter = reciters.find(
+      (r: Reciter) => r.identifier === currentReciter
+    );
+    return reciter?.name || 'اختر قارئ';
+  }, [reciters, currentReciter]);
 
-  useEffect(() => {
-    if (searchQuery.trim()) {
-      const filtered = surahs.filter(surah =>
-        surah.name.includes(searchQuery) ||
-        surah.englishName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        surah.number.toString() === searchQuery
-      );
-      setFilteredSurahs(filtered);
-    } else {
-      setFilteredSurahs(surahs);
-    }
-  }, [searchQuery, surahs]);
+  // فتح صفحة السورة
+  const openSurah = useCallback(
+    (surahNumber: number) => {
+      router.push(`/surah/${surahNumber}`);
+    },
+    [router]
+  );
 
-  const loadSavedData = async () => {
-    try {
-      // تحميل الإشارات المرجعية
-      const savedBookmarks = await AsyncStorage.getItem('quran_bookmarks');
-      if (savedBookmarks) {
-        setBookmarks(JSON.parse(savedBookmarks));
-      }
-      
-      // تحميل القراءة الأخيرة
-      const savedLastRead = await AsyncStorage.getItem('quran_last_read');
-      if (savedLastRead) {
-        setLastRead(JSON.parse(savedLastRead));
-      }
-      
-      // تحميل القارئ المختار
-      const savedReciter = await AsyncStorage.getItem('quran_reciter');
-      if (savedReciter) {
-        const reciter = RECITERS.find(r => r.identifier === savedReciter);
-        if (reciter) {
-          setSelectedReciter(reciter);
-          setReciter(reciter.identifier);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading saved data:', error);
-    }
-  };
+  // اختيار قارئ
+  const selectReciter = useCallback(
+    (identifier: string) => {
+      setReciter(identifier);
+      setShowReciterModal(false);
+    },
+    [setReciter]
+  );
 
-  const loadVerseOfDay = () => {
-    if (surahs.length === 0) return;
-    
-    // اختيار آية عشوائية بناءً على اليوم
-    const today = new Date();
-    const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
-    
-    const randomSurahIndex = dayOfYear % surahs.length;
-    const randomSurah = surahs[randomSurahIndex];
-    const randomAyah = (dayOfYear % randomSurah.numberOfAyahs) + 1;
-    
-    // الحصول على نص الآية من الكاش
-    const ayah = randomSurah.ayahs?.find(a => a.numberInSurah === randomAyah);
-    if (ayah) {
-      setVerseOfDay({
-        surah: randomSurah.name,
-        surahNumber: randomSurah.number,
-        ayahNumber: randomAyah,
-        text: ayah.text,
-      });
-    }
-  };
-
-  // ===============================
-  // اختيار القارئ
-  // ===============================
-  const selectReciter = async (reciter: typeof RECITERS[0]) => {
-    setSelectedReciter(reciter);
-    setReciter(reciter.identifier);
-    await AsyncStorage.setItem('quran_reciter', reciter.identifier);
-    setShowReciterModal(false);
-  };
-
-  // ===============================
-  // الإشارات المرجعية
-  // ===============================
-  const removeBookmark = async (bookmarkId: string) => {
-    const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
-    setBookmarks(updatedBookmarks);
-    await AsyncStorage.setItem('quran_bookmarks', JSON.stringify(updatedBookmarks));
-  };
-
-  // ===============================
-  // فتح السورة
-  // ===============================
-  const openSurah = (surahNumber: number) => {
-    router.push(`/surah/${surahNumber}`);
-  };
-
-  // ===============================
-  // استكمال التلاوة
-  // ===============================
-  const handleResumePlayback = async () => {
-    const resumed = await resumePlayback();
-    if (!resumed) {
-      Alert.alert('', 'لا يوجد تلاوة سابقة للاستكمال');
-    }
-  };
-
-  // ===============================
   // عرض عنصر السورة
-  // ===============================
-  const renderSurahItem = ({ item }: { item: typeof surahs[0] }) => (
-    <TouchableOpacity
-      style={styles.surahItem}
-      onPress={() => openSurah(item.number)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.surahRight}>
-        <Ionicons name="chevron-back" size={20} color={Colors.textLight} />
-      </View>
-      
-      <View style={styles.surahInfo}>
-        <Text style={styles.surahName}>{item.name}</Text>
-        <Text style={styles.surahDetails}>
-          {item.revelationType === 'Meccan' ? 'مكية' : 'مدنية'} • {item.numberOfAyahs} آية
-        </Text>
-      </View>
-      
-      <View style={styles.surahNumber}>
-        <Text style={styles.surahNumberText}>{item.number}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // ===============================
-  // عرض عنصر الجزء
-  // ===============================
-  const renderJuzItem = (juzNumber: number) => (
-    <TouchableOpacity
-      key={juzNumber}
-      style={styles.juzItem}
-      onPress={() => router.push(`/juz/${juzNumber}`)}
-      activeOpacity={0.7}
-    >
-      <Ionicons name="chevron-back" size={20} color={Colors.textLight} />
-      <Text style={styles.juzName}>الجزء {juzNumber}</Text>
-      <View style={styles.juzNumber}>
-        <Text style={styles.juzNumberText}>{juzNumber}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // ===============================
-  // عرض عنصر الإشارة المرجعية
-  // ===============================
-  const renderBookmarkItem = ({ item }: { item: BookmarkItem }) => (
-    <View style={styles.bookmarkItem}>
+  const renderSurahItem = useCallback(
+    ({ item }: { item: Surah }) => (
       <TouchableOpacity
-        style={styles.bookmarkContent}
-        onPress={() => router.push(`/surah/${item.surahNumber}?ayah=${item.ayahNumber}`)}
+        style={[styles.surahItem, { borderBottomColor: colors.border }]}
+        onPress={() => openSurah(item.number)}
+        activeOpacity={0.7}
       >
-        <View style={styles.bookmarkHeader}>
-          <Text style={styles.bookmarkAyahNum}>آية {item.ayahNumber}</Text>
-          <Text style={styles.bookmarkSurah}>{item.surahName}</Text>
+        {/* رقم السورة */}
+        <View style={[styles.surahNumber, { backgroundColor: colors.primary + '15' }]}>
+          <Text style={[styles.surahNumberText, { color: colors.primary }]}>
+            {toArabicNumber(item.number)}
+          </Text>
         </View>
-        <Text style={styles.bookmarkText} numberOfLines={2}>
-          {item.ayahText}
-        </Text>
+
+        {/* معلومات السورة */}
+        <View style={styles.surahInfo}>
+          <Text style={[styles.surahName, { color: colors.text }]}>
+            {item.name}
+          </Text>
+          <Text style={[styles.surahDetails, { color: colors.textSecondary }]}>
+            {getRevelationType(item.revelationType)} • {toArabicNumber(item.numberOfAyahs)} آية
+          </Text>
+        </View>
+
+        {/* رقم الصفحة */}
+        <View style={styles.pageInfo}>
+          <Text style={[styles.pageNumber, { color: colors.textSecondary }]}>
+            ص {toArabicNumber(SURAH_PAGES[item.number] || 1)}
+          </Text>
+          <Ionicons
+            name="chevron-back"
+            size={20}
+            color={colors.textSecondary}
+          />
+        </View>
       </TouchableOpacity>
-      
-      <View style={styles.bookmarkActions}>
-        <TouchableOpacity
-          style={styles.bookmarkAction}
-          onPress={() => copyToClipboard(item.ayahText)}
-        >
-          <Ionicons name="copy-outline" size={18} color={Colors.secondary} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.bookmarkAction}
-          onPress={() => removeBookmark(item.id)}
-        >
-          <Ionicons name="trash-outline" size={18} color={Colors.error} />
-        </TouchableOpacity>
-      </View>
-    </View>
+    ),
+    [colors, openSurah]
   );
 
-  // ===============================
-  // عرض التحميل
-  // ===============================
-  if (quranLoading) {
+  // عرض عنصر القارئ
+  const renderReciterItem = useCallback(
+    ({ item }: { item: Reciter }) => (
+      <TouchableOpacity
+        style={[
+          styles.reciterItem,
+          { borderBottomColor: colors.border },
+          item.identifier === currentReciter && {
+            backgroundColor: colors.primary + '15',
+          },
+        ]}
+        onPress={() => selectReciter(item.identifier)}
+        activeOpacity={0.7}
+      >
+        <Text
+          style={[
+            styles.reciterName,
+            { color: colors.text },
+            item.identifier === currentReciter && { color: colors.primary },
+          ]}
+        >
+          {item.name}
+        </Text>
+        {item.identifier === currentReciter && (
+          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+        )}
+      </TouchableOpacity>
+    ),
+    [colors, currentReciter, selectReciter]
+  );
+
+  // شاشة التحميل
+  if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>جاري تحميل القرآن الكريم...</Text>
-        <Text style={styles.loadingSubtext}>يتم تحميل 114 سورة</Text>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            جاري تحميل القرآن الكريم...
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  // ===============================
-  // العرض الرئيسي
-  // ===============================
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* الرأس */}
-      <View style={styles.header}>
-        <View style={styles.headerActions}>
+  // شاشة الخطأ
+  if (error) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <View style={styles.errorContainer}>
+          <Ionicons name="cloud-offline" size={64} color={colors.error} />
+          <Text style={[styles.errorText, { color: colors.error }]}>
+            {error}
+          </Text>
           <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => setShowReciterModal(true)}
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.replace('/quran')}
           >
-            <Ionicons name="mic" size={22} color={Colors.primary} />
+            <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
           </TouchableOpacity>
         </View>
-        
-        <Text style={styles.headerTitle}>القرآن الكريم</Text>
-      </View>
+      </SafeAreaView>
+    );
+  }
 
-      {/* آية اليوم */}
-      {verseOfDay && activeTab === 'surah' && (
+  return (
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={['top']}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          القرآن الكريم
+        </Text>
         <TouchableOpacity
-          style={styles.verseOfDayCard}
-          onPress={() => router.push(`/ayah-of-day?surah=${verseOfDay.surahNumber}&ayah=${verseOfDay.ayahNumber}`)}
-          activeOpacity={0.8}
+          style={[styles.settingsButton, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/settings')}
         >
-          <View style={styles.verseOfDayHeader}>
-            <View style={styles.verseOfDayBadge}>
-              <Text style={styles.verseOfDayBadgeText}>آية اليوم</Text>
-              <Ionicons name="sunny" size={16} color={Colors.gold} />
-            </View>
-          </View>
-          
-          <Text style={styles.verseOfDayText} numberOfLines={2}>
-            ﴿ {verseOfDay.text} ﴾
-          </Text>
-          
-          <Text style={styles.verseOfDayRef}>
-            {verseOfDay.surah} - آية {verseOfDay.ayahNumber}
-          </Text>
+          <Ionicons name="settings-outline" size={22} color={colors.text} />
         </TouchableOpacity>
-      )}
-
-      {/* استكمال التلاوة */}
-      {lastRead && activeTab === 'surah' && (
-        <TouchableOpacity
-          style={styles.lastReadCard}
-          onPress={() => router.push(`/surah/${lastRead.surahNumber}?ayah=${lastRead.ayahNumber}`)}
-        >
-          <Ionicons name="chevron-back" size={20} color={Colors.textLight} />
-          
-          <View style={styles.lastReadInfo}>
-            <Text style={styles.lastReadSurah}>
-              {lastRead.surahName} - آية {lastRead.ayahNumber}
-            </Text>
-            <Text style={styles.lastReadLabel}>متابعة القراءة</Text>
-          </View>
-          
-          <View style={styles.lastReadIcon}>
-            <Ionicons name="bookmark" size={24} color={Colors.primary} />
-          </View>
-        </TouchableOpacity>
-      )}
-
-      {/* زر استكمال التلاوة */}
-      {playbackState.currentSurah > 0 && activeTab === 'surah' && (
-        <TouchableOpacity
-          style={styles.resumeCard}
-          onPress={handleResumePlayback}
-        >
-          <View style={styles.resumeInfo}>
-            <Ionicons name="play-circle" size={24} color={Colors.primary} />
-            <Text style={styles.resumeText}>استكمال التلاوة</Text>
-          </View>
-          <Text style={styles.resumeDetails}>
-            {surahs.find(s => s.number === playbackState.currentSurah)?.name} - آية {playbackState.currentAyah}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* القارئ المختار */}
-      <TouchableOpacity
-        style={styles.reciterCard}
-        onPress={() => setShowReciterModal(true)}
-      >
-        <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
-        <Text style={styles.reciterName}>{selectedReciter.name}</Text>
-        <Ionicons name="mic" size={20} color={Colors.secondary} />
-      </TouchableOpacity>
-
-      {/* شريط البحث */}
-      <View style={styles.searchBar}>
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color={Colors.textLight} />
-          </TouchableOpacity>
-        )}
-        <TextInput
-          style={styles.searchInput}
-          placeholder="ابحث عن سورة..."
-          placeholderTextColor={Colors.textLight}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <Ionicons name="search" size={20} color={Colors.textLight} />
       </View>
 
       {/* التبويبات */}
-      <View style={styles.tabBar}>
+      <View style={styles.tabsContainer}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'bookmarks' && styles.tabActive]}
-          onPress={() => setActiveTab('bookmarks')}
+          style={[
+            styles.tab,
+            activeTab === 'read' && {
+              backgroundColor: colors.primary,
+            },
+          ]}
+          onPress={() => setActiveTab('read')}
         >
-          {bookmarks.length > 0 && (
-            <View style={styles.badgeCount}>
-              <Text style={styles.badgeCountText}>{bookmarks.length}</Text>
-            </View>
-          )}
-          <Text style={[styles.tabText, activeTab === 'bookmarks' && styles.tabTextActive]}>
-            المحفوظات
-          </Text>
-          <Ionicons 
-            name="bookmarks" 
-            size={18} 
-            color={activeTab === 'bookmarks' ? Colors.primary : Colors.textLight} 
+          <Ionicons
+            name="book-outline"
+            size={20}
+            color={activeTab === 'read' ? '#FFFFFF' : colors.textSecondary}
           />
+          <Text
+            style={[
+              styles.tabText,
+              {
+                color: activeTab === 'read' ? '#FFFFFF' : colors.textSecondary,
+              },
+            ]}
+          >
+            قراءة
+          </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'juz' && styles.tabActive]}
-          onPress={() => setActiveTab('juz')}
+          style={[
+            styles.tab,
+            activeTab === 'listen' && {
+              backgroundColor: colors.primary,
+            },
+          ]}
+          onPress={() => setActiveTab('listen')}
         >
-          <Text style={[styles.tabText, activeTab === 'juz' && styles.tabTextActive]}>
-            الأجزاء
-          </Text>
-          <Ionicons 
-            name="layers" 
-            size={18} 
-            color={activeTab === 'juz' ? Colors.primary : Colors.textLight} 
+          <Ionicons
+            name="headset-outline"
+            size={20}
+            color={activeTab === 'listen' ? '#FFFFFF' : colors.textSecondary}
           />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'surah' && styles.tabActive]}
-          onPress={() => setActiveTab('surah')}
-        >
-          <Text style={[styles.tabText, activeTab === 'surah' && styles.tabTextActive]}>
-            السور
+          <Text
+            style={[
+              styles.tabText,
+              {
+                color: activeTab === 'listen' ? '#FFFFFF' : colors.textSecondary,
+              },
+            ]}
+          >
+            استماع
           </Text>
-          <Ionicons 
-            name="book" 
-            size={18} 
-            color={activeTab === 'surah' ? Colors.primary : Colors.textLight} 
-          />
         </TouchableOpacity>
       </View>
 
-      {/* المحتوى */}
-      {activeTab === 'surah' && (
-        <FlatList
-          data={filteredSurahs}
-          renderItem={renderSurahItem}
-          keyExtractor={item => item.number.toString()}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          initialNumToRender={20}
-          maxToRenderPerBatch={10}
-        />
-      )}
-
-      {activeTab === 'juz' && (
-        <ScrollView 
-          style={styles.juzList}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+      {/* اختيار القارئ (في وضع الاستماع) */}
+      {activeTab === 'listen' && (
+        <TouchableOpacity
+          style={[styles.reciterSelector, { backgroundColor: colors.card }]}
+          onPress={() => setShowReciterModal(true)}
         >
-          {Array.from({ length: 30 }, (_, i) => i + 1).map(juzNumber => 
-            renderJuzItem(juzNumber)
-          )}
-        </ScrollView>
+          <View style={styles.reciterSelectorContent}>
+            <Ionicons name="person" size={20} color={colors.primary} />
+            <Text style={[styles.reciterSelectorText, { color: colors.text }]}>
+              {currentReciterName}
+            </Text>
+          </View>
+          <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
       )}
 
-      {activeTab === 'bookmarks' && (
-        <FlatList
-          data={bookmarks}
-          renderItem={renderBookmarkItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="bookmarks-outline" size={64} color={Colors.textLight} />
-              <Text style={styles.emptyText}>لا توجد إشارات مرجعية</Text>
-              <Text style={styles.emptySubtext}>
-                اضغط مطولاً على أي آية لحفظها
-              </Text>
-            </View>
-          }
+      {/* البحث */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+        <Ionicons name="search" size={20} color={colors.textSecondary} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="ابحث عن سورة..."
+          placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          returnKeyType="search"
         />
-      )}
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {/* شريط المشغل */}
+      {/* قائمة السور */}
+      <FlatList
+        data={filteredSurahs}
+        renderItem={renderSurahItem}
+        keyExtractor={(item) => item.number.toString()}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="search" size={48} color={colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              لا توجد نتائج للبحث
+            </Text>
+          </View>
+        }
+      />
+
+      {/* شريط التشغيل */}
       <AudioPlayerBar />
 
-      {/* نافذة اختيار القارئ */}
+      {/* Modal اختيار القارئ */}
       <Modal
         visible={showReciterModal}
-        transparent
         animationType="slide"
+        transparent={true}
         onRequestClose={() => setShowReciterModal(false)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowReciterModal(false)}
-        >
-          <View style={styles.reciterModalContent}>
-            <View style={styles.modalHeader}>
+        <View style={styles.modalOverlay}>
+          <View
+            style={[styles.modalContent, { backgroundColor: colors.background }]}
+          >
+            {/* Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                اختر القارئ
+              </Text>
               <TouchableOpacity onPress={() => setShowReciterModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.textLight} />
+                <Ionicons name="close" size={28} color={colors.text} />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>اختر القارئ</Text>
             </View>
-            
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {RECITERS.map(reciter => (
-                <TouchableOpacity
-                  key={reciter.identifier}
-                  style={[
-                    styles.reciterItem,
-                    selectedReciter.identifier === reciter.identifier && styles.reciterItemActive
-                  ]}
-                  onPress={() => selectReciter(reciter)}
-                >
-                  {selectedReciter.identifier === reciter.identifier && (
-                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                  )}
-                  
-                  <View style={styles.reciterItemRight}>
-                    <Text style={[
-                      styles.reciterItemName,
-                      selectedReciter.identifier === reciter.identifier && styles.reciterItemNameActive
-                    ]}>
-                      {reciter.name}
-                    </Text>
-                    <Ionicons 
-                      name="mic" 
-                      size={24} 
-                      color={selectedReciter.identifier === reciter.identifier ? Colors.primary : Colors.textLight} 
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+
+            {/* قائمة القراء */}
+            <FlatList
+              data={reciters}
+              renderItem={renderReciterItem}
+              keyExtractor={(item) => item.identifier}
+              contentContainerStyle={styles.recitersList}
+              showsVerticalScrollIndicator={false}
+            />
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </SafeAreaView>
   );
 }
 
-// ===============================
-// الأنماط
-// ===============================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
-    gap: 12,
+    gap: Spacing.md,
   },
   loadingText: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.md,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.md,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    color: Colors.text,
   },
-  loadingSubtext: {
-    fontSize: 14,
-    color: Colors.textLight,
-  },
-
-  // الرأس
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: FONT_SIZES['2xl'],
     fontWeight: '700',
-    color: Colors.text,
   },
-  headerActions: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  headerButton: {
+  settingsButton: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // آية اليوم
-  verseOfDayCard: {
-    margin: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: Colors.primary + '10',
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-  },
-  verseOfDayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: Spacing.md,
-  },
-  verseOfDayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    backgroundColor: Colors.gold + '20',
     borderRadius: BorderRadius.full,
-  },
-  verseOfDayBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.gold,
-  },
-  verseOfDayText: {
-    fontSize: 20,
-    color: Colors.text,
-    textAlign: 'center',
-    lineHeight: 36,
-    marginBottom: Spacing.sm,
-  },
-  verseOfDayRef: {
-    fontSize: 12,
-    color: Colors.textLight,
-    textAlign: 'center',
-  },
-
-  // القراءة الأخيرة
-  lastReadCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
-  },
-  lastReadIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primary + '20',
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  lastReadInfo: {
-    flex: 1,
-    marginRight: Spacing.md,
-    alignItems: 'flex-end',
-  },
-  lastReadLabel: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  lastReadSurah: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-
-  // استكمال التلاوة
-  resumeCard: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: Spacing.md,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
-    padding: Spacing.md,
-    backgroundColor: Colors.primary + '10',
+    backgroundColor: 'transparent',
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-  },
-  resumeInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: Spacing.xs,
     gap: Spacing.sm,
-  },
-  resumeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  resumeDetails: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-
-  // القارئ
-  reciterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    padding: Spacing.sm,
-    backgroundColor: Colors.secondary + '10',
-    borderRadius: BorderRadius.lg,
-    gap: Spacing.xs,
-  },
-  reciterName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.secondary,
-  },
-
-  // البحث
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: Spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.text,
-    textAlign: 'right',
-  },
-
-  // التبويبات
-  tabBar: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: 4,
   },
   tab: {
     flex: 1,
@@ -759,188 +478,107 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     gap: Spacing.xs,
   },
-  tabActive: {
-    backgroundColor: Colors.primary + '15',
-  },
   tabText: {
-    fontSize: 13,
+    fontSize: FONT_SIZES.md,
     fontWeight: '600',
-    color: Colors.textLight,
   },
-  tabTextActive: {
-    color: Colors.primary,
-  },
-  badgeCount: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: Colors.primary,
+  reciterSelector: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeCountText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-
-  // قائمة السور
-  listContent: {
+    justifyContent: 'space-between',
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
     paddingHorizontal: Spacing.md,
-    paddingBottom: 150,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  reciterSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  reciterSelectorText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '500',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    textAlign: 'right',
+    paddingVertical: Platform.OS === 'ios' ? Spacing.xs : 0,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: 100,
   },
   surahItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
   },
   surahNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: Spacing.md,
   },
   surahNumberText: {
-    color: '#FFF',
-    fontSize: 14,
+    fontSize: FONT_SIZES.md,
     fontWeight: '700',
   },
   surahInfo: {
     flex: 1,
-    marginRight: Spacing.md,
     alignItems: 'flex-end',
   },
   surahName: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.text,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'normal',
   },
   surahDetails: {
-    fontSize: 12,
-    color: Colors.textLight,
+    fontSize: FONT_SIZES.sm,
+    marginTop: 2,
   },
-  surahRight: {
-    padding: Spacing.xs,
-  },
-
-  // قائمة الأجزاء
-  juzList: {
-    flex: 1,
-  },
-  juzItem: {
+  pageInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    gap: Spacing.xs,
   },
-  juzNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pageNumber: {
+    fontSize: FONT_SIZES.sm,
   },
-  juzNumberText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  juzName: {
+  emptyContainer: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'right',
-    marginRight: Spacing.md,
-  },
-
-  // الإشارات المرجعية
-  bookmarkItem: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
-    overflow: 'hidden',
-  },
-  bookmarkContent: {
-    padding: Spacing.md,
-  },
-  bookmarkHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  bookmarkSurah: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.primary,
-  },
-  bookmarkAyahNum: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  bookmarkText: {
-    fontSize: 16,
-    color: Colors.text,
-    lineHeight: 28,
-    textAlign: 'right',
-  },
-  bookmarkActions: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  bookmarkAction: {
-    flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.sm,
-  },
-
-  // الحالة الفارغة
-  emptyState: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 100,
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.md,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text,
-    marginTop: Spacing.md,
+    fontSize: FONT_SIZES.md,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: Colors.textLight,
-    marginTop: Spacing.xs,
-  },
-
-  // النوافذ المنبثقة
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  reciterModalContent: {
-    backgroundColor: Colors.surface,
+  modalContent: {
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     maxHeight: '70%',
-    paddingBottom: Spacing.xl,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -948,36 +586,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: FONT_SIZES.xl,
     fontWeight: '700',
-    color: Colors.text,
+  },
+  recitersList: {
+    paddingBottom: Spacing.xl,
   },
   reciterItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
-  reciterItemActive: {
-    backgroundColor: Colors.primary + '10',
-  },
-  reciterItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  reciterItemName: {
-    fontSize: 16,
-    color: Colors.text,
-  },
-  reciterItemNameActive: {
-    fontWeight: '700',
-    color: Colors.primary,
+  reciterName: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: '500',
   },
 });

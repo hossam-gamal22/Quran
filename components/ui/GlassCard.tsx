@@ -23,7 +23,7 @@ export function GlassCard({
   noShadow = false,
 }: GlassCardProps) {
   const colors = useColors();
-  const isDark = colors.background === '#000000';
+const isDark = colors.background === '#11151c';
 
   // على الويب نستخدم CSS backdrop-filter
   if (Platform.OS === 'web') {
