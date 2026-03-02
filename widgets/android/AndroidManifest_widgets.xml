@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- widgets/android/AndroidManifest_widgets.xml -->
+<!-- تسجيل الويدجت في AndroidManifest -->
+<!-- يجب دمج هذا المحتوى مع ملف AndroidManifest.xml الرئيسي -->
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+    
+        <!-- ========================================
+             ويدجت مواقيت الصلاة
+             ======================================== -->
+        <receiver
+            android:name=".widgets.NextPrayerWidget"
+            android:exported="true"
+            android:label="@string/widget_prayer_name">
+            
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.roohmuslim.app.ACTION_REFRESH_PRAYER_WIDGET" />
+                <action android:name="com.roohmuslim.app.ACTION_OPEN_APP" />
+            </intent-filter>
+            
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_prayer_info" />
+        </receiver>
+
+        <!-- ========================================
+             ويدجت الأذكار
+             ======================================== -->
+        <receiver
+            android:name=".widgets.AzkarWidget"
+            android:exported="true"
+            android:label="@string/widget_azkar_name">
+            
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.roohmuslim.app.ACTION_REFRESH_AZKAR_WIDGET" />
+                <action android:name="com.roohmuslim.app.ACTION_NEXT_ZIKR" />
+                <action android:name="com.roohmuslim.app.ACTION_OPEN_AZKAR" />
+            </intent-filter>
+            
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_azkar_info" />
+        </receiver>
+
+        <!-- ========================================
+             ويدجت التاريخ الهجري
+             ======================================== -->
+        <receiver
+            android:name=".widgets.HijriDateWidget"
+            android:exported="true"
+            android:label="@string/widget_hijri_name">
+            
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.roohmuslim.app.ACTION_REFRESH_HIJRI_WIDGET" />
+                <action android:name="com.roohmuslim.app.ACTION_OPEN_APP_HIJRI" />
+            </intent-filter>
+            
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_hijri_date_info" />
+        </receiver>
+
+        <!-- ========================================
+             خدمة تحديث الويدجت
+             ======================================== -->
+        <service
+            android:name=".widgets.WidgetUpdateService"
+            android:exported="false">
+            
+            <intent-filter>
+                <action android:name="com.roohmuslim.app.ACTION_UPDATE_ALL_WIDGETS" />
+                <action android:name="com.roohmuslim.app.ACTION_UPDATE_PRAYER_WIDGET" />
+                <action android:name="com.roohmuslim.app.ACTION_UPDATE_AZKAR_WIDGET" />
+                <action android:name="com.roohmuslim.app.ACTION_UPDATE_HIJRI_WIDGET" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>

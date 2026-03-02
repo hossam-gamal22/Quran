@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/values/strings_widgets.xml -->
+<!-- نصوص الويدجت -->
+
+<resources>
+    <!-- أسماء الويدجت -->
+    <string name="widget_prayer_name">مواقيت الصلاة</string>
+    <string name="widget_azkar_name">أذكار المسلم</string>
+    <string name="widget_hijri_name">التاريخ الهجري</string>
+    
+    <!-- وصف الويدجت -->
+    <string name="widget_prayer_description">عرض الصلاة القادمة والوقت المتبقي</string>
+    <string name="widget_azkar_description">عرض ذكر عشوائي يتغير تلقائياً</string>
+    <string name="widget_hijri_description">عرض التاريخ الهجري اليومي</string>
+    
+    <!-- نصوص عامة -->
+    <string name="widget_remaining">متبقي</string>
+    <string name="widget_next_prayer">الصلاة القادمة</string>
+    <string name="widget_times">مرات</string>
+    <string name="widget_repeat">كرر</string>
+    <string name="widget_morning">صباح</string>
+    <string name="widget_evening">مساء</string>
+    <string name="widget_benefit">الفائدة</string>
+    <string name="widget_hijri_calendar">التقويم الهجري</string>
+</resources>
