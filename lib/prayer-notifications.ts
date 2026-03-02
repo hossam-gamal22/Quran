@@ -2,12 +2,27 @@
  * Prayer Notifications Service
  * يدير جدولة إشعارات مواقيت الصلاة الخمس
  */
-
+// lib/prayer-notifications.ts
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { fetchPrayerTimesByCoords, PRAYER_NAMES_AR } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
+// ✅ استورد الـ Types من الملف الجديد
+import { 
+  NotificationSettings, 
+  DEFAULT_NOTIFICATION_SETTINGS,
+  PrayerKey 
+} from './notification-types';
+
+// احذف تعريفات NotificationSettings و DEFAULT_NOTIFICATION_SETTINGS من هنا
+// واستخدم الـ export من notification-types
+
+// ✅ أضف re-export للـ types
+export { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './notification-types';
+
+// ... باقي الملف كما هو
+
 
 // ─── إعداد سلوك الإشعارات ────────────────────────────────────────────────────
 Notifications.setNotificationHandler({

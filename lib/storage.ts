@@ -1,6 +1,9 @@
+// lib/storage.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './prayer-notifications';
+// ✅ تم تغيير الاستيراد من notification-types بدلاً من prayer-notifications
+import { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './notification-types';
 
+// ... باقي الملف كما هو بدون تغيير
 export interface Bookmark {
   id: string;
   surahNumber: number;

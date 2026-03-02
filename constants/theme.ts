@@ -1,102 +1,125 @@
-import { Dimensions } from 'react-native';
+// constants/theme.ts
+import { Dimensions, Platform } from 'react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // ============================================
-// الألوان
+// الألوان - Light Mode
 // ============================================
 
 export const Colors = {
+  // الألوان الأساسية
   primary: '#059669',
   primaryLight: '#10B981',
   primaryDark: '#047857',
+  
   secondary: '#6366F1',
   secondaryLight: '#818CF8',
   secondaryDark: '#4F46E5',
+  
+  // ألوان الخلفية
   background: '#F9FAFB',
   surface: '#FFFFFF',
   surfaceVariant: '#F3F4F6',
+  
+  // ألوان النص
   text: '#111827',
   textSecondary: '#4B5563',
   textLight: '#9CA3AF',
   textOnPrimary: '#FFFFFF',
+  
+  // ألوان الحالة
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
   info: '#3B82F6',
+  
+  // ألوان إضافية
   white: '#FFFFFF',
   black: '#000000',
   border: '#E5E7EB',
   divider: '#F3F4F6',
   overlay: 'rgba(0, 0, 0, 0.5)',
+  
+  // ألوان خاصة
   gold: '#D4AF37',
   quranGreen: '#0D9488',
   prayerBlue: '#0284C7',
 };
 
+// ============================================
+// الألوان - Dark Mode
+// ============================================
+
 export const DarkColors = {
   primary: '#10B981',
   primaryLight: '#34D399',
   primaryDark: '#059669',
+  
   secondary: '#818CF8',
   secondaryLight: '#A5B4FC',
   secondaryDark: '#6366F1',
+  
   background: '#111827',
   surface: '#1F2937',
   surfaceVariant: '#374151',
+  
   text: '#F9FAFB',
   textSecondary: '#D1D5DB',
   textLight: '#9CA3AF',
   textOnPrimary: '#FFFFFF',
+  
   success: '#34D399',
   warning: '#FBBF24',
   error: '#F87171',
   info: '#60A5FA',
+  
   white: '#FFFFFF',
   black: '#000000',
   border: '#374151',
   divider: '#1F2937',
   overlay: 'rgba(0, 0, 0, 0.7)',
+  
   gold: '#FCD34D',
   quranGreen: '#14B8A6',
   prayerBlue: '#38BDF8',
 };
 
 // ============================================
-// SchemeColors للـ theme-lab
+// مخططات الألوان للـ ThemeLab
 // ============================================
 
 export type ColorScheme = 'light' | 'dark';
 
 export const SchemeColors = {
   light: {
-    primary: '#059669',
-    secondary: '#6366F1',
-    background: '#F9FAFB',
-    surface: '#FFFFFF',
-    foreground: '#111827',
-    muted: '#9CA3AF',
-    border: '#E5E7EB',
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
+    primary: Colors.primary,
+    secondary: Colors.secondary,
+    background: Colors.background,
+    surface: Colors.surface,
+    foreground: Colors.text,
+    muted: Colors.textLight,
+    border: Colors.border,
+    success: Colors.success,
+    warning: Colors.warning,
+    error: Colors.error,
   },
   dark: {
-    primary: '#10B981',
-    secondary: '#818CF8',
-    background: '#111827',
-    surface: '#1F2937',
-    foreground: '#F9FAFB',
-    muted: '#9CA3AF',
-    border: '#374151',
-    success: '#34D399',
-    warning: '#FBBF24',
-    error: '#F87171',
+    primary: DarkColors.primary,
+    secondary: DarkColors.secondary,
+    background: DarkColors.background,
+    surface: DarkColors.surface,
+    foreground: DarkColors.text,
+    muted: DarkColors.textLight,
+    border: DarkColors.border,
+    success: DarkColors.success,
+    warning: DarkColors.warning,
+    error: DarkColors.error,
   },
 };
 
 // ============================================
-// المسافات (SPACING)
+// المسافات
 // ============================================
 
 export const Spacing = {
@@ -108,11 +131,11 @@ export const Spacing = {
   xxl: 48,
 };
 
-// Alias for onboarding.tsx
+// Alias للتوافق
 export const SPACING = Spacing;
 
 // ============================================
-// الزوايا المستديرة (BORDER_RADIUS)
+// الزوايا المستديرة
 // ============================================
 
 export const BorderRadius = {
@@ -124,11 +147,11 @@ export const BorderRadius = {
   full: 9999,
 };
 
-// Alias for onboarding.tsx
+// Alias للتوافق
 export const BORDER_RADIUS = BorderRadius;
 
 // ============================================
-// أحجام الخطوط (FONT_SIZES)
+// أحجام الخطوط
 // ============================================
 
 export const FONT_SIZES = {
@@ -144,38 +167,43 @@ export const FONT_SIZES = {
 };
 
 // ============================================
-// الظلال
+// الظلال - متوافقة مع Web و Native
 // ============================================
 
+type ShadowStyle = {
+  shadowColor?: string;
+  shadowOffset?: { width: number; height: number };
+  shadowOpacity?: number;
+  shadowRadius?: number;
+  elevation?: number;
+  boxShadow?: string;
+};
+
+const createShadow = (
+  offsetY: number,
+  opacity: number,
+  radius: number,
+  elevation: number
+): ShadowStyle => {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: `0px ${offsetY}px ${radius}px rgba(0, 0, 0, ${opacity})`,
+    };
+  }
+  return {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: offsetY },
+    shadowOpacity: opacity,
+    shadowRadius: radius,
+    elevation: elevation,
+  };
+};
+
 export const Shadows = {
-  sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  xl: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
+  sm: createShadow(1, 0.05, 2, 1),
+  md: createShadow(2, 0.1, 4, 3),
+  lg: createShadow(4, 0.15, 8, 5),
+  xl: createShadow(8, 0.2, 16, 8),
 };
 
 // ============================================
@@ -239,4 +267,16 @@ export const Animation = {
     damping: 15,
     stiffness: 150,
   },
+};
+
+// ============================================
+// دالة مساعدة للحصول على الألوان حسب الثيم
+// ============================================
+
+export const getColors = (isDark: boolean) => {
+  return isDark ? DarkColors : Colors;
+};
+
+export const getSchemeColors = (scheme: ColorScheme) => {
+  return SchemeColors[scheme];
 };
