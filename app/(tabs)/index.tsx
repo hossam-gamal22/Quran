@@ -22,10 +22,6 @@ import { useAppConfig } from '../../lib/app-config-context';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ============================================
-// أيقونات الميزات
-// ============================================
-
 interface Feature {
   id: string;
   title: string;
@@ -45,10 +41,6 @@ const FEATURES: Feature[] = [
   { id: 'hijri', title: 'التقويم', icon: 'calendar', color: '#F59E0B', route: '/hijri' },
 ];
 
-// ============================================
-// آيات مختارة
-// ============================================
-
 const DAILY_VERSES = [
   { text: 'إِنَّ مَعَ الْعُسْرِ يُسْرًا', surah: 'الشرح', ayah: 6 },
   { text: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', surah: 'الطلاق', ayah: 3 },
@@ -62,10 +54,6 @@ const DAILY_VERSES = [
   { text: 'وَعَسَىٰ أَن تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَّكُمْ', surah: 'البقرة', ayah: 216 },
 ];
 
-// ============================================
-// أذكار مختارة
-// ============================================
-
 const DAILY_AZKAR = [
   { text: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ', source: 'متفق عليه' },
   { text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللهِ', source: 'متفق عليه' },
@@ -77,50 +65,30 @@ const DAILY_AZKAR = [
   { text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ', source: 'رواه الترمذي' },
 ];
 
-// ============================================
-// المكون الرئيسي
-// ============================================
-
 export default function HomeScreen() {
   const router = useRouter();
-  
-  // جلب إعدادات التطبيق من Firebase
   const { config: appConfig, isLoading: configLoading, refresh: refreshConfig } = useAppConfig();
   
-  // جلب إعدادات الإعلانات
-  
-  // الحالات
   const [darkMode, setDarkMode] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [greeting, setGreeting] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  
-  // مواقيت الصلاة
   const [prayerTimes, setPrayerTimes] = useState<any>(null);
   const [nextPrayer, setNextPrayer] = useState<any>(null);
   const [hijriDate, setHijriDate] = useState<any>(null);
   const [location, setLocation] = useState<string>('');
-  
-  // آية وذكر اليوم
   const [dailyVerse, setDailyVerse] = useState<{ text: string; surah: string; ayah: number } | null>(null);
   const [dailyZikr, setDailyZikr] = useState<{ text: string; source: string } | null>(null);
   
-  // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   const currentColors = darkMode ? DarkColors : Colors;
 
-  // تسجيل مشاهدة الصفحة للإعلانات
-  useEffect(() => {
-    onPageView();
-  }, []);
-
   useEffect(() => {
     initializeApp();
   }, []);
 
-  // تحديث الصلاة التالية كل دقيقة
   useEffect(() => {
     const timer = setInterval(() => {
       if (prayerTimes) {
@@ -222,10 +190,7 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [refreshConfig]);
 
-  // المشاركة
-  const getShareSignature = () => {
-    return `\n\n📱 تطبيق ${appConfig.name}`;
-  };
+  const getShareSignature = () => `\n\n📱 تطبيق ${appConfig.name}`;
 
   const getShareWithDownload = () => {
     let signature = `\n\n📱 تطبيق ${appConfig.name}`;
@@ -237,9 +202,7 @@ export default function HomeScreen() {
 
   const shareApp = async () => {
     try {
-      await Share.share({
-        message: `${appConfig.description}${getShareWithDownload()}`,
-      });
+      await Share.share({ message: `${appConfig.description}${getShareWithDownload()}` });
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -267,7 +230,6 @@ export default function HomeScreen() {
     }
   };
 
-  // فلترة الميزات حسب الإعدادات
   const getEnabledFeatures = () => {
     if (!appConfig.features) return FEATURES;
     return FEATURES.filter(feature => {
@@ -276,51 +238,35 @@ export default function HomeScreen() {
     });
   };
 
-  // شاشة التحميل
   if (isLoading || configLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: currentColors.background }]}>
         <ActivityIndicator size="large" color={currentColors.primary} />
-        <Text style={[styles.loadingText, { color: currentColors.textLight }]}>
-          جاري التحميل...
-        </Text>
+        <Text style={[styles.loadingText, { color: currentColors.textLight }]}>جاري التحميل...</Text>
       </View>
     );
   }
 
-  // شاشة الصيانة
   if (appConfig.maintenanceMode) {
     return (
       <View style={[styles.maintenanceContainer, { backgroundColor: currentColors.background }]}>
         <Ionicons name="construct" size={80} color={currentColors.primary} />
-        <Text style={[styles.maintenanceTitle, { color: currentColors.text }]}>
-          التطبيق تحت الصيانة
-        </Text>
-        <Text style={[styles.maintenanceText, { color: currentColors.textLight }]}>
-          نعمل على تحسين التطبيق، يرجى المحاولة لاحقاً
-        </Text>
-        <TouchableOpacity 
-          style={[styles.retryButton, { backgroundColor: currentColors.primary }]}
-          onPress={onRefresh}
-        >
+        <Text style={[styles.maintenanceTitle, { color: currentColors.text }]}>التطبيق تحت الصيانة</Text>
+        <Text style={[styles.maintenanceText, { color: currentColors.textLight }]}>نعمل على تحسين التطبيق، يرجى المحاولة لاحقاً</Text>
+        <TouchableOpacity style={[styles.retryButton, { backgroundColor: currentColors.primary }]} onPress={onRefresh}>
           <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  // العرض الرئيسي
   return (
     <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-      {/* الهيدر */}
       <View style={[styles.header, { backgroundColor: currentColors.surface }]}>
         <View style={styles.headerLeft}>
           <Text style={[styles.greeting, { color: currentColors.textLight }]}>{greeting}</Text>
-          <Text style={[styles.appName, { color: currentColors.primary }]}>
-            {appConfig.name}
-          </Text>
+          <Text style={[styles.appName, { color: currentColors.primary }]}>{appConfig.name}</Text>
         </View>
-        
         <TouchableOpacity onPress={shareApp} style={styles.shareButton}>
           <Ionicons name="share-social-outline" size={24} color={currentColors.text} />
         </TouchableOpacity>
@@ -330,17 +276,11 @@ export default function HomeScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh}
-            colors={[currentColors.primary]}
-            tintColor={currentColors.primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentColors.primary]} tintColor={currentColors.primary} />
         }
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
           
-          {/* بطاقة الصلاة التالية */}
           {nextPrayer && (
             <TouchableOpacity 
               style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
@@ -350,29 +290,16 @@ export default function HomeScreen() {
               <View style={styles.nextPrayerHeader}>
                 <View>
                   <Text style={styles.nextPrayerLabel}>الصلاة القادمة</Text>
-                  <Text style={styles.nextPrayerName}>
-                    {PRAYER_NAMES[nextPrayer.name]?.ar || nextPrayer.name}
-                  </Text>
+                  <Text style={styles.nextPrayerName}>{PRAYER_NAMES[nextPrayer.name]?.ar || nextPrayer.name}</Text>
                 </View>
                 <View style={styles.nextPrayerTimeContainer}>
-                  <Text style={styles.nextPrayerTime}>
-                    {formatTime(nextPrayer.time)}
-                  </Text>
-                  {nextPrayer.remaining && (
-                    <Text style={styles.nextPrayerRemaining}>
-                      {nextPrayer.remaining}
-                    </Text>
-                  )}
+                  <Text style={styles.nextPrayerTime}>{formatTime(nextPrayer.time)}</Text>
+                  {nextPrayer.remaining && <Text style={styles.nextPrayerRemaining}>{nextPrayer.remaining}</Text>}
                 </View>
               </View>
-              
               {(hijriDate || location) && (
                 <View style={styles.hijriContainer}>
-                  {hijriDate && (
-                    <Text style={styles.hijriText}>
-                      {hijriDate.day} {hijriDate.month?.ar} {hijriDate.year}هـ
-                    </Text>
-                  )}
+                  {hijriDate && <Text style={styles.hijriText}>{hijriDate.day} {hijriDate.month?.ar} {hijriDate.year}هـ</Text>}
                   {location && (
                     <View style={styles.locationContainer}>
                       <Ionicons name="location" size={14} color="rgba(255,255,255,0.8)" />
@@ -384,7 +311,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* بطاقة بديلة */}
           {!nextPrayer && (
             <TouchableOpacity 
               style={[styles.nextPrayerCard, { backgroundColor: appConfig.primaryColor || currentColors.primary }]}
@@ -399,7 +325,6 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
 
-          {/* آية اليوم */}
           {dailyVerse && (
             <TouchableOpacity 
               style={[styles.verseCard, { backgroundColor: currentColors.surface }]}
@@ -414,16 +339,11 @@ export default function HomeScreen() {
                   <Ionicons name="share-outline" size={18} color={currentColors.textLight} />
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.verseText, { color: currentColors.text }]}>
-                ﴿ {dailyVerse.text} ﴾
-              </Text>
-              <Text style={[styles.verseRef, { color: currentColors.textLight }]}>
-                {dailyVerse.surah} - آية {dailyVerse.ayah}
-              </Text>
+              <Text style={[styles.verseText, { color: currentColors.text }]}>﴿ {dailyVerse.text} ﴾</Text>
+              <Text style={[styles.verseRef, { color: currentColors.textLight }]}>{dailyVerse.surah} - آية {dailyVerse.ayah}</Text>
             </TouchableOpacity>
           )}
 
-          {/* ذكر اليوم */}
           {dailyZikr && (
             <TouchableOpacity 
               style={[styles.zikrCard, { backgroundColor: currentColors.surface }]}
@@ -438,16 +358,11 @@ export default function HomeScreen() {
                   <Ionicons name="share-outline" size={18} color={currentColors.textLight} />
                 </TouchableOpacity>
               </View>
-              <Text style={[styles.zikrText, { color: currentColors.text }]}>
-                {dailyZikr.text}
-              </Text>
-              <Text style={[styles.zikrSource, { color: currentColors.textLight }]}>
-                {dailyZikr.source}
-              </Text>
+              <Text style={[styles.zikrText, { color: currentColors.text }]}>{dailyZikr.text}</Text>
+              <Text style={[styles.zikrSource, { color: currentColors.textLight }]}>{dailyZikr.source}</Text>
             </TouchableOpacity>
           )}
 
-          {/* الميزات */}
           <Text style={[styles.sectionTitle, { color: currentColors.text }]}>الميزات</Text>
           <View style={styles.featuresGrid}>
             {getEnabledFeatures().map((feature) => (
@@ -460,356 +375,99 @@ export default function HomeScreen() {
                 <View style={[styles.featureIcon, { backgroundColor: feature.color + '15' }]}>
                   <Ionicons name={feature.icon as any} size={28} color={feature.color} />
                 </View>
-                <Text style={[styles.featureTitle, { color: currentColors.text }]}>
-                  {feature.title}
-                </Text>
+                <Text style={[styles.featureTitle, { color: currentColors.text }]}>{feature.title}</Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          {/* الأذكار السريعة */}
           <Text style={[styles.sectionTitle, { color: currentColors.text }]}>الأذكار</Text>
           <View style={styles.azkarQuick}>
-            <TouchableOpacity 
-              style={[styles.azkarQuickItem, { backgroundColor: '#F59E0B' + '15' }]}
-              onPress={() => router.push('/azkar/morning')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#F59E0B15' }]} onPress={() => router.push('/azkar/morning')} activeOpacity={0.7}>
               <Ionicons name="sunny" size={24} color="#F59E0B" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>
-                أذكار الصباح
-              </Text>
+              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار الصباح</Text>
               <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.azkarQuickItem, { backgroundColor: '#6366F1' + '15' }]}
-              onPress={() => router.push('/azkar/evening')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#6366F115' }]} onPress={() => router.push('/azkar/evening')} activeOpacity={0.7}>
               <Ionicons name="moon" size={24} color="#6366F1" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>
-                أذكار المساء
-              </Text>
+              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار المساء</Text>
               <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.azkarQuickItem, { backgroundColor: '#10B981' + '15' }]}
-              onPress={() => router.push('/azkar/after-prayer')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#10B98115' }]} onPress={() => router.push('/azkar/after-prayer')} activeOpacity={0.7}>
               <Ionicons name="checkmark-done" size={24} color="#10B981" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>
-                أذكار بعد الصلاة
-              </Text>
+              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار بعد الصلاة</Text>
               <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.azkarQuickItem, { backgroundColor: '#8B5CF6' + '15' }]}
-              onPress={() => router.push('/azkar/sleep')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity style={[styles.azkarQuickItem, { backgroundColor: '#8B5CF615' }]} onPress={() => router.push('/azkar/sleep')} activeOpacity={0.7}>
               <Ionicons name="bed" size={24} color="#8B5CF6" />
-              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>
-                أذكار النوم
-              </Text>
+              <Text style={[styles.azkarQuickText, { color: currentColors.text }]}>أذكار النوم</Text>
               <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
             </TouchableOpacity>
           </View>
 
-          {/* معلومات التطبيق */}
           <View style={[styles.appInfoCard, { backgroundColor: currentColors.surface }]}>
-            <Text style={[styles.appInfoName, { color: appConfig.primaryColor || currentColors.primary }]}>
-              {appConfig.name}
-            </Text>
-            <Text style={[styles.appInfoVersion, { color: currentColors.textLight }]}>
-              الإصدار {appConfig.version}
-            </Text>
+            <Text style={[styles.appInfoName, { color: appConfig.primaryColor || currentColors.primary }]}>{appConfig.name}</Text>
+            <Text style={[styles.appInfoVersion, { color: currentColors.textLight }]}>الإصدار {appConfig.version}</Text>
           </View>
 
-          <View style={{ height: 120 }} />
+          <View style={{ height: 100 }} />
         </Animated.View>
       </ScrollView>
-
-      {/* البانر في الأسفل */}
-      
-      </View>
     </View>
   );
 }
 
-// ============================================
-// الأنماط
-// ============================================
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: Spacing.md,
-    fontSize: Typography.sizes.md,
-  },
-  maintenanceContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  maintenanceTitle: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-    marginTop: Spacing.lg,
-    textAlign: 'center',
-  },
-  maintenanceText: {
-    fontSize: Typography.sizes.md,
-    marginTop: Spacing.sm,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.md,
-    ...Shadows.sm,
-  },
+  container: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: Spacing.md, fontSize: Typography.sizes.md },
+  maintenanceContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+  maintenanceTitle: { fontSize: Typography.sizes.xxl, fontWeight: '700', marginTop: Spacing.lg, textAlign: 'center' },
+  maintenanceText: { fontSize: Typography.sizes.md, marginTop: Spacing.sm, textAlign: 'center' },
+  retryButton: { marginTop: Spacing.xl, paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: BorderRadius.lg },
+  retryButtonText: { color: '#fff', fontSize: Typography.sizes.md, fontWeight: '600' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingTop: Spacing.xl + 20, paddingBottom: Spacing.md, ...Shadows.sm },
   headerLeft: {},
-  greeting: {
-    fontSize: Typography.sizes.sm,
-  },
-  appName: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-  },
-  shareButton: {
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.full,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: Spacing.md,
-  },
-  nextPrayerCard: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    marginTop: Spacing.md,
-    ...Shadows.lg,
-  },
-  nextPrayerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  nextPrayerLabel: {
-    fontSize: Typography.sizes.sm,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  nextPrayerName: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-    color: '#fff',
-    marginTop: 4,
-  },
-  nextPrayerTimeContainer: {
-    alignItems: 'flex-end',
-  },
-  nextPrayerTime: {
-    fontSize: Typography.sizes.xxl,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  nextPrayerRemaining: {
-    fontSize: Typography.sizes.sm,
-    color: '#fff',
-    opacity: 0.9,
-    marginTop: 4,
-  },
-  hijriContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
-  },
-  hijriText: {
-    fontSize: Typography.sizes.md,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  locationText: {
-    fontSize: Typography.sizes.sm,
-    color: '#fff',
-    opacity: 0.8,
-  },
-  noPrayerContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-  },
-  noPrayerText: {
-    fontSize: Typography.sizes.lg,
-    color: '#fff',
-    fontWeight: '600',
-    marginTop: Spacing.sm,
-  },
-  noPrayerSubtext: {
-    fontSize: Typography.sizes.sm,
-    color: '#fff',
-    opacity: 0.8,
-    marginTop: 4,
-  },
-  verseCard: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginTop: Spacing.md,
-    borderRightWidth: 4,
-    borderRightColor: Colors.quranGreen,
-    ...Shadows.sm,
-  },
-  verseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  verseLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    flex: 1,
-  },
-  shareIconButton: {
-    padding: 4,
-  },
-  verseText: {
-    fontSize: Typography.sizes.xl,
-    textAlign: 'center',
-    lineHeight: 36,
-    marginVertical: Spacing.md,
-  },
-  verseRef: {
-    fontSize: Typography.sizes.sm,
-    textAlign: 'center',
-  },
-  zikrCard: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginTop: Spacing.md,
-    borderRightWidth: 4,
-    borderRightColor: Colors.success,
-    ...Shadows.sm,
-  },
-  zikrHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  zikrLabel: {
-    fontSize: Typography.sizes.sm,
-    fontWeight: '600',
-    flex: 1,
-  },
-  zikrText: {
-    fontSize: Typography.sizes.lg,
-    textAlign: 'center',
-    lineHeight: 30,
-    marginVertical: Spacing.sm,
-  },
-  zikrSource: {
-    fontSize: Typography.sizes.xs,
-    textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '600',
-    marginTop: Spacing.xl,
-    marginBottom: Spacing.md,
-    textAlign: 'right',
-  },
-  featuresGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  featureItem: {
-    width: (SCREEN_WIDTH - Spacing.md * 2 - Spacing.sm * 3) / 4,
-    alignItems: 'center',
-    padding: Spacing.sm,
-  },
-  featureIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.xs,
-  },
-  featureTitle: {
-    fontSize: Typography.sizes.xs,
-    textAlign: 'center',
-  },
-  azkarQuick: {
-    gap: Spacing.sm,
-  },
-  azkarQuickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.md,
-  },
-  azkarQuickText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-  },
-  appInfoCard: {
-    alignItems: 'center',
-    padding: Spacing.lg,
-    marginTop: Spacing.xl,
-    borderRadius: BorderRadius.lg,
-  },
-  appInfoName: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '700',
-  },
-  appInfoVersion: {
-    fontSize: Typography.sizes.xs,
-    marginTop: 4,
-  },
-  bannerContainer: {
-    position: 'absolute',
-    bottom: 80,
-    left: 0,
-    right: 0,
-  },
+  greeting: { fontSize: Typography.sizes.sm },
+  appName: { fontSize: Typography.sizes.xxl, fontWeight: '700' },
+  shareButton: { padding: Spacing.sm, borderRadius: BorderRadius.full },
+  content: { flex: 1, paddingHorizontal: Spacing.md },
+  nextPrayerCard: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginTop: Spacing.md, ...Shadows.lg },
+  nextPrayerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  nextPrayerLabel: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.9 },
+  nextPrayerName: { fontSize: Typography.sizes.xxl, fontWeight: '700', color: '#fff', marginTop: 4 },
+  nextPrayerTimeContainer: { alignItems: 'flex-end' },
+  nextPrayerTime: { fontSize: Typography.sizes.xxl, fontWeight: '700', color: '#fff' },
+  nextPrayerRemaining: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.9, marginTop: 4 },
+  hijriContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
+  hijriText: { fontSize: Typography.sizes.md, color: '#fff', opacity: 0.9 },
+  locationContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locationText: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.8 },
+  noPrayerContainer: { alignItems: 'center', paddingVertical: Spacing.md },
+  noPrayerText: { fontSize: Typography.sizes.lg, color: '#fff', fontWeight: '600', marginTop: Spacing.sm },
+  noPrayerSubtext: { fontSize: Typography.sizes.sm, color: '#fff', opacity: 0.8, marginTop: 4 },
+  verseCard: { borderRadius: BorderRadius.lg, padding: Spacing.lg, marginTop: Spacing.md, borderRightWidth: 4, borderRightColor: Colors.quranGreen, ...Shadows.sm },
+  verseHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  verseLabel: { fontSize: Typography.sizes.sm, fontWeight: '600', flex: 1 },
+  shareIconButton: { padding: 4 },
+  verseText: { fontSize: Typography.sizes.xl, textAlign: 'center', lineHeight: 36, marginVertical: Spacing.md },
+  verseRef: { fontSize: Typography.sizes.sm, textAlign: 'center' },
+  zikrCard: { borderRadius: BorderRadius.lg, padding: Spacing.lg, marginTop: Spacing.md, borderRightWidth: 4, borderRightColor: Colors.success, ...Shadows.sm },
+  zikrHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  zikrLabel: { fontSize: Typography.sizes.sm, fontWeight: '600', flex: 1 },
+  zikrText: { fontSize: Typography.sizes.lg, textAlign: 'center', lineHeight: 30, marginVertical: Spacing.sm },
+  zikrSource: { fontSize: Typography.sizes.xs, textAlign: 'center' },
+  sectionTitle: { fontSize: Typography.sizes.lg, fontWeight: '600', marginTop: Spacing.xl, marginBottom: Spacing.md, textAlign: 'right' },
+  featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  featureItem: { width: (SCREEN_WIDTH - Spacing.md * 2 - Spacing.sm * 3) / 4, alignItems: 'center', padding: Spacing.sm },
+  featureIcon: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.xs },
+  featureTitle: { fontSize: Typography.sizes.xs, textAlign: 'center' },
+  azkarQuick: { gap: Spacing.sm },
+  azkarQuickItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderRadius: BorderRadius.md, gap: Spacing.md },
+  azkarQuickText: { fontSize: Typography.sizes.md, fontWeight: '500', flex: 1, textAlign: 'right' },
+  appInfoCard: { alignItems: 'center', padding: Spacing.lg, marginTop: Spacing.xl, borderRadius: BorderRadius.lg },
+  appInfoName: { fontSize: Typography.sizes.lg, fontWeight: '700' },
+  appInfoVersion: { fontSize: Typography.sizes.xs, marginTop: 4 },
 });

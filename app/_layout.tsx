@@ -5,10 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import mobileAds from 'react-native-google-mobile-ads';
 import { Colors } from '../constants/theme';
 import { AppConfigProvider } from '../lib/app-config-context';
-import { AdsProvider } from '../lib/ads-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -19,11 +17,6 @@ function RootLayoutContent() {
   useEffect(() => {
     async function prepare() {
       try {
-        // تهيئة الإعلانات
-        await mobileAds().initialize();
-        console.log('✅ Mobile Ads initialized');
-
-        // تحميل الإعدادات
         const settings = await AsyncStorage.getItem('app_settings');
         if (settings) {
           const parsed = JSON.parse(settings);
@@ -80,9 +73,7 @@ function RootLayoutContent() {
 export default function RootLayout() {
   return (
     <AppConfigProvider>
-      <AdsProvider>
-        <RootLayoutContent />
-      </AdsProvider>
+      <RootLayoutContent />
     </AppConfigProvider>
   );
 }
