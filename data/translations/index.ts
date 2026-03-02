@@ -1,8 +1,14 @@
 // data/translations/index.ts
-// نظام الترجمات المركزي لتطبيق روح المسلم
+// نظام الترجمات المركزي - روح المسلم
 
+// ========================================
+// أنواع اللغات المدعومة
+// ========================================
 export type SupportedLanguage = 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
 
+// ========================================
+// واجهة الترجمة
+// ========================================
 export interface TranslationEntry {
   ar: string;
   en: string;
@@ -22,86 +28,179 @@ export type TranslationKeys = {
   [key: string]: TranslationEntry;
 };
 
-// استيراد كل ملفات الترجمات
+// ========================================
+// استيراد ملفات الترجمات
+// ========================================
 import { azkarTranslations } from './azkar';
-import { duasTranslations } from './duas';
-import { ruqyaTranslations } from './ruqya';
 import { categoriesTranslations } from './categories';
 import { benefitsTranslations } from './benefits';
+import { duasTranslations } from './duas';
+import { ruqyaTranslations } from './ruqya';
+import { uiTranslations } from './ui';
 
-// دمج كل الترجمات في كائن واحد
+// ========================================
+// دمج جميع الترجمات
+// ========================================
 export const translations: TranslationKeys = {
   ...azkarTranslations,
-  ...duasTranslations,
-  ...ruqyaTranslations,
   ...categoriesTranslations,
   ...benefitsTranslations,
+  ...duasTranslations,
+  ...ruqyaTranslations,
+  ...uiTranslations,
 };
 
 // ========================================
-// الدوال الرئيسية
+// قائمة اللغات المدعومة مع أسمائها
 // ========================================
+export const languageNames: Record<SupportedLanguage, string> = {
+  ar: 'العربية',
+  en: 'English',
+  ur: 'اردو',
+  id: 'Bahasa Indonesia',
+  tr: 'Türkçe',
+  fr: 'Français',
+  de: 'Deutsch',
+  hi: 'हिन्दी',
+  bn: 'বাংলা',
+  ms: 'Bahasa Melayu',
+  ru: 'Русский',
+  es: 'Español',
+};
 
-/**
- * الحصول على ترجمة نص معين
- * @param key - مفتاح الترجمة (مثال: "azkar.morning.1")
- * @param lang - اللغة المطلوبة
- * @returns النص المترجم أو المفتاح إذا لم يوجد
- */
-export const t = (key: string, lang: SupportedLanguage = 'ar'): string => {
+// ========================================
+// قائمة اللغات مع الأيقونات
+// ========================================
+export const languageFlags: Record<SupportedLanguage, string> = {
+  ar: '🇸🇦',
+  en: '🇬🇧',
+  ur: '🇵🇰',
+  id: '🇮🇩',
+  tr: '🇹🇷',
+  fr: '🇫🇷',
+  de: '🇩🇪',
+  hi: '🇮🇳',
+  bn: '🇧🇩',
+  ms: '🇲🇾',
+  ru: '🇷🇺',
+  es: '🇪🇸',
+};
+
+// ========================================
+// دالة الترجمة الرئيسية
+// ========================================
+export function t(key: string, lang: SupportedLanguage = 'ar'): string {
   const entry = translations[key];
+  
   if (!entry) {
-    console.warn(`Translation key not found: ${key}`);
+    console.warn(`[Translation] Missing key: ${key}`);
     return key;
   }
-  return entry[lang] || entry['ar'] || key;
-};
+  
+  const translation = entry[lang];
+  
+  if (!translation) {
+    // fallback للعربية
+    return entry.ar || key;
+  }
+  
+  return translation;
+}
 
-/**
- * الحصول على كل الترجمات لمفتاح معين
- * @param key - مفتاح الترجمة
- * @returns كائن يحتوي على كل الترجمات
- */
-export const getAllTranslations = (key: string): TranslationEntry | null => {
+// ========================================
+// دالة للحصول على جميع ترجمات مفتاح معين
+// ========================================
+export function getAllTranslations(key: string): TranslationEntry | null {
   return translations[key] || null;
-};
+}
 
-/**
- * التحقق من وجود مفتاح ترجمة
- * @param key - مفتاح الترجمة
- * @returns true إذا كان المفتاح موجوداً
- */
-export const hasTranslation = (key: string): boolean => {
+// ========================================
+// دالة للتحقق من وجود ترجمة
+// ========================================
+export function hasTranslation(key: string): boolean {
   return key in translations;
-};
+}
 
-/**
- * الحصول على قائمة اللغات المدعومة
- * @returns مصفوفة بأكواد اللغات
- */
-export const getSupportedLanguages = (): SupportedLanguage[] => {
+// ========================================
+// دالة للحصول على قائمة اللغات
+// ========================================
+export function getSupportedLanguages(): SupportedLanguage[] {
   return ['ar', 'en', 'ur', 'id', 'tr', 'fr', 'de', 'hi', 'bn', 'ms', 'ru', 'es'];
-};
+}
 
-/**
- * الحصول على اسم اللغة
- * @param code - كود اللغة
- * @returns اسم اللغة بالعربية
- */
-export const getLanguageName = (code: SupportedLanguage): string => {
-  const names: Record<SupportedLanguage, string> = {
-    ar: 'العربية',
-    en: 'English',
-    ur: 'اردو',
-    id: 'Bahasa Indonesia',
-    tr: 'Türkçe',
-    fr: 'Français',
-    de: 'Deutsch',
-    hi: 'हिन्दी',
-    bn: 'বাংলা',
-    ms: 'Bahasa Melayu',
-    ru: 'Русский',
-    es: 'Español',
+// ========================================
+// دالة للحصول على اسم اللغة
+// ========================================
+export function getLanguageName(code: SupportedLanguage): string {
+  return languageNames[code] || code;
+}
+
+// ========================================
+// دالة للحصول على علم اللغة
+// ========================================
+export function getLanguageFlag(code: SupportedLanguage): string {
+  return languageFlags[code] || '🏳️';
+}
+
+// ========================================
+// دالة للحصول على اللغة مع العلم والاسم
+// ========================================
+export function getLanguageInfo(code: SupportedLanguage): { code: SupportedLanguage; name: string; flag: string } {
+  return {
+    code,
+    name: languageNames[code] || code,
+    flag: languageFlags[code] || '🏳️',
   };
-  return names[code] || code;
-};
+}
+
+// ========================================
+// دالة للحصول على جميع اللغات مع معلوماتها
+// ========================================
+export function getAllLanguagesInfo(): Array<{ code: SupportedLanguage; name: string; flag: string }> {
+  return getSupportedLanguages().map(code => getLanguageInfo(code));
+}
+
+// ========================================
+// دالة للتحقق من اتجاه اللغة (RTL/LTR)
+// ========================================
+export function isRTL(lang: SupportedLanguage): boolean {
+  const rtlLanguages: SupportedLanguage[] = ['ar', 'ur'];
+  return rtlLanguages.includes(lang);
+}
+
+// ========================================
+// دالة للحصول على اتجاه اللغة
+// ========================================
+export function getTextDirection(lang: SupportedLanguage): 'rtl' | 'ltr' {
+  return isRTL(lang) ? 'rtl' : 'ltr';
+}
+
+// ========================================
+// دالة للحصول على محاذاة النص
+// ========================================
+export function getTextAlign(lang: SupportedLanguage): 'right' | 'left' {
+  return isRTL(lang) ? 'right' : 'left';
+}
+
+// ========================================
+// Hook للاستخدام في React
+// ========================================
+export function createTranslator(lang: SupportedLanguage) {
+  return {
+    t: (key: string) => t(key, lang),
+    lang,
+    isRTL: isRTL(lang),
+    direction: getTextDirection(lang),
+    textAlign: getTextAlign(lang),
+  };
+}
+
+// ========================================
+// تصدير الملفات الفرعية
+// ========================================
+export { azkarTranslations } from './azkar';
+export { categoriesTranslations } from './categories';
+export { benefitsTranslations } from './benefits';
+export { duasTranslations } from './duas';
+export { ruqyaTranslations } from './ruqya';
+export { uiTranslations } from './ui';
