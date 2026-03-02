@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#1B4332"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rooh.almuslim"
@@ -24,7 +26,8 @@
       "package": "com.rooh.almuslim"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-asset"
     ],
     "extra": {
       "router": {
