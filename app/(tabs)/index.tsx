@@ -37,7 +37,7 @@ const FEATURES: Feature[] = [
   { id: 'qibla', title: 'القبلة', icon: 'compass', color: '#6366F1', route: '/qibla' },
   { id: 'tasbih', title: 'التسبيح', icon: 'radio-button-on', color: '#8B5CF6', route: '/tasbih' },
   { id: 'names', title: 'أسماء الله', icon: 'sparkles', color: '#D4AF37', route: '/names' },
-  { id: 'ruqyah', title: 'الرقية', icon: 'shield-checkmark', color: '#EF4444', route: '/ruqyah' },
+{ id: 'ruqyah', title: 'الرقية', icon: 'shield-checkmark', color: '#EF4444', route: '/ruqya' },
   { id: 'hijri', title: 'التقويم', icon: 'calendar', color: '#F59E0B', route: '/hijri' },
 ];
 

@@ -64,7 +64,7 @@ function RootLayoutContent() {
         <Stack.Screen name="hijri" options={{ headerShown: false }} />
         <Stack.Screen name="tasbih" options={{ headerShown: false }} />
         <Stack.Screen name="names" options={{ headerShown: false }} />
-        <Stack.Screen name="ruqyah" options={{ headerShown: false }} />
+<Stack.Screen name="ruqya" options={{ headerShown: false }} />
       </Stack>
     </>
   );
