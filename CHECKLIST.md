@@ -1,7 +1,8 @@
+Copy# Rooh Al-Muslim - Project Checklist
 ## روح المسلم - قائمة المهام
 
 > آخر تحديث: 2 مارس 2026
-> نسبة الإنجاز الكلية: **60%**
+> نسبة الإنجاز الكلية: **70%**
 
 ---
 
@@ -100,15 +101,36 @@
 
 ---
 
-## ⏳ Phase 7: Widgets (0%)
+## ✅ Phase 7: Widgets (100%)
 
+### ملفات مشتركة
 | الملف | الحالة | الوصف |
 |-------|--------|-------|
-| `widgets/ios/NextPrayerWidget.swift` | ⏳ | ويدجت الصلاة iOS |
-| `widgets/ios/AzkarWidget.swift` | ⏳ | ويدجت الأذكار iOS |
-| `widgets/android/NextPrayerWidget.kt` | ⏳ | ويدجت الصلاة Android |
-| `widgets/android/AzkarWidget.kt` | ⏳ | ويدجت الأذكار Android |
-| `app/widget-settings.tsx` | ⏳ | إعدادات الويدجت |
+| `lib/widget-data.ts` | ✅ | مشاركة البيانات |
+| `app/widget-settings.tsx` | ✅ | إعدادات الويدجت |
+
+### iOS Widgets
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `widgets/ios/NextPrayerWidget.swift` | ✅ | ويدجت الصلاة |
+| `widgets/ios/AzkarWidget.swift` | ✅ | ويدجت الأذكار |
+| `widgets/ios/HijriDateWidget.swift` | ✅ | ويدجت التاريخ الهجري |
+| `widgets/ios/WidgetBundle.swift` | ✅ | تجميع الويدجت |
+
+### Android Widgets
+| الملف | الحالة | الوصف |
+|-------|--------|-------|
+| `widgets/android/NextPrayerWidget.kt` | ✅ | ويدجت الصلاة |
+| `widgets/android/AzkarWidget.kt` | ✅ | ويدجت الأذكار |
+| `widgets/android/HijriDateWidget.kt` | ✅ | ويدجت التاريخ الهجري |
+| `widgets/android/WidgetUpdateService.kt` | ✅ | خدمة التحديث |
+
+### أنواع الويدجت
+| الويدجت | iOS | Android | الأحجام |
+|---------|-----|---------|---------|
+| مواقيت الصلاة | ✅ | ✅ | Small, Medium, Large |
+| الأذكار | ✅ | ✅ | Small, Medium, Large |
+| التاريخ الهجري | ✅ | ✅ | Small, Medium, Large |
 
 ---
 
@@ -168,20 +190,27 @@
 | Phase 4: Azkar & Duas | ✅ | 100% |
 | Phase 5: Prayer Times | ✅ | 100% |
 | Phase 6: Worship Tracker | ✅ | 100% |
-| Phase 7: Widgets | ⏳ | 0% |
+| Phase 7: Widgets | ✅ | 100% |
 | Phase 8: Settings | ⏳ | 0% |
 | Phase 9: Seasonal | ⏳ | 0% |
 | Phase 10: Admin Panel | ⏳ | 0% |
 | Phase 11: Final Polish | ⏳ | 0% |
 
-### الإحصائيات العامة
-- **الملفات المكتملة:** 33 ملف
-- **الترجمات:** 2,880 ترجمة
-- **اللغات:** 12 لغة
-- **الأذكار:** 55 ذكر
-- **الأدعية:** 38 دعاء
-- **الرقية:** 10 رقية
-- **مفاتيح UI:** 88 مفتاح
+---
+
+## 📈 الإحصائيات العامة
+
+| البند | العدد |
+|-------|-------|
+| **الملفات المكتملة** | 43 ملف |
+| **الترجمات** | 2,880 ترجمة |
+| **اللغات** | 12 لغة |
+| **الأذكار** | 55 ذكر |
+| **الأدعية** | 38 دعاء |
+| **الرقية** | 10 رقية |
+| **مفاتيح UI** | 88 مفتاح |
+| **الويدجت iOS** | 4 ملفات |
+| **الويدجت Android** | 4 ملفات |
 
 ---
 
@@ -197,84 +226,21 @@
 
 ## 📦 المكتبات الأساسية
 
-```
-expo-av
-expo-blur
-expo-location
-expo-notifications
-expo-clipboard
-expo-haptics
-react-native-reanimated
-react-native-svg
-@react-native-async-storage/async-storage
-expo-linear-gradient
-```
+Copy
+expo-av expo-blur expo-location expo-notifications expo-clipboard expo-haptics react-native-reanimated react-native-svg @react-native-async-storage/async-storage expo-linear-gradient
+
 
 ---
 
 ## 📁 هيكل المجلدات
 
-```
-rooh-al-muslim/
-├── app/
-│   ├── (tabs)/
-│   │   ├── index.tsx
-│   │   ├── quran.tsx
-│   │   ├── prayer.tsx
-│   │   └── settings.tsx
-│   ├── surah/[id].tsx
-│   ├── khatma/
-│   ├── worship-tracker/
-│   │   ├── index.tsx
-│   │   ├── prayer.tsx
-│   │   ├── fasting.tsx
-│   │   └── quran.tsx
-│   └── settings/
-├── components/ui/
-│   ├── GlassCard.tsx
-│   ├── quran/
-│   └── prayer/
-├── contexts/
-│   ├── QuranContext.tsx
-│   ├── KhatmaContext.tsx
-│   └── WorshipContext.tsx
-├── data/
-│   ├── azkar.ts
-│   ├── duas.ts
-│   ├── ruqya.ts
-│   └── translations/
-├── lib/
-│   ├── prayer-times.ts
-│   ├── worship-storage.ts
-│   ├── hijri-date.ts
-│   └── storage.ts
-└── constants/
-    ├── theme.ts
-    └── colors.ts
-```
+rooh-al-muslim/ ├── app/ │ ├── (tabs)/ │ │ ├── index.tsx │ │ ├── quran.tsx │ │ ├── prayer.tsx │ │ └── settings.tsx │ ├── surah/[id].tsx │ ├── khatma/ │ ├── worship-tracker/ │ ├── widget-settings.tsx │ └── settings/ ├── components/ui/ │ ├── GlassCard.tsx │ ├── quran/ │ └── prayer/ ├── contexts/ │ ├── QuranContext.tsx │ ├── KhatmaContext.tsx │ └── WorshipContext.tsx ├── data/ │ ├── azkar.ts │ ├── duas.ts │ ├── ruqya.ts │ └── translations/ ├── lib/ │ ├── prayer-times.ts │ ├── worship-storage.ts │ ├── widget-data.ts │ ├── hijri-date.ts │ └── storage.ts ├── widgets/ │ ├── ios/ │ │ ├── NextPrayerWidget.swift │ │ ├── AzkarWidget.swift │ │ ├── HijriDateWidget.swift │ │ └── WidgetBundle.swift │ └── android/ │ ├── NextPrayerWidget.kt │ ├── AzkarWidget.kt │ ├── HijriDateWidget.kt │ └── WidgetUpdateService.kt └── constants/ ├── theme.ts └── colors.ts
+
 
 ---
 
 ## 🚀 المرحلة التالية
 
-**Phase 7: Widgets** أو **Phase 8: Settings**
+**Phase 8: Settings** - صفحة الإعدادات الرئيسية
 
-اختر المرحلة للبدء!
-```
-
-**ملخص Phase 6:**
-
-| الملف | الوصف |
-|-------|-------|
-| `lib/worship-storage.ts` | تخزين + CRUD + إحصائيات |
-| `contexts/WorshipContext.tsx` | سياق + hooks متخصصة |
-| `app/worship-tracker/index.tsx` | الصفحة الرئيسية |
-| `app/worship-tracker/prayer.tsx` | متتبع الصلاة |
-| `app/worship-tracker/fasting.tsx` | متتبع الصيام |
-| `app/worship-tracker/quran.tsx` | متتبع القرآن |
-
-**المطلوب:**
-1. ارفع ملف `CHECKLIST.md` على GitHub
-2. قل **"تم"** واختر المرحلة التالية:
-   - **Phase 7:** Widgets (iOS & Android)
-   - **Phase 8:** Settings (إعدادات التطبيق)
+اختر للبدء!
