@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/layout/widget_hijri_date.xml -->
+<!-- تخطيط ويدجت التاريخ الهجري - روح المسلم -->
+
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@drawable/widget_background_hijri"
+    android:gravity="center">
+
+    <!-- اسم اليوم -->
+    <TextView
+        android:id="@+id/tv_day_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#EEFFFFFF"
+        android:textSize="13sp"
+        tools:text="الأحد" />
+
+    <!-- اليوم الهجري -->
+    <TextView
+        android:id="@+id/tv_hijri_day"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="52sp"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-light"
+        tools:text="15" />
+
+    <!-- الشهر الهجري -->
+    <TextView
+        android:id="@+id/tv_hijri_month"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        tools:text="رمضان" />
+
+    <!-- السنة الهجرية -->
+    <TextView
+        android:id="@+id/tv_hijri_year"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="12sp"
+        tools:text="1446 هـ" />
+
+    <!-- التاريخ الميلادي -->
+    <TextView
+        android:id="@+id/tv_gregorian_date"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="#99FFFFFF"
+        android:textSize="11sp"
+        tools:text="2 مارس 2026" />
+
+</LinearLayout>
