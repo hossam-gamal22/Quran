@@ -36,7 +36,7 @@ export interface Zikr {
     fr?: string;
   };
   audio?: string;
-  currentCount?: number; // للعداد في التطبيق
+  currentCount?: number;
 }
 
 export interface AzkarCategory {
@@ -48,7 +48,7 @@ export interface AzkarCategory {
 }
 
 export interface ZikrProgress {
-  oderId: number;
+  zikrId: number;
   completed: boolean;
   currentCount: number;
   lastRead: string;
@@ -86,14 +86,16 @@ const DEFAULT_LANGUAGE: Language = 'ar';
  * الحصول على جميع الأذكار
  */
 export const getAllAzkar = (): Zikr[] => {
-  return azkarData as Zikr[];
+  const data = azkarData as { azkar: Zikr[] };
+  return data.azkar || [];
 };
 
 /**
  * الحصول على جميع الفئات
  */
 export const getAllCategories = (): AzkarCategory[] => {
-  return (categoriesData as AzkarCategory[]).sort((a, b) => a.order - b.order);
+  const data = categoriesData as { categories: AzkarCategory[] };
+  return (data.categories || []).sort((a, b) => a.order - b.order);
 };
 
 /**
@@ -125,14 +127,14 @@ export const getCategoryById = (id: AzkarCategoryType): AzkarCategory | undefine
  * الحصول على ترجمة الذكر
  */
 export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
-  return zikr.translation[language] || zikr.translation[DEFAULT_LANGUAGE] || zikr.arabic;
+  return zikr.translation?.[language] || zikr.translation?.[DEFAULT_LANGUAGE] || zikr.arabic;
 };
 
 /**
  * الحصول على اسم الفئة مترجم
  */
 export const getCategoryName = (category: AzkarCategory, language: Language): string => {
-  return category.name[language] || category.name[DEFAULT_LANGUAGE];
+  return category.name?.[language] || category.name?.[DEFAULT_LANGUAGE] || '';
 };
 
 /**
@@ -163,14 +165,14 @@ export const searchAzkar = (query: string, language: Language = 'ar'): Zikr[] =>
     if (zikr.arabic.includes(normalizedQuery)) return true;
     
     // البحث في النطق
-    if (zikr.transliteration.toLowerCase().includes(normalizedQuery)) return true;
+    if (zikr.transliteration?.toLowerCase().includes(normalizedQuery)) return true;
     
     // البحث في الترجمة
-    const translation = zikr.translation[language];
+    const translation = zikr.translation?.[language];
     if (translation && translation.toLowerCase().includes(normalizedQuery)) return true;
     
     // البحث في المرجع
-    if (zikr.reference.toLowerCase().includes(normalizedQuery)) return true;
+    if (zikr.reference?.toLowerCase().includes(normalizedQuery)) return true;
     
     return false;
   });
@@ -225,7 +227,7 @@ export const saveDailyProgress = async (progress: DailyProgress): Promise<void> 
  */
 export const updateZikrProgress = async (
   category: AzkarCategoryType,
-  oderId: number,
+  zikrId: number,
   currentCount: number
 ): Promise<void> => {
   try {
@@ -245,7 +247,7 @@ export const updateZikrProgress = async (
         total: categoryAzkar.length,
         completed: 0,
         azkarProgress: categoryAzkar.map(z => ({
-          oderId: z.id,
+          zikrId: z.id,
           completed: false,
           currentCount: 0,
           lastRead: '',
@@ -254,7 +256,7 @@ export const updateZikrProgress = async (
     }
     
     const categoryProgress = progress.categories[category]!;
-    const zikrProgress = categoryProgress.azkarProgress.find(z => z.oderId === zikrId);
+    const zikrProgress = categoryProgress.azkarProgress.find(z => z.zikrId === zikrId);
     
     if (zikrProgress) {
       const zikr = getZikrById(zikrId);
@@ -389,44 +391,13 @@ export const getAzkarStats = () => {
 // دوال مساعدة للعرض
 // ===================================================
 
-/**
- * الحصول على أذكار الصباح
- */
 export const getMorningAzkar = (): Zikr[] => getAzkarByCategory('morning');
-
-/**
- * الحصول على أذكار المساء
- */
 export const getEveningAzkar = (): Zikr[] => getAzkarByCategory('evening');
-
-/**
- * الحصول على أذكار النوم
- */
 export const getSleepAzkar = (): Zikr[] => getAzkarByCategory('sleep');
-
-/**
- * الحصول على أذكار الاستيقاظ
- */
 export const getWakeupAzkar = (): Zikr[] => getAzkarByCategory('wakeup');
-
-/**
- * الحصول على أذكار بعد الصلاة
- */
 export const getAfterPrayerAzkar = (): Zikr[] => getAzkarByCategory('after_prayer');
-
-/**
- * الحصول على أدعية القرآن
- */
 export const getQuranDuas = (): Zikr[] => getAzkarByCategory('quran_duas');
-
-/**
- * الحصول على أدعية السنة
- */
 export const getSunnahDuas = (): Zikr[] => getAzkarByCategory('sunnah_duas');
-
-/**
- * الحصول على الرقية الشرعية
- */
 export const getRuqya = (): Zikr[] => getAzkarByCategory('ruqya');
 
 // ===================================================

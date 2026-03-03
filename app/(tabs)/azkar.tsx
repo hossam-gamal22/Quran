@@ -1,395 +1,357 @@
+// app/(tabs)/azkar.tsx
+// شاشة الأذكار الرئيسية - النظام الجديد
+// =========================================
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
+  TouchableOpacity,
   Animated,
-  Dimensions,
   Share,
+  RefreshControl,
+  Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
-import { APP_CONFIG } from '../../constants/app';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// استيراد API الأذكار الجديد
 import AzkarAPI, {
-  getAllCategories,
-  getAzkarByCategory,
-  getCategoryName,
-  getCategoryCompletionPercentage,
   AzkarCategory,
   AzkarCategoryType,
   Language,
-} from '../../lib/azkar-api';
+  getCategoryName,
+  getAzkarByCategory,
+  getCategoryCompletionPercentage,
+  getAllCategories,
+  getAzkarStats,
+} from '@/lib/azkar-api';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-// ============================================
+// =========================================
 // أيقونات الفئات
-// ============================================
+// =========================================
 
-const CATEGORY_ICONS: Record<AzkarCategoryType, string> = {
-  morning: 'sunny',
-  evening: 'moon',
-  sleep: 'bed',
-  wakeup: 'alarm',
-  after_prayer: 'checkmark-done',
-  quran_duas: 'book',
-  sunnah_duas: 'heart',
-  ruqya: 'shield-checkmark',
+const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons' | 'material' | 'fontawesome' }> = {
+  morning: { name: 'sunny', type: 'ionicons' },
+  evening: { name: 'moon', type: 'ionicons' },
+  sleep: { name: 'bed', type: 'fontawesome' },
+  wakeup: { name: 'sunrise', type: 'material' },
+  after_prayer: { name: 'hands-praying', type: 'fontawesome' },
+  quran_duas: { name: 'book-open', type: 'fontawesome' },
+  sunnah_duas: { name: 'star', type: 'ionicons' },
+  ruqya: { name: 'shield-checkmark', type: 'ionicons' },
 };
 
-// ============================================
+// =========================================
 // المكون الرئيسي
-// ============================================
+// =========================================
 
 export default function AzkarScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  
+  // الحالة
+  const [categories, setCategories] = useState<AzkarCategory[]>([]);
+  const [progress, setProgress] = useState<Record<AzkarCategoryType, number>>({} as any);
   const [darkMode, setDarkMode] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [progress, setProgress] = useState<Record<string, number>>({});
-  const [categories, setCategories] = useState<AzkarCategory[]>([]);
   const [language, setLanguage] = useState<Language>('ar');
-  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<{ total: number; categoriesCount: number } | null>(null);
   
   // الأنيميشن
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
-  useEffect(() => {
-    initializeScreen();
-  }, []);
+  // =========================================
+  // تحميل البيانات
+  // =========================================
 
-  const initializeScreen = async () => {
+  const loadData = useCallback(async () => {
     try {
-      await Promise.all([
-        loadSettings(),
-        loadCategories(),
-        loadProgress(),
+      // تحميل الإعدادات
+      const [storedDarkMode, storedViewMode, storedLanguage] = await Promise.all([
+        AsyncStorage.getItem('darkMode'),
+        AsyncStorage.getItem('azkar_view_mode'),
+        AsyncStorage.getItem('app_language'),
       ]);
-      
+
+      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
+      if (storedViewMode) setViewMode(storedViewMode as 'grid' | 'list');
+      if (storedLanguage) setLanguage(storedLanguage as Language);
+
+      // تحميل الفئات
+      const allCategories = getAllCategories();
+      setCategories(allCategories);
+
+      // تحميل الإحصائيات
+      const azkarStats = getAzkarStats();
+      setStats({
+        total: azkarStats.total,
+        categoriesCount: azkarStats.categoriesCount,
+      });
+
+      // تحميل التقدم لكل فئة
+      const progressData: Record<AzkarCategoryType, number> = {} as any;
+      for (const cat of allCategories) {
+        progressData[cat.id] = await getCategoryCompletionPercentage(cat.id);
+      }
+      setProgress(progressData);
+
+      // تشغيل الأنيميشن
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }).start();
     } catch (error) {
-      console.error('Error initializing screen:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Error loading azkar data:', error);
     }
+  }, [fadeAnim]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // =========================================
+  // التحديث
+  // =========================================
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  // =========================================
+  // التنقل
+  // =========================================
+
+  const navigateToCategory = (categoryId: AzkarCategoryType) => {
+    router.push({
+      pathname: '/azkar/[category]',
+      params: { category: categoryId },
+    });
   };
 
-  const loadSettings = async () => {
-    try {
-      const settings = await AsyncStorage.getItem('app_settings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setDarkMode(parsed.darkMode ?? false);
-        setViewMode(parsed.azkarViewMode ?? 'grid');
-        setLanguage(parsed.language ?? 'ar');
-      }
-    } catch (error) {
-      console.error('Error loading settings:', error);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      const allCategories = getAllCategories();
-      setCategories(allCategories);
-    } catch (error) {
-      console.error('Error loading categories:', error);
-    }
-  };
-
-  const loadProgress = async () => {
-    try {
-      const progressData: Record<string, number> = {};
-      const allCategories = getAllCategories();
-      
-      for (const category of allCategories) {
-        const percentage = await getCategoryCompletionPercentage(category.id);
-        if (percentage > 0) {
-          progressData[category.id] = percentage;
-        }
-      }
-      
-      setProgress(progressData);
-    } catch (error) {
-      console.error('Error loading progress:', error);
-    }
-  };
-
-  const currentColors = darkMode ? DarkColors : Colors;
+  // =========================================
+  // المشاركة
+  // =========================================
 
   const shareCategory = async (category: AzkarCategory) => {
-    const categoryName = getCategoryName(category, language);
-    const azkarCount = getAzkarByCategory(category.id).length;
-    const shareText = `📿 ${categoryName}\n${azkarCount} أذكار\n\n${APP_CONFIG.getShareSignature()}`;
-    
     try {
-      await Share.share({ message: shareText });
+      const categoryName = getCategoryName(category, language);
+      const azkarCount = getAzkarByCategory(category.id).length;
+      
+      await Share.share({
+        message: `${categoryName}\n${azkarCount} أذكار\n\nحمّل تطبيق القرآن والأذكار`,
+      });
     } catch (error) {
       console.error('Error sharing:', error);
     }
   };
 
-  const navigateToCategory = (categoryId: AzkarCategoryType) => {
-    router.push(`/azkar/${categoryId}` as any);
+  // =========================================
+  // تبديل وضع العرض
+  // =========================================
+
+  const toggleViewMode = async () => {
+    const newMode = viewMode === 'grid' ? 'list' : 'grid';
+    setViewMode(newMode);
+    await AsyncStorage.setItem('azkar_view_mode', newMode);
   };
 
-  // ============================================
-  // عرض الشبكة
-  // ============================================
+  // =========================================
+  // رندر الأيقونة
+  // =========================================
 
-  const renderGridItem = (category: AzkarCategory, index: number) => {
-    const categoryName = getCategoryName(category, language);
-    const azkarCount = getAzkarByCategory(category.id).length;
-    const icon = CATEGORY_ICONS[category.id] || 'apps';
+  const renderIcon = (categoryId: AzkarCategoryType, size: number, color: string) => {
+    const iconConfig = CATEGORY_ICONS[categoryId];
     
+    if (iconConfig.type === 'ionicons') {
+      return <Ionicons name={iconConfig.name as any} size={size} color={color} />;
+    } else if (iconConfig.type === 'material') {
+      return <MaterialCommunityIcons name={iconConfig.name as any} size={size} color={color} />;
+    } else {
+      return <FontAwesome5 name={iconConfig.name} size={size} color={color} />;
+    }
+  };
+
+  // =========================================
+  // رندر كارت الفئة (Grid)
+  // =========================================
+
+  const renderGridCard = (category: AzkarCategory, index: number) => {
+    const azkarCount = getAzkarByCategory(category.id).length;
+    const categoryProgress = progress[category.id] || 0;
+    const categoryName = getCategoryName(category, language);
+
     return (
-      <TouchableOpacity
+      <Animated.View
         key={category.id}
-        style={[styles.gridItem, { backgroundColor: currentColors.surface }]}
-        onPress={() => navigateToCategory(category.id)}
-        onLongPress={() => shareCategory(category)}
-        activeOpacity={0.7}
+        style={[
+          styles.gridCard,
+          {
+            opacity: fadeAnim,
+            transform: [{
+              translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            }],
+          },
+        ]}
       >
-        <View style={[styles.gridIconContainer, { backgroundColor: category.color + '15' }]}>
-          <Ionicons name={icon as any} size={32} color={category.color} />
-        </View>
-        
-        <Text style={[styles.gridTitle, { color: currentColors.text }]} numberOfLines={2}>
-          {categoryName}
-        </Text>
-        
-        <Text style={[styles.gridCount, { color: currentColors.textLight }]}>
-          {azkarCount} {language === 'ar' ? 'ذكر' : 'items'}
-        </Text>
-        
-        {/* شريط التقدم */}
-        {progress[category.id] !== undefined && progress[category.id] > 0 && (
+        <TouchableOpacity
+          style={[
+            styles.gridCardInner,
+            { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+          ]}
+          onPress={() => navigateToCategory(category.id)}
+          onLongPress={() => shareCategory(category)}
+          activeOpacity={0.7}
+        >
+          {/* الأيقونة */}
+          <View style={[styles.iconContainer, { backgroundColor: category.color + '20' }]}>
+            {renderIcon(category.id, 28, category.color)}
+          </View>
+
+          {/* الاسم */}
+          <Text
+            style={[
+              styles.categoryName,
+              { color: darkMode ? '#F9FAFB' : '#1F2937' },
+            ]}
+            numberOfLines={2}
+          >
+            {categoryName}
+          </Text>
+
+          {/* العدد */}
+          <Text style={[styles.azkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+            {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+          </Text>
+
+          {/* شريط التقدم */}
           <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View 
+            <View style={[styles.progressBar, { backgroundColor: darkMode ? '#374151' : '#E5E7EB' }]}>
+              <View
                 style={[
-                  styles.progressFill, 
-                  { width: `${progress[category.id]}%`, backgroundColor: category.color }
-                ]} 
+                  styles.progressFill,
+                  {
+                    width: `${categoryProgress}%`,
+                    backgroundColor: category.color,
+                  },
+                ]}
               />
             </View>
             <Text style={[styles.progressText, { color: category.color }]}>
-              {progress[category.id]}%
+              {categoryProgress}%
             </Text>
           </View>
-        )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
-  // ============================================
-  // عرض القائمة
-  // ============================================
+  // =========================================
+  // رندر كارت الفئة (List)
+  // =========================================
 
-  const renderListItem = (category: AzkarCategory) => {
-    const categoryName = getCategoryName(category, language);
+  const renderListCard = (category: AzkarCategory, index: number) => {
     const azkarCount = getAzkarByCategory(category.id).length;
-    const icon = CATEGORY_ICONS[category.id] || 'apps';
-    
-    // وصف الفئة حسب النوع
-    const getSubtitle = (): string => {
-      const subtitles: Record<AzkarCategoryType, Record<Language, string>> = {
-        morning: {
-          ar: 'تقال بعد صلاة الفجر حتى طلوع الشمس',
-          en: 'Said after Fajr prayer until sunrise',
-          fr: 'Dit après la prière du Fajr jusqu\'au lever du soleil',
-          ur: 'فجر کی نماز کے بعد سورج طلوع ہونے تک',
-          id: 'Dibaca setelah shalat Subuh hingga matahari terbit',
-          tr: 'Sabah namazından güneş doğana kadar okunur',
-          de: 'Nach dem Fajr-Gebet bis zum Sonnenaufgang',
-          hi: 'फज्र की नमाज़ के बाद सूर्योदय तक',
-          bn: 'ফজরের নামাজের পর সূর্যোদয় পর্যন্ত',
-          ms: 'Dibaca selepas solat Subuh hingga matahari terbit',
-          ru: 'Читается после утренней молитвы до восхода солнца',
-          es: 'Se dice después del Fajr hasta la salida del sol',
-        },
-        evening: {
-          ar: 'تقال بعد صلاة العصر حتى غروب الشمس',
-          en: 'Said after Asr prayer until sunset',
-          fr: 'Dit après la prière d\'Asr jusqu\'au coucher du soleil',
-          ur: 'عصر کی نماز کے بعد سورج غروب ہونے تک',
-          id: 'Dibaca setelah shalat Ashar hingga matahari terbenam',
-          tr: 'İkindi namazından güneş batana kadar okunur',
-          de: 'Nach dem Asr-Gebet bis zum Sonnenuntergang',
-          hi: 'अस्र की नमाज़ के बाद सूर्यास्त तक',
-          bn: 'আসরের নামাজের পর সূর্যাস্ত পর্যন্ত',
-          ms: 'Dibaca selepas solat Asar hingga matahari terbenam',
-          ru: 'Читается после послеполуденной молитвы до заката',
-          es: 'Se dice después del Asr hasta la puesta del sol',
-        },
-        sleep: {
-          ar: 'تقال قبل النوم',
-          en: 'Said before sleeping',
-          fr: 'Dit avant de dormir',
-          ur: 'سونے سے پہلے',
-          id: 'Dibaca sebelum tidur',
-          tr: 'Uyumadan önce okunur',
-          de: 'Vor dem Schlafen',
-          hi: 'सोने से पहले',
-          bn: 'ঘুমানোর আগে',
-          ms: 'Dibaca sebelum tidur',
-          ru: 'Читается перед сном',
-          es: 'Se dice antes de dormir',
-        },
-        wakeup: {
-          ar: 'تقال عند الاستيقاظ من النوم',
-          en: 'Said upon waking up',
-          fr: 'Dit au réveil',
-          ur: 'نیند سے بیدار ہونے پر',
-          id: 'Dibaca saat bangun tidur',
-          tr: 'Uyanınca okunur',
-          de: 'Beim Aufwachen',
-          hi: 'जागने पर',
-          bn: 'ঘুম থেকে উঠে',
-          ms: 'Dibaca ketika bangun tidur',
-          ru: 'Читается при пробуждении',
-          es: 'Se dice al despertar',
-        },
-        after_prayer: {
-          ar: 'تقال بعد السلام من الصلاة المفروضة',
-          en: 'Said after obligatory prayers',
-          fr: 'Dit après les prières obligatoires',
-          ur: 'فرض نماز کے بعد',
-          id: 'Dibaca setelah shalat wajib',
-          tr: 'Farz namazlardan sonra okunur',
-          de: 'Nach den Pflichtgebeten',
-          hi: 'फर्ज नमाज़ के बाद',
-          bn: 'ফরজ নামাজের পর',
-          ms: 'Dibaca selepas solat fardhu',
-          ru: 'Читается после обязательных молитв',
-          es: 'Se dice después de las oraciones obligatorias',
-        },
-        quran_duas: {
-          ar: 'أدعية مأثورة من القرآن الكريم',
-          en: 'Supplications from the Holy Quran',
-          fr: 'Invocations du Saint Coran',
-          ur: 'قرآن کریم سے دعائیں',
-          id: 'Doa-doa dari Al-Quran',
-          tr: 'Kur\'an-ı Kerim\'den dualar',
-          de: 'Bittgebete aus dem Heiligen Koran',
-          hi: 'पवित्र कुरान से दुआएं',
-          bn: 'পবিত্র কুরআন থেকে দোয়া',
-          ms: 'Doa-doa dari Al-Quran',
-          ru: 'Мольбы из Священного Корана',
-          es: 'Súplicas del Sagrado Corán',
-        },
-        sunnah_duas: {
-          ar: 'أدعية مأثورة من السنة النبوية',
-          en: 'Supplications from the Prophetic Sunnah',
-          fr: 'Invocations de la Sunna prophétique',
-          ur: 'سنت نبوی سے دعائیں',
-          id: 'Doa-doa dari Sunnah Nabi',
-          tr: 'Peygamber Sünnetinden dualar',
-          de: 'Bittgebete aus der prophetischen Sunna',
-          hi: 'पैगंबर की सुन्नत से दुआएं',
-          bn: 'নবীর সুন্নাহ থেকে দোয়া',
-          ms: 'Doa-doa dari Sunnah Nabi',
-          ru: 'Мольбы из пророческой Сунны',
-          es: 'Súplicas de la Sunna profética',
-        },
-        ruqya: {
-          ar: 'آيات وأدعية الرقية الشرعية',
-          en: 'Ruqyah verses and supplications',
-          fr: 'Versets et invocations de Ruqya',
-          ur: 'رقیہ شرعیہ کی آیات اور دعائیں',
-          id: 'Ayat dan doa ruqyah syar\'iyyah',
-          tr: 'Rukye ayetleri ve duaları',
-          de: 'Ruqya-Verse und Bittgebete',
-          hi: 'रुक़्या की आयतें और दुआएं',
-          bn: 'রুকইয়াহ আয়াত ও দোয়া',
-          ms: 'Ayat dan doa ruqyah syar\'iyyah',
-          ru: 'Аяты и мольбы рукья',
-          es: 'Versículos y súplicas de Ruqyah',
-        },
-      };
-      
-      return subtitles[category.id]?.[language] || subtitles[category.id]?.ar || '';
-    };
-    
+    const categoryProgress = progress[category.id] || 0;
+    const categoryName = getCategoryName(category, language);
+
     return (
-      <TouchableOpacity
+      <Animated.View
         key={category.id}
-        style={[styles.listItem, { backgroundColor: currentColors.surface }]}
-        onPress={() => navigateToCategory(category.id)}
-        onLongPress={() => shareCategory(category)}
-        activeOpacity={0.7}
+        style={[
+          styles.listCard,
+          {
+            opacity: fadeAnim,
+            transform: [{
+              translateX: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-50, 0],
+              }),
+            }],
+          },
+        ]}
       >
-        <View style={[styles.listIconContainer, { backgroundColor: category.color + '15' }]}>
-          <Ionicons name={icon as any} size={28} color={category.color} />
-        </View>
-        
-        <View style={styles.listContent}>
-          <Text style={[styles.listTitle, { color: currentColors.text }]}>{categoryName}</Text>
-          <Text style={[styles.listSubtitle, { color: currentColors.textLight }]} numberOfLines={1}>
-            {getSubtitle()}
-          </Text>
-          <Text style={[styles.listCount, { color: category.color }]}>
-            {azkarCount} {language === 'ar' ? 'ذكر' : 'items'}
-          </Text>
-          
-          {/* شريط التقدم */}
-          {progress[category.id] !== undefined && progress[category.id] > 0 && (
-            <View style={styles.listProgressContainer}>
-              <View style={styles.listProgressBar}>
-                <View 
-                  style={[
-                    styles.progressFill, 
-                    { width: `${progress[category.id]}%`, backgroundColor: category.color }
-                  ]} 
-                />
-              </View>
-              <Text style={[styles.listProgressText, { color: category.color }]}>
-                {progress[category.id]}%
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.listCardInner,
+            { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+          ]}
+          onPress={() => navigateToCategory(category.id)}
+          onLongPress={() => shareCategory(category)}
+          activeOpacity={0.7}
+        >
+          {/* الأيقونة */}
+          <View style={[styles.listIconContainer, { backgroundColor: category.color + '20' }]}>
+            {renderIcon(category.id, 24, category.color)}
+          </View>
+
+          {/* المحتوى */}
+          <View style={styles.listContent}>
+            <Text
+              style={[
+                styles.listCategoryName,
+                { color: darkMode ? '#F9FAFB' : '#1F2937' },
+              ]}
+              numberOfLines={1}
+            >
+              {categoryName}
+            </Text>
+            <Text style={[styles.listAzkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+            </Text>
+          </View>
+
+          {/* التقدم */}
+          <View style={styles.listProgressContainer}>
+            <Text style={[styles.listProgressText, { color: category.color }]}>
+              {categoryProgress}%
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
-  // ============================================
-  // إحصائيات سريعة
-  // ============================================
+  // =========================================
+  // رندر الإحصائيات
+  // =========================================
 
   const renderStats = () => {
-    const stats = AzkarAPI.getAzkarStats();
-    
+    if (!stats) return null;
+
     return (
-      <View style={[styles.statsContainer, { backgroundColor: currentColors.surface }]}>
+      <View style={[styles.statsContainer, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
-            {language === 'ar' ? 'إجمالي الأذكار' : 'Total Azkar'}
+          <Text style={[styles.statNumber, { color: '#10B981' }]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+            {language === 'ar' ? 'إجمالي الأذكار' : 'Total Adhkar'}
           </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.categoriesCount}</Text>
-          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
-            {language === 'ar' ? 'الأقسام' : 'Categories'}
+          <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{stats.categoriesCount}</Text>
+          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+            {language === 'ar' ? 'الفئات' : 'Categories'}
           </Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.languagesSupported}</Text>
-          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
+          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>12</Text>
+          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
             {language === 'ar' ? 'لغة' : 'Languages'}
           </Text>
         </View>
@@ -397,327 +359,312 @@ export default function AzkarScreen() {
     );
   };
 
-  // ============================================
-  // العرض
-  // ============================================
+  // =========================================
+  // رندر الروابط السريعة
+  // =========================================
+
+  const renderQuickLinks = () => {
+    const quickLinks = [
+      { id: 'tasbih', icon: 'hand-left', label: language === 'ar' ? 'التسبيح' : 'Tasbih', route: '/tasbih', color: '#10B981' },
+      { id: 'ruqya', icon: 'shield', label: language === 'ar' ? 'الرقية' : 'Ruqyah', route: '/ruqya', color: '#6366F1' },
+      { id: 'names', icon: 'list', label: language === 'ar' ? 'الأسماء الحسنى' : 'Names', route: '/names', color: '#EC4899' },
+    ];
+
+    return (
+      <View style={styles.quickLinksContainer}>
+        <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+          {language === 'ar' ? 'روابط سريعة' : 'Quick Links'}
+        </Text>
+        <View style={styles.quickLinksRow}>
+          {quickLinks.map(link => (
+            <TouchableOpacity
+              key={link.id}
+              style={[
+                styles.quickLinkCard,
+                { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+              ]}
+              onPress={() => router.push(link.route as any)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={link.icon as any} size={24} color={link.color} />
+              <Text style={[styles.quickLinkLabel, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                {link.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  // =========================================
+  // الرندر الرئيسي
+  // =========================================
 
   return (
-    <View style={[styles.container, { backgroundColor: currentColors.background }]}>
-      {/* الهيدر */}
-      <View style={[styles.header, { backgroundColor: currentColors.surface }]}>
-        <TouchableOpacity 
-          style={styles.viewModeButton}
-          onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-        >
-          <Ionicons 
-            name={viewMode === 'grid' ? 'list' : 'grid'} 
-            size={22} 
-            color={currentColors.text} 
-          />
-        </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: currentColors.text }]}>
-          {language === 'ar' ? 'الأذكار' : 'Azkar'}
-        </Text>
-        
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={() => router.push('/tasbih')}
-        >
-          <Ionicons name="radio-button-on" size={22} color={currentColors.primary} />
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+      {/* Header */}
+      <LinearGradient
+        colors={darkMode ? ['#1F2937', '#111827'] : ['#10B981', '#059669']}
+        style={[styles.header, { paddingTop: insets.top + 10 }]}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>
+            {language === 'ar' ? 'الأذكار والأدعية' : 'Adhkar & Duas'}
+          </Text>
+          <TouchableOpacity onPress={toggleViewMode} style={styles.viewToggle}>
+            <Ionicons
+              name={viewMode === 'grid' ? 'list' : 'grid'}
+              size={24}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       {/* المحتوى */}
-      <Animated.ScrollView 
-        style={[styles.content, { opacity: fadeAnim }]}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={viewMode === 'grid' ? styles.gridContainer : styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {/* بانر علوي */}
-        <View style={[styles.banner, { backgroundColor: currentColors.primary }]}>
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>📿 {language === 'ar' ? 'حافظ على أذكارك' : 'Keep your Azkar'}</Text>
-            <Text style={styles.bannerSubtitle}>
-              {language === 'ar' 
-                ? '"من قال سبحان الله وبحمده في يوم مائة مرة حُطت خطاياه"'
-                : '"Whoever says SubhanAllah wa bihamdihi 100 times, his sins will be forgiven"'}
-            </Text>
-          </View>
-        </View>
-
         {/* الإحصائيات */}
         {renderStats()}
 
-        {/* قائمة الأذكار */}
+        {/* الفئات */}
+        <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+          {language === 'ar' ? 'الفئات' : 'Categories'}
+        </Text>
+
         {viewMode === 'grid' ? (
-          <View style={styles.gridWrapper}>
-            {categories.map((category, index) => renderGridItem(category, index))}
+          <View style={styles.gridContainer}>
+            {categories.map((category, index) => renderGridCard(category, index))}
           </View>
         ) : (
-          categories.map(renderListItem)
+          <View style={styles.listContainer}>
+            {categories.map((category, index) => renderListCard(category, index))}
+          </View>
         )}
 
-        {/* روابط سريعة */}
-        <View style={styles.quickLinks}>
-          <Text style={[styles.quickLinksTitle, { color: currentColors.text }]}>
-            {language === 'ar' ? 'المزيد' : 'More'}
-          </Text>
-          
-          <View style={styles.quickLinksRow}>
-            <TouchableOpacity 
-              style={[styles.quickLinkItem, { backgroundColor: currentColors.surface }]}
-              onPress={() => router.push('/tasbih')}
-            >
-              <Ionicons name="radio-button-on" size={24} color="#8B5CF6" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
-                {language === 'ar' ? 'التسبيح' : 'Tasbih'}
-              </Text>
-            </TouchableOpacity>
+        {/* الروابط السريعة */}
+        {renderQuickLinks()}
 
-            <TouchableOpacity 
-              style={[styles.quickLinkItem, { backgroundColor: currentColors.surface }]}
-              onPress={() => navigateToCategory('ruqya')}
-            >
-              <Ionicons name="shield-checkmark" size={24} color="#EF4444" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
-                {language === 'ar' ? 'الرقية' : 'Ruqyah'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.quickLinkItem, { backgroundColor: currentColors.surface }]}
-              onPress={() => router.push('/names')}
-            >
-              <Ionicons name="sparkles" size={24} color="#D4AF37" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
-                {language === 'ar' ? 'أسماء الله' : 'Names'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        {/* المسافة السفلية */}
         <View style={{ height: 100 }} />
-      </Animated.ScrollView>
+      </ScrollView>
     </View>
   );
 }
 
-// ============================================
+// =========================================
 // الأنماط
-// ============================================
+// =========================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   header: {
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+  },
+  headerContent: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.md,
-    ...Shadows.sm,
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  viewModeButton: {
-    padding: Spacing.sm,
+  viewToggle: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-  headerButton: {
-    padding: Spacing.sm,
-  },
-  content: {
+  scrollView: {
     flex: 1,
-    paddingHorizontal: Spacing.md,
   },
-  banner: {
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.md,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
   },
-  bannerContent: {
-    alignItems: 'center',
-  },
-  bannerTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '700',
-    color: Colors.white,
-    marginBottom: Spacing.sm,
-  },
-  bannerSubtitle: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.white,
-    opacity: 0.9,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  // Stats
+  
+  // الإحصائيات
   statsContainer: {
     flexDirection: 'row',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    ...Shadows.sm,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   statLabel: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 12,
     marginTop: 4,
   },
   statDivider: {
     width: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: Spacing.sm,
+    height: 40,
+    backgroundColor: '#E5E7EB',
   },
-  // Grid styles
+
+  // عنوان القسم
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+
+  // Grid View
   gridContainer: {
-    paddingBottom: Spacing.xl,
-  },
-  gridWrapper: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  gridItem: {
-    width: (SCREEN_WIDTH - Spacing.md * 2 - Spacing.sm) / 2,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    alignItems: 'center',
-    ...Shadows.sm,
+  gridCard: {
+    width: (width - 48) / 2,
+    marginBottom: 16,
   },
-  gridIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+  gridCardInner: {
+    padding: 16,
+    borderRadius: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
-    marginBottom: Spacing.sm,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  gridTitle: {
-    fontSize: Typography.sizes.md,
+  categoryName: {
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
+    marginBottom: 4,
   },
-  gridCount: {
-    fontSize: Typography.sizes.xs,
-    marginTop: 4,
+  azkarCount: {
+    fontSize: 12,
+    marginBottom: 12,
   },
   progressContainer: {
     width: '100%',
-    marginTop: Spacing.sm,
+    flexDirection: 'row',
     alignItems: 'center',
   },
   progressBar: {
-    width: '100%',
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
+    marginRight: 8,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 2,
+    borderRadius: 3,
   },
   progressText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 4,
+    width: 35,
+    textAlign: 'right',
   },
-  // List styles
+
+  // List View
   listContainer: {
-    paddingBottom: Spacing.xl,
+    gap: 12,
   },
-  listItem: {
+  listCard: {
+    marginBottom: 0,
+  },
+  listCardInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   listIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   listContent: {
     flex: 1,
-    marginHorizontal: Spacing.md,
   },
-  listTitle: {
-    fontSize: Typography.sizes.md,
+  listCategoryName: {
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'right',
+    marginBottom: 4,
   },
-  listSubtitle: {
-    fontSize: Typography.sizes.xs,
-    marginTop: 2,
-    textAlign: 'right',
-  },
-  listCount: {
-    fontSize: Typography.sizes.xs,
-    fontWeight: '600',
-    marginTop: 4,
-    textAlign: 'right',
+  listAzkarCount: {
+    fontSize: 13,
   },
   listProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: Spacing.xs,
-    gap: Spacing.sm,
-  },
-  listProgressBar: {
-    flex: 1,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
   },
   listProgressText: {
-    fontSize: Typography.sizes.xs,
+    fontSize: 14,
     fontWeight: '600',
-    minWidth: 35,
+    marginRight: 8,
   },
-  // Quick links
-  quickLinks: {
-    marginTop: Spacing.lg,
-  },
-  quickLinksTitle: {
-    fontSize: Typography.sizes.lg,
-    fontWeight: '600',
-    marginBottom: Spacing.md,
-    textAlign: 'right',
+
+  // Quick Links
+  quickLinksContainer: {
+    marginTop: 24,
   },
   quickLinksRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  quickLinkItem: {
-    flex: 1,
+  quickLinkCard: {
+    width: (width - 56) / 3,
+    padding: 16,
+    borderRadius: 16,
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    marginHorizontal: Spacing.xs,
-    ...Shadows.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  quickLinkText: {
-    fontSize: Typography.sizes.sm,
+  quickLinkLabel: {
+    fontSize: 12,
     fontWeight: '500',
-    marginTop: Spacing.sm,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
