@@ -1,6 +1,7 @@
 // admin-panel/src/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
@@ -13,3 +14,4 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const storage = getStorage(app);

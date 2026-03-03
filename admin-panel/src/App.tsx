@@ -16,14 +16,13 @@ import {
   LogOut,
   Smartphone,
   ChevronLeft,
-  RotateCcw
+  RotateCcw,
+  BookOpen,
+  Users,
+  CreditCard,
+  Megaphone,
+  DollarSign
 } from 'lucide-react';
-import { 
-  LayoutDashboard, Sparkles, FileText, Bell, Palette, 
-  Calendar, BarChart3, Settings,
-  BookOpen  // ✅ أضف هذا
-} from 'lucide-react';
-
 
 // استيراد الصفحات
 import Dashboard from './pages/Dashboard';
@@ -35,10 +34,12 @@ import Seasonal from './pages/Seasonal';
 import Analytics from './pages/Analytics';
 import SplashScreens from './pages/SplashScreens';
 import AzkarManager from './pages/AzkarManager';
-
+import UsersPage from './pages/Users';
+import Subscriptions from './pages/Subscriptions';
+import Ads from './pages/Ads';
+import Pricing from './pages/Pricing';
 
 // ==================== Mobile Preview Component ====================
-
 const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [device, setDevice] = useState<'iphone' | 'android'>('iphone');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -77,7 +78,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 
         {/* Controls */}
         <div className="p-4 border-b border-slate-700 flex flex-wrap items-center gap-4">
-          {/* Device Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-400">الجهاز:</span>
             <div className="flex bg-slate-700 rounded-lg p-1">
@@ -100,7 +100,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             </div>
           </div>
 
-          {/* Theme Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-400">الوضع:</span>
             <div className="flex bg-slate-700 rounded-lg p-1">
@@ -123,7 +122,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             </div>
           </div>
 
-          {/* Screen Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-slate-400">الشاشة:</span>
             <select
@@ -137,7 +135,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             </select>
           </div>
 
-          {/* Rotate Button */}
           <button
             onClick={() => setRotation(r => r + 90)}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm"
@@ -149,7 +146,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 
         {/* Preview Area */}
         <div className="p-8 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 min-h-[600px]">
-          {/* Phone Frame */}
           <div
             className={`relative transition-transform duration-500 ${
               device === 'iphone' 
@@ -158,18 +154,15 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             } bg-black p-3 shadow-2xl`}
             style={{ transform: `rotate(${rotation}deg)` }}
           >
-            {/* Screen */}
             <div 
               className={`w-full h-full overflow-hidden ${
                 device === 'iphone' ? 'rounded-[40px]' : 'rounded-[24px]'
               } ${bgColor}`}
             >
-              {/* iPhone Notch */}
               {device === 'iphone' && (
                 <div className="absolute top-5 left-1/2 -translate-x-1/2 w-[120px] h-[35px] bg-black rounded-[20px] z-20" />
               )}
 
-              {/* Status Bar */}
               <div className={`flex items-center justify-between px-8 pt-4 pb-2 ${textColor}`}>
                 <span className="text-xs font-semibold">9:41</span>
                 <div className="flex items-center gap-1">
@@ -182,25 +175,19 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                 </div>
               </div>
 
-              {/* App Content */}
               <div className="flex flex-col h-full" dir="rtl">
-                {/* App Header */}
                 <div className="bg-emerald-600 px-4 py-4 flex items-center justify-between">
                   <h1 className="text-white text-lg font-bold">روح المسلم</h1>
                   <div className="text-white/80 text-xs">٣ رمضان ١٤٤٧</div>
                 </div>
 
-                {/* Content based on screen */}
                 <div className={`flex-1 p-4 overflow-auto ${bgColor}`}>
                   {currentScreen === 'home' && (
                     <div className="space-y-4">
-                      {/* Welcome Card */}
                       <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 rounded-2xl text-white">
                         <p className="text-sm opacity-90">السلام عليكم</p>
                         <p className="font-bold mt-1">حان وقت أذكار المساء 🌙</p>
                       </div>
-
-                      {/* Quick Actions */}
                       <div className="grid grid-cols-3 gap-2">
                         {[
                           { icon: '🌅', name: 'الصباح' },
@@ -213,8 +200,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                           </div>
                         ))}
                       </div>
-
-                      {/* Categories */}
                       <div className={`${cardBg} p-4 rounded-xl shadow-sm`}>
                         <h3 className={`font-bold mb-3 ${textColor}`}>الأذكار</h3>
                         {['أذكار الصباح', 'أذكار المساء', 'أذكار النوم'].map((item, i) => (
@@ -275,7 +260,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                       <h2 className={`font-bold text-lg ${textColor}`}>مواقيت الصلاة</h2>
                       <div className={`${cardBg} p-4 rounded-xl shadow-sm text-center`}>
                         <p className={`text-sm ${secondaryText}`}>الصلاة القادمة</p>
-                        <p className={`text-3xl font-bold text-emerald-500 mt-2`}>المغرب</p>
+                        <p className="text-3xl font-bold text-emerald-500 mt-2">المغرب</p>
                         <p className={`text-2xl font-bold ${textColor} mt-1`}>5:45</p>
                         <p className={`text-sm ${secondaryText} mt-1`}>باقي ساعة و 23 دقيقة</p>
                       </div>
@@ -327,7 +312,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                   )}
                 </div>
 
-                {/* Tab Bar */}
                 <div className={`${cardBg} border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'} px-2 py-2 flex items-center justify-around`}>
                   {screens.slice(0, 5).map((screen) => (
                     <button
@@ -345,7 +329,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                   ))}
                 </div>
 
-                {/* Home Indicator */}
                 {device === 'iphone' && (
                   <div className="flex justify-center pb-2">
                     <div className={`w-32 h-1 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} rounded-full`} />
@@ -356,7 +339,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
           </div>
         </div>
 
-        {/* Footer Info */}
         <div className="p-4 border-t border-slate-700 flex items-center justify-between text-sm">
           <div className="text-slate-400">
             {device === 'iphone' ? 'iPhone 14 Pro' : 'Samsung Galaxy S23'} • {theme === 'light' ? 'الوضع الفاتح' : 'الوضع الداكن'}
@@ -372,7 +354,6 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 };
 
 // ==================== Sidebar ====================
-
 const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'لوحة التحكم' },
@@ -383,8 +364,11 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/themes', icon: Palette, label: 'الثيمات' },
     { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
     { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
+    { path: '/users', icon: Users, label: 'المستخدمين' },
+    { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
+    { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
+    { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
     { path: '/settings', icon: Settings, label: 'الإعدادات' },
-    
   ];
 
   return (
@@ -416,7 +400,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
           </div>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 max-h-[calc(100vh-180px)] overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -448,7 +432,6 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
 };
 
 // ==================== Main App ====================
-
 const App: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -459,7 +442,6 @@ const App: React.FC = () => {
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
         <div className="lg:mr-64">
-          {/* Header */}
           <header className="h-16 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 flex items-center justify-between px-6 sticky top-0 z-30">
             <div className="flex items-center gap-4">
               <button
@@ -495,16 +477,18 @@ const App: React.FC = () => {
               <Route path="/themes" element={<Themes />} />
               <Route path="/seasonal" element={<Seasonal />} />
               <Route path="/analytics" element={<Analytics />} />
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/ads" element={<Ads />} />
+              <Route path="/pricing" element={<Pricing />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
         </div>
 
-        {/* Mobile Preview Modal */}
         <MobilePreview isOpen={previewOpen} onClose={() => setPreviewOpen(false)} />
 
-        {/* Floating Preview Button */}
         <button
           onClick={() => setPreviewOpen(true)}
           className="fixed bottom-6 left-6 w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/30 flex items-center justify-center transition-all hover:scale-110 z-40"

@@ -1,506 +1,479 @@
-/**
- * Daily Wird Screen — الورد اليومي
- * يشمل: أذكار الصباح، أذكار المساء، أذكار النوم، أذكار بعد الصلاة، دعاء اليوم
- */
+// app/(tabs)/tasbih.tsx
+// شاشة التسبيح الإلكترونية بتصميم دائري
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  FlatList, Modal, Animated, Platform, Switch,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Dimensions,
+  Platform,
 } from 'react-native';
-import { useColors } from '@/hooks/use-colors';
-import { ScreenContainer } from '@/components/screen-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withSequence,
+  withTiming,
+  interpolate,
+  Extrapolate,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface Dhikr {
-  id: string;
-  arabic: string;
-  translation: string;
+import { useSettings } from '@/contexts/SettingsContext';
+
+const { width, height } = Dimensions.get('window');
+const CIRCLE_SIZE = width * 0.65;
+const DOT_COUNT = 33;
+
+// ========================================
+// الأذكار المتاحة
+// ========================================
+
+const ADHKAR = [
+  { id: 1, text: 'سُبْحَانَ اللَّه', target: 33 },
+  { id: 2, text: 'الْحَمْدُ لِلَّه', target: 33 },
+  { id: 3, text: 'اللَّهُ أَكْبَر', target: 34 },
+  { id: 4, text: 'لَا إِلَهَ إِلَّا اللَّه', target: 100 },
+  { id: 5, text: 'أَسْتَغْفِرُ اللَّه', target: 100 },
+  { id: 6, text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', target: 100 },
+  { id: 7, text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّه', target: 100 },
+];
+
+// ========================================
+// مكون النقطة
+// ========================================
+
+interface DotProps {
+  index: number;
+  total: number;
   count: number;
-  virtue?: string;
-  source?: string;
+  target: number;
 }
 
-interface WirdCategory {
-  id: string;
-  title: string;
-  icon: string;
-  color: string;
-  time: string;
-  adhkar: Dhikr[];
-}
+const Dot: React.FC<DotProps> = ({ index, total, count, target }) => {
+  const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
+  const radius = CIRCLE_SIZE / 2 + 25;
+  const x = Math.cos(angle) * radius;
+  const y = Math.sin(angle) * radius;
+  
+  const dotIndex = index + 1;
+  const isActive = dotIndex <= (count % target || (count > 0 && count % target === 0 ? target : 0));
+  const isCompleted = count >= target && dotIndex <= target;
+  
+  return (
+    <View
+      style={[
+        styles.dot,
+        {
+          transform: [
+            { translateX: x },
+            { translateY: y },
+          ],
+        },
+        isActive && styles.dotActive,
+        isCompleted && styles.dotCompleted,
+      ]}
+    />
+  );
+};
 
-// ─── Wird Data ────────────────────────────────────────────────────────────────
-const WIRD_CATEGORIES: WirdCategory[] = [
-  {
-    id: 'morning',
-    title: 'أذكار الصباح',
-    icon: '🌅',
-    color: '#F59E0B',
-    time: 'بعد صلاة الفجر',
-    adhkar: [
-      {
-        id: 'm1', count: 1,
-        arabic: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-        translation: 'أصبحنا وأصبح الملك لله، والحمد لله وحده لا شريك له',
-        source: 'أبو داود',
-      },
-      {
-        id: 'm2', count: 3,
-        arabic: 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ',
-        translation: 'اللهم بك أصبحنا وبك نحيا ونموت وإليك النشور',
-        source: 'الترمذي',
-      },
-      {
-        id: 'm3', count: 1,
-        arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ',
-        translation: 'سيد الاستغفار',
-        virtue: 'من قاله موقناً به فمات من يومه دخل الجنة',
-        source: 'البخاري',
-      },
-      {
-        id: 'm4', count: 3,
-        arabic: 'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ',
-        translation: 'من قالها ثلاثاً لم تصبه فجأة بلاء',
-        virtue: 'لم يضره شيء',
-        source: 'الترمذي',
-      },
-      {
-        id: 'm5', count: 100,
-        arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
-        translation: 'سبحان الله وبحمده',
-        virtue: 'حطّت خطاياه وإن كانت مثل زبد البحر',
-        source: 'مسلم',
-      },
-      {
-        id: 'm6', count: 10,
-        arabic: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-        translation: 'التهليل عشر مرات صباحاً',
-        virtue: 'كانت كعِدْل عشر رقاب',
-        source: 'أحمد',
-      },
-      {
-        id: 'm7', count: 1,
-        arabic: 'آيَةُ الكُرْسِيِّ — اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ',
-        translation: 'آية الكرسي — البقرة: 255',
-        virtue: 'من قرأها دبر كل صلاة لم يمنعه من دخول الجنة إلا أن يموت',
-        source: 'النسائي',
-      },
-      {
-        id: 'm8', count: 3,
-        arabic: 'قُلْ هُوَ اللَّهُ أَحَدٌ • قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ • قُلْ أَعُوذُ بِرَبِّ النَّاسِ',
-        translation: 'المعوذات الثلاث',
-        virtue: 'كفتك من كل شيء',
-        source: 'أبو داود',
-      },
-    ],
-  },
-  {
-    id: 'evening',
-    title: 'أذكار المساء',
-    icon: '🌙',
-    color: '#2563EB',
-    time: 'بعد صلاة العصر',
-    adhkar: [
-      {
-        id: 'e1', count: 1,
-        arabic: 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-        translation: 'أمسينا وأمسى الملك لله',
-        source: 'أبو داود',
-      },
-      {
-        id: 'e2', count: 3,
-        arabic: 'اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي، لَا إِلَهَ إِلَّا أَنْتَ',
-        translation: 'اللهم عافني في بدني وسمعي وبصري',
-        source: 'أبو داود',
-      },
-      {
-        id: 'e3', count: 1,
-        arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالْآخِرَةِ، اللَّهُمَّ أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي دِينِي وَدُنْيَايَ وَأَهْلِي وَمَالِي',
-        translation: 'دعاء العافية',
-        source: 'ابن ماجه',
-      },
-      {
-        id: 'e4', count: 3,
-        arabic: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ',
-        translation: 'لم يضره لدغ تلك الليلة',
-        virtue: 'لم يضره لدغ تلك الليلة',
-        source: 'مسلم',
-      },
-      {
-        id: 'e5', count: 7,
-        arabic: 'حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ',
-        translation: 'سبع مرات صباحاً ومساءً',
-        virtue: 'كفاه الله ما أهمه من أمر الدنيا والآخرة',
-        source: 'أبو داود',
-      },
-      {
-        id: 'e6', count: 100,
-        arabic: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
-        translation: 'سبحان الله وبحمده',
-        virtue: 'حطّت خطاياه وإن كانت مثل زبد البحر',
-        source: 'مسلم',
-      },
-    ],
-  },
-  {
-    id: 'sleep',
-    title: 'أذكار النوم',
-    icon: '😴',
-    color: '#7C3AED',
-    time: 'عند النوم',
-    adhkar: [
-      {
-        id: 's1', count: 1,
-        arabic: 'بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا',
-        translation: 'باسمك اللهم أموت وأحيا',
-        source: 'البخاري',
-      },
-      {
-        id: 's2', count: 1,
-        arabic: 'الَّلهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ',
-        translation: 'اللهم قني عذابك',
-        source: 'أبو داود',
-      },
-      {
-        id: 's3', count: 33,
-        arabic: 'سُبْحَانَ اللَّهِ ﴿33﴾ • الْحَمْدُ لِلَّهِ ﴿33﴾ • اللَّهُ أَكْبَرُ ﴿34﴾',
-        translation: 'تسبيح فاطمة عليها السلام',
-        virtue: 'خير من خادم',
-        source: 'البخاري',
-      },
-      {
-        id: 's4', count: 1,
-        arabic: 'آيَةُ الكُرْسِيِّ — اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ...',
-        translation: 'آية الكرسي',
-        virtue: 'لا يزال عليك من الله حافظ ولا يقربك شيطان حتى تصبح',
-        source: 'البخاري',
-      },
-      {
-        id: 's5', count: 1,
-        arabic: 'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا بِمَا تَحْفَظُ بِهِ عِبَادَكَ الصَّالِحِينَ',
-        translation: 'دعاء وضع الجنب',
-        source: 'البخاري ومسلم',
-      },
-    ],
-  },
-  {
-    id: 'prayer',
-    title: 'أذكار بعد الصلاة',
-    icon: '🕌',
-    color: '#1B6B3A',
-    time: 'عقب كل صلاة',
-    adhkar: [
-      {
-        id: 'p1', count: 3,
-        arabic: 'أَسْتَغْفِرُ اللَّهَ',
-        translation: 'أستغفر الله',
-        source: 'مسلم',
-      },
-      {
-        id: 'p2', count: 1,
-        arabic: 'اللَّهُمَّ أَنْتَ السَّلَامُ، وَمِنْكَ السَّلَامُ، تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالْإِكْرَامِ',
-        translation: 'اللهم أنت السلام',
-        source: 'مسلم',
-      },
-      {
-        id: 'p3', count: 33,
-        arabic: 'سُبْحَانَ اللَّهِ ﴿33﴾ • الْحَمْدُ لِلَّهِ ﴿33﴾ • اللَّهُ أَكْبَرُ ﴿33﴾\nثُمَّ: لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-        translation: 'التسبيح والتحميد والتكبير',
-        virtue: 'غُفرت خطاياه وإن كانت مثل زبد البحر',
-        source: 'مسلم',
-      },
-      {
-        id: 'p4', count: 1,
-        arabic: 'آيَةُ الكُرْسِيِّ دُبُرَ كُلِّ صَلَاةٍ',
-        translation: 'آية الكرسي دبر كل صلاة مكتوبة',
-        virtue: 'لم يمنعه من دخول الجنة إلا أن يموت',
-        source: 'النسائي',
-      },
-      {
-        id: 'p5', count: 1,
-        arabic: 'اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ',
-        translation: 'اللهم أعني على ذكرك وشكرك وحسن عبادتك',
-        source: 'أبو داود',
-      },
-    ],
-  },
-];
+// ========================================
+// المكون الرئيسي
+// ========================================
 
-// ─── Daily Duas (rotated by day of year) ─────────────────────────────────────
-const DAILY_DUAS = [
-  { arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ', ref: 'البقرة 201' },
-  { arabic: 'رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي وَاحْلُلْ عُقْدَةً مِنْ لِسَانِي يَفْقَهُوا قَوْلِي', ref: 'طه 25-28' },
-  { arabic: 'رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا وَهَبْ لَنَا مِنْ لَدُنْكَ رَحْمَةً إِنَّكَ أَنْتَ الْوَهَّابُ', ref: 'آل عمران 8' },
-  { arabic: 'رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ الَّتِي أَنْعَمْتَ عَلَيَّ وَعَلَى وَالِدَيَّ وَأَنْ أَعْمَلَ صَالِحًا تَرْضَاهُ وَأَصْلِحْ لِي فِي ذُرِّيَّتِي', ref: 'الأحقاف 15' },
-  { arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى', ref: 'مسلم' },
-  { arabic: 'اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ، وَالْعَجْزِ وَالْكَسَلِ، وَالْجُبْنِ وَالْبُخْلِ، وَضَلَعِ الدَّيْنِ وَغَلَبَةِ الرِّجَالِ', ref: 'البخاري' },
-  { arabic: 'رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ وَاجْعَلْنَا لِلْمُتَّقِينَ إِمَامًا', ref: 'الفرقان 74' },
-];
+export default function TasbihScreen() {
+  const router = useRouter();
+  const { isDarkMode } = useSettings();
+  
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [count, setCount] = useState(0);
+  const [rounds, setRounds] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  const scale = useSharedValue(1);
+  const ripple = useSharedValue(0);
+  const counterScale = useSharedValue(1);
 
-const STORAGE_KEY = '@wird_progress';
+  const currentDhikr = ADHKAR[currentIndex];
 
-interface WirdProgress {
-  [categoryId: string]: {
-    [dhikrId: string]: boolean;
-  };
-}
-
-export default function DailyWirdScreen() {
-  const colors = useColors();
-  const [activeCategory, setActiveCategory] = useState('morning');
-  const [progress, setProgress] = useState<WirdProgress>({});
-  const [expandedDhikr, setExpandedDhikr] = useState<string | null>(null);
-  const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const celebAnim = useRef(new Animated.Value(0)).current;
-
-  const todayKey = new Date().toDateString();
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const dailyDua = DAILY_DUAS[dayOfYear % DAILY_DUAS.length];
-
+  // تحميل البيانات المحفوظة
   useEffect(() => {
-    AsyncStorage.getItem(`${STORAGE_KEY}_${todayKey}`).then(data => {
-      if (data) setProgress(JSON.parse(data));
-    });
+    loadSavedData();
   }, []);
 
-  const saveProgress = useCallback((p: WirdProgress) => {
-    AsyncStorage.setItem(`${STORAGE_KEY}_${todayKey}`, JSON.stringify(p));
-  }, [todayKey]);
+  // حفظ البيانات
+  useEffect(() => {
+    saveData();
+  }, [count, rounds, totalCount, currentIndex]);
 
-  const toggleDhikr = useCallback((categoryId: string, dhikrId: string) => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setProgress(prev => {
-      const newP: WirdProgress = {
-        ...prev,
-        [categoryId]: { ...(prev[categoryId] || {}), [dhikrId]: !prev[categoryId]?.[dhikrId] },
-      };
-      saveProgress(newP);
-
-      // Check if category complete
-      const cat = WIRD_CATEGORIES.find(c => c.id === categoryId)!;
-      const allDone = cat.adhkar.every(d => newP[categoryId]?.[d.id]);
-      if (allDone && !Object.values(prev[categoryId] || {}).every(Boolean)) {
-        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Animated.sequence([
-          Animated.timing(celebAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-          Animated.delay(2000),
-          Animated.timing(celebAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
-        ]).start();
+  const loadSavedData = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('tasbih_data');
+      if (saved) {
+        const data = JSON.parse(saved);
+        setCount(data.count || 0);
+        setRounds(data.rounds || 0);
+        setTotalCount(data.totalCount || 0);
+        setCurrentIndex(data.currentIndex || 0);
       }
-      return newP;
-    });
-  }, [saveProgress, celebAnim]);
-
-  const getCategoryProgress = (cat: WirdCategory) => {
-    const done = cat.adhkar.filter(d => progress[cat.id]?.[d.id]).length;
-    return { done, total: cat.adhkar.length, pct: Math.round((done / cat.adhkar.length) * 100) };
+    } catch (error) {
+      console.error('Error loading tasbih data:', error);
+    }
   };
 
-  const totalDone = WIRD_CATEGORIES.reduce((sum, cat) => sum + getCategoryProgress(cat).done, 0);
-  const totalAll  = WIRD_CATEGORIES.reduce((sum, cat) => sum + cat.adhkar.length, 0);
-  const overallPct = Math.round((totalDone / totalAll) * 100);
+  const saveData = async () => {
+    try {
+      await AsyncStorage.setItem('tasbih_data', JSON.stringify({
+        count,
+        rounds,
+        totalCount,
+        currentIndex,
+      }));
+    } catch (error) {
+      console.error('Error saving tasbih data:', error);
+    }
+  };
 
-  const activeCat = WIRD_CATEGORIES.find(c => c.id === activeCategory)!;
-  const { done: catDone, total: catTotal } = getCategoryProgress(activeCat);
+  // معالجة الضغط على العداد
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // أنيميشن الضغط
+    scale.value = withSequence(
+      withTiming(0.95, { duration: 50 }),
+      withSpring(1, { damping: 10, stiffness: 300 })
+    );
+    
+    counterScale.value = withSequence(
+      withTiming(1.2, { duration: 100 }),
+      withSpring(1, { damping: 15, stiffness: 200 })
+    );
+    
+    ripple.value = 0;
+    ripple.value = withTiming(1, { duration: 600 });
 
-  const s = StyleSheet.create({
-    header: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
-    },
-    title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
-    // Daily dua card
-    duaCard: {
-      margin: 12, backgroundColor: '#1B6B3A', borderRadius: 18, padding: 18,
-      shadowColor: '#1B6B3A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6,
-    },
-    duaLabel: { fontSize: 11, color: 'rgba(255,255,255,0.7)', textAlign: 'right', marginBottom: 6, fontWeight: '700' },
-    duaText: { fontSize: 17, color: '#fff', textAlign: 'right', lineHeight: 32, fontWeight: '600' },
-    duaRef: { fontSize: 11, color: 'rgba(255,255,255,0.6)', textAlign: 'right', marginTop: 8 },
-    // Overall progress
-    progressCard: {
-      marginHorizontal: 12, marginBottom: 4, backgroundColor: colors.surface,
-      borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border,
-    },
-    progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    progressLabel: { fontSize: 13, fontWeight: '700', color: colors.foreground },
-    progressPct: { fontSize: 13, fontWeight: '900', color: colors.primary },
-    progressBar: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: 'hidden' },
-    progressFill: { height: 8, backgroundColor: '#1B6B3A', borderRadius: 4 },
-    // Category tabs
-    tabsScroll: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-    tab: {
-      paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5,
-      flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 8,
-    },
-    tabText: { fontSize: 13, fontWeight: '700' },
-    tabBadge: { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center' },
-    tabBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff' },
-    // Category header
-    catHeader: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    catTitle: { fontSize: 16, fontWeight: '800', color: colors.foreground },
-    catProgress: { fontSize: 13, fontWeight: '700' },
-    // Dhikr cards
-    dhikrCard: {
-      marginHorizontal: 12, marginVertical: 5, borderRadius: 14,
-      borderWidth: 1, overflow: 'hidden',
-    },
-    dhikrMain: { padding: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-    checkBtn: {
-      width: 28, height: 28, borderRadius: 14, borderWidth: 2,
-      justifyContent: 'center', alignItems: 'center', flexShrink: 0, marginTop: 4,
-    },
-    dhikrBody: { flex: 1 },
-    dhikrArabic: { fontSize: 17, lineHeight: 32, textAlign: 'right', fontWeight: '600' },
-    dhikrTrans: { fontSize: 12, textAlign: 'right', marginTop: 4 },
-    dhikrSource: { fontSize: 11, textAlign: 'right', marginTop: 2 },
-    countBadge: {
-      borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3,
-      alignSelf: 'flex-end', marginTop: 6,
-    },
-    countText: { fontSize: 11, fontWeight: '800' },
-    // Virtue card
-    virtueCard: {
-      paddingHorizontal: 14, paddingVertical: 10,
-      borderTopWidth: 1,
-    },
-    virtueText: { fontSize: 12, textAlign: 'right', lineHeight: 20 },
-    // Celebrate
-    celebOverlay: {
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', zIndex: 999,
-    },
-    celebCard: {
-      backgroundColor: '#fff', borderRadius: 28, padding: 40, alignItems: 'center',
-      shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 20,
-    },
-  });
+    const newCount = count + 1;
+    setCount(newCount);
+    setTotalCount(prev => prev + 1);
+
+    // التحقق من إكمال الجولة
+    if (newCount >= currentDhikr.target) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCount(0);
+      setRounds(prev => prev + 1);
+    }
+  }, [count, currentDhikr.target]);
+
+  // تغيير الذكر
+  const changeAdhkar = (direction: 'prev' | 'next') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (direction === 'next') {
+      setCurrentIndex(prev => (prev + 1) % ADHKAR.length);
+    } else {
+      setCurrentIndex(prev => (prev - 1 + ADHKAR.length) % ADHKAR.length);
+    }
+    setCount(0);
+  };
+
+  // إعادة التعيين
+  const handleReset = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCount(0);
+    setRounds(0);
+  };
+
+  // إعادة تعيين الكل
+  const handleResetAll = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setCount(0);
+    setRounds(0);
+    setTotalCount(0);
+  };
+
+  // الأنيميشن
+  const circleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const counterAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: counterScale.value }],
+  }));
+
+  const rippleAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(ripple.value, [0, 1], [0.5, 0], Extrapolate.CLAMP),
+    transform: [
+      { scale: interpolate(ripple.value, [0, 1], [1, 1.5], Extrapolate.CLAMP) },
+    ],
+  }));
+
+  const backgroundColor = isDarkMode ? '#11151c' : '#0d3d2d';
+  const textColor = '#fff';
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={{ width: 36 }} />
-        <Text style={s.title}>📜 الورد اليومي</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
-        {/* Dua of the Day */}
-        <View style={s.duaCard}>
-          <Text style={s.duaLabel}>📿 دعاء اليوم</Text>
-          <Text style={s.duaText}>{dailyDua.arabic}</Text>
-          <Text style={s.duaRef}>— {dailyDua.ref}</Text>
+    <LinearGradient
+      colors={isDarkMode ? ['#11151c', '#1a2a20'] : ['#0d3d2d', '#1a5a40']}
+      style={styles.container}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        {/* الهيدر */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="chevron-right" size={28} color={textColor} />
+          </Pressable>
+          <Text style={styles.headerTitle}>السبحة الإلكترونية</Text>
+          <Pressable onPress={handleResetAll} style={styles.resetAllButton}>
+            <MaterialCommunityIcons name="refresh" size={24} color={textColor} />
+          </Pressable>
         </View>
 
-        {/* Overall Progress */}
-        <View style={s.progressCard}>
-          <View style={s.progressRow}>
-            <Text style={s.progressLabel}>التقدم اليومي الكلي</Text>
-            <Text style={[s.progressPct, { color: overallPct === 100 ? '#1B6B3A' : colors.primary }]}>
-              {totalDone}/{totalAll} ({overallPct}%)
-            </Text>
+        {/* اختيار الذكر */}
+        <View style={styles.adhkarSelector}>
+          <Pressable onPress={() => changeAdhkar('prev')} style={styles.arrowButton}>
+            <MaterialCommunityIcons name="chevron-right" size={28} color="#4ade80" />
+          </Pressable>
+          <View style={styles.adhkarTextContainer}>
+            <Text style={styles.adhkarText}>{currentDhikr.text}</Text>
           </View>
-          <View style={s.progressBar}>
-            <View style={[s.progressFill, { width: `${overallPct}%` as any, backgroundColor: overallPct === 100 ? '#1B6B3A' : colors.primary }]} />
+          <Pressable onPress={() => changeAdhkar('next')} style={styles.arrowButton}>
+            <MaterialCommunityIcons name="chevron-left" size={28} color="#4ade80" />
+          </Pressable>
+        </View>
+
+        {/* العداد الدائري */}
+        <View style={styles.counterContainer}>
+          {/* النقاط حول الدائرة */}
+          <View style={styles.dotsContainer}>
+            {Array.from({ length: DOT_COUNT }).map((_, index) => (
+              <Dot
+                key={index}
+                index={index}
+                total={DOT_COUNT}
+                count={count}
+                target={currentDhikr.target > 33 ? 33 : currentDhikr.target}
+              />
+            ))}
           </View>
-        </View>
 
-        {/* Category Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabsScroll}>
-          {WIRD_CATEGORIES.map(cat => {
-            const { done, total } = getCategoryProgress(cat);
-            const isActive = activeCategory === cat.id;
-            const isDone = done === total;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={[s.tab, {
-                  borderColor: isActive ? cat.color : colors.border,
-                  backgroundColor: isActive ? cat.color + '15' : colors.surface,
-                }]}
-                onPress={() => setActiveCategory(cat.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 16 }}>{cat.icon}</Text>
-                <Text style={[s.tabText, { color: isActive ? cat.color : colors.muted }]}>{cat.title}</Text>
-                <View style={[s.tabBadge, { backgroundColor: isDone ? '#1B6B3A' : cat.color }]}>
-                  <Text style={s.tabBadgeText}>{isDone ? '✓' : done}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Active Category */}
-        <View style={s.catHeader}>
-          <Text style={[s.catProgress, { color: activeCat.color }]}>{catDone}/{catTotal}</Text>
-          <Text style={s.catTitle}>{activeCat.icon} {activeCat.title}</Text>
-        </View>
-
-        {/* Adhkar list */}
-        {activeCat.adhkar.map((dhikr, idx) => {
-          const isDone = !!progress[activeCat.id]?.[dhikr.id];
-          const isExpanded = expandedDhikr === dhikr.id;
-          return (
-            <TouchableOpacity
-              key={dhikr.id}
-              style={[s.dhikrCard, {
-                backgroundColor: isDone ? activeCat.color + '08' : colors.surface,
-                borderColor: isDone ? activeCat.color + '40' : colors.border,
-              }]}
-              onPress={() => setExpandedDhikr(isExpanded ? null : dhikr.id)}
-              activeOpacity={0.85}
-            >
-              <View style={s.dhikrMain}>
-                <TouchableOpacity
-                  style={[s.checkBtn, {
-                    borderColor: isDone ? activeCat.color : colors.border,
-                    backgroundColor: isDone ? activeCat.color : 'transparent',
-                  }]}
-                  onPress={() => toggleDhikr(activeCat.id, dhikr.id)}
-                >
-                  {isDone && <Text style={{ fontSize: 14, color: '#fff' }}>✓</Text>}
-                </TouchableOpacity>
-                <View style={s.dhikrBody}>
-                  <Text style={[s.dhikrArabic, { color: isDone ? colors.muted : colors.foreground }]}>
-                    {dhikr.arabic}
-                  </Text>
-                  {dhikr.translation !== dhikr.arabic && (
-                    <Text style={[s.dhikrTrans, { color: colors.muted }]}>{dhikr.translation}</Text>
-                  )}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {dhikr.source && <Text style={[s.dhikrSource, { color: colors.muted }]}>📚 {dhikr.source}</Text>}
-                    <View style={[s.countBadge, { backgroundColor: activeCat.color + '18' }]}>
-                      <Text style={[s.countText, { color: activeCat.color }]}>× {dhikr.count}</Text>
-                    </View>
-                  </View>
-                </View>
+          {/* الدائرة الرئيسية */}
+          <Pressable onPress={handlePress}>
+            <Animated.View style={[styles.mainCircle, circleAnimatedStyle]}>
+              {/* تأثير الموجة */}
+              <Animated.View style={[styles.ripple, rippleAnimatedStyle]} />
+              
+              {/* الدائرة الداخلية */}
+              <View style={styles.innerCircle}>
+                <Animated.View style={counterAnimatedStyle}>
+                  <Text style={styles.countText}>{count}</Text>
+                </Animated.View>
+                <Text style={styles.targetText}>{currentDhikr.target} /</Text>
               </View>
-              {/* Virtue (expanded) */}
-              {dhikr.virtue && isExpanded && (
-                <View style={[s.virtueCard, { borderTopColor: activeCat.color + '30', backgroundColor: activeCat.color + '08' }]}>
-                  <Text style={[s.virtueText, { color: activeCat.color }]}>🌟 {dhikr.virtue}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Celebration Overlay */}
-      <Animated.View style={[s.celebOverlay, { opacity: celebAnim }]} pointerEvents="none">
-        <View style={s.celebCard}>
-          <Text style={{ fontSize: 60, marginBottom: 8 }}>🎉</Text>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: '#1B6B3A', marginBottom: 6 }}>أحسنت!</Text>
-          <Text style={{ fontSize: 14, color: '#555', textAlign: 'center' }}>أتممت {activeCat.title}</Text>
-          <Text style={{ fontSize: 22, marginTop: 10 }}>بارك الله فيك 🌟</Text>
+            </Animated.View>
+          </Pressable>
         </View>
-      </Animated.View>
-    </ScreenContainer>
+
+        {/* الإحصائيات */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{rounds}</Text>
+            <Text style={styles.statLabel}>الجولات</Text>
+          </View>
+          
+          <Pressable onPress={handleReset} style={styles.resetButton}>
+            <MaterialCommunityIcons name="restart" size={32} color="#4ade80" />
+          </Pressable>
+          
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{totalCount}</Text>
+            <Text style={styles.statLabel}>المجموع</Text>
+          </View>
+        </View>
+
+        {/* تعليمات */}
+        <Text style={styles.instructions}>اضغط على الدائرة للتسبيح</Text>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
+
+// ========================================
+// الأنماط
+// ========================================
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  
+  // الهيدر
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 20,
+    color: '#fff',
+  },
+  resetAllButton: {
+    padding: 8,
+  },
+
+  // اختيار الذكر
+  adhkarSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 20,
+    paddingHorizontal: 20,
+  },
+  arrowButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adhkarTextContainer: {
+    flex: 1,
+    marginHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  adhkarText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 22,
+    color: '#fff',
+    textAlign: 'center',
+  },
+
+  // العداد
+  counterContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotsContainer: {
+    position: 'absolute',
+    width: CIRCLE_SIZE + 60,
+    height: CIRCLE_SIZE + 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dot: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dotActive: {
+    backgroundColor: '#4ade80',
+    shadowColor: '#4ade80',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  dotCompleted: {
+    backgroundColor: '#4ade80',
+  },
+  mainCircle: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(74, 222, 128, 0.4)',
+  },
+  ripple: {
+    position: 'absolute',
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    borderWidth: 3,
+    borderColor: '#4ade80',
+  },
+  innerCircle: {
+    width: CIRCLE_SIZE - 40,
+    height: CIRCLE_SIZE - 40,
+    borderRadius: (CIRCLE_SIZE - 40) / 2,
+    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(74, 222, 128, 0.3)',
+  },
+  countText: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 72,
+    color: '#fff',
+  },
+  targetText: {
+    fontFamily: 'Cairo-Medium',
+    fontSize: 24,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: -10,
+  },
+
+  // الإحصائيات
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 40,
+    paddingVertical: 30,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontFamily: 'Cairo-Bold',
+    fontSize: 32,
+    color: '#fff',
+  },
+  statLabel: {
+    fontFamily: 'Cairo-Medium',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
+  },
+  resetButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(74, 222, 128, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // التعليمات
+  instructions: {
+    fontFamily: 'Cairo-Regular',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    paddingBottom: 20,
+  },
+});
