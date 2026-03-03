@@ -86,7 +86,12 @@ const DEFAULT_LANGUAGE: Language = 'ar';
  * الحصول على جميع الأذكار
  */
 export const getAllAzkar = (): Zikr[] => {
-  const data = azkarData as { azkar: Zikr[] };
+  // التحقق من بنية البيانات
+  if (Array.isArray(azkarData)) {
+    return azkarData as Zikr[];
+  }
+  // إذا كانت البيانات في شكل { azkar: [...] }
+  const data = azkarData as { azkar?: Zikr[] };
   return data.azkar || [];
 };
 
@@ -94,7 +99,12 @@ export const getAllAzkar = (): Zikr[] => {
  * الحصول على جميع الفئات
  */
 export const getAllCategories = (): AzkarCategory[] => {
-  const data = categoriesData as { categories: AzkarCategory[] };
+  // التحقق من بنية البيانات
+  if (Array.isArray(categoriesData)) {
+    return (categoriesData as AzkarCategory[]).sort((a, b) => a.order - b.order);
+  }
+  // إذا كانت البيانات في شكل { categories: [...] }
+  const data = categoriesData as { categories?: AzkarCategory[] };
   return (data.categories || []).sort((a, b) => a.order - b.order);
 };
 
@@ -162,7 +172,7 @@ export const searchAzkar = (query: string, language: Language = 'ar'): Zikr[] =>
   
   return getAllAzkar().filter(zikr => {
     // البحث في النص العربي
-    if (zikr.arabic.includes(normalizedQuery)) return true;
+    if (zikr.arabic?.includes(normalizedQuery)) return true;
     
     // البحث في النطق
     if (zikr.transliteration?.toLowerCase().includes(normalizedQuery)) return true;
@@ -405,39 +415,26 @@ export const getRuqya = (): Zikr[] => getAzkarByCategory('ruqya');
 // ===================================================
 
 export default {
-  // البيانات
   getAllAzkar,
   getAllCategories,
   getAzkarByCategory,
   getZikrById,
   getCategoryById,
-  
-  // الترجمات
   getZikrTranslation,
   getCategoryName,
   getZikrBenefit,
-  
-  // البحث
   searchAzkar,
-  
-  // التقدم
   getDailyProgress,
   saveDailyProgress,
   updateZikrProgress,
   resetDailyProgress,
   getCategoryCompletionPercentage,
-  
-  // المفضلة
   getFavorites,
   addToFavorites,
   removeFromFavorites,
   isFavorite,
   getFavoriteAzkar,
-  
-  // الإحصائيات
   getAzkarStats,
-  
-  // دوال مختصرة
   getMorningAzkar,
   getEveningAzkar,
   getSleepAzkar,
