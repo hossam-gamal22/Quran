@@ -1,25 +1,25 @@
 // admin-panel/src/services/pushNotifications.ts
 // خدمة إرسال الإشعارات عبر Expo Push API
-// آخر تحديث: 2026-03-04
+// آخر تحديث: 2026-03-03
 
 import { db } from '../firebase';
 import { 
   collection, 
   getDocs, 
   query, 
-  where,
-  Timestamp 
+  where, 
+  Timestamp,
+  addDoc,
+  serverTimestamp
 } from 'firebase/firestore';
 
-// ========================================
-// الأنواع
-// ========================================
+// ==================== الأنواع ====================
 
 interface ExpoPushMessage {
-  to: string | string[];
+  to: string;
   title: string;
   body: string;
-  data?: Record<string, unknown>;
+  data?: Record<string, any>;
   sound?: 'default' | null;
   badge?: number;
   channelId?: string;
@@ -32,9 +32,10 @@ interface PushNotificationPayload {
   titleEn?: string;
   bodyAr: string;
   bodyEn?: string;
-  targetAudience: 'all' | 'ios' | 'android' | 'active' | 'inactive';
+  targetAudience: 'all' | 'ios' | 'android' | 'active' | 'inactive' | 'custom';
   targetLanguages?: string[];
   targetCountries?: string[];
+  actionType?: 'none' | 'screen' | 'url';
   actionUrl?: string;
   imageUrl?: string;
 }
@@ -47,113 +48,110 @@ interface SendResult {
 }
 
 interface UserToken {
-  token: string;
+  id: string;
+  fcmToken: string;
+  platform: string;
   language: string;
+  country: string;
+  lastActive: Timestamp | null;
 }
 
 interface BatchResult {
-  success: number;
-  failed: number;
+  successCount: number;
+  failureCount: number;
   errors: string[];
 }
 
 interface UserStats {
   total: number;
-  withToken: number;
+  withTokens: number;
   ios: number;
   android: number;
   active: number;
 }
 
-// ========================================
-// الثوابت
-// ========================================
+// ==================== الثوابت ====================
 
 const EXPO_PUSH_API = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
 
-// ========================================
-// الدوال المساعدة
-// ========================================
+// ==================== دوال مساعدة ====================
 
 /**
  * جلب توكنات المستخدمين من Firebase
  */
-async function fetchUserTokens(
+const fetchUserTokens = async (
   targetAudience: string,
   targetLanguages?: string[],
   targetCountries?: string[]
-): Promise<UserToken[]> {
-  const tokens: UserToken[] = [];
-  
+): Promise<UserToken[]> => {
   try {
     const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
+    let usersQuery = query(usersRef);
     
-    snapshot.docs.forEach(doc => {
+    // تصفية حسب المنصة
+    if (targetAudience === 'ios') {
+      usersQuery = query(usersRef, where('platform', '==', 'ios'));
+    } else if (targetAudience === 'android') {
+      usersQuery = query(usersRef, where('platform', '==', 'android'));
+    }
+    
+    const snapshot = await getDocs(usersQuery);
+    let users: UserToken[] = [];
+    
+    snapshot.forEach(doc => {
       const data = doc.data();
-      
       // تجاهل المستخدمين بدون توكن
-      if (!data.fcmToken || data.fcmToken === '' || data.placeholder) {
-        return;
+      if (data.fcmToken && data.fcmToken.startsWith('ExponentPushToken')) {
+        users.push({
+          id: doc.id,
+          fcmToken: data.fcmToken,
+          platform: data.platform || 'unknown',
+          language: data.language || 'ar',
+          country: data.country || 'SA',
+          lastActive: data.lastActive,
+        });
       }
-      
-      // تصفية حسب الـ audience
-      if (targetAudience === 'ios' && data.platform !== 'ios') return;
-      if (targetAudience === 'android' && data.platform !== 'android') return;
-      
-      // تصفية حسب النشاط
-      if (targetAudience === 'active' || targetAudience === 'inactive') {
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        let lastActive: Date;
-        
-        if (data.lastActive instanceof Timestamp) {
-          lastActive = data.lastActive.toDate();
-        } else if (data.lastActive) {
-          lastActive = new Date(data.lastActive);
-        } else {
-          return;
-        }
-        
-        if (targetAudience === 'active' && lastActive < weekAgo) return;
-        if (targetAudience === 'inactive' && lastActive >= weekAgo) return;
-      }
-      
-      // تصفية حسب اللغة
-      if (targetLanguages && targetLanguages.length > 0) {
-        if (!targetLanguages.includes(data.language)) return;
-      }
-      
-      // تصفية حسب البلد
-      if (targetCountries && targetCountries.length > 0) {
-        if (!targetCountries.includes(data.country)) return;
-      }
-      
-      tokens.push({
-        token: data.fcmToken,
-        language: data.language || 'ar',
-      });
     });
     
-    console.log(`📱 Found ${tokens.length} user tokens for target: ${targetAudience}`);
-    return tokens;
+    // تصفية المستخدمين النشطين/غير النشطين
+    if (targetAudience === 'active') {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => {
+        if (!u.lastActive) return false;
+        const lastActive = u.lastActive.toDate();
+        return lastActive > weekAgo;
+      });
+    } else if (targetAudience === 'inactive') {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      users = users.filter(u => {
+        if (!u.lastActive) return true;
+        const lastActive = u.lastActive.toDate();
+        return lastActive <= weekAgo;
+      });
+    }
     
+    // تصفية حسب اللغة
+    if (targetLanguages && targetLanguages.length > 0) {
+      users = users.filter(u => targetLanguages.includes(u.language));
+    }
+    
+    // تصفية حسب البلد
+    if (targetCountries && targetCountries.length > 0) {
+      users = users.filter(u => targetCountries.includes(u.country));
+    }
+    
+    return users;
   } catch (error) {
-    console.error('❌ Error fetching user tokens:', error);
+    console.error('Error fetching user tokens:', error);
     return [];
   }
-}
+};
 
 /**
- * إرسال دفعة من الإشعارات عبر Expo API
+ * إرسال دفعة من الإشعارات
  */
-async function sendBatch(messages: ExpoPushMessage[]): Promise<BatchResult> {
-  const result: BatchResult = { success: 0, failed: 0, errors: [] };
-  
-  if (messages.length === 0) {
-    return result;
-  }
-  
+const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
   try {
     const response = await fetch(EXPO_PUSH_API, {
       method: 'POST',
@@ -166,170 +164,181 @@ async function sendBatch(messages: ExpoPushMessage[]): Promise<BatchResult> {
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      result.errors.push(`HTTP ${response.status}: ${errorText}`);
-      result.failed = messages.length;
-      return result;
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    const responseData = await response.json();
+    const result = await response.json();
     
-    if (responseData.data && Array.isArray(responseData.data)) {
-      responseData.data.forEach((ticket: { status: string; message?: string }) => {
-        if (ticket.status === 'ok') {
-          result.success++;
+    let successCount = 0;
+    let failureCount = 0;
+    const errors: string[] = [];
+    
+    if (result.data) {
+      result.data.forEach((item: any, index: number) => {
+        if (item.status === 'ok') {
+          successCount++;
         } else {
-          result.failed++;
-          if (ticket.message) {
-            result.errors.push(ticket.message);
-          }
+          failureCount++;
+          errors.push(`Token ${index}: ${item.message || 'Unknown error'}`);
         }
       });
     }
     
-    return result;
-    
+    return { successCount, failureCount, errors };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    result.errors.push(errorMessage);
-    result.failed = messages.length;
-    return result;
+    console.error('Batch send error:', error);
+    return {
+      successCount: 0,
+      failureCount: messages.length,
+      errors: [(error as Error).message],
+    };
   }
-}
+};
 
-// ========================================
-// الدوال الرئيسية
-// ========================================
+// ==================== الدوال الرئيسية ====================
 
 /**
- * إرسال إشعار للمستخدمين
+ * إرسال إشعار push لجميع المستخدمين المستهدفين
  */
-export async function sendPushNotification(payload: PushNotificationPayload): Promise<SendResult> {
-  const result: SendResult = {
-    success: false,
-    sentCount: 0,
-    failedCount: 0,
-    errors: [],
-  };
+export const sendPushNotification = async (
+  payload: PushNotificationPayload
+): Promise<SendResult> => {
+  const errors: string[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
   
   try {
-    console.log('🚀 Starting push notification send...');
-    
     // 1. جلب توكنات المستخدمين
-    const userTokens = await fetchUserTokens(
+    const users = await fetchUserTokens(
       payload.targetAudience,
       payload.targetLanguages,
       payload.targetCountries
     );
     
-    if (userTokens.length === 0) {
-      result.errors.push('لم يتم العثور على مستخدمين مطابقين');
-      return result;
+    if (users.length === 0) {
+      return {
+        success: false,
+        sentCount: 0,
+        failedCount: 0,
+        errors: ['لا يوجد مستخدمين مطابقين للمعايير المحددة'],
+      };
     }
     
-    // 2. إنشاء الرسائل
-    const messages: ExpoPushMessage[] = userTokens.map(({ token, language }) => {
-      const isArabic = language === 'ar' || !payload.titleEn;
-      const title = isArabic ? payload.titleAr : (payload.titleEn || payload.titleAr);
-      const body = isArabic ? payload.bodyAr : (payload.bodyEn || payload.bodyAr);
-      
-      return {
-        to: token,
-        title,
-        body,
-        sound: 'default',
-        priority: 'high',
-        channelId: 'default',
-        data: {
-          actionUrl: payload.actionUrl,
-          imageUrl: payload.imageUrl,
-        },
-      };
-    });
+    console.log(`📤 Sending to ${users.length} users...`);
+    
+    // 2. بناء الرسائل
+    const messages: ExpoPushMessage[] = users.map(user => ({
+      to: user.fcmToken,
+      title: user.language === 'ar' ? payload.titleAr : (payload.titleEn || payload.titleAr),
+      body: user.language === 'ar' ? payload.bodyAr : (payload.bodyEn || payload.bodyAr),
+      sound: 'default',
+      priority: 'high',
+      data: {
+        actionType: payload.actionType,
+        actionUrl: payload.actionUrl,
+        imageUrl: payload.imageUrl,
+      },
+    }));
     
     // 3. إرسال على دفعات
-    const batches: ExpoPushMessage[][] = [];
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-      batches.push(messages.slice(i, i + BATCH_SIZE));
-    }
-    
-    // 4. إرسال كل دفعة
-    for (let i = 0; i < batches.length; i++) {
-      const batchResult = await sendBatch(batches[i]);
-      result.sentCount += batchResult.success;
-      result.failedCount += batchResult.failed;
-      result.errors.push(...batchResult.errors);
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch);
+      
+      sentCount += result.successCount;
+      failedCount += result.failureCount;
+      errors.push(...result.errors);
       
       // تأخير بين الدفعات
-      if (i < batches.length - 1) {
+      if (i + BATCH_SIZE < messages.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
     
-    result.success = result.sentCount > 0;
-    return result;
+    // 4. تسجيل الإشعار في Firebase
+    await addDoc(collection(db, 'notifications'), {
+      ...payload,
+      status: 'sent',
+      sentCount,
+      failedCount,
+      deliveredCount: sentCount, // تقدير مبدئي
+      openedCount: 0,
+      clickedCount: 0,
+      sentAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    });
     
+    console.log(`✅ Sent: ${sentCount}, Failed: ${failedCount}`);
+    
+    return {
+      success: sentCount > 0,
+      sentCount,
+      failedCount,
+      errors: errors.slice(0, 10), // أول 10 أخطاء فقط
+    };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    result.errors.push(errorMessage);
-    return result;
+    console.error('Send notification error:', error);
+    return {
+      success: false,
+      sentCount,
+      failedCount,
+      errors: [(error as Error).message],
+    };
   }
-}
+};
 
 /**
  * إرسال إشعار اختباري
  */
-export async function sendTestNotification(token: string): Promise<boolean> {
-  const message: ExpoPushMessage = {
-    to: token,
-    title: 'إشعار اختباري 🔔',
-    body: 'هذا إشعار اختباري من لوحة تحكم روح المسلم',
-    sound: 'default',
-    priority: 'high',
-  };
-  
-  const result = await sendBatch([message]);
-  return result.success > 0;
-}
+export const sendTestNotification = async (token: string): Promise<boolean> => {
+  try {
+    const response = await fetch(EXPO_PUSH_API, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([{
+        to: token,
+        title: 'إشعار اختباري 🔔',
+        body: 'هذا إشعار تجريبي من لوحة التحكم',
+        sound: 'default',
+      }]),
+    });
+    
+    return response.ok;
+  } catch (error) {
+    console.error('Test notification error:', error);
+    return false;
+  }
+};
 
 /**
  * التحقق من صلاحية التوكن
  */
-export function isValidExpoToken(token: string): boolean {
-  return token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[');
-}
+export const isValidExpoToken = (token: string): boolean => {
+  return token.startsWith('ExponentPushToken[') && token.endsWith(']');
+};
 
 /**
- * إحصائيات المستخدمين
+ * الحصول على إحصائيات المستخدمين
  */
-export async function getUserStats(): Promise<UserStats> {
+export const getUserStats = async (): Promise<UserStats> => {
   try {
-    const usersRef = collection(db, 'users');
-    const snapshot = await getDocs(usersRef);
-    const users = snapshot.docs
-      .map(doc => doc.data())
-      .filter(u => !u.placeholder);
-    
+    const users = await fetchUserTokens('all');
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     
     return {
       total: users.length,
-      withToken: users.filter(u => u.fcmToken && u.fcmToken !== '').length,
+      withTokens: users.filter(u => u.fcmToken).length,
       ios: users.filter(u => u.platform === 'ios').length,
       android: users.filter(u => u.platform === 'android').length,
       active: users.filter(u => {
         if (!u.lastActive) return false;
-        let lastActive: Date;
-        if (u.lastActive instanceof Timestamp) {
-          lastActive = u.lastActive.toDate();
-        } else {
-          lastActive = new Date(u.lastActive);
-        }
-        return lastActive > weekAgo;
+        return u.lastActive.toDate() > weekAgo;
       }).length,
     };
   } catch (error) {
-    console.error('❌ Error getting user stats:', error);
-    return { total: 0, withToken: 0, ios: 0, android: 0, active: 0 };
+    return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0 };
   }
-}
+};
