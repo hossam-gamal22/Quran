@@ -1,43 +1,102 @@
 {
   "expo": {
-    "name": "رُوح المسلم",
+    "name": "روح المسلم",
     "slug": "rooh-almuslim",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "scheme": "rooh-almuslim",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1B4332"
+      "backgroundColor": "#0a0a0a"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rooh.almuslim"
+      "bundleIdentifier": "com.rooh.almuslim",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
+        "NSLocationAlwaysUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
+        "UIBackgroundModes": ["audio", "fetch", "remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#1B4332"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
       },
-      "package": "com.rooh.almuslim"
+      "package": "com.rooh.almuslim",
+      "versionCode": 1,
+      "permissions": [
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "SCHEDULE_EXACT_ALARM",
+        "POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-router",
-      "expo-asset",
-      "expo-audio",
-      "expo-secure-store",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10B981",
+          "sounds": ["./assets/sounds/adhan.wav", "./assets/sounds/notification.wav"],
+          "androidMode": "default",
+          "androidCollapsedTitle": "روح المسلم"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة"
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "نحتاج إذن الحركة لتحديد اتجاه القبلة"
+        }
+      ],
+      "expo-asset",
+      "expo-localization"
     ],
+    "experiments": {
+      "typedRoutes": true
+    },
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "12ffec15-6357-43b4-a309-8e71cc2afc8c"
       }
     },
-    "scheme": "rooh-almuslim"
+    "owner": "hossam-gamal22",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/12ffec15-6357-43b4-a309-8e71cc2afc8c",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "locales": {
+      "ar": "./locales/ar.json",
+      "en": "./locales/en.json"
+    }
   }
 }

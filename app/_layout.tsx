@@ -7,6 +7,10 @@ import { Tabs, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useEffect } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
+import { registerUser, updateLastActive } from '../lib/firebase-user';
+import { trackAppOpen, initializeGlobalStats, syncLocalStats } from '../lib/firebase-analytics';
 import Animated, {
   useAnimatedStyle,
   withSpring,
@@ -17,6 +21,62 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import { useEffect } from 'react';
+import { registerUser, updateUserActivity } from '../lib/firebase-user';
+
+export default function RootLayout() {
+  // ========== Firebase Integration ==========
+  useEffect(() => {
+    // تهيئة Firebase والتسجيل
+    const initFirebase = async () => {
+      try {
+        // تهيئة الإحصائيات العامة
+        await initializeGlobalStats();
+        
+        // تسجيل المستخدم
+        await registerUser();
+        
+        // تسجيل فتح التطبيق
+        await trackAppOpen();
+        
+        console.log('✅ Firebase initialized in app');
+      } catch (error) {
+        console.log('Firebase init error:', error);
+      }
+    };
+    
+    initFirebase();
+    
+    // تتبع حالة التطبيق
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        // التطبيق أصبح نشط
+        updateLastActive();
+      } else if (nextAppState === 'background') {
+        // التطبيق ذهب للخلفية - مزامنة الإحصائيات
+        syncLocalStats();
+      }
+    };
+    
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    
+    // تحديث النشاط كل 5 دقائق
+    const activityInterval = setInterval(() => {
+      updateLastActive();
+    }, 5 * 60 * 1000);
+    
+    // مزامنة الإحصائيات كل 15 دقيقة
+    const syncInterval = setInterval(() => {
+      syncLocalStats();
+    }, 15 * 60 * 1000);
+    
+    return () => {
+      subscription.remove();
+      clearInterval(activityInterval);
+      clearInterval(syncInterval);
+    };
+  }, []);
+  
 
 const { width } = Dimensions.get('window');
 

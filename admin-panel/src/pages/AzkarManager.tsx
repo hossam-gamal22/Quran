@@ -1,8 +1,7 @@
 // admin-panel/src/pages/AzkarManager.tsx
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, Edit, Trash2, Download, RefreshCw, Play, Square, 
-  Upload, Search, Database, FileJson
+  Download, RefreshCw, Play, Square, Search, FileJson
 } from 'lucide-react';
 
 // الأنواع
@@ -53,8 +52,8 @@ const CATEGORIES = [
   { id: 'ruqya', name: 'الرقية الشرعية', icon: '🛡️', color: 'bg-indigo-500' },
 ];
 
-// رابط ملف JSON من GitHub
-const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
+// ✅ استخدام jsDelivr CDN بدل raw.githubusercontent (يحل مشكلة CORS)
+const AZKAR_JSON_URL = 'https://cdn.jsdelivr.net/gh/hossam-gamal22/Quran@main/data/json/azkar.json';
 
 const AzkarManager: React.FC = () => {
   const [azkarData, setAzkarData] = useState<AzkarData | null>(null);
@@ -70,12 +69,10 @@ const AzkarManager: React.FC = () => {
   const [notification, setNotification] = useState<{show: boolean; message: string; type: 'success' | 'error'}>({show: false, message: '', type: 'success'});
   const [dataSource, setDataSource] = useState<'github' | 'local'>('github');
 
-  // تحميل البيانات من GitHub
   useEffect(() => {
     loadAzkarFromGitHub();
   }, []);
 
-  // فلترة
   useEffect(() => {
     let filtered = [...azkarList];
     if (selectedCategory !== 'all') {
@@ -93,12 +90,13 @@ const AzkarManager: React.FC = () => {
     setFilteredList(filtered);
   }, [azkarList, selectedCategory, searchQuery]);
 
-  // تحميل من GitHub
   const loadAzkarFromGitHub = async () => {
     setLoading(true);
     try {
-      const response = await fetch(AZKAR_JSON_URL);
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch(AZKAR_JSON_URL, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data: AzkarData = await response.json();
       setAzkarData(data);
       setAzkarList(data.azkar || []);
@@ -106,7 +104,7 @@ const AzkarManager: React.FC = () => {
       showNotification(`✅ تم تحميل ${data.azkar?.length || 0} ذكر من GitHub`, 'success');
     } catch (error) {
       console.error('Error loading azkar:', error);
-      showNotification('❌ خطأ في تحميل الأذكار', 'error');
+      showNotification('❌ خطأ في تحميل الأذكار - تأكد من الاتصال بالإنترنت', 'error');
     }
     setLoading(false);
   };
@@ -116,7 +114,6 @@ const AzkarManager: React.FC = () => {
     setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 3000);
   };
 
-  // تشغيل الصوت
   const playAudio = (url: string) => {
     if (audioElement) {
       audioElement.pause();
@@ -141,7 +138,6 @@ const AzkarManager: React.FC = () => {
     setPlayingAudio(null);
   };
 
-  // تصدير JSON
   const exportToJson = () => {
     const exportData = {
       version: azkarData?.version || "2.0",
@@ -159,13 +155,11 @@ const AzkarManager: React.FC = () => {
     showNotification(`📥 تم تصدير ${azkarList.length} ذكر`, 'success');
   };
 
-  // عرض تفاصيل ذكر
   const viewZikrDetails = (zikr: Zikr) => {
     setSelectedZikr(zikr);
     setShowDetailModal(true);
   };
 
-  // الإحصائيات
   const stats = {
     total: azkarList.length,
     withAudio: azkarList.filter(z => z.audio && z.audio.length > 0).length,
@@ -177,7 +171,6 @@ const AzkarManager: React.FC = () => {
     }, {} as Record<string, number>)
   };
 
-  // حساب نسبة الترجمات
   const getTranslationCoverage = () => {
     if (azkarList.length === 0) return 0;
     let totalTranslations = 0;
@@ -191,7 +184,6 @@ const AzkarManager: React.FC = () => {
 
   return (
     <div className="p-6 min-h-screen" dir="rtl">
-      {/* Notification */}
       {notification.show && (
         <div className={`fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-96 p-4 rounded-xl shadow-lg z-50 ${
           notification.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
@@ -200,12 +192,11 @@ const AzkarManager: React.FC = () => {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">🕌 إدارة الأذكار والأدعية</h1>
           <p className="text-slate-400 text-sm mt-1">
-            📂 مصدر البيانات: <span className="text-emerald-400">{dataSource === 'github' ? 'GitHub Repository' : 'Local'}</span>
+            📂 مصدر البيانات: <span className="text-emerald-400">{dataSource === 'github' ? 'GitHub (jsDelivr CDN)' : 'Local'}</span>
             {azkarData && <span className="mr-2">| الإصدار: {azkarData.version} | آخر تحديث: {azkarData.lastUpdate}</span>}
           </p>
         </div>
@@ -229,7 +220,6 @@ const AzkarManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl text-white">
           <p className="text-sm opacity-80">إجمالي الأذكار</p>
@@ -253,14 +243,13 @@ const AzkarManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Category Stats */}
       <div className="bg-slate-800 rounded-xl p-4 mb-6">
         <h3 className="text-white font-medium mb-3">📊 توزيع الأذكار على الفئات</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {CATEGORIES.map(cat => (
             <div 
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
+              onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)}
               className={`p-3 rounded-lg cursor-pointer transition-all ${
                 selectedCategory === cat.id 
                   ? `${cat.color} text-white` 
@@ -276,7 +265,6 @@ const AzkarManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-6">
         <select
           value={selectedCategory}
@@ -304,12 +292,10 @@ const AzkarManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Results Count */}
       <div className="mb-4 text-slate-400">
         عرض {filteredList.length} من {azkarList.length} ذكر
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-12 bg-slate-800 rounded-xl">
           <RefreshCw className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
@@ -397,7 +383,6 @@ const AzkarManager: React.FC = () => {
         </div>
       )}
 
-      {/* Detail Modal */}
       {showDetailModal && selectedZikr && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
@@ -411,7 +396,6 @@ const AzkarManager: React.FC = () => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-              {/* Arabic Text */}
               <div className="mb-6">
                 <h3 className="text-emerald-400 font-medium mb-2">النص العربي</h3>
                 <p className="text-white text-xl font-arabic leading-loose bg-slate-900 p-4 rounded-xl" dir="rtl">
@@ -419,7 +403,6 @@ const AzkarManager: React.FC = () => {
                 </p>
               </div>
 
-              {/* Transliteration */}
               {selectedZikr.transliteration && (
                 <div className="mb-6">
                   <h3 className="text-emerald-400 font-medium mb-2">النطق</h3>
@@ -429,7 +412,6 @@ const AzkarManager: React.FC = () => {
                 </div>
               )}
 
-              {/* Info */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-slate-900 p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">الفئة</p>
@@ -449,7 +431,6 @@ const AzkarManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Benefit */}
               {selectedZikr.benefit && (
                 <div className="mb-6">
                   <h3 className="text-emerald-400 font-medium mb-2">الفائدة</h3>
@@ -459,7 +440,6 @@ const AzkarManager: React.FC = () => {
                 </div>
               )}
 
-              {/* Audio */}
               {selectedZikr.audio && (
                 <div className="mb-6">
                   <h3 className="text-emerald-400 font-medium mb-2">🔊 الصوت</h3>
@@ -481,7 +461,6 @@ const AzkarManager: React.FC = () => {
                 </div>
               )}
 
-              {/* Translations */}
               <div>
                 <h3 className="text-emerald-400 font-medium mb-3">🌍 الترجمات ({Object.keys(selectedZikr.translations || {}).length} لغة)</h3>
                 <div className="space-y-3">

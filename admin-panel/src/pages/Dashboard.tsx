@@ -6,10 +6,10 @@ import {
   Sparkles, FileText, Bell, Palette, Calendar, Settings, CheckCircle, Star, Globe, AlertCircle
 } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
-// رابط ملف الأذكار
-const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
+// ✅ استخدام jsDelivr CDN بدل raw.githubusercontent (يحل مشكلة CORS)
+const AZKAR_JSON_URL = 'https://cdn.jsdelivr.net/gh/hossam-gamal22/Quran@main/data/json/azkar.json';
 
 interface Stats {
   totalUsers: number;
@@ -59,6 +59,7 @@ const Dashboard: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [error, setError] = useState<string | null>(null);
   const [firebaseConnected, setFirebaseConnected] = useState(false);
+  const [azkarLoaded, setAzkarLoaded] = useState(false);
 
   useEffect(() => {
     loadAllData();
@@ -68,101 +69,115 @@ const Dashboard: React.FC = () => {
     setIsLoading(true);
     setError(null);
     
+    let totalAzkar = 0;
+
+    // 1. تحميل عدد الأذكار من GitHub JSON (عبر jsDelivr)
     try {
-      // 1. تحميل عدد الأذكار من GitHub JSON
-      const azkarResponse = await fetch(AZKAR_JSON_URL);
-      const azkarData = await azkarResponse.json();
-      const totalAzkar = azkarData.totalCount || azkarData.azkar?.length || 0;
+      const azkarResponse = await fetch(AZKAR_JSON_URL, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (azkarResponse.ok) {
+        const azkarData = await azkarResponse.json();
+        totalAzkar = azkarData.totalCount || azkarData.azkar?.length || 0;
+        setAzkarLoaded(true);
+      }
+    } catch (azkarError) {
+      console.error('Error loading azkar JSON:', azkarError);
+      setAzkarLoaded(false);
+    }
 
-      // 2. محاولة تحميل البيانات من Firebase
-      let usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
-      let statsData = { azkarRead: 0, quranPages: 0, prayers: 0, avgSession: 0 };
-      let activityData: ActivityItem[] = [];
+    // 2. محاولة تحميل البيانات من Firebase
+    let usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
+    let statsData = { azkarRead: 0, quranPages: 0, prayers: 0, avgSession: 0 };
+    let activityData: ActivityItem[] = [];
 
-      try {
-        // تحميل المستخدمين
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const users = usersSnapshot.docs.map(doc => doc.data());
-        
-        const now = new Date();
-        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    try {
+      // تحميل المستخدمين
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      const users = usersSnapshot.docs
+        .map(doc => doc.data())
+        .filter(u => !u.placeholder); // تجاهل الـ placeholder
+      
+      const now = new Date();
+      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-        usersData = {
-          total: users.length,
-          active: users.filter(u => u.lastActive && new Date(u.lastActive.toDate?.() || u.lastActive) > weekAgo).length,
-          daily: users.filter(u => u.lastActive && new Date(u.lastActive.toDate?.() || u.lastActive) > dayAgo).length,
-          ios: users.filter(u => u.platform === 'ios').length,
-          android: users.filter(u => u.platform === 'android').length,
+      usersData = {
+        total: users.length,
+        active: users.filter(u => {
+          if (!u.lastActive) return false;
+          const lastActive = u.lastActive.toDate ? u.lastActive.toDate() : new Date(u.lastActive);
+          return lastActive > weekAgo;
+        }).length,
+        daily: users.filter(u => {
+          if (!u.lastActive) return false;
+          const lastActive = u.lastActive.toDate ? u.lastActive.toDate() : new Date(u.lastActive);
+          return lastActive > dayAgo;
+        }).length,
+        ios: users.filter(u => u.platform === 'ios').length,
+        android: users.filter(u => u.platform === 'android').length,
+      };
+
+      // تحميل الإحصائيات
+      const statsSnapshot = await getDocs(collection(db, 'stats'));
+      if (!statsSnapshot.empty) {
+        const statsDoc = statsSnapshot.docs[0].data();
+        statsData = {
+          azkarRead: statsDoc.totalAzkarRead || 0,
+          quranPages: statsDoc.totalQuranPages || 0,
+          prayers: statsDoc.totalPrayers || 0,
+          avgSession: statsDoc.avgSessionDuration || 0,
         };
-
-        // تحميل الإحصائيات
-        const statsSnapshot = await getDocs(collection(db, 'stats'));
-        if (!statsSnapshot.empty) {
-          const statsDoc = statsSnapshot.docs[0].data();
-          statsData = {
-            azkarRead: statsDoc.totalAzkarRead || 0,
-            quranPages: statsDoc.totalQuranPages || 0,
-            prayers: statsDoc.totalPrayers || 0,
-            avgSession: statsDoc.avgSessionDuration || 0,
-          };
-        }
-
-        // تحميل آخر النشاطات
-        try {
-          const activitySnapshot = await getDocs(
-            query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(5))
-          );
-          activityData = activitySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              type: data.type || 'user',
-              description: data.description || '',
-              time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
-              country: data.country,
-            };
-          });
-        } catch (e) {
-          console.log('Activity collection not found');
-        }
-
-        setFirebaseConnected(true);
-      } catch (firebaseError) {
-        console.log('Firebase not configured or empty, using demo data');
-        setFirebaseConnected(false);
-        
-        // بيانات تجريبية للعرض
-        usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
-        activityData = [
-          { id: '1', type: 'info', description: 'التطبيق جاهز للنشر - انتظار المستخدمين', time: 'الآن' },
-          { id: '2', type: 'azkar', description: `${totalAzkar} ذكر جاهز للعرض`, time: 'منذ دقيقة' },
-        ];
       }
 
-      setStats({
-        totalUsers: usersData.total,
-        activeUsers: usersData.active,
-        dailyActiveUsers: usersData.daily,
-        avgSessionDuration: statsData.avgSession,
-        totalAzkar: totalAzkar,
-        totalAzkarRead: statsData.azkarRead,
-        totalQuranPages: statsData.quranPages,
-        totalPrayers: statsData.prayers,
-        iosUsers: usersData.ios,
-        androidUsers: usersData.android,
-      });
+      // تحميل آخر النشاطات
+      try {
+        const activitySnapshot = await getDocs(
+          query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(5))
+        );
+        activityData = activitySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            type: data.type || 'user',
+            description: data.description || '',
+            time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
+            country: data.country,
+          };
+        });
+      } catch (e) {
+        console.log('Activity collection not found or empty');
+      }
 
-      setActivity(activityData.length > 0 ? activityData : [
-        { id: '1', type: 'info', description: 'لا يوجد نشاط بعد - التطبيق جاهز للنشر', time: 'الآن' },
-      ]);
-
-      setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setError('خطأ في تحميل البيانات');
+      setFirebaseConnected(true);
+    } catch (firebaseError) {
+      console.log('Firebase error:', firebaseError);
+      setFirebaseConnected(false);
     }
-    
+
+    // تعيين البيانات النهائية
+    setStats({
+      totalUsers: usersData.total,
+      activeUsers: usersData.active,
+      dailyActiveUsers: usersData.daily,
+      avgSessionDuration: statsData.avgSession,
+      totalAzkar: totalAzkar,
+      totalAzkarRead: statsData.azkarRead,
+      totalQuranPages: statsData.quranPages,
+      totalPrayers: statsData.prayers,
+      iosUsers: usersData.ios,
+      androidUsers: usersData.android,
+    });
+
+    // النشاط الافتراضي إذا لم يوجد
+    if (activityData.length === 0) {
+      activityData = [
+        { id: '1', type: 'info', description: 'التطبيق جاهز للنشر', time: 'الآن' },
+        { id: '2', type: 'azkar', description: `${totalAzkar} ذكر جاهز`, time: 'منذ دقيقة' },
+      ];
+    }
+    setActivity(activityData);
+    setLastUpdated(new Date());
     setIsLoading(false);
   };
 
@@ -260,7 +275,7 @@ const Dashboard: React.FC = () => {
           value={stats.totalAzkar}
           icon={<Moon className="w-6 h-6 text-purple-400" />}
           iconBg="bg-purple-500/20"
-          subtitle="من ملف JSON"
+          subtitle={azkarLoaded ? "من ملف JSON ✅" : "جاري التحميل..."}
         />
       </div>
 
@@ -378,7 +393,7 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { name: 'ملف الأذكار', status: stats.totalAzkar > 0 },
+            { name: 'ملف الأذكار', status: azkarLoaded },
             { name: 'Firebase', status: firebaseConnected },
             { name: 'Admin Panel', status: true },
             { name: 'API', status: true },
