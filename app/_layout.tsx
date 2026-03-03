@@ -1,33 +1,51 @@
-// app/(tabs)/_layout.tsx
-// تخطيط التابات السفلية مع زرار التسبيح في المنتصف
+// app/_layout.tsx
+// التخطيط الرئيسي للتطبيق مع تكامل Firebase
+// آخر تحديث: 2026-03-04
 
-import React from 'react';
-import { View, Text, StyleSheet, Platform, Pressable, Dimensions } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
-import { useEffect } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
-import { registerUser, updateLastActive } from '../lib/firebase-user';
-import { trackAppOpen, initializeGlobalStats, syncLocalStats } from '../lib/firebase-analytics';
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { AppState, AppStateStatus, View } from 'react-native';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { useSettings } from '@/contexts/SettingsContext';
-import { useEffect } from 'react';
-import { registerUser, updateUserActivity } from '../lib/firebase-user';
+// Contexts
+import { SettingsProvider } from '@/contexts/SettingsContext';
+import { QuranProvider } from '@/contexts/QuranContext';
+import { KhatmaProvider } from '@/contexts/KhatmaContext';
+import { WorshipProvider } from '@/contexts/WorshipContext';
+import { SeasonalProvider } from '@/contexts/SeasonalContext';
+import { OnboardingProvider } from '@/contexts/OnboardingContext';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
+
+// Firebase Integration
+import { registerUser, updateLastActive } from '@/lib/firebase-user';
+import { 
+  initializeGlobalStats, 
+  trackAppOpen, 
+  syncLocalStats 
+} from '@/lib/firebase-analytics';
+
+// Prevent splash screen from auto-hiding
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // تحميل الخطوط
+  const [fontsLoaded] = useFonts({
+    'Cairo-Regular': require('../assets/fonts/Cairo-Regular.ttf'),
+    'Cairo-Medium': require('../assets/fonts/Cairo-Medium.ttf'),
+    'Cairo-SemiBold': require('../assets/fonts/Cairo-SemiBold.ttf'),
+    'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
+    'Amiri-Regular': require('../assets/fonts/Amiri-Regular.ttf'),
+    'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
+    'UthmanicHafs': require('../assets/fonts/UthmanicHafs.ttf'),
+  });
+
   // ========== Firebase Integration ==========
   useEffect(() => {
-    // تهيئة Firebase والتسجيل
     const initFirebase = async () => {
       try {
         // تهيئة الإحصائيات العامة
@@ -41,7 +59,7 @@ export default function RootLayout() {
         
         console.log('✅ Firebase initialized in app');
       } catch (error) {
-        console.log('Firebase init error:', error);
+        console.log('Firebase init error (non-blocking):', error);
       }
     };
     
@@ -50,10 +68,8 @@ export default function RootLayout() {
     // تتبع حالة التطبيق
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        // التطبيق أصبح نشط
         updateLastActive();
       } else if (nextAppState === 'background') {
-        // التطبيق ذهب للخلفية - مزامنة الإحصائيات
         syncLocalStats();
       }
     };
@@ -76,361 +92,62 @@ export default function RootLayout() {
       clearInterval(syncInterval);
     };
   }, []);
-  
 
-const { width } = Dimensions.get('window');
-
-// ========================================
-// الثوابت
-// ========================================
-
-const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 85 : 70;
-const TASBIH_BUTTON_SIZE = 60;
-const ACTIVE_COLOR = '#2f7659';
-const INACTIVE_COLOR_LIGHT = '#999';
-const INACTIVE_COLOR_DARK = '#666';
-
-// ========================================
-// أيقونة التاب المخصصة
-// ========================================
-
-interface TabIconProps {
-  name: string;
-  color: string;
-  focused: boolean;
-  label: string;
-}
-
-const TabIcon: React.FC<TabIconProps> = ({ name, color, focused, label }) => {
-  const scale = useSharedValue(1);
-  
-  React.useEffect(() => {
-    if (focused) {
-      scale.value = withSpring(1.1, { damping: 15, stiffness: 150 });
-    } else {
-      scale.value = withSpring(1, { damping: 15, stiffness: 150 });
+  // إخفاء شاشة البداية بعد تحميل الخطوط
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
     }
-  }, [focused]);
+  }, [fontsLoaded]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <View style={styles.tabIconContainer}>
-      <Animated.View style={[styles.iconWrapper, animatedStyle]}>
-        {focused && <View style={styles.activeIndicator} />}
-        <MaterialCommunityIcons
-          name={name as any}
-          size={focused ? 26 : 24}
-          color={color}
-        />
-      </Animated.View>
-      <Text
-        style={[
-          styles.tabLabel,
-          { color },
-          focused && styles.tabLabelActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-};
-
-// ========================================
-// زرار التسبيح المركزي
-// ========================================
-
-const TasbihButton: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
-  const router = useRouter();
-  const scale = useSharedValue(1);
-  const rotation = useSharedValue(0);
-
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    // أنيميشن عند الضغط
-    scale.value = withSequence(
-      withTiming(0.9, { duration: 100 }),
-      withSpring(1, { damping: 10, stiffness: 200 })
-    );
-    
-    rotation.value = withSequence(
-      withTiming(10, { duration: 50 }),
-      withTiming(-10, { duration: 50 }),
-      withTiming(0, { duration: 50 })
-    );
-
-    // الانتقال لشاشة التسبيح
-    router.push('/tasbih');
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { rotate: `${rotation.value}deg` }
-    ],
-  }));
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
-    <View style={styles.tasbihButtonContainer}>
-      <Pressable onPress={handlePress}>
-        <Animated.View style={animatedStyle}>
-          <LinearGradient
-            colors={['#2f7659', '#1d4d3a']}
-            style={styles.tasbihButton}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={styles.tasbihButtonInner}>
-              <MaterialCommunityIcons
-                name="hand-heart"
-                size={28}
-                color="#fff"
-              />
-            </View>
-          </LinearGradient>
-          {/* الهالة الخارجية */}
-          <View style={styles.tasbihButtonGlow} />
-        </Animated.View>
-      </Pressable>
-      <Text style={[styles.tasbihLabel, isDarkMode && styles.tasbihLabelDark]}>
-        تسبيح
-      </Text>
-    </View>
-  );
-};
-
-// ========================================
-// المكون الرئيسي
-// ========================================
-
-export default function TabsLayout() {
-  const { isDarkMode } = useSettings();
-
-  return (
-    <View style={{ flex: 1 }}>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: ACTIVE_COLOR,
-          tabBarInactiveTintColor: isDarkMode ? INACTIVE_COLOR_DARK : INACTIVE_COLOR_LIGHT,
-          tabBarStyle: {
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: TAB_BAR_HEIGHT,
-            backgroundColor: isDarkMode ? 'rgba(17,21,28,0.95)' : 'rgba(255,255,255,0.95)',
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-            paddingTop: 10,
-          },
-          tabBarLabelStyle: {
-            fontFamily: 'Cairo-Medium',
-            fontSize: 11,
-            marginTop: 4,
-          },
-        }}
-      >
-        {/* الأذكار */}
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'الأذكار',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon
-                name="book-open-page-variant"
-                color={color}
-                focused={focused}
-                label="الأذكار"
-              />
-            ),
-            tabBarLabel: () => null,
-          }}
-        />
-
-        {/* القرآن */}
-        <Tabs.Screen
-          name="quran"
-          options={{
-            title: 'القرآن',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon
-                name="book-open-variant"
-                color={color}
-                focused={focused}
-                label="القرآن"
-              />
-            ),
-            tabBarLabel: () => null,
-          }}
-        />
-
-        {/* placeholder للتسبيح - المكان الفاضي */}
-        <Tabs.Screen
-          name="tasbih-placeholder"
-          options={{
-            title: '',
-            tabBarIcon: () => <View style={{ width: TASBIH_BUTTON_SIZE }} />,
-            tabBarLabel: () => null,
-          }}
-          listeners={{
-            tabPress: (e) => {
-              e.preventDefault(); // منع الضغط على المكان الفاضي
-            },
-          }}
-        />
-
-        {/* الصلاة */}
-        <Tabs.Screen
-          name="prayer"
-          options={{
-            title: 'الصلاة',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon
-                name="mosque"
-                color={color}
-                focused={focused}
-                label="الصلاة"
-              />
-            ),
-            tabBarLabel: () => null,
-          }}
-        />
-
-        {/* المزيد */}
-        <Tabs.Screen
-          name="more"
-          options={{
-            title: 'المزيد',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon
-                name="dots-horizontal"
-                color={color}
-                focused={focused}
-                label="المزيد"
-              />
-            ),
-            tabBarLabel: () => null,
-          }}
-        />
-
-        {/* إخفاء الشاشات الأخرى من التاب بار */}
-        <Tabs.Screen name="settings" options={{ href: null }} />
-        <Tabs.Screen name="qibla" options={{ href: null }} />
-        <Tabs.Screen name="favorites" options={{ href: null }} />
-        <Tabs.Screen name="khatm" options={{ href: null }} />
-        <Tabs.Screen name="wird" options={{ href: null }} />
-        <Tabs.Screen name="tasbih" options={{ href: null }} />
-        <Tabs.Screen name="quran-search" options={{ href: null }} />
-        <Tabs.Screen name="recitations" options={{ href: null }} />
-        <Tabs.Screen name="tafsir-search" options={{ href: null }} />
-        <Tabs.Screen name="daily-ayah" options={{ href: null }} />
-        <Tabs.Screen name="hijri-calendar" options={{ href: null }} />
-        <Tabs.Screen name="notifications-center" options={{ href: null }} />
-        <Tabs.Screen name="azkar" options={{ href: null }} />
-      </Tabs>
-
-      {/* زرار التسبيح المركزي - فوق التاب بار */}
-      <View style={styles.tasbihButtonWrapper}>
-        <TasbihButton isDarkMode={isDarkMode} />
-      </View>
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <SettingsProvider>
+          <RemoteConfigProvider>
+            <NotificationsProvider>
+              <QuranProvider>
+                <KhatmaProvider>
+                  <WorshipProvider>
+                    <SeasonalProvider>
+                      <OnboardingProvider>
+                        <StatusBar style="auto" />
+                        <Stack
+                          screenOptions={{
+                            headerShown: false,
+                            animation: 'slide_from_right',
+                          }}
+                        >
+                          <Stack.Screen name="(tabs)" />
+                          <Stack.Screen name="onboarding" />
+                          <Stack.Screen name="surah/[id]" />
+                          <Stack.Screen name="tafsir/[id]" />
+                          <Stack.Screen name="azkar/[category]" />
+                          <Stack.Screen name="khatma/[id]" />
+                          <Stack.Screen name="settings/[section]" />
+                          <Stack.Screen name="seasonal/[event]" />
+                          <Stack.Screen name="worship-tracker" />
+                          <Stack.Screen name="names" />
+                          <Stack.Screen name="ruqya" />
+                          <Stack.Screen name="hijri" />
+                          <Stack.Screen name="hajj-umrah" />
+                          <Stack.Screen name="night-reading" />
+                          <Stack.Screen name="azkar-search" />
+                          <Stack.Screen name="azkar-reminder" />
+                        </Stack>
+                      </OnboardingProvider>
+                    </SeasonalProvider>
+                  </WorshipProvider>
+                </KhatmaProvider>
+              </QuranProvider>
+            </NotificationsProvider>
+          </RemoteConfigProvider>
+        </SettingsProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
-
-// ========================================
-// الأنماط
-// ========================================
-
-const styles = StyleSheet.create({
-  tabIconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  iconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    top: -8,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: ACTIVE_COLOR,
-  },
-  tabLabel: {
-    fontFamily: 'Cairo-Medium',
-    fontSize: 11,
-    marginTop: 4,
-  },
-  tabLabelActive: {
-    fontFamily: 'Cairo-Bold',
-  },
-  
-  // زرار التسبيح
-  tasbihButtonWrapper: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 35 : 20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  tasbihButtonContainer: {
-    alignItems: 'center',
-  },
-  tasbihButton: {
-    width: TASBIH_BUTTON_SIZE,
-    height: TASBIH_BUTTON_SIZE,
-    borderRadius: TASBIH_BUTTON_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  tasbihButtonInner: {
-    width: TASBIH_BUTTON_SIZE - 8,
-    height: TASBIH_BUTTON_SIZE - 8,
-    borderRadius: (TASBIH_BUTTON_SIZE - 8) / 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  tasbihButtonGlow: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-    right: -5,
-    bottom: -5,
-    borderRadius: (TASBIH_BUTTON_SIZE + 10) / 2,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: 'rgba(47,118,89,0.3)',
-  },
-  tasbihLabel: {
-    fontFamily: 'Cairo-Medium',
-    fontSize: 11,
-    marginTop: 6,
-    color: '#2f7659',
-  },
-  tasbihLabelDark: {
-    color: '#4ade80',
-  },
-});
