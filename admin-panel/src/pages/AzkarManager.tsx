@@ -1,467 +1,455 @@
 // admin-panel/src/pages/AzkarManager.tsx
-// إدارة الأذكار مع الترجمة التلقائية
-// ==========================================
+// إدارة الأذكار مع الترجمات الموثقة (بدون ترجمة آلية)
+// ========================================================
 
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Card,
-  CardContent,
-  Grid,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Tabs,
-  Tab,
-  CircularProgress,
-  Snackbar,
-  Alert,
-  Tooltip,
-  Switch,
-  FormControlLabel,
+  Box, Typography, Button, TextField, Dialog, DialogTitle,
+  DialogContent, DialogActions, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Paper, IconButton,
+  Chip, Tabs, Tab, CircularProgress, Snackbar, Alert,
+  Select, MenuItem, FormControl, InputLabel, Card, CardContent,
+  Grid, LinearProgress, Tooltip, Accordion, AccordionSummary,
+  AccordionDetails, Divider
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Translate as TranslateIcon,
-  Search as SearchIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Refresh as RefreshIcon,
-  ContentCopy as CopyIcon,
+  Add, Edit, Delete, Download, Refresh, VolumeUp, CloudUpload,
+  CheckCircle, Error, Search, ExpandMore, Language, Link as LinkIcon,
+  PlayArrow, Stop, ContentCopy
 } from '@mui/icons-material';
+import { db, storage } from '../firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// ==========================================
-// الأنواع
-// ==========================================
-
-type Language = 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-
-type CategoryType = 
-  | 'morning'
-  | 'evening'
-  | 'sleep'
-  | 'wakeup'
-  | 'after_prayer'
-  | 'quran_duas'
-  | 'sunnah_duas'
-  | 'ruqya';
+// ==================== الأنواع ====================
+interface Translation {
+  text: string;
+  source: string; // مصدر الترجمة (مثل: Dar-us-Salam, IslamHouse)
+  verified: boolean;
+}
 
 interface Zikr {
   id?: string;
   numericId: number;
-  category: CategoryType;
+  hisnNumber: number; // رقم الذكر في حصن المسلم
+  category: string;
   arabic: string;
   transliteration: string;
-  translation: Record<Language, string>;
+  translations: {
+    ar: Translation;
+    en: Translation;
+    fr: Translation;
+    de: Translation;
+    hi: Translation;
+    id: Translation;
+    ms: Translation;
+    tr: Translation;
+    ur: Translation;
+    bn: Translation;
+    es: Translation;
+    ru: Translation;
+  };
   count: number;
   reference: string;
-  benefit?: {
-    ar?: string;
-    en?: string;
-    fr?: string;
-  };
+  benefit?: string;
   audio?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  audioSource?: string;
 }
 
-interface Category {
-  id: CategoryType;
-  name: Record<Language, string>;
-  icon: string;
-  color: string;
-  order: number;
-}
-
-// ==========================================
-// الثوابت
-// ==========================================
-
-const LANGUAGES: { code: Language; name: string; nativeName: string }[] = [
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
-  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' },
-  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
+// اللغات المدعومة مع مصادر الترجمة
+const LANGUAGES = [
+  { code: 'ar', name: 'العربية', dir: 'rtl', source: 'Original' },
+  { code: 'en', name: 'English', dir: 'ltr', source: 'Dar-us-Salam' },
+  { code: 'fr', name: 'Français', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'de', name: 'Deutsch', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'hi', name: 'हिन्दी', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'id', name: 'Indonesia', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'ms', name: 'Melayu', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'tr', name: 'Türkçe', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'ur', name: 'اردو', dir: 'rtl', source: 'Dar-us-Salam' },
+  { code: 'bn', name: 'বাংলা', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'es', name: 'Español', dir: 'ltr', source: 'IslamHouse' },
+  { code: 'ru', name: 'Русский', dir: 'ltr', source: 'IslamHouse' },
 ];
 
-const CATEGORIES: Category[] = [
-  { id: 'morning', name: { ar: 'أذكار الصباح', en: 'Morning Adhkar' } as any, icon: 'sunny', color: '#F59E0B', order: 1 },
-  { id: 'evening', name: { ar: 'أذكار المساء', en: 'Evening Adhkar' } as any, icon: 'moon', color: '#8B5CF6', order: 2 },
-  { id: 'sleep', name: { ar: 'أذكار النوم', en: 'Sleep Adhkar' } as any, icon: 'bed', color: '#3B82F6', order: 3 },
-  { id: 'wakeup', name: { ar: 'أذكار الاستيقاظ', en: 'Wakeup Adhkar' } as any, icon: 'sun', color: '#10B981', order: 4 },
-  { id: 'after_prayer', name: { ar: 'أذكار بعد الصلاة', en: 'After Prayer' } as any, icon: 'hands', color: '#EC4899', order: 5 },
-  { id: 'quran_duas', name: { ar: 'أدعية من القرآن', en: 'Quran Duas' } as any, icon: 'book', color: '#14B8A6', order: 6 },
-  { id: 'sunnah_duas', name: { ar: 'أدعية من السنة', en: 'Sunnah Duas' } as any, icon: 'star', color: '#F97316', order: 7 },
-  { id: 'ruqya', name: { ar: 'الرقية الشرعية', en: 'Ruqyah' } as any, icon: 'shield', color: '#6366F1', order: 8 },
+// الفئات
+const CATEGORIES = [
+  { id: 'morning', name: 'أذكار الصباح', nameEn: 'Morning Adhkar', icon: '🌅', hisnChapter: 27 },
+  { id: 'evening', name: 'أذكار المساء', nameEn: 'Evening Adhkar', icon: '🌆', hisnChapter: 27 },
+  { id: 'sleep', name: 'أذكار النوم', nameEn: 'Sleep Adhkar', icon: '🌙', hisnChapter: 28 },
+  { id: 'wakeup', name: 'أذكار الاستيقاظ', nameEn: 'Waking Up Adhkar', icon: '☀️', hisnChapter: 1 },
+  { id: 'after_prayer', name: 'أذكار بعد الصلاة', nameEn: 'After Prayer', icon: '🕌', hisnChapter: 26 },
+  { id: 'quran_duas', name: 'أدعية من القرآن', nameEn: 'Quran Duas', icon: '📖', hisnChapter: 0 },
+  { id: 'sunnah_duas', name: 'أدعية من السنة', nameEn: 'Sunnah Duas', icon: '⭐', hisnChapter: 0 },
+  { id: 'ruqya', name: 'الرقية الشرعية', nameEn: 'Ruqyah', icon: '🛡️', hisnChapter: 32 },
 ];
 
-const EMPTY_ZIKR: Omit<Zikr, 'id'> = {
-  numericId: 0,
-  category: 'morning',
-  arabic: '',
-  transliteration: '',
-  translation: {
-    ar: '',
-    en: '',
-    ur: '',
-    id: '',
-    tr: '',
-    fr: '',
-    de: '',
-    hi: '',
-    bn: '',
-    ms: '',
-    ru: '',
-    es: '',
+// مصادر الصوت الموثقة
+const AUDIO_SOURCES = {
+  archive: {
+    name: 'Archive.org - HisnulMuslim',
+    baseUrl: 'https://archive.org/download/HisnulMuslimAudio_201510/',
+    format: (num: number) => `n${num}.mp3`
   },
-  count: 1,
-  reference: '',
-  benefit: {
-    ar: '',
-    en: '',
-    fr: '',
-  },
-  audio: '',
+  salafi: {
+    name: 'SalafiAudio',
+    baseUrl: 'https://salafiaudio.files.wordpress.com/2015/07/',
+    format: (num: number) => `hisn-al-muslim-audio-dua-${num}.mp3`
+  }
 };
 
-// ==========================================
-// المكون الرئيسي
-// ==========================================
+// مصادر الترجمات الموثقة
+const TRANSLATION_SOURCES = [
+  { id: 'darussalam', name: 'Dar-us-Salam Publications', url: 'https://dar-us-salam.com' },
+  { id: 'islamhouse', name: 'IslamHouse.com', url: 'https://islamhouse.com' },
+  { id: 'myislam', name: 'MyIslam.org', url: 'https://myislam.org/hisnul-muslim/' },
+  { id: 'sunnah', name: 'Sunnah.com', url: 'https://sunnah.com' },
+  { id: 'ahadith', name: 'Ahadith.co.uk', url: 'https://ahadith.co.uk/fortressofthemuslim.php' },
+];
 
-export default function AzkarManager() {
-  // الحالة
-  const [azkar, setAzkar] = useState<Zikr[]>([]);
-  const [filteredAzkar, setFilteredAzkar] = useState<Zikr[]>([]);
+// ==================== المكون الرئيسي ====================
+const AzkarManager: React.FC = () => {
+  // الحالات
+  const [azkarList, setAzkarList] = useState<Zikr[]>([]);
+  const [filteredList, setFilteredList] = useState<Zikr[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingZikr, setEditingZikr] = useState<Zikr | null>(null);
-  const [formData, setFormData] = useState<Omit<Zikr, 'id'>>(EMPTY_ZIKR);
   const [activeTab, setActiveTab] = useState(0);
-  const [translating, setTranslating] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
-    open: false,
-    message: '',
-    severity: 'success',
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [expandedLang, setExpandedLang] = useState<string | false>(false);
+
+  // نموذج فارغ
+  const createEmptyTranslation = (): Translation => ({
+    text: '',
+    source: '',
+    verified: false
   });
 
-  // ==========================================
-  // تحميل البيانات
-  // ==========================================
-
-  const loadAzkar = async () => {
-    setLoading(true);
-    try {
-      const querySnapshot = await getDocs(collection(db, 'azkar'));
-      const data: Zikr[] = [];
-      querySnapshot.forEach((doc) => {
-        data.push({ id: doc.id, ...doc.data() } as Zikr);
-      });
-      data.sort((a, b) => a.numericId - b.numericId);
-      setAzkar(data);
-      setFilteredAzkar(data);
-    } catch (error) {
-      console.error('Error loading azkar:', error);
-      showSnackbar('فشل في تحميل الأذكار', 'error');
-    }
-    setLoading(false);
+  const emptyZikr: Zikr = {
+    numericId: 0,
+    hisnNumber: 0,
+    category: 'morning',
+    arabic: '',
+    transliteration: '',
+    translations: {
+      ar: createEmptyTranslation(),
+      en: createEmptyTranslation(),
+      fr: createEmptyTranslation(),
+      de: createEmptyTranslation(),
+      hi: createEmptyTranslation(),
+      id: createEmptyTranslation(),
+      ms: createEmptyTranslation(),
+      tr: createEmptyTranslation(),
+      ur: createEmptyTranslation(),
+      bn: createEmptyTranslation(),
+      es: createEmptyTranslation(),
+      ru: createEmptyTranslation(),
+    },
+    count: 1,
+    reference: '',
+    benefit: '',
+    audio: '',
+    audioSource: ''
   };
 
+  const [formData, setFormData] = useState<Zikr>(emptyZikr);
+
+  // ==================== تحميل البيانات ====================
   useEffect(() => {
     loadAzkar();
   }, []);
 
-  // ==========================================
-  // الفلترة
-  // ==========================================
-
   useEffect(() => {
-    let filtered = [...azkar];
+    filterAzkar();
+  }, [azkarList, selectedCategory, searchQuery]);
 
+  // تنظيف الصوت عند إغلاق المكون
+  useEffect(() => {
+    return () => {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.src = '';
+      }
+    };
+  }, [audioElement]);
+
+  const loadAzkar = async () => {
+    setLoading(true);
+    try {
+      const snapshot = await getDocs(collection(db, 'azkar'));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zikr));
+      setAzkarList(data.sort((a, b) => a.numericId - b.numericId));
+    } catch (error) {
+      console.error('Error loading azkar:', error);
+      showSnackbar('خطأ في تحميل الأذكار', 'error');
+    }
+    setLoading(false);
+  };
+
+  const filterAzkar = () => {
+    let filtered = [...azkarList];
+    
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(z => z.category === selectedCategory);
     }
-
+    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(z =>
         z.arabic.includes(query) ||
-        z.translation.en?.toLowerCase().includes(query) ||
-        z.reference.toLowerCase().includes(query)
+        z.transliteration.toLowerCase().includes(query) ||
+        z.translations.en.text.toLowerCase().includes(query) ||
+        z.reference.toLowerCase().includes(query) ||
+        z.hisnNumber.toString() === query
       );
     }
-
-    setFilteredAzkar(filtered);
-  }, [azkar, selectedCategory, searchQuery]);
-
-  // ==========================================
-  // الترجمة التلقائية
-  // ==========================================
-
-  const translateText = async (text: string, targetLang: Language): Promise<string> => {
-    try {
-      // استخدام Google Translate API أو أي API ترجمة
-      const response = await fetch(
-        `https://translation.googleapis.com/language/translate/v2?key=${process.env.REACT_APP_GOOGLE_TRANSLATE_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            q: text,
-            source: 'ar',
-            target: targetLang === 'ar' ? 'en' : targetLang,
-            format: 'text',
-          }),
-        }
-      );
-
-      const data = await response.json();
-      return data.data?.translations?.[0]?.translatedText || text;
-    } catch (error) {
-      console.error('Translation error:', error);
-      return text;
-    }
+    
+    setFilteredList(filtered);
   };
 
-  const translateAllLanguages = async () => {
-    if (!formData.arabic) {
-      showSnackbar('يرجى إدخال النص العربي أولاً', 'error');
-      return;
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  // ==================== إدارة الصوت ====================
+  const getAudioUrl = (hisnNumber: number, source: 'archive' | 'salafi' = 'archive'): string => {
+    const audioSource = AUDIO_SOURCES[source];
+    return audioSource.baseUrl + audioSource.format(hisnNumber);
+  };
+
+  const playAudio = (url: string) => {
+    if (audioElement) {
+      audioElement.pause();
     }
+    
+    const audio = new Audio(url);
+    audio.onended = () => setPlayingAudio(null);
+    audio.onerror = () => {
+      showSnackbar('خطأ في تشغيل الصوت', 'error');
+      setPlayingAudio(null);
+    };
+    
+    audio.play();
+    setAudioElement(audio);
+    setPlayingAudio(url);
+  };
 
-    setTranslating(true);
+  const stopAudio = () => {
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.currentTime = 0;
+    }
+    setPlayingAudio(null);
+  };
 
-    try {
-      const newTranslations = { ...formData.translation };
-      newTranslations.ar = formData.arabic;
-
-      // ترجمة لكل لغة
-      for (const lang of LANGUAGES) {
-        if (lang.code === 'ar') continue;
-        
-        const translated = await translateText(formData.arabic, lang.code);
-        newTranslations[lang.code] = translated;
-        
-        // تأخير صغير لتجنب rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-
+  const setAudioFromHisn = (hisnNumber: number) => {
+    if (hisnNumber > 0) {
+      const audioUrl = getAudioUrl(hisnNumber);
       setFormData(prev => ({
         ...prev,
-        translation: newTranslations,
+        audio: audioUrl,
+        audioSource: 'Archive.org - HisnulMuslim'
       }));
-
-      showSnackbar('تمت الترجمة بنجاح لجميع اللغات', 'success');
-    } catch (error) {
-      console.error('Translation error:', error);
-      showSnackbar('فشل في الترجمة', 'error');
+      showSnackbar(`تم تعيين صوت حصن المسلم رقم ${hisnNumber}`, 'success');
     }
-
-    setTranslating(false);
   };
 
-  // ==========================================
-  // إضافة/تعديل الذكر
-  // ==========================================
+  // رفع صوت مخصص
+  const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
+    setUploadingAudio(true);
+    try {
+      const storageRef = ref(storage, `azkar-audio/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setFormData(prev => ({
+        ...prev,
+        audio: url,
+        audioSource: 'Custom Upload'
+      }));
+      showSnackbar('تم رفع الصوت بنجاح', 'success');
+    } catch (error) {
+      showSnackbar('خطأ في رفع الصوت', 'error');
+    }
+    setUploadingAudio(false);
+  };
+
+  // ==================== إدارة الترجمات ====================
+  const updateTranslation = (lang: string, field: keyof Translation, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      translations: {
+        ...prev.translations,
+        [lang]: {
+          ...prev.translations[lang as keyof typeof prev.translations],
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const copyFromSource = (lang: string, sourceUrl: string) => {
+    window.open(sourceUrl, '_blank');
+    showSnackbar(`افتح المصدر وانسخ الترجمة ${lang}`, 'info');
+  };
+
+  const getTranslationStatus = (zikr: Zikr): { complete: number; verified: number; total: number } => {
+    const langs = Object.keys(zikr.translations) as Array<keyof typeof zikr.translations>;
+    const complete = langs.filter(l => zikr.translations[l].text).length;
+    const verified = langs.filter(l => zikr.translations[l].verified).length;
+    return { complete, verified, total: langs.length };
+  };
+
+  // ==================== حفظ وحذف ====================
   const handleSave = async () => {
-    if (!formData.arabic || !formData.reference) {
-      showSnackbar('يرجى ملء الحقول المطلوبة', 'error');
+    // التحقق من البيانات الأساسية
+    if (!formData.arabic.trim()) {
+      showSnackbar('الرجاء إدخال النص العربي', 'error');
+      return;
+    }
+
+    if (!formData.translations.en.text.trim()) {
+      showSnackbar('الرجاء إدخال الترجمة الإنجليزية على الأقل', 'error');
       return;
     }
 
     try {
+      // تعيين النص العربي كترجمة عربية
+      const dataToSave = {
+        ...formData,
+        translations: {
+          ...formData.translations,
+          ar: {
+            ...formData.translations.ar,
+            text: formData.arabic,
+            source: 'Original',
+            verified: true
+          }
+        }
+      };
+
       if (editingZikr?.id) {
-        // تعديل
-        await updateDoc(doc(db, 'azkar', editingZikr.id), {
-          ...formData,
-          updatedAt: new Date(),
-        });
+        await updateDoc(doc(db, 'azkar', editingZikr.id), dataToSave);
         showSnackbar('تم تحديث الذكر بنجاح', 'success');
       } else {
-        // إضافة جديد
-        const maxId = azkar.reduce((max, z) => Math.max(max, z.numericId), 0);
-        await addDoc(collection(db, 'azkar'), {
-          ...formData,
-          numericId: maxId + 1,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        showSnackbar('تمت إضافة الذكر بنجاح', 'success');
+        // تعيين رقم جديد
+        const maxId = azkarList.reduce((max, z) => Math.max(max, z.numericId), 0);
+        dataToSave.numericId = maxId + 1;
+        await addDoc(collection(db, 'azkar'), dataToSave);
+        showSnackbar('تم إضافة الذكر بنجاح', 'success');
       }
 
       setDialogOpen(false);
       setEditingZikr(null);
-      setFormData(EMPTY_ZIKR);
+      setFormData(emptyZikr);
       loadAzkar();
     } catch (error) {
-      console.error('Save error:', error);
-      showSnackbar('فشل في الحفظ', 'error');
+      console.error('Error saving:', error);
+      showSnackbar('خطأ في الحفظ', 'error');
     }
   };
 
-  // ==========================================
-  // حذف الذكر
-  // ==========================================
-
-  const handleDelete = async (zikr: Zikr) => {
-    if (!zikr.id) return;
-    
-    if (!window.confirm(`هل أنت متأكد من حذف "${zikr.arabic.substring(0, 50)}..."؟`)) {
-      return;
-    }
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('هل أنت متأكد من حذف هذا الذكر؟')) return;
 
     try {
-      await deleteDoc(doc(db, 'azkar', zikr.id));
+      await deleteDoc(doc(db, 'azkar', id));
       showSnackbar('تم حذف الذكر', 'success');
       loadAzkar();
     } catch (error) {
-      console.error('Delete error:', error);
-      showSnackbar('فشل في الحذف', 'error');
+      showSnackbar('خطأ في الحذف', 'error');
     }
   };
 
-  // ==========================================
-  // تصدير JSON
-  // ==========================================
+  const handleEdit = (zikr: Zikr) => {
+    setEditingZikr(zikr);
+    setFormData(zikr);
+    setDialogOpen(true);
+  };
 
-  const exportJSON = () => {
-    const data = {
-      azkar: azkar.map(z => ({
+  const handleAdd = () => {
+    setEditingZikr(null);
+    setFormData(emptyZikr);
+    setDialogOpen(true);
+  };
+
+  // ==================== تصدير البيانات ====================
+  const exportToJson = () => {
+    // تحويل البيانات للتنسيق المطلوب للتطبيق
+    const exportData = {
+      azkar: azkarList.map(z => ({
         id: z.numericId,
         category: z.category,
         arabic: z.arabic,
         transliteration: z.transliteration,
-        translation: z.translation,
+        translations: Object.fromEntries(
+          Object.entries(z.translations).map(([lang, trans]) => [lang, trans.text])
+        ),
         count: z.count,
         reference: z.reference,
-        benefit: z.benefit,
-        audio: z.audio,
-      })),
+        benefit: z.benefit || '',
+        audio: z.audio || ''
+      }))
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'azkar.json';
+    a.download = `azkar_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    
-    showSnackbar('تم تصدير الملف', 'success');
+    showSnackbar('تم تصدير البيانات', 'success');
   };
 
-  // ==========================================
-  // Snackbar
-  // ==========================================
-
-  const showSnackbar = (message: string, severity: 'success' | 'error') => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  // ==========================================
-  // فتح Dialog للإضافة/التعديل
-  // ==========================================
-
-  const openAddDialog = () => {
-    setEditingZikr(null);
-    setFormData(EMPTY_ZIKR);
-    setActiveTab(0);
-    setDialogOpen(true);
-  };
-
-  const openEditDialog = (zikr: Zikr) => {
-    setEditingZikr(zikr);
-    setFormData({
-      numericId: zikr.numericId,
-      category: zikr.category,
-      arabic: zikr.arabic,
-      transliteration: zikr.transliteration,
-      translation: zikr.translation,
-      count: zikr.count,
-      reference: zikr.reference,
-      benefit: zikr.benefit || { ar: '', en: '', fr: '' },
-      audio: zikr.audio || '',
-    });
-    setActiveTab(0);
-    setDialogOpen(true);
-  };
-
-  // ==========================================
-  // الإحصائيات
-  // ==========================================
-
+  // ==================== الإحصائيات ====================
   const getStats = () => {
-    const stats: Record<CategoryType, number> = {} as any;
+    const stats = {
+      total: azkarList.length,
+      withAudio: azkarList.filter(z => z.audio).length,
+      byCategory: {} as Record<string, number>,
+      translationCoverage: {} as Record<string, number>
+    };
+
     CATEGORIES.forEach(cat => {
-      stats[cat.id] = azkar.filter(z => z.category === cat.id).length;
+      stats.byCategory[cat.id] = azkarList.filter(z => z.category === cat.id).length;
     });
+
+    LANGUAGES.forEach(lang => {
+      stats.translationCoverage[lang.code] = azkarList.filter(
+        z => z.translations[lang.code as keyof typeof z.translations]?.text
+      ).length;
+    });
+
     return stats;
   };
 
   const stats = getStats();
 
-  // ==========================================
-  // الرندر
-  // ==========================================
-
+  // ==================== العرض ====================
   return (
     <Box sx={{ p: 3 }}>
-      {/* Header */}
+      {/* العنوان والأزرار */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          إدارة الأذكار
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+          🕌 إدارة الأذكار
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={exportJSON}
-          >
+          <Button variant="outlined" startIcon={<Download />} onClick={exportToJson}>
             تصدير JSON
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={loadAzkar}
-          >
+          <Button variant="outlined" startIcon={<Refresh />} onClick={loadAzkar}>
             تحديث
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openAddDialog}
-          >
+          <Button variant="contained" startIcon={<Add />} onClick={handleAdd}>
             إضافة ذكر
           </Button>
         </Box>
@@ -469,127 +457,157 @@ export default function AzkarManager() {
 
       {/* الإحصائيات */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {CATEGORIES.map(cat => (
-          <Grid item xs={6} sm={4} md={3} lg={1.5} key={cat.id}>
-            <Card
-              sx={{
-                cursor: 'pointer',
-                border: selectedCategory === cat.id ? `2px solid ${cat.color}` : 'none',
-                '&:hover': { boxShadow: 3 },
-              }}
-              onClick={() => setSelectedCategory(selectedCategory === cat.id ? 'all' : cat.id)}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 1 }}>
-                <Typography variant="h5" sx={{ color: cat.color }}>
-                  {stats[cat.id] || 0}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  {cat.name.ar}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
+        <Grid item xs={12} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>إجمالي الأذكار</Typography>
+              <Typography variant="h4">{stats.total}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>مع صوت</Typography>
+              <Typography variant="h4">{stats.withAudio}</Typography>
+              <LinearProgress 
+                variant="determinate" 
+                value={(stats.withAudio / stats.total) * 100} 
+                sx={{ mt: 1 }}
+              />
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>عدد الفئات</Typography>
+              <Typography variant="h4">{CATEGORIES.length}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>اللغات المدعومة</Typography>
+              <Typography variant="h4">{LANGUAGES.length}</Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
-      {/* البحث والفلترة */}
+      {/* الفلاتر */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <TextField
-          placeholder="ابحث في الأذكار..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          size="small"
-          sx={{ width: 300 }}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-          }}
-        />
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>التصنيف</InputLabel>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>الفئة</InputLabel>
           <Select
             value={selectedCategory}
-            label="التصنيف"
-            onChange={(e) => setSelectedCategory(e.target.value as any)}
+            label="الفئة"
+            onChange={(e) => setSelectedCategory(e.target.value)}
           >
-            <MenuItem value="all">جميع التصنيفات</MenuItem>
+            <MenuItem value="all">جميع الفئات</MenuItem>
             {CATEGORIES.map(cat => (
               <MenuItem key={cat.id} value={cat.id}>
-                {cat.name.ar} ({stats[cat.id] || 0})
+                {cat.icon} {cat.name} ({stats.byCategory[cat.id] || 0})
               </MenuItem>
             ))}
           </Select>
         </FormControl>
+        <TextField
+          label="بحث"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="بحث بالعربي أو الإنجليزي أو رقم حصن المسلم..."
+          sx={{ flexGrow: 1 }}
+          InputProps={{
+            startAdornment: <Search sx={{ color: 'action.active', mr: 1 }} />
+          }}
+        />
       </Box>
 
-      {/* الجدول */}
+      {/* جدول الأذكار */}
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
           <CircularProgress />
         </Box>
       ) : (
         <TableContainer component={Paper}>
-          <Table size="small">
+          <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-                <TableCell width={50}>#</TableCell>
-                <TableCell width={120}>التصنيف</TableCell>
-                <TableCell>النص العربي</TableCell>
-                <TableCell width={100}>التكرار</TableCell>
-                <TableCell width={150}>المرجع</TableCell>
-                <TableCell width={100}>الترجمات</TableCell>
-                <TableCell width={120}>الإجراءات</TableCell>
+              <TableRow sx={{ bgcolor: 'primary.main' }}>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>#</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>حصن</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>الفئة</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold', minWidth: 300 }}>النص العربي</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>الترجمات</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>صوت</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>إجراءات</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredAzkar.map((zikr) => {
-                const category = CATEGORIES.find(c => c.id === zikr.category);
-                const translationCount = Object.values(zikr.translation || {}).filter(t => t).length;
-                
+              {filteredList.map((zikr) => {
+                const transStatus = getTranslationStatus(zikr);
                 return (
                   <TableRow key={zikr.id} hover>
                     <TableCell>{zikr.numericId}</TableCell>
                     <TableCell>
+                      {zikr.hisnNumber > 0 ? (
+                        <Chip label={zikr.hisnNumber} size="small" color="primary" />
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>
                       <Chip
-                        label={category?.name.ar}
+                        label={CATEGORIES.find(c => c.id === zikr.category)?.name || zikr.category}
                         size="small"
-                        sx={{ backgroundColor: category?.color + '20', color: category?.color }}
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography
-                        sx={{
-                          maxWidth: 400,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          direction: 'rtl',
-                        }}
-                      >
+                      <Typography sx={{ 
+                        fontFamily: 'Amiri, serif',
+                        fontSize: '1.1rem',
+                        direction: 'rtl',
+                        maxWidth: 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
                         {zikr.arabic}
                       </Typography>
                     </TableCell>
-                    <TableCell>{zikr.count}×</TableCell>
                     <TableCell>
-                      <Typography variant="caption">{zikr.reference}</Typography>
+                      <Tooltip title={`${transStatus.complete}/${transStatus.total} مكتمل، ${transStatus.verified} موثق`}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={(transStatus.complete / transStatus.total) * 100}
+                            sx={{ width: 60, height: 8, borderRadius: 4 }}
+                          />
+                          <Typography variant="caption">
+                            {transStatus.complete}/{transStatus.total}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={`${translationCount}/12`}
-                        size="small"
-                        color={translationCount === 12 ? 'success' : 'warning'}
-                      />
+                      {zikr.audio ? (
+                        <IconButton
+                          size="small"
+                          color={playingAudio === zikr.audio ? 'secondary' : 'primary'}
+                          onClick={() => playingAudio === zikr.audio ? stopAudio() : playAudio(zikr.audio!)}
+                        >
+                          {playingAudio === zikr.audio ? <Stop /> : <PlayArrow />}
+                        </IconButton>
+                      ) : (
+                        <Chip label="لا يوجد" size="small" variant="outlined" />
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Tooltip title="تعديل">
-                        <IconButton size="small" onClick={() => openEditDialog(zikr)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="حذف">
-                        <IconButton size="small" color="error" onClick={() => handleDelete(zikr)}>
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      <IconButton size="small" onClick={() => handleEdit(zikr)}>
+                        <Edit />
+                      </IconButton>
+                      <IconButton size="small" color="error" onClick={() => handleDelete(zikr.id!)}>
+                        <Delete />
+                      </IconButton>
                     </TableCell>
                   </TableRow>
                 );
@@ -599,163 +617,298 @@ export default function AzkarManager() {
         </TableContainer>
       )}
 
+      {/* مصادر الترجمات الموثقة */}
+      <Box sx={{ mt: 3 }}>
+        <Typography variant="h6" gutterBottom>📚 مصادر الترجمات الموثقة:</Typography>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          {TRANSLATION_SOURCES.map(source => (
+            <Chip
+              key={source.id}
+              label={source.name}
+              component="a"
+              href={source.url}
+              target="_blank"
+              clickable
+              icon={<LinkIcon />}
+            />
+          ))}
+        </Box>
+      </Box>
+
       {/* Dialog إضافة/تعديل */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>
           {editingZikr ? 'تعديل الذكر' : 'إضافة ذكر جديد'}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
           <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
             <Tab label="البيانات الأساسية" />
-            <Tab label="الترجمات (12 لغة)" />
-            <Tab label="الفضل والمرجع" />
+            <Tab label="الترجمات الموثقة" />
+            <Tab label="الصوت" />
           </Tabs>
 
-          {/* التاب الأول: البيانات الأساسية */}
+          {/* تاب البيانات الأساسية */}
           {activeTab === 0 && (
             <Grid container spacing={2}>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel>التصنيف</InputLabel>
+                  <InputLabel>الفئة</InputLabel>
                   <Select
                     value={formData.category}
-                    label="التصنيف"
-                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as CategoryType }))}
+                    label="الفئة"
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   >
                     {CATEGORIES.map(cat => (
                       <MenuItem key={cat.id} value={cat.id}>
-                        {cat.name.ar}
+                        {cat.icon} {cat.name}
                       </MenuItem>
                     ))}
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  fullWidth
+                  label="رقم حصن المسلم"
+                  type="number"
+                  value={formData.hisnNumber}
+                  onChange={(e) => setFormData({ ...formData, hisnNumber: parseInt(e.target.value) || 0 })}
+                  helperText="للربط مع الصوت والترجمات"
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
                   label="عدد التكرار"
                   type="number"
                   value={formData.count}
-                  onChange={(e) => setFormData(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
-                  inputProps={{ min: 1 }}
+                  onChange={(e) => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="النص العربي *"
                   multiline
-                  rows={4}
+                  rows={3}
+                  label="النص العربي *"
                   value={formData.arabic}
-                  onChange={(e) => setFormData(prev => ({ ...prev, arabic: e.target.value }))}
-                  sx={{ direction: 'rtl' }}
+                  onChange={(e) => setFormData({ ...formData, arabic: e.target.value })}
+                  sx={{ direction: 'rtl', fontFamily: 'Amiri, serif' }}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="النطق (Transliteration)"
-                  multiline
-                  rows={2}
                   value={formData.transliteration}
-                  onChange={(e) => setFormData(prev => ({ ...prev, transliteration: e.target.value }))}
+                  onChange={(e) => setFormData({ ...formData, transliteration: e.target.value })}
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="رابط الصوت (اختياري)"
-                  value={formData.audio}
-                  onChange={(e) => setFormData(prev => ({ ...prev, audio: e.target.value }))}
+                  label="المرجع"
+                  value={formData.reference}
+                  onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                  placeholder="مثال: البخاري 1/152، مسلم 1/288"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="الفائدة (اختياري)"
+                  value={formData.benefit}
+                  onChange={(e) => setFormData({ ...formData, benefit: e.target.value })}
                 />
               </Grid>
             </Grid>
           )}
 
-          {/* التاب الثاني: الترجمات */}
+          {/* تاب الترجمات */}
           {activeTab === 1 && (
             <Box>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                <Button
-                  variant="contained"
-                  startIcon={translating ? <CircularProgress size={20} /> : <TranslateIcon />}
-                  onClick={translateAllLanguages}
-                  disabled={translating || !formData.arabic}
+              <Alert severity="info" sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                  ⚠️ <strong>مهم:</strong> يرجى استخدام الترجمات الموثقة فقط من المصادر الإسلامية المعتمدة.
+                  انقر على "فتح المصدر" للحصول على الترجمة الصحيحة.
+                </Typography>
+              </Alert>
+
+              {LANGUAGES.map((lang) => (
+                <Accordion 
+                  key={lang.code}
+                  expanded={expandedLang === lang.code}
+                  onChange={(_, expanded) => setExpandedLang(expanded ? lang.code : false)}
                 >
-                  {translating ? 'جاري الترجمة...' : 'ترجمة تلقائية لجميع اللغات'}
-                </Button>
-              </Box>
-              <Grid container spacing={2}>
-                {LANGUAGES.map(lang => (
-                  <Grid item xs={12} md={6} key={lang.code}>
-                    <TextField
-                      fullWidth
-                      label={`${lang.nativeName} (${lang.name})`}
-                      multiline
-                      rows={2}
-                      value={formData.translation[lang.code] || ''}
-                      onChange={(e) => setFormData(prev => ({
-                        ...prev,
-                        translation: { ...prev.translation, [lang.code]: e.target.value },
-                      }))}
-                      sx={{ direction: lang.code === 'ar' || lang.code === 'ur' ? 'rtl' : 'ltr' }}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
+                  <AccordionSummary expandIcon={<ExpandMore />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                      <Typography sx={{ fontWeight: 'bold' }}>{lang.name}</Typography>
+                      {formData.translations[lang.code as keyof typeof formData.translations]?.text ? (
+                        <Chip 
+                          size="small" 
+                          label={formData.translations[lang.code as keyof typeof formData.translations].verified ? "موثق ✓" : "غير موثق"}
+                          color={formData.translations[lang.code as keyof typeof formData.translations].verified ? "success" : "warning"}
+                        />
+                      ) : (
+                        <Chip size="small" label="فارغ" variant="outlined" />
+                      )}
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <TextField
+                          fullWidth
+                          multiline
+                          rows={3}
+                          label={`الترجمة ${lang.name}`}
+                          value={formData.translations[lang.code as keyof typeof formData.translations]?.text || ''}
+                          onChange={(e) => updateTranslation(lang.code, 'text', e.target.value)}
+                          sx={{ direction: lang.dir }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth>
+                          <InputLabel>مصدر الترجمة</InputLabel>
+                          <Select
+                            value={formData.translations[lang.code as keyof typeof formData.translations]?.source || ''}
+                            label="مصدر الترجمة"
+                            onChange={(e) => updateTranslation(lang.code, 'source', e.target.value)}
+                          >
+                            {TRANSLATION_SOURCES.map(src => (
+                              <MenuItem key={src.id} value={src.name}>{src.name}</MenuItem>
+                            ))}
+                            <MenuItem value="Manual">إدخال يدوي</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          startIcon={<CheckCircle />}
+                          color={formData.translations[lang.code as keyof typeof formData.translations]?.verified ? "success" : "inherit"}
+                          onClick={() => updateTranslation(
+                            lang.code, 
+                            'verified', 
+                            !formData.translations[lang.code as keyof typeof formData.translations]?.verified
+                          )}
+                        >
+                          {formData.translations[lang.code as keyof typeof formData.translations]?.verified ? 'موثق ✓' : 'تحديد كموثق'}
+                        </Button>
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          startIcon={<LinkIcon />}
+                          onClick={() => copyFromSource(lang.name, 'https://myislam.org/hisnul-muslim/')}
+                        >
+                          فتح المصدر
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </AccordionDetails>
+                </Accordion>
+              ))}
             </Box>
           )}
 
-          {/* التاب الثالث: الفضل والمرجع */}
+          {/* تاب الصوت */}
           {activeTab === 2 && (
             <Grid container spacing={2}>
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="المرجع *"
-                  value={formData.reference}
-                  onChange={(e) => setFormData(prev => ({ ...prev, reference: e.target.value }))}
-                  placeholder="مثال: صحيح البخاري، سورة البقرة: 255"
-                />
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    🔊 يمكنك استخدام ملفات الصوت من حصن المسلم المتاحة على Archive.org
+                    أو رفع ملف صوتي خاص.
+                  </Typography>
+                </Alert>
               </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>استخدام صوت حصن المسلم</Typography>
+                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                      <TextField
+                        label="رقم حصن المسلم"
+                        type="number"
+                        value={formData.hisnNumber}
+                        onChange={(e) => setFormData({ ...formData, hisnNumber: parseInt(e.target.value) || 0 })}
+                        size="small"
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={() => setAudioFromHisn(formData.hisnNumber)}
+                        disabled={!formData.hisnNumber}
+                      >
+                        تعيين الصوت
+                      </Button>
+                    </Box>
+                    {formData.hisnNumber > 0 && (
+                      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                        <Button
+                          size="small"
+                          startIcon={<PlayArrow />}
+                          onClick={() => playAudio(getAudioUrl(formData.hisnNumber))}
+                        >
+                          تجربة Archive.org
+                        </Button>
+                        <Button
+                          size="small"
+                          startIcon={<PlayArrow />}
+                          onClick={() => playAudio(getAudioUrl(formData.hisnNumber, 'salafi'))}
+                        >
+                          تجربة SalafiAudio
+                        </Button>
+                      </Box>
+                    )}
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom>رفع صوت مخصص</Typography>
+                    <Button
+                      variant="outlined"
+                      component="label"
+                      startIcon={uploadingAudio ? <CircularProgress size={20} /> : <CloudUpload />}
+                      disabled={uploadingAudio}
+                    >
+                      {uploadingAudio ? 'جاري الرفع...' : 'اختر ملف MP3'}
+                      <input type="file" accept="audio/*" hidden onChange={handleAudioUpload} />
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="الفضل (بالعربي)"
-                  multiline
-                  rows={2}
-                  value={formData.benefit?.ar || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    benefit: { ...prev.benefit, ar: e.target.value },
-                  }))}
-                  sx={{ direction: 'rtl' }}
+                  label="رابط الصوت"
+                  value={formData.audio}
+                  onChange={(e) => setFormData({ ...formData, audio: e.target.value })}
+                  InputProps={{
+                    endAdornment: formData.audio && (
+                      <IconButton onClick={() => playingAudio ? stopAudio() : playAudio(formData.audio!)}>
+                        {playingAudio === formData.audio ? <Stop /> : <PlayArrow />}
+                      </IconButton>
+                    )
+                  }}
                 />
               </Grid>
+
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="الفضل (بالإنجليزي)"
-                  multiline
-                  rows={2}
-                  value={formData.benefit?.en || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    benefit: { ...prev.benefit, en: e.target.value },
-                  }))}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="الفضل (بالفرنسي)"
-                  multiline
-                  rows={2}
-                  value={formData.benefit?.fr || ''}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    benefit: { ...prev.benefit, fr: e.target.value },
-                  }))}
+                  label="مصدر الصوت"
+                  value={formData.audioSource}
+                  onChange={(e) => setFormData({ ...formData, audioSource: e.target.value })}
                 />
               </Grid>
             </Grid>
@@ -773,12 +926,12 @@ export default function AzkarManager() {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
-          {snackbar.message}
-        </Alert>
+        <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
     </Box>
   );
-}
+};
+
+export default AzkarManager;

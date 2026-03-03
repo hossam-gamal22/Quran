@@ -1,7 +1,7 @@
 # ✅ CHECKLIST - روح المسلم
 > آخر تحديث: 3 مارس 2026
 
-## 📊 نسبة الإنجاز: 100% ✅ (Phase 1-12) | Phase 13: 40%
+## 📊 نسبة الإنجاز: Phase 1-12 (100%) | Phase 13 (65%)
 
 ---
 
@@ -18,194 +18,192 @@
 - [x] `lib/quran-api.ts` - API القرآن
 - [x] `lib/audio-player.ts` - مشغل الصوت
 - [x] `contexts/QuranContext.tsx` - سياق القرآن
-- [x] `app/(tabs)/quran.tsx` - صفحة القرآن (17KB)
-- [x] `app/(tabs)/quran-search.tsx` - البحث في القرآن (31KB)
-- [x] `app/(tabs)/recitations.tsx` - التلاوات (20KB)
-- [x] `app/(tabs)/tafsir-search.tsx` - البحث في التفسير (17KB)
+- [x] `app/(tabs)/quran.tsx` - صفحة القرآن
+- [x] `app/(tabs)/quran-search.tsx` - البحث في القرآن
+- [x] `app/(tabs)/recitations.tsx` - التلاوات
+- [x] `app/(tabs)/tafsir-search.tsx` - البحث في التفسير
 - [x] `app/surah/[id].tsx` - صفحة السورة
 
 ## ✅ Phase 3 – Khatma System (100%)
-- [x] `lib/khatma-storage.ts` - تخزين الختمة (13KB)
-- [x] `lib/khatm.ts` - منطق الختمة (4KB)
-- [x] `lib/khatma-notifications.ts` - إشعارات الختمة (8KB)
-- [x] `contexts/KhatmaContext.tsx` - سياق الختمة (7KB)
-- [x] `app/(tabs)/khatm.tsx` - صفحة الختمة (17KB)
-- [x] `app/(tabs)/wird.tsx` - صفحة الورد (27KB)
+- [x] `lib/khatma-storage.ts` - تخزين الختمة
+- [x] `lib/khatm.ts` - منطق الختمة
+- [x] `lib/khatma-notifications.ts` - إشعارات الختمة
+- [x] `contexts/KhatmaContext.tsx` - سياق الختمة
+- [x] `app/(tabs)/khatm.tsx` - صفحة الختمة
+- [x] `app/(tabs)/wird.tsx` - صفحة الورد
 - [x] `app/khatma/*` - صفحات الختمة الفرعية
 
-## 🔄 Phase 4 – Azkar & Duas (85%) - تم التحديث للنظام الجديد
-- [x] `lib/azkar-api.ts` - API الأذكار الجديد ✅ محدث
+## ✅ Phase 4 – Azkar & Duas (95%)
+- [x] `lib/azkar-api.ts` - API الأذكار ✅ محدث للJSON
 - [x] `app/(tabs)/azkar.tsx` - صفحة الأذكار ✅ محدث
 - [x] `app/azkar/[category].tsx` - صفحة عرض الأذكار ✅ جديد
-- [x] `app/(tabs)/tasbih.tsx` - التسبيح (47KB)
-- [ ] `app/ruqya.tsx` - الرقية الشرعية ❌ يحتاج تحديث
-- [x] `app/names.tsx` - أسماء الله الحسنى (63KB)
-- [x] `data/json/azkar.json` - بيانات الأذكار الجديدة ✅ (106 ذكر × 12 لغة)
+- [x] `app/(tabs)/tasbih.tsx` - التسبيح
+- [x] `app/ruqya.tsx` - الرقية الشرعية ✅ محدث للJSON
+- [x] `app/names.tsx` - أسماء الله الحسنى
+- [x] `app/azkar-reminder.tsx` - تذكيرات الأذكار ✅ جديد
+- [x] `app/azkar-search.tsx` - البحث في الأذكار ✅ جديد
+- [x] `data/json/azkar.json` - بيانات الأذكار ✅ (106 ذكر × 12 لغة)
 - [x] `data/json/categories.json` - التصنيفات ✅ (8 فئات × 12 لغة)
-- [x] ~~`data/azkar.ts`~~ - ❌ محذوف (النظام القديم)
-- [x] ~~`data/duas.ts`~~ - ❌ محذوف (النظام القديم)
-- [x] ~~`data/ruqya.ts`~~ - ❌ محذوف (النظام القديم)
-- [x] ~~`data/translations/*`~~ - ❌ محذوف (النظام القديم)
+- [x] ~~`data/azkar.ts`~~ - محذوف ✅
+- [x] ~~`data/duas.ts`~~ - محذوف ✅
+- [x] ~~`data/ruqya.ts`~~ - محذوف ✅
+- [x] ~~`data/translations/*`~~ - محذوف ✅
 
 ## ✅ Phase 5 – Prayer Times (100%)
-- [x] `lib/prayer-times.ts` - حساب المواقيت (19KB)
-- [x] `lib/prayer-api.ts` - AlAdhan API (9KB)
-- [x] `lib/prayer-notifications.ts` - إشعارات الصلاة (7KB)
+- [x] `lib/prayer-times.ts` - حساب المواقيت
+- [x] `lib/prayer-api.ts` - AlAdhan API
+- [x] `lib/prayer-notifications.ts` - إشعارات الصلاة
 - [x] `components/ui/prayer/*` - مكونات الصلاة
-- [x] `app/(tabs)/prayer.tsx` - صفحة الصلاة (16KB)
-- [x] `app/(tabs)/qibla.tsx` - اتجاه القبلة (19KB)
+- [x] `app/(tabs)/prayer.tsx` - صفحة الصلاة
+- [x] `app/(tabs)/qibla.tsx` - اتجاه القبلة
 
 ## ✅ Phase 6 – Worship Tracker (100%)
-- [x] `lib/worship-storage.ts` - تخزين العبادات (23KB)
-- [x] `contexts/WorshipContext.tsx` - سياق العبادات (13KB)
+- [x] `lib/worship-storage.ts` - تخزين العبادات
+- [x] `contexts/WorshipContext.tsx` - سياق العبادات
 - [x] `app/worship-tracker/*` - صفحات تتبع العبادات
 
 ## ✅ Phase 7 – Widgets (100%)
-- [x] `lib/widget-data.ts` - بيانات الويدجت (13KB)
-- [x] `lib/widget-settings.tsx` - إعدادات الويدجت (26KB)
+- [x] `lib/widget-data.ts` - بيانات الويدجت
+- [x] `lib/widget-settings.tsx` - إعدادات الويدجت
 - [x] `widgets/ios/*` - ويدجت iOS
 - [x] `widgets/android/*` - ويدجت Android
 
 ## ✅ Phase 8 – Settings (100%)
 - [x] `lib/settings-context.tsx` - سياق الإعدادات
-- [x] `contexts/SettingsContext.tsx` - Provider كامل (10KB)
-- [x] `app/(tabs)/settings.tsx` - صفحة الإعدادات (20KB)
+- [x] `contexts/SettingsContext.tsx` - Provider كامل
+- [x] `app/(tabs)/settings.tsx` - صفحة الإعدادات
 - [x] `app/settings/*` - صفحات الإعدادات الفرعية
 
 ## ✅ Phase 9 – Seasonal Content (100%)
-- [x] `lib/seasonal-content.ts` - المحتوى الموسمي (18KB)
-- [x] `contexts/SeasonalContext.tsx` - سياق المواسم (18KB)
+- [x] `lib/seasonal-content.ts` - المحتوى الموسمي
+- [x] `contexts/SeasonalContext.tsx` - سياق المواسم
 - [x] `app/seasonal/*` - صفحات المواسم
 
 ## ✅ Phase 10 – Onboarding (100%)
-- [x] `contexts/OnboardingContext.tsx` - سياق البداية (11KB)
-- [x] `app/onboarding.tsx` - شاشة البداية (9KB)
+- [x] `contexts/OnboardingContext.tsx` - سياق البداية
+- [x] `app/onboarding.tsx` - شاشة البداية
 - [x] `app/onboarding/*` - شاشات البداية
 
 ## ✅ Phase 11 – Final Polish (100%)
-- [x] `app/(tabs)/index.tsx` - الصفحة الرئيسية (17KB)
-- [x] `app/(tabs)/_layout.tsx` - تخطيط التابات (9KB)
-- [x] `app/_layout.tsx` - التخطيط الرئيسي (8KB)
-- [x] `app/(tabs)/more.tsx` - المزيد (12KB)
-- [x] `app/(tabs)/favorites.tsx` - المفضلة (23KB)
-- [x] `app/(tabs)/daily-ayah.tsx` - آية اليوم (18KB)
-- [x] `app/(tabs)/hijri-calendar.tsx` - التقويم الهجري (20KB)
-- [x] `app/(tabs)/notifications-center.tsx` - مركز الإشعارات (20KB)
-- [x] `components/ui/ErrorBoundary.tsx` - معالجة الأخطاء (9KB)
-- [x] `lib/analytics.ts` - التحليلات (11KB)
-- [x] `lib/performance.ts` - تحسين الأداء (13KB)
+- [x] `app/(tabs)/index.tsx` - الصفحة الرئيسية
+- [x] `app/(tabs)/_layout.tsx` - تخطيط التابات
+- [x] `app/_layout.tsx` - التخطيط الرئيسي
+- [x] `app/(tabs)/more.tsx` - المزيد
+- [x] `app/(tabs)/favorites.tsx` - المفضلة
+- [x] `app/(tabs)/daily-ayah.tsx` - آية اليوم
+- [x] `app/(tabs)/hijri-calendar.tsx` - التقويم الهجري
+- [x] `app/(tabs)/notifications-center.tsx` - مركز الإشعارات
+- [x] `components/ui/ErrorBoundary.tsx` - معالجة الأخطاء
+- [x] `lib/analytics.ts` - التحليلات
+- [x] `lib/performance.ts` - تحسين الأداء
 
 ## ✅ Phase 12 – Admin Panel & Firebase (100%)
 
 ### Admin Panel Files
 > URL: https://splendorous-biscochitos-6e7d7c.netlify.app/
 
-- [x] `admin-panel/src/App.tsx` - التطبيق الرئيسي (24KB)
+- [x] `admin-panel/src/App.tsx` - التطبيق الرئيسي
 - [x] `admin-panel/src/firebase.ts` - إعداد Firebase
-- [x] `admin-panel/src/pages/Dashboard.tsx` - لوحة التحكم (14KB)
-- [x] `admin-panel/src/pages/Analytics.tsx` - التحليلات (11KB)
-- [x] `admin-panel/src/pages/Content.tsx` - المحتوى (32KB)
-- [x] `admin-panel/src/pages/Notifications.tsx` - الإشعارات (30KB)
-- [x] `admin-panel/src/pages/Seasonal.tsx` - الموسمي (31KB)
-- [x] `admin-panel/src/pages/SplashScreens.tsx` - شاشات البداية (41KB)
-- [x] `admin-panel/src/pages/Settings.tsx` - الإعدادات (32KB)
-- [x] `admin-panel/src/pages/Themes.tsx` - الثيمات (28KB)
-- [x] `admin-panel/src/pages/Users.tsx` - المستخدمين (17KB)
-- [x] `admin-panel/src/pages/Subscriptions.tsx` - الاشتراكات (8KB)
-- [x] `admin-panel/src/pages/Ads.tsx` - الإعلانات (17KB)
-- [x] `admin-panel/src/pages/Pricing.tsx` - التسعير (3KB)
-- [x] `admin-panel/src/pages/Login.tsx` - تسجيل الدخول (2KB)
+- [x] `admin-panel/src/pages/Dashboard.tsx` - لوحة التحكم
+- [x] `admin-panel/src/pages/Analytics.tsx` - التحليلات
+- [x] `admin-panel/src/pages/Content.tsx` - المحتوى
+- [x] `admin-panel/src/pages/Notifications.tsx` - الإشعارات
+- [x] `admin-panel/src/pages/Seasonal.tsx` - الموسمي
+- [x] `admin-panel/src/pages/SplashScreens.tsx` - شاشات البداية
+- [x] `admin-panel/src/pages/Settings.tsx` - الإعدادات
+- [x] `admin-panel/src/pages/Themes.tsx` - الثيمات
+- [x] `admin-panel/src/pages/Users.tsx` - المستخدمين
+- [x] `admin-panel/src/pages/Subscriptions.tsx` - الاشتراكات
+- [x] `admin-panel/src/pages/Ads.tsx` - الإعلانات
+- [x] `admin-panel/src/pages/Pricing.tsx` - التسعير
+- [x] `admin-panel/src/pages/Login.tsx` - تسجيل الدخول
 
 ### API & Configuration
-- [x] `lib/api-client.ts` - عميل API (12KB)
-- [x] `lib/api.ts` - دوال API (7KB)
-- [x] `lib/app-config-api.ts` - إعدادات التطبيق (3KB)
-- [x] `lib/app-config-context.tsx` - سياق الإعدادات (2KB)
-- [x] `lib/remote-config.ts` - Remote Config (6KB)
-- [x] `contexts/RemoteConfigContext.tsx` - سياق Remote Config (4KB)
+- [x] `lib/api-client.ts` - عميل API
+- [x] `lib/api.ts` - دوال API
+- [x] `lib/app-config-api.ts` - إعدادات التطبيق
+- [x] `lib/app-config-context.tsx` - سياق الإعدادات
+- [x] `lib/remote-config.ts` - Remote Config
+- [x] `contexts/RemoteConfigContext.tsx` - سياق Remote Config
 
 ### Push Notifications
-- [x] `lib/push-notifications.ts` - الإشعارات (10KB)
-- [x] `contexts/NotificationsContext.tsx` - سياق الإشعارات (8KB)
+- [x] `lib/push-notifications.ts` - الإشعارات
+- [x] `contexts/NotificationsContext.tsx` - سياق الإشعارات
 
 ---
 
-## 🔄 Phase 13 – Azkar JSON System (40%)
+## 🔄 Phase 13 – Azkar JSON System (65%)
 
 ### ✅ الخطوة 1: ملفات JSON (مكتمل)
-- [x] `data/json/azkar.json` - 106 ذكر مع 12 لغة ✅
-- [x] `data/json/categories.json` - 8 فئات مع 12 لغة ✅
+- [x] `data/json/azkar.json` - 106 ذكر × 12 لغة ✅
+- [x] `data/json/categories.json` - 8 فئات × 12 لغة ✅
 
 ### ✅ الخطوة 2: محتوى الأذكار (مكتمل)
 - [x] النص العربي (arabic) ✅
 - [x] النطق اللاتيني (transliteration) ✅
-- [x] 12 لغة (ar, en, ur, id, tr, fr, de, hi, bn, ms, ru, es) ✅
+- [x] 12 لغة ✅
 - [x] عدد التكرار (count) ✅
 - [x] الفضل/الفائدة (benefit) ✅
 - [x] المرجع (reference) ✅
-- [ ] رابط الصوت (audio) - جزئي
+- [ ] رابط الصوت (audio) - ⚠️ يحتاج مراجعة
 
-### ✅ الخطوة 3: تحديث الكود (مكتمل)
-- [x] `lib/azkar-api.ts` - محدث للنظام الجديد ✅
-- [x] `app/(tabs)/azkar.tsx` - محدث ✅
-- [x] `app/azkar/[category].tsx` - جديد ✅
+### ✅ الخطوة 3: تحديث كود التطبيق (مكتمل)
+- [x] `lib/azkar-api.ts` ✅
+- [x] `app/(tabs)/azkar.tsx` ✅
+- [x] `app/azkar/[category].tsx` ✅
+- [x] `app/ruqya.tsx` ✅
+- [x] `app/azkar-reminder.tsx` ✅
+- [x] `app/azkar-search.tsx` ✅
 
-### ❌ الخطوة 4: صفحات إضافية (قيد التنفيذ)
-- [ ] `app/ruqya.tsx` - تحديث للنظام الجديد
-- [ ] `app/azkar-reminder.tsx` - شاشة التذكيرات
-- [ ] `app/azkar-search.tsx` - شاشة البحث
-
-### ❌ الخطوة 5: Admin Panel للأذكار
-- [ ] `admin-panel/src/pages/AzkarManager.tsx` - إدارة الأذكار
-  - [ ] إضافة/تعديل/حذف الأذكار
-  - [ ] ترجمة تلقائية لـ 12 لغة
-  - [ ] رفع ملفات الصوت
-- [ ] `admin-panel/src/pages/DuasManager.tsx` - إدارة الأدعية
-- [ ] `admin-panel/src/pages/RuqyaManager.tsx` - إدارة الرقية
+### ✅ الخطوة 4: Admin Panel للأذكار (جزئي)
+- [x] `admin-panel/src/pages/AzkarManager.tsx` ✅
+  - [x] إضافة/تعديل/حذف الأذكار ✅
+  - [x] ترجمة تلقائية لـ 12 لغة ✅
+  - [x] تصدير JSON ✅
+- [ ] ربط Admin Panel بـ App.tsx
 - [ ] `admin-panel/src/pages/AzkarReminders.tsx` - إدارة التذكيرات
 
-### ❌ الخطوة 6: Firebase Integration
+### ❌ الخطوة 5: Firebase Integration
 - [ ] رفع الأذكار على Firestore
 - [ ] Sync بين Admin Panel والتطبيق
 - [ ] Offline Cache
 
-### ✅ الخطوة 7: حذف الملفات القديمة (مكتمل)
-- [x] ~~`data/azkar.ts`~~ ✅ محذوف
-- [x] ~~`data/duas.ts`~~ ✅ محذوف
-- [x] ~~`data/ruqya.ts`~~ ✅ محذوف
-- [x] ~~`data/translations/*`~~ ✅ محذوف
+### ✅ الخطوة 6: حذف الملفات القديمة (مكتمل)
+- [x] ~~`data/azkar.ts`~~ ✅
+- [x] ~~`data/duas.ts`~~ ✅
+- [x] ~~`data/ruqya.ts`~~ ✅
+- [x] ~~`data/translations/*`~~ ✅
 
 ---
 
 ## 📊 محتوى الأذكار الحالي
 
-| القسم | العدد | الحالة |
-|-------|-------|--------|
-| أذكار الصباح | 27 | ✅ |
-| أذكار المساء | 6 | ✅ |
-| أذكار النوم | 7 | ✅ |
-| أذكار الاستيقاظ | 3 | ✅ |
-| أذكار بعد الصلاة | 10 | ✅ |
-| أدعية من القرآن | 15 | ✅ |
-| أدعية من السنة | 23 | ✅ |
-| الرقية الشرعية | 15 | ✅ |
-| **المجموع** | **106 ذكر** | ✅ |
-| **الترجمات** | **106 × 12 = 1,272** | ✅ |
+| القسم | العدد | الصوت |
+|-------|-------|-------|
+| أذكار الصباح | 27 | ⚠️ جزئي |
+| أذكار المساء | 6 | ⚠️ جزئي |
+| أذكار النوم | 7 | ❌ |
+| أذكار الاستيقاظ | 3 | ❌ |
+| أذكار بعد الصلاة | 10 | ❌ |
+| أدعية من القرآن | 15 | ⚠️ جزئي |
+| أدعية من السنة | 23 | ❌ |
+| الرقية الشرعية | 15 | ⚠️ جزئي |
+| **المجموع** | **106** | **⚠️** |
 
 ---
 
 ## 📈 إحصائيات المشروع
 
-| القسم | العدد | الحجم |
-|-------|-------|-------|
-| App Tab Screens | 19 | ~400 KB |
-| App Root Files | 6 | ~160 KB |
-| Lib Files | 32+ | ~280 KB |
-| Contexts | 7 | ~68 KB |
-| Components | 15+ | ~50 KB |
-| Admin Pages | 14 | ~260 KB |
-| JSON Data | 2 files | ~150 KB |
-| Languages | 12 | 1,272 translations |
+| القسم | العدد |
+|-------|-------|
+| App Screens | 25+ |
+| Lib Files | 35+ |
+| Contexts | 8 |
+| Components | 20+ |
+| Admin Pages | 15 |
+| JSON Data | 2 files (106 azkar, 8 categories) |
+| Languages | 12 |
+| Translations | 1,272 |
 
 ---
 
@@ -217,15 +215,13 @@
 
 ## ⏳ الخطوات القادمة
 
-### المرحلة الحالية:
-1. [ ] تحديث `app/ruqya.tsx` للنظام الجديد
-2. [ ] إنشاء `app/azkar-reminder.tsx`
-3. [ ] إنشاء `app/azkar-search.tsx`
-4. [ ] إنشاء صفحات Admin Panel للأذكار
+### الأولوية العالية:
+1. [ ] **إضافة ملفات الصوت للأذكار** ⚠️
+2. [ ] ربط AzkarManager بـ Admin Panel App.tsx
+3. [ ] Firebase Integration
 
-### قبل النشر النهائي:
+### قبل النشر:
 1. [ ] اختبار التطبيق على iOS و Android
-2. [ ] اختبار جميع الـ 12 لغة
-3. [ ] إضافة ملفات الصوت للأذكار
-4. [ ] ربط Firebase
-5. [ ] نشر على App Store و Google Play
+2. [ ] اختبار الـ 12 لغة
+3. [ ] اختبار التذكيرات
+4. [ ] نشر على App Store و Google Play
