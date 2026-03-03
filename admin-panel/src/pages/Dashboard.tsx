@@ -1,118 +1,223 @@
 // admin-panel/src/pages/Dashboard.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users,
-  Activity,
-  Clock,
-  Eye,
-  BookOpen,
-  Moon,
-  TrendingUp,
-  RefreshCw,
-  Sparkles,
-  FileText,
-  Bell,
-  Palette,
-  Calendar,
-  Settings,
-  CheckCircle,
-  Star,
-  Globe
+  Users, Activity, Clock, Eye, BookOpen, Moon, TrendingUp, RefreshCw,
+  Sparkles, FileText, Bell, Palette, Calendar, Settings, CheckCircle, Star, Globe, AlertCircle
 } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, query, where, orderBy, limit, Timestamp } from 'firebase/firestore';
 
-// ==================== البيانات ====================
+// رابط ملف الأذكار
+const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
 
-const INITIAL_STATS = {
-  totalUsers: 15420,
-  activeUsers: 8750,
-  dailyActiveUsers: 2340,
-  avgSessionDuration: 8.5,
-  totalAzkarRead: 125000,
-  totalQuranPages: 89000,
-  totalPrayers: 156000
-};
+interface Stats {
+  totalUsers: number;
+  activeUsers: number;
+  dailyActiveUsers: number;
+  avgSessionDuration: number;
+  totalAzkar: number;
+  totalAzkarRead: number;
+  totalQuranPages: number;
+  totalPrayers: number;
+  iosUsers: number;
+  androidUsers: number;
+}
 
-const INITIAL_ACTIVITY = [
-  { id: '1', type: 'user', description: 'مستخدم جديد من مصر', time: 'منذ دقيقة', country: '🇪🇬' },
-  { id: '2', type: 'azkar', description: 'أذكار الصباح الأكثر قراءة اليوم', time: 'منذ 5 دقائق' },
-  { id: '3', type: 'quran', description: '50 مستخدم أكملوا سورة الكهف', time: 'منذ 15 دقيقة' },
-  { id: '4', type: 'prayer', description: 'زيادة 15% في تسجيل الصلوات', time: 'منذ ساعة' },
-  { id: '5', type: 'share', description: '200 مشاركة لآية الكرسي', time: 'منذ ساعتين' },
-];
+interface ActivityItem {
+  id: string;
+  type: string;
+  description: string;
+  time: string;
+  country?: string;
+}
 
 const QUICK_ACTIONS = [
   { id: '1', title: 'شاشات البداية', icon: Sparkles, path: '/splash-screens', color: 'bg-purple-500/20 text-purple-400' },
   { id: '2', title: 'إدارة المحتوى', icon: FileText, path: '/content', color: 'bg-blue-500/20 text-blue-400' },
-  { id: '3', title: 'الإشعارات', icon: Bell, path: '/notifications', color: 'bg-amber-500/20 text-amber-400' },
-  { id: '4', title: 'الثيمات', icon: Palette, path: '/themes', color: 'bg-pink-500/20 text-pink-400' },
-  { id: '5', title: 'المحتوى الموسمي', icon: Calendar, path: '/seasonal', color: 'bg-emerald-500/20 text-emerald-400' },
+  { id: '3', title: 'الأذكار', icon: Moon, path: '/azkar', color: 'bg-emerald-500/20 text-emerald-400' },
+  { id: '4', title: 'الإشعارات', icon: Bell, path: '/notifications', color: 'bg-amber-500/20 text-amber-400' },
+  { id: '5', title: 'المستخدمين', icon: Users, path: '/users', color: 'bg-pink-500/20 text-pink-400' },
   { id: '6', title: 'الإعدادات', icon: Settings, path: '/settings', color: 'bg-slate-500/20 text-slate-400' },
 ];
 
-// ==================== المكونات ====================
-
-const StatCard: React.FC<{
-  title: string;
-  value: number | string;
-  icon: React.ReactNode;
-  iconBg: string;
-  change?: number;
-  suffix?: string;
-}> = ({ title, value, icon, iconBg, change, suffix }) => (
-  <div className="bg-slate-800/50 backdrop-blur-sm p-5 rounded-2xl border border-slate-700/50 hover:border-emerald-500/30 transition-all">
-    <div className="flex items-start justify-between">
-      <div>
-        <p className="text-sm text-slate-400">{title}</p>
-        <p className="text-2xl font-bold text-white mt-1">
-          {typeof value === 'number' ? value.toLocaleString() : value}
-          {suffix && <span className="text-lg text-slate-400 mr-1">{suffix}</span>}
-        </p>
-        {change !== undefined && (
-          <div className="flex items-center gap-1 mt-2 text-sm text-emerald-400">
-            <TrendingUp className="w-4 h-4" />
-            <span>{change}% من الأسبوع الماضي</span>
-          </div>
-        )}
-      </div>
-      <div className={`p-3 rounded-xl ${iconBg}`}>
-        {icon}
-      </div>
-    </div>
-  </div>
-);
-
-// ==================== المكون الرئيسي ====================
-
 const Dashboard: React.FC = () => {
-  const [stats] = useState(INITIAL_STATS);
-  const [activity] = useState(INITIAL_ACTIVITY);
-  const [isLoading, setIsLoading] = useState(false);
+  const [stats, setStats] = useState<Stats>({
+    totalUsers: 0,
+    activeUsers: 0,
+    dailyActiveUsers: 0,
+    avgSessionDuration: 0,
+    totalAzkar: 0,
+    totalAzkarRead: 0,
+    totalQuranPages: 0,
+    totalPrayers: 0,
+    iosUsers: 0,
+    androidUsers: 0,
+  });
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [error, setError] = useState<string | null>(null);
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
 
-  const refreshData = async () => {
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const loadAllData = async () => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setLastUpdated(new Date());
+    setError(null);
+    
+    try {
+      // 1. تحميل عدد الأذكار من GitHub JSON
+      const azkarResponse = await fetch(AZKAR_JSON_URL);
+      const azkarData = await azkarResponse.json();
+      const totalAzkar = azkarData.totalCount || azkarData.azkar?.length || 0;
+
+      // 2. محاولة تحميل البيانات من Firebase
+      let usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
+      let statsData = { azkarRead: 0, quranPages: 0, prayers: 0, avgSession: 0 };
+      let activityData: ActivityItem[] = [];
+
+      try {
+        // تحميل المستخدمين
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const users = usersSnapshot.docs.map(doc => doc.data());
+        
+        const now = new Date();
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        usersData = {
+          total: users.length,
+          active: users.filter(u => u.lastActive && new Date(u.lastActive.toDate?.() || u.lastActive) > weekAgo).length,
+          daily: users.filter(u => u.lastActive && new Date(u.lastActive.toDate?.() || u.lastActive) > dayAgo).length,
+          ios: users.filter(u => u.platform === 'ios').length,
+          android: users.filter(u => u.platform === 'android').length,
+        };
+
+        // تحميل الإحصائيات
+        const statsSnapshot = await getDocs(collection(db, 'stats'));
+        if (!statsSnapshot.empty) {
+          const statsDoc = statsSnapshot.docs[0].data();
+          statsData = {
+            azkarRead: statsDoc.totalAzkarRead || 0,
+            quranPages: statsDoc.totalQuranPages || 0,
+            prayers: statsDoc.totalPrayers || 0,
+            avgSession: statsDoc.avgSessionDuration || 0,
+          };
+        }
+
+        // تحميل آخر النشاطات
+        try {
+          const activitySnapshot = await getDocs(
+            query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(5))
+          );
+          activityData = activitySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              type: data.type || 'user',
+              description: data.description || '',
+              time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
+              country: data.country,
+            };
+          });
+        } catch (e) {
+          console.log('Activity collection not found');
+        }
+
+        setFirebaseConnected(true);
+      } catch (firebaseError) {
+        console.log('Firebase not configured or empty, using demo data');
+        setFirebaseConnected(false);
+        
+        // بيانات تجريبية للعرض
+        usersData = { total: 0, active: 0, daily: 0, ios: 0, android: 0 };
+        activityData = [
+          { id: '1', type: 'info', description: 'التطبيق جاهز للنشر - انتظار المستخدمين', time: 'الآن' },
+          { id: '2', type: 'azkar', description: `${totalAzkar} ذكر جاهز للعرض`, time: 'منذ دقيقة' },
+        ];
+      }
+
+      setStats({
+        totalUsers: usersData.total,
+        activeUsers: usersData.active,
+        dailyActiveUsers: usersData.daily,
+        avgSessionDuration: statsData.avgSession,
+        totalAzkar: totalAzkar,
+        totalAzkarRead: statsData.azkarRead,
+        totalQuranPages: statsData.quranPages,
+        totalPrayers: statsData.prayers,
+        iosUsers: usersData.ios,
+        androidUsers: usersData.android,
+      });
+
+      setActivity(activityData.length > 0 ? activityData : [
+        { id: '1', type: 'info', description: 'لا يوجد نشاط بعد - التطبيق جاهز للنشر', time: 'الآن' },
+      ]);
+
+      setLastUpdated(new Date());
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setError('خطأ في تحميل البيانات');
+    }
+    
     setIsLoading(false);
   };
 
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'الآن';
+    if (minutes < 60) return `منذ ${minutes} دقيقة`;
+    if (hours < 24) return `منذ ${hours} ساعة`;
+    return `منذ ${days} يوم`;
+  };
+
+  const StatCard: React.FC<{
+    title: string;
+    value: number | string;
+    icon: React.ReactNode;
+    iconBg: string;
+    subtitle?: string;
+  }> = ({ title, value, icon, iconBg, subtitle }) => (
+    <div className="bg-slate-800/50 backdrop-blur-sm p-5 rounded-2xl border border-slate-700/50 hover:border-emerald-500/30 transition-all">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm text-slate-400">{title}</p>
+          <p className="text-2xl font-bold text-white mt-1">
+            {typeof value === 'number' ? value.toLocaleString() : value}
+          </p>
+          {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+        </div>
+        <div className={`p-3 rounded-xl ${iconBg}`}>{icon}</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" dir="rtl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">لوحة التحكم</h1>
-          <p className="text-slate-400 mt-1">مرحباً بك في لوحة تحكم روح المسلم</p>
+          <p className="text-slate-400 mt-1">
+            {firebaseConnected ? '🟢 متصل بـ Firebase' : '🟡 وضع العرض - Firebase غير مُعد'}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-500">
             آخر تحديث: {lastUpdated.toLocaleTimeString('ar-EG')}
           </span>
           <button
-            onClick={refreshData}
+            onClick={loadAllData}
             disabled={isLoading}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition-colors border border-slate-700"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             تحديث
@@ -120,40 +225,46 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Row 1 */}
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/50 text-red-400 p-4 rounded-xl flex items-center gap-2">
+          <AlertCircle className="w-5 h-5" />
+          {error}
+        </div>
+      )}
+
+      {/* Stats Row 1 - Users */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="إجمالي المستخدمين"
           value={stats.totalUsers}
           icon={<Users className="w-6 h-6 text-blue-400" />}
           iconBg="bg-blue-500/20"
-          change={12}
+          subtitle={stats.totalUsers === 0 ? "انتظار النشر" : undefined}
         />
         <StatCard
           title="المستخدمين النشطين"
           value={stats.activeUsers}
           icon={<Activity className="w-6 h-6 text-emerald-400" />}
           iconBg="bg-emerald-500/20"
-          change={8}
+          subtitle="آخر 7 أيام"
         />
         <StatCard
           title="المستخدمين اليوم"
           value={stats.dailyActiveUsers}
           icon={<Eye className="w-6 h-6 text-amber-400" />}
           iconBg="bg-amber-500/20"
-          change={3}
         />
         <StatCard
-          title="متوسط مدة الجلسة"
-          value={stats.avgSessionDuration}
-          suffix="د"
-          icon={<Clock className="w-6 h-6 text-purple-400" />}
+          title="الأذكار المتاحة"
+          value={stats.totalAzkar}
+          icon={<Moon className="w-6 h-6 text-purple-400" />}
           iconBg="bg-purple-500/20"
-          change={5}
+          subtitle="من ملف JSON"
         />
       </div>
 
-      {/* Stats Row 2 */}
+      {/* Stats Row 2 - Content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
           title="الأذكار المقروءة"
@@ -206,8 +317,7 @@ const Dashboard: React.FC = () => {
                   {item.type === 'user' && <Users className="w-4 h-4 text-blue-400" />}
                   {item.type === 'azkar' && <Moon className="w-4 h-4 text-purple-400" />}
                   {item.type === 'quran' && <BookOpen className="w-4 h-4 text-emerald-400" />}
-                  {item.type === 'prayer' && <Clock className="w-4 h-4 text-amber-400" />}
-                  {item.type === 'share' && <Globe className="w-4 h-4 text-pink-400" />}
+                  {item.type === 'info' && <AlertCircle className="w-4 h-4 text-amber-400" />}
                 </div>
                 <div className="flex-1">
                   <p className="text-sm text-slate-300">{item.description}</p>
@@ -220,74 +330,69 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* System Status & App Info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-white">حالة النظام</h2>
-            <span className="flex items-center gap-2 text-sm text-emerald-400">
-              <CheckCircle className="w-4 h-4" />
-              كل شيء يعمل
-            </span>
-          </div>
-          <div className="space-y-2">
-            {['API', 'قاعدة البيانات', 'الإشعارات', 'CDN'].map((item, i) => (
-              <div key={i} className="flex items-center justify-between py-2">
-                <span className="text-slate-400">{item}</span>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-sm text-emerald-400">يعمل</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
-          <h2 className="text-lg font-bold text-white mb-4">معلومات التطبيق</h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-              <span className="text-slate-400">الإصدار الحالي</span>
-              <span className="font-medium text-white">1.0.0</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-              <span className="text-slate-400">آخر تحديث</span>
-              <span className="font-medium text-white">2 مارس 2026</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-slate-700/50">
-              <span className="text-slate-400">وضع الصيانة</span>
-              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm">معطل</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-slate-400">الإعلانات</span>
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded-full text-sm">مفعّلة</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Platform Distribution */}
+      {stats.totalUsers > 0 && (
+        <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
+          <h2 className="text-lg font-bold text-white mb-4">توزيع المستخدمين</h2>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400"> iOS</span>
+                <span className="font-medium text-white">
+                  {stats.iosUsers.toLocaleString()} ({stats.totalUsers > 0 ? Math.round((stats.iosUsers / stats.totalUsers) * 100) : 0}%)
+                </span>
+              </div>
+              <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 rounded-full transition-all" 
+                  style={{ width: `${stats.totalUsers > 0 ? (stats.iosUsers / stats.totalUsers) * 100 : 0}%` }} 
+                />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-slate-400">🤖 Android</span>
+                <span className="font-medium text-white">
+                  {stats.androidUsers.toLocaleString()} ({stats.totalUsers > 0 ? Math.round((stats.androidUsers / stats.totalUsers) * 100) : 0}%)
+                </span>
+              </div>
+              <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 rounded-full transition-all" 
+                  style={{ width: `${stats.totalUsers > 0 ? (stats.androidUsers / stats.totalUsers) * 100 : 0}%` }} 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* System Status */}
       <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
-        <h2 className="text-lg font-bold text-white mb-4">توزيع المستخدمين</h2>
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400"> iOS</span>
-              <span className="font-medium text-white">8,500 (55%)</span>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white">حالة النظام</h2>
+          <span className="flex items-center gap-2 text-sm text-emerald-400">
+            <CheckCircle className="w-4 h-4" />
+            جاهز للنشر
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { name: 'ملف الأذكار', status: stats.totalAzkar > 0 },
+            { name: 'Firebase', status: firebaseConnected },
+            { name: 'Admin Panel', status: true },
+            { name: 'API', status: true },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between py-2 px-3 bg-slate-700/30 rounded-lg">
+              <span className="text-slate-400">{item.name}</span>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${item.status ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
+                <span className={`text-sm ${item.status ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                  {item.status ? 'يعمل' : 'انتظار'}
+                </span>
+              </div>
             </div>
-            <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full" style={{ width: '55%' }} />
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400">🤖 Android</span>
-              <span className="font-medium text-white">6,920 (45%)</span>
-            </div>
-            <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: '45%' }} />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
