@@ -1,836 +1,478 @@
 // lib/azkar-api.ts
-// مصدر الأذكار من كتاب حصن المسلم مع التخريج الكامل
-// APIs المستخدمة: hisnmuslim.com (موثق من كتاب حصن المسلم للشيخ سعيد بن وهف القحطاني)
+// نظام الأذكار الجديد - يقرأ من JSON مع دعم 12 لغة
+// ===================================================
 
-export const AZKAR_API_BASE = 'https://hisnmuslim.com/api/ar';
-export const HADITH_API_BASE = 'https://hadithapi.pages.dev/api';
-export const MUSLIM_KIT_API = 'https://ahegazy.github.io/muslimKit/json';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import azkarData from '@/data/json/azkar.json';
+import categoriesData from '@/data/json/categories.json';
 
-// أنواع الأذكار
+// ===================================================
+// الأنواع (Types)
+// ===================================================
+
+export type Language = 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
+
+export type AzkarCategoryType = 
+  | 'morning'
+  | 'evening'
+  | 'sleep'
+  | 'wakeup'
+  | 'after_prayer'
+  | 'quran_duas'
+  | 'sunnah_duas'
+  | 'ruqya';
+
 export interface Zikr {
   id: number;
-  text: string;
+  category: AzkarCategoryType;
+  arabic: string;
+  transliteration: string;
+  translation: Record<Language, string>;
   count: number;
-  currentCount?: number;
-  reference: string;      // التخريج (البخاري، مسلم، أبو داود، الترمذي، إلخ)
-  referenceNumber?: string; // رقم الحديث
-  benefit?: string;        // فضل الذكر
-  audioUrl?: string;       // رابط الصوت
-  source: 'quran' | 'hadith_sahih' | 'hadith_hasan' | 'athar';
-  grade?: 'صحيح' | 'حسن' | 'صحيح لغيره';
+  reference: string;
+  benefit?: {
+    ar?: string;
+    en?: string;
+    fr?: string;
+  };
+  audio?: string;
+  currentCount?: number; // للعداد في التطبيق
 }
 
 export interface AzkarCategory {
-  id: number;
-  title: string;
-  titleEn?: string;
-  description?: string;
+  id: AzkarCategoryType;
+  name: Record<Language, string>;
   icon: string;
   color: string;
-  azkar: Zikr[];
-  audioUrl?: string;
+  order: number;
 }
 
-// ===============================
-// أذكار الصباح - من كتاب حصن المسلم
-// ===============================
-export const MORNING_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'أَعُوذُ بِاللَّهِ مِنَ الشَّيطَانِ الرَّجِيمِ ﴿اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ لَّهُ مَا فِي السَّمَوَاتِ وَمَا فِي الأَرْضِ مَن ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلاَّ بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلاَ يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلاَّ بِمَا شَاء وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلاَ يَؤُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ﴾',
-    count: 1,
-    reference: 'سورة البقرة، آية 255',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح أُجير من الجن حتى يمسي، ومن قالها حين يمسي أُجير من الجن حتى يصبح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/75.mp3',
-  },
-  {
-    id: 2,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ هُوَ ٱللَّهُ أَحَدٌ ٱللَّهُ ٱلصَّمَدُ لَمْ يَلِدْ وَلَمْ يُولَدْ وَلَمْ يَكُن لَّهُۥ كُفُوًا أَحَدٌۢ﴾',
-    count: 3,
-    reference: 'سورة الإخلاص',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/76.mp3',
-  },
-  {
-    id: 3,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ مِن شَرِّ مَا خَلَقَ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ وَمِن شَرِّ ٱلنَّفَّٰثَٰتِ فِى ٱلْعُقَدِ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ﴾',
-    count: 3,
-    reference: 'سورة الفلق',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-  },
-  {
-    id: 4,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ مَلِكِ ٱلنَّاسِ إِلَٰهِ ٱلنَّاسِ مِن شَرِّ ٱلْوَسْوَاسِ ٱلْخَنَّاسِ ٱلَّذِى يُوَسْوِسُ فِى صُدُورِ ٱلنَّاسِ مِنَ ٱلْجِنَّةِ وَٱلنَّاسِ﴾',
-    count: 3,
-    reference: 'سورة الناس',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-  },
-  {
-    id: 5,
-    text: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذَا الْيَوْمِ وَخَيرَ مَا بَعْدَهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذَا الْيَوْمِ وَشَرِّ مَا بَعْدَهُ، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '2723',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/77.mp3',
-  },
-  {
-    id: 6,
-    text: 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ',
-    count: 1,
-    reference: 'رواه الترمذي',
-    referenceNumber: '3391',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/78.mp3',
-  },
-  {
-    id: 7,
-    text: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلاَّ أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لاَ يَغْفِرُ الذُّنوبَ إِلاَّ أَنْتَ',
-    count: 1,
-    reference: 'رواه البخاري',
-    referenceNumber: '6306',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'سيد الاستغفار، من قالها موقناً بها حين يمسي فمات من ليلته دخل الجنة، ومن قالها موقناً بها حين يصبح فمات من يومه دخل الجنة',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/79.mp3',
-  },
-  {
-    id: 8,
-    text: 'اللَّهُمَّ إِنِّي أَصْبَحْتُ أُشْهِدُكَ، وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلاَئِكَتِكَ، وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلاَّ أَنْتَ وَحْدَكَ لاَ شَرِيكَ لَكَ، وَأَنَّ مُحَمَّداً عَبْدُكَ وَرَسُولُكَ',
-    count: 4,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5069',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من قالها أعتقه الله من النار',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/80.mp3',
-  },
-  {
-    id: 9,
-    text: 'اللَّهُمَّ مَا أَصْبَحَ بِي مِنْ نِعْمَةٍ أَوْ بِأَحَدٍ مِنْ خَلْقِكَ فَمِنْكَ وَحْدَكَ لاَ شَرِيكَ لَكَ، فَلَكَ الْحَمْدُ وَلَكَ الشُّكْرُ',
-    count: 1,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5073',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من قالها حين يصبح فقد أدَّى شكر يومه',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/81.mp3',
-  },
-  {
-    id: 10,
-    text: 'اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي، لاَ إِلَهَ إِلاَّ أَنْتَ. اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكُفْرِ، وَالفَقْرِ، وَأَعُوذُ بِكَ مِنْ عَذَابِ القَبْرِ، لاَ إِلَهَ إِلاَّ أَنْتَ',
-    count: 3,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5090',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/82.mp3',
-  },
-  {
-    id: 11,
-    text: 'حَسْبِيَ اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ عَلَيهِ تَوَكَّلتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ',
-    count: 7,
-    reference: 'سورة التوبة، آية 129 - رواه ابن السني',
-    referenceNumber: '71',
-    source: 'quran',
-    benefit: 'من قالها سبع مرات كفاه الله ما أهمه من أمر الدنيا والآخرة',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/83.mp3',
-  },
-  {
-    id: 12,
-    text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالآخِرَةِ، اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ: فِي دِينِي وَدُنْيَايَ وَأَهْلِي، وَمَالِي، اللَّهُمَّ اسْتُرْ عَوْرَاتِي، وَآمِنْ رَوْعَاتِي، اللَّهُمَّ احْفَظْنِي مِنْ بَينِ يَدَيَّ، وَمِنْ خَلْفِي، وَعَنْ يَمِينِي، وَعَنْ شِمَالِي، وَمِنْ فَوْقِي، وَأَعُوذُ بِعَظَمَتِكَ أَنْ أُغْتَالَ مِنْ تَحْتِي',
-    count: 1,
-    reference: 'رواه أبو داود وابن ماجه',
-    referenceNumber: 'أبو داود 5074، ابن ماجه 3871',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/84.mp3',
-  },
-  {
-    id: 13,
-    text: 'اللَّهُمَّ عَالِمَ الغَيْبِ وَالشَّهَادَةِ فَاطِرَ السَّمَوَاتِ وَالْأَرْضِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ، أَشْهَدُ أَنْ لاَ إِلَهَ إِلاَّ أَنْتَ، أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي، وَمِنْ شَرِّ الشَّيْطانِ وَشَرَكِهِ، وَأَنْ أَقْتَرِفَ عَلَى نَفْسِي سُوءاً، أَوْ أَجُرَّهُ إِلَى مُسْلِمٍ',
-    count: 1,
-    reference: 'رواه الترمذي وأبو داود',
-    referenceNumber: 'الترمذي 3392، أبو داود 5067',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/85.mp3',
-  },
-  {
-    id: 14,
-    text: 'بِسْمِ اللَّهِ الَّذِي لاَ يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلاَ فِي السّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ',
-    count: 3,
-    reference: 'رواه أبو داود والترمذي',
-    referenceNumber: 'أبو داود 5088، الترمذي 3388',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'من قالها ثلاث مرات حين يصبح وحين يمسي لم يضره شيء',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/86.mp3',
-  },
-  {
-    id: 15,
-    text: 'رَضِيتُ بِاللَّهِ رَبَّاً، وَبِالْإِسْلاَمِ دِيناً، وَبِمُحَمَّدٍ صلى الله عليه وسلم نَبِيّاً',
-    count: 3,
-    reference: 'رواه أبو داود والترمذي والنسائي',
-    referenceNumber: 'أبو داود 5072، الترمذي 3389',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من قالها حين يصبح وحين يمسي كان حقاً على الله أن يُرضيه يوم القيامة',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/87.mp3',
-  },
-  {
-    id: 16,
-    text: 'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغيثُ أَصْلِحْ لِي شَأْنِيَ كُلَّهُ وَلاَ تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ',
-    count: 3,
-    reference: 'رواه الحاكم وصححه ووافقه الذهبي',
-    referenceNumber: '1/545',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/88.mp3',
-  },
-  {
-    id: 17,
-    text: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ رَبِّ الْعَالَمِينَ، اللَّهُـمَّ إِنِّي أَسْأَلُكَ خَيْرَ هَذَا الْيَوْمِ: فَتْحَهُ، وَنَصْرَهُ، وَنورَهُ، وَبَرَكَتَهُ، وَهُدَاهُ، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِيهِ وَشَرِّ مَا بَعْدَهُ',
-    count: 1,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5084',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/89.mp3',
-  },
-  {
-    id: 18,
-    text: 'أَصْبَحْنا عَلَى فِطْرَةِ الْإِسْلاَمِ، وَعَلَى كَلِمَةِ الْإِخْلاَصِ، وَعَلَى دِينِ نَبِيِّنَا مُحَمَّدٍ صَلَّى اللهُ عَلَيْهِ وَسَلَّمَ، وَعَلَى مِلَّةِ أَبِينَا إِبْرَاهِيمَ، حَنِيفاً مُسْلِماً وَمَا كَانَ مِنَ الْمُشرِكِينَ',
-    count: 1,
-    reference: 'رواه أحمد',
-    referenceNumber: '3/407',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/90.mp3',
-  },
-  {
-    id: 19,
-    text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
-    count: 100,
-    reference: 'رواه مسلم',
-    referenceNumber: '2692',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'من قالها مائة مرة حين يصبح وحين يمسي لم يأت أحد يوم القيامة بأفضل مما جاء به، إلا أحد قال مثل ما قال أو زاد عليه',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/91.mp3',
-  },
-  {
-    id: 20,
-    text: 'لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-    count: 100,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 3293، مسلم 2691',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'كانت له عدل عشر رقاب، وكُتبت له مائة حسنة، ومُحيت عنه مائة سيئة، وكانت له حرزاً من الشيطان يومه ذلك حتى يمسي',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/93.mp3',
-  },
-  {
-    id: 21,
-    text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ: عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ',
-    count: 3,
-    reference: 'رواه مسلم',
-    referenceNumber: '2726',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/94.mp3',
-  },
-  {
-    id: 22,
-    text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْماً نَافِعاً، وَرِزْقاً طَيِّباً، وَعَمَلاً مُتَقَبَّلاً',
-    count: 1,
-    reference: 'رواه ابن ماجه',
-    referenceNumber: '925',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'إذا أصبح، بعد صلاة الفجر',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/95.mp3',
-  },
-  {
-    id: 23,
-    text: 'أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ',
-    count: 100,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 6307، مسلم 2702',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'قال رسول الله ﷺ: إني لأستغفر الله في اليوم مائة مرة',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/96.mp3',
-  },
-  {
-    id: 24,
-    text: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبَيِّنَا مُحَمَّدٍ',
-    count: 10,
-    reference: 'رواه الطبراني',
-    referenceNumber: 'صححه الألباني في صحيح الجامع 6357',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من صلى عليَّ حين يصبح عشراً وحين يمسي عشراً أدركته شفاعتي يوم القيامة',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/98.mp3',
-  },
-];
+export interface ZikrProgress {
+  oderId: number;
+  completed: boolean;
+  currentCount: number;
+  lastRead: string;
+}
 
-// ===============================
-// أذكار المساء - من كتاب حصن المسلم
-// ===============================
-export const EVENING_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'أَعُوذُ بِاللَّهِ مِنَ الشَّيطَانِ الرَّجِيمِ ﴿اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ لَّهُ مَا فِي السَّمَوَاتِ وَمَا فِي الأَرْضِ مَن ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلاَّ بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلاَ يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلاَّ بِمَا شَاء وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلاَ يَؤُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ﴾',
-    count: 1,
-    reference: 'سورة البقرة، آية 255',
-    source: 'quran',
-    benefit: 'من قالها حين يمسي أُجير من الجن حتى يصبح',
-  },
-  {
-    id: 2,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ هُوَ ٱللَّهُ أَحَدٌ ٱللَّهُ ٱلصَّمَدُ لَمْ يَلِدْ وَلَمْ يُولَدْ وَلَمْ يَكُن لَّهُۥ كُفُوًا أَحَدٌۢ﴾',
-    count: 3,
-    reference: 'سورة الإخلاص',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-  },
-  {
-    id: 3,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ مِن شَرِّ مَا خَلَقَ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ وَمِن شَرِّ ٱلنَّفَّٰثَٰتِ فِى ٱلْعُقَدِ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ﴾',
-    count: 3,
-    reference: 'سورة الفلق',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-  },
-  {
-    id: 4,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ مَلِكِ ٱلنَّاسِ إِلَٰهِ ٱلنَّاسِ مِن شَرِّ ٱلْوَسْوَاسِ ٱلْخَنَّاسِ ٱلَّذِى يُوَسْوِسُ فِى صُدُورِ ٱلنَّاسِ مِنَ ٱلْجِنَّةِ وَٱلنَّاسِ﴾',
-    count: 3,
-    reference: 'سورة الناس',
-    source: 'quran',
-    benefit: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-    grade: 'صحيح',
-    referenceNumber: 'رواه أبو داود 5082، والترمذي 3575',
-  },
-  {
-    id: 5,
-    text: 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، رَبِّ أَسْأَلُكَ خَيْرَ مَا فِي هَذِهِ اللَّيْلَةِ وَخَيرَ مَا بَعْدَهَا، وَأَعُوذُ بِكَ مِنْ شَرِّ مَا فِي هَذِهِ اللَّيْلَةِ وَشَرِّ مَا بَعْدَهَا، رَبِّ أَعُوذُ بِكَ مِنَ الْكَسَلِ وَسُوءِ الْكِبَرِ، رَبِّ أَعُوذُ بِكَ مِنْ عَذَابٍ فِي النَّارِ وَعَذَابٍ فِي الْقَبْرِ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '2723',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 6,
-    text: 'اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ الْمَصِيرُ',
-    count: 1,
-    reference: 'رواه الترمذي',
-    referenceNumber: '3391',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-  },
-  {
-    id: 7,
-    text: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلاَّ أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لاَ يَغْفِرُ الذُّنوبَ إِلاَّ أَنْتَ',
-    count: 1,
-    reference: 'رواه البخاري',
-    referenceNumber: '6306',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'سيد الاستغفار، من قالها موقناً بها حين يمسي فمات من ليلته دخل الجنة',
-  },
-  {
-    id: 8,
-    text: 'اللَّهُمَّ إِنِّي أَمْسَيْتُ أُشْهِدُكَ، وَأُشْهِدُ حَمَلَةَ عَرْشِكَ، وَمَلاَئِكَتِكَ، وَجَمِيعَ خَلْقِكَ، أَنَّكَ أَنْتَ اللَّهُ لَا إِلَهَ إِلاَّ أَنْتَ وَحْدَكَ لاَ شَرِيكَ لَكَ، وَأَنَّ مُحَمَّداً عَبْدُكَ وَرَسُولُكَ',
-    count: 4,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5069',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من قالها أعتقه الله من النار',
-  },
-  {
-    id: 9,
-    text: 'اللَّهُمَّ مَا أَمْسَى بِي مِنْ نِعْمَةٍ أَوْ بِأَحَدٍ مِنْ خَلْقِكَ فَمِنْكَ وَحْدَكَ لاَ شَرِيكَ لَكَ، فَلَكَ الْحَمْدُ وَلَكَ الشُّكْرُ',
-    count: 1,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5073',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'من قالها حين يمسي فقد أدَّى شكر ليلته',
-  },
-  {
-    id: 10,
-    text: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ',
-    count: 3,
-    reference: 'رواه مسلم',
-    referenceNumber: '2709',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'من قالها ثلاث مرات حين يمسي لم تضره حُمَة تلك الليلة',
-  },
-  // باقي أذكار المساء مشابهة لأذكار الصباح...
-];
+export interface DailyProgress {
+  date: string;
+  categories: {
+    [key in AzkarCategoryType]?: {
+      total: number;
+      completed: number;
+      azkarProgress: ZikrProgress[];
+    };
+  };
+}
 
-// ===============================
-// أذكار بعد الصلاة - من كتاب حصن المسلم
-// ===============================
-export const AFTER_PRAYER_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'أَسْتَغْفِرُ اللَّهَ، أَسْتَغْفِرُ اللَّهَ، أَسْتَغْفِرُ اللَّهَ. اللَّهُمَّ أَنْتَ السَّلاَمُ، وَمِنْكَ السَّلاَمُ، تَبَارَكْتَ يَا ذَا الْجَلاَلِ وَالْإِكْرَامِ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '591',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/66.mp3',
-  },
-  {
-    id: 2,
-    text: 'لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ، اللَّهُمَّ لاَ مَانِعَ لِمَا أَعْطَيْتَ، وَلاَ مُعْطِيَ لِمَا مَنَعْتَ، وَلاَ يَنْفَعُ ذَا الْجَدِّ مِنْكَ الجَدُّ',
-    count: 1,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 844، مسلم 593',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/67.mp3',
-  },
-  {
-    id: 3,
-    text: 'لَا إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ، وَلَهُ الْحَمدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. لاَ حَوْلَ وَلاَ قُوَّةَ إِلاَّ بِاللَّهِ، لاَ إِلَهَ إِلاَّ اللَّهُ، وَلاَ نَعْبُدُ إِلاَّ إِيَّاهُ, لَهُ النِّعْمَةُ وَلَهُ الْفَضْلُ وَلَهُ الثَّنَاءُ الْحَسَنُ، لَا إِلَهَ إِلاَّ اللَّهُ مُخْلِصِينَ لَهُ الدِّينَ وَلَوْ كَرِهَ الكَافِرُونَ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '594',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/68.mp3',
-  },
-  {
-    id: 4,
-    text: 'سُبْحَانَ اللَّهِ',
-    count: 33,
-    reference: 'رواه مسلم',
-    referenceNumber: '597',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'التسبيح والتحميد والتكبير 33 مرة لكل منها',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/69.mp3',
-  },
-  {
-    id: 5,
-    text: 'الْحَمْدُ لِلَّهِ',
-    count: 33,
-    reference: 'رواه مسلم',
-    referenceNumber: '597',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 6,
-    text: 'اللَّهُ أَكْبَرُ',
-    count: 33,
-    reference: 'رواه مسلم',
-    referenceNumber: '597',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 7,
-    text: 'لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '597',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'تمام المائة بعد التسبيح والتحميد والتكبير',
-  },
-  {
-    id: 8,
-    text: 'أَعُوذُ بِاللَّهِ مِنَ الشَّيطَانِ الرَّجِيمِ ﴿اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ لَّهُ مَا فِي السَّمَوَاتِ وَمَا فِي الأَرْضِ مَن ذَا الَّذِي يَشْفَعُ عِنْدَهُ إِلاَّ بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلاَ يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلاَّ بِمَا شَاء وَسِعَ كُرْسِيُّهُ السَّمَوَاتِ وَالْأَرْضَ وَلاَ يَؤُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ﴾',
-    count: 1,
-    reference: 'سورة البقرة، آية 255 - رواه النسائي في الكبرى',
-    referenceNumber: '9928',
-    source: 'quran',
-    benefit: 'من قرأها دبر كل صلاة لم يمنعه من دخول الجنة إلا أن يموت',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/71.mp3',
-  },
-  {
-    id: 9,
-    text: 'بِسْمِ اللهِ الرَّحْمنِ الرَّحِيم ﴿قُلْ هُوَ ٱللَّهُ أَحَدٌ﴾ و﴿قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ﴾ و﴿قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ﴾',
-    count: 1,
-    reference: 'سورة الإخلاص والمعوذتين - رواه أبو داود والترمذي',
-    referenceNumber: 'أبو داود 1523، الترمذي 3584',
-    source: 'quran',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/70.mp3',
-  },
-  {
-    id: 10,
-    text: 'لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-    count: 10,
-    reference: 'رواه الترمذي وأحمد',
-    referenceNumber: 'الترمذي 3474، أحمد 4/227',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'بعد صلاة المغرب والصبح عشر مرات',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/72.mp3',
-  },
-  {
-    id: 11,
-    text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْماً نافِعاً، وَرِزْقاً طَيِّباً، وَعَمَلاً مُتَقَبَّلاً',
-    count: 1,
-    reference: 'رواه ابن ماجه',
-    referenceNumber: '925',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'بعد السلام من صلاة الفجر',
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/73.mp3',
-  },
-];
+// ===================================================
+// ثوابت
+// ===================================================
 
-// ===============================
-// أذكار النوم - من كتاب حصن المسلم
-// ===============================
-export const SLEEP_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي، وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا بِمَا تَحْفَظُ بِهِ عِبَادَكَ الصَّالِحِينَ',
-    count: 1,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 6320، مسلم 2714',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 2,
-    text: 'اللَّهُمَّ إِنَّكَ خَلَقْتَ نَفْسِي وَأَنْتَ تَوَفَّاهَا، لَكَ مَمَاتُهَا وَمَحْيَاهَا، إِنْ أَحْيَيْتَهَا فَاحْفَظْهَا، وَإِنْ أَمَتَّهَا فَاغْفِرْ لَهَا. اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '2712',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 3,
-    text: 'اللَّهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ',
-    count: 3,
-    reference: 'رواه أبو داود والترمذي',
-    referenceNumber: 'أبو داود 5045، الترمذي 3398',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 4,
-    text: 'بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا',
-    count: 1,
-    reference: 'رواه البخاري',
-    referenceNumber: '6324',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 5,
-    text: 'سُبْحَانَ اللَّهِ',
-    count: 33,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 5361، مسلم 2727',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'من قالها قبل النوم: سبحان الله 33، والحمد لله 33، والله أكبر 34، كان خيراً له من خادم',
-  },
-  {
-    id: 6,
-    text: 'الْحَمْدُ لِلَّهِ',
-    count: 33,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 5361، مسلم 2727',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 7,
-    text: 'اللَّهُ أَكْبَرُ',
-    count: 34,
-    reference: 'رواه البخاري ومسلم',
-    referenceNumber: 'البخاري 5361، مسلم 2727',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 8,
-    text: 'اللَّهُمَّ رَبَّ السَّمَوَاتِ السَّبْعِ وَرَبَّ الْأَرْضِ، وَرَبَّ الْعَرْشِ الْعَظِيمِ، رَبَّنَا وَرَبَّ كُلِّ شَيْءٍ، فَالِقَ الْحَبِّ وَالنَّوَى، وَمُنْزِلَ التَّوْرَاةِ وَالْإِنْجِيلِ وَالْفُرْقَانِ، أَعُوذُ بِكَ مِنْ شَرِّ كُلِّ شَيْءٍ أَنْتَ آخِذٌ بِنَاصِيَتِهِ. اللَّهُمَّ أَنْتَ الْأَوَّلُ فَلَيْسَ قَبْلَكَ شَيْءٌ، وَأَنْتَ الْآخِرُ فَلَيْسَ بَعْدَكَ شَيْءٌ، وَأَنْتَ الظَّاهِرُ فَلَيْسَ فَوْقَكَ شَيْءٌ، وَأَنْتَ الْبَاطِنُ فَلَيْسَ دُونَكَ شَيْءٌ، اقْضِ عَنَّا الدَّيْنَ وَأَغْنِنَا مِنَ الْفَقْرِ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '2713',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 9,
-    text: 'الْحَمْدُ لِلَّهِ الَّذِي أَطْعَمَنَا وَسَقَانَا، وَكَفَانَا، وَآوَانَا، فَكَمْ مِمَّنْ لَا كَافِيَ لَهُ وَلَا مُؤْوِيَ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '2715',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 10,
-    text: 'اللَّهُمَّ عَالِمَ الْغَيْبِ وَالشَّهَادَةِ، فَاطِرَ السَّمَوَاتِ وَالْأَرْضِ، رَبَّ كُلِّ شَيْءٍ وَمَلِيكَهُ، أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا أَنْتَ، أَعُوذُ بِكَ مِنْ شَرِّ نَفْسِي، وَمِنْ شَرِّ الشَّيْطَانِ وَشِرْكِهِ، وَأَنْ أَقْتَرِفَ عَلَى نَفْسِي سُوءًا، أَوْ أَجُرَّهُ إِلَى مُسْلِمٍ',
-    count: 1,
-    reference: 'رواه أبو داود والترمذي',
-    referenceNumber: 'أبو داود 5067، الترمذي 3392',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 11,
-    text: 'يقرأ سورة الملك وسورة السجدة',
-    count: 1,
-    reference: 'رواه الترمذي',
-    referenceNumber: '2892',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'كان النبي ﷺ لا ينام حتى يقرأ الم السجدة، وتبارك الذي بيده الملك',
-  },
-];
+const STORAGE_KEYS = {
+  DAILY_PROGRESS: 'azkar_daily_progress',
+  FAVORITES: 'azkar_favorites',
+  SETTINGS: 'azkar_settings',
+  LAST_SYNC: 'azkar_last_sync',
+};
 
-// ===============================
-// أذكار الاستيقاظ من النوم
-// ===============================
-export const WAKEUP_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'الْحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُورُ',
-    count: 1,
-    reference: 'رواه البخاري',
-    referenceNumber: '6312',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-  },
-  {
-    id: 2,
-    text: 'لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ. سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللَّهُ، وَاللَّهُ أَكْبَرُ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ، رَبِّ اغْفِرْ لِي',
-    count: 1,
-    reference: 'رواه البخاري',
-    referenceNumber: '1154',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'من تعارَّ من الليل فقال هذا ثم دعا استُجيب له، فإن توضأ وصلى قُبلت صلاته',
-  },
-];
+const DEFAULT_LANGUAGE: Language = 'ar';
 
-// ===============================
-// أذكار متنوعة
-// ===============================
-export const MISC_AZKAR: Zikr[] = [
-  {
-    id: 1,
-    text: 'بِسْمِ اللَّهِ، تَوَكَّلْتُ عَلَى اللَّهِ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ',
-    count: 1,
-    reference: 'رواه أبو داود والترمذي',
-    referenceNumber: 'أبو داود 5095، الترمذي 3426',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'ذكر الخروج من المنزل - يقال له: هُديت وكُفيت ووُقيت، وتنحَّى عنه الشيطان',
-  },
-  {
-    id: 2,
-    text: 'بِسْمِ اللَّهِ وَلَجْنَا، وَبِسْمِ اللَّهِ خَرَجْنَا، وَعَلَى اللَّهِ رَبِّنَا تَوَكَّلْنَا',
-    count: 1,
-    reference: 'رواه أبو داود',
-    referenceNumber: '5096',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'ذكر دخول المنزل',
-  },
-  {
-    id: 3,
-    text: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ مِنْ فَضْلِكَ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '713',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'ذكر دخول المسجد',
-  },
-  {
-    id: 4,
-    text: 'اللَّهُمَّ افْتَحْ لِي أَبْوَابَ رَحْمَتِكَ',
-    count: 1,
-    reference: 'رواه مسلم',
-    referenceNumber: '713',
-    source: 'hadith_sahih',
-    grade: 'صحيح',
-    benefit: 'ذكر دخول المسجد',
-  },
-  {
-    id: 5,
-    text: 'اللَّهُمَّ اغْفِرْ لِي ذُنُوبِي، وَافْتَحْ لِي أَبْوَابَ رَحْمَتِكَ',
-    count: 1,
-    reference: 'رواه ابن ماجه',
-    referenceNumber: '771',
-    source: 'hadith_hasan',
-    grade: 'حسن',
-    benefit: 'ذكر الخروج من المسجد',
-  },
-];
+// ===================================================
+// تحميل البيانات
+// ===================================================
 
-// ===============================
-// دوال الـ API
-// ===============================
+/**
+ * الحصول على جميع الأذكار
+ */
+export const getAllAzkar = (): Zikr[] => {
+  return azkarData as Zikr[];
+};
 
-// جلب الأذكار من API حصن المسلم
-export async function fetchAzkarFromAPI(categoryId: number): Promise<Zikr[]> {
+/**
+ * الحصول على جميع الفئات
+ */
+export const getAllCategories = (): AzkarCategory[] => {
+  return (categoriesData as AzkarCategory[]).sort((a, b) => a.order - b.order);
+};
+
+/**
+ * الحصول على الأذكار حسب الفئة
+ */
+export const getAzkarByCategory = (category: AzkarCategoryType): Zikr[] => {
+  return getAllAzkar().filter(zikr => zikr.category === category);
+};
+
+/**
+ * الحصول على ذكر بالـ ID
+ */
+export const getZikrById = (id: number): Zikr | undefined => {
+  return getAllAzkar().find(zikr => zikr.id === id);
+};
+
+/**
+ * الحصول على فئة بالـ ID
+ */
+export const getCategoryById = (id: AzkarCategoryType): AzkarCategory | undefined => {
+  return getAllCategories().find(cat => cat.id === id);
+};
+
+// ===================================================
+// الترجمات
+// ===================================================
+
+/**
+ * الحصول على ترجمة الذكر
+ */
+export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
+  return zikr.translation[language] || zikr.translation[DEFAULT_LANGUAGE] || zikr.arabic;
+};
+
+/**
+ * الحصول على اسم الفئة مترجم
+ */
+export const getCategoryName = (category: AzkarCategory, language: Language): string => {
+  return category.name[language] || category.name[DEFAULT_LANGUAGE];
+};
+
+/**
+ * الحصول على فضل الذكر مترجم
+ */
+export const getZikrBenefit = (zikr: Zikr, language: Language): string | undefined => {
+  if (!zikr.benefit) return undefined;
+  
+  if (language === 'ar') return zikr.benefit.ar;
+  if (language === 'fr') return zikr.benefit.fr;
+  return zikr.benefit.en || zikr.benefit.ar;
+};
+
+// ===================================================
+// البحث
+// ===================================================
+
+/**
+ * البحث في الأذكار
+ */
+export const searchAzkar = (query: string, language: Language = 'ar'): Zikr[] => {
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  if (!normalizedQuery) return [];
+  
+  return getAllAzkar().filter(zikr => {
+    // البحث في النص العربي
+    if (zikr.arabic.includes(normalizedQuery)) return true;
+    
+    // البحث في النطق
+    if (zikr.transliteration.toLowerCase().includes(normalizedQuery)) return true;
+    
+    // البحث في الترجمة
+    const translation = zikr.translation[language];
+    if (translation && translation.toLowerCase().includes(normalizedQuery)) return true;
+    
+    // البحث في المرجع
+    if (zikr.reference.toLowerCase().includes(normalizedQuery)) return true;
+    
+    return false;
+  });
+};
+
+// ===================================================
+// التقدم والإحصائيات
+// ===================================================
+
+/**
+ * الحصول على تاريخ اليوم
+ */
+const getTodayDate = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
+/**
+ * الحصول على التقدم اليومي
+ */
+export const getDailyProgress = async (): Promise<DailyProgress | null> => {
   try {
-    const response = await fetch(`${AZKAR_API_BASE}/${categoryId}.json`);
-    if (!response.ok) throw new Error('Failed to fetch azkar');
-    const data = await response.json();
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.DAILY_PROGRESS);
+    if (!stored) return null;
     
-    // تحويل البيانات إلى الصيغة المطلوبة
-    const categoryKey = Object.keys(data)[0];
-    const azkarArray = data[categoryKey];
+    const progress: DailyProgress = JSON.parse(stored);
     
-    return azkarArray.map((item: any, index: number) => ({
-      id: item.ID || index + 1,
-      text: item.ARABIC_TEXT,
-      count: item.REPEAT || 1,
-      reference: extractReference(item.ARABIC_TEXT),
-      audioUrl: item.AUDIO,
-      source: 'hadith_sahih' as const,
-    }));
+    // إذا كان التقدم من يوم سابق، نعيد تعيينه
+    if (progress.date !== getTodayDate()) {
+      return null;
+    }
+    
+    return progress;
   } catch (error) {
-    console.error('Error fetching azkar:', error);
+    console.error('Error getting daily progress:', error);
+    return null;
+  }
+};
+
+/**
+ * حفظ التقدم اليومي
+ */
+export const saveDailyProgress = async (progress: DailyProgress): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.DAILY_PROGRESS, JSON.stringify(progress));
+  } catch (error) {
+    console.error('Error saving daily progress:', error);
+  }
+};
+
+/**
+ * تحديث تقدم ذكر معين
+ */
+export const updateZikrProgress = async (
+  category: AzkarCategoryType,
+  oderId: number,
+  currentCount: number
+): Promise<void> => {
+  try {
+    let progress = await getDailyProgress();
+    const today = getTodayDate();
+    
+    if (!progress) {
+      progress = {
+        date: today,
+        categories: {},
+      };
+    }
+    
+    if (!progress.categories[category]) {
+      const categoryAzkar = getAzkarByCategory(category);
+      progress.categories[category] = {
+        total: categoryAzkar.length,
+        completed: 0,
+        azkarProgress: categoryAzkar.map(z => ({
+          oderId: z.id,
+          completed: false,
+          currentCount: 0,
+          lastRead: '',
+        })),
+      };
+    }
+    
+    const categoryProgress = progress.categories[category]!;
+    const zikrProgress = categoryProgress.azkarProgress.find(z => z.oderId === zikrId);
+    
+    if (zikrProgress) {
+      const zikr = getZikrById(zikrId);
+      zikrProgress.currentCount = currentCount;
+      zikrProgress.lastRead = new Date().toISOString();
+      
+      if (zikr && currentCount >= zikr.count) {
+        zikrProgress.completed = true;
+      }
+      
+      // تحديث عدد المكتمل
+      categoryProgress.completed = categoryProgress.azkarProgress.filter(z => z.completed).length;
+    }
+    
+    await saveDailyProgress(progress);
+  } catch (error) {
+    console.error('Error updating zikr progress:', error);
+  }
+};
+
+/**
+ * إعادة تعيين التقدم اليومي
+ */
+export const resetDailyProgress = async (): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.DAILY_PROGRESS);
+  } catch (error) {
+    console.error('Error resetting daily progress:', error);
+  }
+};
+
+/**
+ * الحصول على نسبة الإنجاز لفئة معينة
+ */
+export const getCategoryCompletionPercentage = async (category: AzkarCategoryType): Promise<number> => {
+  const progress = await getDailyProgress();
+  if (!progress || !progress.categories[category]) return 0;
+  
+  const categoryProgress = progress.categories[category]!;
+  if (categoryProgress.total === 0) return 0;
+  
+  return Math.round((categoryProgress.completed / categoryProgress.total) * 100);
+};
+
+// ===================================================
+// المفضلة
+// ===================================================
+
+/**
+ * الحصول على الأذكار المفضلة
+ */
+export const getFavorites = async (): Promise<number[]> => {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Error getting favorites:', error);
     return [];
   }
-}
+};
 
-// استخراج المرجع من النص
-function extractReference(text: string): string {
-  // منطق لاستخراج المرجع إن وُجد في النص
-  if (text.includes('رواه البخاري')) return 'رواه البخاري';
-  if (text.includes('رواه مسلم')) return 'رواه مسلم';
-  if (text.includes('رواه أبو داود')) return 'رواه أبو داود';
-  if (text.includes('رواه الترمذي')) return 'رواه الترمذي';
-  return 'حصن المسلم';
-}
-
-// جلب فهرس الأذكار
-export async function fetchAzkarCategories(): Promise<AzkarCategory[]> {
+/**
+ * إضافة ذكر للمفضلة
+ */
+export const addToFavorites = async (zikrId: number): Promise<void> => {
   try {
-    const response = await fetch(`${AZKAR_API_BASE.replace('/ar', '')}/husn.json`);
-    if (!response.ok) throw new Error('Failed to fetch categories');
-    const data = await response.json();
-    
-    return data.MAIN.find((item: any) => item.LANGUAGE === 'العربية')
-      ? data['العربية'].map((cat: any) => ({
-          id: cat.ID,
-          title: cat.TITLE,
-          audioUrl: cat.AUDIO_URL,
-        }))
-      : [];
+    const favorites = await getFavorites();
+    if (!favorites.includes(zikrId)) {
+      favorites.push(zikrId);
+      await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(favorites));
+    }
   } catch (error) {
-    console.error('Error fetching categories:', error);
-    return [];
+    console.error('Error adding to favorites:', error);
   }
-}
+};
 
-// تصدير جميع فئات الأذكار
-export const AZKAR_CATEGORIES: AzkarCategory[] = [
-  {
-    id: 1,
-    title: 'أذكار الصباح',
-    titleEn: 'Morning Azkar',
-    description: 'أذكار تقال بعد صلاة الفجر حتى طلوع الشمس',
-    icon: 'sunny-outline',
-    color: '#F59E0B',
-    azkar: MORNING_AZKAR,
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_028.mp3',
-  },
-  {
-    id: 2,
-    title: 'أذكار المساء',
-    titleEn: 'Evening Azkar',
-    description: 'أذكار تقال بعد صلاة العصر حتى غروب الشمس',
-    icon: 'moon-outline',
-    color: '#6366F1',
-    azkar: EVENING_AZKAR,
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_028.mp3',
-  },
-  {
-    id: 3,
-    title: 'أذكار بعد الصلاة',
-    titleEn: 'After Prayer Azkar',
-    description: 'أذكار تقال بعد السلام من الصلاة',
-    icon: 'hand-left-outline',
-    color: '#22C55E',
-    azkar: AFTER_PRAYER_AZKAR,
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_026.mp3',
-  },
-  {
-    id: 4,
-    title: 'أذكار النوم',
-    titleEn: 'Sleep Azkar',
-    description: 'أذكار تقال قبل النوم',
-    icon: 'bed-outline',
-    color: '#8B5CF6',
-    azkar: SLEEP_AZKAR,
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_029.mp3',
-  },
-  {
-    id: 5,
-    title: 'أذكار الاستيقاظ',
-    titleEn: 'Wake Up Azkar',
-    description: 'أذكار تقال عند الاستيقاظ من النوم',
-    icon: 'alarm-outline',
-    color: '#EC4899',
-    azkar: WAKEUP_AZKAR,
-    audioUrl: 'http://www.hisnmuslim.com/audio/ar/ar_7esn_AlMoslem_by_Doors_002.mp3',
-  },
-  {
-    id: 6,
-    title: 'أذكار متنوعة',
-    titleEn: 'Miscellaneous Azkar',
-    description: 'أذكار دخول وخروج المنزل والمسجد وغيرها',
-    icon: 'apps-outline',
-    color: '#14B8A6',
-    azkar: MISC_AZKAR,
-  },
-];
+/**
+ * إزالة ذكر من المفضلة
+ */
+export const removeFromFavorites = async (zikrId: number): Promise<void> => {
+  try {
+    const favorites = await getFavorites();
+    const updated = favorites.filter(id => id !== zikrId);
+    await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(updated));
+  } catch (error) {
+    console.error('Error removing from favorites:', error);
+  }
+};
 
-// IDs للأذكار في API حصن المسلم
-export const HISN_MUSLIM_IDS = {
-  morningEvening: 27,
-  sleep: 28,
-  wakeUp: 1,
-  afterPrayer: 25,
-  enterHome: 11,
-  leaveHome: 10,
-  enterMosque: 13,
-  leaveMosque: 14,
-  adhan: 15,
-  travel: 96,
-  istikharah: 26,
-  distress: 34,
-  anxiety: 35,
-  debt: 41,
-  hajj: 115,
+/**
+ * التحقق إذا كان الذكر في المفضلة
+ */
+export const isFavorite = async (zikrId: number): Promise<boolean> => {
+  const favorites = await getFavorites();
+  return favorites.includes(zikrId);
+};
+
+/**
+ * الحصول على الأذكار المفضلة كاملة
+ */
+export const getFavoriteAzkar = async (): Promise<Zikr[]> => {
+  const favoriteIds = await getFavorites();
+  return getAllAzkar().filter(zikr => favoriteIds.includes(zikr.id));
+};
+
+// ===================================================
+// الإحصائيات
+// ===================================================
+
+/**
+ * إحصائيات الأذكار
+ */
+export const getAzkarStats = () => {
+  const allAzkar = getAllAzkar();
+  const categories = getAllCategories();
+  
+  const stats: Record<AzkarCategoryType, number> = {} as Record<AzkarCategoryType, number>;
+  
+  categories.forEach(cat => {
+    stats[cat.id] = allAzkar.filter(z => z.category === cat.id).length;
+  });
+  
+  return {
+    total: allAzkar.length,
+    byCategory: stats,
+    categoriesCount: categories.length,
+    languagesSupported: 12,
+  };
+};
+
+// ===================================================
+// دوال مساعدة للعرض
+// ===================================================
+
+/**
+ * الحصول على أذكار الصباح
+ */
+export const getMorningAzkar = (): Zikr[] => getAzkarByCategory('morning');
+
+/**
+ * الحصول على أذكار المساء
+ */
+export const getEveningAzkar = (): Zikr[] => getAzkarByCategory('evening');
+
+/**
+ * الحصول على أذكار النوم
+ */
+export const getSleepAzkar = (): Zikr[] => getAzkarByCategory('sleep');
+
+/**
+ * الحصول على أذكار الاستيقاظ
+ */
+export const getWakeupAzkar = (): Zikr[] => getAzkarByCategory('wakeup');
+
+/**
+ * الحصول على أذكار بعد الصلاة
+ */
+export const getAfterPrayerAzkar = (): Zikr[] => getAzkarByCategory('after_prayer');
+
+/**
+ * الحصول على أدعية القرآن
+ */
+export const getQuranDuas = (): Zikr[] => getAzkarByCategory('quran_duas');
+
+/**
+ * الحصول على أدعية السنة
+ */
+export const getSunnahDuas = (): Zikr[] => getAzkarByCategory('sunnah_duas');
+
+/**
+ * الحصول على الرقية الشرعية
+ */
+export const getRuqya = (): Zikr[] => getAzkarByCategory('ruqya');
+
+// ===================================================
+// التصدير الافتراضي
+// ===================================================
+
+export default {
+  // البيانات
+  getAllAzkar,
+  getAllCategories,
+  getAzkarByCategory,
+  getZikrById,
+  getCategoryById,
+  
+  // الترجمات
+  getZikrTranslation,
+  getCategoryName,
+  getZikrBenefit,
+  
+  // البحث
+  searchAzkar,
+  
+  // التقدم
+  getDailyProgress,
+  saveDailyProgress,
+  updateZikrProgress,
+  resetDailyProgress,
+  getCategoryCompletionPercentage,
+  
+  // المفضلة
+  getFavorites,
+  addToFavorites,
+  removeFromFavorites,
+  isFavorite,
+  getFavoriteAzkar,
+  
+  // الإحصائيات
+  getAzkarStats,
+  
+  // دوال مختصرة
+  getMorningAzkar,
+  getEveningAzkar,
+  getSleepAzkar,
+  getWakeupAzkar,
+  getAfterPrayerAzkar,
+  getQuranDuas,
+  getSunnahDuas,
+  getRuqya,
 };
