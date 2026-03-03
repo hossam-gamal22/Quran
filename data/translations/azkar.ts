@@ -216,7 +216,6 @@ export const azkarTranslations: TranslationKeys = {
     ru: "Я доволен Аллахом как Господом, Исламом как религией и Мухаммадом (мир ему и благословение Аллаха) как пророком.",
     es: "Estoy complacido con Allah como mi Señor, con el Islam como mi religión, y con Muhammad (la paz sea con él) como mi Profeta.",
   },
-
   "azkar.morning.10.benefit": {
     ar: "من قالها ثلاث مرات حين يصبح وحين يمسي كان حقاً على الله أن يرضيه يوم القيامة",
     en: "Whoever says it three times in the morning and evening, it is a right upon Allah to please him on the Day of Judgment.",
@@ -231,7 +230,8 @@ export const azkarTranslations: TranslationKeys = {
     ru: "Кто скажет это трижды утром и вечером, на Аллахе будет право удовлетворить его в День Суда.",
     es: "Quien lo diga tres veces por la mañana y por la tarde, es un derecho sobre Allah complacerlo el Día del Juicio.",
   },
-};
+
+  "azkar.morning.11.text": {
   // ========================================
   // تكملة أذكار الصباح (11-17)
   // ========================================
