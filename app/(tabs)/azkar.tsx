@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,80 +7,41 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  Share,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
 import { APP_CONFIG } from '../../constants/app';
-import { Share } from 'react-native';
+
+// استيراد API الأذكار الجديد
+import AzkarAPI, {
+  getAllCategories,
+  getAzkarByCategory,
+  getCategoryName,
+  getCategoryCompletionPercentage,
+  AzkarCategory,
+  AzkarCategoryType,
+  Language,
+} from '../../lib/azkar-api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ============================================
-// أنواع الأذكار
+// أيقونات الفئات
 // ============================================
 
-interface AzkarCategory {
-  id: string;
-  title: string;
-  subtitle: string;
-  icon: string;
-  color: string;
-  route: string;
-  count?: number;
-}
-
-const AZKAR_CATEGORIES: AzkarCategory[] = [
-  {
-    id: 'morning',
-    title: 'أذكار الصباح',
-    subtitle: 'تقال بعد صلاة الفجر حتى طلوع الشمس',
-    icon: 'sunny',
-    color: '#F59E0B',
-    route: '/azkar/morning',
-  },
-  {
-    id: 'evening',
-    title: 'أذكار المساء',
-    subtitle: 'تقال بعد صلاة العصر حتى غروب الشمس',
-    icon: 'moon',
-    color: '#6366F1',
-    route: '/azkar/evening',
-  },
-  {
-    id: 'after-prayer',
-    title: 'أذكار بعد الصلاة',
-    subtitle: 'تقال بعد السلام من الصلاة المفروضة',
-    icon: 'checkmark-done',
-    color: '#10B981',
-    route: '/azkar/after-prayer',
-  },
-  {
-    id: 'sleep',
-    title: 'أذكار النوم',
-    subtitle: 'تقال قبل النوم',
-    icon: 'bed',
-    color: '#8B5CF6',
-    route: '/azkar/sleep',
-  },
-  {
-    id: 'wakeup',
-    title: 'أذكار الاستيقاظ',
-    subtitle: 'تقال عند الاستيقاظ من النوم',
-    icon: 'alarm',
-    color: '#EC4899',
-    route: '/azkar/wakeup',
-  },
-  {
-    id: 'misc',
-    title: 'أذكار متنوعة',
-    subtitle: 'أذكار وأدعية مختلفة',
-    icon: 'apps',
-    color: '#059669',
-    route: '/azkar/misc',
-  },
-];
+const CATEGORY_ICONS: Record<AzkarCategoryType, string> = {
+  morning: 'sunny',
+  evening: 'moon',
+  sleep: 'bed',
+  wakeup: 'alarm',
+  after_prayer: 'checkmark-done',
+  quran_duas: 'book',
+  sunnah_duas: 'heart',
+  ruqya: 'shield-checkmark',
+};
 
 // ============================================
 // المكون الرئيسي
@@ -90,21 +51,37 @@ export default function AzkarScreen() {
   const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [progress, setProgress] = useState<{ [key: string]: number }>({});
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [categories, setCategories] = useState<AzkarCategory[]>([]);
+  const [language, setLanguage] = useState<Language>('ar');
+  const [isLoading, setIsLoading] = useState(true);
   
   // الأنيميشن
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    loadSettings();
-    loadProgress();
-    
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+    initializeScreen();
   }, []);
+
+  const initializeScreen = async () => {
+    try {
+      await Promise.all([
+        loadSettings(),
+        loadCategories(),
+        loadProgress(),
+      ]);
+      
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    } catch (error) {
+      console.error('Error initializing screen:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -113,26 +90,31 @@ export default function AzkarScreen() {
         const parsed = JSON.parse(settings);
         setDarkMode(parsed.darkMode ?? false);
         setViewMode(parsed.azkarViewMode ?? 'grid');
+        setLanguage(parsed.language ?? 'ar');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
+  const loadCategories = async () => {
+    try {
+      const allCategories = getAllCategories();
+      setCategories(allCategories);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
   const loadProgress = async () => {
     try {
-      const today = new Date().toDateString();
-      const progressData: { [key: string]: number } = {};
+      const progressData: Record<string, number> = {};
+      const allCategories = getAllCategories();
       
-      for (const category of AZKAR_CATEGORIES) {
-        const saved = await AsyncStorage.getItem(`azkar_progress_${category.id}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.date === today) {
-            const completed = parsed.azkar?.filter((a: any) => a.completed)?.length || 0;
-            const total = parsed.azkar?.length || 1;
-            progressData[category.id] = Math.round((completed / total) * 100);
-          }
+      for (const category of allCategories) {
+        const percentage = await getCategoryCompletionPercentage(category.id);
+        if (percentage > 0) {
+          progressData[category.id] = percentage;
         }
       }
       
@@ -145,7 +127,10 @@ export default function AzkarScreen() {
   const currentColors = darkMode ? DarkColors : Colors;
 
   const shareCategory = async (category: AzkarCategory) => {
-    const shareText = `📿 ${category.title}\n${category.subtitle}\n\n${APP_CONFIG.getShareSignature()}`;
+    const categoryName = getCategoryName(category, language);
+    const azkarCount = getAzkarByCategory(category.id).length;
+    const shareText = `📿 ${categoryName}\n${azkarCount} أذكار\n\n${APP_CONFIG.getShareSignature()}`;
+    
     try {
       await Share.share({ message: shareText });
     } catch (error) {
@@ -153,70 +138,43 @@ export default function AzkarScreen() {
     }
   };
 
+  const navigateToCategory = (categoryId: AzkarCategoryType) => {
+    router.push(`/azkar/${categoryId}` as any);
+  };
+
   // ============================================
   // عرض الشبكة
   // ============================================
 
-  const renderGridItem = (category: AzkarCategory, index: number) => (
-    <TouchableOpacity
-      key={category.id}
-      style={[styles.gridItem, { backgroundColor: currentColors.surface }]}
-      onPress={() => router.push(category.route as any)}
-      onLongPress={() => shareCategory(category)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.gridIconContainer, { backgroundColor: category.color + '15' }]}>
-        <Ionicons name={category.icon as any} size={32} color={category.color} />
-      </View>
-      <Text style={[styles.gridTitle, { color: currentColors.text }]} numberOfLines={2}>
-        {category.title}
-      </Text>
-      
-      {/* شريط التقدم */}
-      {progress[category.id] !== undefined && progress[category.id] > 0 && (
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${progress[category.id]}%`, backgroundColor: category.color }
-              ]} 
-            />
-          </View>
-          <Text style={[styles.progressText, { color: category.color }]}>
-            {progress[category.id]}%
-          </Text>
+  const renderGridItem = (category: AzkarCategory, index: number) => {
+    const categoryName = getCategoryName(category, language);
+    const azkarCount = getAzkarByCategory(category.id).length;
+    const icon = CATEGORY_ICONS[category.id] || 'apps';
+    
+    return (
+      <TouchableOpacity
+        key={category.id}
+        style={[styles.gridItem, { backgroundColor: currentColors.surface }]}
+        onPress={() => navigateToCategory(category.id)}
+        onLongPress={() => shareCategory(category)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.gridIconContainer, { backgroundColor: category.color + '15' }]}>
+          <Ionicons name={icon as any} size={32} color={category.color} />
         </View>
-      )}
-    </TouchableOpacity>
-  );
-
-  // ============================================
-  // عرض القائمة
-  // ============================================
-
-  const renderListItem = (category: AzkarCategory) => (
-    <TouchableOpacity
-      key={category.id}
-      style={[styles.listItem, { backgroundColor: currentColors.surface }]}
-      onPress={() => router.push(category.route as any)}
-      onLongPress={() => shareCategory(category)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.listIconContainer, { backgroundColor: category.color + '15' }]}>
-        <Ionicons name={category.icon as any} size={28} color={category.color} />
-      </View>
-      
-      <View style={styles.listContent}>
-        <Text style={[styles.listTitle, { color: currentColors.text }]}>{category.title}</Text>
-        <Text style={[styles.listSubtitle, { color: currentColors.textLight }]} numberOfLines={1}>
-          {category.subtitle}
+        
+        <Text style={[styles.gridTitle, { color: currentColors.text }]} numberOfLines={2}>
+          {categoryName}
+        </Text>
+        
+        <Text style={[styles.gridCount, { color: currentColors.textLight }]}>
+          {azkarCount} {language === 'ar' ? 'ذكر' : 'items'}
         </Text>
         
         {/* شريط التقدم */}
         {progress[category.id] !== undefined && progress[category.id] > 0 && (
-          <View style={styles.listProgressContainer}>
-            <View style={styles.listProgressBar}>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
               <View 
                 style={[
                   styles.progressFill, 
@@ -224,16 +182,220 @@ export default function AzkarScreen() {
                 ]} 
               />
             </View>
-            <Text style={[styles.listProgressText, { color: category.color }]}>
+            <Text style={[styles.progressText, { color: category.color }]}>
               {progress[category.id]}%
             </Text>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // ============================================
+  // عرض القائمة
+  // ============================================
+
+  const renderListItem = (category: AzkarCategory) => {
+    const categoryName = getCategoryName(category, language);
+    const azkarCount = getAzkarByCategory(category.id).length;
+    const icon = CATEGORY_ICONS[category.id] || 'apps';
+    
+    // وصف الفئة حسب النوع
+    const getSubtitle = (): string => {
+      const subtitles: Record<AzkarCategoryType, Record<Language, string>> = {
+        morning: {
+          ar: 'تقال بعد صلاة الفجر حتى طلوع الشمس',
+          en: 'Said after Fajr prayer until sunrise',
+          fr: 'Dit après la prière du Fajr jusqu\'au lever du soleil',
+          ur: 'فجر کی نماز کے بعد سورج طلوع ہونے تک',
+          id: 'Dibaca setelah shalat Subuh hingga matahari terbit',
+          tr: 'Sabah namazından güneş doğana kadar okunur',
+          de: 'Nach dem Fajr-Gebet bis zum Sonnenaufgang',
+          hi: 'फज्र की नमाज़ के बाद सूर्योदय तक',
+          bn: 'ফজরের নামাজের পর সূর্যোদয় পর্যন্ত',
+          ms: 'Dibaca selepas solat Subuh hingga matahari terbit',
+          ru: 'Читается после утренней молитвы до восхода солнца',
+          es: 'Se dice después del Fajr hasta la salida del sol',
+        },
+        evening: {
+          ar: 'تقال بعد صلاة العصر حتى غروب الشمس',
+          en: 'Said after Asr prayer until sunset',
+          fr: 'Dit après la prière d\'Asr jusqu\'au coucher du soleil',
+          ur: 'عصر کی نماز کے بعد سورج غروب ہونے تک',
+          id: 'Dibaca setelah shalat Ashar hingga matahari terbenam',
+          tr: 'İkindi namazından güneş batana kadar okunur',
+          de: 'Nach dem Asr-Gebet bis zum Sonnenuntergang',
+          hi: 'अस्र की नमाज़ के बाद सूर्यास्त तक',
+          bn: 'আসরের নামাজের পর সূর্যাস্ত পর্যন্ত',
+          ms: 'Dibaca selepas solat Asar hingga matahari terbenam',
+          ru: 'Читается после послеполуденной молитвы до заката',
+          es: 'Se dice después del Asr hasta la puesta del sol',
+        },
+        sleep: {
+          ar: 'تقال قبل النوم',
+          en: 'Said before sleeping',
+          fr: 'Dit avant de dormir',
+          ur: 'سونے سے پہلے',
+          id: 'Dibaca sebelum tidur',
+          tr: 'Uyumadan önce okunur',
+          de: 'Vor dem Schlafen',
+          hi: 'सोने से पहले',
+          bn: 'ঘুমানোর আগে',
+          ms: 'Dibaca sebelum tidur',
+          ru: 'Читается перед сном',
+          es: 'Se dice antes de dormir',
+        },
+        wakeup: {
+          ar: 'تقال عند الاستيقاظ من النوم',
+          en: 'Said upon waking up',
+          fr: 'Dit au réveil',
+          ur: 'نیند سے بیدار ہونے پر',
+          id: 'Dibaca saat bangun tidur',
+          tr: 'Uyanınca okunur',
+          de: 'Beim Aufwachen',
+          hi: 'जागने पर',
+          bn: 'ঘুম থেকে উঠে',
+          ms: 'Dibaca ketika bangun tidur',
+          ru: 'Читается при пробуждении',
+          es: 'Se dice al despertar',
+        },
+        after_prayer: {
+          ar: 'تقال بعد السلام من الصلاة المفروضة',
+          en: 'Said after obligatory prayers',
+          fr: 'Dit après les prières obligatoires',
+          ur: 'فرض نماز کے بعد',
+          id: 'Dibaca setelah shalat wajib',
+          tr: 'Farz namazlardan sonra okunur',
+          de: 'Nach den Pflichtgebeten',
+          hi: 'फर्ज नमाज़ के बाद',
+          bn: 'ফরজ নামাজের পর',
+          ms: 'Dibaca selepas solat fardhu',
+          ru: 'Читается после обязательных молитв',
+          es: 'Se dice después de las oraciones obligatorias',
+        },
+        quran_duas: {
+          ar: 'أدعية مأثورة من القرآن الكريم',
+          en: 'Supplications from the Holy Quran',
+          fr: 'Invocations du Saint Coran',
+          ur: 'قرآن کریم سے دعائیں',
+          id: 'Doa-doa dari Al-Quran',
+          tr: 'Kur\'an-ı Kerim\'den dualar',
+          de: 'Bittgebete aus dem Heiligen Koran',
+          hi: 'पवित्र कुरान से दुआएं',
+          bn: 'পবিত্র কুরআন থেকে দোয়া',
+          ms: 'Doa-doa dari Al-Quran',
+          ru: 'Мольбы из Священного Корана',
+          es: 'Súplicas del Sagrado Corán',
+        },
+        sunnah_duas: {
+          ar: 'أدعية مأثورة من السنة النبوية',
+          en: 'Supplications from the Prophetic Sunnah',
+          fr: 'Invocations de la Sunna prophétique',
+          ur: 'سنت نبوی سے دعائیں',
+          id: 'Doa-doa dari Sunnah Nabi',
+          tr: 'Peygamber Sünnetinden dualar',
+          de: 'Bittgebete aus der prophetischen Sunna',
+          hi: 'पैगंबर की सुन्नत से दुआएं',
+          bn: 'নবীর সুন্নাহ থেকে দোয়া',
+          ms: 'Doa-doa dari Sunnah Nabi',
+          ru: 'Мольбы из пророческой Сунны',
+          es: 'Súplicas de la Sunna profética',
+        },
+        ruqya: {
+          ar: 'آيات وأدعية الرقية الشرعية',
+          en: 'Ruqyah verses and supplications',
+          fr: 'Versets et invocations de Ruqya',
+          ur: 'رقیہ شرعیہ کی آیات اور دعائیں',
+          id: 'Ayat dan doa ruqyah syar\'iyyah',
+          tr: 'Rukye ayetleri ve duaları',
+          de: 'Ruqya-Verse und Bittgebete',
+          hi: 'रुक़्या की आयतें और दुआएं',
+          bn: 'রুকইয়াহ আয়াত ও দোয়া',
+          ms: 'Ayat dan doa ruqyah syar\'iyyah',
+          ru: 'Аяты и мольбы рукья',
+          es: 'Versículos y súplicas de Ruqyah',
+        },
+      };
       
-      <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
-    </TouchableOpacity>
-  );
+      return subtitles[category.id]?.[language] || subtitles[category.id]?.ar || '';
+    };
+    
+    return (
+      <TouchableOpacity
+        key={category.id}
+        style={[styles.listItem, { backgroundColor: currentColors.surface }]}
+        onPress={() => navigateToCategory(category.id)}
+        onLongPress={() => shareCategory(category)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.listIconContainer, { backgroundColor: category.color + '15' }]}>
+          <Ionicons name={icon as any} size={28} color={category.color} />
+        </View>
+        
+        <View style={styles.listContent}>
+          <Text style={[styles.listTitle, { color: currentColors.text }]}>{categoryName}</Text>
+          <Text style={[styles.listSubtitle, { color: currentColors.textLight }]} numberOfLines={1}>
+            {getSubtitle()}
+          </Text>
+          <Text style={[styles.listCount, { color: category.color }]}>
+            {azkarCount} {language === 'ar' ? 'ذكر' : 'items'}
+          </Text>
+          
+          {/* شريط التقدم */}
+          {progress[category.id] !== undefined && progress[category.id] > 0 && (
+            <View style={styles.listProgressContainer}>
+              <View style={styles.listProgressBar}>
+                <View 
+                  style={[
+                    styles.progressFill, 
+                    { width: `${progress[category.id]}%`, backgroundColor: category.color }
+                  ]} 
+                />
+              </View>
+              <Text style={[styles.listProgressText, { color: category.color }]}>
+                {progress[category.id]}%
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        <Ionicons name="chevron-back" size={20} color={currentColors.textLight} />
+      </TouchableOpacity>
+    );
+  };
+
+  // ============================================
+  // إحصائيات سريعة
+  // ============================================
+
+  const renderStats = () => {
+    const stats = AzkarAPI.getAzkarStats();
+    
+    return (
+      <View style={[styles.statsContainer, { backgroundColor: currentColors.surface }]}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.total}</Text>
+          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
+            {language === 'ar' ? 'إجمالي الأذكار' : 'Total Azkar'}
+          </Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.categoriesCount}</Text>
+          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
+            {language === 'ar' ? 'الأقسام' : 'Categories'}
+          </Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={[styles.statNumber, { color: currentColors.primary }]}>{stats.languagesSupported}</Text>
+          <Text style={[styles.statLabel, { color: currentColors.textLight }]}>
+            {language === 'ar' ? 'لغة' : 'Languages'}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   // ============================================
   // العرض
@@ -254,7 +416,9 @@ export default function AzkarScreen() {
           />
         </TouchableOpacity>
         
-        <Text style={[styles.headerTitle, { color: currentColors.text }]}>الأذكار</Text>
+        <Text style={[styles.headerTitle, { color: currentColors.text }]}>
+          {language === 'ar' ? 'الأذكار' : 'Azkar'}
+        </Text>
         
         <TouchableOpacity 
           style={styles.headerButton}
@@ -273,25 +437,32 @@ export default function AzkarScreen() {
         {/* بانر علوي */}
         <View style={[styles.banner, { backgroundColor: currentColors.primary }]}>
           <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>📿 حافظ على أذكارك</Text>
+            <Text style={styles.bannerTitle}>📿 {language === 'ar' ? 'حافظ على أذكارك' : 'Keep your Azkar'}</Text>
             <Text style={styles.bannerSubtitle}>
-              "من قال سبحان الله وبحمده في يوم مائة مرة حُطت خطاياه"
+              {language === 'ar' 
+                ? '"من قال سبحان الله وبحمده في يوم مائة مرة حُطت خطاياه"'
+                : '"Whoever says SubhanAllah wa bihamdihi 100 times, his sins will be forgiven"'}
             </Text>
           </View>
         </View>
 
+        {/* الإحصائيات */}
+        {renderStats()}
+
         {/* قائمة الأذكار */}
         {viewMode === 'grid' ? (
           <View style={styles.gridWrapper}>
-            {AZKAR_CATEGORIES.map((category, index) => renderGridItem(category, index))}
+            {categories.map((category, index) => renderGridItem(category, index))}
           </View>
         ) : (
-          AZKAR_CATEGORIES.map(renderListItem)
+          categories.map(renderListItem)
         )}
 
         {/* روابط سريعة */}
         <View style={styles.quickLinks}>
-          <Text style={[styles.quickLinksTitle, { color: currentColors.text }]}>المزيد</Text>
+          <Text style={[styles.quickLinksTitle, { color: currentColors.text }]}>
+            {language === 'ar' ? 'المزيد' : 'More'}
+          </Text>
           
           <View style={styles.quickLinksRow}>
             <TouchableOpacity 
@@ -299,15 +470,19 @@ export default function AzkarScreen() {
               onPress={() => router.push('/tasbih')}
             >
               <Ionicons name="radio-button-on" size={24} color="#8B5CF6" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>التسبيح</Text>
+              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
+                {language === 'ar' ? 'التسبيح' : 'Tasbih'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={[styles.quickLinkItem, { backgroundColor: currentColors.surface }]}
-              onPress={() => router.push('/ruqyah')}
+              onPress={() => navigateToCategory('ruqya')}
             >
               <Ionicons name="shield-checkmark" size={24} color="#EF4444" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>الرقية</Text>
+              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
+                {language === 'ar' ? 'الرقية' : 'Ruqyah'}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -315,7 +490,9 @@ export default function AzkarScreen() {
               onPress={() => router.push('/names')}
             >
               <Ionicons name="sparkles" size={24} color="#D4AF37" />
-              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>أسماء الله</Text>
+              <Text style={[styles.quickLinkText, { color: currentColors.text }]}>
+                {language === 'ar' ? 'أسماء الله' : 'Names'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -361,7 +538,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   bannerContent: {
     alignItems: 'center',
@@ -378,6 +555,31 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  // Stats
+  statsContainer: {
+    flexDirection: 'row',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    ...Shadows.sm,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: Typography.sizes.xl,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: Typography.sizes.xs,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: Spacing.sm,
   },
   // Grid styles
   gridContainer: {
@@ -408,6 +610,10 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.md,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  gridCount: {
+    fontSize: Typography.sizes.xs,
+    marginTop: 4,
   },
   progressContainer: {
     width: '100%',
@@ -461,6 +667,12 @@ const styles = StyleSheet.create({
   listSubtitle: {
     fontSize: Typography.sizes.xs,
     marginTop: 2,
+    textAlign: 'right',
+  },
+  listCount: {
+    fontSize: Typography.sizes.xs,
+    fontWeight: '600',
+    marginTop: 4,
     textAlign: 'right',
   },
   listProgressContainer: {
