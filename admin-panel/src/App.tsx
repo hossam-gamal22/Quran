@@ -18,6 +18,12 @@ import {
   ChevronLeft,
   RotateCcw
 } from 'lucide-react';
+import { 
+  LayoutDashboard, Sparkles, FileText, Bell, Palette, 
+  Calendar, BarChart3, Settings,
+  BookOpen  // ✅ أضف هذا
+} from 'lucide-react';
+
 
 // استيراد الصفحات
 import Dashboard from './pages/Dashboard';
@@ -28,6 +34,8 @@ import Themes from './pages/Themes';
 import Seasonal from './pages/Seasonal';
 import Analytics from './pages/Analytics';
 import SplashScreens from './pages/SplashScreens';
+import AzkarManager from './pages/AzkarManager';
+
 
 // ==================== Mobile Preview Component ====================
 
@@ -370,11 +378,13 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/', icon: LayoutDashboard, label: 'لوحة التحكم' },
     { path: '/splash-screens', icon: Sparkles, label: 'شاشات البداية' },
     { path: '/content', icon: FileText, label: 'المحتوى' },
+    { path: '/azkar', icon: BookOpen, label: 'إدارة الأذكار' },
     { path: '/notifications', icon: Bell, label: 'الإشعارات' },
     { path: '/themes', icon: Palette, label: 'الثيمات' },
     { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
     { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
     { path: '/settings', icon: Settings, label: 'الإعدادات' },
+    
   ];
 
   return (
@@ -480,6 +490,7 @@ const App: React.FC = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/splash-screens" element={<SplashScreens />} />
               <Route path="/content" element={<Content />} />
+              <Route path="/azkar" element={<AzkarManager />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/themes" element={<Themes />} />
               <Route path="/seasonal" element={<Seasonal />} />
