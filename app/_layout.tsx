@@ -37,7 +37,7 @@ const FONTS = {
   'Cairo-Bold': require('@/assets/fonts/Cairo-Bold.ttf'),
   'Amiri-Regular': require('@/assets/fonts/Amiri-Regular.ttf'),
   'Amiri-Bold': require('@/assets/fonts/Amiri-Bold.ttf'),
-  'UthmanicHafs': require('@/assets/fonts/UthmanicHafs.ttf'),
+  'UthmanicHafs': require('@/assets/fonts/UthmanicHafs.otf'),
 };
 
 // ========================================
