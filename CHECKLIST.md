@@ -125,6 +125,77 @@
 - [x] `lib/push-notifications.ts` - الإشعارات (10KB)
 - [x] `contexts/NotificationsContext.tsx` - سياق الإشعارات (8KB)
 
+
+
+## 🔄 Phase 13 – Azkar JSON System (0%)
+
+### الخطوة 1: تجهيز ملفات JSON
+- [ ] `data/json/azkar.json` - جميع الأذكار (حصن المسلم كامل)
+- [ ] `data/json/duas.json` - جميع الأدعية
+- [ ] `data/json/ruqya.json` - الرقية الشرعية
+- [ ] `data/json/categories.json` - تصنيفات الأذكار
+
+### الخطوة 2: محتوى كل ذكر
+- [ ] النص العربي (arabic)
+- [ ] النطق اللاتيني (transliteration)
+- [ ] الترجمات 12 لغة (ar, en, ur, id, tr, fr, de, hi, bn, ms, ru, es)
+- [ ] رابط الصوت (audio)
+- [ ] عدد التكرار (count)
+- [ ] الفضل/الفائدة (benefit)
+- [ ] المرجع (reference)
+
+### الخطوة 3: Firebase Integration
+- [ ] رفع الأذكار على Firebase Firestore
+- [ ] Collection: `azkar` - الأذكار
+- [ ] Collection: `duas` - الأدعية
+- [ ] Collection: `ruqya` - الرقية
+- [ ] Collection: `categories` - التصنيفات
+
+### الخطوة 4: Admin Panel Pages
+- [ ] `admin-panel/src/pages/AzkarManager.tsx` - إدارة الأذكار
+  - [ ] إضافة/تعديل/حذف الأذكار
+  - [ ] تعديل الترجمات لكل لغة
+  - [ ] رفع ملفات الصوت
+  - [ ] تحديد عدد التكرار والفضل
+- [ ] `admin-panel/src/pages/DuasManager.tsx` - إدارة الأدعية
+- [ ] `admin-panel/src/pages/RuqyaManager.tsx` - إدارة الرقية
+- [ ] `admin-panel/src/pages/AzkarReminders.tsx` - إدارة التذكيرات
+  - [ ] إرسال تذكير لجميع المستخدمين
+  - [ ] جدولة التذكيرات التلقائية
+
+### الخطوة 5: حذف الملفات القديمة
+- [ ] حذف `data/translations/azkar.ts`
+- [ ] حذف `data/translations/duas.ts`
+- [ ] حذف `data/translations/ruqya.ts`
+
+### الخطوة 6: تعديل نظام القراءة
+- [ ] تعديل `lib/azkar-api.ts` لقراءة من Firebase
+- [ ] إضافة Offline Cache للأذكار
+- [ ] تعديل الشاشات لعرض Transliteration
+- [ ] إضافة مشغل الصوت للأذكار
+
+### الخطوة 7: شاشة التذكير في التطبيق
+- [ ] `app/azkar-reminder.tsx` - شاشة إعداد التذكير
+  - [ ] تفعيل/إيقاف التذكير
+  - [ ] تحديد وقت التذكير
+  - [ ] تحديد أيام التذكير
+  - [ ] اختيار صوت التذكير
+- [ ] ربط التذكير مع `lib/notifications-manager.ts`
+
+### المحتوى المطلوب
+| القسم | العدد |
+|-------|-------|
+| أذكار الصباح | 17 |
+| أذكار المساء | 17 |
+| أذكار النوم | 10 |
+| أذكار الاستيقاظ | 10 |
+| أذكار بعد الصلاة | 10 |
+| أدعية قرآنية | 15 |
+| أدعية نبوية | 15 |
+| الرقية الشرعية | 15 |
+| أذكار متنوعة | ~50 |
+| **المجموع** | **~160 ذكر × 12 لغة** |
+
 ---
 
 ## 📈 إحصائيات المشروع

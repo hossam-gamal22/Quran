@@ -249,7 +249,7 @@ export const duasTranslations: TranslationKeys = {
 };
   // ========================================
   // تكملة أدعية القرآن
-  // ========================================
+  // ========================================,
   "dua.quran.9.text": {
     ar: "رَبِّ أَعُوذُ بِكَ مِنْ هَمَزَاتِ الشَّيَاطِينِ وَأَعُوذُ بِكَ رَبِّ أَن يَحْضُرُونِ",
     en: "My Lord, I seek refuge in You from the incitements of the devils, and I seek refuge in You, my Lord, lest they be present with me.",

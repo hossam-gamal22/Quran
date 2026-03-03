@@ -524,7 +524,7 @@ export const azkarTranslations: TranslationKeys = {
     ru: "Мы вступили в вечер на естестве Ислама, на слове искренности, на религии нашего Пророка Мухаммада (мир ему и благословение Аллаха), и на пути нашего отца Ибрахима, ханифа, мусульманина, и он не был из многобожников.",
     es: "Hemos llegado a la tarde sobre la naturaleza del Islam, sobre la palabra de sinceridad, sobre la religión de nuestro Profeta Muhammad (la paz sea con él), y sobre el camino de nuestro padre Ibrahim, inclinado hacia la verdad, musulmán, y no era de los politeístas.",
   },
-};
+},
   // ========================================
   // تكملة أذكار المساء (6-10)
   // ========================================
@@ -851,7 +851,7 @@ export const azkarTranslations: TranslationKeys = {
     ru: "Кто скажет это при пробуждении, а затем попросит, его просьба будет исполнена. Если он совершит омовение и помолится, его молитва будет принята.",
     es: "Quien lo diga al despertar y luego suplique, su súplica será respondida. Si realiza la ablución y reza, su oración será aceptada.",
   },
-};
+},
   // ========================================
   // أذكار بعد الصلاة (8 أذكار)
   // ========================================
@@ -1358,4 +1358,5 @@ export const azkarTranslations: TranslationKeys = {
     ru: "Мольба Юнуса (мир ему). Ни один мусульманин не взывает с ней о чём-либо, кроме как Аллах отвечает ему.",
     es: "La súplica de Yunus (la paz sea con él). Ningún musulmán suplica con ella por algo excepto que Allah le responde.",
   },
+},
 };
