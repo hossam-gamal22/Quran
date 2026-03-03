@@ -1,7 +1,7 @@
 # ✅ CHECKLIST - روح المسلم
 > آخر تحديث: 3 مارس 2026
 
-## 📊 نسبة الإنجاز: 100% ✅ (جاهز للاختبار)
+## 📊 نسبة الإنجاز: 100% ✅ (Phase 1-12) | Phase 13: 40%
 
 ---
 
@@ -33,16 +33,19 @@
 - [x] `app/(tabs)/wird.tsx` - صفحة الورد (27KB)
 - [x] `app/khatma/*` - صفحات الختمة الفرعية
 
-## ✅ Phase 4 – Azkar & Duas (100%)
-- [x] `lib/azkar-api.ts` - API الأذكار (44KB)
-- [x] `app/(tabs)/azkar.tsx` - صفحة الأذكار (14KB)
+## 🔄 Phase 4 – Azkar & Duas (85%) - تم التحديث للنظام الجديد
+- [x] `lib/azkar-api.ts` - API الأذكار الجديد ✅ محدث
+- [x] `app/(tabs)/azkar.tsx` - صفحة الأذكار ✅ محدث
+- [x] `app/azkar/[category].tsx` - صفحة عرض الأذكار ✅ جديد
 - [x] `app/(tabs)/tasbih.tsx` - التسبيح (47KB)
-- [x] `app/ruqya.tsx` - الرقية الشرعية (51KB)
+- [ ] `app/ruqya.tsx` - الرقية الشرعية ❌ يحتاج تحديث
 - [x] `app/names.tsx` - أسماء الله الحسنى (63KB)
-- [x] `data/azkar.ts` - بيانات الأذكار
-- [x] `data/duas.ts` - بيانات الأدعية
-- [x] `data/ruqya.ts` - بيانات الرقية
-- [x] `data/translations/*` - الترجمات (12 لغة)
+- [x] `data/json/azkar.json` - بيانات الأذكار الجديدة ✅ (106 ذكر × 12 لغة)
+- [x] `data/json/categories.json` - التصنيفات ✅ (8 فئات × 12 لغة)
+- [x] ~~`data/azkar.ts`~~ - ❌ محذوف (النظام القديم)
+- [x] ~~`data/duas.ts`~~ - ❌ محذوف (النظام القديم)
+- [x] ~~`data/ruqya.ts`~~ - ❌ محذوف (النظام القديم)
+- [x] ~~`data/translations/*`~~ - ❌ محذوف (النظام القديم)
 
 ## ✅ Phase 5 – Prayer Times (100%)
 - [x] `lib/prayer-times.ts` - حساب المواقيت (19KB)
@@ -125,76 +128,69 @@
 - [x] `lib/push-notifications.ts` - الإشعارات (10KB)
 - [x] `contexts/NotificationsContext.tsx` - سياق الإشعارات (8KB)
 
+---
 
+## 🔄 Phase 13 – Azkar JSON System (40%)
 
-## 🔄 Phase 13 – Azkar JSON System (0%)
+### ✅ الخطوة 1: ملفات JSON (مكتمل)
+- [x] `data/json/azkar.json` - 106 ذكر مع 12 لغة ✅
+- [x] `data/json/categories.json` - 8 فئات مع 12 لغة ✅
 
-### الخطوة 1: تجهيز ملفات JSON
-- [ ] `data/json/azkar.json` - جميع الأذكار (حصن المسلم كامل)
-- [ ] `data/json/duas.json` - جميع الأدعية
-- [ ] `data/json/ruqya.json` - الرقية الشرعية
-- [ ] `data/json/categories.json` - تصنيفات الأذكار
+### ✅ الخطوة 2: محتوى الأذكار (مكتمل)
+- [x] النص العربي (arabic) ✅
+- [x] النطق اللاتيني (transliteration) ✅
+- [x] 12 لغة (ar, en, ur, id, tr, fr, de, hi, bn, ms, ru, es) ✅
+- [x] عدد التكرار (count) ✅
+- [x] الفضل/الفائدة (benefit) ✅
+- [x] المرجع (reference) ✅
+- [ ] رابط الصوت (audio) - جزئي
 
-### الخطوة 2: محتوى كل ذكر
-- [ ] النص العربي (arabic)
-- [ ] النطق اللاتيني (transliteration)
-- [ ] الترجمات 12 لغة (ar, en, ur, id, tr, fr, de, hi, bn, ms, ru, es)
-- [ ] رابط الصوت (audio)
-- [ ] عدد التكرار (count)
-- [ ] الفضل/الفائدة (benefit)
-- [ ] المرجع (reference)
+### ✅ الخطوة 3: تحديث الكود (مكتمل)
+- [x] `lib/azkar-api.ts` - محدث للنظام الجديد ✅
+- [x] `app/(tabs)/azkar.tsx` - محدث ✅
+- [x] `app/azkar/[category].tsx` - جديد ✅
 
-### الخطوة 3: Firebase Integration
-- [ ] رفع الأذكار على Firebase Firestore
-- [ ] Collection: `azkar` - الأذكار
-- [ ] Collection: `duas` - الأدعية
-- [ ] Collection: `ruqya` - الرقية
-- [ ] Collection: `categories` - التصنيفات
+### ❌ الخطوة 4: صفحات إضافية (قيد التنفيذ)
+- [ ] `app/ruqya.tsx` - تحديث للنظام الجديد
+- [ ] `app/azkar-reminder.tsx` - شاشة التذكيرات
+- [ ] `app/azkar-search.tsx` - شاشة البحث
 
-### الخطوة 4: Admin Panel Pages
+### ❌ الخطوة 5: Admin Panel للأذكار
 - [ ] `admin-panel/src/pages/AzkarManager.tsx` - إدارة الأذكار
   - [ ] إضافة/تعديل/حذف الأذكار
-  - [ ] تعديل الترجمات لكل لغة
+  - [ ] ترجمة تلقائية لـ 12 لغة
   - [ ] رفع ملفات الصوت
-  - [ ] تحديد عدد التكرار والفضل
 - [ ] `admin-panel/src/pages/DuasManager.tsx` - إدارة الأدعية
 - [ ] `admin-panel/src/pages/RuqyaManager.tsx` - إدارة الرقية
 - [ ] `admin-panel/src/pages/AzkarReminders.tsx` - إدارة التذكيرات
-  - [ ] إرسال تذكير لجميع المستخدمين
-  - [ ] جدولة التذكيرات التلقائية
 
-### الخطوة 5: حذف الملفات القديمة
-- [ ] حذف `data/translations/azkar.ts`
-- [ ] حذف `data/translations/duas.ts`
-- [ ] حذف `data/translations/ruqya.ts`
+### ❌ الخطوة 6: Firebase Integration
+- [ ] رفع الأذكار على Firestore
+- [ ] Sync بين Admin Panel والتطبيق
+- [ ] Offline Cache
 
-### الخطوة 6: تعديل نظام القراءة
-- [ ] تعديل `lib/azkar-api.ts` لقراءة من Firebase
-- [ ] إضافة Offline Cache للأذكار
-- [ ] تعديل الشاشات لعرض Transliteration
-- [ ] إضافة مشغل الصوت للأذكار
+### ✅ الخطوة 7: حذف الملفات القديمة (مكتمل)
+- [x] ~~`data/azkar.ts`~~ ✅ محذوف
+- [x] ~~`data/duas.ts`~~ ✅ محذوف
+- [x] ~~`data/ruqya.ts`~~ ✅ محذوف
+- [x] ~~`data/translations/*`~~ ✅ محذوف
 
-### الخطوة 7: شاشة التذكير في التطبيق
-- [ ] `app/azkar-reminder.tsx` - شاشة إعداد التذكير
-  - [ ] تفعيل/إيقاف التذكير
-  - [ ] تحديد وقت التذكير
-  - [ ] تحديد أيام التذكير
-  - [ ] اختيار صوت التذكير
-- [ ] ربط التذكير مع `lib/notifications-manager.ts`
+---
 
-### المحتوى المطلوب
-| القسم | العدد |
-|-------|-------|
-| أذكار الصباح | 17 |
-| أذكار المساء | 17 |
-| أذكار النوم | 10 |
-| أذكار الاستيقاظ | 10 |
-| أذكار بعد الصلاة | 10 |
-| أدعية قرآنية | 15 |
-| أدعية نبوية | 15 |
-| الرقية الشرعية | 15 |
-| أذكار متنوعة | ~50 |
-| **المجموع** | **~160 ذكر × 12 لغة** |
+## 📊 محتوى الأذكار الحالي
+
+| القسم | العدد | الحالة |
+|-------|-------|--------|
+| أذكار الصباح | 27 | ✅ |
+| أذكار المساء | 6 | ✅ |
+| أذكار النوم | 7 | ✅ |
+| أذكار الاستيقاظ | 3 | ✅ |
+| أذكار بعد الصلاة | 10 | ✅ |
+| أدعية من القرآن | 15 | ✅ |
+| أدعية من السنة | 23 | ✅ |
+| الرقية الشرعية | 15 | ✅ |
+| **المجموع** | **106 ذكر** | ✅ |
+| **الترجمات** | **106 × 12 = 1,272** | ✅ |
 
 ---
 
@@ -208,7 +204,8 @@
 | Contexts | 7 | ~68 KB |
 | Components | 15+ | ~50 KB |
 | Admin Pages | 14 | ~260 KB |
-| Translations | 12 لغة | 2,880 keys |
+| JSON Data | 2 files | ~150 KB |
+| Languages | 12 | 1,272 translations |
 
 ---
 
@@ -218,20 +215,17 @@
 
 ---
 
-## ⏳ خطوات ما قبل النشر
+## ⏳ الخطوات القادمة
 
-### للاختبار الآن:
-1. [ ] تشغيل التطبيق: `npx expo start`
-2. [ ] اختبار على iOS Simulator
-3. [ ] اختبار على Android Emulator
-4. [ ] التحقق من الـ RTL والخطوط العربية
-5. [ ] اختبار التنقل بين الصفحات
-6. [ ] اختبار وضع Dark Mode
-7. [ ] اختبار مواقيت الصلاة والموقع
+### المرحلة الحالية:
+1. [ ] تحديث `app/ruqya.tsx` للنظام الجديد
+2. [ ] إنشاء `app/azkar-reminder.tsx`
+3. [ ] إنشاء `app/azkar-search.tsx`
+4. [ ] إنشاء صفحات Admin Panel للأذكار
 
 ### قبل النشر النهائي:
-1. [ ] تحديث Expo Project ID في `lib/push-notifications.ts`
-2. [ ] إعداد APNs Key لـ iOS في Firebase
-3. [ ] اختبار Push Notifications على أجهزة حقيقية
-4. [ ] بناء التطبيق: `eas build`
+1. [ ] اختبار التطبيق على iOS و Android
+2. [ ] اختبار جميع الـ 12 لغة
+3. [ ] إضافة ملفات الصوت للأذكار
+4. [ ] ربط Firebase
 5. [ ] نشر على App Store و Google Play
