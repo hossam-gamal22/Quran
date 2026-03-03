@@ -1,0 +1,356 @@
+// lib/push-notifications.ts
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { Platform } from 'react-native';
+import { initializeApp, getApps } from 'firebase/app';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ==================== Firebase Config ====================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
+  authDomain: "rooh-almuslim.firebaseapp.com",
+  projectId: "rooh-almuslim",
+  storageBucket: "rooh-almuslim.firebasestorage.app",
+  messagingSenderId: "328160076358",
+  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
+};
+
+// Initialize Firebase
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+
+// ==================== Types ====================
+
+export interface PushNotificationData {
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+  imageUrl?: string;
+}
+
+export interface NotificationSettings {
+  enabled: boolean;
+  prayerReminders: boolean;
+  azkarReminders: boolean;
+  dailyAyah: boolean;
+  seasonalContent: boolean;
+  generalUpdates: boolean;
+}
+
+// Storage Keys
+const STORAGE_KEYS = {
+  FCM_TOKEN: '@fcm_token',
+  NOTIFICATION_SETTINGS: '@notification_settings',
+  DEVICE_REGISTERED: '@device_registered',
+};
+
+// ==================== Configure Notifications ====================
+
+// Configure notification handler
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+// ==================== Permission Functions ====================
+
+export const requestNotificationPermission = async (): Promise<boolean> => {
+  try {
+    if (!Device.isDevice) {
+      console.log('Push notifications require a physical device');
+      return false;
+    }
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log('Permission not granted for push notifications');
+      return false;
+    }
+
+    // Android specific channel setup
+    if (Platform.OS === 'android') {
+      await setupAndroidChannels();
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+    return false;
+  }
+};
+
+// ==================== Android Channels ====================
+
+const setupAndroidChannels = async (): Promise<void> => {
+  // Prayer Times Channel
+  await Notifications.setNotificationChannelAsync('prayer-times', {
+    name: 'مواقيت الصلاة',
+    description: 'إشعارات أوقات الصلاة',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'adhan.wav',
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#10B981',
+  });
+
+  // Azkar Channel
+  await Notifications.setNotificationChannelAsync('azkar', {
+    name: 'الأذكار',
+    description: 'تذكيرات الأذكار',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'notification.wav',
+  });
+
+  // Daily Ayah Channel
+  await Notifications.setNotificationChannelAsync('daily-ayah', {
+    name: 'آية اليوم',
+    description: 'آية قرآنية يومية',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+
+  // General Updates Channel
+  await Notifications.setNotificationChannelAsync('general', {
+    name: 'تحديثات عامة',
+    description: 'إشعارات وتحديثات عامة',
+    importance: Notifications.AndroidImportance.LOW,
+  });
+
+  // Seasonal Content Channel
+  await Notifications.setNotificationChannelAsync('seasonal', {
+    name: 'المحتوى الموسمي',
+    description: 'محتوى المناسبات الإسلامية',
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+};
+
+// ==================== FCM Token Functions ====================
+
+export const getFCMToken = async (): Promise<string | null> => {
+  try {
+    // Check cached token first
+    const cachedToken = await AsyncStorage.getItem(STORAGE_KEYS.FCM_TOKEN);
+    if (cachedToken) {
+      return cachedToken;
+    }
+
+    // Get Expo push token (works with FCM on Android, APNs on iOS)
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId: 'your-expo-project-id', // Replace with your Expo project ID
+    });
+
+    if (token.data) {
+      await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, token.data);
+      return token.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting FCM token:', error);
+    return null;
+  }
+};
+
+export const refreshFCMToken = async (): Promise<string | null> => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEYS.FCM_TOKEN);
+    return await getFCMToken();
+  } catch (error) {
+    console.error('Error refreshing FCM token:', error);
+    return null;
+  }
+};
+
+// ==================== Register Device ====================
+
+export const registerDeviceForPushNotifications = async (): Promise<{
+  success: boolean;
+  token?: string;
+  error?: string;
+}> => {
+  try {
+    // Check if already registered
+    const isRegistered = await AsyncStorage.getItem(STORAGE_KEYS.DEVICE_REGISTERED);
+    if (isRegistered === 'true') {
+      const token = await getFCMToken();
+      return { success: true, token: token || undefined };
+    }
+
+    // Request permission
+    const hasPermission = await requestNotificationPermission();
+    if (!hasPermission) {
+      return { success: false, error: 'Permission denied' };
+    }
+
+    // Get FCM token
+    const token = await getFCMToken();
+    if (!token) {
+      return { success: false, error: 'Failed to get FCM token' };
+    }
+
+    // TODO: Send token to your backend server
+    // await sendTokenToServer(token);
+
+    // Mark as registered
+    await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_REGISTERED, 'true');
+
+    return { success: true, token };
+  } catch (error) {
+    console.error('Error registering device:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+};
+
+// ==================== Notification Settings ====================
+
+export const getNotificationSettings = async (): Promise<NotificationSettings> => {
+  try {
+    const settings = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATION_SETTINGS);
+    if (settings) {
+      return JSON.parse(settings);
+    }
+  } catch (error) {
+    console.error('Error getting notification settings:', error);
+  }
+
+  // Default settings
+  return {
+    enabled: true,
+    prayerReminders: true,
+    azkarReminders: true,
+    dailyAyah: true,
+    seasonalContent: true,
+    generalUpdates: true,
+  };
+};
+
+export const saveNotificationSettings = async (
+  settings: NotificationSettings
+): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.NOTIFICATION_SETTINGS,
+      JSON.stringify(settings)
+    );
+  } catch (error) {
+    console.error('Error saving notification settings:', error);
+  }
+};
+
+// ==================== Local Notifications ====================
+
+export const scheduleLocalNotification = async (
+  notification: PushNotificationData,
+  trigger: Notifications.NotificationTriggerInput
+): Promise<string> => {
+  const id = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: notification.title,
+      body: notification.body,
+      data: notification.data,
+      sound: true,
+    },
+    trigger,
+  });
+  return id;
+};
+
+export const schedulePrayerNotification = async (
+  prayerName: string,
+  prayerTime: Date,
+  minutesBefore: number = 0
+): Promise<string> => {
+  const triggerDate = new Date(prayerTime);
+  triggerDate.setMinutes(triggerDate.getMinutes() - minutesBefore);
+
+  const notification: PushNotificationData = {
+    title: minutesBefore > 0 
+      ? `⏰ ${prayerName} بعد ${minutesBefore} دقيقة`
+      : `🕌 حان وقت ${prayerName}`,
+    body: minutesBefore > 0
+      ? `استعد لصلاة ${prayerName}`
+      : `أقم صلاتك الآن`,
+    data: { type: 'prayer', prayer: prayerName },
+  };
+
+  return scheduleLocalNotification(notification, {
+    date: triggerDate,
+    channelId: 'prayer-times',
+  });
+};
+
+export const scheduleAzkarReminder = async (
+  azkarType: 'morning' | 'evening' | 'sleep',
+  time: Date
+): Promise<string> => {
+  const titles = {
+    morning: '☀️ أذكار الصباح',
+    evening: '🌅 أذكار المساء',
+    sleep: '🌙 أذكار النوم',
+  };
+
+  const notification: PushNotificationData = {
+    title: titles[azkarType],
+    body: 'حان وقت قراءة الأذكار',
+    data: { type: 'azkar', category: azkarType },
+  };
+
+  return scheduleLocalNotification(notification, {
+    date: time,
+    channelId: 'azkar',
+  });
+};
+
+// ==================== Cancel Notifications ====================
+
+export const cancelNotification = async (id: string): Promise<void> => {
+  await Notifications.cancelScheduledNotificationAsync(id);
+};
+
+export const cancelAllNotifications = async (): Promise<void> => {
+  await Notifications.cancelAllScheduledNotificationsAsync();
+};
+
+// ==================== Notification Listeners ====================
+
+export const addNotificationReceivedListener = (
+  callback: (notification: Notifications.Notification) => void
+): Notifications.Subscription => {
+  return Notifications.addNotificationReceivedListener(callback);
+};
+
+export const addNotificationResponseListener = (
+  callback: (response: Notifications.NotificationResponse) => void
+): Notifications.Subscription => {
+  return Notifications.addNotificationResponseReceivedListener(callback);
+};
+
+// ==================== Badge ====================
+
+export const setBadgeCount = async (count: number): Promise<void> => {
+  await Notifications.setBadgeCountAsync(count);
+};
+
+export const clearBadge = async (): Promise<void> => {
+  await Notifications.setBadgeCountAsync(0);
+};
+
+// ==================== Get Scheduled Notifications ====================
+
+export const getScheduledNotifications = async (): Promise<
+  Notifications.NotificationRequest[]
+> => {
+  return Notifications.getAllScheduledNotificationsAsync();
+};

@@ -1,0 +1,322 @@
+// contexts/NotificationsContext.tsx
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  ReactNode,
+} from 'react';
+import * as Notifications from 'expo-notifications';
+import {
+  registerDeviceForPushNotifications,
+  getNotificationSettings,
+  saveNotificationSettings,
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+  schedulePrayerNotification,
+  scheduleAzkarReminder,
+  cancelAllNotifications,
+  getScheduledNotifications,
+  clearBadge,
+  NotificationSettings,
+} from '@/lib/push-notifications';
+import { useRouter } from 'expo-router';
+
+// ==================== Types ====================
+
+interface NotificationsContextType {
+  // State
+  isEnabled: boolean;
+  settings: NotificationSettings;
+  fcmToken: string | null;
+  isLoading: boolean;
+  error: string | null;
+  scheduledCount: number;
+  
+  // Actions
+  enableNotifications: () => Promise<boolean>;
+  disableNotifications: () => Promise<void>;
+  updateSettings: (settings: Partial<NotificationSettings>) => Promise<void>;
+  refreshToken: () => Promise<void>;
+  
+  // Prayer Notifications
+  schedulePrayerReminders: (prayers: Array<{
+    name: string;
+    time: Date;
+    minutesBefore?: number;
+  }>) => Promise<void>;
+  
+  // Azkar Notifications
+  scheduleAzkarReminders: (reminders: Array<{
+    type: 'morning' | 'evening' | 'sleep';
+    time: Date;
+  }>) => Promise<void>;
+  
+  // Clear
+  clearAllScheduled: () => Promise<void>;
+}
+
+// ==================== Context ====================
+
+const NotificationsContext = createContext<NotificationsContextType | undefined>(
+  undefined
+);
+
+// ==================== Provider ====================
+
+interface NotificationsProviderProps {
+  children: ReactNode;
+}
+
+export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
+  children,
+}) => {
+  const router = useRouter();
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [settings, setSettings] = useState<NotificationSettings>({
+    enabled: true,
+    prayerReminders: true,
+    azkarReminders: true,
+    dailyAyah: true,
+    seasonalContent: true,
+    generalUpdates: true,
+  });
+  const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [scheduledCount, setScheduledCount] = useState(0);
+  
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
+
+  // Initialize
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        setIsLoading(true);
+        
+        // Load settings
+        const savedSettings = await getNotificationSettings();
+        setSettings(savedSettings);
+        setIsEnabled(savedSettings.enabled);
+        
+        // Get scheduled count
+        const scheduled = await getScheduledNotifications();
+        setScheduledCount(scheduled.length);
+        
+        // Clear badge on app open
+        await clearBadge();
+        
+      } catch (err) {
+        console.error('Error initializing notifications:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initialize();
+  }, []);
+
+  // Setup listeners
+  useEffect(() => {
+    // Notification received while app is foregrounded
+    notificationListener.current = addNotificationReceivedListener(
+      (notification) => {
+        console.log('Notification received:', notification);
+      }
+    );
+
+    // User interacted with notification
+    responseListener.current = addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+      
+      // Handle navigation based on notification type
+      if (data?.type === 'prayer') {
+        router.push('/(tabs)/prayer');
+      } else if (data?.type === 'azkar') {
+        router.push(`/azkar/${data.category}`);
+      } else if (data?.type === 'quran') {
+        router.push('/(tabs)/quran');
+      } else if (data?.type === 'seasonal') {
+        router.push('/seasonal');
+      }
+    });
+
+    return () => {
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
+    };
+  }, [router]);
+
+  // Enable notifications
+  const enableNotifications = useCallback(async (): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const result = await registerDeviceForPushNotifications();
+      
+      if (result.success) {
+        setIsEnabled(true);
+        setFcmToken(result.token || null);
+        
+        const newSettings = { ...settings, enabled: true };
+        setSettings(newSettings);
+        await saveNotificationSettings(newSettings);
+        
+        return true;
+      } else {
+        setError(result.error || 'Failed to enable notifications');
+        return false;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [settings]);
+
+  // Disable notifications
+  const disableNotifications = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      await cancelAllNotifications();
+      
+      const newSettings = { ...settings, enabled: false };
+      setSettings(newSettings);
+      await saveNotificationSettings(newSettings);
+      
+      setIsEnabled(false);
+      setScheduledCount(0);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [settings]);
+
+  // Update settings
+  const updateSettings = useCallback(
+    async (newSettings: Partial<NotificationSettings>): Promise<void> => {
+      try {
+        const updated = { ...settings, ...newSettings };
+        setSettings(updated);
+        await saveNotificationSettings(updated);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      }
+    },
+    [settings]
+  );
+
+  // Refresh token
+  const refreshToken = useCallback(async (): Promise<void> => {
+    try {
+      const result = await registerDeviceForPushNotifications();
+      if (result.success && result.token) {
+        setFcmToken(result.token);
+      }
+    } catch (err) {
+      console.error('Error refreshing token:', err);
+    }
+  }, []);
+
+  // Schedule prayer reminders
+  const schedulePrayerReminders = useCallback(
+    async (
+      prayers: Array<{ name: string; time: Date; minutesBefore?: number }>
+    ): Promise<void> => {
+      if (!settings.prayerReminders) return;
+      
+      try {
+        for (const prayer of prayers) {
+          await schedulePrayerNotification(
+            prayer.name,
+            prayer.time,
+            prayer.minutesBefore || 0
+          );
+        }
+        
+        const scheduled = await getScheduledNotifications();
+        setScheduledCount(scheduled.length);
+      } catch (err) {
+        console.error('Error scheduling prayer reminders:', err);
+      }
+    },
+    [settings.prayerReminders]
+  );
+
+  // Schedule azkar reminders
+  const scheduleAzkarReminders = useCallback(
+    async (
+      reminders: Array<{ type: 'morning' | 'evening' | 'sleep'; time: Date }>
+    ): Promise<void> => {
+      if (!settings.azkarReminders) return;
+      
+      try {
+        for (const reminder of reminders) {
+          await scheduleAzkarReminder(reminder.type, reminder.time);
+        }
+        
+        const scheduled = await getScheduledNotifications();
+        setScheduledCount(scheduled.length);
+      } catch (err) {
+        console.error('Error scheduling azkar reminders:', err);
+      }
+    },
+    [settings.azkarReminders]
+  );
+
+  // Clear all scheduled
+  const clearAllScheduled = useCallback(async (): Promise<void> => {
+    try {
+      await cancelAllNotifications();
+      setScheduledCount(0);
+    } catch (err) {
+      console.error('Error clearing notifications:', err);
+    }
+  }, []);
+
+  const value: NotificationsContextType = {
+    isEnabled,
+    settings,
+    fcmToken,
+    isLoading,
+    error,
+    scheduledCount,
+    enableNotifications,
+    disableNotifications,
+    updateSettings,
+    refreshToken,
+    schedulePrayerReminders,
+    scheduleAzkarReminders,
+    clearAllScheduled,
+  };
+
+  return (
+    <NotificationsContext.Provider value={value}>
+      {children}
+    </NotificationsContext.Provider>
+  );
+};
+
+// ==================== Hook ====================
+
+export const useNotifications = (): NotificationsContextType => {
+  const context = useContext(NotificationsContext);
+  
+  if (context === undefined) {
+    throw new Error(
+      'useNotifications must be used within a NotificationsProvider'
+    );
+  }
+  
+  return context;
+};
+
+export default NotificationsContext;
