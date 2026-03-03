@@ -2,10 +2,10 @@
 // التخطيط الرئيسي للتطبيق مع تكامل Firebase
 // آخر تحديث: 2026-03-04
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, View } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -68,9 +68,9 @@ export default function RootLayout() {
     // تتبع حالة التطبيق
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        updateLastActive();
+        updateLastActive().catch(() => {});
       } else if (nextAppState === 'background') {
-        syncLocalStats();
+        syncLocalStats().catch(() => {});
       }
     };
     
@@ -78,12 +78,12 @@ export default function RootLayout() {
     
     // تحديث النشاط كل 5 دقائق
     const activityInterval = setInterval(() => {
-      updateLastActive();
+      updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
     
     // مزامنة الإحصائيات كل 15 دقيقة
     const syncInterval = setInterval(() => {
-      syncLocalStats();
+      syncLocalStats().catch(() => {});
     }, 15 * 60 * 1000);
     
     return () => {
@@ -94,11 +94,15 @@ export default function RootLayout() {
   }, []);
 
   // إخفاء شاشة البداية بعد تحميل الخطوط
-  useEffect(() => {
+  const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
-      SplashScreen.hideAsync();
+      await SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    onLayoutRootView();
+  }, [onLayoutRootView]);
 
   if (!fontsLoaded) {
     return null;
