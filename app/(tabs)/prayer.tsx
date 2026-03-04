@@ -38,55 +38,40 @@ import {
   formatTime12h,
 } from '@/lib/prayer-times';
 import { getHijriDate } from '@/lib/hijri-date';
-import { t } from '@/lib/i18n';
+import { useSettings } from '@/contexts/SettingsContext';
 
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 
-// ========================================
-// المكون الرئيسي
-// ========================================
-
 export default function PrayerScreen() {
-  // الحالات
+  // استخدام الـ context بدل المتغيرات الثابتة
+  const { isDarkMode, t, settings } = useSettings();
+  const language = settings.language;
+
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationType | null>(null);
-  const [settings, setSettings] = useState<PrayerSettings | null>(null);
+  const [prayerSettings, setPrayerSettings] = useState<PrayerSettings | null>(null);
   const [hijriDate, setHijriDate] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'card' | 'circular'>('card');
 
-  // إعدادات العرض
-  const language = 'ar';
-  const isDarkMode = false;
-
-  // ========================================
-  // تحميل البيانات
-  // ========================================
-
-  // جلب الموقع
   const fetchLocation = async (): Promise<LocationType | null> => {
     try {
-      // التحقق من الإذن
       const { status } = await Location.requestForegroundPermissionsAsync();
       
       if (status !== 'granted') {
-        // محاولة جلب الموقع المحفوظ
         const stored = await getStoredLocation();
         if (stored) return stored;
-        
-        throw new Error('لم يتم منح إذن الموقع');
+        throw new Error(t('messages.locationPermission'));
       }
 
-      // جلب الموقع الحالي
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      // جلب اسم المدينة
       const [geocode] = await Location.reverseGeocodeAsync({
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
@@ -99,18 +84,13 @@ export default function PrayerScreen() {
         country: geocode?.country || '',
       };
 
-      // حفظ الموقع
       await saveLocation(locationData);
-
       return locationData;
     } catch (err) {
       console.error('Error fetching location:', err);
-      
-      // محاولة جلب الموقع المحفوظ
       const stored = await getStoredLocation();
       if (stored) return stored;
 
-      // استخدام موقع افتراضي (مكة)
       return {
         latitude: 21.4225,
         longitude: 39.8262,
@@ -120,16 +100,13 @@ export default function PrayerScreen() {
     }
   };
 
-  // جلب مواقيت الصلاة
   const loadPrayerTimes = async (forceRefresh = false) => {
     try {
       setError(null);
       
-      // جلب الإعدادات
-      const prayerSettings = await getPrayerSettings();
-      setSettings(prayerSettings);
+      const settings = await getPrayerSettings();
+      setPrayerSettings(settings);
 
-      // التحقق من الكاش أولاً
       const today = getTodayDateString();
       if (!forceRefresh) {
         const cached = await getCachedPrayerTimes(today);
@@ -140,103 +117,78 @@ export default function PrayerScreen() {
         }
       }
 
-      // جلب الموقع
       const loc = await fetchLocation();
       setLocation(loc);
 
       if (!loc) {
-        throw new Error('تعذر تحديد الموقع');
+        throw new Error(t('messages.locationRequired'));
       }
 
-      // جلب المواقيت من API
-      const response = await fetchPrayerTimes(loc, new Date(), prayerSettings);
+      const response = await fetchPrayerTimes(loc, new Date(), settings);
       let times = parsePrayerTimes(response);
-
-      // تطبيق التعديلات
-      times = applyAdjustments(times, prayerSettings.adjustments);
-
-      // حفظ في الكاش
+      times = applyAdjustments(times, settings.adjustments);
       await cachePrayerTimes(today, times);
 
       setPrayerTimes(times);
 
-      // تحديث التاريخ الهجري
       if (response.date?.hijri) {
         const { day, month, year } = response.date.hijri;
         setHijriDate(`${day} ${month.ar} ${year}`);
       }
     } catch (err: any) {
       console.error('Error loading prayer times:', err);
-      setError(err.message || 'حدث خطأ في جلب مواقيت الصلاة');
+      setError(err.message || t('messages.error'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  // التحميل الأولي
   useEffect(() => {
     loadPrayerTimes();
-
-    // تحديث التاريخ الهجري
     const hijri = getHijriDate();
     if (hijri) {
       setHijriDate(hijri);
     }
   }, []);
 
-  // السحب للتحديث
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     loadPrayerTimes(true);
   }, []);
 
-  // ========================================
-  // معالجات الأحداث
-  // ========================================
-
-  // تبديل وضع العرض
   const toggleViewMode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setViewMode(prev => prev === 'card' ? 'circular' : 'card');
   };
 
-  // تبديل إشعار صلاة
   const handleToggleNotification = async (prayer: PrayerName, enabled: boolean) => {
-    if (!settings) return;
+    if (!prayerSettings) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const newSettings: PrayerSettings = {
-      ...settings,
+      ...prayerSettings,
       notifications: {
-        ...settings.notifications,
+        ...prayerSettings.notifications,
         [prayer]: enabled,
       },
     };
 
-    setSettings(newSettings);
+    setPrayerSettings(newSettings);
     await savePrayerSettings(newSettings);
   };
 
-  // فتح الإعدادات
   const openSettings = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // TODO: فتح صفحة إعدادات الصلاة
-    Alert.alert('قريباً', 'إعدادات مواقيت الصلاة قريباً');
+    Alert.alert(t('common.settings'), t('prayer.settings'));
   };
 
-  // ========================================
-  // العرض
-  // ========================================
-
-  // اسم المدينة للعرض
   const locationName = location
     ? `${location.city}${location.country ? `, ${location.country}` : ''}`
     : '';
 
-  // هل نحن في الثلث الأخير؟
   const inLastThird = prayerTimes ? isInLastThird(prayerTimes) : false;
 
   return (
@@ -249,14 +201,13 @@ export default function PrayerScreen() {
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
-      {/* الهيدر */}
       <Animated.View
         entering={FadeInDown.duration(500)}
-        style={styles.header}
+        style={[styles.header, isDarkMode && styles.headerDark]}
       >
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-            {t('tabs.prayer')}
+            {t('prayer.title')}
           </Text>
           {locationName && (
             <View style={styles.locationBadge}>
@@ -273,9 +224,8 @@ export default function PrayerScreen() {
         </View>
 
         <View style={styles.headerRight}>
-          {/* زر تبديل العرض */}
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
             onPress={toggleViewMode}
           >
             <MaterialCommunityIcons
@@ -285,9 +235,8 @@ export default function PrayerScreen() {
             />
           </TouchableOpacity>
 
-          {/* زر الإعدادات */}
           <TouchableOpacity
-            style={styles.headerButton}
+            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
             onPress={openSettings}
           >
             <MaterialCommunityIcons
@@ -312,7 +261,6 @@ export default function PrayerScreen() {
           />
         }
       >
-        {/* رسالة الخطأ */}
         {error && (
           <Animated.View
             entering={FadeInDown.duration(300)}
@@ -329,7 +277,6 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {/* كارت الصلاة القادمة أو المؤقت الدائري */}
         {viewMode === 'card' ? (
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <PrayerCard
@@ -353,7 +300,6 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {/* تنبيه الثلث الأخير */}
         {inLastThird && (
           <Animated.View
             entering={FadeInDown.delay(200).duration(500)}
@@ -366,19 +312,17 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {/* قائمة الصلوات */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <PrayerList
             prayerTimes={prayerTimes}
             language={language}
             isDarkMode={isDarkMode}
-            notificationSettings={settings?.notifications}
+            notificationSettings={prayerSettings?.notifications}
             onToggleNotification={handleToggleNotification}
             showNotificationToggle={true}
           />
         </Animated.View>
 
-        {/* معلومات إضافية */}
         {prayerTimes && (
           <Animated.View
             entering={FadeInDown.delay(400).duration(500)}
@@ -420,16 +364,11 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {/* مسافة في الأسفل */}
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
   );
 }
-
-// ========================================
-// الأنماط
-// ========================================
 
 const styles = StyleSheet.create({
   container: {
@@ -448,6 +387,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+  },
+  headerDark: {
+    backgroundColor: '#1a1a2e',
+    borderBottomColor: '#333',
   },
   headerLeft: {
     flex: 1,
@@ -486,6 +429,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerButtonDark: {
+    backgroundColor: '#252540',
   },
   scrollView: {
     flex: 1,

@@ -22,16 +22,11 @@ import {
   PrayerTimes,
   PrayerName,
   formatTime12h,
-  getPrayerNameAr,
   getPrayerIcon,
   isPrayerPassed,
   getNextPrayer,
 } from '@/lib/prayer-times';
-import { t } from '@/lib/i18n';
-
-// ========================================
-// الأنواع
-// ========================================
+import { useSettings } from '@/contexts/SettingsContext';
 
 interface PrayerListProps {
   prayerTimes: PrayerTimes | null;
@@ -47,7 +42,6 @@ interface PrayerItemProps {
   time: string;
   isNext: boolean;
   isPassed: boolean;
-  language: string;
   isDarkMode: boolean;
   notificationEnabled?: boolean;
   onToggleNotification?: (enabled: boolean) => void;
@@ -55,22 +49,14 @@ interface PrayerItemProps {
   index: number;
 }
 
-// ========================================
-// ألوان الصلوات
-// ========================================
-
 const prayerColors: Record<PrayerName, { light: string; dark: string }> = {
-  fajr: { light: '#5c6bc0', dark: '#7986cb' },      // أزرق بنفسجي - الفجر
-  sunrise: { light: '#ffb74d', dark: '#ffa726' },   // برتقالي - الشروق
-  dhuhr: { light: '#ffd54f', dark: '#ffca28' },     // أصفر - الظهر
-  asr: { light: '#ff8a65', dark: '#ff7043' },       // برتقالي محمر - العصر
-  maghrib: { light: '#ef5350', dark: '#e53935' },   // أحمر - المغرب
-  isha: { light: '#5c6bc0', dark: '#3f51b5' },      // أزرق داكن - العشاء
+  fajr: { light: '#5c6bc0', dark: '#7986cb' },
+  sunrise: { light: '#ffb74d', dark: '#ffa726' },
+  dhuhr: { light: '#ffd54f', dark: '#ffca28' },
+  asr: { light: '#ff8a65', dark: '#ff7043' },
+  maghrib: { light: '#ef5350', dark: '#e53935' },
+  isha: { light: '#5c6bc0', dark: '#3f51b5' },
 };
-
-// ========================================
-// المكون الرئيسي
-// ========================================
 
 export const PrayerList: React.FC<PrayerListProps> = ({
   prayerTimes,
@@ -87,6 +73,8 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   onToggleNotification,
   showNotificationToggle = false,
 }) => {
+  const { t } = useSettings();
+
   if (!prayerTimes) {
     return (
       <View style={[styles.container, isDarkMode && styles.containerDark]}>
@@ -97,7 +85,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
             color={isDarkMode ? '#666' : '#ccc'}
           />
           <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
-            {t('ui.message.loading', language)}
+            {t('common.loading')}
           </Text>
         </View>
       </View>
@@ -123,7 +111,6 @@ export const PrayerList: React.FC<PrayerListProps> = ({
           time={prayer.time}
           isNext={nextPrayer?.name === prayer.name}
           isPassed={isPrayerPassed(prayer.time)}
-          language={language}
           isDarkMode={isDarkMode}
           notificationEnabled={notificationSettings[prayer.name]}
           onToggleNotification={
@@ -139,24 +126,20 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   );
 };
 
-// ========================================
-// مكون عنصر الصلاة
-// ========================================
-
 const PrayerItem: React.FC<PrayerItemProps> = ({
   name,
   time,
   isNext,
   isPassed,
-  language,
   isDarkMode,
   notificationEnabled,
   onToggleNotification,
   showNotificationToggle,
   index,
 }) => {
+  const { t } = useSettings();
   const scale = useSharedValue(1);
-  const prayerNameLocalized = t(`ui.prayer.${name}`, language);
+  const prayerNameLocalized = t(`prayer.${name}`);
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;
@@ -193,7 +176,6 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           isPassed && !isNext && styles.prayerItemPassed,
         ]}
       >
-        {/* أيقونة الصلاة */}
         <View
           style={[
             styles.iconContainer,
@@ -207,7 +189,6 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           />
         </View>
 
-        {/* اسم الصلاة */}
         <View style={styles.prayerInfo}>
           <Text
             style={[
@@ -222,13 +203,12 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           {isNext && (
             <View style={[styles.nextBadge, { backgroundColor: accentColor }]}>
               <Text style={styles.nextBadgeText}>
-                {t('ui.prayer.nextPrayer', language)}
+                {t('prayer.nextPrayer')}
               </Text>
             </View>
           )}
         </View>
 
-        {/* الوقت */}
         <View style={styles.timeContainer}>
           <Text
             style={[
@@ -241,7 +221,6 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             {formatTime12h(time)}
           </Text>
 
-          {/* زر الإشعار */}
           {showNotificationToggle && name !== 'sunrise' && (
             <Switch
               value={notificationEnabled}
@@ -252,7 +231,6 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             />
           )}
 
-          {/* أيقونة الصلاة فاتت */}
           {isPassed && !isNext && (
             <MaterialCommunityIcons
               name="check-circle"
@@ -266,10 +244,6 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
     </Animated.View>
   );
 };
-
-// ========================================
-// الأنماط
-// ========================================
 
 const styles = StyleSheet.create({
   container: {

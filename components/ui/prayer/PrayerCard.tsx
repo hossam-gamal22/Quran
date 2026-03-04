@@ -26,16 +26,11 @@ import {
   getNextPrayer,
   getTimeRemaining,
   formatTime12h,
-  getPrayerNameAr,
   getPrayerIcon,
 } from '@/lib/prayer-times';
-import { t } from '@/lib/i18n';
+import { useSettings } from '@/contexts/SettingsContext';
 
 const { width } = Dimensions.get('window');
-
-// ========================================
-// الأنواع
-// ========================================
 
 interface PrayerCardProps {
   prayerTimes: PrayerTimes | null;
@@ -45,10 +40,6 @@ interface PrayerCardProps {
   isDarkMode?: boolean;
 }
 
-// ========================================
-// المكون الرئيسي
-// ========================================
-
 export const PrayerCard: React.FC<PrayerCardProps> = ({
   prayerTimes,
   hijriDate,
@@ -56,6 +47,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
   language = 'ar',
   isDarkMode = false,
 }) => {
+  const { t } = useSettings();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -66,12 +58,10 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     time: string;
   } | null>(null);
 
-  // أنيميشن النبض
   const pulseScale = useSharedValue(1);
   const glowOpacity = useSharedValue(0.5);
 
   useEffect(() => {
-    // أنيميشن النبض للوقت
     pulseScale.value = withRepeat(
       withSequence(
         withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
@@ -81,7 +71,6 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
       true
     );
 
-    // أنيميشن التوهج
     glowOpacity.value = withRepeat(
       withSequence(
         withTiming(0.8, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
@@ -92,21 +81,18 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     );
   }, []);
 
-  // تحديث العد التنازلي كل ثانية
   useEffect(() => {
     if (!prayerTimes) return;
 
     const updateCountdown = () => {
       const next = getNextPrayer(prayerTimes);
       setNextPrayer(next);
-
       const remaining = getTimeRemaining(prayerTimes);
       setTimeRemaining(remaining);
     };
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
-
     return () => clearInterval(interval);
   }, [prayerTimes]);
 
@@ -118,7 +104,6 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     opacity: glowOpacity.value,
   }));
 
-  // حالة التحميل
   if (!prayerTimes || !nextPrayer) {
     return (
       <View style={styles.container}>
@@ -130,7 +115,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
               color={isDarkMode ? '#fff' : '#2f7659'}
             />
             <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
-              {t('ui.message.loading', language)}
+              {t('common.loading')}
             </Text>
           </View>
         </BlurView>
@@ -138,8 +123,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
     );
   }
 
-  const prayerNameAr = getPrayerNameAr(nextPrayer.name);
-  const prayerNameLocalized = t(`ui.prayer.${nextPrayer.name}`, language);
+  const prayerNameLocalized = t(`prayer.${nextPrayer.name}`);
   const prayerIcon = getPrayerIcon(nextPrayer.name);
 
   return (
@@ -153,7 +137,6 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        {/* تأثير التوهج */}
         <Animated.View style={[styles.glowEffect, glowAnimatedStyle]}>
           <LinearGradient
             colors={['transparent', 'rgba(255,255,255,0.1)', 'transparent']}
@@ -163,9 +146,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
           />
         </Animated.View>
 
-        {/* المحتوى */}
         <View style={styles.content}>
-          {/* الصف العلوي: التاريخ والموقع */}
           <View style={styles.topRow}>
             {hijriDate && (
               <View style={styles.dateContainer}>
@@ -181,10 +162,9 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
             )}
           </View>
 
-          {/* الصلاة القادمة */}
           <View style={styles.mainContent}>
             <Text style={styles.nextLabel}>
-              {t('ui.prayer.nextPrayer', language)}
+              {t('prayer.nextPrayer')}
             </Text>
 
             <View style={styles.prayerInfo}>
@@ -201,11 +181,10 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
               </View>
             </View>
 
-            {/* العد التنازلي */}
             {timeRemaining && (
               <View style={styles.countdownContainer}>
                 <Text style={styles.remainingLabel}>
-                  {t('ui.prayer.timeRemaining', language)}
+                  {t('prayer.timeRemaining')}
                 </Text>
                 <Animated.View style={[styles.countdown, pulseAnimatedStyle]}>
                   <CountdownDigit value={timeRemaining.hours} label="س" />
@@ -223,10 +202,6 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
   );
 };
 
-// ========================================
-// مكون رقم العد التنازلي
-// ========================================
-
 interface CountdownDigitProps {
   value: number;
   label: string;
@@ -242,10 +217,6 @@ const CountdownDigit: React.FC<CountdownDigitProps> = ({ value, label }) => {
     </View>
   );
 };
-
-// ========================================
-// الأنماط
-// ========================================
 
 const styles = StyleSheet.create({
   container: {
