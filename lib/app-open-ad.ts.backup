@@ -1,0 +1,31 @@
+// lib/app-open-ad.ts
+// إعلان فتح التطبيق - روح المسلم
+// ⚠️ معدّل للتجربة على Expo Go - الإعلانات معطلة
+
+// ⚠️ قبل النشر: فك التعليق عن السطر ده
+// import { AppOpenAd, AdEventType, TestIds } from 'react-native-google-mobile-ads';
+import { Platform, AppState, AppStateStatus } from 'react-native';
+
+const AD_UNIT_IDS = {
+  android: 'ca-app-pub-6103597967254377/5798712736',
+  ios: 'ca-app-pub-6103597967254377/3930767722',
+};
+
+// ⚠️ للتجربة فقط - كل الدوال فاضية
+export const loadAppOpenAd = (): void => {
+  console.log('⚠️ Ads disabled for Expo Go testing');
+};
+
+export const showAppOpenAd = async (): Promise<boolean> => {
+  console.log('⚠️ Ads disabled for Expo Go testing');
+  return false;
+};
+
+export const initializeAppOpenAds = (): (() => void) => {
+  console.log('⚠️ Ads disabled for Expo Go testing');
+  return () => {};
+};
+
+export const isAdReady = (): boolean => {
+  return false;
+};
