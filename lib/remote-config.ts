@@ -53,6 +53,9 @@ export interface AppConfig {
   // Prayer Settings
   default_calculation_method: number;
   default_madhab: string;
+
+  // Branding (admin-replaceable)
+  app_logo_url: string;
 }
 
 // ==================== Default Values ====================
@@ -80,6 +83,8 @@ const DEFAULT_CONFIG: AppConfig = {
   
   default_calculation_method: 4, // Umm Al-Qura
   default_madhab: 'shafi',
+
+  app_logo_url: '',
 };
 
 // ==================== Initialize Remote Config ====================
@@ -167,6 +172,8 @@ export const getAllConfig = (): AppConfig => {
     
     default_calculation_method: getConfigValue('default_calculation_method'),
     default_madhab: getConfigValue('default_madhab'),
+
+    app_logo_url: getConfigValue('app_logo_url'),
   };
 };
 

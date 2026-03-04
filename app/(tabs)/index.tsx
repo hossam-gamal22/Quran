@@ -5,12 +5,14 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
   Dimensions,
   StatusBar,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -21,8 +23,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
+import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { getHijriDate } from '@/lib/hijri-date';
-import GlassCard from '@/components/ui/GlassCard';
+import DailyHighlights from '@/components/ui/DailyHighlights';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -129,7 +132,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { isDarkMode } = useSettings();
   const { currentSeason, dailyData } = useSeasonal();
-  
+  const { getConfig } = useRemoteConfig();
+  const logoUrl = getConfig('app_logo_url' as any) as string | undefined;
+
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // التاريخ الهجري
@@ -152,31 +157,30 @@ export default function HomeScreen() {
   };
 
   const navigateToDuas = (categoryId: string) => {
-    router.push(`/duas/${categoryId}`);
+    if (categoryId === 'ruqya') {
+      router.push('/ruqya');
+    } else {
+      router.push(`/azkar/${categoryId}`);
+    }
   };
 
   return (
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-      {/* Header */}
+      {/* Header — centered, no side buttons */}
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>روح المسلم</Text>
-          <Text style={[styles.headerDate, isDarkMode && styles.textMuted]}>
-            {hijriDate.day} {hijriDate.monthName} {hijriDate.year}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => router.push('/seasonal')}
-        >
+        {logoUrl ? (
+          <Image source={{ uri: logoUrl }} style={styles.logoImage} resizeMode="contain" />
+        ) : (
           <MaterialCommunityIcons
-            name="calendar-star"
-            size={26}
-            color={isDarkMode ? '#fff' : '#333'}
+            name="heart-circle"
+            size={32}
+            color="#2f7659"
+            style={styles.logo}
           />
-        </TouchableOpacity>
+        )}
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>روح المسلم</Text>
       </Animated.View>
 
       <ScrollView
@@ -192,6 +196,9 @@ export default function HomeScreen() {
           />
         }
       >
+        {/* Daily Highlights */}
+        <DailyHighlights />
+
         {/* بطاقة الموسم */}
         {currentSeason && (
           <Animated.View entering={FadeIn.duration(600)}>
@@ -206,11 +213,11 @@ export default function HomeScreen() {
                 style={styles.seasonCard}
               >
                 <View style={styles.seasonContent}>
-                  <MaterialCommunityIcons name={currentSeason.icon as any} size={32} color="#fff" />
                   <View style={styles.seasonInfo}>
                     <Text style={styles.seasonName}>{currentSeason.nameAr}</Text>
                     <Text style={styles.seasonGreeting}>{dailyData.greeting}</Text>
                   </View>
+                  <MaterialCommunityIcons name={currentSeason.icon as any} size={36} color="#fff" />
                 </View>
                 <View style={styles.seasonBadge}>
                   <Text style={styles.seasonDay}>اليوم {currentSeason.currentDay}</Text>
@@ -340,31 +347,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#11151c',
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-  headerContent: {},
+  logo: {
+    marginBottom: 8,
+  },
+  logoImage: {
+    width: 48,
+    height: 48,
+    marginBottom: 8,
+  },
   headerTitle: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: 'Amiri-Bold',
     color: '#333',
-  },
-  headerDate: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Regular',
-    color: '#666',
-    marginTop: 2,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(47,118,89,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    textAlign: 'center',
   },
   textLight: {
     color: '#fff',
@@ -388,6 +388,7 @@ const styles = StyleSheet.create({
   seasonContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 14,
   },
   seasonInfo: {
@@ -397,16 +398,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Cairo-Bold',
     color: '#fff',
+    textAlign: 'right',
   },
   seasonGreeting: {
     fontSize: 14,
     fontFamily: 'Cairo-Regular',
     color: 'rgba(255,255,255,0.9)',
+    textAlign: 'right',
   },
   seasonBadge: {
     position: 'absolute',
     top: 16,
-    left: 16,
+    right: 16,
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -433,14 +436,36 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   quickAccessItem: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 14,
     alignItems: 'center',
     width: 90,
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(255,255,255,0.88)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.5)',
+      },
+      android: {
+        backgroundColor: '#fff',
+        elevation: 2,
+      },
+    }),
   },
   quickAccessItemDark: {
-    backgroundColor: '#1a1a2e',
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(26,31,43,0.85)',
+        borderColor: 'rgba(255,255,255,0.08)',
+      },
+      android: {
+        backgroundColor: '#1a1a2e',
+      },
+    }),
   },
   quickAccessIcon: {
     width: 46,
@@ -468,13 +493,35 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   categoryCard: {
-    backgroundColor: '#fff',
     borderRadius: 18,
     padding: 16,
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.5)',
+      },
+      android: {
+        backgroundColor: '#fff',
+        elevation: 2,
+      },
+    }),
   },
   categoryCardDark: {
-    backgroundColor: '#1a1a2e',
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(26,31,43,0.88)',
+        borderColor: 'rgba(255,255,255,0.07)',
+      },
+      android: {
+        backgroundColor: '#1a1a2e',
+      },
+    }),
   },
   categoryIcon: {
     width: 56,
@@ -504,12 +551,34 @@ const styles = StyleSheet.create({
   duaCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 14,
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.5)',
+      },
+      android: {
+        backgroundColor: '#fff',
+        elevation: 2,
+      },
+    }),
   },
   duaCardDark: {
-    backgroundColor: '#1a1a2e',
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(26,31,43,0.88)',
+        borderColor: 'rgba(255,255,255,0.07)',
+      },
+      android: {
+        backgroundColor: '#1a1a2e',
+      },
+    }),
   },
   duaIcon: {
     width: 48,

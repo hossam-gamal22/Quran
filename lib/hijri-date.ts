@@ -86,32 +86,44 @@ export const ISLAMIC_EVENTS: IslamicEvent[] = [
 ];
 
 /**
- * تحويل التاريخ الميلادي إلى هجري باستخدام خوارزمية دقيقة
+ * تحويل التاريخ الميلادي إلى هجري
+ * الخوارزمية: حساب رقم يوليان ثم التحويل إلى التقويم الهجري الجدولي
  */
 export function gregorianToHijri(date: Date = new Date()): HijriDate {
-  const gregorianYear = date.getFullYear();
-  const gregorianMonth = date.getMonth() + 1;
-  const gregorianDay = date.getDate();
-  const weekdayIndex = date.getDay();
+  const g = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const gd = date.getDate();
+  const wd = date.getDay();
 
-  // حساب Julian Day Number
-  let jd = Math.floor((1461 * (gregorianYear + 4800 + Math.floor((gregorianMonth - 14) / 12))) / 4) +
-    Math.floor((367 * (gregorianMonth - 2 - 12 * Math.floor((gregorianMonth - 14) / 12))) / 12) -
-    Math.floor((3 * Math.floor((gregorianYear + 4900 + Math.floor((gregorianMonth - 14) / 12)) / 100)) / 4) +
-    gregorianDay - 32075;
+  // الخطوة 1: تحويل الميلادي إلى رقم يوليان (Julian Day Number)
+  const a = Math.floor((14 - m) / 12);
+  const y = g + 4800 - a;
+  const mo = m + 12 * a - 3;
+  const julianDay =
+    gd +
+    Math.floor((153 * mo + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045;
 
-  // تحويل من Julian إلى Hijri
-  const l = jd - 1948440 + 10632;
+  // الخطوة 2: تحويل رقم يوليان إلى هجري (خوارزمية التقويم الهجري الجدولي)
+  const l = julianDay - 1948440 + 10632;
   const n = Math.floor((l - 1) / 10631);
   const l2 = l - 10631 * n + 354;
-  const j = Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) +
+  const j =
+    Math.floor((10985 - l2) / 5316) * Math.floor((50 * l2) / 17719) +
     Math.floor(l2 / 5670) * Math.floor((43 * l2) / 15238);
-  const l3 = l2 - Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) -
-    Math.floor(j / 16) * Math.floor((15238 * j) / 43) + 29;
-  
-  const hijriMonth = Math.floor((24 * l3) / 709);
-  const hijriDay = l3 - Math.floor((709 * hijriMonth) / 24);
+  const l3 =
+    l2 -
+    Math.floor((30 - j) / 15) * Math.floor((17719 * j) / 50) -
+    Math.floor(j / 16) * Math.floor((15238 * j) / 43) +
+    29;
+
   const hijriYear = 30 * n + j - 30;
+  const hijriMonth = Math.floor((24 * (l3 - 1)) / 709);
+  const hijriDay = l3 - Math.floor((709 * hijriMonth) / 24);
 
   return {
     day: hijriDay,
@@ -119,9 +131,23 @@ export function gregorianToHijri(date: Date = new Date()): HijriDate {
     monthName: HIJRI_MONTHS_EN[hijriMonth - 1] || '',
     monthNameAr: HIJRI_MONTHS_AR[hijriMonth - 1] || '',
     year: hijriYear,
-    weekday: WEEKDAYS_EN[weekdayIndex],
-    weekdayAr: WEEKDAYS_AR[weekdayIndex],
+    weekday: WEEKDAYS_EN[wd],
+    weekdayAr: WEEKDAYS_AR[wd],
   };
+}
+
+/**
+ * دالة مساعدة - نفس gregorianToHijri
+ */
+export function getHijriDate(date: Date = new Date()): HijriDate {
+  return gregorianToHijri(date);
+}
+
+/**
+ * دالة مساعدة - نفس gregorianToHijri (alias آخر)
+ */
+export function getHijriDateObject(date: Date = new Date()): HijriDate {
+  return gregorianToHijri(date);
 }
 
 /**

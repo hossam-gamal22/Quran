@@ -253,8 +253,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="azkar" options={{ href: null }} />
       </Tabs>
 
-      {/* زرار التسبيح */}
-      <View style={styles.tasbihButtonWrapper}>
+      {/* زرار التسبيح — box-none lets sibling tab-bar touches pass through */}
+      <View style={styles.tasbihButtonWrapper} pointerEvents="box-none">
         <TasbihButton isDarkMode={isDarkMode} />
       </View>
     </View>

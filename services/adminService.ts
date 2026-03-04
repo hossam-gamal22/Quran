@@ -1,5 +1,5 @@
 // services/adminService.ts
-import { db } from '../config/firebase';
+import { db } from '../lib/firebase-config';
 import {
   doc,
   getDoc,
