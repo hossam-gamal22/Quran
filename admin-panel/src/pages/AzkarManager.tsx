@@ -1,6 +1,6 @@
 // admin-panel/src/pages/AzkarManager.tsx
 // إدارة الأذكار - روح المسلم
-// آخر تحديث: 2026-03-03
+// آخر تحديث: 2026-03-04
 
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, Play, Square, Search, FileJson, X } from 'lucide-react';
@@ -58,7 +58,7 @@ const CATEGORIES = [
   { id: 'ruqya', name: 'الرقية الشرعية', icon: '🛡️', color: 'bg-indigo-500' },
 ];
 
-// ✅ استخدام raw.githubusercontent مباشرة لتجنب مشكلة jsDelivr cache
+// ✅ استخدام raw.githubusercontent لتجنب مشكلة jsDelivr cache
 const AZKAR_JSON_URL = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/json/azkar.json';
 
 // ========================================
@@ -96,11 +96,11 @@ const AzkarManager: React.FC = () => {
 
   const filterAzkar = () => {
     let filtered = [...azkarList];
-    
+
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(z => z.category === selectedCategory);
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(z =>
@@ -110,37 +110,37 @@ const AzkarManager: React.FC = () => {
         z.translations?.en?.toLowerCase().includes(query)
       );
     }
-    
+
     setFilteredList(filtered);
   };
 
   const loadAzkarFromGitHub = async () => {
     setLoading(true);
-    
+
     try {
       // إضافة timestamp لتجنب الـ cache
       const url = `${AZKAR_JSON_URL}?t=${Date.now()}`;
-      
+
       const response = await fetch(url, {
         headers: { 'Accept': 'application/json' },
         cache: 'no-store',
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      
+
       const data: AzkarData = await response.json();
-      
+
       setAzkarData(data);
       setAzkarList(data.azkar || []);
       showNotification(`✅ تم تحميل ${data.azkar?.length || 0} ذكر بنجاح`, 'success');
-      
+
     } catch (error) {
       console.error('Error loading azkar:', error);
       showNotification('❌ خطأ في تحميل الأذكار', 'error');
     }
-    
+
     setLoading(false);
   };
 
@@ -157,7 +157,7 @@ const AzkarManager: React.FC = () => {
     if (audioElement) {
       audioElement.pause();
     }
-    
+
     const audio = new Audio(url);
     audio.onended = () => setPlayingAudio(null);
     audio.onerror = () => {
@@ -183,7 +183,7 @@ const AzkarManager: React.FC = () => {
       totalCount: azkarList.length,
       azkar: azkarList,
     };
-    
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -241,7 +241,7 @@ const AzkarManager: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">إدارة الأذكار والأدعية</h1>
           <p className="text-slate-400 text-sm mt-1">
             {azkarData && (
-              <span>الإصدار: {azkarData.version} | آخر تحديث: {azkarData.lastUpdate}</span>
+              <span>الإصدار: {azkarData.version} | آخر تحديث: {azkarData.lastUpdate} | المصدر: GitHub</span>
             )}
           </p>
         </div>
@@ -445,7 +445,7 @@ const AzkarManager: React.FC = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] space-y-6">
               {/* Arabic Text */}
               <div>
