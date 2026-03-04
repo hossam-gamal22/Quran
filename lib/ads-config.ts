@@ -1,74 +1,112 @@
 // lib/ads-config.ts
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+// إعدادات الإعلانات - روح المسلم
+// آخر تحديث: 2026-03-04
+
+import { Platform } from 'react-native';
+import { db } from './firebase-config';
+import { doc, getDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
-  authDomain: "rooh-almuslim.firebaseapp.com",
-  projectId: "rooh-almuslim",
-  storageBucket: "rooh-almuslim.firebasestorage.app",
-  messagingSenderId: "328160076358",
-  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
+// ==================== Ad Unit IDs ====================
+
+export const AD_IDS = {
+  APP_OPEN: {
+    android: 'ca-app-pub-6103597967254377/5798712736',
+    ios: 'ca-app-pub-6103597967254377/3930767722',
+  },
+  // يمكنك إضافة المزيد لاحقاً
+  BANNER: {
+    android: '', // أضف لاحقاً
+    ios: '',     // أضف لاحقاً
+  },
+  INTERSTITIAL: {
+    android: '', // أضف لاحقاً
+    ios: '',     // أضف لاحقاً
+  },
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
+// ==================== Test Ad IDs ====================
+
+export const TEST_AD_IDS = {
+  APP_OPEN: 'ca-app-pub-3940256099942544/9257395921',
+  BANNER: 'ca-app-pub-3940256099942544/6300978111',
+  INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
+};
+
+// ==================== Types ====================
 
 export interface AdsConfig {
   enabled: boolean;
-  bannerAdCode: string;
-  interstitialAdCode: string;
-  showBannerOnHome: boolean;
-  showBannerOnQuran: boolean;
-  showBannerOnAzkar: boolean;
-  showAdOnAppOpen: boolean;
-  interstitialMode: 'pages' | 'time' | 'session';
-  interstitialFrequency: number;
-  interstitialTimeInterval: number;
-  interstitialSessionLimit: number;
-  delayFirstAd: boolean;
-  firstAdDelay: number;
+  showAppOpenAd: boolean;
+  appOpenAdFrequency: number;
+  skipFirstOpen: boolean;
+  minTimeBetweenAds: number;
+  maxAdsPerSession: number;
 }
+
+// ==================== Default Config ====================
 
 const DEFAULT_ADS_CONFIG: AdsConfig = {
   enabled: true,
-  bannerAdCode: 'ca-app-pub-3940256099942544/6300978111', // Test Banner
-  interstitialAdCode: 'ca-app-pub-3940256099942544/1033173712', // Test Interstitial
-  showBannerOnHome: true,
-  showBannerOnQuran: false,
-  showBannerOnAzkar: true,
-  showAdOnAppOpen: false,
-  interstitialMode: 'pages',
-  interstitialFrequency: 5,
-  interstitialTimeInterval: 3,
-  interstitialSessionLimit: 2,
-  delayFirstAd: true,
-  firstAdDelay: 30,
+  showAppOpenAd: true,
+  appOpenAdFrequency: 1,      // كل مرة يفتح التطبيق
+  skipFirstOpen: true,         // تخطي أول فتح
+  minTimeBetweenAds: 60,       // 60 ثانية
+  maxAdsPerSession: 5,         // أقصى 5 إعلانات
 };
 
+// ==================== Functions ====================
+
+/**
+ * الحصول على Ad Unit ID حسب المنصة
+ */
+export const getAdUnitId = (type: 'APP_OPEN' | 'BANNER' | 'INTERSTITIAL', useTestAds: boolean = __DEV__): string => {
+  if (useTestAds) {
+    return TEST_AD_IDS[type];
+  }
+  
+  const platformAds = AD_IDS[type];
+  return Platform.OS === 'ios' ? platformAds.ios : platformAds.android;
+};
+
+/**
+ * جلب إعدادات الإعلانات من Firebase
+ */
 export const fetchAdsConfig = async (): Promise<AdsConfig> => {
   try {
-    const docRef = doc(db, 'config', 'ads-settings');
+    const docRef = doc(db, 'config', 'ads');
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      const data = docSnap.data() as AdsConfig;
-      await AsyncStorage.setItem('ads_config_cache', JSON.stringify(data));
-      return { ...DEFAULT_ADS_CONFIG, ...data };
+      const data = docSnap.data() as Partial<AdsConfig>;
+      const config = { ...DEFAULT_ADS_CONFIG, ...data };
+      
+      // حفظ في Cache
+      await AsyncStorage.setItem('ads_config_cache', JSON.stringify(config));
+      
+      return config;
     }
   } catch (error) {
     console.log('Error fetching ads config:', error);
   }
   
+  // محاولة قراءة من Cache
   try {
     const cached = await AsyncStorage.getItem('ads_config_cache');
     if (cached) {
       return { ...DEFAULT_ADS_CONFIG, ...JSON.parse(cached) };
     }
   } catch (error) {
-    console.log('Error reading cache');
+    console.log('Error reading ads cache');
   }
   
   return DEFAULT_ADS_CONFIG;
+};
+
+/**
+ * التحقق إذا كانت الإعلانات مفعلة
+ */
+export const isAdsEnabled = async (): Promise<boolean> => {
+  const config = await fetchAdsConfig();
+  return config.enabled;
 };

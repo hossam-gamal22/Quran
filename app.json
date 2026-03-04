@@ -20,7 +20,20 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
         "NSLocationAlwaysUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
-        "UIBackgroundModes": ["audio", "fetch", "remote-notification"]
+        "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
+        "SKAdNetworkItems": [
+          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
+          { "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork" },
+          { "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork" },
+          { "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork" },
+          { "SKAdNetworkIdentifier": "5a6flpkh64.skadnetwork" },
+          { "SKAdNetworkIdentifier": "p78aez5w95.skadnetwork" },
+          { "SKAdNetworkIdentifier": "v72qych5uu.skadnetwork" },
+          { "SKAdNetworkIdentifier": "c6k4g5qg8m.skadnetwork" },
+          { "SKAdNetworkIdentifier": "s39g8k73mm.skadnetwork" },
+          { "SKAdNetworkIdentifier": "3qy4746246.skadnetwork" }
+        ],
+        "NSUserTrackingUsageDescription": "يستخدم هذا التطبيق معرف الإعلانات لعرض إعلانات مخصصة"
       }
     },
     "android": {
@@ -36,7 +49,8 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "SCHEDULE_EXACT_ALARM",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "com.google.android.gms.permission.AD_ID"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -72,7 +86,14 @@
         }
       ],
       "expo-asset",
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6103597967254377~4576655042",
+          "iosAppId": "ca-app-pub-6103597967254377~2134799890"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

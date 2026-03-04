@@ -1,15 +1,16 @@
 // app/_layout.tsx
-// التخطيط الرئيسي للتطبيق مع تكامل Firebase
+// التخطيط الرئيسي للتطبيق مع تكامل Firebase والإعلانات
 // آخر تحديث: 2026-03-04
 
 import React, { useEffect, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import mobileAds from 'react-native-google-mobile-ads';
 
 // Contexts
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -29,6 +30,9 @@ import {
   syncLocalStats 
 } from '@/lib/firebase-analytics';
 
+// Ads Integration
+import { initializeAppOpenAds } from '@/lib/app-open-ad';
+
 // Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
@@ -43,6 +47,21 @@ export default function RootLayout() {
     'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
     'UthmanicHafs': require('../assets/fonts/UthmanicHafs.ttf'),
   });
+
+  // ========== تهيئة الإعلانات ==========
+  useEffect(() => {
+    const initAds = async () => {
+      try {
+        // تهيئة Google Mobile Ads SDK
+        await mobileAds().initialize();
+        console.log('✅ Google Mobile Ads SDK initialized');
+      } catch (error) {
+        console.log('❌ Error initializing ads SDK:', error);
+      }
+    };
+
+    initAds();
+  }, []);
 
   // ========== Firebase Integration ==========
   useEffect(() => {
@@ -90,6 +109,16 @@ export default function RootLayout() {
       subscription.remove();
       clearInterval(activityInterval);
       clearInterval(syncInterval);
+    };
+  }, []);
+
+  // ========== App Open Ads ==========
+  useEffect(() => {
+    // تهيئة إعلانات فتح التطبيق
+    const cleanupAds = initializeAppOpenAds();
+    
+    return () => {
+      cleanupAds();
     };
   }, []);
 
