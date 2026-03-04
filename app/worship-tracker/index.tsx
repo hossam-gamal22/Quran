@@ -26,7 +26,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useWorship } from '@/contexts/WorshipContext';
-import { t } from '@/data/translations';
+import { t } from '@/lib/i18n';
 import GlassCard from '@/components/ui/GlassCard';
 
 const { width } = Dimensions.get('window');

@@ -1,16 +1,20 @@
 // app/_layout.tsx
-// التخطيط الرئيسي للتطبيق مع تكامل Firebase والإعلانات
+// التخطيط الرئيسي للتطبيق مع تكامل Firebase
 // آخر تحديث: 2026-03-04
+// ⚠️ الإعلانات معلّقة للتجربة على Expo Go
 
 import React, { useEffect, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import mobileAds from 'react-native-google-mobile-ads';
+
+// ⚠️ قبل النشر: فك التعليق عن السطرين دول
+// import mobileAds from 'react-native-google-mobile-ads';
+// import { initializeAppOpenAds } from '@/lib/app-open-ad';
 
 // Contexts
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -30,14 +34,9 @@ import {
   syncLocalStats 
 } from '@/lib/firebase-analytics';
 
-// Ads Integration
-import { initializeAppOpenAds } from '@/lib/app-open-ad';
-
-// Prevent splash screen from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  // تحميل الخطوط
   const [fontsLoaded] = useFonts({
     'Cairo-Regular': require('../assets/fonts/Cairo-Regular.ttf'),
     'Cairo-Medium': require('../assets/fonts/Cairo-Medium.ttf'),
@@ -45,37 +44,29 @@ export default function RootLayout() {
     'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
     'Amiri-Regular': require('../assets/fonts/Amiri-Regular.ttf'),
     'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
-    'UthmanicHafs': require('../assets/fonts/UthmanicHafs.ttf'),
+    'UthmanicHafs': require('../assets/fonts/UthmanicHafs.otf'),
   });
 
-  // ========== تهيئة الإعلانات ==========
-  useEffect(() => {
-    const initAds = async () => {
-      try {
-        // تهيئة Google Mobile Ads SDK
-        await mobileAds().initialize();
-        console.log('✅ Google Mobile Ads SDK initialized');
-      } catch (error) {
-        console.log('❌ Error initializing ads SDK:', error);
-      }
-    };
+  // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
+  // useEffect(() => {
+  //   const initAds = async () => {
+  //     try {
+  //       await mobileAds().initialize();
+  //       console.log('✅ Google Mobile Ads SDK initialized');
+  //     } catch (error) {
+  //       console.log('❌ Error initializing ads SDK:', error);
+  //     }
+  //   };
+  //   initAds();
+  // }, []);
 
-    initAds();
-  }, []);
-
-  // ========== Firebase Integration ==========
+  // Firebase Integration
   useEffect(() => {
     const initFirebase = async () => {
       try {
-        // تهيئة الإحصائيات العامة
         await initializeGlobalStats();
-        
-        // تسجيل المستخدم
         await registerUser();
-        
-        // تسجيل فتح التطبيق
         await trackAppOpen();
-        
         console.log('✅ Firebase initialized in app');
       } catch (error) {
         console.log('Firebase init error (non-blocking):', error);
@@ -84,7 +75,6 @@ export default function RootLayout() {
     
     initFirebase();
     
-    // تتبع حالة التطبيق
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
@@ -95,12 +85,10 @@ export default function RootLayout() {
     
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
-    // تحديث النشاط كل 5 دقائق
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
     
-    // مزامنة الإحصائيات كل 15 دقيقة
     const syncInterval = setInterval(() => {
       syncLocalStats().catch(() => {});
     }, 15 * 60 * 1000);
@@ -112,17 +100,14 @@ export default function RootLayout() {
     };
   }, []);
 
-  // ========== App Open Ads ==========
-  useEffect(() => {
-    // تهيئة إعلانات فتح التطبيق
-    const cleanupAds = initializeAppOpenAds();
-    
-    return () => {
-      cleanupAds();
-    };
-  }, []);
+  // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
+  // useEffect(() => {
+  //   const cleanupAds = initializeAppOpenAds();
+  //   return () => {
+  //     cleanupAds();
+  //   };
+  // }, []);
 
-  // إخفاء شاشة البداية بعد تحميل الخطوط
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
       await SplashScreen.hideAsync();

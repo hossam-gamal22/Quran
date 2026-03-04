@@ -29,7 +29,7 @@ import {
   getPrayerNameAr,
   getPrayerIcon,
 } from '@/lib/prayer-times';
-import { t } from '@/data/translations';
+import { t } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 

@@ -38,7 +38,7 @@ import {
   formatTime12h,
 } from '@/lib/prayer-times';
 import { getHijriDate } from '@/lib/hijri-date';
-import { t } from '@/data/translations';
+import { t } from '@/lib/i18n';
 
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';

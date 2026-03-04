@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
 import { getHijriDate, getHijriDateObject } from './hijri-date';
 import { allAzkar } from '@/data/azkar';
-import { t } from '@/data/translations';
+import { t } from '@/lib/i18n';
 
 // ========================================
 // الثوابت
