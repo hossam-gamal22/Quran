@@ -53,28 +53,20 @@ export interface UserData {
 
 // ==================== الدوال ====================
 
-/**
- * توليد معرف فريد للمستخدم
- */
 const generateUserId = (): string => {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 10);
   return `user_${timestamp}_${randomPart}`;
 };
 
-/**
- * الحصول على معرف المستخدم (أو إنشاء واحد جديد)
- */
 export const getUserId = async (): Promise<string> => {
   try {
     let userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-    
     if (!userId) {
       userId = generateUserId();
       await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userId);
       console.log('🆔 New user ID generated:', userId);
     }
-    
     return userId;
   } catch (error) {
     console.error('❌ Error getting user ID:', error);
@@ -82,12 +74,8 @@ export const getUserId = async (): Promise<string> => {
   }
 };
 
-/**
- * الحصول على FCM Token للإشعارات
- */
 export const getFCMToken = async (): Promise<string> => {
   try {
-    // التحقق من الأذونات
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
     
@@ -101,15 +89,12 @@ export const getFCMToken = async (): Promise<string> => {
       return '';
     }
     
-    // الحصول على التوكن
-    // ⚠️ غيّر YOUR_EXPO_PROJECT_ID_HERE بـ Project ID الحقيقي
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: '12ffec15-6357-43b4-a309-8e71cc2afc8c',
     });
     
     const token = tokenData.data;
     await AsyncStorage.setItem(STORAGE_KEYS.FCM_TOKEN, token);
-    
     console.log('🔔 FCM Token obtained:', token.substring(0, 20) + '...');
     return token;
   } catch (error) {
@@ -118,21 +103,13 @@ export const getFCMToken = async (): Promise<string> => {
   }
 };
 
-/**
- * تسجيل المستخدم في Firebase
- */
 export const registerUser = async (): Promise<{ success: boolean; userId: string }> => {
   try {
     const userId = await getUserId();
     const userRef = doc(db, 'users', userId);
-    
-    // التحقق إذا كان المستخدم موجود
     const userDoc = await getDoc(userRef);
-    
-    // الحصول على FCM Token
     const fcmToken = await getFCMToken();
     
-    // جمع بيانات الجهاز
     const locales = Localization.getLocales();
     const userData: Partial<UserData> = {
       id: userId,
@@ -152,7 +129,6 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     };
     
     if (!userDoc.exists()) {
-      // ✅ مستخدم جديد
       await setDoc(userRef, {
         ...userData,
         createdAt: serverTimestamp(),
@@ -163,13 +139,9 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
           dailyAyah: true,
         },
       });
-      
-      // حفظ أول فتح
       await AsyncStorage.setItem(STORAGE_KEYS.FIRST_OPEN, 'false');
-      
       console.log('✅ New user registered successfully:', userId);
     } else {
-      // 🔄 تحديث مستخدم موجود
       await updateDoc(userRef, userData);
       console.log('✅ User data updated:', userId);
     }
@@ -181,66 +153,16 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
   }
 };
 
-/**
- * تحديث وقت آخر نشاط
- */
 export const updateLastActive = async (): Promise<void> => {
   try {
     const userId = await getUserId();
     const userRef = doc(db, 'users', userId);
-    
-    await updateDoc(userRef, {
-      lastActive: serverTimestamp(),
-    });
+    await updateDoc(userRef, { lastActive: serverTimestamp() });
   } catch (error) {
-    // تجاهل الخطأ لعدم تعطيل التطبيق
     console.log('Could not update last active');
   }
 };
 
-/**
- * تحديث إعدادات الإشعارات
- */
-export const updateNotificationSettings = async (
-  settings: Partial<UserData['settings']>
-): Promise<void> => {
-  try {
-    const userId = await getUserId();
-    const userRef = doc(db, 'users', userId);
-    
-    await updateDoc(userRef, {
-      settings,
-      updatedAt: serverTimestamp(),
-    });
-    
-    console.log('✅ Notification settings updated');
-  } catch (error) {
-    console.error('❌ Error updating settings:', error);
-  }
-};
-
-/**
- * ترقية المستخدم لـ Premium
- */
-export const upgradeToPremium = async (): Promise<void> => {
-  try {
-    const userId = await getUserId();
-    const userRef = doc(db, 'users', userId);
-    
-    await updateDoc(userRef, {
-      isPremium: true,
-      updatedAt: serverTimestamp(),
-    });
-    
-    console.log('✅ User upgraded to premium');
-  } catch (error) {
-    console.error('❌ Error upgrading to premium:', error);
-  }
-};
-
-/**
- * التحقق إذا كان أول فتح للتطبيق
- */
 export const isFirstOpen = async (): Promise<boolean> => {
   try {
     const firstOpen = await AsyncStorage.getItem(STORAGE_KEYS.FIRST_OPEN);
