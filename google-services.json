@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "328160076358",
+    "project_id": "rooh-almuslim",
+    "storage_bucket": "rooh-almuslim.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:328160076358:android:5cddcc506f5bfb15c06047",
+        "android_client_info": {
+          "package_name": "com.rooh.almuslim"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9DnDJnqTzy7L86W-cpZCyBr9Z7fTDsxo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
