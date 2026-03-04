@@ -3,18 +3,52 @@
 // آخر تحديث: 2026-03-04
 
 import { translations, Language, TranslationKeys } from '@/constants/translations';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ==================== المتغيرات ====================
 
 let currentLanguage: Language = 'ar';
+const LANGUAGE_STORAGE_KEY = '@app_language';
 
-// ==================== الدوال ====================
+// ==================== تحميل اللغة المحفوظة ====================
+
+export const loadSavedLanguage = async (): Promise<Language> => {
+  try {
+    const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (saved && isValidLanguage(saved)) {
+      currentLanguage = saved as Language;
+    }
+  } catch (error) {
+    console.error('Error loading language:', error);
+  }
+  return currentLanguage;
+};
+
+// ==================== حفظ اللغة ====================
+
+export const saveLanguage = async (lang: Language): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    currentLanguage = lang;
+  } catch (error) {
+    console.error('Error saving language:', error);
+  }
+};
+
+// ==================== التحقق من صحة اللغة ====================
+
+const isValidLanguage = (lang: string): lang is Language => {
+  return ['ar', 'en', 'fr', 'de', 'es', 'tr', 'ur', 'id', 'ms', 'hi', 'bn', 'ru'].includes(lang);
+};
+
+// ==================== الدوال الأساسية ====================
 
 /**
  * تعيين اللغة الحالية
  */
-export const setLanguage = (lang: Language): void => {
+export const setLanguage = async (lang: Language): Promise<void> => {
   currentLanguage = lang;
+  await saveLanguage(lang);
 };
 
 /**
@@ -26,28 +60,37 @@ export const getLanguage = (): Language => {
 
 /**
  * الحصول على الترجمة
+ * @param key - مفتاح الترجمة (مثل: 'tabs.home' أو 'common.loading')
+ * @param params - متغيرات للاستبدال (مثل: {count: 5})
  */
 export const t = (key: string, params?: Record<string, string | number>): string => {
   const keys = key.split('.');
   let value: any = translations[currentLanguage];
   
+  // البحث في اللغة الحالية
   for (const k of keys) {
     if (value && typeof value === 'object' && k in value) {
       value = value[k];
     } else {
       // fallback للعربية
-      value = translations['ar'];
-      for (const fallbackKey of keys) {
-        if (value && typeof value === 'object' && fallbackKey in value) {
-          value = value[fallbackKey];
-        } else {
-          return key; // إرجاع المفتاح إذا لم يوجد
-        }
-      }
+      value = null;
       break;
     }
   }
   
+  // إذا لم يوجد، جرب العربية
+  if (value === null || value === undefined) {
+    value = translations['ar'];
+    for (const k of keys) {
+      if (value && typeof value === 'object' && k in value) {
+        value = value[k];
+      } else {
+        return key; // إرجاع المفتاح إذا لم يوجد
+      }
+    }
+  }
+  
+  // التأكد من أن القيمة نص
   if (typeof value !== 'string') {
     return key;
   }
@@ -55,11 +98,18 @@ export const t = (key: string, params?: Record<string, string | number>): string
   // استبدال المتغيرات
   if (params) {
     Object.keys(params).forEach(param => {
-      value = value.replace(`{${param}}`, String(params[param]));
+      value = value.replace(new RegExp(`{${param}}`, 'g'), String(params[param]));
     });
   }
   
   return value;
+};
+
+/**
+ * الحصول على كل الترجمات للغة معينة
+ */
+export const getTranslations = (lang?: Language): TranslationKeys => {
+  return translations[lang || currentLanguage];
 };
 
 /**
@@ -68,6 +118,13 @@ export const t = (key: string, params?: Record<string, string | number>): string
 export const isRTL = (lang?: Language): boolean => {
   const checkLang = lang || currentLanguage;
   return ['ar', 'ur'].includes(checkLang);
+};
+
+/**
+ * الحصول على اتجاه الكتابة
+ */
+export const getTextDirection = (lang?: Language): 'rtl' | 'ltr' => {
+  return isRTL(lang) ? 'rtl' : 'ltr';
 };
 
 /**
@@ -115,19 +172,39 @@ export const getLanguageFlag = (lang: Language): string => {
 /**
  * قائمة اللغات المدعومة
  */
-export const supportedLanguages: { code: Language; name: string; flag: string; rtl: boolean }[] = [
-  { code: 'ar', name: 'العربية', flag: '🇸🇦', rtl: true },
-  { code: 'en', name: 'English', flag: '🇬🇧', rtl: false },
-  { code: 'fr', name: 'Français', flag: '🇫🇷', rtl: false },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪', rtl: false },
-  { code: 'es', name: 'Español', flag: '🇪🇸', rtl: false },
-  { code: 'tr', name: 'Türkçe', flag: '🇹🇷', rtl: false },
-  { code: 'ur', name: 'اردو', flag: '🇵🇰', rtl: true },
-  { code: 'id', name: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false },
-  { code: 'ms', name: 'Bahasa Melayu', flag: '🇲🇾', rtl: false },
-  { code: 'hi', name: 'हिन्दी', flag: '🇮🇳', rtl: false },
-  { code: 'bn', name: 'বাংলা', flag: '🇧🇩', rtl: false },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺', rtl: false },
+export const supportedLanguages: { 
+  code: Language; 
+  name: string; 
+  nativeName: string;
+  flag: string; 
+  rtl: boolean;
+}[] = [
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', rtl: false },
+  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', rtl: false },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true },
+  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false },
+  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾', rtl: false },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', rtl: false },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', rtl: false },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false },
 ];
 
-export default { t, setLanguage, getLanguage, isRTL };
+// ==================== تصدير افتراضي ====================
+
+export default { 
+  t, 
+  setLanguage, 
+  getLanguage, 
+  isRTL,
+  getTextDirection,
+  getLanguageName,
+  getLanguageFlag,
+  loadSavedLanguage,
+  saveLanguage,
+  getTranslations,
+  supportedLanguages,
+};

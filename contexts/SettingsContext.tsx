@@ -1,5 +1,6 @@
 // contexts/SettingsContext.tsx
 // سياق الإعدادات - روح المسلم
+// آخر تحديث: 2026-03-04
 
 import React, {
   createContext,
@@ -10,14 +11,25 @@ import React, {
   ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName } from 'react-native';
+import { Appearance, ColorSchemeName, I18nManager } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
+import { 
+  t as translate, 
+  setLanguage as setI18nLanguage, 
+  getLanguage,
+  loadSavedLanguage,
+  isRTL,
+  getTranslations,
+  supportedLanguages,
+} from '@/lib/i18n';
+import { translations, Language, TranslationKeys } from '@/constants/translations';
 
 // ========================================
 // الأنواع
 // ========================================
 
-export type Language = 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
+export type { Language } from '@/constants/translations';
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 99;
@@ -78,6 +90,8 @@ interface SettingsContextType {
   settings: AppSettings;
   isLoading: boolean;
   isDarkMode: boolean;
+  isRTL: boolean;
+  currentTranslations: TranslationKeys;
   
   // دوال التحديث
   updateLanguage: (language: Language) => Promise<void>;
@@ -91,8 +105,8 @@ interface SettingsContextType {
   exportSettings: () => Promise<string>;
   importSettings: (data: string) => Promise<boolean>;
   
-  // دوال مساعدة
-  t: (key: string) => string;
+  // دالة الترجمة
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 // ========================================
@@ -181,6 +195,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     ? systemTheme === 'dark' 
     : settings.theme === 'dark';
 
+  // حساب اتجاه اللغة
+  const isRTLMode = isRTL(settings.language);
+
+  // الترجمات الحالية
+  const currentTranslations = translations[settings.language] || translations['ar'];
+
   // ========================================
   // تحميل الإعدادات
   // ========================================
@@ -198,10 +218,25 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   const loadSettings = async () => {
     try {
+      // تحميل الإعدادات المحفوظة
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setSettings({ ...defaultSettings, ...parsed });
+        const loadedSettings = { ...defaultSettings, ...parsed };
+        setSettings(loadedSettings);
+        
+        // تحديث اللغة في نظام الترجمة
+        await setI18nLanguage(loadedSettings.language);
+        
+        // تحديث اتجاه النص
+        const shouldBeRTL = isRTL(loadedSettings.language);
+        if (I18nManager.isRTL !== shouldBeRTL) {
+          I18nManager.allowRTL(shouldBeRTL);
+          I18nManager.forceRTL(shouldBeRTL);
+        }
+      } else {
+        // أول تشغيل - محاولة تحديد اللغة من الجهاز
+        await setI18nLanguage('ar');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -228,8 +263,30 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   // ========================================
 
   const updateLanguage = useCallback(async (language: Language) => {
+    // تحديث نظام الترجمة
+    await setI18nLanguage(language);
+    
+    // تحديث اتجاه النص
+    const shouldBeRTL = isRTL(language);
+    const needsRestart = I18nManager.isRTL !== shouldBeRTL;
+    
+    if (needsRestart) {
+      I18nManager.allowRTL(shouldBeRTL);
+      I18nManager.forceRTL(shouldBeRTL);
+    }
+    
+    // حفظ الإعدادات
     const newSettings = { ...settings, language };
     await saveSettings(newSettings);
+    
+    // إعادة تحميل التطبيق إذا تغير الاتجاه
+    if (needsRestart) {
+      try {
+        await Updates.reloadAsync();
+      } catch (e) {
+        console.log('Could not reload app:', e);
+      }
+    }
   }, [settings]);
 
   const updateTheme = useCallback(async (theme: ThemeMode) => {
@@ -244,7 +301,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
     await saveSettings(newSettings);
     
-    // تحديث إعدادات الإشعارات الفعلية
+    // إلغاء الإشعارات إذا تم تعطيلها
     if (notifications.enabled === false) {
       await Notifications.cancelAllScheduledNotificationsAsync();
     }
@@ -272,6 +329,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   const resetSettings = useCallback(async () => {
     await saveSettings({ ...defaultSettings, firstLaunch: false });
+    await setI18nLanguage('ar');
   }, []);
 
   const exportSettings = useCallback(async (): Promise<string> => {
@@ -283,6 +341,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       const parsed = JSON.parse(data);
       const newSettings = { ...defaultSettings, ...parsed, firstLaunch: false };
       await saveSettings(newSettings);
+      await setI18nLanguage(newSettings.language);
       return true;
     } catch (error) {
       console.error('Error importing settings:', error);
@@ -291,13 +350,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, []);
 
   // ========================================
-  // دالة الترجمة المختصرة
+  // دالة الترجمة
   // ========================================
 
-  const t = useCallback((key: string): string => {
-    // يمكن ربطها بنظام الترجمات الموجود
-    return key;
-  }, []);
+  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
+    return translate(key, params);
+  }, [settings.language]); // تتحدث عند تغيير اللغة
 
   // ========================================
   // القيمة
@@ -307,6 +365,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     settings,
     isLoading,
     isDarkMode,
+    isRTL: isRTLMode,
+    currentTranslations,
     updateLanguage,
     updateTheme,
     updateNotifications,
@@ -326,7 +386,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 };
 
 // ========================================
-// Hook
+// Hook الرئيسي
 // ========================================
 
 export const useSettings = (): SettingsContextType => {
@@ -347,8 +407,20 @@ export const useTheme = () => {
 };
 
 export const useLanguage = () => {
-  const { settings, updateLanguage, t } = useSettings();
-  return { language: settings.language, updateLanguage, t };
+  const { settings, updateLanguage, t, isRTL, currentTranslations } = useSettings();
+  return { 
+    language: settings.language, 
+    updateLanguage, 
+    t, 
+    isRTL,
+    translations: currentTranslations,
+    supportedLanguages,
+  };
+};
+
+export const useTranslation = () => {
+  const { t, settings, isRTL } = useSettings();
+  return { t, language: settings.language, isRTL };
 };
 
 export const useNotificationSettings = () => {

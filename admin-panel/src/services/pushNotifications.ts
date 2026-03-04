@@ -1,6 +1,7 @@
 // admin-panel/src/services/pushNotifications.ts
 // خدمة إرسال الإشعارات عبر Expo Push API
-// آخر تحديث: 2026-03-03
+// آخر تحديث: 2026-03-04
+// محدث لدعم 12 لغة
 
 import { db } from '../firebase';
 import { 
@@ -15,6 +16,32 @@ import {
 
 // ==================== الأنواع ====================
 
+// اللغات المدعومة (12 لغة)
+export type SupportedLanguage = 'ar' | 'en' | 'fr' | 'de' | 'es' | 'tr' | 'ur' | 'id' | 'ms' | 'hi' | 'bn' | 'ru';
+
+export const SUPPORTED_LANGUAGES: { code: SupportedLanguage; name: string; flag: string; rtl: boolean }[] = [
+  { code: 'ar', name: 'العربية', flag: '🇸🇦', rtl: true },
+  { code: 'en', name: 'English', flag: '🇺🇸', rtl: false },
+  { code: 'fr', name: 'Français', flag: '🇫🇷', rtl: false },
+  { code: 'de', name: 'Deutsch', flag: '🇩🇪', rtl: false },
+  { code: 'es', name: 'Español', flag: '🇪🇸', rtl: false },
+  { code: 'tr', name: 'Türkçe', flag: '🇹🇷', rtl: false },
+  { code: 'ur', name: 'اردو', flag: '🇵🇰', rtl: true },
+  { code: 'id', name: 'Indonesia', flag: '🇮🇩', rtl: false },
+  { code: 'ms', name: 'Melayu', flag: '🇲🇾', rtl: false },
+  { code: 'hi', name: 'हिन्दी', flag: '🇮🇳', rtl: false },
+  { code: 'bn', name: 'বাংলা', flag: '🇧🇩', rtl: false },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺', rtl: false },
+];
+
+// ترجمات الإشعار
+export type NotificationTranslations = {
+  [key in SupportedLanguage]?: {
+    title: string;
+    body: string;
+  };
+};
+
 interface ExpoPushMessage {
   to: string;
   title: string;
@@ -27,14 +54,14 @@ interface ExpoPushMessage {
   ttl?: number;
 }
 
-interface PushNotificationPayload {
-  titleAr: string;
-  titleEn?: string;
-  bodyAr: string;
-  bodyEn?: string;
+export interface PushNotificationPayload {
+  // الترجمات لكل اللغات
+  translations: NotificationTranslations;
+  // الاستهداف
   targetAudience: 'all' | 'ios' | 'android' | 'active' | 'inactive' | 'custom';
   targetLanguages?: string[];
   targetCountries?: string[];
+  // الإجراء
   actionType?: 'none' | 'screen' | 'url';
   actionUrl?: string;
   imageUrl?: string;
@@ -45,6 +72,7 @@ interface SendResult {
   sentCount: number;
   failedCount: number;
   errors: string[];
+  perLanguage: { [lang: string]: number };
 }
 
 interface UserToken {
@@ -62,12 +90,13 @@ interface BatchResult {
   errors: string[];
 }
 
-interface UserStats {
+export interface UserStats {
   total: number;
   withTokens: number;
   ios: number;
   android: number;
   active: number;
+  byLanguage: { [lang: string]: number };
 }
 
 // ==================== الثوابت ====================
@@ -149,6 +178,39 @@ const fetchUserTokens = async (
 };
 
 /**
+ * الحصول على الترجمة المناسبة للمستخدم
+ */
+const getTranslationForUser = (
+  translations: NotificationTranslations,
+  userLanguage: string
+): { title: string; body: string } => {
+  // 1. محاولة الحصول على لغة المستخدم
+  const userLang = userLanguage as SupportedLanguage;
+  if (translations[userLang]?.title && translations[userLang]?.body) {
+    return translations[userLang]!;
+  }
+  
+  // 2. Fallback للعربي
+  if (translations.ar?.title && translations.ar?.body) {
+    return translations.ar;
+  }
+  
+  // 3. Fallback للإنجليزي
+  if (translations.en?.title && translations.en?.body) {
+    return translations.en;
+  }
+  
+  // 4. أول ترجمة متاحة
+  for (const lang of Object.keys(translations) as SupportedLanguage[]) {
+    if (translations[lang]?.title && translations[lang]?.body) {
+      return translations[lang]!;
+    }
+  }
+  
+  return { title: 'روح المسلم', body: '' };
+};
+
+/**
  * إرسال دفعة من الإشعارات
  */
 const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
@@ -198,7 +260,7 @@ const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
 // ==================== الدوال الرئيسية ====================
 
 /**
- * إرسال إشعار push لجميع المستخدمين المستهدفين
+ * إرسال إشعار push لجميع المستخدمين المستهدفين (يدعم 12 لغة)
  */
 export const sendPushNotification = async (
   payload: PushNotificationPayload
@@ -206,6 +268,7 @@ export const sendPushNotification = async (
   const errors: string[] = [];
   let sentCount = 0;
   let failedCount = 0;
+  const perLanguage: { [lang: string]: number } = {};
   
   try {
     // 1. جلب توكنات المستخدمين
@@ -221,24 +284,33 @@ export const sendPushNotification = async (
         sentCount: 0,
         failedCount: 0,
         errors: ['لا يوجد مستخدمين مطابقين للمعايير المحددة'],
+        perLanguage: {},
       };
     }
     
     console.log(`📤 Sending to ${users.length} users...`);
     
-    // 2. بناء الرسائل
-    const messages: ExpoPushMessage[] = users.map(user => ({
-      to: user.fcmToken,
-      title: user.language === 'ar' ? payload.titleAr : (payload.titleEn || payload.titleAr),
-      body: user.language === 'ar' ? payload.bodyAr : (payload.bodyEn || payload.bodyAr),
-      sound: 'default',
-      priority: 'high',
-      data: {
-        actionType: payload.actionType,
-        actionUrl: payload.actionUrl,
-        imageUrl: payload.imageUrl,
-      },
-    }));
+    // 2. بناء الرسائل مع الترجمة المناسبة لكل مستخدم
+    const messages: ExpoPushMessage[] = users.map(user => {
+      const translation = getTranslationForUser(payload.translations, user.language);
+      
+      // تتبع الإرسال حسب اللغة
+      perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+      
+      return {
+        to: user.fcmToken,
+        title: translation.title,
+        body: translation.body,
+        sound: 'default',
+        priority: 'high',
+        data: {
+          actionType: payload.actionType,
+          actionUrl: payload.actionUrl,
+          imageUrl: payload.imageUrl,
+          language: user.language,
+        },
+      };
+    });
     
     // 3. إرسال على دفعات
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
@@ -257,11 +329,18 @@ export const sendPushNotification = async (
     
     // 4. تسجيل الإشعار في Firebase
     await addDoc(collection(db, 'notifications'), {
-      ...payload,
+      translations: payload.translations,
+      targetAudience: payload.targetAudience,
+      targetLanguages: payload.targetLanguages,
+      targetCountries: payload.targetCountries,
+      actionType: payload.actionType,
+      actionUrl: payload.actionUrl,
+      imageUrl: payload.imageUrl,
       status: 'sent',
       sentCount,
       failedCount,
-      deliveredCount: sentCount, // تقدير مبدئي
+      perLanguage,
+      deliveredCount: sentCount,
       openedCount: 0,
       clickedCount: 0,
       sentAt: serverTimestamp(),
@@ -269,12 +348,14 @@ export const sendPushNotification = async (
     });
     
     console.log(`✅ Sent: ${sentCount}, Failed: ${failedCount}`);
+    console.log('📊 Per language:', perLanguage);
     
     return {
       success: sentCount > 0,
       sentCount,
       failedCount,
-      errors: errors.slice(0, 10), // أول 10 أخطاء فقط
+      errors: errors.slice(0, 10),
+      perLanguage,
     };
   } catch (error) {
     console.error('Send notification error:', error);
@@ -283,6 +364,7 @@ export const sendPushNotification = async (
       sentCount,
       failedCount,
       errors: [(error as Error).message],
+      perLanguage,
     };
   }
 };
@@ -290,7 +372,24 @@ export const sendPushNotification = async (
 /**
  * إرسال إشعار اختباري
  */
-export const sendTestNotification = async (token: string): Promise<boolean> => {
+export const sendTestNotification = async (token: string, language: string = 'ar'): Promise<boolean> => {
+  const testMessages: { [key: string]: { title: string; body: string } } = {
+    ar: { title: 'إشعار اختباري 🔔', body: 'هذا إشعار تجريبي من لوحة التحكم' },
+    en: { title: 'Test Notification 🔔', body: 'This is a test notification from admin panel' },
+    fr: { title: 'Notification test 🔔', body: 'Ceci est une notification test' },
+    de: { title: 'Testbenachrichtigung 🔔', body: 'Dies ist eine Testbenachrichtigung' },
+    es: { title: 'Notificación de prueba 🔔', body: 'Esta es una notificación de prueba' },
+    tr: { title: 'Test Bildirimi 🔔', body: 'Bu bir test bildirimidir' },
+    ur: { title: 'ٹیسٹ نوٹیفیکیشن 🔔', body: 'یہ ایک ٹیسٹ نوٹیفیکیشن ہے' },
+    id: { title: 'Notifikasi Uji 🔔', body: 'Ini adalah notifikasi uji coba' },
+    ms: { title: 'Pemberitahuan Ujian 🔔', body: 'Ini adalah pemberitahuan ujian' },
+    hi: { title: 'टेस्ट नोटिफिकेशन 🔔', body: 'यह एक टेस्ट नोटिफिकेशन है' },
+    bn: { title: 'টেস্ট নোটিফিকেশন 🔔', body: 'এটি একটি পরীক্ষামূলক বিজ্ঞপ্তি' },
+    ru: { title: 'Тестовое уведомление 🔔', body: 'Это тестовое уведомление' },
+  };
+  
+  const msg = testMessages[language] || testMessages.ar;
+  
   try {
     const response = await fetch(EXPO_PUSH_API, {
       method: 'POST',
@@ -300,8 +399,8 @@ export const sendTestNotification = async (token: string): Promise<boolean> => {
       },
       body: JSON.stringify([{
         to: token,
-        title: 'إشعار اختباري 🔔',
-        body: 'هذا إشعار تجريبي من لوحة التحكم',
+        title: msg.title,
+        body: msg.body,
         sound: 'default',
       }]),
     });
@@ -328,6 +427,12 @@ export const getUserStats = async (): Promise<UserStats> => {
     const users = await fetchUserTokens('all');
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     
+    // حساب التوزيع حسب اللغة
+    const byLanguage: { [lang: string]: number } = {};
+    users.forEach(u => {
+      byLanguage[u.language] = (byLanguage[u.language] || 0) + 1;
+    });
+    
     return {
       total: users.length,
       withTokens: users.filter(u => u.fcmToken).length,
@@ -337,8 +442,9 @@ export const getUserStats = async (): Promise<UserStats> => {
         if (!u.lastActive) return false;
         return u.lastActive.toDate() > weekAgo;
       }).length,
+      byLanguage,
     };
   } catch (error) {
-    return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0 };
+    return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0, byLanguage: {} };
   }
 };
