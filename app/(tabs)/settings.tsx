@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -22,7 +23,7 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Application from 'expo-application';
 
-import { useSettings, Language, ThemeMode } from '@/contexts/SettingsContext';
+import { useSettings, Language, ThemeMode, AppBackgroundKey, QuranBackgroundKey } from '@/contexts/SettingsContext';
 import GlassCard from '@/components/ui/GlassCard';
 
 // ========================================
@@ -163,6 +164,27 @@ const SettingSection: React.FC<SettingSectionProps> = ({
 };
 
 // ========================================
+// خرائط صور الخلفيات
+// ========================================
+
+const APP_BG_IMAGES: Record<string, any> = {
+  background1: require('@/assets/images/background1.png'),
+  background2: require('@/assets/images/background2.png'),
+  background3: require('@/assets/images/background3.png'),
+  background4: require('@/assets/images/background4.png'),
+  background5: require('@/assets/images/background5.png'),
+  background6: require('@/assets/images/background6.png'),
+  background7: require('@/assets/images/background7.png'),
+};
+
+const QURAN_BG_IMAGES: Record<string, any> = {
+  quranbg1: require('@/assets/images/quranbg1.png'),
+  quranbg2: require('@/assets/images/quranbg2.png'),
+  quranbg3: require('@/assets/images/quranbg3.png'),
+  quranbg4: require('@/assets/images/quranbg4.png'),
+};
+
+// ========================================
 // المكون الرئيسي
 // ========================================
 
@@ -174,6 +196,7 @@ export default function SettingsScreen() {
     updateLanguage,
     updateTheme,
     updateNotifications,
+    updateDisplay,
     resetSettings,
   } = useSettings();
 
@@ -309,8 +332,55 @@ export default function SettingsScreen() {
           />
         </SettingSection>
 
+        {/* الخلفيات */}
+        <SettingSection title="خلفية التطبيق" index={2} isDarkMode={isDarkMode}>
+          <View style={styles.bgGrid}>
+            <TouchableOpacity
+              style={[
+                styles.bgThumb,
+                settings.display.appBackground === 'none' && styles.bgThumbSelected,
+              ]}
+              onPress={() => updateDisplay({ appBackground: 'none' })}
+            >
+              <View style={[styles.bgThumbInner, { backgroundColor: isDarkMode ? '#1a1a2e' : '#f5f5f5' }]}>
+                <MaterialCommunityIcons name="cancel" size={24} color={isDarkMode ? '#aaa' : '#999'} />
+                <Text style={[styles.bgThumbLabel, isDarkMode && styles.textMuted]}>بدون</Text>
+              </View>
+            </TouchableOpacity>
+            {(Object.keys(APP_BG_IMAGES) as AppBackgroundKey[]).map((key) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.bgThumb,
+                  settings.display.appBackground === key && styles.bgThumbSelected,
+                ]}
+                onPress={() => updateDisplay({ appBackground: key })}
+              >
+                <Image source={APP_BG_IMAGES[key]} style={styles.bgThumbImage} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </SettingSection>
+
+        <SettingSection title="خلفية القرآن" index={3} isDarkMode={isDarkMode}>
+          <View style={styles.bgGrid}>
+            {(Object.keys(QURAN_BG_IMAGES) as QuranBackgroundKey[]).map((key) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.bgThumb,
+                  settings.display.quranBackground === key && styles.bgThumbSelected,
+                ]}
+                onPress={() => updateDisplay({ quranBackground: key })}
+              >
+                <Image source={QURAN_BG_IMAGES[key]} style={styles.bgThumbImage} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </SettingSection>
+
         {/* الإشعارات */}
-        <SettingSection title="الإشعارات" index={2} isDarkMode={isDarkMode}>
+        <SettingSection title="الإشعارات" index={4} isDarkMode={isDarkMode}>
           <SettingItem
             icon="bell"
             iconColor="#2f7659"
@@ -331,7 +401,7 @@ export default function SettingsScreen() {
         </SettingSection>
 
         {/* مواقيت الصلاة */}
-        <SettingSection title="مواقيت الصلاة" index={3} isDarkMode={isDarkMode}>
+        <SettingSection title="مواقيت الصلاة" index={5} isDarkMode={isDarkMode}>
           <SettingItem
             icon="mosque"
             iconColor="#2f7659"
@@ -351,7 +421,7 @@ export default function SettingsScreen() {
         </SettingSection>
 
         {/* البيانات */}
-        <SettingSection title="البيانات والخصوصية" index={4} isDarkMode={isDarkMode}>
+        <SettingSection title="البيانات والخصوصية" index={6} isDarkMode={isDarkMode}>
           <SettingItem
             icon="cloud-upload"
             iconColor="#5d4e8c"

@@ -253,37 +253,6 @@ export default function MoreScreen() {
           {LEGAL_ITEMS.map(renderItem)}
         </View>
 
-        {/* السوشيال ميديا */}
-        <View style={styles.socialSection}>
-          <Text style={[styles.socialTitle, { color: currentColors.text }]}>تابعنا</Text>
-          <View style={styles.socialIcons}>
-            <TouchableOpacity 
-              style={[styles.socialIcon, { backgroundColor: '#1DA1F2' }]}
-              onPress={() => openURL('https://twitter.com')}
-            >
-              <Ionicons name="logo-twitter" size={24} color={Colors.white} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.socialIcon, { backgroundColor: '#4267B2' }]}
-              onPress={() => openURL('https://facebook.com')}
-            >
-              <Ionicons name="logo-facebook" size={24} color={Colors.white} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.socialIcon, { backgroundColor: '#E4405F' }]}
-              onPress={() => openURL('https://instagram.com')}
-            >
-              <Ionicons name="logo-instagram" size={24} color={Colors.white} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.socialIcon, { backgroundColor: '#25D366' }]}
-              onPress={() => openURL('https://wa.me/')}
-            >
-              <Ionicons name="logo-whatsapp" size={24} color={Colors.white} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* رسالة الدعم */}
         <View style={[styles.supportMessage, { backgroundColor: currentColors.surface }]}>
           <Ionicons name="heart" size={24} color={Colors.error} />
@@ -383,26 +352,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.xs,
     marginTop: 2,
     textAlign: 'right',
-  },
-  socialSection: {
-    alignItems: 'center',
-    marginVertical: Spacing.lg,
-  },
-  socialTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    marginBottom: Spacing.md,
-  },
-  socialIcons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  socialIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   supportMessage: {
     flexDirection: 'row',

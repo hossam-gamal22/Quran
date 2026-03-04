@@ -127,7 +127,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
       icon: 'hands-pray',
       gradient: ['#dc2626', '#b91c1c'],
       description: dailyDua?.textAr ? `${dailyDua.textAr.substring(0, 18)}…` : undefined,
-      route: '/azkar/sunnah',
+      route: '/azkar/sunnah_duas',
     },
     {
       id: 'daily-ayah',

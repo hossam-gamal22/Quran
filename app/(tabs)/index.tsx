@@ -1,7 +1,7 @@
 // app/(tabs)/index.tsx
 // الصفحة الرئيسية - الأذكار - روح المسلم
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Dimensions,
   StatusBar,
   Platform,
 } from 'react-native';
@@ -24,11 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
-import { getHijriDate } from '@/lib/hijri-date';
 import DailyHighlights from '@/components/ui/DailyHighlights';
-
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
 
 // ========================================
 // الثوابت
@@ -38,9 +33,9 @@ const AZKAR_CATEGORIES = [
   { id: 'morning', name: 'أذكار الصباح', icon: 'weather-sunny', color: '#f5a623', count: 33 },
   { id: 'evening', name: 'أذكار المساء', icon: 'weather-night', color: '#5d4e8c', count: 33 },
   { id: 'sleep', name: 'أذكار النوم', icon: 'bed', color: '#3a7ca5', count: 15 },
-  { id: 'wake', name: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
-  { id: 'prayer', name: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', count: 20 },
-  { id: 'misc', name: 'أذكار متنوعة', icon: 'format-list-text', color: '#e91e63', count: 50 },
+  { id: 'wakeup', name: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
+  { id: 'after_prayer', name: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', count: 20 },
+  { id: 'ruqya', name: 'الرقية الشرعية', icon: 'shield-check', color: '#e91e63', count: 12 },
 ];
 
 const QUICK_ACCESS = [
@@ -51,9 +46,8 @@ const QUICK_ACCESS = [
 ];
 
 const DUA_CATEGORIES = [
-  { id: 'quran', name: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5' },
-  { id: 'sunnah', name: 'أدعية من السنة', icon: 'book-cross', color: '#2f7659' },
-  { id: 'ruqya', name: 'الرقية الشرعية', icon: 'shield-check', color: '#5d4e8c' },
+  { id: 'quran_duas', name: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5' },
+  { id: 'sunnah_duas', name: 'أدعية من السنة', icon: 'book-cross', color: '#2f7659' },
 ];
 
 // ========================================
@@ -137,9 +131,6 @@ export default function HomeScreen() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // التاريخ الهجري
-  const hijriDate = useMemo(() => getHijriDate(), []);
-
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -149,19 +140,19 @@ export default function HomeScreen() {
   }, []);
 
   const navigateToCategory = (categoryId: string) => {
-    router.push(`/azkar/${categoryId}`);
-  };
-
-  const navigateToQuickAccess = (itemId: string) => {
-    router.push(`/azkar/${itemId}`);
-  };
-
-  const navigateToDuas = (categoryId: string) => {
     if (categoryId === 'ruqya') {
       router.push('/ruqya');
     } else {
-      router.push(`/azkar/${categoryId}`);
+      router.push(`/azkar/${categoryId}` as any);
     }
+  };
+
+  const navigateToQuickAccess = (itemId: string) => {
+    router.push(`/azkar/${itemId}` as any);
+  };
+
+  const navigateToDuas = (categoryId: string) => {
+    router.push(`/azkar/${categoryId}` as any);
   };
 
   return (
@@ -173,11 +164,10 @@ export default function HomeScreen() {
         {logoUrl ? (
           <Image source={{ uri: logoUrl }} style={styles.logoImage} resizeMode="contain" />
         ) : (
-          <MaterialCommunityIcons
-            name="heart-circle"
-            size={32}
-            color="#2f7659"
-            style={styles.logo}
+          <Image
+            source={require('@/assets/images/App-icon.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
           />
         )}
         <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>روح المسلم</Text>
@@ -204,7 +194,7 @@ export default function HomeScreen() {
           <Animated.View entering={FadeIn.duration(600)}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => router.push(`/seasonal/${currentSeason.type}`)}
+              onPress={() => router.push(`/seasonal/${currentSeason.type}` as any)}
             >
               <LinearGradient
                 colors={[currentSeason.color, `${currentSeason.color}cc`]}
@@ -220,7 +210,7 @@ export default function HomeScreen() {
                   <MaterialCommunityIcons name={currentSeason.icon as any} size={36} color="#fff" />
                 </View>
                 <View style={styles.seasonBadge}>
-                  <Text style={styles.seasonDay}>اليوم {currentSeason.currentDay}</Text>
+                  <Text style={styles.seasonDay}>{currentSeason.currentDay}</Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>

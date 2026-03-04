@@ -256,7 +256,7 @@ export default function PrayerScreen() {
       >
         <View style={styles.headerLeft}>
           <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-            {t('ui.nav.prayer', language)}
+            {t('tabs.prayer')}
           </Text>
           {locationName && (
             <View style={styles.locationBadge}>
@@ -324,7 +324,7 @@ export default function PrayerScreen() {
               style={styles.retryButton}
               onPress={() => loadPrayerTimes(true)}
             >
-              <Text style={styles.retryText}>{t('ui.button.retry', language)}</Text>
+              <Text style={styles.retryText}>{t('common.retry')}</Text>
             </TouchableOpacity>
           </Animated.View>
         )}

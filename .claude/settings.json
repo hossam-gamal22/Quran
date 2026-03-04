@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"TextToSpeech\\\\|Expo.Speech\\\\|Audio.Sound\\\\|expo-av\" /Users/hossamgamal/Desktop/MobileApps/Quran/lib/*.ts /Users/hossamgamal/Desktop/MobileApps/Quran/hooks/*.ts)"
+    ]
+  }
+}

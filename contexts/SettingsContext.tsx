@@ -50,6 +50,9 @@ export interface NotificationSettings {
   vibration: boolean;
 }
 
+export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7';
+export type QuranBackgroundKey = 'quranbg1' | 'quranbg2' | 'quranbg3' | 'quranbg4';
+
 export interface DisplaySettings {
   fontSize: FontSize;
   arabicFontSize: number;
@@ -58,6 +61,8 @@ export interface DisplaySettings {
   showTranslation: boolean;
   showTransliteration: boolean;
   highlightTajweed: boolean;
+  appBackground: AppBackgroundKey;
+  quranBackground: QuranBackgroundKey;
 }
 
 export interface PrayerSettings {
@@ -137,6 +142,8 @@ const defaultDisplay: DisplaySettings = {
   showTranslation: true,
   showTransliteration: false,
   highlightTajweed: true,
+  appBackground: 'none',
+  quranBackground: 'quranbg1',
 };
 
 const defaultPrayer: PrayerSettings = {
