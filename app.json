@@ -45,8 +45,7 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "SCHEDULE_EXACT_ALARM",
-        "POST_NOTIFICATIONS",
-        "com.google.android.gms.permission.AD_ID"
+        "POST_NOTIFICATIONS"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -81,14 +80,7 @@
         }
       ],
       "expo-asset",
-      "expo-localization",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-6103597967254377~4576655042",
-          "iosAppId": "ca-app-pub-6103597967254377~2134799890"
-        }
-      ]
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
