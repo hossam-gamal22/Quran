@@ -1,57 +1,44 @@
 // components/ads/BannerAd.tsx
+// نسخة تجريبية للاختبار على Expo Go - الإعلانات معطلة
+// ⚠️ قبل النشر: استخدم النسخة الأصلية
+
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { BannerAd as GoogleBannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
-import { useAds } from '../../lib/ads-context';
+import { View, Text, StyleSheet } from 'react-native';
 
-interface BannerAdProps {
-  screen: 'home' | 'quran' | 'azkar' | 'other';
+interface BannerAdComponentProps {
+  screen?: 'home' | 'quran' | 'azkar' | 'other';
 }
 
-export default function BannerAd({ screen }: BannerAdProps) {
-  const { config, showBanner } = useAds();
-
-  // التحقق من إمكانية عرض البانر لهذه الشاشة
-  const shouldShow = (): boolean => {
-    if (!showBanner || !config) return false;
-    
-    switch (screen) {
-      case 'home':
-        return config.showBannerOnHome;
-      case 'quran':
-        return config.showBannerOnQuran;
-      case 'azkar':
-        return config.showBannerOnAzkar;
-      default:
-        return true;
-    }
-  };
-
-  if (!shouldShow()) return null;
-
-  // استخدام Test ID في التطوير أو الكود الحقيقي من الإعدادات
-  const adUnitId = __DEV__ 
-    ? TestIds.BANNER 
-    : (config?.bannerAdCode || TestIds.BANNER);
-
-  return (
-    <View style={styles.container}>
-      <GoogleBannerAd
-        unitId={adUnitId}
-        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-        }}
-        onAdLoaded={() => console.log('Banner loaded')}
-        onAdFailedToLoad={(error) => console.log('Banner failed:', error)}
-      />
-    </View>
-  );
-}
+export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen = 'other' }) => {
+  // في وضع التجربة، نعرض placeholder بدلاً من الإعلان
+  if (__DEV__) {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.placeholderText}>📢 مكان الإعلان ({screen})</Text>
+      </View>
+    );
+  }
+  
+  // في الإنتاج، لا نعرض شيء (الإعلانات معطلة)
+  return null;
+};
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
+  placeholder: {
+    height: 50,
+    backgroundColor: '#1a1a2e',
     justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderStyle: 'dashed',
+  },
+  placeholderText: {
+    color: '#666',
+    fontSize: 12,
   },
 });
+
+export default BannerAdComponent;
