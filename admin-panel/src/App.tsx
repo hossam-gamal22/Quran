@@ -40,6 +40,7 @@ import Ads from './pages/Ads';
 import Pricing from './pages/Pricing';
 import WelcomeBanner from './pages/WelcomeBanner';
 import HighlightsManager from './pages/HighlightsManager';
+import NavigationUI from './pages/NavigationUI';
 
 // ==================== Mobile Preview Component ====================
 const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -372,6 +373,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
     { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
     { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
+    { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
     { path: '/settings', icon: Settings, label: 'الإعدادات' },
   ];
 
@@ -487,6 +489,7 @@ const App: React.FC = () => {
               <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/ads" element={<Ads />} />
               <Route path="/pricing" element={<Pricing />} />
+              <Route path="/navigation-ui" element={<NavigationUI />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

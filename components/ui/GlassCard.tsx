@@ -3,9 +3,9 @@
 // Inspired by iOS Control Center, Widgets, and Dynamic Island
 
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Platform, TouchableOpacity, Text, Switch, LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, ViewStyle, Platform, TouchableOpacity, Text, Switch, LayoutChangeEvent, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { BorderRadius, Shadows } from '@/constants/theme';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -598,6 +598,15 @@ const SegmentIcon: React.FC<{
   activeColor: string;
   inactiveColor: string;
 }> = React.memo(({ icon, activeProgress, activeColor, inactiveColor }) => {
+  if (icon.startsWith('img:')) {
+    const uri = icon.slice(4).trim();
+    if (!uri) return null;
+    return <Image source={{ uri }} style={styles.segmentImageIcon} resizeMode="contain" />;
+  }
+
+  const isIonicon = icon.startsWith('ion:');
+  const iconName = (isIonicon ? icon.slice(4) : icon).trim();
+
   const [color, setColor] = React.useState(inactiveColor);
 
   React.useEffect(() => {
@@ -629,7 +638,11 @@ const SegmentIcon: React.FC<{
   }, [activeProgress, activeColor, inactiveColor]);
 
   return (
-    <MaterialCommunityIcons name={icon as any} size={16} color={color} />
+    isIonicon ? (
+      <Ionicons name={iconName as any} size={16} color={color} />
+    ) : (
+      <MaterialCommunityIcons name={iconName as any} size={16} color={color} />
+    )
   );
 });
 
@@ -903,6 +916,10 @@ const styles = StyleSheet.create({
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  segmentImageIcon: {
+    width: 16,
+    height: 16,
   },
   segmentLabel: {
     fontSize: 14,

@@ -43,6 +43,7 @@ import {
 import { markAzkarCompleted, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 
 // Map azkar category IDs → worship tracker keys
@@ -504,81 +505,82 @@ export default function CategoryAzkarScreen() {
         >
           <Animated.View
             style={[
-              styles.zikrCard,
+              styles.zikrCardAnimated,
               {
-                backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
                 opacity: fadeAnim,
                 transform: [{ scale: scaleAnim }],
               },
             ]}
           >
-            {/* أزرار الإجراءات */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={() => playZikrAudio(currentZikr)}
-                style={styles.actionButton}
-              >
-                {audioLoading ? (
-                  <ActivityIndicator size="small" color={categoryInfo.color} />
-                ) : (
+            <GlassCard intensity={46} style={styles.zikrCardGlass}>
+              {/* أزرار الإجراءات */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  onPress={() => playZikrAudio(currentZikr)}
+                  style={styles.actionButton}
+                >
+                  {audioLoading ? (
+                    <ActivityIndicator size="small" color={categoryInfo.color} />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name={audioPlaying ? 'pause-circle' : 'play-circle'}
+                      size={26}
+                      color={categoryInfo.color}
+                    />
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => toggleFavorite(currentZikr.id)}
+                  style={styles.actionButton}
+                >
                   <MaterialCommunityIcons
-                    name={audioPlaying ? 'pause-circle' : 'play-circle'}
-                    size={26}
-                    color={categoryInfo.color}
+                    name={favorites[currentZikr.id] ? 'heart' : 'heart-outline'}
+                    size={24}
+                    color={favorites[currentZikr.id] ? '#EF4444' : (darkMode ? '#9CA3AF' : '#6B7280')}
                   />
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => toggleFavorite(currentZikr.id)}
-                style={styles.actionButton}
-              >
-                <MaterialCommunityIcons
-                  name={favorites[currentZikr.id] ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={favorites[currentZikr.id] ? '#EF4444' : (darkMode ? '#9CA3AF' : '#6B7280')}
-                />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={() => resetCount(currentZikr.id)}
-                style={styles.actionButton}
-              >
-                <MaterialCommunityIcons
-                  name="refresh"
-                  size={22}
-                  color={darkMode ? '#9CA3AF' : '#6B7280'}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* النص العربي */}
-            <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {currentZikr.arabic}
-            </Text>
-
-            {/* النطق */}
-            {showTransliteration && currentZikr.transliteration && (
-              <Text style={[styles.transliteration, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {currentZikr.transliteration}
-              </Text>
-            )}
-
-            {/* الترجمة */}
-            {showTranslation && (
-              <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                {getZikrTranslation(currentZikr, language)}
-              </Text>
-            )}
-
-            {/* الفضل */}
-            {currentZikr.benefit && (
-              <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}>
-                <MaterialCommunityIcons name="star" size={16} color={categoryInfo.color} />
-                <Text style={[styles.benefitText, { color: categoryInfo.color }]}>
-                  {getZikrBenefit(currentZikr, language)}
-                </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={() => resetCount(currentZikr.id)}
+                  style={styles.actionButton}
+                >
+                  <MaterialCommunityIcons
+                    name="refresh"
+                    size={22}
+                    color={darkMode ? '#9CA3AF' : '#6B7280'}
+                  />
+                </TouchableOpacity>
               </View>
-            )}
+
+              {/* النص العربي */}
+              <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                {currentZikr.arabic}
+              </Text>
+
+              {/* النطق */}
+              {showTransliteration && currentZikr.transliteration && (
+                <Text style={[styles.transliteration, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+                  {currentZikr.transliteration}
+                </Text>
+              )}
+
+              {/* الترجمة */}
+              {showTranslation && (
+                <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+                  {getZikrTranslation(currentZikr, language)}
+                </Text>
+              )}
+
+              {/* الفضل */}
+              {currentZikr.benefit && (
+                <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}> 
+                  <MaterialCommunityIcons name="star" size={16} color={categoryInfo.color} />
+                  <Text style={[styles.benefitText, { color: categoryInfo.color }]}> 
+                    {getZikrBenefit(currentZikr, language)}
+                  </Text>
+                </View>
+              )}
+            </GlassCard>
 
           </Animated.View>
         </ScrollView>
@@ -773,12 +775,12 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
   },
-  zikrCard: {
+  zikrCardAnimated: {
+    borderRadius: 20,
+  },
+  zikrCardGlass: {
     borderRadius: 20,
     padding: 20,
-    backgroundColor: 'rgba(120,120,128,0.12)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   actionButtons: {
     flexDirection: 'row',

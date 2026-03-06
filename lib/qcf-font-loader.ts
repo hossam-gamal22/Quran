@@ -1,23 +1,45 @@
+/**
+ * QCF4 V4 Font Loader
+ *
+ * Downloads per-page QCF4 tajweed fonts (.ttf.gz) from jsDelivr CDN,
+ * decompresses with pako, caches to local filesystem, and loads via expo-font.
+ *
+ * Font source: quran_library package (alheekmahlib/quran_library)
+ * Font naming: QCF4_tajweed_001.ttf.gz … QCF4_tajweed_604.ttf.gz
+ */
+
 import * as Font from 'expo-font';
 import * as FileSystem from 'expo-file-system/legacy';
+import pako from 'pako';
+import { patchCpalTableAllPalettes, DARK_UNIFIED_COLOR } from './ttf-cpal-patcher';
 
-const CDN_BASE = 'https://static-cdn.tarteel.ai/qul/fonts/quran_fonts/v2/ttf';
-const CDN_VERSION = '3.1';
-const CACHE_DIR = FileSystem.documentDirectory + 'qpc_v2/';
+const CDN_BASE =
+  'https://cdn.jsdelivr.net/gh/alheekmahlib/quran_library@main/assets/fonts/quran_fonts_qfc4';
+const CACHE_DIR = (FileSystem.documentDirectory ?? '') + 'qcf4_cache/';
 
 const loadedPages = new Set<number>();
 const loadingPromises = new Map<number, Promise<void>>();
 let cacheDirReady = false;
 
-/** Font family name for a given page number (1-based) */
+/** Total pages in the Quran Mushaf */
+export const TOTAL_QURAN_PAGES = 604;
+
+/** Font family for a given page (1-based) */
 export function getPageFontFamily(page: number): string {
-  return `qpc_v2_p${page}`;
+  return `QCF4_page${page}`;
 }
 
-/** Check if a page font is ready */
+/** Whether the font for this page is already loaded in memory */
 export function isPageFontLoaded(page: number): boolean {
   return loadedPages.has(page);
 }
+
+/** Validate page number */
+export function isValidPage(page: number): boolean {
+  return Number.isInteger(page) && page >= 1 && page <= TOTAL_QURAN_PAGES;
+}
+
+// ── Internals ──
 
 /** Ensure cache directory exists */
 async function ensureCacheDir(): Promise<void> {
@@ -29,112 +51,128 @@ async function ensureCacheDir(): Promise<void> {
   cacheDirReady = true;
 }
 
-/** Total pages in the Quran Mushaf */
-export const TOTAL_QURAN_PAGES = 604;
-
-/** Validate page number is within valid Quran range */
-export function isValidPage(page: number): boolean {
-  return Number.isInteger(page) && page >= 1 && page <= TOTAL_QURAN_PAGES;
+/** Zero-pad page number to 3 digits */
+function pad3(n: number): string {
+  return String(n).padStart(3, '0');
 }
 
-/** Load the font for a single page (downloads from CDN if not cached) */
-export async function loadPageFont(page: number): Promise<void> {
-  // Validate page number
-  if (!isValidPage(page)) {
-    console.warn(`[QCF] Invalid page number: ${page}. Must be 1-${TOTAL_QURAN_PAGES}.`);
-    return;
-  }
-
+// Accept darkMode param (default false)
+export async function loadPageFont(
+  page: number,
+  darkMode: boolean = false,
+): Promise<void> {
   if (loadedPages.has(page)) return;
-
-  if (loadingPromises.has(page)) {
-    return loadingPromises.get(page);
-  }
+  if (loadingPromises.has(page)) return loadingPromises.get(page);
 
   const promise = (async () => {
-    await ensureCacheDir();
-
-    const localPath = `${CACHE_DIR}p${page}.ttf`;
-    const fontName = getPageFontFamily(page);
-    const cdnUrl = `${CDN_BASE}/p${page}.ttf?v=${CDN_VERSION}`;
-
-    // Check local cache first
-    const info = await FileSystem.getInfoAsync(localPath);
-    if (!info.exists) {
-      try {
-        await FileSystem.downloadAsync(cdnUrl, localPath);
-      } catch (downloadError) {
-        console.error(`[QCF] Failed to download font for page ${page}:`, downloadError);
-        throw downloadError;
-      }
-    }
-
     try {
-      await Font.loadAsync({ [fontName]: { uri: localPath } });
+      await ensureCacheDir();
+      const familyName = getPageFontFamily(page);
+      // Use different cache for dark mode
+      const cachedPath = CACHE_DIR + `page${page}${darkMode ? '_dark' : ''}.ttf`;
+
+      // Check if already cached on disk
+      const cacheInfo = await FileSystem.getInfoAsync(cachedPath);
+      if (cacheInfo.exists) {
+        await Font.loadAsync({ [familyName]: cachedPath });
+        loadedPages.add(page);
+        return;
+      }
+
+      // Download .ttf.gz from CDN
+      const url = `${CDN_BASE}/QCF4_tajweed_${pad3(page)}.ttf.gz`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Font download failed: ${response.status} for page ${page}`);
+      }
+
+      // Decompress gzip → raw TTF bytes
+      const gzBuffer = await response.arrayBuffer();
+      let ttfBytes = pako.ungzip(new Uint8Array(gzBuffer));
+
+      // Patch ALL palettes for dark mode
+      if (darkMode) {
+        ttfBytes = patchCpalTableAllPalettes(ttfBytes, DARK_UNIFIED_COLOR);
+      }
+
+      // Convert to base64 and write to cache
+      const base64 = uint8ArrayToBase64(ttfBytes);
+      await FileSystem.writeAsStringAsync(cachedPath, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Load font into memory
+      await Font.loadAsync({ [familyName]: cachedPath });
       loadedPages.add(page);
-    } catch (fontError) {
-      console.error(`[QCF] Failed to load font for page ${page}:`, fontError);
-      // Try to remove corrupted cache file
-      try {
-        await FileSystem.deleteAsync(localPath, { idempotent: true });
-      } catch {}
-      throw fontError;
+    } catch (err) {
+      console.warn(`[QCF4] Failed to load font for page ${page}:`, err);
+      throw err;
+    } finally {
+      loadingPromises.delete(page);
     }
-  })().finally(() => {
-    loadingPromises.delete(page);
-  });
+  })();
 
   loadingPromises.set(page, promise);
   return promise;
 }
 
 /**
- * Ensure fonts are loaded for present page + radius.
- * Loads center page first, then spreads outward.
+ * Ensure fonts for center page ± radius are loaded.
+ * Center page loads first, then expands outward.
  */
 export async function ensurePagesLoaded(
   centerPage: number,
-  radius: number = 3
+  radius: number = 2,
 ): Promise<void> {
-  // Build load order: center first, then spiral outward
-  const pages: number[] = [];
-  pages.push(centerPage);
-  for (let d = 1; d <= radius; d++) {
-    if (centerPage + d <= TOTAL_QURAN_PAGES) pages.push(centerPage + d);
-    if (centerPage - d >= 1) pages.push(centerPage - d);
+  // Load center page first (blocking)
+  if (isValidPage(centerPage)) {
+    await loadPageFont(centerPage);
   }
 
-  // Load center page immediately (await), rest in parallel
-  if (pages.length > 0) {
-    await loadPageFont(pages[0]);
+  // Load surrounding pages (non-blocking, parallel)
+  const surrounding: number[] = [];
+  for (let d = 1; d <= radius; d++) {
+    if (isValidPage(centerPage - d)) surrounding.push(centerPage - d);
+    if (isValidPage(centerPage + d)) surrounding.push(centerPage + d);
   }
-  if (pages.length > 1) {
-    await Promise.all(pages.slice(1).map(loadPageFont));
-  }
+  // Fire-and-forget so we don't block rendering
+  Promise.all(surrounding.map((p) => loadPageFont(p).catch(() => {}))).catch(
+    () => {},
+  );
 }
 
-/** Preload fonts in background, spiraling outward from a start page */
+/** Preload fonts spiraling outward from a start page */
 export function preloadFontsInBackground(startPage: number): void {
-  const pagesToLoad: number[] = [];
-  for (let d = 0; d <= 604; d++) {
-    if (startPage + d <= 604 && !loadedPages.has(startPage + d)) {
-      pagesToLoad.push(startPage + d);
+  let i = 0;
+  const step = async () => {
+    i++;
+    const pages = [startPage + i, startPage - i].filter(isValidPage);
+    for (const p of pages) {
+      if (!loadedPages.has(p)) {
+        try {
+          await loadPageFont(p);
+        } catch {}
+      }
     }
-    if (d > 0 && startPage - d >= 1 && !loadedPages.has(startPage - d)) {
-      pagesToLoad.push(startPage - d);
+    if (i < 10 && pages.length > 0) {
+      setTimeout(step, 200);
+    }
+  };
+  setTimeout(step, 500);
+}
+
+// ── Helpers ──
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const len = bytes.byteLength;
+  const chunkSize = 8192;
+  for (let offset = 0; offset < len; offset += chunkSize) {
+    const end = Math.min(offset + chunkSize, len);
+    const chunk = bytes.subarray(offset, end);
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
     }
   }
-
-  // Load in small batches to avoid blocking
-  let i = 0;
-  const batchSize = 5;
-  const loadBatch = () => {
-    if (i >= pagesToLoad.length) return;
-    const batch = pagesToLoad.slice(i, i + batchSize);
-    i += batchSize;
-    Promise.all(batch.map(loadPageFont)).then(() => {
-      setTimeout(loadBatch, 50);
-    });
-  };
-  loadBatch();
+  return btoa(binary);
 }

@@ -42,6 +42,35 @@ export interface HighlightItemConfig {
   order: number;
 }
 
+export type IconMode = 'material' | 'ionicons' | 'sf' | 'png';
+
+export interface ConfigurableIcon {
+  mode: IconMode;
+  name?: string;
+  selectedName?: string;
+  pngUrl?: string;
+  selectedPngUrl?: string;
+}
+
+export interface ConfigurableNavItem {
+  key: string;
+  labelAr: string;
+  labelEn?: string;
+  icon: ConfigurableIcon;
+}
+
+export interface UICustomizationConfig {
+  tabBarItems: ConfigurableNavItem[];
+  quranSegments: ConfigurableNavItem[];
+  prayerTopSegments: ConfigurableNavItem[];
+  prayerViewSegments: ConfigurableNavItem[];
+  tabBarLayout?: {
+    labelFontSize?: number;
+    titleVerticalOffset?: number;
+    selectedBgOpacity?: number;
+  };
+}
+
 export interface RemoteAppConfig {
   name: string;
   nameEn: string;
@@ -71,7 +100,61 @@ export interface RemoteAppConfig {
   };
   welcomeBanner?: WelcomeBannerConfig;
   highlights?: HighlightItemConfig[];
+  uiCustomization?: UICustomizationConfig;
 }
+
+const DEFAULT_UI_CUSTOMIZATION: UICustomizationConfig = {
+  tabBarItems: [
+    {
+      key: 'settings',
+      labelAr: 'الإعدادات',
+      labelEn: 'Settings',
+      icon: { mode: 'sf', name: 'gearshape', selectedName: 'gearshape.fill' },
+    },
+    {
+      key: 'prayer',
+      labelAr: 'الصلاة',
+      labelEn: 'Prayer',
+      icon: { mode: 'sf', name: 'building.columns', selectedName: 'building.columns.fill' },
+    },
+    {
+      key: 'tasbih',
+      labelAr: 'تسبيح',
+      labelEn: 'Tasbih',
+      icon: { mode: 'sf', name: 'hand.raised', selectedName: 'hand.raised.fill' },
+    },
+    {
+      key: 'quran',
+      labelAr: 'القرآن',
+      labelEn: 'Quran',
+      icon: { mode: 'sf', name: 'book', selectedName: 'book.fill' },
+    },
+    {
+      key: 'index',
+      labelAr: 'الرئيسية',
+      labelEn: 'Home',
+      icon: { mode: 'sf', name: 'house', selectedName: 'house.fill' },
+    },
+  ],
+  quranSegments: [
+    { key: 'surahs', labelAr: 'السور', labelEn: 'Surahs', icon: { mode: 'material', name: 'book-open-variant' } },
+    { key: 'juz', labelAr: 'الأجزاء', labelEn: 'Juz', icon: { mode: 'material', name: 'bookshelf' } },
+    { key: 'listen', labelAr: 'استماع', labelEn: 'Listen', icon: { mode: 'material', name: 'headphones' } },
+  ],
+  prayerTopSegments: [
+    { key: 'prayer', labelAr: 'الصلاة', labelEn: 'Prayer', icon: { mode: 'material', name: 'clock-time-four-outline' } },
+    { key: 'qibla', labelAr: 'القبلة', labelEn: 'Qibla', icon: { mode: 'material', name: 'compass' } },
+  ],
+  prayerViewSegments: [
+    { key: 'list', labelAr: 'قائمة', labelEn: 'List', icon: { mode: 'material', name: 'format-list-text' } },
+    { key: 'clock', labelAr: 'ساعة', labelEn: 'Clock', icon: { mode: 'material', name: 'clock-outline' } },
+  ],
+  tabBarLayout: {
+    labelFontSize: 12,
+    titleVerticalOffset: 4,
+    selectedBgOpacity: 0.16,
+  },
+};
 
 // القيم الافتراضية
 const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
@@ -101,6 +184,7 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
     ruqyah: true,
     hijri: true,
   },
+  uiCustomization: DEFAULT_UI_CUSTOMIZATION,
 };
 
 // جلب الإعدادات من Firebase

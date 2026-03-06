@@ -38,6 +38,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   } = useQuran();
 
   const [minimized, setMinimized] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const { isPlaying, isLoading, currentSurah, currentAyah, duration, position } = playbackState;
 
   // All hooks must be called before any early return (Rules of Hooks)
@@ -74,6 +75,18 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setMinimized(prev => !prev);
   };
+
+  // If user hid the UI, render a small reopen floating button (audio keeps playing)
+  if (hidden) {
+    return (
+      <Pressable
+        onPress={() => setHidden(false)}
+        style={[styles.reopenButton, global && styles.reopenGlobal]}
+      >
+        <MaterialCommunityIcons name="play" size={18} color="#fff" />
+      </Pressable>
+    );
+  }
 
   // ── Minimized pill view ──
   if (minimized) {
@@ -115,14 +128,24 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
                 />
               )}
             </Pressable>
+
             <Text style={[styles.miniText, { color: textColor }]} numberOfLines={1}>
-              {surahName}
+              {surahName} - آية {currentAyah}
             </Text>
+
             <Pressable
-              onPress={(e) => { e.stopPropagation && e.stopPropagation(); handlePress(stopPlayback); }}
+              onPress={(e) => { e.stopPropagation && e.stopPropagation(); toggleMinimize(); }}
               hitSlop={8}
             >
-              <MaterialCommunityIcons name="close" size={18} color={textSecondary} />
+              <MaterialCommunityIcons name="chevron-up" size={18} color={textSecondary} />
+            </Pressable>
+
+            <Pressable
+              onPress={(e) => { e.stopPropagation && e.stopPropagation(); /* no-op on tap to avoid accidental stop */ }}
+              onLongPress={(e) => { e.stopPropagation && e.stopPropagation(); handlePress(stopPlayback); }}
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons name="close-circle" size={20} color="#FF3B30" />
             </Pressable>
           </View>
         </BlurView>
@@ -151,6 +174,15 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
             },
           ]}
         >
+          {/* Absolute close in top-right corner (hides UI without stopping playback) */}
+          <Pressable
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHidden(true); }}
+            hitSlop={8}
+            style={[styles.absoluteClose, global && styles.absoluteCloseGlobal]}
+          >
+            <MaterialCommunityIcons name="close" size={20} color="#FF3B30" />
+          </Pressable>
+
           {/* Top row: info + controls */}
           <View style={styles.topRow}>
             {/* معلومات التشغيل */}
@@ -191,10 +223,6 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
               <Pressable onPress={() => handlePress(playNext)} style={styles.controlButton}>
                 <MaterialCommunityIcons name="skip-previous" size={22} color={textColor} />
               </Pressable>
-
-              <Pressable onPress={() => handlePress(stopPlayback)} style={styles.controlButton}>
-                <MaterialCommunityIcons name="stop" size={22} color="#FF3B30" />
-              </Pressable>
             </View>
           </View>
 
@@ -233,7 +261,7 @@ const styles = StyleSheet.create({
   },
   globalPosition: {
     position: 'absolute',
-    bottom: 56,
+    bottom: 80,
     left: Spacing.md,
     right: Spacing.md,
     zIndex: 50,
@@ -322,5 +350,33 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-SemiBold',
     fontWeight: '600',
     textAlign: 'right',
+  },
+  absoluteClose: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    zIndex: 20,
+    padding: 6,
+  },
+  absoluteCloseGlobal: {
+    // when the bar is rendered in global mode, nudge the close slightly outward
+    top: -8,
+    right: Spacing.md,
+  },
+  reopenButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    position: 'absolute',
+    bottom: 26,
+    right: Spacing.md,
+    zIndex: 60,
+  },
+  reopenGlobal: {
+    // slightly higher when global is true
+    bottom: 96,
   },
 });

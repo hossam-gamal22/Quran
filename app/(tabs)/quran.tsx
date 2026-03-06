@@ -12,9 +12,10 @@ import {
   StatusBar,
   ScrollView,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -27,11 +28,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useQuran } from '../../contexts/QuranContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { useAppConfig } from '@/lib/app-config-context';
 import { useColors } from '../../hooks/use-colors';
 import { getLastRead } from '../../lib/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import {
-  GlassSegmentedControl,
   GlassCard,
   GlassToggle,
 } from '../../components/ui/GlassCard';
@@ -139,6 +141,7 @@ interface GlassActionButtonProps {
   onPress: () => void;
   isLightBg: boolean;
   primaryColor: string;
+  accentColor?: string;
 }
 
 const GlassActionButton: React.FC<GlassActionButtonProps> = ({
@@ -147,8 +150,10 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
   onPress,
   isLightBg,
   primaryColor,
+  accentColor,
 }) => {
   const scale = useSharedValue(1);
+  const tint = accentColor || primaryColor;
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -166,7 +171,17 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
   return (
     <Animated.View style={[{ flex: 1 }, animatedStyle]}>
       <TouchableOpacity
-        style={styles.glassQuickAction}
+        style={[
+          styles.glassQuickAction,
+          {
+            backgroundColor: isLightBg
+              ? `${tint}1A`
+              : `${tint}26`,
+            borderColor: isLightBg
+              ? `${tint}33`
+              : `${tint}55`,
+          },
+        ]}
         onPress={handlePress}
         activeOpacity={1}
       >
@@ -174,19 +189,19 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
           styles.glassQuickActionInner,
           {
             backgroundColor: isLightBg
-              ? 'rgba(255,255,255,0.6)'
-              : 'rgba(40,42,48,0.6)',
+              ? 'rgba(255,255,255,0.72)'
+              : 'rgba(25,28,34,0.75)',
             borderColor: isLightBg
-              ? 'rgba(255,255,255,0.8)'
-              : 'rgba(255,255,255,0.08)',
+              ? 'rgba(255,255,255,0.78)'
+              : 'rgba(255,255,255,0.12)',
           },
         ]}>
           <View style={styles.glassQuickActionIcon}>
-            <MaterialCommunityIcons name={icon as any} size={18} color={primaryColor} />
+            <MaterialCommunityIcons name={icon as any} size={20} color={tint} />
           </View>
           <Text style={[
             styles.glassQuickActionText,
-            { color: isLightBg ? '#1a1a1a' : '#fff' },
+            { color: tint },
           ]}>
             {label}
           </Text>
@@ -202,7 +217,9 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
 
 export default function QuranScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { isDarkMode, settings, updateDisplay, isRTL } = useSettings();
+  const { config } = useAppConfig();
   const colors = useColors();
   const isLightBg = !isDarkMode;
 
@@ -219,12 +236,53 @@ export default function QuranScreen() {
   } = useQuran();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'surahs' | 'juz' | 'listen'>('surahs');
   const [showReciterModal, setShowReciterModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [lastReadSurah, setLastReadSurah] = useState<number | null>(null);
   const [lastReadPage, setLastReadPage] = useState<number | null>(null);
   const [firstBookmarkPage, setFirstBookmarkPage] = useState<number | null>(null);
+
+  const activeTab = useMemo<'surahs' | 'juz' | 'listen'>(() => {
+    const tab = params.tab;
+    if (tab === 'juz' || tab === 'listen' || tab === 'surahs') return tab;
+    return 'surahs';
+  }, [params.tab]);
+
+  const quranSegments = useMemo(() => {
+    const defaults = {
+      surahs: { label: 'السور', icon: 'book-open-variant' },
+      juz: { label: 'الأجزاء', icon: 'bookshelf' },
+      listen: { label: 'استماع', icon: 'headphones' },
+    };
+
+    const byKey = new Map((config.uiCustomization?.quranSegments || []).map((item) => [item.key, item]));
+
+    return (['surahs', 'juz', 'listen'] as const).map((key) => {
+      const item = byKey.get(key);
+      const label = settings.language === 'ar'
+        ? (item?.labelAr || defaults[key].label)
+        : (item?.labelEn || item?.labelAr || defaults[key].label);
+
+      const iconMode = item?.icon?.mode;
+      const iconName = item?.icon?.name;
+      const iconPng = item?.icon?.pngUrl;
+
+      let icon: string = defaults[key].icon;
+      if (iconMode === 'png' && iconPng) {
+        icon = `img:${iconPng}`;
+      } else if (iconMode === 'ionicons' && iconName) {
+        icon = `ion:${iconName}`;
+      } else if ((iconMode === 'material' || iconMode === 'sf') && iconName) {
+        icon = iconName;
+      }
+
+      return { key, label, icon };
+    });
+  }, [config.uiCustomization?.quranSegments, settings.language]);
+
+  const quranSegmentKeys = useMemo(() => quranSegments.map((segment) => segment.key as 'surahs' | 'juz' | 'listen'), [quranSegments]);
+  const quranSegmentLabels = useMemo(() => quranSegments.map((segment) => segment.label), [quranSegments]);
+  const quranSelectedIndex = Math.max(0, quranSegmentKeys.indexOf(activeTab));
 
   useEffect(() => {
     let mounted = true;
@@ -318,7 +376,17 @@ export default function QuranScreen() {
     if (firstBookmarkPage) {
       const surah = getFirstSurahOnPage(firstBookmarkPage);
       router.push(`/surah/${surah}?page=${firstBookmarkPage}`);
+      return;
     }
+
+    Alert.alert(
+      'لا يوجد فاصل محفوظ',
+      'احفظ فاصلًا أولًا من شاشة المصحف عبر الضغط المطول على الآية، أو افتح المفضلة.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        { text: 'فتح المفضلة', onPress: () => router.push('/favorites') },
+      ]
+    );
   }, [firstBookmarkPage, router]);
 
   const onSurahPress = useCallback(
@@ -654,14 +722,21 @@ export default function QuranScreen() {
 
         {/* التبويبات - iOS Glass Segmented Control */}
         <View style={{ marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-          <GlassSegmentedControl
-            segments={[
-              { key: 'surahs', label: 'السور', icon: 'book-open-variant' },
-              { key: 'juz', label: 'الأجزاء', icon: 'bookshelf' },
-              { key: 'listen', label: 'استماع', icon: 'headphones' },
-            ]}
-            selected={activeTab}
-            onSelect={(key) => setActiveTab(key as 'surahs' | 'juz' | 'listen')}
+          <SegmentedControl
+            values={quranSegmentLabels}
+            selectedIndex={quranSelectedIndex}
+            onChange={(event) => {
+              const nextKey = quranSegmentKeys[event.nativeEvent.selectedSegmentIndex] || 'surahs';
+              router.replace({
+                pathname: '/(tabs)/quran',
+                params: { tab: nextKey },
+              });
+            }}
+            tintColor={Platform.OS === 'ios' ? '#D4AF37' : undefined}
+            backgroundColor={isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(34,38,46,0.82)'}
+            style={{ height: 44 }}
+            fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isLightBg ? '#1F2937' : '#D1D5DB' }}
+            activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isLightBg ? '#111827' : '#F9FAFB' }}
           />
         </View>
 
@@ -760,6 +835,7 @@ export default function QuranScreen() {
                 onPress={() => router.push('/tafsir-search')}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
+                accentColor="#2563EB"
               />
               <GlassActionButton
                 icon="book-open-page-variant"
@@ -767,6 +843,7 @@ export default function QuranScreen() {
                 onPress={openLastReadSurah}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
+                accentColor="#16A34A"
               />
             </View>
             <View style={styles.quickActionsRow}>
@@ -776,6 +853,7 @@ export default function QuranScreen() {
                 onPress={openBookmarkPage}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
+                accentColor="#D97706"
               />
               <GlassActionButton
                 icon="book-check"
@@ -783,6 +861,7 @@ export default function QuranScreen() {
                 onPress={() => router.push('/khatma')}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
+                accentColor="#7C3AED"
               />
             </View>
           </View>
@@ -1174,28 +1253,30 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   glassQuickAction: {
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
   },
   glassQuickActionInner: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
-    borderRadius: 16,
-    paddingVertical: 11,
-    paddingHorizontal: Spacing.md,
+    gap: 4,
+    borderRadius: 18,
+    minHeight: 60,
+    paddingVertical: 8,
+    paddingHorizontal: Spacing.sm,
     borderWidth: StyleSheet.hairlineWidth,
   },
   glassQuickActionIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   glassQuickActionText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     fontFamily: 'Cairo-SemiBold',
     fontWeight: '600',
   },

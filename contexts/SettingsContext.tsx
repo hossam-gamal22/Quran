@@ -83,6 +83,10 @@ export interface DisplaySettings {
   homeLayout: HomeLayout;
   /** Font size adjustment for Mushaf reader (-4 to +8, default 0) */
   quranFontSizeAdjust: number;
+  /** Fallback font selection: 'page' = per-page QPC font, or bundled Uthmanic variants */
+  quranFontFallback?: 'page' | 'uthmanic3' | 'uthmanic2' | 'uthmanic1';
+  /** Use CDN page images instead of text rendering */
+  quranUseCdnPages?: boolean;
   /** Show tafsir panel below Mushaf reader */
   showTafsir: boolean;
   /** Focus mode - hide UI elements while reading Quran */
@@ -179,6 +183,8 @@ const defaultDisplay: DisplaySettings = {
   quranBackground: 'quranbg1',
   quranFontSizeAdjust: 0,
   quranThemeIndex: 0,
+  quranFontFallback: 'page',
+  quranUseCdnPages: false,
   homeLayout: 'grid',
   showTafsir: false,
   focusMode: false,

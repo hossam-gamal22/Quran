@@ -65,10 +65,11 @@ class AudioPlayerManager {
     surahNumber: number,
     ayahNumber: number,
     reciterIdentifier: string,
-    continuous: boolean = false
+    continuous: boolean = false,
+    suppressLoading: boolean = false
   ): Promise<void> {
     try {
-      this.updateState({ isLoading: true });
+      if (!suppressLoading) this.updateState({ isLoading: true });
       this.continuousPlay = continuous;
 
       // الحصول على عدد آيات السورة
@@ -133,21 +134,22 @@ class AudioPlayerManager {
 
       // عند انتهاء الآية
       if (status.didJustFinish && this.continuousPlay) {
-        await this.playNextAyah();
+        // Internal transition: suppress the loading indicator between ayahs
+        await this.playNextAyah(true);
       }
     }
   }
 
   // ─── تشغيل الآية التالية ─────────────────────────────────────────────────────
-  async playNextAyah(): Promise<void> {
+  async playNextAyah(suppressLoading: boolean = false): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
     
     if (currentAyah < this.surahAyahsCount) {
       // الآية التالية في نفس السورة
-      await this.playAyah(currentSurah, currentAyah + 1, reciterIdentifier, true);
+      await this.playAyah(currentSurah, currentAyah + 1, reciterIdentifier, true, suppressLoading);
     } else if (currentSurah < 114) {
       // أول آية في السورة التالية
-      await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true);
+      await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true, suppressLoading);
     } else {
       // نهاية القرآن
       await this.stop();
@@ -192,6 +194,8 @@ class AudioPlayerManager {
       isLoading: false,
       duration: 0,
       position: 0,
+      currentSurah: 0,
+      currentAyah: 0,
     });
   }
 

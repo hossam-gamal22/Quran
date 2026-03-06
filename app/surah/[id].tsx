@@ -20,6 +20,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
 import {
   View,
   Text,
@@ -233,7 +235,7 @@ const bs = StyleSheet.create({
 });
 
 // ══════════════════════════════════════════════
-// MushafPage — QPC V2 rendering with bookmark + audio highlighting
+// MushafPage — QCF4 V4 font-based rendering with bookmark + audio highlighting
 // ══════════════════════════════════════════════
 
 interface MushafPageProps {
@@ -241,6 +243,9 @@ interface MushafPageProps {
   themeIndex: number;
   width: number;
   fontSizeAdjust: number;
+  forceLightText?: boolean;
+  fontFallbackKey?: 'page' | 'uthmanic3' | 'uthmanic2' | 'uthmanic1';
+  useCdnImage?: boolean;
   bookmarkMap: Record<string, BookmarkColor>;
   playingAyahKey: string | null;
   highlightAyahKey: string | null;
@@ -248,18 +253,25 @@ interface MushafPageProps {
 }
 
 const MushafPage = React.memo(function MushafPage({
-  page, themeIndex, width, fontSizeAdjust, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
+  page, themeIndex, width, fontSizeAdjust, forceLightText, fontFallbackKey, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
 }: MushafPageProps) {
+  const { isDarkMode } = useSettings();
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page));
-  const textColor = getQuranTextColor('', themeIndex);
+  const [fontError, setFontError] = useState(false);
+  const baseTextColor = getQuranTextColor('', themeIndex);
+  const textColor = forceLightText ? '#F3EBDD' : baseTextColor;
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
 
+  // Load QCF4 per-page font
   useEffect(() => {
     if (!fontLoaded) {
-      loadPageFont(page).then(() => setFontLoaded(true)).catch(() => {});
+      setFontError(false);
+      loadPageFont(page, isDarkMode)
+        .then(() => setFontLoaded(true))
+        .catch(() => setFontError(true));
     }
-  }, [page, fontLoaded]);
+  }, [page, fontLoaded, isDarkMode]);
 
   const blocks = useMemo(() => (fontLoaded ? buildPageBlocks(page) : []), [page, fontLoaded]);
   const fontFamily = getPageFontFamily(page);
@@ -276,7 +288,8 @@ const MushafPage = React.memo(function MushafPage({
       ? fontSize * 1.6
       : fontSize * 1.7;
 
-  if (!fontLoaded) {
+  // Font loading state
+  if (!fontLoaded && !fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={goldenColor} />
@@ -284,14 +297,36 @@ const MushafPage = React.memo(function MushafPage({
     );
   }
 
+  // Font failed to load — retry UI
+  if (fontError) {
+    return (
+      <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ color: getQuranTextColor('', themeIndex), marginBottom: 12 }}>تعذر تحميل خط الصفحة</Text>
+        <TouchableOpacity
+          onPress={() => {
+            setFontError(false);
+            setFontLoaded(false);
+          }}
+          style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: getGoldenColor(themeIndex), borderRadius: 10 }}
+        >
+          <Text style={{ color: '#fff' }}>إعادة المحاولة</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const WINDOW_HEIGHT = Dimensions.get('window').height;
+  const MIN_PAGE_HEIGHT = Math.max(WINDOW_HEIGHT - 140, 520);
+
   return (
     <ScrollView
       style={{ width }}
       contentContainerStyle={{
         flexGrow: 1,
         justifyContent: 'flex-start',
-        paddingVertical: 4,
-        paddingHorizontal: 4,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        minHeight: MIN_PAGE_HEIGHT,
       }}
       showsVerticalScrollIndicator={false}
       bounces={false}
@@ -304,56 +339,68 @@ const MushafPage = React.memo(function MushafPage({
           return <BasmalaLine key={`bsm-${i}`} themeIndex={themeIndex} />;
         }
 
-        // Group segments by ayah for bookmark/audio highlighting
-        type SegGroup = { surah: number; ayah: number; parts: { glyph: string; isEnd: boolean }[] };
-        const ayahGroups: SegGroup[] = [];
-        let curr: SegGroup | null = null;
-        for (const seg of block.segments) {
-          if (!curr || curr.surah !== seg.surah || curr.ayah !== seg.ayah) {
-            curr = { surah: seg.surah, ayah: seg.ayah, parts: [] };
-            ayahGroups.push(curr);
+        // Render each page LINE as a single Text element to preserve layout
+        if (block.type === 'ayah') {
+          // build segments grouped by ayah but keep them inline within the line
+          type SegGroup = { surah: number; ayah: number; parts: { glyph: string; isEnd: boolean }[] };
+          const ayahGroups: SegGroup[] = [];
+          let curr: SegGroup | null = null;
+          for (const seg of block.segments) {
+            if (!curr || curr.surah !== seg.surah || curr.ayah !== seg.ayah) {
+              curr = { surah: seg.surah, ayah: seg.ayah, parts: [] };
+              ayahGroups.push(curr);
+            }
+            curr.parts.push({ glyph: seg.glyph, isEnd: seg.isAyahEnd });
           }
-          curr.parts.push({ glyph: seg.glyph, isEnd: seg.isAyahEnd });
+
+          return (
+            <Text
+              key={i}
+              style={{ fontFamily, fontSize, textAlign: 'center', lineHeight, writingDirection: 'rtl' }}
+              allowFontScaling={false}
+            >
+              {ayahGroups.map((group, gi) => {
+                const ayahKey = `${group.surah}:${group.ayah}`;
+                const bcolor = bookmarkMap[ayahKey];
+                const isPlaying = playingAyahKey === ayahKey;
+                const isHighlighted = highlightAyahKey === ayahKey;
+
+                let bgColor: string | undefined;
+                if (bcolor) bgColor = BOOKMARK_BG_COLORS[bcolor];
+                else if (isPlaying) bgColor = PLAYING_AYAH_BG;
+                else if (isHighlighted) bgColor = targetAyahBg;
+
+                return (
+                  <Text
+                    key={gi}
+                    onLongPress={() => {
+                      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      onAyahLongPress?.(group.surah, group.ayah, page);
+                    }}
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    {group.parts.map((part, pi) => (
+                      <Text
+                        key={pi}
+                        style={{
+                          color: textColor, // لون موحد فقط
+                          ...(isDarkMode ? {
+                            textShadowColor: '#222',
+                            textShadowOffset: { width: 0, height: 1 },
+                            textShadowRadius: 2,
+                          } : {}),
+                        }}
+                      >
+                        {part.glyph}
+                      </Text>
+                    ))}
+                  </Text>
+                );
+              })}
+            </Text>
+          );
         }
-
-        return (
-          <Text
-            key={i}
-            style={{ fontFamily, fontSize, textAlign: 'center', lineHeight }}
-          >
-            {ayahGroups.map((group, gi) => {
-              const ayahKey = `${group.surah}:${group.ayah}`;
-              const bcolor = bookmarkMap[ayahKey];
-              const isPlaying = playingAyahKey === ayahKey;
-              const isHighlighted = highlightAyahKey === ayahKey;
-
-              let bgColor: string | undefined;
-              if (bcolor) bgColor = BOOKMARK_BG_COLORS[bcolor];
-              else if (isPlaying) bgColor = PLAYING_AYAH_BG;
-              else if (isHighlighted) bgColor = targetAyahBg;
-
-              return (
-                <Text
-                  key={gi}
-                  style={{ backgroundColor: bgColor }}
-                  onLongPress={() => {
-                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    onAyahLongPress?.(group.surah, group.ayah, page);
-                  }}
-                >
-                  {group.parts.map((part, pi) => (
-                    <Text
-                      key={pi}
-                      style={{ color: part.isEnd ? goldenColor : textColor }}
-                    >
-                      {part.glyph}
-                    </Text>
-                  ))}
-                </Text>
-              );
-            })}
-          </Text>
-        );
+        return null;
       })}
     </ScrollView>
   );
@@ -463,7 +510,9 @@ export default function SurahScreen() {
   // Intelligent default: light mode → quranbg1, dark mode → quranbg3
   const defaultBg = isDarkMode ? 'quranbg3' : 'quranbg1';
   const quranBgKey = settings.display.quranBackground ?? defaultBg;
-  const isLightBg = isThemeLight(themeIndex);
+  const hasDarkBackgroundImage = quranBgKey === 'quranbg3' || quranBgKey === 'quranbg4';
+  const isLightBg = isThemeLight(themeIndex) && !hasDarkBackgroundImage;
+  const forceLightText = isDarkMode || hasDarkBackgroundImage;
   const textColor = getQuranTextColor('', themeIndex);
   const goldenColor = getGoldenColor(themeIndex);
 
@@ -775,6 +824,9 @@ export default function SurahScreen() {
           themeIndex={themeIndex}
           width={SCREEN_WIDTH}
           fontSizeAdjust={fontSizeAdjust}
+          forceLightText={forceLightText}
+          fontFallbackKey={settings.display.quranFontFallback}
+          useCdnImage={settings.display.quranUseCdnPages}
           bookmarkMap={bookmarkMap}
           playingAyahKey={playingAyahKey}
           highlightAyahKey={highlightAyahKey}
@@ -937,6 +989,9 @@ export default function SurahScreen() {
               themeIndex={themeIndex}
               width={SCREEN_WIDTH}
               fontSizeAdjust={fontSizeAdjust}
+              forceLightText={forceLightText}
+              fontFallbackKey={settings.display.quranFontFallback}
+              useCdnImage={settings.display.quranUseCdnPages}
               bookmarkMap={bookmarkMap}
               playingAyahKey={null}
               highlightAyahKey={null}
@@ -1459,6 +1514,36 @@ export default function SurahScreen() {
                             <Text style={[stg.resetText, { color: goldenColor }]}>إعادة تعيين</Text>
                           </TouchableOpacity>
                         )}
+                      </View>
+
+                      {/* ─── Quran Font Fallback ─── */}
+                      <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)' }]}>
+                        <View style={stg.sectionHeader}>
+                          <MaterialCommunityIcons name="font" size={20} color={goldenColor} />
+                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>خط المصحف (Fallback)</Text>
+                        </View>
+                        <View style={{ paddingVertical: 8 }}>
+                          {([
+                            { key: 'page', label: 'خط الصفحة (افتراضي)' },
+                            { key: 'uthmanic3', label: 'Uthmanic Hafs 3' },
+                            { key: 'uthmanic2', label: 'Uthmanic Hafs 2' },
+                            { key: 'uthmanic1', label: 'Uthmanic Hafs 1' },
+                          ] as const).map(opt => {
+                            const isActive = (settings.display.quranFontFallback ?? 'page') === opt.key;
+                            return (
+                              <TouchableOpacity
+                                key={opt.key}
+                                style={[stg.optionRow, { paddingVertical: 8 }]}
+                                onPress={() => updateDisplay({ quranFontFallback: opt.key as any })}
+                              >
+                                <View style={{ flex: 1 }}>
+                                  <Text style={{ color: isActive ? goldenColor : (settingsIsLight ? '#333' : '#fff') }}>{opt.label}</Text>
+                                </View>
+                                {isActive && <MaterialCommunityIcons name="check" size={18} color={goldenColor} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </View>
 
                       {/* ─── Background Image ─── */}

@@ -21,7 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
-import { GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
 
 import AzkarAPI, {
   AzkarCategory,
@@ -211,52 +211,51 @@ export default function AzkarScreen() {
         ]}
       >
         <TouchableOpacity
-          style={[
-            styles.gridCardInner,
-            { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
-          ]}
+          style={styles.gridCardInner}
           onPress={() => navigateToCategory(category.id)}
           onLongPress={() => shareCategory(category)}
           activeOpacity={0.7}
         >
-          {/* الأيقونة */}
-          <View style={styles.iconContainer}> 
-            {renderIcon(category.id, 28, category.color)}
-          </View>
-
-          {/* الاسم */}
-          <Text
-            style={[
-              styles.categoryName,
-              { color: darkMode ? '#F9FAFB' : '#1F2937' },
-            ]}
-            numberOfLines={2}
-          >
-            {categoryName}
-          </Text>
-
-          {/* العدد */}
-          <Text style={[styles.azkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-            {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
-          </Text>
-
-          {/* شريط التقدم */}
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { backgroundColor: darkMode ? '#374151' : '#E5E7EB' }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${categoryProgress}%`,
-                    backgroundColor: category.color,
-                  },
-                ]}
-              />
+          <GlassCard intensity={42} style={styles.gridCardGlass}>
+            {/* الأيقونة */}
+            <View style={styles.iconContainer}> 
+              {renderIcon(category.id, 28, category.color)}
             </View>
-            <Text style={[styles.progressText, { color: category.color }]}>
-              {categoryProgress}%
+
+            {/* الاسم */}
+            <Text
+              style={[
+                styles.categoryName,
+                { color: darkMode ? '#F9FAFB' : '#1F2937' },
+              ]}
+              numberOfLines={2}
+            >
+              {categoryName}
             </Text>
-          </View>
+
+            {/* العدد */}
+            <Text style={[styles.azkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+            </Text>
+
+            {/* شريط التقدم */}
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, { backgroundColor: darkMode ? '#374151' : '#E5E7EB' }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${categoryProgress}%`,
+                      backgroundColor: category.color,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.progressText, { color: category.color }]}>
+                {categoryProgress}%
+              </Text>
+            </View>
+          </GlassCard>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -288,42 +287,41 @@ export default function AzkarScreen() {
         ]}
       >
         <TouchableOpacity
-          style={[
-            styles.listCardInner,
-            { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
-          ]}
+          style={styles.listCardInner}
           onPress={() => navigateToCategory(category.id)}
           onLongPress={() => shareCategory(category)}
           activeOpacity={0.7}
         >
-          {/* الأيقونة */}
-          <View style={styles.listIconContainer}> 
-            {renderIcon(category.id, 24, category.color)}
-          </View>
+          <GlassCard intensity={40} style={styles.listCardGlass}>
+            {/* الأيقونة */}
+            <View style={styles.listIconContainer}> 
+              {renderIcon(category.id, 24, category.color)}
+            </View>
 
-          {/* المحتوى */}
-          <View style={styles.listContent}>
-            <Text
-              style={[
-                styles.listCategoryName,
-                { color: darkMode ? '#F9FAFB' : '#1F2937' },
-              ]}
-              numberOfLines={1}
-            >
-              {categoryName}
-            </Text>
-            <Text style={[styles.listAzkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-              {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
-            </Text>
-          </View>
+            {/* المحتوى */}
+            <View style={styles.listContent}>
+              <Text
+                style={[
+                  styles.listCategoryName,
+                  { color: darkMode ? '#F9FAFB' : '#1F2937' },
+                ]}
+                numberOfLines={1}
+              >
+                {categoryName}
+              </Text>
+              <Text style={[styles.listAzkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+                {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+              </Text>
+            </View>
 
-          {/* التقدم */}
-          <View style={styles.listProgressContainer}>
-            <Text style={[styles.listProgressText, { color: category.color }]}>
-              {categoryProgress}%
-            </Text>
-            <Ionicons name="chevron-forward" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-          </View>
+            {/* التقدم */}
+            <View style={styles.listProgressContainer}>
+              <Text style={[styles.listProgressText, { color: category.color }]}>
+                {categoryProgress}%
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+            </View>
+          </GlassCard>
         </TouchableOpacity>
       </Animated.View>
     );
@@ -351,17 +349,16 @@ export default function AzkarScreen() {
           {quickLinks.map(link => (
             <TouchableOpacity
               key={link.id}
-              style={[
-                styles.quickLinkCard,
-                { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
-              ]}
+              style={styles.quickLinkCard}
               onPress={() => router.push(link.route as any)}
               activeOpacity={0.7}
             >
-              <Ionicons name={link.icon as any} size={24} color={link.color} />
-              <Text style={[styles.quickLinkLabel, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                {link.label}
-              </Text>
+              <GlassCard intensity={38} style={styles.quickLinkGlass}>
+                <Ionicons name={link.icon as any} size={24} color={link.color} />
+                <Text style={[styles.quickLinkLabel, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                  {link.label}
+                </Text>
+              </GlassCard>
             </TouchableOpacity>
           ))}
         </View>
@@ -505,11 +502,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   gridCardInner: {
+    width: '100%',
+  },
+  gridCardGlass: {
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    minHeight: 160,
   },
   iconContainer: {
     width: 56,
@@ -560,12 +559,13 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   listCardInner: {
+    width: '100%',
+  },
+  listCardGlass: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   listIconContainer: {
     width: 48,
@@ -606,11 +606,11 @@ const styles = StyleSheet.create({
   },
   quickLinkCard: {
     width: (width - 56) / 3,
+  },
+  quickLinkGlass: {
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   quickLinkLabel: {
     fontSize: 12,

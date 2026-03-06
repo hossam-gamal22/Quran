@@ -15,10 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
@@ -43,9 +44,10 @@ import {
 } from '@/lib/prayer-times';
 import { getHijriDate } from '@/lib/hijri-date';
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
+import { useAppConfig } from '@/lib/app-config-context';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { GlassCard, GlassToggle, GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { GlassCard, GlassToggle } from '@/components/ui/GlassCard';
 
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
@@ -79,8 +81,10 @@ const ASR_METHODS = [
 export default function PrayerScreen() {
   // استخدام الـ context بدل المتغيرات الثابتة
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
+  const { config } = useAppConfig();
   const language = settings.language;
   const router = useRouter();
+  const params = useLocalSearchParams<{ view?: string }>();
 
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationType | null>(null);
@@ -89,8 +93,80 @@ export default function PrayerScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showClock, setShowClock] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  const showClock = params.view === 'clock';
+
+  const prayerTopSegments = React.useMemo(() => {
+    const defaults = {
+      prayer: { label: 'الصلاة', icon: 'clock-time-four-outline' },
+      qibla: { label: 'القبلة', icon: 'compass' },
+    } as const;
+
+    const byKey = new Map((config.uiCustomization?.prayerTopSegments || []).map((item) => [item.key, item]));
+
+    return (['prayer', 'qibla'] as const).map((key) => {
+      const item = byKey.get(key);
+      const label = settings.language === 'ar'
+        ? (item?.labelAr || defaults[key].label)
+        : (item?.labelEn || item?.labelAr || defaults[key].label);
+
+      const iconMode = item?.icon?.mode;
+      const iconName = item?.icon?.name;
+      const iconPng = item?.icon?.pngUrl;
+
+      let icon = defaults[key].icon;
+      if (iconMode === 'png' && iconPng) {
+        icon = `img:${iconPng}`;
+      } else if (iconMode === 'ionicons' && iconName) {
+        icon = `ion:${iconName}`;
+      } else if ((iconMode === 'material' || iconMode === 'sf') && iconName) {
+        icon = iconName;
+      }
+
+      return { key, label, icon };
+    });
+  }, [config.uiCustomization?.prayerTopSegments, settings.language]);
+
+  const prayerTopKeys = React.useMemo(() => prayerTopSegments.map((segment) => segment.key as 'prayer' | 'qibla'), [prayerTopSegments]);
+  const prayerTopLabels = React.useMemo(() => prayerTopSegments.map((segment) => segment.label), [prayerTopSegments]);
+
+  const prayerViewSegments = React.useMemo(() => {
+    const defaults = {
+      list: { label: 'قائمة', icon: 'format-list-text' },
+      clock: { label: 'ساعة', icon: 'clock-outline' },
+    } as const;
+
+    const byKey = new Map((config.uiCustomization?.prayerViewSegments || []).map((item) => [item.key, item]));
+
+    return (['list', 'clock'] as const).map((key) => {
+      const item = byKey.get(key);
+      const label = settings.language === 'ar'
+        ? (item?.labelAr || defaults[key].label)
+        : (item?.labelEn || item?.labelAr || defaults[key].label);
+
+      const iconMode = item?.icon?.mode;
+      const iconName = item?.icon?.name;
+      const iconPng = item?.icon?.pngUrl;
+
+      let icon = defaults[key].icon;
+      if (iconMode === 'png' && iconPng) {
+        icon = `img:${iconPng}`;
+      } else if (iconMode === 'ionicons' && iconName) {
+        icon = `ion:${iconName}`;
+      } else if ((iconMode === 'material' || iconMode === 'sf') && iconName) {
+        icon = iconName;
+      }
+
+      return { key, label, icon };
+    });
+  }, [config.uiCustomization?.prayerViewSegments, settings.language]);
+
+  const prayerViewKeys = React.useMemo(() => prayerViewSegments.map((segment) => segment.key as 'list' | 'clock'), [prayerViewSegments]);
+  const prayerViewLabels = React.useMemo(() => prayerViewSegments.map((segment) => segment.label), [prayerViewSegments]);
+  const prayerViewSelectedIndex = showClock
+    ? Math.max(0, prayerViewKeys.indexOf('clock'))
+    : Math.max(0, prayerViewKeys.indexOf('list'));
 
   const fetchLocation = async (): Promise<LocationType | null> => {
     try {
@@ -272,6 +348,25 @@ export default function PrayerScreen() {
         </View>
       </Animated.View>
 
+      <View style={styles.topNavTabsWrap}>
+        <SegmentedControl
+          values={prayerTopLabels}
+          selectedIndex={0}
+          onChange={(event) => {
+            const key = prayerTopKeys[event.nativeEvent.selectedSegmentIndex] || 'prayer';
+            if (key === 'qibla') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/qibla');
+            }
+          }}
+          tintColor={Platform.OS === 'ios' ? '#2f7659' : undefined}
+          backgroundColor={isDarkMode ? 'rgba(34,38,46,0.82)' : 'rgba(255,255,255,0.65)'}
+          style={{ height: 44 }}
+          fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isDarkMode ? '#D1D5DB' : '#1F2937' }}
+          activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isDarkMode ? '#F9FAFB' : '#111827' }}
+        />
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -436,13 +531,21 @@ export default function PrayerScreen() {
 
       {/* iOS Glass Segmented Toggle */}
       <View style={styles.toggleContainer}>
-        <GlassSegmentedControl
-          segments={[
-            { key: 'list', label: 'قائمة', icon: 'format-list-text' },
-            { key: 'clock', label: 'ساعة', icon: 'clock-outline' },
-          ]}
-          selected={showClock ? 'clock' : 'list'}
-          onSelect={(key) => setShowClock(key === 'clock')}
+        <SegmentedControl
+          values={prayerViewLabels}
+          selectedIndex={prayerViewSelectedIndex}
+          onChange={(event) => {
+            const key = prayerViewKeys[event.nativeEvent.selectedSegmentIndex] || 'list';
+            router.replace({
+              pathname: '/(tabs)/prayer',
+              params: { view: key },
+            });
+          }}
+          tintColor={Platform.OS === 'ios' ? '#2f7659' : undefined}
+          backgroundColor={isDarkMode ? 'rgba(34,38,46,0.82)' : 'rgba(255,255,255,0.65)'}
+          style={{ height: 44 }}
+          fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isDarkMode ? '#D1D5DB' : '#1F2937' }}
+          activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isDarkMode ? '#F9FAFB' : '#111827' }}
         />
       </View>
 
@@ -603,6 +706,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  topNavTabsWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   scrollContent: {
     paddingVertical: 10,

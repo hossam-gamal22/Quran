@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -143,7 +143,9 @@ export default function RootLayout() {
                         <Stack
                           screenOptions={{
                             headerShown: false,
-                            animation: 'slide_from_right',
+                            animation: Platform.OS === 'ios' ? 'ios_from_right' : 'fade_from_bottom',
+                            gestureEnabled: true,
+                            fullScreenGestureEnabled: Platform.OS === 'ios',
                           }}
                         >
                           <Stack.Screen name="(tabs)" />
