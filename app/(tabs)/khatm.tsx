@@ -124,7 +124,7 @@ export default function KhatmScreen() {
     // Progress card
     progressCard: {
       margin: 16, backgroundColor: colors.primary, borderRadius: 22, padding: 24,
-      shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
+      borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)',
     },
     khatmName: { fontSize: 18, fontWeight: '800', color: '#fff', textAlign: 'right', marginBottom: 4 },
     khatmDuration: { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginBottom: 16 },
@@ -141,14 +141,14 @@ export default function KhatmScreen() {
     // Stats row
     statsRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 16 },
     statCard: {
-      flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 14,
+      flex: 1, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, padding: 14,
       borderWidth: 1, borderColor: colors.border, alignItems: 'center',
     },
     statNum: { fontSize: 26, fontWeight: '900', color: colors.primary },
     statLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
     // Empty state
     emptyCard: {
-      margin: 16, backgroundColor: colors.surface, borderRadius: 20, padding: 32,
+      margin: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 20, padding: 32,
       alignItems: 'center', borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed',
     },
     emptyEmoji: { fontSize: 52, marginBottom: 12 },
@@ -162,7 +162,7 @@ export default function KhatmScreen() {
     // History
     sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, textAlign: 'right', paddingHorizontal: 16, marginBottom: 8 },
     historyItem: {
-      marginHorizontal: 16, marginBottom: 10, backgroundColor: colors.surface,
+      marginHorizontal: 16, marginBottom: 10, backgroundColor: 'rgba(120,120,128,0.12)',
       borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.border,
       flexDirection: 'row', alignItems: 'center',
     },
@@ -181,7 +181,7 @@ export default function KhatmScreen() {
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
     modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 16 },
     input: {
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
       borderRadius: 14, padding: 14, fontSize: 16, color: colors.foreground,
       textAlign: 'right', marginBottom: 16,
     },
@@ -207,8 +207,8 @@ export default function KhatmScreen() {
       backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999,
     },
     celebCard: {
-      backgroundColor: '#fff', borderRadius: 28, padding: 40, alignItems: 'center',
-      shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 20,
+      backgroundColor: 'rgba(30,30,30,0.95)', borderRadius: 28, padding: 40, alignItems: 'center',
+      borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)',
     },
   });
 
@@ -345,7 +345,7 @@ export default function KhatmScreen() {
                     {isCompleted && <IconSymbol name="checkmark" size={14} color="#fff" />}
                   </View>
                   <Text style={s.surahName}>{SURAH_NAMES_AR[surahNum - 1]}</Text>
-                  <View style={[s.surahNum, { backgroundColor: isCompleted ? colors.primary + '18' : colors.surface, borderWidth: 1, borderColor: colors.border }]}>
+                  <View style={[s.surahNum, { backgroundColor: isCompleted ? colors.primary + '18' : 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border }]}>
                     <Text style={[s.surahNumText, { color: isCompleted ? colors.primary : colors.muted }]}>{surahNum}</Text>
                   </View>
                 </TouchableOpacity>

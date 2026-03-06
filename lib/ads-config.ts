@@ -1,29 +1,27 @@
 // lib/ads-config.ts
 // إعدادات الإعلانات - روح المسلم
-// آخر تحديث: 2026-03-04
 
 import { Platform } from 'react-native';
 import { db } from './firebase-config';
 import { doc, getDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ==================== Ad Unit IDs ====================
+// ==================== Ad Screen Keys ====================
 
-export const AD_IDS = {
-  APP_OPEN: {
-    android: 'ca-app-pub-6103597967254377/5798712736',
-    ios: 'ca-app-pub-6103597967254377/3930767722',
-  },
-  // يمكنك إضافة المزيد لاحقاً
-  BANNER: {
-    android: '', // أضف لاحقاً
-    ios: '',     // أضف لاحقاً
-  },
-  INTERSTITIAL: {
-    android: '', // أضف لاحقاً
-    ios: '',     // أضف لاحقاً
-  },
-};
+export type AdScreenKey =
+  | 'home'
+  | 'quran'
+  | 'azkar'
+  | 'tasbih'
+  | 'prayer'
+  | 'duas'
+  | 'names'
+  | 'ruqya'
+  | 'hijri'
+  | 'surah'
+  | 'tafsir'
+  | 'khatma'
+  | 'worship';
 
 // ==================== Test Ad IDs ====================
 
@@ -35,24 +33,65 @@ export const TEST_AD_IDS = {
 
 // ==================== Types ====================
 
+export interface AdUnitIds {
+  android: string;
+  ios: string;
+}
+
 export interface AdsConfig {
   enabled: boolean;
-  showAppOpenAd: boolean;
-  appOpenAdFrequency: number;
-  skipFirstOpen: boolean;
-  minTimeBetweenAds: number;
-  maxAdsPerSession: number;
+  // Ad Unit IDs
+  bannerAdId: AdUnitIds;
+  interstitialAdId: AdUnitIds;
+  appOpenAdId: AdUnitIds;
+  // Per-screen banner visibility
+  bannerScreens: Record<string, boolean>;
+  // App Open Ad
+  showAdOnAppOpen: boolean;
+  // Interstitial settings
+  interstitialMode: 'pages' | 'time' | 'session';
+  interstitialFrequency: number;
+  interstitialTimeInterval: number;
+  interstitialSessionLimit: number;
+  // Delay
+  delayFirstAd: boolean;
+  firstAdDelay: number;
+  // Metadata
+  updatedAt?: string;
 }
 
 // ==================== Default Config ====================
 
-const DEFAULT_ADS_CONFIG: AdsConfig = {
+export const DEFAULT_ADS_CONFIG: AdsConfig = {
   enabled: true,
-  showAppOpenAd: true,
-  appOpenAdFrequency: 1,      // كل مرة يفتح التطبيق
-  skipFirstOpen: true,         // تخطي أول فتح
-  minTimeBetweenAds: 60,       // 60 ثانية
-  maxAdsPerSession: 5,         // أقصى 5 إعلانات
+  bannerAdId: { android: '', ios: '' },
+  interstitialAdId: { android: '', ios: '' },
+  appOpenAdId: {
+    android: 'ca-app-pub-6103597967254377/5798712736',
+    ios: 'ca-app-pub-6103597967254377/3930767722',
+  },
+  bannerScreens: {
+    home: true,
+    quran: false,
+    azkar: true,
+    tasbih: false,
+    prayer: false,
+    duas: false,
+    names: false,
+    ruqya: false,
+    hijri: false,
+    surah: false,
+    tafsir: false,
+    khatma: false,
+    worship: false,
+  },
+  showAdOnAppOpen: false,
+  interstitialMode: 'pages',
+  interstitialFrequency: 5,
+  interstitialTimeInterval: 3,
+  interstitialSessionLimit: 2,
+  delayFirstAd: true,
+  firstAdDelay: 30,
 };
 
 // ==================== Functions ====================
@@ -60,13 +99,76 @@ const DEFAULT_ADS_CONFIG: AdsConfig = {
 /**
  * الحصول على Ad Unit ID حسب المنصة
  */
-export const getAdUnitId = (type: 'APP_OPEN' | 'BANNER' | 'INTERSTITIAL', useTestAds: boolean = __DEV__): string => {
+export const getAdUnitId = (
+  type: 'APP_OPEN' | 'BANNER' | 'INTERSTITIAL',
+  config?: AdsConfig | null,
+  useTestAds: boolean = __DEV__
+): string => {
   if (useTestAds) {
     return TEST_AD_IDS[type];
   }
-  
-  const platformAds = AD_IDS[type];
-  return Platform.OS === 'ios' ? platformAds.ios : platformAds.android;
+
+  if (config) {
+    const idMap = {
+      APP_OPEN: config.appOpenAdId,
+      BANNER: config.bannerAdId,
+      INTERSTITIAL: config.interstitialAdId,
+    };
+    const ids = idMap[type];
+    return Platform.OS === 'ios' ? ids.ios : ids.android;
+  }
+
+  return TEST_AD_IDS[type];
+};
+
+/**
+ * تحويل صيغة admin panel القديمة إلى الصيغة الموحدة
+ */
+const normalizeAdminConfig = (data: Record<string, any>): Partial<AdsConfig> => {
+  const normalized: Partial<AdsConfig> = {};
+
+  if (data.enabled !== undefined) normalized.enabled = data.enabled;
+
+  // Ad Unit IDs - support both old flat format and new nested format
+  if (data.bannerAdId) {
+    normalized.bannerAdId = data.bannerAdId;
+  } else if (data.bannerAdCode) {
+    normalized.bannerAdId = { android: data.bannerAdCode, ios: data.bannerAdCode };
+  }
+
+  if (data.interstitialAdId) {
+    normalized.interstitialAdId = data.interstitialAdId;
+  } else if (data.interstitialAdCode) {
+    normalized.interstitialAdId = { android: data.interstitialAdCode, ios: data.interstitialAdCode };
+  }
+
+  if (data.appOpenAdId) {
+    normalized.appOpenAdId = data.appOpenAdId;
+  }
+
+  // Banner screens - support both old flat booleans and new nested object
+  if (data.bannerScreens) {
+    normalized.bannerScreens = data.bannerScreens;
+  } else {
+    const screens: Record<string, boolean> = {};
+    if (data.showBannerOnHome !== undefined) screens.home = data.showBannerOnHome;
+    if (data.showBannerOnQuran !== undefined) screens.quran = data.showBannerOnQuran;
+    if (data.showBannerOnAzkar !== undefined) screens.azkar = data.showBannerOnAzkar;
+    if (Object.keys(screens).length > 0) {
+      normalized.bannerScreens = { ...DEFAULT_ADS_CONFIG.bannerScreens, ...screens };
+    }
+  }
+
+  if (data.showAdOnAppOpen !== undefined) normalized.showAdOnAppOpen = data.showAdOnAppOpen;
+  if (data.interstitialMode) normalized.interstitialMode = data.interstitialMode;
+  if (data.interstitialFrequency !== undefined) normalized.interstitialFrequency = data.interstitialFrequency;
+  if (data.interstitialTimeInterval !== undefined) normalized.interstitialTimeInterval = data.interstitialTimeInterval;
+  if (data.interstitialSessionLimit !== undefined) normalized.interstitialSessionLimit = data.interstitialSessionLimit;
+  if (data.delayFirstAd !== undefined) normalized.delayFirstAd = data.delayFirstAd;
+  if (data.firstAdDelay !== undefined) normalized.firstAdDelay = data.firstAdDelay;
+  if (data.updatedAt) normalized.updatedAt = data.updatedAt;
+
+  return normalized;
 };
 
 /**
@@ -74,22 +176,21 @@ export const getAdUnitId = (type: 'APP_OPEN' | 'BANNER' | 'INTERSTITIAL', useTes
  */
 export const fetchAdsConfig = async (): Promise<AdsConfig> => {
   try {
-    const docRef = doc(db, 'config', 'ads');
+    const docRef = doc(db, 'config', 'ads-settings');
     const docSnap = await getDoc(docRef);
-    
+
     if (docSnap.exists()) {
-      const data = docSnap.data() as Partial<AdsConfig>;
-      const config = { ...DEFAULT_ADS_CONFIG, ...data };
-      
-      // حفظ في Cache
+      const raw = docSnap.data();
+      const normalized = normalizeAdminConfig(raw);
+      const config = { ...DEFAULT_ADS_CONFIG, ...normalized };
+
       await AsyncStorage.setItem('ads_config_cache', JSON.stringify(config));
-      
       return config;
     }
   } catch (error) {
     console.log('Error fetching ads config:', error);
   }
-  
+
   // محاولة قراءة من Cache
   try {
     const cached = await AsyncStorage.getItem('ads_config_cache');
@@ -99,8 +200,16 @@ export const fetchAdsConfig = async (): Promise<AdsConfig> => {
   } catch (error) {
     console.log('Error reading ads cache');
   }
-  
+
   return DEFAULT_ADS_CONFIG;
+};
+
+/**
+ * التحقق إذا كان البانر مفعّل لشاشة معينة
+ */
+export const isBannerEnabledForScreen = (config: AdsConfig, screen: AdScreenKey): boolean => {
+  if (!config.enabled) return false;
+  return config.bannerScreens[screen] ?? false;
 };
 
 /**

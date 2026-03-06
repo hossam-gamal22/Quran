@@ -70,19 +70,130 @@ export const WEEKDAYS_EN = [
   'Saturday',
 ];
 
-// المناسبات الإسلامية
-export const ISLAMIC_EVENTS: IslamicEvent[] = [
-  { name: 'Islamic New Year', nameAr: 'رأس السنة الهجرية', hijriMonth: 1, hijriDay: 1 },
-  { name: 'Ashura', nameAr: 'يوم عاشوراء', hijriMonth: 1, hijriDay: 10 },
-  { name: 'Mawlid al-Nabi', nameAr: 'المولد النبوي الشريف', hijriMonth: 3, hijriDay: 12 },
-  { name: 'Isra and Miraj', nameAr: 'الإسراء والمعراج', hijriMonth: 7, hijriDay: 27 },
-  { name: 'Start of Shaban', nameAr: 'بداية شهر شعبان', hijriMonth: 8, hijriDay: 1 },
-  { name: 'Mid-Shaban', nameAr: 'ليلة النصف من شعبان', hijriMonth: 8, hijriDay: 15 },
-  { name: 'Start of Ramadan', nameAr: 'بداية شهر رمضان', hijriMonth: 9, hijriDay: 1 },
-  { name: 'Laylat al-Qadr', nameAr: 'ليلة القدر', hijriMonth: 9, hijriDay: 27 },
-  { name: 'Eid al-Fitr', nameAr: 'عيد الفطر المبارك', hijriMonth: 10, hijriDay: 1 },
-  { name: 'Day of Arafah', nameAr: 'يوم عرفة', hijriMonth: 12, hijriDay: 9 },
-  { name: 'Eid al-Adha', nameAr: 'عيد الأضحى المبارك', hijriMonth: 12, hijriDay: 10 },
+// Islamic Events - from trusted Islamic calendar sources
+// Based on lunar Hijri calendar calculations
+export interface IslamicEventDetails {
+  name: string;
+  nameAr: string;
+  hijriMonth: number;
+  hijriDay: number;
+  description?: string;
+  descriptionAr?: string;
+  type: 'holiday' | 'fasting' | 'special' | 'observance';
+  importance: 'major' | 'minor';
+}
+
+export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
+  {
+    name: 'Islamic New Year',
+    nameAr: 'رأس السنة الهجرية',
+    hijriMonth: 1,
+    hijriDay: 1,
+    description: 'First day of the Islamic calendar year',
+    descriptionAr: 'بداية العام الهجري الجديد',
+    type: 'holiday',
+    importance: 'major',
+  },
+  {
+    name: 'Day of Ashura',
+    nameAr: 'يوم عاشوراء',
+    hijriMonth: 1,
+    hijriDay: 10,
+    description: 'A significant day in Islamic history. It is recommended to fast on this day',
+    descriptionAr: 'يوم من أهم الأيام في التاريخ الإسلامي. يستحب صيام هذا اليوم',
+    type: 'fasting',
+    importance: 'major',
+  },
+  {
+    name: 'Mawlid al-Nabi (Birthnight of Prophet)',
+    nameAr: 'المولد النبوي الشريف',
+    hijriMonth: 3,
+    hijriDay: 12,
+    description: 'Celebration of the birth of Prophet Muhammad (PBUH)',
+    descriptionAr: 'ذكرى مولد النبي محمد صلى الله عليه وسلم',
+    type: 'special',
+    importance: 'major',
+  },
+  {
+    name: 'Isra and Miraj',
+    nameAr: 'الإسراء والمعراج',
+    hijriMonth: 7,
+    hijriDay: 27,
+    description: 'The night journey and ascension of Prophet Muhammad (PBUH)',
+    descriptionAr: 'ذكرى رحلة الإسراء والمعراج للنبي صلى الله عليه وسلم',
+    type: 'special',
+    importance: 'major',
+  },
+  {
+    name: 'Half of Shaban',
+    nameAr: 'ليلة النصف من شعبان',
+    hijriMonth: 8,
+    hijriDay: 15,
+    description: 'A blessed night with special spiritual significance',
+    descriptionAr: 'ليلة مباركة ذات أهمية روحية خاصة',
+    type: 'observance',
+    importance: 'minor',
+  },
+  {
+    name: 'First Day of Ramadan',
+    nameAr: 'أول رمضان - بداية شهر الصيام',
+    hijriMonth: 9,
+    hijriDay: 1,
+    description: 'Beginning of the holy month of fasting',
+    descriptionAr: 'بداية شهر رمضان المبارك شهر الصيام',
+    type: 'holiday',
+    importance: 'major',
+  },
+  {
+    name: 'Laylat al-Qadr (Night of Power)',
+    nameAr: 'ليلة القدر',
+    hijriMonth: 9,
+    hijriDay: 27,
+    description: 'The most blessed night of the year. Worship on this night is better than a thousand months',
+    descriptionAr: 'أفضل ليلة في السنة. العمل فيها خير من العمل ألف شهر',
+    type: 'special',
+    importance: 'major',
+  },
+  {
+    name: 'Eid al-Fitr',
+    nameAr: 'عيد الفطر المبارك',
+    hijriMonth: 10,
+    hijriDay: 1,
+    description: 'Festival of Breaking the Fast - a joyful celebration after Ramadan',
+    descriptionAr: 'عيد الفطر أو عيد الغدير - يأتي بعد شهر رمضان',
+    type: 'holiday',
+    importance: 'major',
+  },
+  {
+    name: 'Day of Tarwiyah',
+    nameAr: 'يوم التروية',
+    hijriMonth: 12,
+    hijriDay: 8,
+    description: 'The eighth day of Dhul-Hijjah, the beginning of the Hajj season',
+    descriptionAr: 'اليوم الثامن من ذي الحجة، بداية مناسك الحج',
+    type: 'observance',
+    importance: 'major',
+  },
+  {
+    name: 'Day of Arafah',
+    nameAr: 'يوم عرفة',
+    hijriMonth: 12,
+    hijriDay: 9,
+    description: 'The greatest day of the Hajj. Fasting on this day is highly recommended for those not on Hajj',
+    descriptionAr: 'أعظم أيام الحج. يستحب صيام هذا اليوم لغير الحاج',
+    type: 'fasting',
+    importance: 'major',
+  },
+  {
+    name: 'Eid al-Adha',
+    nameAr: 'عيد الأضحى المبارك',
+    hijriMonth: 12,
+    hijriDay: 10,
+    description: 'Festival of Sacrifice - the greatest Islamic holiday',
+    descriptionAr: 'عيد الأضحى - أعظم أعياد الإسلام',
+    type: 'holiday',
+    importance: 'major',
+  },
 ];
 
 /**

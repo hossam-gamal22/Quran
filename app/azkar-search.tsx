@@ -18,6 +18,7 @@ import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSettings } from '@/contexts/SettingsContext';
 
 import {
   Zikr,
@@ -39,13 +40,14 @@ export default function AzkarSearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+  const { isDarkMode, settings } = useSettings();
+  const darkMode = isDarkMode;
+  const language = (settings.language || 'ar') as Language;
 
   // الحالة
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Zikr[]>([]);
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<Language>('ar');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -58,14 +60,7 @@ export default function AzkarSearchScreen() {
 
   const loadSettings = useCallback(async () => {
     try {
-      const [storedDarkMode, storedLanguage, storedRecent] = await Promise.all([
-        AsyncStorage.getItem('darkMode'),
-        AsyncStorage.getItem('app_language'),
-        AsyncStorage.getItem('azkar_recent_searches'),
-      ]);
-
-      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
-      if (storedLanguage) setLanguage(storedLanguage as Language);
+      const storedRecent = await AsyncStorage.getItem('azkar_recent_searches');
       if (storedRecent) setRecentSearches(JSON.parse(storedRecent));
 
       // تركيز على حقل البحث
@@ -177,7 +172,7 @@ export default function AzkarSearchScreen() {
   const shareZikr = async (zikr: Zikr) => {
     try {
       const translation = getZikrTranslation(zikr, language);
-      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${zikr.reference}\n\nمن تطبيق القرآن والأذكار`;
+      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${zikr.reference}\n\nمن تطبيق روح المسلم`;
       
       await Share.share({ message });
     } catch (error) {
@@ -441,11 +436,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   categoryBadge: {
     alignSelf: 'flex-start',

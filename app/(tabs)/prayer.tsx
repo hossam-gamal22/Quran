@@ -9,15 +9,19 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  Alert,
+  Modal,
   Platform,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import Animated, {
+  FadeInDown,
+} from 'react-native-reanimated';
 
 import {
   PrayerTimes,
@@ -38,16 +42,45 @@ import {
   formatTime12h,
 } from '@/lib/prayer-times';
 import { getHijriDate } from '@/lib/hijri-date';
-import { useSettings } from '@/contexts/SettingsContext';
+import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { GlassCard, GlassToggle, GlassSegmentedControl } from '@/components/ui/GlassCard';
 
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 
+// ========================================
+// ثوابت طرق الحساب
+// ========================================
+
+const PRAYER_METHODS: { value: CalculationMethod; label: string; subtitle: string }[] = [
+  { value: 4, label: 'أم القرى', subtitle: 'مكة المكرمة' },
+  { value: 3, label: 'رابطة العالم الإسلامي', subtitle: 'Muslim World League' },
+  { value: 2, label: 'الجمعية الإسلامية لأمريكا الشمالية', subtitle: 'ISNA' },
+  { value: 5, label: 'الهيئة المصرية', subtitle: 'Egyptian General Authority' },
+  { value: 1, label: 'جامعة العلوم الإسلامية - كراتشي', subtitle: 'Karachi' },
+  { value: 8, label: 'منطقة الخليج', subtitle: 'Gulf Region' },
+  { value: 9, label: 'الكويت', subtitle: 'Kuwait' },
+  { value: 13, label: 'تركيا', subtitle: 'Diyanet' },
+  { value: 15, label: 'ماليزيا', subtitle: 'JAKIM' },
+];
+
+const ASR_METHODS = [
+  { value: 0, label: 'حنفي', subtitle: 'ظل المثلين' },
+  { value: 1, label: 'شافعي / حنبلي / مالكي', subtitle: 'ظل المثل' },
+];
+
+// ========================================
+// المكون الرئيسي
+// ========================================
+
 export default function PrayerScreen() {
   // استخدام الـ context بدل المتغيرات الثابتة
-  const { isDarkMode, t, settings } = useSettings();
+  const { isDarkMode, t, settings, updatePrayer } = useSettings();
   const language = settings.language;
+  const router = useRouter();
 
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationType | null>(null);
@@ -56,7 +89,8 @@ export default function PrayerScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'card' | 'circular'>('card');
+  const [showClock, setShowClock] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const fetchLocation = async (): Promise<LocationType | null> => {
     try {
@@ -148,7 +182,7 @@ export default function PrayerScreen() {
     loadPrayerTimes();
     const hijri = getHijriDate();
     if (hijri) {
-      setHijriDate(hijri);
+      setHijriDate(`${hijri.day} ${hijri.monthNameAr} ${hijri.year}`);
     }
   }, []);
 
@@ -160,7 +194,7 @@ export default function PrayerScreen() {
 
   const toggleViewMode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setViewMode(prev => prev === 'card' ? 'circular' : 'card');
+    setShowClock(prev => !prev);
   };
 
   const handleToggleNotification = async (prayer: PrayerName, enabled: boolean) => {
@@ -182,7 +216,7 @@ export default function PrayerScreen() {
 
   const openSettings = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(t('common.settings'), t('prayer.settings'));
+    setShowSettings(true);
   };
 
   const locationName = location
@@ -192,13 +226,18 @@ export default function PrayerScreen() {
   const inLastThird = prayerTimes ? isInLastThird(prayerTimes) : false;
 
   return (
-    <SafeAreaView
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
       style={[styles.container, isDarkMode && styles.containerDark]}
+    >
+    <SafeAreaView
+      style={{ flex: 1 }}
       edges={['top']}
     >
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+        backgroundColor="transparent"
       />
 
       <Animated.View
@@ -225,25 +264,10 @@ export default function PrayerScreen() {
 
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
-            onPress={toggleViewMode}
-          >
-            <MaterialCommunityIcons
-              name={viewMode === 'card' ? 'clock-outline' : 'card-text-outline'}
-              size={24}
-              color={isDarkMode ? '#fff' : '#333'}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
             onPress={openSettings}
+            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
           >
-            <MaterialCommunityIcons
-              name="cog-outline"
-              size={24}
-              color={isDarkMode ? '#fff' : '#333'}
-            />
+            <MaterialCommunityIcons name="cog-outline" size={22} color={isDarkMode ? '#fff' : '#333'} />
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -277,23 +301,23 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {viewMode === 'card' ? (
-          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-            <PrayerCard
-              prayerTimes={prayerTimes}
-              hijriDate={hijriDate}
-              location={locationName}
-              language={language}
-              isDarkMode={isDarkMode}
-            />
-          </Animated.View>
-        ) : (
+        {showClock ? (
           <Animated.View
             entering={FadeInDown.delay(100).duration(500)}
             style={styles.circularContainer}
           >
             <CountdownTimer
               prayerTimes={prayerTimes}
+              language={language}
+              isDarkMode={isDarkMode}
+            />
+          </Animated.View>
+        ) : (
+          <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+            <PrayerCard
+              prayerTimes={prayerTimes}
+              hijriDate={hijriDate}
+              location={locationName}
               language={language}
               isDarkMode={isDarkMode}
             />
@@ -307,7 +331,7 @@ export default function PrayerScreen() {
           >
             <MaterialCommunityIcons name="star-crescent" size={20} color="#ffd700" />
             <Text style={styles.lastThirdText}>
-              أنت الآن في الثلث الأخير من الليل - وقت استجابة الدعاء
+              {t('prayer.lastThirdMessage')}
             </Text>
           </Animated.View>
         )}
@@ -320,6 +344,7 @@ export default function PrayerScreen() {
             notificationSettings={prayerSettings?.notifications}
             onToggleNotification={handleToggleNotification}
             showNotificationToggle={true}
+            showSunrise={settings.prayer.showSunrise}
           />
         </Animated.View>
 
@@ -329,7 +354,7 @@ export default function PrayerScreen() {
             style={[styles.extraInfo, isDarkMode && styles.extraInfoDark]}
           >
             <Text style={[styles.extraTitle, isDarkMode && styles.textLight]}>
-              أوقات إضافية
+              {t('prayer.extraTimes')}
             </Text>
 
             <View style={styles.extraRow}>
@@ -340,7 +365,7 @@ export default function PrayerScreen() {
                   color={isDarkMode ? '#aaa' : '#666'}
                 />
                 <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
-                  منتصف الليل
+                  {t('prayer.midnight')}
                 </Text>
                 <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
                   {formatTime12h(prayerTimes.midnight)}
@@ -354,7 +379,7 @@ export default function PrayerScreen() {
                   color={isDarkMode ? '#aaa' : '#666'}
                 />
                 <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
-                  الثلث الأخير
+                  {t('prayer.lastThird')}
                 </Text>
                 <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
                   {formatTime12h(prayerTimes.lastThird)}
@@ -364,9 +389,155 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
+        {/* Qibla Quick Access Button */}
+        <Animated.View
+          entering={FadeInDown.delay(500).duration(500)}
+          style={styles.qiblaContainer}
+        >
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push('/(tabs)/qibla' as any);
+            }}
+            activeOpacity={0.85}
+            style={[styles.qiblaButton, isDarkMode && styles.qiblaButtonDark]}
+          >
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 60 : 30}
+              tint={isDarkMode ? 'dark' : 'light'}
+              style={styles.qiblaButtonBlur}
+            >
+              <View style={[styles.qiblaButtonContent, isDarkMode && styles.qiblaButtonContentDark]}>
+                <View style={styles.qiblaIconWrapper}>
+                  <MaterialCommunityIcons name="compass" size={32} color="#5856D6" />
+                </View>
+                <View style={styles.qiblaTextWrapper}>
+                  <Text style={[styles.qiblaTitle, isDarkMode && styles.textLight]}>
+                    {t('prayer.qiblaDirection') || 'اتجاه القبلة'}
+                  </Text>
+                  <Text style={[styles.qiblaSubtitle, isDarkMode && styles.textMuted]}>
+                    {t('prayer.qiblaSubtitle') || 'بوصلة تحديد اتجاه القبلة'}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons
+                  name="chevron-left"
+                  size={24}
+                  color={isDarkMode ? '#8e8e93' : '#aaa'}
+                />
+              </View>
+            </BlurView>
+          </TouchableOpacity>
+        </Animated.View>
+
         <View style={styles.bottomSpace} />
       </ScrollView>
+
+      <BannerAdComponent screen="prayer" />
+
+      {/* iOS Glass Segmented Toggle */}
+      <View style={styles.toggleContainer}>
+        <GlassSegmentedControl
+          segments={[
+            { key: 'list', label: 'قائمة', icon: 'format-list-text' },
+            { key: 'clock', label: 'ساعة', icon: 'clock-outline' },
+          ]}
+          selected={showClock ? 'clock' : 'list'}
+          onSelect={(key) => setShowClock(key === 'clock')}
+        />
+      </View>
+
+      {/* نافذة إعدادات الصلاة */}
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <View style={settingsStyles.overlay}>
+          <GlassCard style={settingsStyles.content}>
+            <View style={settingsStyles.header}>
+              <Text style={[settingsStyles.title, { color: isDarkMode ? '#fff' : '#333' }]}>إعدادات الصلاة</Text>
+              <TouchableOpacity 
+                onPress={() => setShowSettings(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={isDarkMode ? '#fff' : '#333'} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* طريقة الحساب */}
+              <Text style={[settingsStyles.sectionLabel, { color: isDarkMode ? '#8e8e93' : '#666' }]}>طريقة الحساب</Text>
+              {PRAYER_METHODS.map((method) => (
+                <TouchableOpacity
+                  key={method.value}
+                  style={[
+                    settingsStyles.methodItem,
+                    { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.18)' : 'rgba(120,120,128,0.08)' },
+                    settings.prayer.calculationMethod === method.value && { borderColor: '#2f7659', borderWidth: 2 },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updatePrayer({ calculationMethod: method.value });
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[settingsStyles.methodLabel, { color: isDarkMode ? '#fff' : '#333' }]}>{method.label}</Text>
+                    <Text style={[settingsStyles.methodSub, { color: isDarkMode ? '#8e8e93' : '#777' }]}>{method.subtitle}</Text>
+                  </View>
+                  {settings.prayer.calculationMethod === method.value && (
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              {/* مذهب العصر */}
+              <Text style={[settingsStyles.sectionLabel, { color: isDarkMode ? '#8e8e93' : '#666', marginTop: 20 }]}>مذهب حساب العصر</Text>
+              {ASR_METHODS.map((method) => (
+                <TouchableOpacity
+                  key={method.value}
+                  style={[
+                    settingsStyles.methodItem,
+                    { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.18)' : 'rgba(120,120,128,0.08)' },
+                    settings.prayer.asrJuristic === method.value && { borderColor: '#2f7659', borderWidth: 2 },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updatePrayer({ asrJuristic: method.value as 0 | 1 });
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[settingsStyles.methodLabel, { color: isDarkMode ? '#fff' : '#333' }]}>{method.label}</Text>
+                    <Text style={[settingsStyles.methodSub, { color: isDarkMode ? '#8e8e93' : '#777' }]}>{method.subtitle}</Text>
+                  </View>
+                  {settings.prayer.asrJuristic === method.value && (
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              {/* خيارات العرض */}
+              <Text style={[settingsStyles.sectionLabel, { color: isDarkMode ? '#8e8e93' : '#666', marginTop: 20 }]}>خيارات العرض</Text>
+              <GlassToggle
+                label="إظهار وقت الشروق"
+                icon="weather-sunny"
+                enabled={settings.prayer.showSunrise}
+                onToggle={(val) => updatePrayer({ showSunrise: val })}
+              />
+              <GlassToggle
+                label="تنسيق 24 ساعة"
+                icon="clock-digital"
+                enabled={settings.prayer.show24Hour}
+                onToggle={(val) => updatePrayer({ show24Hour: val })}
+              />
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </GlassCard>
+        </View>
+      </Modal>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -384,13 +555,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'transparent',
   },
   headerDark: {
-    backgroundColor: '#1a1a2e',
-    borderBottomColor: '#333',
+    backgroundColor: 'transparent',
   },
   headerLeft: {
     flex: 1,
@@ -489,16 +657,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginVertical: 10,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   extraInfoDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: 'rgba(120,120,128,0.18)',
   },
   extraTitle: {
     fontSize: 16,
@@ -517,7 +680,7 @@ const styles = StyleSheet.create({
   extraLabel: {
     fontSize: 12,
     fontFamily: 'Cairo-Regular',
-    color: '#666',
+    color: '#555',
   },
   extraValue: {
     fontSize: 16,
@@ -526,5 +689,109 @@ const styles = StyleSheet.create({
   },
   bottomSpace: {
     height: 100,
+  },
+  // Qibla Quick Access
+  qiblaContainer: {
+    marginHorizontal: 16,
+    marginVertical: 10,
+  },
+  qiblaButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  qiblaButtonDark: {},
+  qiblaButtonBlur: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  qiblaButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 0.5,
+    borderColor: 'rgba(0,0,0,0.06)',
+    gap: 14,
+  },
+  qiblaButtonContentDark: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  qiblaIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(88,86,214,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qiblaTextWrapper: {
+    flex: 1,
+  },
+  qiblaTitle: {
+    fontSize: 17,
+    fontFamily: 'Cairo-Bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  qiblaSubtitle: {
+    fontSize: 13,
+    fontFamily: 'Cairo-Regular',
+    color: '#666',
+  },
+  // Glass Toggle
+  toggleContainer: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+});
+
+const settingsStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  content: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderRadius: 0,
+    height: '75%',
+    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontFamily: 'Cairo-Bold',
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Bold',
+    marginBottom: 10,
+    textAlign: 'right',
+  },
+  methodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  methodLabel: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'right',
+  },
+  methodSub: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    textAlign: 'right',
+    marginTop: 2,
   },
 });

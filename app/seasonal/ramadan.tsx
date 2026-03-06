@@ -25,9 +25,9 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
+import { getHijriDate, hijriToGregorian } from '@/lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
 import GlassCard from '@/components/ui/GlassCard';
 
@@ -202,7 +202,7 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
         }}
         activeOpacity={0.7}
       >
-        <View style={[styles.checklistIcon, { backgroundColor: `${item.color}20` }]}>
+        <View style={styles.checklistIcon}>
           <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
         </View>
         <Text style={[styles.checklistLabel, isDarkMode && styles.textLight]}>
@@ -266,7 +266,7 @@ interface StatsCardProps {
 const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, unit, color, isDarkMode }) => {
   return (
     <View style={[styles.statsCard, isDarkMode && styles.statsCardDark]}>
-      <View style={[styles.statsIconBg, { backgroundColor: `${color}20` }]}>
+      <View style={styles.statsIconBg}>
         <MaterialCommunityIcons name={icon as any} size={24} color={color} />
       </View>
       <Text style={[styles.statsValue, isDarkMode && styles.textLight]}>{value}</Text>
@@ -317,9 +317,22 @@ export default function RamadanScreen() {
   }, [refreshSeasonalData]);
 
   const handleDayPress = useCallback((day: number) => {
-    // يمكن إضافة عرض تفاصيل اليوم هنا
+    // If clicked day is in or before currentDay, mark complete
     if (day <= currentDay && !completedDays.includes(day)) {
       markDayCompleted(day);
+    }
+
+    // Navigate to Hijri calendar showing the selected Hijri day
+    try {
+      const hijriNow = getHijriDate();
+      const year = hijriNow.year;
+      const month = 9; // Ramadan
+      const gDate = hijriToGregorian(year, month, day);
+      // send ISO string as query param
+      router.push(`/hijri?date=${encodeURIComponent(gDate.toISOString())}`);
+    } catch (e) {
+      // fallback: just open hijri screen
+      router.push('/hijri');
     }
   }, [currentDay, completedDays, markDayCompleted]);
 
@@ -353,7 +366,7 @@ export default function RamadanScreen() {
       />
 
       {/* Header */}
-      <LinearGradient colors={RAMADAN_GRADIENT} style={styles.header}>
+      <View style={[styles.header, { backgroundColor: `${RAMADAN_GRADIENT[0]}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -361,13 +374,13 @@ export default function RamadanScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>رمضان المبارك</Text>
           {isRamadanActive && (
             <Text style={styles.headerSubtitle}>
-              اليوم {currentDay} من 30
+              {currentDay} من 30
             </Text>
           )}
         </View>
@@ -382,7 +395,7 @@ export default function RamadanScreen() {
           color="rgba(255,255,255,0.1)"
           style={styles.headerDecoration}
         />
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -400,16 +413,15 @@ export default function RamadanScreen() {
         {/* بطاقة اليوم المميز */}
         {specialDay && isRamadanActive && (
           <Animated.View entering={FadeIn.duration(500)}>
-            <LinearGradient
-              colors={['#fff8e1', '#ffecb3']}
-              style={styles.specialDayBanner}
+            <View
+              style={[styles.specialDayBanner, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
             >
               <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
               <View style={styles.specialDayContent}>
                 <Text style={styles.specialDayTitle}>{specialDay.nameAr}</Text>
                 <Text style={styles.specialDayDesc}>{specialDay.description}</Text>
               </View>
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 

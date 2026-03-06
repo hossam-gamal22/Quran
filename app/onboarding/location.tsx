@@ -17,7 +17,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Location from 'expo-location';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
@@ -135,12 +134,12 @@ export default function LocationScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
       
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
           <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+              <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.stepText}>الخطوة 2 من 4</Text>
@@ -163,16 +162,15 @@ export default function LocationScreen() {
           <View style={styles.content}>
             {/* الأيقونة */}
             <Animated.View entering={FadeIn.delay(200).duration(600)} style={styles.iconContainer}>
-              <LinearGradient
-                colors={locationGranted ? ['#2f7659', '#1d5a3a'] : ['#3a7ca5', '#2a5a7a']}
+              <View
                 style={styles.iconGradient}
               >
                 <MaterialCommunityIcons
-                  name={locationGranted ? 'map-marker-check' : 'map-marker-question'}
+                  name={locationGranted ? 'map-marker-check' : 'map-marker-alert'}
                   size={60}
                   color="#fff"
                 />
-              </LinearGradient>
+              </View>
             </Animated.View>
 
             {/* العنوان والوصف */}
@@ -244,17 +242,14 @@ export default function LocationScreen() {
                 onPress={handleContinue}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={locationGranted ? ['#2f7659', '#1d5a3a'] : ['#666', '#444']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.continueButtonGradient}
+                <View
+                  style={[styles.continueButtonGradient, { backgroundColor: locationGranted ? 'rgba(47,118,89,0.85)' : 'rgba(102,102,102,0.85)' }]}
                 >
                   <Text style={styles.continueButtonText}>
                     {locationGranted ? 'متابعة' : 'متابعة بدون موقع'}
                   </Text>
                   <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
 
               {/* مؤشر الصفحات */}
@@ -267,7 +262,7 @@ export default function LocationScreen() {
             </Animated.View>
           </SafeAreaView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -336,6 +331,8 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 24,
   },
   iconGradient: {
@@ -344,10 +341,6 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
     elevation: 10,
   },
   title: {
@@ -433,14 +426,9 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 8,
   },
   continueButtonDisabled: {
-    shadowColor: '#333',
   },
   continueButtonGradient: {
     flexDirection: 'row',

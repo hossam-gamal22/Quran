@@ -23,11 +23,12 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useWorship } from '@/contexts/WorshipContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import GlassCard from '@/components/ui/GlassCard';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -83,7 +84,7 @@ const StatCard: React.FC<StatCardProps> = ({
         onPressOut={handlePressOut}
         style={[styles.statCard, isDarkMode && styles.statCardDark]}
       >
-        <View style={[styles.statIconContainer, { backgroundColor: `${color}20` }]}>
+        <View style={styles.statIconContainer}>
           <MaterialCommunityIcons name={icon} size={24} color={color} />
         </View>
         <Text style={[styles.statValue, isDarkMode && styles.textLight]}>{value}</Text>
@@ -122,11 +123,8 @@ const TrackerCard: React.FC<TrackerCardProps> = ({
   return (
     <Animated.View entering={FadeInDown.delay(index * 150).duration(500)}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
-        <LinearGradient
-          colors={colors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.trackerCard}
+        <View
+          style={[styles.trackerCard, { backgroundColor: `${colors[0]}CC` }]}
         >
           <View style={styles.trackerContent}>
             <View style={styles.trackerLeft}>
@@ -152,10 +150,10 @@ const TrackerCard: React.FC<TrackerCardProps> = ({
                   <Text style={styles.statusText}>{status}</Text>
                 </View>
               )}
-              <MaterialCommunityIcons name="chevron-left" size={24} color="rgba(255,255,255,0.7)" />
+              <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={24} color="rgba(255,255,255,0.7)" />
             </View>
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -235,8 +233,8 @@ export default function WorshipTrackerScreen() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   
+  const { isDarkMode, settings } = useSettings();
   const language = 'ar';
-  const isDarkMode = false;
 
   // حساب إحصائيات الصلاة اليوم
   const getPrayerProgress = () => {
@@ -284,7 +282,12 @@ export default function WorshipTrackerScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (isDarkMode ? '#11151c' : '#fff') : 'transparent' }]}
+    >
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
@@ -466,6 +469,7 @@ export default function WorshipTrackerScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -487,9 +491,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   headerTitle: {
     fontSize: 24,
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgba(120,120,128,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -540,11 +541,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 15,
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   statCardDark: {
     backgroundColor: '#1a1a2e',
@@ -588,11 +585,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
   },
   quickActionDark: {
@@ -623,11 +616,7 @@ const styles = StyleSheet.create({
   trackerCard: {
     borderRadius: 20,
     padding: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   trackerContent: {
     flexDirection: 'row',

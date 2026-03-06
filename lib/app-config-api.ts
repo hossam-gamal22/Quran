@@ -1,7 +1,7 @@
 // lib/app-config-api.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { APP_CONFIG } from '../constants/app';
 
 // Firebase Config
@@ -17,6 +17,30 @@ const firebaseConfig = {
 // Initialize Firebase (مرة واحدة فقط)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const db = getFirestore(app);
+
+export interface WelcomeBannerConfig {
+  enabled: boolean;
+  title: string;
+  subtitle: string;
+  icon: string;
+  color: string;
+  route: string;
+  displayMode?: 'text' | 'text_image' | 'image_only';
+  backgroundImage?: string;
+}
+
+export interface HighlightItemConfig {
+  id: string;
+  enabled: boolean;
+  title: string;
+  icon: string;
+  color: string;
+  route: string;
+  routeType: 'internal' | 'url' | 'html';
+  imageUrl?: string;
+  htmlContent?: string;
+  order: number;
+}
 
 export interface RemoteAppConfig {
   name: string;
@@ -45,6 +69,8 @@ export interface RemoteAppConfig {
     ruqyah: boolean;
     hijri: boolean;
   };
+  welcomeBanner?: WelcomeBannerConfig;
+  highlights?: HighlightItemConfig[];
 }
 
 // القيم الافتراضية
@@ -117,4 +143,280 @@ export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
 // الحصول على الإعدادات
 export const getAppConfig = async (): Promise<RemoteAppConfig> => {
   return await fetchAppConfig();
+};
+
+// اشتراك في التحديثات المباشرة من Firebase
+export const subscribeToAppConfig = (
+  onUpdate: (config: RemoteAppConfig) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const docRef = doc(db, 'config', 'app-settings');
+  
+  const unsubscribe = onSnapshot(
+    docRef,
+    async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as RemoteAppConfig;
+        const mergedConfig = { ...DEFAULT_REMOTE_CONFIG, ...data };
+        
+        // حفظ في AsyncStorage للاستخدام offline
+        await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));
+        
+        console.log('🔄 تم تحديث الإعدادات من Firebase (Real-time)');
+        onUpdate(mergedConfig);
+      }
+    },
+    (error) => {
+      console.error('❌ خطأ في الاشتراك بتحديثات Firebase:', error);
+      if (onError) onError(error);
+    }
+  );
+  
+  return unsubscribe;
+};
+
+// ========================================
+// واجهة وAPI الخلفيات الديناميكية
+// ========================================
+
+export interface DynamicBackground {
+  id: string;
+  name: string;
+  thumbnailUrl: string;
+  fullUrl: string;
+  enabled: boolean;
+  order: number;
+  createdAt?: string;
+}
+
+// جلب الخلفيات الديناميكية من Firebase
+export const fetchDynamicBackgrounds = async (): Promise<DynamicBackground[]> => {
+  try {
+    console.log('🔄 جاري جلب الخلفيات الديناميكية...');
+    
+    const backgroundsRef = collection(db, 'backgrounds');
+    const q = query(
+      backgroundsRef,
+      where('enabled', '==', true),
+      orderBy('order', 'asc')
+    );
+    const querySnapshot = await getDocs(q);
+    
+    const backgrounds: DynamicBackground[] = [];
+    querySnapshot.forEach((doc) => {
+      backgrounds.push({
+        id: doc.id,
+        ...doc.data(),
+      } as DynamicBackground);
+    });
+    
+    // حفظ في AsyncStorage للاستخدام offline
+    await AsyncStorage.setItem('dynamic_backgrounds', JSON.stringify(backgrounds));
+    
+    console.log(`✅ تم جلب ${backgrounds.length} خلفية ديناميكية`);
+    return backgrounds;
+  } catch (error) {
+    console.log('❌ خطأ في جلب الخلفيات:', error);
+  }
+  
+  // محاولة القراءة من Cache
+  try {
+    const cached = await AsyncStorage.getItem('dynamic_backgrounds');
+    if (cached) {
+      console.log('✅ تم استخدام الخلفيات المحفوظة (Cache)');
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.log('⚠️ فشل قراءة Cache للخلفيات');
+  }
+  
+  return [];
+};
+
+// ========================================
+// Server-Driven UI (SDUI) API
+// واجهة المستخدم الديناميكية
+// ========================================
+
+import type { 
+  SDUIScreenConfig, 
+  SDUISection,
+  SDUIConfigResponse 
+} from './sdui/types';
+
+// Cache key for SDUI configs
+const SDUI_CACHE_KEY = 'sdui_screen_configs';
+
+/**
+ * Fetch SDUI configuration for a specific screen
+ * جلب إعدادات الشاشة الديناميكية
+ */
+export const fetchSDUIScreenConfig = async (
+  screenId: string
+): Promise<SDUIScreenConfig | null> => {
+  try {
+    console.log(`🔄 جاري جلب إعدادات SDUI للشاشة: ${screenId}...`);
+    
+    const docRef = doc(db, 'sdui_screens', screenId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      const data = docSnap.data() as SDUIScreenConfig;
+      
+      // Save to cache
+      const cacheKey = `${SDUI_CACHE_KEY}_${screenId}`;
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+      
+      console.log(`✅ تم جلب إعدادات SDUI للشاشة: ${screenId}`);
+      return data;
+    } else {
+      console.log(`⚠️ لا توجد إعدادات SDUI للشاشة: ${screenId}`);
+    }
+  } catch (error) {
+    console.log(`❌ خطأ في جلب إعدادات SDUI للشاشة ${screenId}:`, error);
+  }
+  
+  // Try cache
+  try {
+    const cacheKey = `${SDUI_CACHE_KEY}_${screenId}`;
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) {
+      console.log(`✅ تم استخدام إعدادات SDUI المحفوظة للشاشة: ${screenId}`);
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.log(`⚠️ فشل قراءة Cache لـ SDUI ${screenId}`);
+  }
+  
+  return null;
+};
+
+/**
+ * Fetch all SDUI screen configurations
+ * جلب جميع إعدادات الشاشات الديناميكية
+ */
+export const fetchAllSDUIConfigs = async (): Promise<Record<string, SDUIScreenConfig>> => {
+  try {
+    console.log('🔄 جاري جلب جميع إعدادات SDUI...');
+    
+    const screensRef = collection(db, 'sdui_screens');
+    const querySnapshot = await getDocs(screensRef);
+    
+    const configs: Record<string, SDUIScreenConfig> = {};
+    querySnapshot.forEach((doc) => {
+      configs[doc.id] = {
+        screenId: doc.id,
+        ...doc.data(),
+      } as SDUIScreenConfig;
+    });
+    
+    // Save all to cache
+    await AsyncStorage.setItem(SDUI_CACHE_KEY, JSON.stringify(configs));
+    
+    console.log(`✅ تم جلب ${Object.keys(configs).length} إعدادات شاشة SDUI`);
+    return configs;
+  } catch (error) {
+    console.log('❌ خطأ في جلب جميع إعدادات SDUI:', error);
+  }
+  
+  // Try cache
+  try {
+    const cached = await AsyncStorage.getItem(SDUI_CACHE_KEY);
+    if (cached) {
+      console.log('✅ تم استخدام إعدادات SDUI المحفوظة');
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.log('⚠️ فشل قراءة Cache لـ SDUI');
+  }
+  
+  return {};
+};
+
+/**
+ * Subscribe to real-time updates for a specific SDUI screen
+ * الاشتراك في تحديثات الشاشة الديناميكية في الوقت الفعلي
+ */
+export const subscribeToSDUIScreen = (
+  screenId: string,
+  onUpdate: (config: SDUIScreenConfig) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const docRef = doc(db, 'sdui_screens', screenId);
+  
+  const unsubscribe = onSnapshot(
+    docRef,
+    async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = {
+          screenId: docSnap.id,
+          ...docSnap.data(),
+        } as SDUIScreenConfig;
+        
+        // Save to cache
+        const cacheKey = `${SDUI_CACHE_KEY}_${screenId}`;
+        await AsyncStorage.setItem(cacheKey, JSON.stringify(data));
+        
+        console.log(`🔄 تم تحديث SDUI للشاشة: ${screenId} (Real-time)`);
+        onUpdate(data);
+      }
+    },
+    (error) => {
+      console.error(`❌ خطأ في الاشتراك بـ SDUI ${screenId}:`, error);
+      if (onError) onError(error);
+    }
+  );
+  
+  return unsubscribe;
+};
+
+/**
+ * Subscribe to all SDUI screen updates
+ * الاشتراك في تحديثات جميع الشاشات الديناميكية
+ */
+export const subscribeToAllSDUIScreens = (
+  onUpdate: (configs: Record<string, SDUIScreenConfig>) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const screensRef = collection(db, 'sdui_screens');
+  
+  const unsubscribe = onSnapshot(
+    screensRef,
+    async (querySnapshot) => {
+      const configs: Record<string, SDUIScreenConfig> = {};
+      querySnapshot.forEach((doc) => {
+        configs[doc.id] = {
+          screenId: doc.id,
+          ...doc.data(),
+        } as SDUIScreenConfig;
+      });
+      
+      // Save all to cache
+      await AsyncStorage.setItem(SDUI_CACHE_KEY, JSON.stringify(configs));
+      
+      console.log(`🔄 تم تحديث ${Object.keys(configs).length} شاشة SDUI (Real-time)`);
+      onUpdate(configs);
+    },
+    (error) => {
+      console.error('❌ خطأ في الاشتراك بجميع شاشات SDUI:', error);
+      if (onError) onError(error);
+    }
+  );
+  
+  return unsubscribe;
+};
+
+/**
+ * Clear SDUI cache
+ * مسح ذاكرة التخزين المؤقت لـ SDUI
+ */
+export const clearSDUICache = async (): Promise<void> => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const sduiKeys = keys.filter(key => key.startsWith(SDUI_CACHE_KEY));
+    await AsyncStorage.multiRemove(sduiKeys);
+    console.log('✅ تم مسح ذاكرة SDUI');
+  } catch (error) {
+    console.error('❌ خطأ في مسح ذاكرة SDUI:', error);
+  }
 };

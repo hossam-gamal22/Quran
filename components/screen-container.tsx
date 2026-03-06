@@ -1,12 +1,15 @@
 import { View, type ViewProps, StyleSheet } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
+import BackgroundWrapper from "@/components/ui/BackgroundWrapper";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export interface ScreenContainerProps extends ViewProps {
   edges?: Edge[];
   className?: string;
   containerClassName?: string;
   safeAreaClassName?: string;
+  useAppBackground?: boolean;
 }
 
 /**
@@ -20,23 +23,44 @@ export function ScreenContainer({
   containerClassName,
   safeAreaClassName,
   style,
+  useAppBackground = true,
   ...props
 }: ScreenContainerProps) {
+  const { settings, isDarkMode } = useSettings();
+  const bgKey = settings.display.appBackground;
+  const hasBg = useAppBackground && bgKey !== 'none';
+
+  const content = (
+    <SafeAreaView
+      edges={edges}
+      className={cn("flex-1", safeAreaClassName)}
+      style={styles.safeArea}
+    >
+      <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
+        {children}
+      </View>
+    </SafeAreaView>
+  );
+
+  if (hasBg) {
+    return (
+      <BackgroundWrapper
+        backgroundKey={bgKey}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
+        {...props}
+      >
+        {content}
+      </BackgroundWrapper>
+    );
+  }
+
   return (
     <View
       className={cn("flex-1", "bg-background", containerClassName)}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: isDarkMode ? '#111827' : '#FAFAF8' }]}
       {...props}
     >
-      <SafeAreaView
-        edges={edges}
-        className={cn("flex-1", safeAreaClassName)}
-        style={styles.safeArea}
-      >
-        <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
-          {children}
-        </View>
-      </SafeAreaView>
+      {content}
     </View>
   );
 }

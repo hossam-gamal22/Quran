@@ -80,6 +80,19 @@ interface AppSettings {
   // التحليلات
   analyticsEnabled: boolean;
   crashReportingEnabled: boolean;
+  
+  // التواصل والمشاركة
+  contactInfo: {
+    email: string;
+    phone: string;
+    website: string;
+    facebook: string;
+  };
+  shareLinks: {
+    playStore: string;
+    appStore: string;
+    shareMessage: string;
+  };
 }
 
 interface ApiKey {
@@ -146,6 +159,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxRequestsPerMinute: 60,
   analyticsEnabled: true,
   crashReportingEnabled: true,
+  contactInfo: {
+    email: 'hossamgamal290@gmail.com',
+    phone: '+966 50 000 0000',
+    website: 'https://roohmuslim.com',
+    facebook: 'https://www.facebook.com/HossamGamal59/',
+  },
+  shareLinks: {
+    playStore: 'https://play.google.com/store/apps/details?id=com.roohmuslim.app',
+    appStore: 'https://apps.apple.com/app/rooh-muslim/id123456789',
+    shareMessage: 'تحميل تطبيق روح المسلم - تطبيقك الإسلامي الشامل',
+  },
 };
 
 // ========================================
@@ -155,7 +179,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [activeTab, setActiveTab] = useState<'general' | 'updates' | 'notifications' | 'security' | 'api'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'updates' | 'notifications' | 'security' | 'contact' | 'api'>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showFcmKey, setShowFcmKey] = useState(false);
@@ -272,18 +296,19 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* التبويبات */}
-      <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4">
+      <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4 overflow-x-auto">
         {[
           { id: 'general', label: 'عام', icon: Settings },
           { id: 'updates', label: 'التحديثات', icon: Smartphone },
           { id: 'notifications', label: 'الإشعارات', icon: Bell },
+          { id: 'contact', label: 'التواصل والمشاركة', icon: MessageSquare },
           { id: 'security', label: 'الأمان', icon: Shield },
           { id: 'api', label: 'API Keys', icon: Key },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-gray-700 text-white'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
@@ -615,6 +640,106 @@ const SettingsPage: React.FC = () => {
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   dir="ltr"
                 />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* تاب التواصل والمشاركة */}
+        {activeTab === 'contact' && (
+          <>
+            {/* بيانات التواصل */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Mail size={20} className="text-blue-500" />
+                بيانات التواصل
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">البريد الإلكتروني</label>
+                  <input
+                    type="email"
+                    value={settings.contactInfo.email}
+                    onChange={e => updateSetting('contactInfo', { ...settings.contactInfo, email: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    dir="ltr"
+                    placeholder="example@email.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">رقم الهاتف</label>
+                  <input
+                    type="tel"
+                    value={settings.contactInfo.phone}
+                    onChange={e => updateSetting('contactInfo', { ...settings.contactInfo, phone: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    dir="ltr"
+                    placeholder="+966 50 000 0000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">الموقع الإلكتروني</label>
+                  <input
+                    type="url"
+                    value={settings.contactInfo.website}
+                    onChange={e => updateSetting('contactInfo', { ...settings.contactInfo, website: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    dir="ltr"
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Facebook</label>
+                  <input
+                    type="url"
+                    value={settings.contactInfo.facebook}
+                    onChange={e => updateSetting('contactInfo', { ...settings.contactInfo, facebook: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
+                    dir="ltr"
+                    placeholder="https://www.facebook.com/username"
+                  />
+                </div>
+
+            {/* روابط التحميل والمشاركة */}
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Globe size={20} className="text-green-500" />
+                روابط التحميل والمشاركة
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">رابط Google Play</label>
+                  <input
+                    type="url"
+                    value={settings.shareLinks.playStore}
+                    onChange={e => updateSetting('shareLinks', { ...settings.shareLinks, playStore: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    dir="ltr"
+                    placeholder="https://play.google.com/store/apps/details?id=..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">رابط App Store</label>
+                  <input
+                    type="url"
+                    value={settings.shareLinks.appStore}
+                    onChange={e => updateSetting('shareLinks', { ...settings.shareLinks, appStore: e.target.value })}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    dir="ltr"
+                    placeholder="https://apps.apple.com/app/..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">رسالة المشاركة</label>
+                  <textarea
+                    value={settings.shareLinks.shareMessage}
+                    onChange={e => updateSetting('shareLinks', { ...settings.shareLinks, shareMessage: e.target.value })}
+                    rows={2}
+                    className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                    placeholder="تحميل تطبيقنا..."
+                  />
+                </div>
               </div>
             </div>
           </>

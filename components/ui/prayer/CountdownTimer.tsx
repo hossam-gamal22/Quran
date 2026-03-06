@@ -297,6 +297,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
   },
   prayerName: {

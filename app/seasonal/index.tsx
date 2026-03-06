@@ -17,7 +17,6 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -48,11 +47,8 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
   return (
     <Animated.View entering={FadeInDown.duration(600)}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <LinearGradient
-          colors={[season.color, adjustColor(season.color, -30)]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.activeSeasonCard}
+        <View
+          style={[styles.activeSeasonCard, { backgroundColor: `${season.color}CC` }]}
         >
           {/* الخلفية الزخرفية */}
           <View style={styles.decorativePattern}>
@@ -110,7 +106,7 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
               <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
             </View>
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -125,7 +121,7 @@ const UpcomingSeasonCard: React.FC<UpcomingSeasonCardProps> = ({ season, isDarkM
   return (
     <Animated.View entering={FadeInDown.delay(100).duration(500)}>
       <View style={[styles.upcomingCard, isDarkMode && styles.upcomingCardDark]}>
-        <View style={[styles.upcomingIconContainer, { backgroundColor: `${season.color}20` }]}>
+        <View style={styles.upcomingIconContainer}>
           <MaterialCommunityIcons name={season.icon as any} size={28} color={season.color} />
         </View>
         <View style={styles.upcomingContent}>
@@ -164,9 +160,8 @@ interface SpecialDayCardProps {
 const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDarkMode }) => {
   return (
     <Animated.View entering={FadeIn.duration(500)}>
-      <LinearGradient
-        colors={isDarkMode ? ['#2a2a3e', '#1a1a2e'] : ['#fff8e1', '#fff3cd']}
-        style={styles.specialDayCard}
+      <View
+        style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
       >
         <View style={styles.specialDayHeader}>
           <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
@@ -201,7 +196,7 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
             ))}
           </View>
         )}
-      </LinearGradient>
+      </View>
     </Animated.View>
   );
 };
@@ -227,7 +222,7 @@ const SeasonGridItem: React.FC<SeasonGridItemProps> = ({ season, onPress, index,
         }}
         activeOpacity={0.7}
       >
-        <View style={[styles.gridIconBg, { backgroundColor: `${season.color}20` }]}>
+        <View style={styles.gridIconBg}>
           <MaterialCommunityIcons name={season.icon as any} size={28} color={season.color} />
         </View>
         <Text style={[styles.gridItemName, isDarkMode && styles.textLight]} numberOfLines={1}>
@@ -337,7 +332,7 @@ export default function SeasonalIndexScreen() {
           }}
         >
           <MaterialCommunityIcons
-            name="arrow-right"
+            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
             size={28}
             color={isDarkMode ? '#fff' : '#333'}
           />
@@ -413,9 +408,8 @@ export default function SeasonalIndexScreen() {
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.tipCard}>
-          <LinearGradient
-            colors={isDarkMode ? ['#1a2a1a', '#0d1a0d'] : ['#e8f5e9', '#c8e6c9']}
-            style={styles.tipGradient}
+          <View
+            style={[styles.tipGradient, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)' }]}
           >
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#2f7659" />
             <View style={styles.tipContent}>
@@ -424,7 +418,7 @@ export default function SeasonalIndexScreen() {
                 استغل المواسم الإسلامية في مضاعفة الأجر والتقرب إلى الله بالطاعات
               </Text>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         <View style={styles.bottomSpace} />

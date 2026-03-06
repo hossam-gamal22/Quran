@@ -1,5 +1,5 @@
 // lib/notification-types.ts
-export type PrayerKey = 'Fajr' | 'Dhuhr' | 'Asr' | 'Maghrib' | 'Isha';
+export type PrayerKey = 'fajr' | 'sunrise' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 
 export interface NotificationSettings {
   enabled: boolean;
@@ -11,11 +11,12 @@ export interface NotificationSettings {
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   enabled: false,
   prayers: {
-    Fajr: true,
-    Dhuhr: true,
-    Asr: true,
-    Maghrib: true,
-    Isha: true,
+    fajr: true,
+    sunrise: true,
+    dhuhr: true,
+    asr: true,
+    maghrib: true,
+    isha: true,
   },
   advanceMinutes: 0,
   adhanSound: false,

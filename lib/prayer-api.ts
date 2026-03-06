@@ -196,23 +196,62 @@ export async function fetchHijriDate(date?: Date): Promise<{
   hijri: PrayerTimesResponse['date']['hijri'];
   gregorian: PrayerTimesResponse['date']['gregorian'];
 }> {
+  const targetDate = date || new Date();
+  
+  // Try the Aladhan API first with timeout
   try {
-    const dateStr = date 
-      ? `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`
-      : new Date().toLocaleDateString('en-GB').split('/').join('-');
-    
+    const dateStr = `${targetDate.getDate()}-${targetDate.getMonth() + 1}-${targetDate.getFullYear()}`;
     const url = `${ALADHAN_API_BASE}/gpiToH/${dateStr}`;
     
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    
     const data = await response.json();
 
     if (data.code === 200) {
       return data.data;
     }
-    throw new Error('Failed to fetch hijri date');
-  } catch (error) {
-    console.error('Error fetching hijri date:', error);
-    throw error;
+    throw new Error('Invalid response code from API');
+  } catch (apiError) {
+    console.warn('Aladhan API failed, falling back to local conversion:', apiError);
+    
+    // Fallback to local calculation using gregorianToHijri
+    try {
+      const { gregorianToHijri, HIJRI_MONTHS_AR, HIJRI_MONTHS_EN, WEEKDAYS_AR, WEEKDAYS_EN } = await import('./hijri-date');
+      
+      const hijri = gregorianToHijri(targetDate);
+      const weekdayIndex = targetDate.getDay();
+      
+      return {
+        hijri: {
+          date: `${hijri.day} ${HIJRI_MONTHS_AR[hijri.month - 1]} ${hijri.year}`,
+          day: String(hijri.day),
+          weekday: { en: WEEKDAYS_EN[weekdayIndex], ar: WEEKDAYS_AR[weekdayIndex] },
+          month: { 
+            number: hijri.month, 
+            en: HIJRI_MONTHS_EN[hijri.month - 1], 
+            ar: HIJRI_MONTHS_AR[hijri.month - 1] 
+          },
+          year: String(hijri.year),
+          designation: { abbreviated: 'AH', expanded: 'بعد الهجرة' },
+        },
+        gregorian: {
+          date: targetDate.toLocaleDateString('en-GB'),
+          day: String(targetDate.getDate()),
+          weekday: { en: WEEKDAYS_EN[weekdayIndex] },
+          month: { number: targetDate.getMonth() + 1, en: String(targetDate.getMonth() + 1) },
+          year: String(targetDate.getFullYear()),
+        },
+      };
+    } catch (fallbackError) {
+      console.error('Fallback conversion also failed:', fallbackError);
+      throw new Error('Failed to fetch/calculate hijri date');
+    }
   }
 }
 

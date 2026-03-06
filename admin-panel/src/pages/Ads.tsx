@@ -2,14 +2,22 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
+interface AdUnitIds {
+  android: string;
+  ios: string;
+}
+
 interface AdsSettings {
   enabled: boolean;
-  bannerAdCode: string;
-  interstitialAdCode: string;
-  showBannerOnHome: boolean;
-  showBannerOnQuran: boolean;
-  showBannerOnAzkar: boolean;
+  // Ad Unit IDs per platform
+  bannerAdId: AdUnitIds;
+  interstitialAdId: AdUnitIds;
+  appOpenAdId: AdUnitIds;
+  // Per-screen banner visibility
+  bannerScreens: Record<string, boolean>;
+  // App Open Ad
   showAdOnAppOpen: boolean;
+  // Interstitial settings
   interstitialMode: 'pages' | 'time' | 'session';
   interstitialFrequency: number;
   interstitialTimeInterval: number;
@@ -19,13 +27,42 @@ interface AdsSettings {
   updatedAt: string;
 }
 
+const SCREEN_LABELS: Record<string, string> = {
+  home: 'الصفحة الرئيسية',
+  quran: 'صفحة القرآن',
+  azkar: 'الأذكار',
+  tasbih: 'التسبيح',
+  prayer: 'مواقيت الصلاة',
+  duas: 'الأدعية',
+  names: 'أسماء الله الحسنى',
+  ruqya: 'الرقية الشرعية',
+  hijri: 'التقويم الهجري',
+  surah: 'قراءة السورة',
+  tafsir: 'التفسير',
+  khatma: 'الختمة',
+  worship: 'متتبع العبادات',
+};
+
 const DEFAULT_SETTINGS: AdsSettings = {
   enabled: true,
-  bannerAdCode: '',
-  interstitialAdCode: '',
-  showBannerOnHome: true,
-  showBannerOnQuran: false,
-  showBannerOnAzkar: true,
+  bannerAdId: { android: '', ios: '' },
+  interstitialAdId: { android: '', ios: '' },
+  appOpenAdId: { android: '', ios: '' },
+  bannerScreens: {
+    home: true,
+    quran: false,
+    azkar: true,
+    tasbih: false,
+    prayer: false,
+    duas: false,
+    names: false,
+    ruqya: false,
+    hijri: false,
+    surah: false,
+    tafsir: false,
+    khatma: false,
+    worship: false,
+  },
   showAdOnAppOpen: false,
   interstitialMode: 'pages',
   interstitialFrequency: 5,
@@ -52,13 +89,43 @@ export default function Ads() {
       const docRef = doc(db, 'config', 'ads-settings');
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as AdsSettings);
+        const data = docSnap.data();
+        // Migrate old format to new format
+        const migrated = migrateSettings(data);
+        setSettings({ ...DEFAULT_SETTINGS, ...migrated } as AdsSettings);
       }
     } catch (error) {
       console.error('Error loading ads settings:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const migrateSettings = (data: Record<string, any>): Partial<AdsSettings> => {
+    const result: any = { ...data };
+
+    // Migrate old single ad codes to per-platform format
+    if (data.bannerAdCode && !data.bannerAdId) {
+      result.bannerAdId = { android: data.bannerAdCode, ios: data.bannerAdCode };
+      delete result.bannerAdCode;
+    }
+    if (data.interstitialAdCode && !data.interstitialAdId) {
+      result.interstitialAdId = { android: data.interstitialAdCode, ios: data.interstitialAdCode };
+      delete result.interstitialAdCode;
+    }
+
+    // Migrate old flat boolean screens to bannerScreens object
+    if (!data.bannerScreens) {
+      result.bannerScreens = { ...DEFAULT_SETTINGS.bannerScreens };
+      if (data.showBannerOnHome !== undefined) result.bannerScreens.home = data.showBannerOnHome;
+      if (data.showBannerOnQuran !== undefined) result.bannerScreens.quran = data.showBannerOnQuran;
+      if (data.showBannerOnAzkar !== undefined) result.bannerScreens.azkar = data.showBannerOnAzkar;
+      delete result.showBannerOnHome;
+      delete result.showBannerOnQuran;
+      delete result.showBannerOnAzkar;
+    }
+
+    return result;
   };
 
   const handleSave = async () => {
@@ -77,6 +144,22 @@ export default function Ads() {
       setSaving(false);
     }
   };
+
+  const updateBannerScreen = (screen: string, value: boolean) => {
+    setSettings({
+      ...settings,
+      bannerScreens: { ...settings.bannerScreens, [screen]: value },
+    });
+  };
+
+  const updateAdId = (type: 'bannerAdId' | 'interstitialAdId' | 'appOpenAdId', platform: 'android' | 'ios', value: string) => {
+    setSettings({
+      ...settings,
+      [type]: { ...settings[type], [platform]: value },
+    });
+  };
+
+  const enabledScreenCount = Object.values(settings.bannerScreens).filter(Boolean).length;
 
   if (loading) {
     return (
@@ -116,66 +199,132 @@ export default function Ads() {
         </div>
       </div>
 
-      {/* أكواد AdMob */}
+      {/* أكواد AdMob - Banner */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">أكواد Google AdMob</h2>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Banner Ad Unit ID</label>
-            <input
-              type="text"
-              value={settings.bannerAdCode}
-              onChange={(e) => setSettings({ ...settings, bannerAdCode: e.target.value })}
-              placeholder="ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-            <p className="text-gray-400 text-xs mt-1">إعلان البانر الذي يظهر أسفل الشاشة</p>
+
+        {/* Banner Ad */}
+        <div className="mb-6 border border-gray-100 rounded-xl p-5">
+          <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            Banner Ad Unit IDs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🤖 Android</label>
+              <input
+                type="text"
+                value={settings.bannerAdId.android}
+                onChange={(e) => updateAdId('bannerAdId', 'android', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🍎 iOS</label>
+              <input
+                type="text"
+                value={settings.bannerAdId.ios}
+                onChange={(e) => updateAdId('bannerAdId', 'ios', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Interstitial Ad Unit ID</label>
-            <input
-              type="text"
-              value={settings.interstitialAdCode}
-              onChange={(e) => setSettings({ ...settings, interstitialAdCode: e.target.value })}
-              placeholder="ca-app-pub-xxxxxxxxxxxxxxxx/xxxxxxxxxx"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-            />
-            <p className="text-gray-400 text-xs mt-1">إعلان ملء الشاشة (يمكن تخطيه)</p>
+          <p className="text-gray-400 text-xs mt-2">إعلان البانر الذي يظهر أسفل الشاشات</p>
+        </div>
+
+        {/* Interstitial Ad */}
+        <div className="mb-6 border border-gray-100 rounded-xl p-5">
+          <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            Interstitial Ad Unit IDs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🤖 Android</label>
+              <input
+                type="text"
+                value={settings.interstitialAdId.android}
+                onChange={(e) => updateAdId('interstitialAdId', 'android', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🍎 iOS</label>
+              <input
+                type="text"
+                value={settings.interstitialAdId.ios}
+                onChange={(e) => updateAdId('interstitialAdId', 'ios', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
           </div>
+          <p className="text-gray-400 text-xs mt-2">إعلان ملء الشاشة (يمكن تخطيه)</p>
+        </div>
+
+        {/* App Open Ad */}
+        <div className="border border-gray-100 rounded-xl p-5">
+          <h3 className="font-medium text-gray-800 mb-3 flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+            App Open Ad Unit IDs
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🤖 Android</label>
+              <input
+                type="text"
+                value={settings.appOpenAdId.android}
+                onChange={(e) => updateAdId('appOpenAdId', 'android', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">🍎 iOS</label>
+              <input
+                type="text"
+                value={settings.appOpenAdId.ios}
+                onChange={(e) => updateAdId('appOpenAdId', 'ios', e.target.value)}
+                placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                dir="ltr"
+              />
+            </div>
+          </div>
+          <p className="text-gray-400 text-xs mt-2">إعلان عند فتح التطبيق</p>
         </div>
       </div>
 
       {/* أماكن عرض البانر */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">أماكن عرض البانر</h2>
-        <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.showBannerOnHome}
-              onChange={(e) => setSettings({ ...settings, showBannerOnHome: e.target.checked })}
-              className="w-5 h-5 text-emerald-600 rounded"
-            />
-            <span className="text-gray-700">الصفحة الرئيسية</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.showBannerOnQuran}
-              onChange={(e) => setSettings({ ...settings, showBannerOnQuran: e.target.checked })}
-              className="w-5 h-5 text-emerald-600 rounded"
-            />
-            <span className="text-gray-700">صفحة القرآن</span>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={settings.showBannerOnAzkar}
-              onChange={(e) => setSettings({ ...settings, showBannerOnAzkar: e.target.checked })}
-              className="w-5 h-5 text-emerald-600 rounded"
-            />
-            <span className="text-gray-700">صفحة الأذكار</span>
-          </label>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">أماكن عرض البانر</h2>
+            <p className="text-gray-500 text-sm">اختر الشاشات التي سيظهر فيها إعلان البانر ({enabledScreenCount} شاشات مفعّلة)</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Object.entries(SCREEN_LABELS).map(([key, label]) => (
+            <label key={key} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
+              settings.bannerScreens[key] ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+            }`}>
+              <input
+                type="checkbox"
+                checked={settings.bannerScreens[key] ?? false}
+                onChange={(e) => updateBannerScreen(key, e.target.checked)}
+                className="w-5 h-5 text-emerald-600 rounded"
+              />
+              <span className="text-gray-700 text-sm font-medium">{label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
@@ -200,7 +349,6 @@ export default function Ads() {
         <h2 className="text-lg font-semibold text-gray-800 mb-4">إعدادات الإعلانات البينية (Interstitial)</h2>
         <p className="text-gray-500 text-sm mb-4">إعلانات ملء الشاشة التي يمكن للمستخدم تخطيها</p>
 
-        {/* اختيار نوع التكرار */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">طريقة عرض الإعلانات</label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,7 +376,6 @@ export default function Ads() {
           </div>
         </div>
 
-        {/* إعدادات حسب النوع المختار */}
         {settings.interstitialMode === 'pages' && (
           <div className="bg-gray-50 rounded-lg p-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">عرض إعلان كل:</label>
@@ -320,6 +467,7 @@ export default function Ads() {
         <ul className="space-y-2 text-blue-700 text-sm">
           <li>• الإعلانات: <span className="font-medium">{settings.enabled ? 'مفعّلة' : 'معطّلة'}</span></li>
           <li>• إعلان فتح التطبيق: <span className="font-medium">{settings.showAdOnAppOpen ? 'مفعّل' : 'معطّل'}</span></li>
+          <li>• البانر: <span className="font-medium">{enabledScreenCount} شاشة مفعّلة</span></li>
           <li>• الإعلانات البينية: <span className="font-medium">
             {settings.interstitialMode === 'pages' && `كل ${settings.interstitialFrequency} صفحات`}
             {settings.interstitialMode === 'time' && `كل ${settings.interstitialTimeInterval} دقائق`}
@@ -339,7 +487,7 @@ export default function Ads() {
       </button>
 
       <p className="text-center text-gray-500 text-sm mt-4">
-        آخر تحديث: {new Date(settings.updatedAt).toLocaleString('ar-EG')}
+        ⚡ التغييرات تنعكس في التطبيق عند فتحه مرة جديدة &bull; آخر تحديث: {new Date(settings.updatedAt).toLocaleString('ar-EG')}
       </p>
     </>
   );

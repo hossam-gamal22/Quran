@@ -3,17 +3,21 @@
  * يتحكم في: أذان الصلاة / الورد اليومي / سورة الكهف / الآية اليومية
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Switch, Platform, Alert, TextInput, Modal,
+  Switch, Platform, Alert, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { useColors } from '@/hooks/use-colors';
+import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Haptics from 'expo-haptics';
 import {
   AllNotificationSettings,
+  AdhanType,
+  ADHAN_AUDIO,
   DEFAULT_ALL_NOTIF,
   getAllNotifSettings,
   saveAllNotifSettings,
@@ -61,7 +65,7 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
         onPress={onClose}
       >
         <TouchableOpacity activeOpacity={1}>
-          <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 24, width: 280, alignItems: 'center' }}>
+          <View style={{ backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 20, padding: 24, width: 280, alignItems: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: '800', color: colors.foreground, marginBottom: 20 }}>{title}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <View>
@@ -110,10 +114,65 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function NotificationsCenterScreen() {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
   const [settings, setSettings] = useState<AllNotificationSettings>(DEFAULT_ALL_NOTIF);
   const [hasPermission, setHasPermission] = useState(false);
   const [timePicker, setTimePicker] = useState<{ key: string; value: string; title: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState<AdhanType | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<AdhanType | null>(null);
+  const previewSoundRef = useRef<Audio.Sound | null>(null);
+
+  const stopPreview = useCallback(async () => {
+    if (previewSoundRef.current) {
+      try {
+        await previewSoundRef.current.stopAsync();
+        await previewSoundRef.current.unloadAsync();
+      } catch { /* ignore */ }
+      previewSoundRef.current = null;
+    }
+    setPreviewPlaying(null);
+    setPreviewLoading(null);
+  }, []);
+
+  const playPreview = useCallback(async (type: AdhanType) => {
+    // If same type is playing, stop it
+    if (previewPlaying === type) {
+      await stopPreview();
+      return;
+    }
+    // Stop any current preview
+    await stopPreview();
+
+    setPreviewLoading(type);
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: ADHAN_AUDIO[type] },
+        { shouldPlay: true },
+        (status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            stopPreview();
+          }
+        }
+      );
+      previewSoundRef.current = sound;
+      setPreviewPlaying(type);
+    } catch {
+      Alert.alert('خطأ', 'تعذر تشغيل الأذان. تحقق من اتصال الإنترنت.');
+    } finally {
+      setPreviewLoading(null);
+    }
+  }, [previewPlaying, stopPreview]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { stopPreview(); };
+  }, [stopPreview]);
 
   useEffect(() => {
     getAllNotifSettings().then(setSettings);
@@ -166,7 +225,7 @@ export default function NotificationsCenterScreen() {
     sectionIcon: { fontSize: 20 },
     sectionTitle: { fontSize: 15, fontWeight: '900', color: colors.foreground, flex: 1 },
     sectionToggle: {},
-    card: { marginHorizontal: 12, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+    card: { marginHorizontal: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13 },
     rowDivider: { height: 0.5, backgroundColor: colors.border, marginHorizontal: 16 },
     rowLabel: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: 'right', fontWeight: '600' },
@@ -180,10 +239,14 @@ export default function NotificationsCenterScreen() {
     prayerName: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: 'right', fontWeight: '600' },
     // Advance row
     advanceRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 16, paddingBottom: 12, flexWrap: 'wrap' },
-    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border },
     advChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     advChipText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     advChipTextActive: { color: '#fff' },
+    // Radio buttons for adhan type
+    radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.muted, alignItems: 'center' as const, justifyContent: 'center' as const },
+    radioInner: { width: 12, height: 12, borderRadius: 6 },
+    previewBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(120,120,128,0.12)', alignItems: 'center' as const, justifyContent: 'center' as const },
     // Save indicator
     savingBadge: { position: 'absolute', top: 10, right: 16, backgroundColor: colors.success + '20', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   });
@@ -228,8 +291,9 @@ export default function NotificationsCenterScreen() {
           <Switch
             value={settings.adhanEnabled}
             onValueChange={v => updateAndSave({ adhanEnabled: v })}
-            trackColor={{ false: colors.border, true: colors.primary }}
-            thumbColor="#fff"
+            trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: colors.primary }}
+            thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+            ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           />
           <View style={{ flex: 1 }} />
           <Text style={s.sectionTitle}>أذان الصلاة</Text>
@@ -245,8 +309,9 @@ export default function NotificationsCenterScreen() {
                   value={settings.prayers[p.key]}
                   onValueChange={v => updatePrayer(p.key, v)}
                   disabled={!settings.adhanEnabled}
-                  trackColor={{ false: colors.border, true: colors.primary }}
-                  thumbColor="#fff"
+                  trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: colors.primary }}
+                  thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                  ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
                 />
                 <View style={{ flex: 1 }} />
                 <Text style={s.prayerName}>{p.name}</Text>
@@ -276,6 +341,76 @@ export default function NotificationsCenterScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Adhan Type Selection */}
+          <View style={s.rowDivider} />
+          <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, textAlign: 'right', marginBottom: 8 }}>
+              🔊 نوع الأذان
+            </Text>
+          </View>
+
+          {/* Full Adhan Option */}
+          <TouchableOpacity
+            style={[s.prayerRow, { paddingVertical: 10 }]}
+            onPress={() => updateAndSave({ adhanType: 'full' })}
+            disabled={!settings.adhanEnabled}
+            activeOpacity={0.7}
+          >
+            <TouchableOpacity
+              onPress={() => playPreview('full')}
+              disabled={!settings.adhanEnabled}
+              style={s.previewBtn}
+              activeOpacity={0.6}
+            >
+              {previewLoading === 'full' ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={{ fontSize: 18 }}>{previewPlaying === 'full' ? '⏹️' : '▶️'}</Text>
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[s.prayerName, { fontWeight: '700' }]}>أذان كامل</Text>
+              <Text style={{ fontSize: 11, color: colors.muted, textAlign: 'right' }}>
+                الأذان بالكامل — مشاري العفاسي
+              </Text>
+            </View>
+            <View style={[s.radioOuter, settings.adhanType === 'full' && { borderColor: colors.primary }]}>
+              {settings.adhanType === 'full' && <View style={[s.radioInner, { backgroundColor: colors.primary }]} />}
+            </View>
+          </TouchableOpacity>
+
+          <View style={s.rowDivider} />
+
+          {/* Simple Adhan Option */}
+          <TouchableOpacity
+            style={[s.prayerRow, { paddingVertical: 10, paddingBottom: 14 }]}
+            onPress={() => updateAndSave({ adhanType: 'simple' })}
+            disabled={!settings.adhanEnabled}
+            activeOpacity={0.7}
+          >
+            <TouchableOpacity
+              onPress={() => playPreview('simple')}
+              disabled={!settings.adhanEnabled}
+              style={s.previewBtn}
+              activeOpacity={0.6}
+            >
+              {previewLoading === 'simple' ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Text style={{ fontSize: 18 }}>{previewPlaying === 'simple' ? '⏹️' : '▶️'}</Text>
+              )}
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginRight: 10 }}>
+              <Text style={[s.prayerName, { fontWeight: '700' }]}>أذان بسيط</Text>
+              <Text style={{ fontSize: 11, color: colors.muted, textAlign: 'right' }}>
+                الجزء الأول من الأذان فقط
+              </Text>
+            </View>
+            <View style={[s.radioOuter, settings.adhanType === 'simple' && { borderColor: colors.primary }]}>
+              {settings.adhanType === 'simple' && <View style={[s.radioInner, { backgroundColor: colors.primary }]} />}
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* ── 2. WIRD DAILY ────────────────────────────────── */}
@@ -283,8 +418,9 @@ export default function NotificationsCenterScreen() {
           <Switch
             value={settings.wirdEnabled}
             onValueChange={v => updateAndSave({ wirdEnabled: v })}
-            trackColor={{ false: colors.border, true: '#D97706' }}
-            thumbColor="#fff"
+            trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#D97706' }}
+            thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+            ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           />
           <View style={{ flex: 1 }} />
           <Text style={s.sectionTitle}>الورد اليومي</Text>
@@ -332,8 +468,9 @@ export default function NotificationsCenterScreen() {
           <Switch
             value={settings.kahfEnabled}
             onValueChange={v => updateAndSave({ kahfEnabled: v })}
-            trackColor={{ false: colors.border, true: '#7C3AED' }}
-            thumbColor="#fff"
+            trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#7C3AED' }}
+            thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+            ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           />
           <View style={{ flex: 1 }} />
           <Text style={s.sectionTitle}>سورة الكهف</Text>
@@ -364,8 +501,9 @@ export default function NotificationsCenterScreen() {
           <Switch
             value={settings.dailyAyahEnabled}
             onValueChange={v => updateAndSave({ dailyAyahEnabled: v })}
-            trackColor={{ false: colors.border, true: '#0EA5E9' }}
-            thumbColor="#fff"
+            trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0EA5E9' }}
+            thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+            ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           />
           <View style={{ flex: 1 }} />
           <Text style={s.sectionTitle}>آية اليوم</Text>
@@ -392,7 +530,7 @@ export default function NotificationsCenterScreen() {
         </View>
 
         {/* ── Status Summary ────────────────────────────────── */}
-        <View style={{ marginHorizontal: 12, marginTop: 20, padding: 16, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
+        <View style={{ marginHorizontal: 12, marginTop: 20, padding: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
           <Text style={{ fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 10 }}>
             📊 ملخص الإشعارات النشطة
           </Text>

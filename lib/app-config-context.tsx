@@ -1,6 +1,6 @@
 // lib/app-config-context.tsx
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAppConfig, RemoteAppConfig } from './app-config-api';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { getAppConfig, subscribeToAppConfig, RemoteAppConfig } from './app-config-api';
 
 interface AppConfigContextType {
   config: RemoteAppConfig;
@@ -30,6 +30,7 @@ const AppConfigContext = createContext<AppConfigContextType | undefined>(undefin
 export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
   const [config, setConfig] = useState<RemoteAppConfig>(DEFAULT_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const loadConfig = async () => {
     setIsLoading(true);
@@ -44,7 +45,26 @@ export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    // Load initial config
     loadConfig();
+    
+    // Subscribe to real-time updates
+    unsubscribeRef.current = subscribeToAppConfig(
+      (updatedConfig) => {
+        setConfig(updatedConfig);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('Real-time config subscription error:', error);
+      }
+    );
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
   }, []);
 
   return (

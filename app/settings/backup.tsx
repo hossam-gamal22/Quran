@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,7 +23,6 @@ import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
@@ -90,24 +90,21 @@ const ActionCard: React.FC<ActionCardProps> = ({
       activeOpacity={0.8}
       disabled={isLoading}
     >
-      <LinearGradient
-        colors={gradientColors as [string, string]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.actionIconContainer}
+      <View
+        style={[styles.actionIconContainer, { backgroundColor: `${(gradientColors as [string, string])[0]}CC` }]}
       >
         {isLoading ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
           <MaterialCommunityIcons name={icon} size={28} color="#fff" />
         )}
-      </LinearGradient>
+      </View>
       <View style={styles.actionContent}>
         <Text style={[styles.actionTitle, isDarkMode && styles.textLight]}>{title}</Text>
         <Text style={[styles.actionSubtitle, isDarkMode && styles.textMuted]}>{subtitle}</Text>
       </View>
       <MaterialCommunityIcons
-        name="chevron-left"
+        name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
         size={24}
         color={isDarkMode ? '#666' : '#ccc'}
       />
@@ -433,7 +430,7 @@ export default function BackupScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color={isDarkMode ? '#fff' : '#333'} />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>النسخ الاحتياطي</Text>
         <View style={styles.headerPlaceholder} />
@@ -446,11 +443,8 @@ export default function BackupScreen() {
       >
         {/* Status Card */}
         <Animated.View entering={FadeInDown.delay(50).duration(500)}>
-          <LinearGradient
-            colors={isDarkMode ? ['#1a1a2e', '#16213e'] : ['#2f7659', '#1d4a3a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statusCard}
+          <View
+            style={[styles.statusCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(47,118,89,0.85)' }]}
           >
             <View style={styles.statusIcon}>
               <MaterialCommunityIcons
@@ -467,7 +461,7 @@ export default function BackupScreen() {
                 ? `آخر نسخة: ${formatDate(lastBackup.date)}`
                 : 'أنشئ نسخة احتياطية للحفاظ على بياناتك'}
             </Text>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* Data Stats */}
@@ -674,11 +668,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   actionCardDark: {
     backgroundColor: '#1a1a2e',

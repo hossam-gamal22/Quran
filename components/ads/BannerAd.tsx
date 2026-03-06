@@ -1,15 +1,18 @@
 // components/ads/BannerAd.tsx
-// نسخة تجريبية للاختبار على Expo Go - الإعلانات معطلة
-// ⚠️ قبل النشر: استخدم النسخة الأصلية
-
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useAds } from '@/lib/ads-context';
+import { AdScreenKey } from '@/lib/ads-config';
 
 interface BannerAdComponentProps {
-  screen?: 'home' | 'quran' | 'azkar' | 'other';
+  screen: AdScreenKey;
 }
 
-export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen = 'other' }) => {
+export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen }) => {
+  const { isBannerVisible } = useAds();
+
+  if (!isBannerVisible(screen)) return null;
+
   // في وضع التجربة، نعرض placeholder بدلاً من الإعلان
   if (__DEV__) {
     return (
@@ -18,8 +21,8 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen = '
       </View>
     );
   }
-  
-  // في الإنتاج، لا نعرض شيء (الإعلانات معطلة)
+
+  // في الإنتاج، لا نعرض شيء حتى يتم تفعيل react-native-google-mobile-ads
   return null;
 };
 

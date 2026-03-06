@@ -25,9 +25,9 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useFastingTracker } from '@/contexts/WorshipContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { DailyFastingRecord } from '@/lib/worship-storage';
 import GlassCard from '@/components/ui/GlassCard';
 
@@ -106,11 +106,8 @@ const FastingButton: React.FC<FastingButtonProps> = ({
         activeOpacity={0.9}
         onPress={handlePress}
       >
-        <LinearGradient
-          colors={isFasting ? ['#2f7659', '#1d4a3a'] : ['#5d4e8c', '#3d3260']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fastingButton}
+        <View
+          style={[styles.fastingButton, { backgroundColor: isFasting ? 'rgba(47,118,89,0.85)' : 'rgba(93,78,140,0.85)' }]}
         >
           <View style={styles.fastingButtonInner}>
             <MaterialCommunityIcons
@@ -125,7 +122,7 @@ const FastingButton: React.FC<FastingButtonProps> = ({
               {isFasting ? 'اضغط لإلغاء التسجيل' : 'اضغط للتسجيل'}
             </Text>
           </View>
-        </LinearGradient>
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -286,7 +283,7 @@ export default function FastingTrackerScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthFastingDays, setMonthFastingDays] = useState<number[]>([]);
   
-  const isDarkMode = false;
+  const { isDarkMode } = useSettings();
 
   // حساب أيام الشهر
   const calendarData = useMemo(() => {
@@ -355,7 +352,7 @@ export default function FastingTrackerScreen() {
           onPress={() => router.back()}
         >
           <MaterialCommunityIcons
-            name="arrow-right"
+            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
             size={24}
             color={isDarkMode ? '#fff' : '#333'}
           />
@@ -410,7 +407,7 @@ export default function FastingTrackerScreen() {
             </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#2f765920' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="calendar-check" size={24} color="#2f7659" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -421,7 +418,7 @@ export default function FastingTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#5d4e8c20' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="star-crescent" size={24} color="#5d4e8c" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -432,7 +429,7 @@ export default function FastingTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#c17f5920' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="heart" size={24} color="#c17f59" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -443,7 +440,7 @@ export default function FastingTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#ff6b3520' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="fire" size={24} color="#ff6b35" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -468,7 +465,7 @@ export default function FastingTrackerScreen() {
                 {MONTHS_AR[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </Text>
               <TouchableOpacity onPress={goToNextMonth} style={styles.calendarNav}>
-                <MaterialCommunityIcons name="chevron-left" size={28} color={isDarkMode ? '#fff' : '#333'} />
+                <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={28} color={isDarkMode ? '#fff' : '#333'} />
               </TouchableOpacity>
             </View>
             
@@ -689,11 +686,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   calendarCardDark: {
     backgroundColor: '#1a1a2e',

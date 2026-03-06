@@ -7,25 +7,30 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  ScrollView, Alert, Platform, Animated, Share,
+  ScrollView, Alert, Platform, Animated, Share, Dimensions,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { getVerseQcfData } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Daily Ayahs (7 آيات تتناوب) ────────────────────────────────────────────
 const DAILY_AYAHS = [
-  { arabic: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا', ref: 'الشرح ٥', trans: 'For indeed, with hardship will be ease.' },
-  { arabic: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', ref: 'الطلاق ٣', trans: 'And whoever relies upon Allah - then He is sufficient for him.' },
-  { arabic: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ', ref: 'البقرة ١٥٣', trans: 'Indeed, Allah is with the patient.' },
-  { arabic: 'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ', ref: 'الحديد ٤', trans: 'And He is with you wherever you are.' },
-  { arabic: 'فَاذْكُرُونِي أَذْكُرْكُمْ', ref: 'البقرة ١٥٢', trans: 'So remember Me; I will remember you.' },
-  { arabic: 'وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ', ref: 'آل عمران ١٣٤', trans: 'And Allah loves the doers of good.' },
-  { arabic: 'إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ', ref: 'التوبة ١٢٠', trans: 'Indeed, Allah does not allow to be lost the reward of the doers of good.' },
+  { arabic: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا', ref: 'الشرح ٥', trans: 'For indeed, with hardship will be ease.', surah: 94, ayah: 5 },
+  { arabic: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', ref: 'الطلاق ٣', trans: 'And whoever relies upon Allah - then He is sufficient for him.', surah: 65, ayah: 3 },
+  { arabic: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ', ref: 'البقرة ١٥٣', trans: 'Indeed, Allah is with the patient.', surah: 2, ayah: 153 },
+  { arabic: 'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ', ref: 'الحديد ٤', trans: 'And He is with you wherever you are.', surah: 57, ayah: 4 },
+  { arabic: 'فَاذْكُرُونِي أَذْكُرْكُمْ', ref: 'البقرة ١٥٢', trans: 'So remember Me; I will remember you.', surah: 2, ayah: 152 },
+  { arabic: 'وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ', ref: 'آل عمران ١٣٤', trans: 'And Allah loves the doers of good.', surah: 3, ayah: 134 },
+  { arabic: 'إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ', ref: 'التوبة ١٢٠', trans: 'Indeed, Allah does not allow to be lost the reward of the doers of good.', surah: 9, ayah: 120 },
 ];
 
 // ─── Background image categories from Unsplash ───────────────────────────────
@@ -93,13 +98,17 @@ interface AyahCardProps {
   cardStyle: typeof CARD_STYLES[0];
   cardRef: React.RefObject<ViewShot>;
   showTranslation: boolean;
+  qcfGlyphs: string[] | null;
+  qcfFontFamily: string | null;
 }
 
-function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: AyahCardProps) {
+function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
+  const useQcf = qcfGlyphs && qcfGlyphs.length > 0 && qcfFontFamily;
+
   return (
-    <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0 }}>
-      <View style={{ width: 360, height: 480, borderRadius: 20, overflow: 'hidden', position: 'relative' }}>
+    <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}>
+      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: '#000' }}>
         {/* Background image */}
         <RNImage
           source={{ uri: bgUrl }}
@@ -121,10 +130,16 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
 
           <View style={{ width: 50, height: 1.5, backgroundColor: cardStyle.accentColor, opacity: 0.6, marginBottom: 20, borderRadius: 1 }} />
 
-          {/* Arabic */}
-          <Text style={{ fontSize: 22, color: cardStyle.textColor, textAlign: 'center', lineHeight: 42, fontWeight: '600', marginBottom: 20 }}>
-            {ayah.arabic}
-          </Text>
+          {/* Arabic — QCF or fallback */}
+          {useQcf ? (
+            <Text style={{ fontSize: 28, color: cardStyle.textColor, textAlign: 'center', lineHeight: 52, fontFamily: qcfFontFamily, marginBottom: 20 }}>
+              {qcfGlyphs.join('')}
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 22, color: cardStyle.textColor, textAlign: 'center', lineHeight: 42, fontWeight: '600', marginBottom: 20 }}>
+              {ayah.arabic}
+            </Text>
+          )}
 
           <View style={{ width: 50, height: 1.5, backgroundColor: cardStyle.accentColor, opacity: 0.6, marginBottom: 16, borderRadius: 1 }} />
 
@@ -139,10 +154,13 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
               {ayah.trans}
             </Text>
           )}
+        </View>
 
-          {/* Bottom watermark */}
-          <Text style={{ position: 'absolute', bottom: 12, color: cardStyle.accentColor, opacity: 0.5, fontSize: 11 }}>
-            القرآن الكريم
+        {/* Branding watermark */}
+        <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <RNImage source={require('@/assets/images/App-icon.png')} style={{ width: 20, height: 20, borderRadius: 5 }} />
+          <Text style={{ color: cardStyle.accentColor, opacity: 0.6, fontSize: 11, fontWeight: '600' }}>
+            روح المسلم
           </Text>
         </View>
       </View>
@@ -153,6 +171,7 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function DailyAyahVideoScreen() {
   const colors = useColors();
+  const router = useRouter();
   const cardRef = useRef<ViewShot>(null);
 
   const today = new Date();
@@ -167,10 +186,41 @@ export default function DailyAyahVideoScreen() {
   const [exporting, setExporting] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
 
+  // QCF state
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
+  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
+  const [qcfLoading, setQcfLoading] = useState(true);
+
   const currentAyah = DAILY_AYAHS[selectedAyahIdx];
   const currentBg = selectedCat.images[selectedBgIdx];
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Load QCF font when ayah changes
+  useEffect(() => {
+    let cancelled = false;
+    setQcfLoading(true);
+    const data = getVerseQcfData(currentAyah.surah, currentAyah.ayah);
+    if (!data) {
+      setQcfGlyphs(null);
+      setQcfFontFamily(null);
+      setQcfLoading(false);
+      return;
+    }
+    loadPageFont(data.page).then(() => {
+      if (cancelled) return;
+      setQcfGlyphs(data.glyphs);
+      setQcfFontFamily(getPageFontFamily(data.page));
+      setQcfLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [currentAyah.surah, currentAyah.ayah]);
+
+  // Navigate to ayah in Mushaf on long-press
+  const handleLongPress = useCallback(() => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    router.push(`/surah/${currentAyah.surah}?ayah=${currentAyah.ayah}` as any);
+  }, [currentAyah, router]);
 
   useEffect(() => {
     Animated.loop(
@@ -226,21 +276,21 @@ export default function DailyAyahVideoScreen() {
 
   const s = StyleSheet.create({
     header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
-    title: { fontSize: 20, fontWeight: '900', color: colors.foreground, marginBottom: 2 },
-    subtitle: { fontSize: 13, color: colors.muted },
-    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.muted, textAlign: 'right', marginBottom: 8, marginTop: 4 },
+    title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },
+    subtitle: { fontSize: 13, color: colors.textLight },
+    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: 'right', marginBottom: 8, marginTop: 4 },
     hScroll: { paddingHorizontal: 16 },
-    chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginLeft: 8 },
+    chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border, marginLeft: 8 },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { fontSize: 13, fontWeight: '700', color: colors.muted },
+    chipText: { fontSize: 13, fontWeight: '700', color: colors.textLight },
     chipTextActive: { color: '#fff' },
     cardWrap: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 },
-    previewCard: { borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 12 },
+    previewCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
     actionsRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 16 },
     actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
     actionBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
     styleRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
-    styleCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 3 },
+    styleCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
     toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   });
 
@@ -325,15 +375,22 @@ export default function DailyAyahVideoScreen() {
 
         {/* Preview Card */}
         <Animated.View style={[s.cardWrap, { transform: [{ scale: pulseAnim }] }]}>
-          <View style={s.previewCard}>
+          <TouchableOpacity
+            style={s.previewCard}
+            activeOpacity={0.9}
+            onLongPress={handleLongPress}
+            delayLongPress={500}
+          >
             <AyahImageCard
               ayah={currentAyah}
               bgUrl={currentBg}
               cardStyle={selectedCardStyle}
               cardRef={cardRef}
               showTranslation={showTranslation}
+              qcfGlyphs={qcfGlyphs}
+              qcfFontFamily={qcfFontFamily}
             />
-          </View>
+          </TouchableOpacity>
         </Animated.View>
 
         {/* Action buttons */}
@@ -346,7 +403,7 @@ export default function DailyAyahVideoScreen() {
             {exporting
               ? <ActivityIndicator color="#fff" size="small" />
               : <>
-                  <IconSymbol name="arrow.down.circle.fill" size={18} color="#fff" />
+                  <MaterialCommunityIcons name="download" size={18} color="#fff" />
                   <Text style={s.actionBtnText}>تنزيل</Text>
                 </>
             }
@@ -356,25 +413,39 @@ export default function DailyAyahVideoScreen() {
             onPress={handleShare}
             disabled={exporting}
           >
-            <IconSymbol name="square.and.arrow.up" size={18} color="#fff" />
+            <MaterialCommunityIcons name="share-variant" size={18} color="#fff" />
             <Text style={s.actionBtnText}>مشاركة</Text>
           </TouchableOpacity>
         </View>
 
         {/* Ayah text preview */}
-        <View style={{ marginHorizontal: 16, padding: 16, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
-          <Text style={{ fontSize: 18, color: colors.foreground, textAlign: 'right', lineHeight: 34, fontWeight: '600', marginBottom: 8 }}>
-            {currentAyah.arabic}
-          </Text>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+          style={{ marginHorizontal: 16, padding: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border }}
+        >
+          {qcfGlyphs && qcfFontFamily ? (
+            <Text style={{ fontSize: 24, color: colors.text, textAlign: 'center', lineHeight: 46, fontFamily: qcfFontFamily, marginBottom: 8 }}>
+              {qcfGlyphs.join('')}
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 18, color: colors.text, textAlign: 'right', lineHeight: 34, fontWeight: '600', marginBottom: 8 }}>
+              {currentAyah.arabic}
+            </Text>
+          )}
           <Text style={{ fontSize: 13, color: colors.primary, textAlign: 'right', fontWeight: '700' }}>
             ﴿ {currentAyah.ref} ﴾
           </Text>
+          <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 4, opacity: 0.6 }}>
+            اضغط مطولاً للذهاب للآية في المصحف
+          </Text>
           {showTranslation && (
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 8, fontStyle: 'italic' }}>
+            <Text style={{ fontSize: 13, color: colors.textLight, marginTop: 8, fontStyle: 'italic' }}>
               {currentAyah.trans}
             </Text>
           )}
-        </View>
+        </TouchableOpacity>
 
       </ScrollView>
     </ScreenContainer>

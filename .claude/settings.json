@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -n \"TextToSpeech\\\\|Expo.Speech\\\\|Audio.Sound\\\\|expo-av\" /Users/hossamgamal/Desktop/MobileApps/Quran/lib/*.ts /Users/hossamgamal/Desktop/MobileApps/Quran/hooks/*.ts)"
+      "Bash(grep -n \"TextToSpeech\\\\|Expo.Speech\\\\|Audio.Sound\\\\|expo-av\" /Users/hossamgamal/Desktop/MobileApps/Quran/lib/*.ts /Users/hossamgamal/Desktop/MobileApps/Quran/hooks/*.ts)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL -o /Users/hossamgamal/Desktop/MobileApps/Quran/assets/images/surah-ornament.png https://raw.githubusercontent.com/m4hmoud-atef/Skoon-Flutter-Islamic-App/main/assets/images/888-02.png)",
+      "Bash(curl -sL -o /Users/hossamgamal/Desktop/MobileApps/Quran/assets/images/basmala.png https://raw.githubusercontent.com/m4hmoud-atef/Skoon-Flutter-Islamic-App/main/assets/images/Basmala.png)"
     ]
   }
 }

@@ -38,6 +38,8 @@ import UsersPage from './pages/Users';
 import Subscriptions from './pages/Subscriptions';
 import Ads from './pages/Ads';
 import Pricing from './pages/Pricing';
+import WelcomeBanner from './pages/WelcomeBanner';
+import HighlightsManager from './pages/HighlightsManager';
 
 // ==================== Mobile Preview Component ====================
 const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -357,6 +359,8 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'لوحة التحكم' },
+    { path: '/welcome-banner', icon: Megaphone, label: 'الرسالة الترحيبية' },
+    { path: '/highlights', icon: Sparkles, label: 'الهايلايتس' },
     { path: '/splash-screens', icon: Sparkles, label: 'شاشات البداية' },
     { path: '/content', icon: FileText, label: 'المحتوى' },
     { path: '/azkar', icon: BookOpen, label: 'إدارة الأذكار' },
@@ -470,6 +474,8 @@ const App: React.FC = () => {
           <main className="p-4 lg:p-6">
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/welcome-banner" element={<WelcomeBanner />} />
+              <Route path="/highlights" element={<HighlightsManager />} />
               <Route path="/splash-screens" element={<SplashScreens />} />
               <Route path="/content" element={<Content />} />
               <Route path="/azkar" element={<AzkarManager />} />

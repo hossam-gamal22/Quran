@@ -13,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 
@@ -91,9 +90,8 @@ class ErrorBoundary extends Component<Props, State> {
 
       return (
         <SafeAreaView style={styles.container}>
-          <LinearGradient
-            colors={['#11151c', '#1a1a2e']}
-            style={styles.gradient}
+          <View
+            style={[styles.gradient, { backgroundColor: 'rgba(17,21,28,0.95)' }]}
           >
             <ScrollView
               contentContainerStyle={styles.content}
@@ -101,12 +99,11 @@ class ErrorBoundary extends Component<Props, State> {
             >
               {/* الأيقونة */}
               <View style={styles.iconContainer}>
-                <LinearGradient
-                  colors={['#e74c3c', '#c0392b']}
-                  style={styles.iconGradient}
+                <View
+                  style={[styles.iconGradient, { backgroundColor: 'rgba(231,76,60,0.85)' }]}
                 >
                   <MaterialCommunityIcons name="alert-circle" size={60} color="#fff" />
-                </LinearGradient>
+                </View>
               </View>
 
               {/* العنوان */}
@@ -141,13 +138,12 @@ class ErrorBoundary extends Component<Props, State> {
                   onPress={this.handleReload}
                   activeOpacity={0.8}
                 >
-                  <LinearGradient
-                    colors={['#2f7659', '#1d5a3a']}
-                    style={styles.buttonGradient}
+                  <View
+                    style={[styles.buttonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
                   >
                     <MaterialCommunityIcons name="reload" size={22} color="#fff" />
                     <Text style={styles.buttonText}>إعادة تشغيل التطبيق</Text>
-                  </LinearGradient>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -162,7 +158,7 @@ class ErrorBoundary extends Component<Props, State> {
 
               {/* رسالة الدعم */}
               <View style={styles.supportContainer}>
-                <MaterialCommunityIcons name="help-circle" size={18} color="#666" />
+                <MaterialCommunityIcons name="phone-outline" size={18} color="#666" />
                 <Text style={styles.supportText}>
                   إذا استمرت المشكلة، يرجى التواصل مع الدعم الفني
                 </Text>
@@ -173,7 +169,7 @@ class ErrorBoundary extends Component<Props, State> {
                 اللهم يسر ولا تعسر
               </Text>
             </ScrollView>
-          </LinearGradient>
+          </View>
         </SafeAreaView>
       );
     }
@@ -201,6 +197,8 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 24,
   },
   iconGradient: {
@@ -209,10 +207,6 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#e74c3c',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
     elevation: 10,
   },
   title: {
@@ -268,10 +262,6 @@ const styles = StyleSheet.create({
   primaryButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 8,
   },
   buttonGradient: {

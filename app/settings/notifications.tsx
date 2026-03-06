@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
   Linking,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,11 +23,31 @@ import * as Notifications from 'expo-notifications';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-import { useSettings, NotificationSettings } from '@/contexts/SettingsContext';
+import { useSettings, NotificationSettings, NotificationSoundType, AdhanSoundType } from '@/contexts/SettingsContext';
 
 // ========================================
 // الثوابت
 // ========================================
+
+const NOTIFICATION_SOUNDS: { id: NotificationSoundType; name: string; icon: string }[] = [
+  { id: 'default', name: 'الافتراضي', icon: 'bell-ring' },
+  { id: 'asbahna', name: 'أصبحنا وأصبح الملك لله', icon: 'weather-sunset-up' },
+  { id: 'amsayna', name: 'أمسينا وأمسى الملك لله', icon: 'weather-sunset-down' },
+  { id: 'subhanallah', name: 'سبحان الله', icon: 'star-crescent' },
+  { id: 'alhamdulillah', name: 'الحمد لله', icon: 'hand-heart' },
+  { id: 'allahuakbar', name: 'الله أكبر', icon: 'mosque' },
+  { id: 'silent', name: 'صامت', icon: 'bell-off' },
+];
+
+const ADHAN_SOUNDS: { id: AdhanSoundType; name: string; description: string; icon: string }[] = [
+  { id: 'default', name: 'الافتراضي', description: 'صوت النظام', icon: 'bell-ring' },
+  { id: 'makkah', name: 'الحرم المكي', description: 'أذان الحرم المكي الشريف', icon: 'kaaba' },
+  { id: 'madinah', name: 'المسجد النبوي', description: 'أذان المسجد النبوي الشريف', icon: 'mosque' },
+  { id: 'alaqsa', name: 'المسجد الأقصى', description: 'أذان المسجد الأقصى المبارك', icon: 'dome-light' },
+  { id: 'mishary', name: 'مشاري العفاسي', description: 'أذان الشيخ مشاري راشد', icon: 'account-voice' },
+  { id: 'abdulbasit', name: 'عبد الباسط', description: 'أذان الشيخ عبد الباسط', icon: 'account-voice' },
+  { id: 'silent', name: 'صامت', description: 'بدون صوت', icon: 'bell-off' },
+];
 
 const REMINDER_OPTIONS = [
   { value: 5, label: '5 دقائق' },
@@ -72,7 +93,7 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
 }) => {
   return (
     <View style={[styles.settingItem, isDarkMode && styles.settingItemDark, disabled && styles.settingItemDisabled]}>
-      <View style={[styles.settingIconBg, { backgroundColor: `${iconColor}15` }]}>
+      <View style={styles.settingIconBg}>
         <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#999' : iconColor} />
       </View>
       <View style={styles.settingContent}>
@@ -91,8 +112,9 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onValueChange(val);
         }}
-        trackColor={{ false: '#ddd', true: '#2f7659' }}
-        thumbColor={value ? '#fff' : '#f4f3f4'}
+        trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+        thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+        ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
         disabled={disabled}
       />
     </View>
@@ -152,7 +174,7 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
         }}
         activeOpacity={disabled ? 1 : 0.7}
       >
-        <View style={[styles.settingIconBg, { backgroundColor: `${iconColor}15` }]}>
+        <View style={styles.settingIconBg}>
           <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#999' : iconColor} />
         </View>
         <View style={styles.settingContent}>
@@ -164,7 +186,7 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
           <Text style={[styles.timeText, isDarkMode && styles.textLight, disabled && styles.textDisabled]}>
             {formatDisplayTime(time)}
           </Text>
-          <MaterialCommunityIcons name="chevron-left" size={20} color={isDarkMode ? '#666' : '#ccc'} />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
         </View>
       </TouchableOpacity>
 
@@ -245,7 +267,7 @@ const ReminderSelector: React.FC<ReminderSelectorProps> = ({
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { settings, isDarkMode, updateNotifications } = useSettings();
+  const { settings, isDarkMode, t, updateNotifications } = useSettings();
   const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
   const [prayerNotifications, setPrayerNotifications] = useState<{ [key: string]: boolean }>({
     fajr: true,
@@ -320,9 +342,9 @@ export default function NotificationsScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color={isDarkMode ? '#fff' : '#333'} />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>الإشعارات</Text>
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.notifications')}</Text>
         <View style={styles.headerPlaceholder} />
       </Animated.View>
 
@@ -350,14 +372,14 @@ export default function NotificationsScreen() {
                   اضغط هنا لتفعيل الإشعارات
                 </Text>
               </View>
-              <MaterialCommunityIcons name="chevron-left" size={24} color="#ef5350" />
+              <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={24} color="#ef5350" />
             </TouchableOpacity>
           </Animated.View>
         )}
 
         {/* Main Toggle Section */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الإعدادات العامة</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.general')}</Text>
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             <SettingSwitch
               icon="bell"
@@ -373,7 +395,7 @@ export default function NotificationsScreen() {
 
         {/* Prayer Notifications */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>إشعارات الصلاة</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.prayerNotifications')}</Text>
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             <SettingSwitch
               icon="mosque"
@@ -406,7 +428,7 @@ export default function NotificationsScreen() {
 
         {/* Individual Prayer Notifications */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الصلوات</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('prayer.title')}</Text>
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             {PRAYER_NAMES.map((prayer, index) => (
               <Animated.View key={prayer.key} entering={FadeInRight.delay(index * 50).duration(400)}>
@@ -424,9 +446,72 @@ export default function NotificationsScreen() {
           </View>
         </Animated.View>
 
+        {/* Adhan Sound Selection */}
+        <Animated.View entering={FadeInDown.delay(225).duration(500)}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>صوت الأذان</Text>
+          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+            <View style={[styles.adhanSoundHeader, isDarkMode && { borderBottomColor: '#2a2a3e' }]}>
+              <MaterialCommunityIcons name="volume-high" size={22} color="#2f7659" />
+              <Text style={[styles.adhanSoundHeaderText, isDarkMode && styles.textLight]}>
+                اختر صوت الأذان المفضل
+              </Text>
+            </View>
+            {ADHAN_SOUNDS.map((sound, index) => {
+              const isSelected = (settings.notifications.adhanSoundType || 'default') === sound.id;
+              return (
+                <Animated.View key={sound.id} entering={FadeInRight.delay(index * 40).duration(400)}>
+                  <TouchableOpacity
+                    style={[
+                      styles.adhanSoundOption,
+                      isDarkMode && styles.adhanSoundOptionDark,
+                      isSelected && styles.adhanSoundOptionSelected,
+                      (!isEnabled || !settings.notifications.prayerTimes || !settings.notifications.sound) && styles.settingItemDisabled,
+                    ]}
+                    onPress={() => {
+                      if (isEnabled && settings.notifications.prayerTimes && settings.notifications.sound) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        updateNotifications({ adhanSoundType: sound.id });
+                      }
+                    }}
+                    activeOpacity={(!isEnabled || !settings.notifications.prayerTimes || !settings.notifications.sound) ? 1 : 0.7}
+                  >
+                    <View style={[styles.adhanSoundIconBg, isSelected && styles.adhanSoundIconBgSelected]}>
+                      <MaterialCommunityIcons
+                        name={sound.icon as any}
+                        size={20}
+                        color={isSelected ? '#fff' : (isDarkMode ? '#aaa' : '#666')}
+                      />
+                    </View>
+                    <View style={styles.adhanSoundContent}>
+                      <Text style={[
+                        styles.adhanSoundTitle,
+                        isDarkMode && styles.textLight,
+                        isSelected && styles.adhanSoundTitleSelected,
+                      ]}>
+                        {sound.name}
+                      </Text>
+                      <Text style={[styles.adhanSoundSubtitle, isDarkMode && styles.textMuted]}>
+                        {sound.description}
+                      </Text>
+                    </View>
+                    {isSelected && (
+                      <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
+            {(!isEnabled || !settings.notifications.prayerTimes || !settings.notifications.sound) && (
+              <Text style={[styles.adhanDisabledNote, isDarkMode && styles.textMuted]}>
+                فعّل إشعارات الصلاة والصوت لتخصيص صوت الأذان
+              </Text>
+            )}
+          </View>
+        </Animated.View>
+
         {/* Azkar Notifications */}
         <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>إشعارات الأذكار</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.azkarNotifications')}</Text>
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             <SettingSwitch
               icon="weather-sunset-up"
@@ -507,7 +592,7 @@ export default function NotificationsScreen() {
 
         {/* Sound Settings */}
         <Animated.View entering={FadeInDown.delay(350).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الصوت والاهتزاز</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.sound')}</Text>
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             <SettingSwitch
               icon="volume-high"
@@ -518,6 +603,52 @@ export default function NotificationsScreen() {
               isDarkMode={isDarkMode}
               disabled={!isEnabled}
             />
+
+            {/* Sound Type Picker */}
+            {settings.notifications.sound !== false && isEnabled && (
+              <View style={[styles.soundPickerContainer, isDarkMode && { borderTopColor: '#2a2a3e' }]}>
+                <Text style={[styles.soundPickerLabel, isDarkMode && styles.textMuted]}>
+                  نغمة الإشعار:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.soundPickerScroll}>
+                  {NOTIFICATION_SOUNDS.map((sound) => {
+                    const isSelected = (settings.notifications.soundType || 'default') === sound.id;
+                    return (
+                      <TouchableOpacity
+                        key={sound.id}
+                        style={[
+                          styles.soundOption,
+                          isDarkMode && styles.soundOptionDark,
+                          isSelected && styles.soundOptionSelected,
+                        ]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          updateNotifications({ soundType: sound.id });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons
+                          name={sound.icon as any}
+                          size={18}
+                          color={isSelected ? '#fff' : (isDarkMode ? '#aaa' : '#666')}
+                        />
+                        <Text
+                          style={[
+                            styles.soundOptionText,
+                            isDarkMode && styles.textMuted,
+                            isSelected && styles.soundOptionTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {sound.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             <SettingSwitch
               icon="vibrate"
               iconColor="#ef5350"
@@ -744,6 +875,44 @@ const styles = StyleSheet.create({
     padding: 15,
     gap: 10,
   },
+  soundPickerContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  soundPickerLabel: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Medium',
+    color: '#666',
+    marginBottom: 12,
+  },
+  soundPickerScroll: {
+    flexDirection: 'row',
+  },
+  soundOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    marginLeft: 8,
+    gap: 6,
+  },
+  soundOptionDark: {
+    backgroundColor: '#2a2a3e',
+  },
+  soundOptionSelected: {
+    backgroundColor: '#2f7659',
+  },
+  soundOptionText: {
+    fontSize: 13,
+    fontFamily: 'Cairo-Medium',
+    color: '#666',
+  },
+  soundOptionTextSelected: {
+    color: '#fff',
+  },
   infoText: {
     flex: 1,
     fontSize: 13,
@@ -751,6 +920,71 @@ const styles = StyleSheet.create({
     color: '#333',
     lineHeight: 22,
     textAlign: 'right',
+  },
+  // Adhan Sound Selection Styles
+  adhanSoundHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 12,
+  },
+  adhanSoundHeaderText: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#333',
+  },
+  adhanSoundOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 12,
+  },
+  adhanSoundOptionDark: {
+    borderBottomColor: '#2a2a3e',
+  },
+  adhanSoundOptionSelected: {
+    backgroundColor: 'rgba(47, 118, 89, 0.08)',
+  },
+  adhanSoundIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adhanSoundIconBgSelected: {
+    backgroundColor: '#2f7659',
+  },
+  adhanSoundContent: {
+    flex: 1,
+  },
+  adhanSoundTitle: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#333',
+  },
+  adhanSoundTitleSelected: {
+    color: '#2f7659',
+  },
+  adhanSoundSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#999',
+    marginTop: 2,
+  },
+  adhanDisabledNote: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    color: '#999',
+    textAlign: 'center',
+    padding: 16,
+    fontStyle: 'italic',
   },
   bottomSpace: {
     height: 100,

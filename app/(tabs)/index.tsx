@@ -1,11 +1,12 @@
 // app/(tabs)/index.tsx
 // الصفحة الرئيسية - الأذكار - روح المسلم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   Image,
+  ImageBackground,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -18,36 +19,53 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
+import { fetchAppConfig, WelcomeBannerConfig } from '@/lib/app-config-api';
 import DailyHighlights from '@/components/ui/DailyHighlights';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { ColoredButton } from '@/components/ui/colored-button';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { I18nManager, Dimensions } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ========================================
 // الثوابت
 // ========================================
 
 const AZKAR_CATEGORIES = [
-  { id: 'morning', name: 'أذكار الصباح', icon: 'weather-sunny', color: '#f5a623', count: 33 },
-  { id: 'evening', name: 'أذكار المساء', icon: 'weather-night', color: '#5d4e8c', count: 33 },
-  { id: 'sleep', name: 'أذكار النوم', icon: 'bed', color: '#3a7ca5', count: 15 },
-  { id: 'wakeup', name: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
-  { id: 'after_prayer', name: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', count: 20 },
-  { id: 'ruqya', name: 'الرقية الشرعية', icon: 'shield-check', color: '#e91e63', count: 12 },
+  { id: 'morning', nameKey: 'home.morningAzkar', icon: 'weather-sunny', color: '#f5a623', count: 33 },
+  { id: 'evening', nameKey: 'home.eveningAzkar', icon: 'weather-night', color: '#5d4e8c', count: 33 },
+  { id: 'sleep', nameKey: 'home.sleepAzkar', icon: 'bed', color: '#3a7ca5', count: 15 },
+  { id: 'wakeup', nameKey: 'home.wakeupAzkar', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
+  { id: 'after_prayer', nameKey: 'azkar.afterPrayer', icon: 'mosque', color: '#2f7659', count: 20 },
+  { id: 'ruqya', nameKey: 'azkar.ruqya', icon: 'shield-check', color: '#e91e63', count: 12 },
 ];
 
 const QUICK_ACCESS = [
-  { id: 'ayat_kursi', name: 'آية الكرسي', icon: 'shield-star', color: '#DAA520' },
-  { id: 'tasbih', name: 'التسبيح', icon: 'circle-multiple', color: '#2f7659' },
-  { id: 'istighfar', name: 'الاستغفار', icon: 'heart', color: '#e91e63' },
-  { id: 'salawat', name: 'الصلاة على النبي', icon: 'star-crescent', color: '#3a7ca5' },
+  { id: 'qibla', nameKey: 'home.qibla', icon: 'compass', color: '#5856D6' },
+  { id: 'favorites', nameKey: 'home.favorites', icon: 'heart', color: '#FF3B30' },
+  { id: 'ayat_kursi', nameKey: 'home.ayatKursi', icon: 'shield-star', color: '#DAA520' },
+  { id: 'surah_kahf', nameKey: 'home.surahKahf', icon: 'book-open-page-variant', color: '#3a7ca5' },
+  { id: 'surah_yasin', nameKey: 'home.surahYasin', icon: 'book-heart', color: '#5d4e8c' },
+  { id: 'surah_mulk', nameKey: 'home.surahMulk', icon: 'book-cross', color: '#0D9488' },
+  { id: 'names', nameKey: 'home.namesOfAllah', icon: 'star-crescent', color: '#c17f59' },
+  { id: 'tasbih', nameKey: 'tabs.tasbih', icon: 'circle-multiple', color: '#2f7659' },
+  { id: 'salawat', nameKey: 'home.salawat', icon: 'star-crescent', color: '#e91e63' },
+  { id: 'istighfar', nameKey: 'home.istighfar', icon: 'heart', color: '#8B5CF6' },
+  { id: 'hajj', nameKey: 'hajjUmrah.title', icon: 'star-crescent', color: '#0D9488' },
+  { id: 'seerah', nameKey: 'home.seerah', icon: 'book-account', color: '#6366F1' },
+  { id: 'benefit_azkar', nameKey: 'home.benefitAzkar', icon: 'information', color: '#f5a623' },
 ];
 
 const DUA_CATEGORIES = [
-  { id: 'quran_duas', name: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5' },
-  { id: 'sunnah_duas', name: 'أدعية من السنة', icon: 'book-cross', color: '#2f7659' },
+  { id: 'quran_duas', nameKey: 'azkar.quranDuas', icon: 'book-open-variant', color: '#3a7ca5' },
+  { id: 'sunnah_duas', nameKey: 'azkar.sunnahDuas', icon: 'book-cross', color: '#2f7659' },
 ];
 
 // ========================================
@@ -55,64 +73,126 @@ const DUA_CATEGORIES = [
 // ========================================
 
 interface CategoryCardProps {
-  category: typeof AZKAR_CATEGORIES[0];
+  category: { id: string; nameKey: string; icon: string; color: string; count: number };
   onPress: () => void;
   isDarkMode: boolean;
   index: number;
+  t: (key: string) => string;
+  isGrid?: boolean;
 }
 
-const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMode, index }) => {
+const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMode, index, t, isGrid }) => {
+  if (isGrid) {
+    const cardWidth = (SCREEN_WIDTH - 32 - 10) / 2; // padding + gap
+    return (
+      <Animated.View entering={FadeInDown.delay(index * 60).duration(400)} style={{ width: cardWidth }}>
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onPress();
+          }}
+          activeOpacity={0.8}
+          style={styles.gridCardOuter}
+        >
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 80 : 40}
+            tint={isDarkMode ? 'dark' : 'light'}
+            style={styles.gridCardBlur}
+          >
+            <View style={[
+              styles.gridCard,
+              {
+                backgroundColor: isDarkMode
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(255,255,255,0.40)',
+                borderColor: isDarkMode
+                  ? 'rgba(255,255,255,0.15)'
+                  : 'rgba(0,0,0,0.06)',
+              },
+            ]}>
+              <View style={styles.gridCardIcon}> 
+                <MaterialCommunityIcons name={category.icon as any} size={28} color={category.color} />
+              </View>
+              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2}>
+                {t(category.nameKey)}
+              </Text>
+            </View>
+          </BlurView>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+  // List layout — also glassmorphism
   return (
-    <Animated.View
-      entering={FadeInRight.delay(index * 80).duration(400)}
-      style={styles.categoryCardContainer}
-    >
+    <Animated.View entering={FadeInRight.delay(index * 80).duration(400)}>
       <TouchableOpacity
-        style={[styles.categoryCard, isDarkMode && styles.categoryCardDark]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
         }}
         activeOpacity={0.8}
+        style={styles.listCardOuter}
       >
-        <View style={[styles.categoryIcon, { backgroundColor: `${category.color}20` }]}>
-          <MaterialCommunityIcons name={category.icon as any} size={28} color={category.color} />
-        </View>
-        <Text style={[styles.categoryName, isDarkMode && styles.textLight]} numberOfLines={1}>
-          {category.name}
-        </Text>
-        <Text style={[styles.categoryCount, isDarkMode && styles.textMuted]}>
-          {category.count} ذكر
-        </Text>
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 80 : 40}
+          tint={isDarkMode ? 'dark' : 'light'}
+          style={styles.listCardBlur}
+        >
+          <View style={[
+            styles.listCard,
+            {
+              backgroundColor: isDarkMode
+                ? 'rgba(255,255,255,0.08)'
+                : 'rgba(255,255,255,0.40)',
+              borderColor: isDarkMode
+                ? 'rgba(255,255,255,0.15)'
+                : 'rgba(0,0,0,0.06)',
+            },
+          ]}>
+            <View style={styles.listCardIcon}> 
+              <MaterialCommunityIcons name={category.icon as any} size={22} color={category.color} />
+            </View>
+            <Text style={[styles.listCardLabel, isDarkMode && styles.textLight]} numberOfLines={1}>
+              {t(category.nameKey)}
+            </Text>
+            <MaterialCommunityIcons
+              name="chevron-left"
+              size={20}
+              color={isDarkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.25)'}
+            />
+          </View>
+        </BlurView>
       </TouchableOpacity>
     </Animated.View>
   );
 };
 
 interface QuickAccessItemProps {
-  item: typeof QUICK_ACCESS[0];
+  item: { id: string; nameKey: string; icon: string; color: string };
   onPress: () => void;
   isDarkMode: boolean;
   index: number;
+  t: (key: string) => string;
 }
 
-const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDarkMode, index }) => {
+const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDarkMode, index, t }) => {
   return (
     <Animated.View entering={FadeInDown.delay(200 + index * 60).duration(400)}>
       <TouchableOpacity
-        style={[styles.quickAccessItem, isDarkMode && styles.quickAccessItemDark]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
         }}
         activeOpacity={0.8}
       >
-        <View style={[styles.quickAccessIcon, { backgroundColor: `${item.color}20` }]}>
-          <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
-        </View>
-        <Text style={[styles.quickAccessName, isDarkMode && styles.textLight]} numberOfLines={1}>
-          {item.name}
-        </Text>
+        <GlassCard style={{ padding: 14, alignItems: 'center', width: 90 }}>
+          <View style={styles.quickAccessIcon}> 
+            <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
+          </View>
+          <Text style={[styles.quickAccessName, isDarkMode && styles.textLight]} numberOfLines={1}>
+            {t(item.nameKey)}
+          </Text>
+        </GlassCard>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -124,18 +204,41 @@ const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDark
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings, t } = useSettings();
+  const isRTL = I18nManager.isRTL;
   const { currentSeason, dailyData } = useSeasonal();
   const { getConfig } = useRemoteConfig();
   const logoUrl = getConfig('app_logo_url' as any) as string | undefined;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Welcome banner from Firestore
+  const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>({
+    enabled: true,
+    title: 'رمضان مبارك 🌙',
+    subtitle: 'تابع مهام يومك الرمضانية',
+    icon: 'heart',
+    color: '#2f7659',
+    route: '/worship-tracker',
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    fetchAppConfig().then(cfg => {
+      if (mounted && cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // تحديث البيانات
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const cfg = await fetchAppConfig();
+      if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 500));
     setIsRefreshing(false);
   }, []);
 
@@ -148,29 +251,75 @@ export default function HomeScreen() {
   };
 
   const navigateToQuickAccess = (itemId: string) => {
-    router.push(`/azkar/${itemId}` as any);
+    switch (itemId) {
+      case 'qibla':
+        router.push('/(tabs)/qibla' as any);
+        break;
+      case 'favorites':
+        router.push('/(tabs)/favorites' as any);
+        break;
+      case 'surah_kahf':
+        router.push('/surah/18' as any);
+        break;
+      case 'surah_yasin':
+        router.push('/surah/36' as any);
+        break;
+      case 'surah_mulk':
+        router.push('/surah/67' as any);
+        break;
+      case 'names':
+        router.push('/names');
+        break;
+      case 'hajj':
+        router.push('/hajj-umrah');
+        break;
+      case 'tasbih':
+        router.push('/tasbih');
+        break;
+      case 'seerah':
+        router.push('/story-of-day');
+        break;
+      case 'benefit_azkar':
+        router.push('/azkar-search');
+        break;
+      default:
+        router.push(`/azkar/${itemId}` as any);
+    }
   };
 
   const navigateToDuas = (categoryId: string) => {
     router.push(`/azkar/${categoryId}` as any);
   };
 
-  return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+  const homeLayout = settings.display.homeLayout || 'grid';
+  const isGrid = homeLayout === 'grid';
 
-      {/* Header — centered, no side buttons */}
+  return (
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={[styles.container, isDarkMode && styles.containerDark]}
+    >
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+
+      {/* Header — app icon only, no title */}
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
         {logoUrl ? (
-          <Image source={{ uri: logoUrl }} style={styles.logoImage} resizeMode="contain" />
+          <Image
+            source={{ uri: logoUrl }}
+            style={styles.logoImage}
+            resizeMode="contain"
+            accessibilityLabel="App logo"
+          />
         ) : (
           <Image
             source={require('@/assets/images/App-icon.png')}
             style={styles.logoImage}
             resizeMode="contain"
+            accessibilityLabel="App logo"
           />
         )}
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>روح المسلم</Text>
       </Animated.View>
 
       <ScrollView
@@ -186,44 +335,64 @@ export default function HomeScreen() {
           />
         }
       >
-        {/* Daily Highlights */}
-        <DailyHighlights />
-
-        {/* بطاقة الموسم */}
-        {currentSeason && (
+        {/* الرسالة الترحيبية */}
+        {welcomeBanner?.enabled && (
           <Animated.View entering={FadeIn.duration(600)}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => router.push(`/seasonal/${currentSeason.type}` as any)}
+              onPress={() => router.push(welcomeBanner.route as any)}
             >
-              <LinearGradient
-                colors={[currentSeason.color, `${currentSeason.color}cc`]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.seasonCard}
-              >
-                <View style={styles.seasonContent}>
-                  <View style={styles.seasonInfo}>
-                    <Text style={styles.seasonName}>{currentSeason.nameAr}</Text>
-                    <Text style={styles.seasonGreeting}>{dailyData.greeting}</Text>
+              {welcomeBanner.displayMode === 'image_only' && welcomeBanner.backgroundImage ? (
+                <Image
+                  source={{ uri: welcomeBanner.backgroundImage }}
+                  style={styles.seasonCardImage}
+                  resizeMode="cover"
+                />
+              ) : welcomeBanner.displayMode === 'text_image' && welcomeBanner.backgroundImage ? (
+                <ImageBackground
+                  source={{ uri: welcomeBanner.backgroundImage }}
+                  style={styles.seasonCard}
+                  imageStyle={{ borderRadius: 20 }}
+                  resizeMode="cover"
+                >
+                  <View style={styles.seasonCardOverlay}>
+                    <View style={styles.seasonContent}>
+                      <View style={styles.seasonInfo}>
+                        <Text style={styles.seasonName}>{welcomeBanner.title}</Text>
+                        <Text style={styles.seasonGreeting}>{welcomeBanner.subtitle}</Text>
+                      </View>
+                      <MaterialCommunityIcons name={welcomeBanner.icon as any} size={36} color="#fff" />
+                    </View>
                   </View>
-                  <MaterialCommunityIcons name={currentSeason.icon as any} size={36} color="#fff" />
+                </ImageBackground>
+              ) : (
+                <View
+                  style={[styles.seasonCard, { backgroundColor: `${welcomeBanner.color}CC` }]}
+                >
+                  <View style={styles.seasonContent}>
+                    <View style={styles.seasonInfo}>
+                      <Text style={styles.seasonName}>{welcomeBanner.title}</Text>
+                      <Text style={styles.seasonGreeting}>{welcomeBanner.subtitle}</Text>
+                    </View>
+                    <MaterialCommunityIcons name={welcomeBanner.icon as any} size={36} color="#fff" />
+                  </View>
                 </View>
-                <View style={styles.seasonBadge}>
-                  <Text style={styles.seasonDay}>{currentSeason.currentDay}</Text>
-                </View>
-              </LinearGradient>
+              )}
             </TouchableOpacity>
           </Animated.View>
         )}
 
+        {/* Daily Highlights */}
+        <DailyHighlights />
+
         {/* الوصول السريع */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>وصول سريع</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('home.quickAccess')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.quickAccessContainer}
+            style={{ direction: 'rtl' }}
           >
             {QUICK_ACCESS.map((item, index) => (
               <QuickAccessItem
@@ -232,6 +401,7 @@ export default function HomeScreen() {
                 onPress={() => navigateToQuickAccess(item.id)}
                 isDarkMode={isDarkMode}
                 index={index}
+                t={t}
               />
             ))}
           </ScrollView>
@@ -239,8 +409,8 @@ export default function HomeScreen() {
 
         {/* أقسام الأذكار */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الأذكار</Text>
-          <View style={styles.categoriesGrid}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('home.azkarSection')}</Text>
+          <View style={isGrid ? styles.categoriesGridWrap : styles.categoriesGrid}>
             {AZKAR_CATEGORIES.map((category, index) => (
               <CategoryCard
                 key={category.id}
@@ -248,6 +418,8 @@ export default function HomeScreen() {
                 onPress={() => navigateToCategory(category.id)}
                 isDarkMode={isDarkMode}
                 index={index}
+                t={t}
+                isGrid={isGrid}
               />
             ))}
           </View>
@@ -255,72 +427,67 @@ export default function HomeScreen() {
 
         {/* الأدعية والرقية */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الأدعية والرقية</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('home.duasSection')}</Text>
           <View style={styles.duasContainer}>
             {DUA_CATEGORIES.map((category, index) => (
               <Animated.View
                 key={category.id}
                 entering={FadeInRight.delay(300 + index * 80).duration(400)}
               >
-                <TouchableOpacity
-                  style={[styles.duaCard, isDarkMode && styles.duaCardDark]}
+                <ColoredButton
+                  label={t(category.nameKey)}
+                  icon={category.icon}
+                  backgroundColor={category.color}
+                  iconColor="#fff"
+                  textColor="#fff"
+                  size="medium"
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     navigateToDuas(category.id);
                   }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.duaIcon, { backgroundColor: `${category.color}20` }]}>
-                    <MaterialCommunityIcons name={category.icon as any} size={24} color={category.color} />
-                  </View>
-                  <Text style={[styles.duaName, isDarkMode && styles.textLight]}>{category.name}</Text>
-                  <MaterialCommunityIcons
-                    name="chevron-left"
-                    size={22}
-                    color={isDarkMode ? '#666' : '#ccc'}
-                  />
-                </TouchableOpacity>
+                />
               </Animated.View>
             ))}
           </View>
         </Animated.View>
 
-        {/* روابط إضافية */}
+        {/* عبادات */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('home.worshipSection')}</Text>
           <View style={styles.extraLinks}>
-            <TouchableOpacity
-              style={[styles.extraLinkCard, isDarkMode && styles.extraLinkCardDark]}
-              onPress={() => router.push('/worship-tracker')}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#2f7659', '#1d5a3a']}
-                style={styles.extraLinkGradient}
-              >
-                <MaterialCommunityIcons name="chart-line" size={24} color="#fff" />
-                <Text style={styles.extraLinkText}>تتبع العبادات</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <ColoredButton
+              label={t('home.worshipTracker')}
+              icon="chart-line"
+              backgroundColor="#2f7659"
+              iconColor="#fff"
+              textColor="#fff"
+              size="medium"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/worship-tracker');
+              }}
+            />
 
-            <TouchableOpacity
-              style={[styles.extraLinkCard, isDarkMode && styles.extraLinkCardDark]}
-              onPress={() => router.push('/khatma')}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={['#3a7ca5', '#2a5a7a']}
-                style={styles.extraLinkGradient}
-              >
-                <MaterialCommunityIcons name="book-check" size={24} color="#fff" />
-                <Text style={styles.extraLinkText}>ختمة القرآن</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            <ColoredButton
+              label={t('home.khatmaQuran')}
+              icon="book-check"
+              backgroundColor="#3a7ca5"
+              iconColor="#fff"
+              textColor="#fff"
+              size="medium"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/khatma');
+              }}
+            />
           </View>
         </Animated.View>
 
+        <BannerAdComponent screen="home" />
         <View style={styles.bottomSpace} />
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -336,19 +503,22 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: '#11151c',
   },
+  safeArea: {
+    flex: 1,
+  },
   header: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 8,
   },
   logo: {
     marginBottom: 8,
   },
   logoImage: {
-    width: 48,
-    height: 48,
-    marginBottom: 8,
+    width: 140,
+    height: 140,
+    marginBottom: 4,
   },
   headerTitle: {
     fontSize: 28,
@@ -360,7 +530,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   textMuted: {
-    color: '#999',
+    color: '#D1D1D6',
   },
   scrollView: {
     flex: 1,
@@ -374,6 +544,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
+  },
+  seasonCardImage: {
+    borderRadius: 20,
+    height: 120,
+    marginBottom: 20,
+    width: '100%',
+  },
+  seasonCardOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 20,
+    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
   seasonContent: {
     flexDirection: 'row',
@@ -417,12 +600,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Bold',
     color: '#333',
     marginBottom: 12,
-    marginTop: 8,
+    marginTop: 20,
   },
 
   // الوصول السريع
   quickAccessContainer: {
-    paddingRight: 16,
+    paddingHorizontal: 16,
     gap: 10,
   },
   quickAccessItem: {
@@ -430,37 +613,18 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
     width: 90,
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(255,255,255,0.88)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.5)',
-      },
-      android: {
-        backgroundColor: '#fff',
-        elevation: 2,
-      },
-    }),
+    backgroundColor: 'rgba(120,120,128,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   quickAccessItemDark: {
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(26,31,43,0.85)',
-        borderColor: 'rgba(255,255,255,0.08)',
-      },
-      android: {
-        backgroundColor: '#1a1a2e',
-      },
-    }),
+    backgroundColor: 'rgba(120,120,128,0.18)',
+    borderColor: 'rgba(255,255,255,0.12)',
   },
   quickAccessIcon: {
     width: 46,
     height: 46,
-    borderRadius: 14,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
@@ -468,146 +632,92 @@ const styles = StyleSheet.create({
   quickAccessName: {
     fontSize: 11,
     fontFamily: 'Cairo-Medium',
-    color: '#333',
+    color: '#666',
     textAlign: 'center',
   },
 
   // شبكة الأقسام
   categoriesGrid: {
+    gap: 10,
+  },
+  categoriesGridWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    gap: 10,
   },
-  categoryCardContainer: {
-    width: '50%',
-    padding: 6,
+  gridCardOuter: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  categoryCard: {
-    borderRadius: 18,
+  gridCardBlur: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  gridCard: {
+    borderRadius: 16,
     padding: 16,
     alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.5)',
-      },
-      android: {
-        backgroundColor: '#fff',
-        elevation: 2,
-      },
-    }),
+    justifyContent: 'center',
+    minHeight: 110,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  categoryCardDark: {
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(26,31,43,0.88)',
-        borderColor: 'rgba(255,255,255,0.07)',
-      },
-      android: {
-        backgroundColor: '#1a1a2e',
-      },
-    }),
-  },
-  categoryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+  gridCardIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
   },
-  categoryName: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
+  gridCardLabel: {
+    fontSize: 13,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#444',
     textAlign: 'center',
   },
-  categoryCount: {
-    fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    color: '#999',
-    marginTop: 4,
+
+  // List layout glassmorphism cards
+  listCardOuter: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  listCardBlur: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  listCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  listCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listCardLabel: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#444',
+    textAlign: 'right',
   },
 
   // الأدعية
   duasContainer: {
     gap: 10,
   },
-  duaCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 14,
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(255,255,255,0.9)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.07,
-        shadowRadius: 10,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.5)',
-      },
-      android: {
-        backgroundColor: '#fff',
-        elevation: 2,
-      },
-    }),
-  },
-  duaCardDark: {
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(26,31,43,0.88)',
-        borderColor: 'rgba(255,255,255,0.07)',
-      },
-      android: {
-        backgroundColor: '#1a1a2e',
-      },
-    }),
-  },
-  duaIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  duaName: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-    marginHorizontal: 14,
-  },
 
   // روابط إضافية
   extraLinks: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  extraLinkCard: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  extraLinkCardDark: {},
-  extraLinkGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
     gap: 10,
-  },
-  extraLinkText: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Bold',
-    color: '#fff',
   },
 
   bottomSpace: {

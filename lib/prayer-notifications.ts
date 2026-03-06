@@ -28,22 +28,34 @@ Notifications.setNotificationHandler({
 });
 
 // ─── أسماء الصلوات ──────────────────────────────────────────────────────────
-const PRAYER_KEYS: readonly PrayerKey[] = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+const PRAYER_KEYS: readonly PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
 
 const PRAYER_EMOJIS: Record<PrayerKey, string> = {
-  Fajr: '🌙',
-  Dhuhr: '☀️',
-  Asr: '🌤',
-  Maghrib: '🌇',
-  Isha: '✨',
+  fajr: '🌙',
+  sunrise: '🌅',
+  dhuhr: '☀️',
+  asr: '🌤',
+  maghrib: '🌇',
+  isha: '✨',
 };
 
 const PRAYER_MESSAGES: Record<PrayerKey, string> = {
-  Fajr: 'حان وقت صلاة الفجر — استيقظ على ذكر الله',
-  Dhuhr: 'حان وقت صلاة الظهر — أقم الصلاة لذكر الله',
-  Asr: 'حان وقت صلاة العصر — حافظ على الصلوات',
-  Maghrib: 'حان وقت صلاة المغرب — الصلاة خير من النوم',
-  Isha: 'حان وقت صلاة العشاء — ختم يومك بالصلاة',
+  fajr: 'حان وقت صلاة الفجر — استيقظ على ذكر الله',
+  sunrise: 'شروق الشمس — لا تنسَ الأذكار',
+  dhuhr: 'حان وقت صلاة الظهر — أقم الصلاة لذكر الله',
+  asr: 'حان وقت صلاة العصر — حافظ على الصلوات',
+  maghrib: 'حان وقت صلاة المغرب — الصلاة خير من النوم',
+  isha: 'حان وقت صلاة العشاء — ختم يومك بالصلاة',
+};
+
+// ─── تحويل بين أسماء الصلوات والـ API ───────────────────────────────────────
+const PRAYER_KEY_TO_API: Record<PrayerKey, string> = {
+  fajr: 'Fajr',
+  sunrise: 'Sunrise',
+  dhuhr: 'Dhuhr',
+  asr: 'Asr',
+  maghrib: 'Maghrib',
+  isha: 'Isha',
 };
 
 // مدة التنبيه المسبق بالدقائق
@@ -108,7 +120,13 @@ function prayerTimeToDate(timeStr: string, advanceMinutes: number = 0): Date {
 export async function schedulePrayerNotifications(
   notifSettings: NotificationSettings
 ): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  // Cancel only prayer notifications (not azkar/wird/kahf/daily)
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if (n.identifier.startsWith('prayer_')) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
 
   if (!notifSettings.enabled) return;
 
@@ -132,7 +150,8 @@ export async function schedulePrayerNotifications(
     for (const prayerKey of PRAYER_KEYS) {
       if (!notifSettings.prayers[prayerKey]) continue;
 
-      const timeStr = prayerData.timings[prayerKey];
+      const apiKey = PRAYER_KEY_TO_API[prayerKey];
+      const timeStr = prayerData.timings[apiKey];
       if (!timeStr) continue;
 
       const triggerDate = prayerTimeToDate(timeStr, notifSettings.advanceMinutes);
@@ -144,6 +163,7 @@ export async function schedulePrayerNotifications(
 
       try {
         const id = await Notifications.scheduleNotificationAsync({
+          identifier: `prayer_${prayerKey}`,
           content: {
             title: `${emoji} ${arabicName}`,
             body: message,
@@ -170,7 +190,12 @@ export async function schedulePrayerNotifications(
 
 // ─── إلغاء جميع الإشعارات ────────────────────────────────────────────────────
 export async function cancelAllPrayerNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if (n.identifier.startsWith('prayer_')) {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
 }
 
 // ─── الحصول على الإشعارات المجدولة ───────────────────────────────────────────

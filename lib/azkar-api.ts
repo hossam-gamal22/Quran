@@ -20,14 +20,28 @@ export type AzkarCategoryType =
   | 'after_prayer'
   | 'quran_duas'
   | 'sunnah_duas'
-  | 'ruqya';
+  | 'ruqya'
+  | 'eating'
+  | 'mosque'
+  | 'house'
+  | 'travel'
+  | 'emotions'
+  | 'wudu'
+  | 'nature'
+  | 'fasting'
+  | 'protection'
+  | 'prayerSupplications'
+  | 'salawat'
+  | 'istighfar'
+  | 'ayat_kursi';
 
 export interface Zikr {
   id: number;
   category: AzkarCategoryType;
   arabic: string;
   transliteration: string;
-  translation: Record<Language, string>;
+  translation?: Record<Language, string>;
+  translations?: Record<Language, string>;
   count: number;
   reference: string;
   benefit?: {
@@ -137,7 +151,8 @@ export const getCategoryById = (id: AzkarCategoryType): AzkarCategory | undefine
  * الحصول على ترجمة الذكر
  */
 export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
-  return zikr.translation?.[language] || zikr.translation?.[DEFAULT_LANGUAGE] || zikr.arabic;
+  const t = zikr.translations || zikr.translation;
+  return t?.[language] || t?.[DEFAULT_LANGUAGE] || zikr.arabic;
 };
 
 /**
@@ -178,7 +193,8 @@ export const searchAzkar = (query: string, language: Language = 'ar'): Zikr[] =>
     if (zikr.transliteration?.toLowerCase().includes(normalizedQuery)) return true;
     
     // البحث في الترجمة
-    const translation = zikr.translation?.[language];
+    const t = zikr.translations || zikr.translation;
+    const translation = t?.[language];
     if (translation && translation.toLowerCase().includes(normalizedQuery)) return true;
     
     // البحث في المرجع

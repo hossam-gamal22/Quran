@@ -29,10 +29,10 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 
 import { useQuranTracker } from '@/contexts/WorshipContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import GlassCard from '@/components/ui/GlassCard';
 
 const { width } = Dimensions.get('window');
@@ -262,7 +262,7 @@ export default function QuranTrackerScreen() {
   const [customPages, setCustomPages] = useState('');
   const [dailyGoal, setDailyGoal] = useState(2);
   
-  const isDarkMode = false;
+  const { isDarkMode } = useSettings();
 
   // حساب التقدم
   const totalProgress = useMemo(() => {
@@ -328,7 +328,7 @@ export default function QuranTrackerScreen() {
           onPress={() => router.back()}
         >
           <MaterialCommunityIcons
-            name="arrow-right"
+            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
             size={24}
             color={isDarkMode ? '#fff' : '#333'}
           />
@@ -354,11 +354,8 @@ export default function QuranTrackerScreen() {
       >
         {/* بطاقة التقدم الرئيسية */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <LinearGradient
-            colors={['#c17f59', '#8a5a3d']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.mainCard}
+          <View
+            style={[styles.mainCard, { backgroundColor: 'rgba(193,127,89,0.85)' }]}
           >
             <View style={styles.mainCardContent}>
               <CircularProgress
@@ -397,7 +394,7 @@ export default function QuranTrackerScreen() {
                 </View>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* تقدم اليوم */}
@@ -492,7 +489,7 @@ export default function QuranTrackerScreen() {
             </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#c17f5920' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="book-open-page-variant" size={24} color="#c17f59" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -503,7 +500,7 @@ export default function QuranTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#2f765920' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="check-decagram" size={24} color="#2f7659" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -514,7 +511,7 @@ export default function QuranTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#3a7ca520' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="chart-line" size={24} color="#3a7ca5" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -525,7 +522,7 @@ export default function QuranTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <View style={[styles.statIconBg, { backgroundColor: '#ff6b3520' }]}>
+                <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="fire" size={24} color="#ff6b35" />
                 </View>
                 <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
@@ -732,11 +729,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   quickAddButtonDark: {
     backgroundColor: '#1a1a2e',
@@ -759,11 +752,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   customInputDark: {
     backgroundColor: '#1a1a2e',
@@ -795,11 +784,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderWidth: 2,
     borderColor: 'transparent',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   goalCardDark: {
     backgroundColor: '#1a1a2e',

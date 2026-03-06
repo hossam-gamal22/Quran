@@ -19,11 +19,13 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { APP_CONFIG, APP_NAME } from '../constants/app';
-import {
-  shareAllahName,
-  copyToClipboard,
-  ShareContent,
-} from '../lib/share-service';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useTranslation } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { copyToClipboard, shareText } from '../lib/clipboard';
+import namesTranslations from '@/data/json/names-of-allah-translations.json';
 
 // ===============================
 // الثوابت
@@ -848,11 +850,31 @@ const ALLAH_NAMES: AllahName[] = [
   },
 ];
 
+// Build translations lookup by ID
+const NAMES_MEANINGS_MAP: Record<number, Record<string, string>> = {};
+for (const item of (namesTranslations as any).names) {
+  NAMES_MEANINGS_MAP[item.id] = item.meanings;
+}
+
+/**
+ * Get the localized meaning of a name of Allah
+ */
+function getNameMeaning(name: AllahName, language: string): string {
+  const meanings = NAMES_MEANINGS_MAP[name.id];
+  if (meanings) {
+    return meanings[language] || meanings['ar'] || name.meaning;
+  }
+  return name.meaning;
+}
+
 // ===============================
 // المكون الرئيسي
 // ===============================
 export default function AllahNamesScreen() {
   const router = useRouter();
+  const { isDarkMode, settings } = useSettings();
+  const { language } = useTranslation();
+  const currentLang = settings.language || 'ar';
   
   // الحالة
   const [selectedName, setSelectedName] = useState<AllahName | null>(null);
@@ -909,7 +931,8 @@ export default function AllahNamesScreen() {
   };
   
   const handleCopyName = async (name: AllahName) => {
-    const text = `✨ من أسماء الله الحسنى ✨\n\n🌟 ${name.name}\n\n💎 المعنى: ${name.meaning}\n\n📝 الشرح:\n${name.description}${name.evidence ? `\n\n📖 الدليل:\n${name.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
+    const localizedMeaning = getNameMeaning(name, currentLang);
+    const text = `✨ من أسماء الله الحسنى ✨\n\n🌟 ${name.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${name.description}${name.evidence ? `\n\n📖 الدليل:\n${name.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
     
     const success = await copyToClipboard(text);
     if (success) {
@@ -945,7 +968,9 @@ export default function AllahNamesScreen() {
   const filteredNames = searchQuery
     ? ALLAH_NAMES.filter(name =>
         name.name.includes(searchQuery) ||
-        name.meaning.includes(searchQuery)
+        name.meaning.includes(searchQuery) ||
+        getNameMeaning(name, currentLang).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        name.transliteration.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : ALLAH_NAMES;
   
@@ -986,7 +1011,7 @@ export default function AllahNamesScreen() {
         
         <View style={styles.listItemContent}>
           <Text style={styles.listItemName}>{item.name}</Text>
-          <Text style={styles.listItemMeaning}>{item.meaning}</Text>
+          <Text style={styles.listItemMeaning}>{getNameMeaning(item, currentLang)}</Text>
         </View>
       </View>
       
@@ -1013,25 +1038,30 @@ export default function AllahNamesScreen() {
   );
   
   return (
-    <SafeAreaView style={styles.container}>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }]}
+    >
+    <SafeAreaView style={{ flex: 1 }}>
       {/* الرأس */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-forward" size={24} color={Colors.text} />
+      <View style={[styles.header, { backgroundColor: 'transparent' }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: 'rgba(120,120,128,0.18)' }]}>
+          <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#fff' : Colors.text} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>أسماء الله الحسنى</Text>
+        <Text style={[styles.headerTitle, isDarkMode && { color: '#fff' }]}>أسماء الله الحسنى</Text>
         
-        <TouchableOpacity
-          style={styles.headerBtn}
-          onPress={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-        >
-          <Ionicons
-            name={viewMode === 'grid' ? 'list' : 'grid'}
-            size={24}
-            color={Colors.text}
+        <View style={{ width: 110 }}>
+          <GlassSegmentedControl
+            segments={[
+              { key: 'grid', label: 'شبكة', icon: 'view-grid' },
+              { key: 'list', label: 'قائمة', icon: 'view-list' },
+            ]}
+            selected={viewMode}
+            onSelect={(key) => setViewMode(key as 'grid' | 'list')}
           />
-        </TouchableOpacity>
+        </View>
       </View>
       
       {/* بطاقة المعلومات */}
@@ -1052,6 +1082,8 @@ export default function AllahNamesScreen() {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       />
+
+      <BannerAdComponent screen="names" />
       
       {/* نافذة التفاصيل */}
       <Modal
@@ -1107,7 +1139,7 @@ export default function AllahNamesScreen() {
                     <Ionicons name="bulb" size={20} color={Colors.gold} />
                     <Text style={styles.sectionTitle}>المعنى</Text>
                   </View>
-                  <Text style={styles.meaningText}>{selectedName.meaning}</Text>
+                  <Text style={styles.meaningText}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 {/* الشرح */}
@@ -1191,7 +1223,7 @@ export default function AllahNamesScreen() {
               <>
                 <View style={styles.sharePreview}>
                   <Text style={styles.sharePreviewName}>{selectedName.name}</Text>
-                  <Text style={styles.sharePreviewMeaning}>{selectedName.meaning}</Text>
+                  <Text style={styles.sharePreviewMeaning}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 <View style={styles.shareOptions}>
@@ -1199,7 +1231,7 @@ export default function AllahNamesScreen() {
                     style={styles.shareOption}
                     onPress={() => handleShareName(selectedName)}
                   >
-                    <View style={[styles.shareOptionIcon, { backgroundColor: Colors.primary + '20' }]}>
+                    <View style={styles.shareOptionIcon}>
                       <Ionicons name="share-social" size={24} color={Colors.primary} />
                     </View>
                     <Text style={styles.shareOptionText}>مشاركة</Text>
@@ -1209,7 +1241,7 @@ export default function AllahNamesScreen() {
                     style={styles.shareOption}
                     onPress={() => handleCopyName(selectedName)}
                   >
-                    <View style={[styles.shareOptionIcon, { backgroundColor: Colors.secondary + '20' }]}>
+                    <View style={styles.shareOptionIcon}>
                       <Ionicons name="copy" size={24} color={Colors.secondary} />
                     </View>
                     <Text style={styles.shareOptionText}>نسخ</Text>
@@ -1221,7 +1253,7 @@ export default function AllahNamesScreen() {
                       handleShareName(selectedName);
                     }}
                   >
-                    <View style={[styles.shareOptionIcon, { backgroundColor: '#25D366' + '20' }]}>
+                    <View style={styles.shareOptionIcon}>
                       <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                     </View>
                     <Text style={styles.shareOptionText}>واتساب</Text>
@@ -1234,7 +1266,7 @@ export default function AllahNamesScreen() {
                       setShowShareModal(false);
                     }}
                   >
-                    <View style={[styles.shareOptionIcon, { backgroundColor: Colors.error + '20' }]}>
+                    <View style={styles.shareOptionIcon}>
                       <Ionicons
                         name={favorites.includes(selectedName.id) ? 'heart' : 'heart-outline'}
                         size={24}
@@ -1252,6 +1284,7 @@ export default function AllahNamesScreen() {
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -1261,7 +1294,7 @@ export default function AllahNamesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#11151c',
   },
   
   // الرأس
@@ -1271,8 +1304,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    backgroundColor: 'transparent',
   },
   headerBtn: {
     width: 44,
@@ -1316,11 +1348,10 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     height: ITEM_WIDTH,
     margin: Spacing.xs,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.15)',
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.sm,
   },
   gridItemNumber: {
     position: 'absolute',
@@ -1356,10 +1387,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.15)',
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
-    ...Shadows.sm,
   },
   listItemLeft: {
     flexDirection: 'row',
@@ -1413,7 +1443,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   detailsModal: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(30,30,30,0.95)',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     maxHeight: '85%',
@@ -1528,8 +1558,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    borderRadius: 14,
     gap: Spacing.xs,
+    backgroundColor: 'rgba(120,120,128,0.18)',
   },
   actionBtnText: {
     color: '#FFF',
@@ -1564,7 +1595,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   shareModalContent: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(30,30,30,0.95)',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     padding: Spacing.lg,

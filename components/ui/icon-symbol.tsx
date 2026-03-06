@@ -103,7 +103,7 @@ export function IconSymbol({ name, size = 24, color = "#000000", style }: IconSy
         style={style}
         fallback={
           <Ionicons
-            name={(ICON_MAP[name] || "help-circle-outline") as any}
+            name={(ICON_MAP[name] || "information-outline") as any}
             size={size}
             color={color}
             style={style}
@@ -114,7 +114,7 @@ export function IconSymbol({ name, size = 24, color = "#000000", style }: IconSy
   }
 
   // استخدام Ionicons على Android و Web
-  const ionIconName = ICON_MAP[name] || "help-circle-outline";
+  const ionIconName = ICON_MAP[name] || "information-outline";
   
   return (
     <Ionicons

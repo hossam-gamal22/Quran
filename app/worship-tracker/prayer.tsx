@@ -1,7 +1,7 @@
 // app/worship-tracker/prayer.tsx
 // صفحة متتبع الصلاة - روح المسلم
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
-  Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,12 +24,17 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { usePrayerTracker } from '@/contexts/WorshipContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { PrayerStatus, PrayerName, DailyPrayerRecord } from '@/lib/worship-storage';
+import {
+  getCachedPrayerTimes,
+  formatTime12h,
+  timeStringToDate,
+  PrayerTimes,
+} from '@/lib/prayer-times';
 import GlassCard from '@/components/ui/GlassCard';
 
 const { width } = Dimensions.get('window');
@@ -37,12 +43,19 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const PRAYERS: { key: PrayerName; name: string; icon: string; time: string }[] = [
-  { key: 'fajr', name: 'الفجر', icon: 'weather-sunset-up', time: '٤:٣٠ ص' },
-  { key: 'dhuhr', name: 'الظهر', icon: 'weather-sunny', time: '١٢:١٥ م' },
-  { key: 'asr', name: 'العصر', icon: 'weather-sunny-alert', time: '٣:٤٥ م' },
-  { key: 'maghrib', name: 'المغرب', icon: 'weather-sunset-down', time: '٦:٢٠ م' },
-  { key: 'isha', name: 'العشاء', icon: 'weather-night', time: '٧:٥٠ م' },
+const PRAYERS: { key: PrayerName; name: string; icon: string }[] = [
+  { key: 'fajr', name: 'الفجر', icon: 'weather-sunset-up' },
+  { key: 'dhuhr', name: 'الظهر', icon: 'weather-sunny' },
+  { key: 'asr', name: 'العصر', icon: 'weather-sunny-alert' },
+  { key: 'maghrib', name: 'المغرب', icon: 'weather-sunset-down' },
+  { key: 'isha', name: 'العشاء', icon: 'weather-night' },
+];
+
+const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; label: string }[] = [
+  { value: 'prayed', color: '#2f7659', icon: 'check-circle', label: 'في الوقت' },
+  { value: 'late', color: '#f5a623', icon: 'clock-alert', label: 'متأخر' },
+  { value: 'missed', color: '#ef5350', icon: 'close-circle', label: 'فائتة' },
+  { value: 'none', color: '#999', icon: 'circle-outline', label: 'لم تسجل' },
 ];
 
 const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; label: string }> = {
@@ -64,6 +77,8 @@ interface PrayerItemProps {
   onStatusChange: (status: PrayerStatus) => void;
   index: number;
   isDarkMode?: boolean;
+  timeString?: string;
+  isAvailable: boolean;
 }
 
 const PrayerItem: React.FC<PrayerItemProps> = ({
@@ -72,7 +87,10 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   onStatusChange,
   index,
   isDarkMode = false,
+  timeString,
+  isAvailable,
 }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
   const scale = useSharedValue(1);
   const config = STATUS_CONFIG[status];
 
@@ -81,31 +99,24 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   }));
 
   const handlePress = () => {
-    scale.value = withSpring(0.95);
-    setTimeout(() => {
-      scale.value = withSpring(1);
-    }, 100);
+    if (!isAvailable) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
+    scale.value = withSpring(0.97);
+    setTimeout(() => { scale.value = withSpring(1); }, 100);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // تدوير الحالة
-    const statuses: PrayerStatus[] = ['none', 'prayed', 'late', 'missed'];
-    const currentIndex = statuses.indexOf(status);
-    const nextIndex = (currentIndex + 1) % statuses.length;
-    onStatusChange(statuses[nextIndex]);
+    setMenuOpen(!menuOpen);
   };
 
-  const handleLongPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      prayer.name,
-      'اختر حالة الصلاة',
-      [
-        { text: 'في الوقت', onPress: () => onStatusChange('prayed') },
-        { text: 'متأخر', onPress: () => onStatusChange('late') },
-        { text: 'فائتة', onPress: () => onStatusChange('missed') },
-        { text: 'إلغاء', style: 'cancel' },
-      ]
+  const selectStatus = (newStatus: PrayerStatus) => {
+    Haptics.notificationAsync(
+      newStatus === 'prayed'
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Warning
     );
+    onStatusChange(newStatus);
+    setMenuOpen(false);
   };
 
   return (
@@ -116,19 +127,19 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handlePress}
-        onLongPress={handleLongPress}
         style={[
           styles.prayerItem,
           isDarkMode && styles.prayerItemDark,
-          { borderLeftColor: config.color, borderLeftWidth: 4 },
+          { borderLeftColor: isAvailable ? config.color : '#555', borderLeftWidth: 4 },
+          !isAvailable && { opacity: 0.5 },
         ]}
       >
         <View style={styles.prayerLeft}>
-          <View style={[styles.prayerIconBg, { backgroundColor: `${config.color}20` }]}>
+          <View style={styles.prayerIconBg}>
             <MaterialCommunityIcons
               name={prayer.icon as any}
               size={24}
-              color={config.color}
+              color={isAvailable ? config.color : '#999'}
             />
           </View>
           <View style={styles.prayerInfo}>
@@ -136,24 +147,60 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               {prayer.name}
             </Text>
             <Text style={[styles.prayerTime, isDarkMode && styles.textMuted]}>
-              {prayer.time}
+              {timeString || '--:--'}
             </Text>
           </View>
         </View>
         
         <View style={styles.prayerRight}>
-          <View style={[styles.statusBadge, { backgroundColor: `${config.color}20` }]}>
+          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : '#999'}20` }]}>
             <MaterialCommunityIcons
-              name={config.icon as any}
+              name={isAvailable ? config.icon as any : 'lock-clock'}
               size={18}
-              color={config.color}
+              color={isAvailable ? config.color : '#999'}
             />
-            <Text style={[styles.statusText, { color: config.color }]}>
-              {config.label}
+            <Text style={[styles.statusText, { color: isAvailable ? config.color : '#999' }]}>
+              {isAvailable ? config.label : 'لم يحِن'}
             </Text>
+            {isAvailable && (
+              <MaterialCommunityIcons
+                name={menuOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={config.color}
+              />
+            )}
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* القائمة المنسدلة */}
+      {menuOpen && isAvailable && (
+        <View style={[styles.dropdownMenu, isDarkMode && styles.dropdownMenuDark]}>
+          {STATUS_OPTIONS.map(opt => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.dropdownItem,
+                status === opt.value && { backgroundColor: `${opt.color}15` },
+              ]}
+              onPress={() => selectStatus(opt.value)}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons
+                name={opt.icon as any}
+                size={20}
+                color={opt.color}
+              />
+              <Text style={[styles.dropdownLabel, { color: isDarkMode ? '#eee' : '#333' }]}>
+                {opt.label}
+              </Text>
+              {status === opt.value && (
+                <MaterialCommunityIcons name="check" size={18} color={opt.color} style={{ marginRight: 'auto' }} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </Animated.View>
   );
 };
@@ -245,8 +292,36 @@ export default function PrayerTrackerScreen() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   
-  const isDarkMode = false;
+  const { isDarkMode } = useSettings();
+
+  // جلب مواقيت الصلاة الحقيقية من الكاش
+  useEffect(() => {
+    const loadTimes = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const cached = await getCachedPrayerTimes(today);
+      if (cached) setPrayerTimes(cached);
+    };
+    loadTimes();
+  }, []);
+
+  // تحديد هل الصلاة حان وقتها (أو فات)
+  const isPrayerAvailable = useCallback((prayerKey: PrayerName): boolean => {
+    if (!prayerTimes) return true; // لو مفيش مواقيت، نسمح بالكل
+    const timeStr = prayerTimes[prayerKey as keyof PrayerTimes];
+    if (!timeStr) return true;
+    const prayerDate = timeStringToDate(timeStr);
+    return new Date() >= prayerDate;
+  }, [prayerTimes]);
+
+  // جلب وقت الصلاة المنسق
+  const getPrayerTimeDisplay = useCallback((prayerKey: PrayerName): string | undefined => {
+    if (!prayerTimes) return undefined;
+    const timeStr = prayerTimes[prayerKey as keyof PrayerTimes];
+    if (!timeStr) return undefined;
+    return formatTime12h(timeStr);
+  }, [prayerTimes]);
 
   // حساب أيام الأسبوع
   const weekDates = useMemo(() => {
@@ -284,11 +359,6 @@ export default function PrayerTrackerScreen() {
 
   // تغيير حالة الصلاة
   const handleStatusChange = async (prayer: PrayerName, status: PrayerStatus) => {
-    Haptics.notificationAsync(
-      status === 'prayed' 
-        ? Haptics.NotificationFeedbackType.Success 
-        : Haptics.NotificationFeedbackType.Warning
-    );
     await updatePrayer(prayer, status);
   };
 
@@ -317,7 +387,7 @@ export default function PrayerTrackerScreen() {
           onPress={() => router.back()}
         >
           <MaterialCommunityIcons
-            name="arrow-right"
+            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
             size={24}
             color={isDarkMode ? '#fff' : '#333'}
           />
@@ -343,11 +413,8 @@ export default function PrayerTrackerScreen() {
       >
         {/* بطاقة التقدم */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <LinearGradient
-            colors={['#2f7659', '#1d4a3a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.progressCard}
+          <View
+            style={[styles.progressCard, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
           >
             <View style={styles.progressHeader}>
               <View>
@@ -381,7 +448,7 @@ export default function PrayerTrackerScreen() {
                 <Text style={styles.progressStatLabel}>نسبة الالتزام</Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* أيام الأسبوع */}
@@ -413,7 +480,7 @@ export default function PrayerTrackerScreen() {
             صلوات اليوم
           </Text>
           <Text style={[styles.sectionSubtitle, isDarkMode && styles.textMuted]}>
-            اضغط لتغيير الحالة • اضغط مطولاً لاختيار الحالة
+            اضغط لاختيار حالة الصلاة
           </Text>
           <View style={styles.prayersContainer}>
             {PRAYERS.map((prayer, index) => (
@@ -424,6 +491,8 @@ export default function PrayerTrackerScreen() {
                 onStatusChange={(status) => handleStatusChange(prayer.key, status)}
                 index={index}
                 isDarkMode={isDarkMode}
+                timeString={getPrayerTimeDisplay(prayer.key)}
+                isAvailable={isPrayerAvailable(prayer.key)}
               />
             ))}
           </View>
@@ -630,11 +699,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   weekDayDark: {
     backgroundColor: '#1a1a2e',
@@ -690,11 +755,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   prayerItemDark: {
     backgroundColor: '#1a1a2e',
@@ -734,6 +795,33 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
+    fontFamily: 'Cairo-Medium',
+  },
+  // dropdown
+  dropdownMenu: {
+    backgroundColor: '#fff',
+    marginHorizontal: 4,
+    marginTop: -4,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderTopWidth: 0,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  dropdownMenuDark: {
+    backgroundColor: '#1a1a2e',
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  dropdownLabel: {
+    fontSize: 15,
     fontFamily: 'Cairo-Medium',
   },
   // إحصائيات

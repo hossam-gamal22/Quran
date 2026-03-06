@@ -14,9 +14,12 @@ const KEYS = {
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+export type AdhanType = 'full' | 'simple';
+
 export interface AllNotificationSettings {
   // أذان الصلاة
   adhanEnabled: boolean;
+  adhanType: AdhanType; // 'full' = أذان كامل, 'simple' = أذان بسيط
   prayers: {
     Fajr: boolean;
     Dhuhr: boolean;
@@ -40,8 +43,16 @@ export interface AllNotificationSettings {
   dailyAyahTime: string;      // "06:00"
 }
 
+// ─── Adhan Audio URLs ────────────────────────────────────────────────────────
+// Full adhan: Mishary Rashid Al-Afasy (~3 minutes)
+export const ADHAN_AUDIO = {
+  full: 'https://cdn.aladhan.com/audio/adhans/1.mp3',
+  simple: 'https://cdn.aladhan.com/audio/adhans/7.mp3',
+} as const;
+
 export const DEFAULT_ALL_NOTIF: AllNotificationSettings = {
   adhanEnabled: false,
+  adhanType: 'full',
   prayers: { Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true },
   adhanAdvanceMinutes: 0,
   wirdEnabled: false,

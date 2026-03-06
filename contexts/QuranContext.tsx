@@ -26,6 +26,7 @@ interface QuranContextType {
   resumePlayback: () => Promise<boolean>;
   setReciter: (identifier: string) => void;
   setContinuousPlay: (enabled: boolean) => void;
+  seekTo: (positionMillis: number) => Promise<void>;
   
   // البيانات
   getSurah: (number: number) => Promise<CachedSurah | null>;
@@ -95,10 +96,19 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
 
   const setReciter = useCallback((identifier: string) => {
     setCurrentReciter(identifier);
+    // If audio is currently playing, restart with the new reciter
+    const state = audioPlayer.getState();
+    if (state.isPlaying && state.currentSurah > 0) {
+      audioPlayer.playAyah(state.currentSurah, state.currentAyah, identifier, true);
+    }
   }, []);
 
   const setContinuousPlay = useCallback((enabled: boolean) => {
     audioPlayer.setContinuousPlay(enabled);
+  }, []);
+
+  const seekTo = useCallback(async (positionMillis: number) => {
+    await audioPlayer.seekTo(positionMillis);
   }, []);
 
   const getSurah = useCallback(async (number: number) => {
@@ -125,6 +135,7 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
         resumePlayback,
         setReciter,
         setContinuousPlay,
+        seekTo,
         getSurah,
         currentReciter,
       }}

@@ -6,6 +6,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -17,8 +18,10 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { GlassSegmentedControl } from '@/components/ui/GlassCard';
 
 import AzkarAPI, {
   AzkarCategory,
@@ -28,7 +31,6 @@ import AzkarAPI, {
   getAzkarByCategory,
   getCategoryCompletionPercentage,
   getAllCategories,
-  getAzkarStats,
 } from '@/lib/azkar-api';
 
 const { width } = Dimensions.get('window');
@@ -44,8 +46,21 @@ const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons'
   wakeup: { name: 'sunrise', type: 'material' },
   after_prayer: { name: 'hands-praying', type: 'fontawesome' },
   quran_duas: { name: 'book-open', type: 'fontawesome' },
-  sunnah_duas: { name: 'star', type: 'ionicons' },
+  sunnah_duas: { name: 'sparkles', type: 'ionicons' },
   ruqya: { name: 'shield-checkmark', type: 'ionicons' },
+  eating: { name: 'restaurant', type: 'ionicons' },
+  mosque: { name: 'mosque', type: 'material' },
+  house: { name: 'home', type: 'ionicons' },
+  travel: { name: 'airplane', type: 'ionicons' },
+  emotions: { name: 'heart', type: 'ionicons' },
+  wudu: { name: 'water', type: 'ionicons' },
+  nature: { name: 'leaf', type: 'ionicons' },
+  fasting: { name: 'moon', type: 'ionicons' },
+  protection: { name: 'shield', type: 'ionicons' },
+  prayerSupplications: { name: 'hands-praying', type: 'fontawesome' },
+  salawat: { name: 'star', type: 'ionicons' },
+  istighfar: { name: 'refresh', type: 'ionicons' },
+  ayat_kursi: { name: 'book', type: 'ionicons' },
 };
 
 // =========================================
@@ -55,15 +70,15 @@ const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons'
 export default function AzkarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDarkMode, settings } = useSettings();
+  const darkMode = isDarkMode;
+  const language = (settings.language || 'ar') as Language;
   
   // الحالة
   const [categories, setCategories] = useState<AzkarCategory[]>([]);
   const [progress, setProgress] = useState<Record<AzkarCategoryType, number>>({} as any);
-  const [darkMode, setDarkMode] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [language, setLanguage] = useState<Language>('ar');
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState<{ total: number; categoriesCount: number } | null>(null);
   
   // الأنيميشن
   const fadeAnim = useState(new Animated.Value(0))[0];
@@ -75,26 +90,12 @@ export default function AzkarScreen() {
   const loadData = useCallback(async () => {
     try {
       // تحميل الإعدادات
-      const [storedDarkMode, storedViewMode, storedLanguage] = await Promise.all([
-        AsyncStorage.getItem('darkMode'),
-        AsyncStorage.getItem('azkar_view_mode'),
-        AsyncStorage.getItem('app_language'),
-      ]);
-
-      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
+      const storedViewMode = await AsyncStorage.getItem('azkar_view_mode');
       if (storedViewMode) setViewMode(storedViewMode as 'grid' | 'list');
-      if (storedLanguage) setLanguage(storedLanguage as Language);
 
       // تحميل الفئات
       const allCategories = getAllCategories();
       setCategories(allCategories);
-
-      // تحميل الإحصائيات
-      const azkarStats = getAzkarStats();
-      setStats({
-        total: azkarStats.total,
-        categoriesCount: azkarStats.categoriesCount,
-      });
 
       // تحميل التقدم لكل فئة
       const progressData: Record<AzkarCategoryType, number> = {} as any;
@@ -117,6 +118,8 @@ export default function AzkarScreen() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+
 
   // =========================================
   // التحديث
@@ -149,7 +152,7 @@ export default function AzkarScreen() {
       const azkarCount = getAzkarByCategory(category.id).length;
       
       await Share.share({
-        message: `${categoryName}\n${azkarCount} أذكار\n\nحمّل تطبيق القرآن والأذكار`,
+        message: `${categoryName}\n${azkarCount} أذكار\n\nحمّل تطبيق روح المسلم`,
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -210,14 +213,14 @@ export default function AzkarScreen() {
         <TouchableOpacity
           style={[
             styles.gridCardInner,
-            { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+            { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
           ]}
           onPress={() => navigateToCategory(category.id)}
           onLongPress={() => shareCategory(category)}
           activeOpacity={0.7}
         >
           {/* الأيقونة */}
-          <View style={[styles.iconContainer, { backgroundColor: category.color + '20' }]}>
+          <View style={styles.iconContainer}> 
             {renderIcon(category.id, 28, category.color)}
           </View>
 
@@ -287,14 +290,14 @@ export default function AzkarScreen() {
         <TouchableOpacity
           style={[
             styles.listCardInner,
-            { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+            { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
           ]}
           onPress={() => navigateToCategory(category.id)}
           onLongPress={() => shareCategory(category)}
           activeOpacity={0.7}
         >
           {/* الأيقونة */}
-          <View style={[styles.listIconContainer, { backgroundColor: category.color + '20' }]}>
+          <View style={styles.listIconContainer}> 
             {renderIcon(category.id, 24, category.color)}
           </View>
 
@@ -326,38 +329,7 @@ export default function AzkarScreen() {
     );
   };
 
-  // =========================================
-  // رندر الإحصائيات
-  // =========================================
 
-  const renderStats = () => {
-    if (!stats) return null;
-
-    return (
-      <View style={[styles.statsContainer, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: '#10B981' }]}>{stats.total}</Text>
-          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-            {language === 'ar' ? 'إجمالي الأذكار' : 'Total Adhkar'}
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: '#8B5CF6' }]}>{stats.categoriesCount}</Text>
-          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-            {language === 'ar' ? 'الفئات' : 'Categories'}
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statNumber, { color: '#F59E0B' }]}>12</Text>
-          <Text style={[styles.statLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-            {language === 'ar' ? 'لغة' : 'Languages'}
-          </Text>
-        </View>
-      </View>
-    );
-  };
 
   // =========================================
   // رندر الروابط السريعة
@@ -366,7 +338,7 @@ export default function AzkarScreen() {
   const renderQuickLinks = () => {
     const quickLinks = [
       { id: 'tasbih', icon: 'hand-left', label: language === 'ar' ? 'التسبيح' : 'Tasbih', route: '/tasbih', color: '#10B981' },
-      { id: 'ruqya', icon: 'shield', label: language === 'ar' ? 'الرقية' : 'Ruqyah', route: '/ruqya', color: '#6366F1' },
+      { id: 'ruqya', icon: 'shield', label: language === 'ar' ? 'الرؤية الشرعية' : 'Legal Sighting', route: '/ruqya', color: '#6366F1' },
       { id: 'names', icon: 'list', label: language === 'ar' ? 'الأسماء الحسنى' : 'Names', route: '/names', color: '#EC4899' },
     ];
 
@@ -381,7 +353,7 @@ export default function AzkarScreen() {
               key={link.id}
               style={[
                 styles.quickLinkCard,
-                { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+                { backgroundColor: darkMode ? 'rgba(30,30,32,0.65)' : 'rgba(255,255,255,0.78)' },
               ]}
               onPress={() => router.push(link.route as any)}
               activeOpacity={0.7}
@@ -402,25 +374,39 @@ export default function AzkarScreen() {
   // =========================================
 
   return (
-    <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (darkMode ? '#111827' : '#F3F4F6') : 'transparent' }]}
+    >
       {/* Header */}
-      <LinearGradient
-        colors={darkMode ? ['#1F2937', '#111827'] : ['#10B981', '#059669']}
-        style={[styles.header, { paddingTop: insets.top + 10 }]}
+      <View
+        style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: 'rgba(120,120,128,0.15)' }]}
       >
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>
-            {language === 'ar' ? 'الأذكار والأدعية' : 'Adhkar & Duas'}
-          </Text>
-          <TouchableOpacity onPress={toggleViewMode} style={styles.viewToggle}>
-            <Ionicons
-              name={viewMode === 'grid' ? 'list' : 'grid'}
-              size={24}
-              color="#FFFFFF"
-            />
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/favorites')}
+            style={styles.viewToggle}
+          >
+            <Ionicons name="heart" size={22} color="#EF4444" />
           </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+          <View style={{ width: 110 }}>
+            <GlassSegmentedControl
+              segments={[
+                { key: 'grid', label: 'شبكة', icon: 'view-grid' },
+                { key: 'list', label: 'قائمة', icon: 'view-list' },
+              ]}
+              selected={viewMode}
+              onSelect={async (key) => {
+                const newMode = key as 'grid' | 'list';
+                setViewMode(newMode);
+                await AsyncStorage.setItem('azkar_view_mode', newMode);
+              }}
+            />
+          </View>
         </View>
-      </LinearGradient>
+      </View>
 
       {/* المحتوى */}
       <ScrollView
@@ -431,9 +417,6 @@ export default function AzkarScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* الإحصائيات */}
-        {renderStats()}
-
         {/* الفئات */}
         <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
           {language === 'ar' ? 'الفئات' : 'Categories'}
@@ -455,7 +438,7 @@ export default function AzkarScreen() {
         {/* المسافة السفلية */}
         <View style={{ height: 100 }} />
       </ScrollView>
-    </View>
+    </BackgroundWrapper>
   );
 }
 
@@ -478,6 +461,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  headerSide: {
+    width: 40,
+    height: 40,
+  },
+  headerLogo: {
+    width: 64,
+    height: 64,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -496,37 +487,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   
-  // الإحصائيات
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E5E7EB',
-  },
-
   // عنوان القسم
   sectionTitle: {
     fontSize: 18,
@@ -548,11 +508,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   iconContainer: {
     width: 56,
@@ -607,11 +564,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   listIconContainer: {
     width: 48,
@@ -655,11 +609,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   quickLinkLabel: {
     fontSize: 12,

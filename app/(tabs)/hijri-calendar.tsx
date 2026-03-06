@@ -137,17 +137,17 @@ export default function HijriCalendarScreen() {
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
-    iconBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface },
+    iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)' },
     // Month nav
     monthNav: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingVertical: 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
+      paddingVertical: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     navBtn: { padding: 10, borderRadius: 20, backgroundColor: colors.primary + '18' },
     monthTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.primary },
     yearText: { textAlign: 'center', fontSize: 12, color: colors.muted, marginTop: 2 },
     // Weekday headers
-    weekRow: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 8, backgroundColor: colors.surface },
+    weekRow: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 8, backgroundColor: 'rgba(120,120,128,0.12)' },
     weekDay: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: colors.primary },
     // Calendar grid
     calGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingBottom: 8 },
@@ -163,7 +163,7 @@ export default function HijriCalendarScreen() {
     eventDot: { width: 5, height: 5, borderRadius: 3, position: 'absolute', bottom: 3 },
     // Selected day info
     selectedCard: {
-      margin: 12, backgroundColor: colors.surface, borderRadius: 16,
+      margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
       padding: 14, borderWidth: 1, borderColor: colors.border,
     },
     selectedDate: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
@@ -203,7 +203,7 @@ export default function HijriCalendarScreen() {
     modalDate: { fontSize: 13, color: colors.primary, textAlign: 'center', marginTop: 10, fontWeight: '700' },
     // Converter section
     convCard: {
-      margin: 12, backgroundColor: colors.surface, borderRadius: 16,
+      margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
       padding: 16, borderWidth: 1, borderColor: colors.border,
     },
     convTitle: { fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 10 },

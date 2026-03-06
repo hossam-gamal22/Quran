@@ -24,7 +24,6 @@ import Animated, {
   withTiming,
   withDelay,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -82,7 +81,7 @@ export default function CompleteScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
       
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         {/* كونفيتي */}
         <ConfettiCannon
           count={80}
@@ -100,14 +99,13 @@ export default function CompleteScreen() {
             {/* الأيقونة */}
             <Animated.View entering={FadeIn.duration(600)} style={styles.iconContainer}>
               <Animated.View style={[styles.starContainer, starAnimatedStyle]}>
-                <LinearGradient
-                  colors={['#2f7659', '#1d5a3a']}
+                <View
                   style={styles.iconGradient}
                 >
                   <Animated.View style={checkAnimatedStyle}>
                     <MaterialCommunityIcons name="check-bold" size={70} color="#fff" />
                   </Animated.View>
-                </LinearGradient>
+                </View>
               </Animated.View>
             </Animated.View>
 
@@ -179,15 +177,12 @@ export default function CompleteScreen() {
               onPress={handleStart}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={['#2f7659', '#1d5a3a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.startButtonGradient}
+              <View
+                style={[styles.startButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
               >
                 <Text style={styles.startButtonText}>ابدأ الآن</Text>
                 <MaterialCommunityIcons name="rocket-launch" size={26} color="#fff" />
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             <Text style={styles.footerText}>
@@ -195,7 +190,7 @@ export default function CompleteScreen() {
             </Text>
           </Animated.View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -221,6 +216,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 30,
   },
   starContainer: {},
@@ -230,10 +227,6 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 15 },
-    shadowOpacity: 0.4,
-    shadowRadius: 25,
     elevation: 15,
   },
   title: {
@@ -314,10 +307,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 18,
     overflow: 'hidden',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
     elevation: 10,
   },
   startButtonGradient: {

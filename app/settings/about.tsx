@@ -11,6 +11,7 @@ import {
   StatusBar,
   Linking,
   Image,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,7 +19,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
 import Animated, { FadeInDown, FadeIn, useAnimatedStyle, useSharedValue, withSpring, withSequence } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 
@@ -30,14 +30,7 @@ const APP_INFO = {
   name: 'روح المسلم',
   tagline: 'رفيقك الروحي اليومي',
   description: 'تطبيق إسلامي شامل يهدف إلى مساعدة المسلمين في أداء عباداتهم اليومية والتقرب إلى الله.',
-  developer: 'فريق روح المسلم',
-  email: 'support@roohmuslim.app',
-  website: 'https://roohmuslim.app',
-  privacy: 'https://roohmuslim.app/privacy',
-  terms: 'https://roohmuslim.app/terms',
-  twitter: 'https://twitter.com/roohmuslim',
-  instagram: 'https://instagram.com/roohmuslim',
-  telegram: 'https://t.me/roohmuslim',
+  email: 'hossamgamal290@gmail.com',
 };
 
 const FEATURES = [
@@ -49,11 +42,7 @@ const FEATURES = [
   { icon: 'widgets', title: 'ويدجت', desc: 'ويدجت للشاشة الرئيسية' },
 ];
 
-const TEAM = [
-  { name: 'التطوير', role: 'فريق التطوير التقني' },
-  { name: 'المحتوى', role: 'مراجعة شرعية ولغوية' },
-  { name: 'التصميم', role: 'واجهة المستخدم والتجربة' },
-];
+
 
 // ========================================
 // مكونات فرعية
@@ -85,7 +74,7 @@ const LinkItem: React.FC<LinkItemProps> = ({
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.linkIconBg, { backgroundColor: `${iconColor}15` }]}>
+      <View style={styles.linkIconBg}>
         <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
       </View>
       <View style={styles.linkContent}>
@@ -94,7 +83,7 @@ const LinkItem: React.FC<LinkItemProps> = ({
           <Text style={[styles.linkSubtitle, isDarkMode && styles.textMuted]}>{subtitle}</Text>
         )}
       </View>
-      <MaterialCommunityIcons name="chevron-left" size={24} color={isDarkMode ? '#666' : '#ccc'} />
+      <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={isDarkMode ? '#666' : '#ccc'} />
     </TouchableOpacity>
   );
 };
@@ -130,7 +119,7 @@ const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isD
 
 export default function AboutScreen() {
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, t } = useSettings();
   const [tapCount, setTapCount] = useState(0);
   const logoScale = useSharedValue(1);
 
@@ -151,10 +140,6 @@ export default function AboutScreen() {
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: logoScale.value }],
   }));
-
-  const openLink = (url: string) => {
-    Linking.openURL(url);
-  };
 
   const openEmail = () => {
     Linking.openURL(`mailto:${APP_INFO.email}?subject=تطبيق روح المسلم`);
@@ -179,9 +164,9 @@ export default function AboutScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color={isDarkMode ? '#fff' : '#333'} />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>عن التطبيق</Text>
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.about')}</Text>
         <View style={styles.headerPlaceholder} />
       </Animated.View>
 
@@ -192,25 +177,22 @@ export default function AboutScreen() {
       >
         {/* App Logo & Info */}
         <Animated.View entering={FadeInDown.delay(50).duration(500)}>
-          <LinearGradient
-            colors={isDarkMode ? ['#1a1a2e', '#16213e'] : ['#2f7659', '#1d4a3a']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.heroCard}
+          <View
+            style={[styles.heroCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(47,118,89,0.85)' }]}
           >
             <TouchableOpacity onPress={handleLogoTap} activeOpacity={0.9}>
               <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
                 <MaterialCommunityIcons name="moon-waning-crescent" size={50} color="#fff" />
               </Animated.View>
             </TouchableOpacity>
-            <Text style={styles.appName}>{APP_INFO.name}</Text>
+            <Text style={styles.appName}>{t('common.appName')}</Text>
             <Text style={styles.appTagline}>{APP_INFO.tagline}</Text>
             <View style={styles.versionBadge}>
               <Text style={styles.versionText}>
                 الإصدار {Application.nativeApplicationVersion || '1.0.0'}
               </Text>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* Description */}
@@ -224,7 +206,7 @@ export default function AboutScreen() {
 
         {/* Features */}
         <Animated.View entering={FadeIn.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>مميزات التطبيق</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.about')}</Text>
           <View style={[styles.featuresGrid, isDarkMode && styles.featuresGridDark]}>
             {FEATURES.map((feature, index) => (
               <FeatureItem
@@ -241,136 +223,65 @@ export default function AboutScreen() {
 
         {/* Stats */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>إحصائيات</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.about')}</Text>
           <View style={[styles.statsContainer, isDarkMode && styles.statsContainerDark]}>
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>12</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>لغة مدعومة</Text>
+              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('settings.language')}</Text>
             </View>
             <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>114</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>سورة</Text>
+              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('quran.surah')}</Text>
             </View>
             <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>100+</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>ذكر ودعاء</Text>
+              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('home.azkarSection')}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Links */}
         <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>روابط</Text>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.support')}</Text>
           <View style={[styles.linksCard, isDarkMode && styles.linksCardDark]}>
-            <LinkItem
-              icon="web"
-              iconColor="#2f7659"
-              title="الموقع الرسمي"
-              subtitle={APP_INFO.website}
-              onPress={() => openLink(APP_INFO.website)}
-              isDarkMode={isDarkMode}
-            />
             <LinkItem
               icon="email"
               iconColor="#3a7ca5"
-              title="تواصل معنا"
+              title={t('settings.contactUs')}
               subtitle={APP_INFO.email}
               onPress={openEmail}
               isDarkMode={isDarkMode}
             />
             <LinkItem
+              icon="facebook"
+              iconColor="#1877F2"
+              title="Facebook"
+              onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/')}
+              isDarkMode={isDarkMode}
+            />
+            <LinkItem
               icon="shield-check"
               iconColor="#5d4e8c"
-              title="سياسة الخصوصية"
-              onPress={() => openLink(APP_INFO.privacy)}
+              title={t('settings.privacyPolicy')}
+              onPress={() => router.push('/settings/privacy-policy' as any)}
               isDarkMode={isDarkMode}
             />
             <LinkItem
               icon="file-document"
               iconColor="#c17f59"
-              title="شروط الاستخدام"
-              onPress={() => openLink(APP_INFO.terms)}
+              title={t('settings.termsOfService')}
+              onPress={() => router.push('/settings/terms-of-use' as any)}
               isDarkMode={isDarkMode}
             />
           </View>
         </Animated.View>
 
-        {/* Social */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>تابعنا</Text>
-          <View style={styles.socialContainer}>
-            <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: '#1DA1F2' }]}
-              onPress={() => openLink(APP_INFO.twitter)}
-            >
-              <MaterialCommunityIcons name="twitter" size={24} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: '#E4405F' }]}
-              onPress={() => openLink(APP_INFO.instagram)}
-            >
-              <MaterialCommunityIcons name="instagram" size={24} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.socialButton, { backgroundColor: '#0088CC' }]}
-              onPress={() => openLink(APP_INFO.telegram)}
-            >
-              <MaterialCommunityIcons name="telegram" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-
-        {/* Credits */}
-        <Animated.View entering={FadeInDown.delay(350).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الفريق</Text>
-          <View style={[styles.creditsCard, isDarkMode && styles.creditsCardDark]}>
-            {TEAM.map((member, index) => (
-              <View
-                key={member.name}
-                style={[
-                  styles.creditItem,
-                  index < TEAM.length - 1 && styles.creditItemBorder,
-                  isDarkMode && styles.creditItemBorderDark,
-                ]}
-              >
-                <View style={styles.creditIcon}>
-                  <MaterialCommunityIcons
-                    name={
-                      member.name === 'التطوير'
-                        ? 'code-tags'
-                        : member.name === 'المحتوى'
-                        ? 'book-open-page-variant'
-                        : 'palette'
-                    }
-                    size={20}
-                    color="#2f7659"
-                  />
-                </View>
-                <View style={styles.creditContent}>
-                  <Text style={[styles.creditName, isDarkMode && styles.textLight]}>
-                    {member.name}
-                  </Text>
-                  <Text style={[styles.creditRole, isDarkMode && styles.textMuted]}>
-                    {member.role}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-
         {/* Footer */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.footer}>
-          <Text style={[styles.footerText, isDarkMode && styles.textMuted]}>
-            صُنع بـ ❤️ لخدمة المسلمين
-          </Text>
+        <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.footer}>
           <Text style={[styles.copyright, isDarkMode && styles.textMuted]}>
-            © {new Date().getFullYear()} {APP_INFO.name}. جميع الحقوق محفوظة.
-          </Text>
-          <Text style={[styles.buildInfo, isDarkMode && styles.textMuted]}>
-            Build {Application.nativeBuildVersion || '1'} • {Application.applicationId || 'com.roohmuslim.app'}
+            © {new Date().getFullYear()} {t('common.appName')}
           </Text>
         </Animated.View>
 

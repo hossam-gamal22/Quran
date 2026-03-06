@@ -1,5 +1,5 @@
 /* components/ui/DailyHighlights.tsx */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,33 +7,35 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  ImageBackground,
-  Platform,
+  Image,
   Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { Video, ResizeMode } from 'expo-av';
 import { useRouter } from 'expo-router';
-import { Colors, Spacing, BorderRadius } from '../../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSettings } from '@/contexts/SettingsContext';
 import { getHijriDate } from '../../lib/hijri-date';
-import { getRandomDua } from '../../lib/api/duas-api';
 import { getTodayAyahWithAudio, QuranAyahWithAudio } from '../../lib/api/quran-cloud-api';
-import { searchPhotos, searchVideos } from '../../lib/api/pexels';
+import { searchPhotos } from '../../lib/api/pexels';
+import { fetchAppConfig, HighlightItemConfig } from '../../lib/app-config-api';
+
+const STORY_CACHE_KEY = 'story_of_day_cache';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.28);
-const CARD_HEIGHT = CARD_WIDTH + 60;
+const CIRCLE_SIZE = Math.round(SCREEN_WIDTH * 0.17);
+const RING_SIZE = CIRCLE_SIZE + 6;
+const ITEM_WIDTH = RING_SIZE + 8 + 14; // itemWrapper width + gap
 
 interface DailyHighlight {
   id: string;
   title: string;
   icon: string;
-  gradient: [string, string];
-  description?: string;
+  color: string;
   imageUrl?: string;
   route: string;
+  htmlContent?: string;
 }
 
 interface DailyHighlightsProps {
@@ -42,49 +44,59 @@ interface DailyHighlightsProps {
 
 const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
   const router = useRouter();
+  const { isDarkMode } = useSettings();
 
   const hijriDate = getHijriDate();
-  const dailyDua = getRandomDua();
 
   const [ayah, setAyah] = useState<QuranAyahWithAudio | null>(null);
   const [storyImageUrl, setStoryImageUrl] = useState<string | null>(null);
-  const [storyVideoUrl, setStoryVideoUrl] = useState<string | null>(null);
+  const [storyAyahText, setStoryAyahText] = useState<string | null>(null);
+  const [adminHighlights, setAdminHighlights] = useState<DailyHighlight[]>([]);
   const [loading, setLoading] = useState(true);
-  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
+      let gotCachedPhoto = false;
+      let gotCachedText = false;
       try {
-        const [ayahResult, photosResult, videosResult] = await Promise.allSettled([
+        // Try reading story cache first (same source as story-of-day page)
+        const cached = await AsyncStorage.getItem(STORY_CACHE_KEY);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            const todayStr = new Date().toISOString().slice(0, 10);
+            if (parsed.date === todayStr && parsed.photoUrl && parsed.ayah?.text) {
+              if (mounted) {
+                setStoryImageUrl(parsed.photoUrl);
+                setStoryAyahText(parsed.ayah.text);
+                gotCachedPhoto = true;
+                gotCachedText = true;
+              }
+            }
+          } catch { /* ignore parse errors */ }
+        }
+
+        const [ayahResult, photosResult] = await Promise.allSettled([
           getTodayAyahWithAudio(),
-          searchPhotos('islamic nature sky serene mosque', 1, 15),
-          searchVideos('islamic nature mosque prayer', 1, 5),
+          !gotCachedPhoto ? searchPhotos('islamic nature sky serene mosque', 1, 15) : Promise.resolve({ photos: [] }),
         ]);
 
         if (!mounted) return;
 
         if (ayahResult.status === 'fulfilled' && ayahResult.value) {
           setAyah(ayahResult.value);
+          if (!gotCachedText) {
+            setStoryAyahText(ayahResult.value.text || null);
+          }
         }
 
-        if (photosResult.status === 'fulfilled' && photosResult.value.photos.length > 0) {
+        if (!gotCachedPhoto && photosResult.status === 'fulfilled' && photosResult.value.photos.length > 0) {
           const idx = Math.floor(
             Math.random() * Math.min(photosResult.value.photos.length, 10)
           );
           setStoryImageUrl(photosResult.value.photos[idx].src.large);
-        }
-
-        if (videosResult.status === 'fulfilled' && videosResult.value.videos.length > 0) {
-          const video = videosResult.value.videos[0];
-          const sdFile =
-            video.video_files.find((f) => f.quality === 'sd') ||
-            video.video_files.find((f) => f.quality === 'hd') ||
-            video.video_files[0];
-          if (sdFile?.link) {
-            setStoryVideoUrl(sdFile.link);
-          }
         }
       } catch {
         // Silently degrade
@@ -93,166 +105,200 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
       }
     };
     load();
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch admin-managed highlights from Firestore
+  useEffect(() => {
+    let mounted = true;
+    fetchAppConfig().then(cfg => {
+      if (!mounted) return;
+      const items = cfg.highlights;
+      if (items && items.length > 0) {
+        const mapped: DailyHighlight[] = items
+          .filter(h => h.enabled)
+          .map(h => ({
+            id: `admin-${h.id}`,
+            title: h.title,
+            icon: h.icon,
+            color: h.color,
+            imageUrl: h.imageUrl || undefined,
+            route: h.route,
+            htmlContent: h.htmlContent || undefined,
+          }));
+        setAdminHighlights(mapped);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
   }, []);
 
   const handlePress = (highlight: DailyHighlight) => {
     onStoryPress?.(highlight.id);
-    router.push(highlight.route as any);
+    if (highlight.htmlContent) {
+      // Open HTML content in in-app webview
+      router.push({ pathname: '/webview', params: { html: highlight.htmlContent, title: highlight.title } } as any);
+    } else if (highlight.route.startsWith('http://') || highlight.route.startsWith('https://')) {
+      // Open URL in in-app webview
+      router.push({ pathname: '/webview', params: { url: highlight.route, title: highlight.title } } as any);
+    } else {
+      router.push(highlight.route as any);
+    }
   };
 
-  const highlights: DailyHighlight[] = [
+  // ===== ORDER (من اليمين): التاريخ الهجري, أذكار, آية اليوم, ستوري, الصلاة =====
+  const builtInHighlights: DailyHighlight[] = [
     {
       id: 'hijri-date',
       title: `${hijriDate.day} ${hijriDate.monthNameAr}`,
-      icon: 'calendar-islamic',
-      gradient: ['#2f7659', '#1a4d35'],
-      description: `${hijriDate.year} هـ`,
+      icon: 'calendar-month',
+      color: '#2f7659',
       route: '/hijri',
     },
     {
-      id: 'daily-story',
-      title: 'ستوري اليوم',
-      icon: 'play-circle-outline',
-      gradient: ['#5b21b6', '#3730a3'],
-      description: ayah?.surah?.name ?? 'جاري التحميل...',
-      imageUrl: storyImageUrl ?? undefined,
-      route: '/night-reading',
-    },
-    {
-      id: 'daily-dua',
-      title: 'دعاء اليوم',
+      id: 'azkar-adhkar',
+      title: 'أدعية وأذكار',
       icon: 'hands-pray',
-      gradient: ['#dc2626', '#b91c1c'],
-      description: dailyDua?.textAr ? `${dailyDua.textAr.substring(0, 18)}…` : undefined,
-      route: '/azkar/sunnah_duas',
+      color: '#be123c',
+      route: '/azkar/morning',
     },
     {
       id: 'daily-ayah',
       title: 'آية اليوم',
       icon: 'book-open-page-variant',
-      gradient: ['#1e40af', '#1e3a8a'],
-      description: ayah?.surah?.name ?? 'جاري التحميل...',
+      color: '#1e40af',
       route: '/(tabs)/daily-ayah',
+    },
+    {
+      id: 'daily-story',
+      title: 'ستوري اليوم',
+      icon: 'play-circle-outline',
+      color: '#5b21b6',
+      imageUrl: storyImageUrl ?? undefined,
+      route: '/story-of-day',
     },
     {
       id: 'next-prayer',
       title: 'صلاتي القادمة',
       icon: 'mosque',
-      gradient: ['#7c2d12', '#5a1f0f'],
+      color: '#7c2d12',
       route: '/(tabs)/prayer',
-    },
-    {
-      id: 'azkar-adhkar',
-      title: 'أدعية وأذكار',
-      icon: 'meditation',
-      gradient: ['#be123c', '#9f1239'],
-      route: '/azkar/morning',
     },
   ];
 
-  const renderCardContent = (highlight: DailyHighlight) => (
-    <View style={styles.cardContent}>
-      <MaterialCommunityIcons
-        name={highlight.icon as any}
-        size={32}
-        color="white"
-        style={styles.cardIcon}
-      />
-      <Text style={styles.cardTitle} numberOfLines={2}>
-        {highlight.title}
-      </Text>
-      {highlight.description ? (
-        <Text style={styles.cardDescription} numberOfLines={1}>
-          {highlight.description}
-        </Text>
-      ) : null}
-    </View>
-  );
+  // Merge admin-managed highlights from Firestore
+  const highlights = [...adminHighlights, ...builtInHighlights];
 
-  const renderCard = (highlight: DailyHighlight) => {
-    // Story card with video
-    if (highlight.id === 'daily-story' && storyVideoUrl) {
-      return (
-        <View style={[styles.card, { overflow: 'hidden' }]}>
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Video
-              ref={videoRef}
-              source={{ uri: storyVideoUrl }}
-              style={StyleSheet.absoluteFill}
-              resizeMode={ResizeMode.COVER}
-              shouldPlay
-              isLooping
-              isMuted
-              volume={0}
-            />
-          </View>
-          <View style={styles.androidDarkOverlay}>{renderCardContent(highlight)}</View>
-        </View>
-      );
-    }
+  const labelColor = isDarkMode ? '#ccc' : '#555';
+  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.2)';
 
-    // Image card (photo background)
-    if (highlight.imageUrl) {
-      return (
-        <ImageBackground
-          source={{ uri: highlight.imageUrl }}
-          style={styles.card}
-          imageStyle={styles.cardImage}
-          resizeMode="cover"
-        >
-          {Platform.OS === 'ios' ? (
-            <BlurView intensity={55} tint="dark" style={styles.cardOverlay}>
-              {renderCardContent(highlight)}
-            </BlurView>
-          ) : (
-            <View style={styles.androidDarkOverlay}>{renderCardContent(highlight)}</View>
-          )}
-        </ImageBackground>
-      );
-    }
+  const scrollRef = useRef<ScrollView>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(true);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollX = useRef(0);
+  const maxScrollX = useRef(0);
 
-    // Gradient card
-    return (
-      <LinearGradient
-        colors={highlight.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.card}
-      >
-        {Platform.OS === 'ios' ? (
-          <View style={styles.iosGlassLayer}>{renderCardContent(highlight)}</View>
-        ) : (
-          renderCardContent(highlight)
-        )}
-      </LinearGradient>
-    );
-  };
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    scrollX.current = contentOffset.x;
+    maxScrollX.current = contentSize.width - layoutMeasurement.width;
+    // RTL layout: content starts from right. x=0 is at the right end.
+    // As user scrolls left (revealing more items on the left), x increases.
+    setCanScrollLeft(contentOffset.x < maxScrollX.current - 10); // can scroll further left (more items on left)
+    setCanScrollRight(contentOffset.x > 10); // can scroll back right (items on right)
+  }, []);
 
   return (
     <View style={styles.container}>
+      {/* Left arrow — scroll to reveal more items on the left */}
+      {canScrollLeft && (
+        <TouchableOpacity
+          style={[styles.arrowBtn, styles.arrowLeft]}
+          onPress={() => {
+            const target = Math.min(scrollX.current + ITEM_WIDTH * 2, maxScrollX.current);
+            scrollRef.current?.scrollTo?.({ x: target, animated: true });
+          }}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="chevron-left" size={22} color={arrowColor} />
+        </TouchableOpacity>
+      )}
+
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        snapToInterval={ITEM_WIDTH}
+        decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
-        {highlights.map((highlight) => (
+        {highlights.map((h) => (
           <TouchableOpacity
-            key={highlight.id}
-            style={styles.cardWrapper}
-            onPress={() => handlePress(highlight)}
-            activeOpacity={0.85}
+            key={h.id}
+            style={styles.itemWrapper}
+            onPress={() => handlePress(h)}
+            activeOpacity={0.75}
           >
-            {renderCard(highlight)}
+            <View style={[styles.ring, { borderColor: h.color }]}>  
+              {h.id === 'daily-story' && h.imageUrl ? (
+                <View style={styles.storyThumbWrapper}>
+                  <Image
+                    source={{ uri: h.imageUrl }}
+                    style={styles.circleImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.storyThumbOverlay} />
+                  {storyAyahText ? (
+                    <Text style={styles.storyThumbText} numberOfLines={3}>
+                      {storyAyahText.slice(0, 60)}
+                    </Text>
+                  ) : (
+                    <MaterialCommunityIcons name="play-circle-outline" size={20} color="#fff" style={{ zIndex: 2 }} />
+                  )}
+                </View>
+              ) : h.imageUrl ? (
+                <Image
+                  source={{ uri: h.imageUrl }}
+                  style={styles.circleImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.circleInner, { backgroundColor: h.color }]}>
+                  <MaterialCommunityIcons
+                    name={h.icon as any}
+                    size={28}
+                    color="#fff"
+                  />
+                </View>
+              )}
+            </View>
+            <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
+              {h.title}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
+      {/* Right arrow — scroll back to show items on the right */}
+      {canScrollRight && (
+        <TouchableOpacity
+          style={[styles.arrowBtn, styles.arrowRight]}
+          onPress={() => {
+            const target = Math.max(scrollX.current - ITEM_WIDTH * 2, 0);
+            scrollRef.current?.scrollTo?.({ x: target, animated: true });
+          }}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="chevron-right" size={22} color={arrowColor} />
+        </TouchableOpacity>
+      )}
+
       {loading && (
         <View style={styles.loadingBadge}>
-          <ActivityIndicator size="small" color={Colors.primary} />
+          <ActivityIndicator size="small" color="#2f7659" />
         </View>
       )}
     </View>
@@ -261,91 +307,90 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    height: CARD_HEIGHT + Spacing.lg * 2,
-    marginVertical: Spacing.sm,
+    marginVertical: 8,
+    position: 'relative' as const,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    flexDirection: 'row',
+    paddingHorizontal: 24,
+    gap: 14,
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
   },
-  cardWrapper: {
-    marginHorizontal: Spacing.xs,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+  arrowBtn: {
+    position: 'absolute' as const,
+    top: (RING_SIZE / 2) - 11,
+    zIndex: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(128,128,128,0.12)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
-  card: {
-    flex: 1,
-    borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
-    justifyContent: 'center',
+  arrowLeft: {
+    left: 0,
+  },
+  arrowRight: {
+    right: 0,
+  },
+  itemWrapper: {
     alignItems: 'center',
+    width: RING_SIZE + 8,
   },
-  cardImage: {
-    borderRadius: BorderRadius.lg,
-  },
-  cardOverlay: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  androidDarkOverlay: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: 'rgba(0,0,0,0.48)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xs,
-  },
-  iosGlassLayer: {
-    flex: 1,
-    width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xs,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  cardContent: {
+  ring: {
+    width: RING_SIZE,
+    height: RING_SIZE,
+    borderRadius: RING_SIZE / 2,
+    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 2,
+  },
+  circleInner: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleImage: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+  },
+  storyThumbWrapper: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
+    overflow: 'hidden' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  storyThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 1,
+  },
+  storyThumbText: {
+    position: 'absolute' as const,
+    zIndex: 2,
+    color: '#fff',
+    fontSize: 8,
+    lineHeight: 12,
+    fontFamily: 'Cairo-Bold',
+    textAlign: 'center' as const,
     paddingHorizontal: 4,
   },
-  cardIcon: {
-    marginBottom: 6,
-  },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  cardDescription: {
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 10,
+  label: {
+    fontSize: 11,
+    fontFamily: 'Cairo-Medium',
+    marginTop: 4,
     textAlign: 'center',
   },
   loadingBadge: {
     position: 'absolute',
-    top: 12,
-    right: 16,
+    top: 4,
+    right: 12,
   },
 });
 

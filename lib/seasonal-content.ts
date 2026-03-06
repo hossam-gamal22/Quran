@@ -119,7 +119,7 @@ const SEASONS_DATA: Record<SeasonType, Omit<SeasonInfo, 'isActive' | 'daysRemain
     startDate: { month: 12, day: 8 },
     endDate: { month: 12, day: 13 },
     color: '#8B4513',
-    icon: 'kaaba',
+    icon: 'star-crescent',
     specialDays: [
       {
         day: 8,

@@ -1,8 +1,8 @@
 // app/(tabs)/tasbih-placeholder.tsx
-// هذا الملف placeholder فقط - الزرار الحقيقي في _layout.tsx
+// Placeholder - التنقل يتم عبر _layout.tsx
 
 import { View } from 'react-native';
 
 export default function TasbihPlaceholder() {
-  return <View />;
+  return <View style={{ flex: 1 }} />;
 }

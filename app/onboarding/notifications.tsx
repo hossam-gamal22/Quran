@@ -11,13 +11,13 @@ import {
   Switch,
   Platform,
   Alert,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
@@ -140,12 +140,12 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
       
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.gradient}>
+      <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
           <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+              <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
               <Text style={styles.stepText}>الخطوة 3 من 4</Text>
@@ -168,8 +168,7 @@ export default function NotificationsScreen() {
           <View style={styles.content}>
             {/* الأيقونة */}
             <Animated.View entering={FadeIn.delay(200).duration(600)} style={styles.iconContainer}>
-              <LinearGradient
-                colors={permissionGranted ? ['#2f7659', '#1d5a3a'] : ['#f5a623', '#e09000']}
+              <View
                 style={styles.iconGradient}
               >
                 <MaterialCommunityIcons
@@ -177,7 +176,7 @@ export default function NotificationsScreen() {
                   size={50}
                   color="#fff"
                 />
-              </LinearGradient>
+              </View>
             </Animated.View>
 
             {/* العنوان */}
@@ -215,7 +214,7 @@ export default function NotificationsScreen() {
                     !permissionGranted && styles.optionItemDisabled,
                   ]}
                 >
-                  <View style={[styles.optionIcon, { backgroundColor: `${option.color}30` }]}>
+                  <View style={styles.optionIcon}>
                     <MaterialCommunityIcons name={option.icon as any} size={24} color={option.color} />
                   </View>
                   <View style={styles.optionContent}>
@@ -248,15 +247,12 @@ export default function NotificationsScreen() {
                 onPress={handleContinue}
                 activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={['#2f7659', '#1d5a3a']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.continueButtonGradient}
-                >
+              <View
+                style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+              >
                   <Text style={styles.continueButtonText}>متابعة</Text>
                   <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-                </LinearGradient>
+              </View>
               </TouchableOpacity>
 
               {/* مؤشر الصفحات */}
@@ -269,7 +265,7 @@ export default function NotificationsScreen() {
             </Animated.View>
           </SafeAreaView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -338,6 +334,8 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
   },
   iconGradient: {
@@ -346,10 +344,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
     elevation: 10,
   },
   title: {
@@ -436,10 +430,6 @@ const styles = StyleSheet.create({
   continueButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 8,
   },
   continueButtonGradient: {

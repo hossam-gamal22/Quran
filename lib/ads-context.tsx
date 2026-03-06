@@ -1,13 +1,14 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Platform } from 'react-native';
-import { fetchAdsConfig, AdsConfig } from './ads-config';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchAdsConfig, AdsConfig, AdScreenKey, isBannerEnabledForScreen, getAdUnitId } from './ads-config';
 
 interface AdsContextType {
   config: AdsConfig | null;
   isLoading: boolean;
-  showBanner: boolean;
+  isBannerVisible: (screen: AdScreenKey) => boolean;
+  getBannerAdUnitId: () => string;
+  getInterstitialAdUnitId: () => string;
+  getAppOpenAdUnitId: () => string;
   canShowInterstitial: () => boolean;
   onPageView: () => void;
   recordInterstitialShown: () => void;
@@ -40,22 +41,35 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     loadConfig();
   }, [loadConfig]);
 
-  // تسجيل مشاهدة صفحة
   const onPageView = useCallback(() => {
     setPageViews(prev => prev + 1);
   }, []);
 
-  // تسجيل عرض إعلان
   const recordInterstitialShown = useCallback(() => {
     setSessionAdsShown(prev => prev + 1);
     setLastAdTime(Date.now());
   }, []);
 
-  // التحقق من إمكانية عرض إعلان
+  const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
+    if (!config) return false;
+    return isBannerEnabledForScreen(config, screen);
+  }, [config]);
+
+  const getBannerAdUnitId = useCallback((): string => {
+    return getAdUnitId('BANNER', config);
+  }, [config]);
+
+  const getInterstitialAdUnitId = useCallback((): string => {
+    return getAdUnitId('INTERSTITIAL', config);
+  }, [config]);
+
+  const getAppOpenAdUnitId = useCallback((): string => {
+    return getAdUnitId('APP_OPEN', config);
+  }, [config]);
+
   const canShowInterstitial = useCallback((): boolean => {
     if (!config || !config.enabled) return false;
-    
-    // التحقق من تأخير أول إعلان
+
     if (config.delayFirstAd) {
       const secondsSinceStart = (Date.now() - appStartTime) / 1000;
       if (secondsSinceStart < config.firstAdDelay) {
@@ -63,31 +77,28 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // حسب نوع التكرار
     switch (config.interstitialMode) {
       case 'pages':
         return pageViews > 0 && pageViews % config.interstitialFrequency === 0;
-      
-      case 'time':
+      case 'time': {
         const minutesSinceLastAd = (Date.now() - lastAdTime) / 60000;
         return minutesSinceLastAd >= config.interstitialTimeInterval;
-      
+      }
       case 'session':
         return sessionAdsShown < config.interstitialSessionLimit;
-      
       default:
         return false;
     }
   }, [config, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
 
-  // هل نعرض البانر
-  const showBanner = config?.enabled ?? false;
-
   return (
     <AdsContext.Provider value={{
       config,
       isLoading,
-      showBanner,
+      isBannerVisible,
+      getBannerAdUnitId,
+      getInterstitialAdUnitId,
+      getAppOpenAdUnitId,
       canShowInterstitial,
       onPageView,
       recordInterstitialShown,

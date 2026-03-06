@@ -34,24 +34,39 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 99;
 
+export type NotificationSoundType = 'default' | 'asbahna' | 'amsayna' | 'subhanallah' | 'alhamdulillah' | 'allahuakbar' | 'silent';
+
+export type AdhanSoundType = 'default' | 'makkah' | 'madinah' | 'alaqsa' | 'mishary' | 'abdulbasit' | 'silent';
+
 export interface NotificationSettings {
   enabled: boolean;
+  prayerTimes: boolean;
   prayerReminder: boolean;
   prayerReminderMinutes: number;
+  reminderMinutes: number;
   fajrSpecial: boolean;
   azkarMorning: boolean;
   azkarMorningTime: string;
   azkarEvening: boolean;
   azkarEveningTime: string;
+  morningAzkar: boolean;
+  morningAzkarTime: string;
+  eveningAzkar: boolean;
+  eveningAzkarTime: string;
   dailyVerse: boolean;
   dailyVerseTime: string;
+  dailyHadith: boolean;
   khatmaReminder: boolean;
   sound: boolean;
   vibration: boolean;
+  soundType: NotificationSoundType;
+  adhanSoundType: AdhanSoundType;
 }
 
-export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7';
+export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7' | 'dynamic';
 export type QuranBackgroundKey = 'quranbg1' | 'quranbg2' | 'quranbg3' | 'quranbg4';
+
+export type HomeLayout = 'grid' | 'list';
 
 export interface DisplaySettings {
   fontSize: FontSize;
@@ -62,7 +77,16 @@ export interface DisplaySettings {
   showTransliteration: boolean;
   highlightTajweed: boolean;
   appBackground: AppBackgroundKey;
+  appBackgroundUrl?: string; // For dynamic/remote backgrounds
   quranBackground: QuranBackgroundKey;
+  quranThemeIndex: number;
+  homeLayout: HomeLayout;
+  /** Font size adjustment for Mushaf reader (-4 to +8, default 0) */
+  quranFontSizeAdjust: number;
+  /** Show tafsir panel below Mushaf reader */
+  showTafsir: boolean;
+  /** Focus mode - hide UI elements while reading Quran */
+  focusMode: boolean;
 }
 
 export interface PrayerSettings {
@@ -120,18 +144,27 @@ interface SettingsContextType {
 
 const defaultNotifications: NotificationSettings = {
   enabled: true,
+  prayerTimes: true,
   prayerReminder: true,
   prayerReminderMinutes: 10,
+  reminderMinutes: 10,
   fajrSpecial: true,
   azkarMorning: true,
   azkarMorningTime: '06:00',
   azkarEvening: true,
   azkarEveningTime: '18:00',
+  morningAzkar: true,
+  morningAzkarTime: '06:00',
+  eveningAzkar: true,
+  eveningAzkarTime: '18:00',
   dailyVerse: true,
   dailyVerseTime: '08:00',
+  dailyHadith: false,
   khatmaReminder: true,
   sound: true,
   vibration: true,
+  soundType: 'default',
+  adhanSoundType: 'default',
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -144,6 +177,11 @@ const defaultDisplay: DisplaySettings = {
   highlightTajweed: true,
   appBackground: 'none',
   quranBackground: 'quranbg1',
+  quranFontSizeAdjust: 0,
+  quranThemeIndex: 0,
+  homeLayout: 'grid',
+  showTafsir: false,
+  focusMode: false,
 };
 
 const defaultPrayer: PrayerSettings = {
@@ -163,7 +201,7 @@ const defaultPrayer: PrayerSettings = {
 
 const defaultSettings: AppSettings = {
   language: 'ar',
-  theme: 'system',
+  theme: 'dark',
   notifications: defaultNotifications,
   display: defaultDisplay,
   prayer: defaultPrayer,

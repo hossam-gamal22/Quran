@@ -1,5 +1,6 @@
 // lib/quran-cache.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import localQuranData from '../data/json/quran-uthmani.json';
 
 const CACHE_KEYS = {
   QURAN_FULL: '@quran_full_data',
@@ -59,52 +60,14 @@ async function isCacheValid(): Promise<boolean> {
   }
 }
 
-// ─── تحميل قائمة السور ─────────────────────────────────────────────────────────
+// ─── تحميل قائمة السور (من الملف المحلي مباشرة) ──────────────────────────────
 export async function fetchAndCacheSurahsList(): Promise<CachedSurah[]> {
-  try {
-    // التحقق من الكاش أولاً
-    const cached = await AsyncStorage.getItem(CACHE_KEYS.SURAHS_LIST);
-    if (cached && await isCacheValid()) {
-      return JSON.parse(cached);
-    }
-
-    // جلب من API
-    const response = await fetch('https://api.alquran.cloud/v1/quran/quran-uthmani');
-    const data = await response.json();
-    
-    if (data.code === 200 && data.data?.surahs) {
-      const surahs: CachedSurah[] = data.data.surahs.map((surah: any) => ({
-        number: surah.number,
-        name: surah.name,
-        englishName: surah.englishName,
-        englishNameTranslation: surah.englishNameTranslation,
-        numberOfAyahs: surah.numberOfAyahs,
-        revelationType: surah.revelationType,
-        ayahs: surah.ayahs.map((ayah: any) => ({
-          number: ayah.number,
-          numberInSurah: ayah.numberInSurah,
-          text: ayah.text,
-          juz: ayah.juz,
-          page: ayah.page,
-          hizbQuarter: ayah.hizbQuarter,
-        })),
-      }));
-
-      // حفظ في الكاش
-      await AsyncStorage.setItem(CACHE_KEYS.SURAHS_LIST, JSON.stringify(surahs));
-      await AsyncStorage.setItem(CACHE_KEYS.CACHE_TIMESTAMP, Date.now().toString());
-      
-      console.log('✅ Cached all 114 surahs');
-      return surahs;
-    }
-    throw new Error('Failed to fetch Quran data');
-  } catch (error) {
-    console.error('Error fetching surahs:', error);
-    // محاولة استرجاع من الكاش حتى لو منتهي
-    const cached = await AsyncStorage.getItem(CACHE_KEYS.SURAHS_LIST);
-    if (cached) return JSON.parse(cached);
-    return [];
-  }
+  // البيانات محفوظة محلياً — لا حاجة للإنترنت
+  // JSON doesn't have numberOfAyahs — derive from ayahs array length
+  return (localQuranData as any[]).map(s => ({
+    ...s,
+    numberOfAyahs: s.numberOfAyahs ?? s.ayahs?.length ?? 0,
+  })) as CachedSurah[];
 }
 
 // ─── الحصول على سورة معينة ─────────────────────────────────────────────────────

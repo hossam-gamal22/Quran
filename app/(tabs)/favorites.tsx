@@ -1,24 +1,30 @@
 /**
  * Favorites Screen — المفضلة
+ * Redesigned with Apple iOS glassmorphism styling and improved contrast
  * حفظ الآيات مع ملاحظات، تصديرها كصور جاهزة للمشاركة
- * يستخدم: react-native-view-shot + expo-sharing + expo-media-library
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert, ActivityIndicator, Platform,
-  ScrollView, Animated, Share,
+  ScrollView, Share,
 } from 'react-native';
-import { useColors } from '@/hooks/use-colors';
-import { ScreenContainer } from '@/components/screen-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
 import { getBookmarks, removeBookmark, Bookmark, addBookmark } from '@/lib/storage';
 import { SURAH_NAMES_AR } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+import { getFavoriteAzkar, removeFromFavorites, Zikr } from '@/lib/azkar-api';
 
 // ─── Image Card Themes ───────────────────────────────────────────────────────
 const CARD_THEMES = [
@@ -46,10 +52,8 @@ function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
         borderRadius: 20,
         padding: 28,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
+        borderWidth: 0.5,
+        borderColor: 'rgba(255,255,255,0.08)',
       }}>
         {/* Top ornament */}
         <Text style={{ fontSize: 28, marginBottom: 16, opacity: 0.8 }}>☽</Text>
@@ -114,8 +118,11 @@ function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function FavoritesScreen() {
-  const colors = useColors();
+  const { isDarkMode, settings, t } = useSettings();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'quran' | 'azkar'>('quran');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [azkarFavorites, setAzkarFavorites] = useState<Zikr[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -126,21 +133,44 @@ export default function FavoritesScreen() {
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'surah'>('date');
   const cardRef = useRef<ViewShot>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Colors based on dark mode for better contrast
+  const colors = {
+    primary: '#2f7659',
+    foreground: isDarkMode ? '#FFFFFF' : '#1C1C1E',
+    muted: isDarkMode ? '#A1A1AA' : '#6B7280',
+    background: isDarkMode ? '#11151c' : '#f5f5f5',
+    card: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)',
+    cardBorder: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)',
+    accent: isDarkMode ? '#4ADE80' : '#2f7659',
+  };
 
   const loadBookmarks = useCallback(async () => {
     setLoading(true);
     const bms = await getBookmarks();
     setBookmarks(bms);
+    const favAzkar = await getFavoriteAzkar();
+    setAzkarFavorites(favAzkar);
     setLoading(false);
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-  }, [fadeAnim]);
+  }, []);
 
   useEffect(() => { loadBookmarks(); }, [loadBookmarks]);
 
   const sortedBookmarks = [...bookmarks].sort((a, b) =>
     sortBy === 'date' ? b.createdAt - a.createdAt : a.surahNumber - b.surahNumber
   );
+
+  // Navigate to Quran ayah
+  const navigateToAyah = useCallback((bookmark: Bookmark) => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/surah/${bookmark.surahNumber}?ayah=${bookmark.ayahNumber}`);
+  }, [router]);
+
+  // Navigate to Azkar category
+  const navigateToAzkar = useCallback((zikr: Zikr) => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(`/azkar/${zikr.category}`);
+  }, [router]);
 
   // Delete bookmark
   const handleDelete = useCallback((bookmark: Bookmark) => {
@@ -241,238 +271,588 @@ export default function FavoritesScreen() {
     });
   }, []);
 
+  // Remove azkar from favorites
+  const handleRemoveAzkar = useCallback((zikr: Zikr) => {
+    Alert.alert(
+      'إزالة من المفضلة',
+      'هل تريد إزالة هذا الذكر من المفضلة؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'إزالة', style: 'destructive',
+          onPress: async () => {
+            await removeFromFavorites(zikr.id);
+            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            loadBookmarks();
+          },
+        },
+      ]
+    );
+  }, [loadBookmarks]);
+
+  // Share azkar as text
+  const handleShareAzkar = useCallback(async (zikr: Zikr) => {
+    await Share.share({
+      message: `${zikr.arabic}\n\n📿 ${zikr.reference}\n\nعدد التكرار: ${zikr.count}`,
+    });
+  }, []);
+
+  // Styles with proper glassmorphism and improved contrast
   const s = StyleSheet.create({
+    // Header
     header: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
     },
-    title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
-    iconBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+    title: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: 22,
+      fontFamily: 'Cairo-Bold',
+      color: colors.foreground,
+    },
     // Sort/stats bar
     statsBar: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingVertical: 10, backgroundColor: colors.surface,
-      borderBottomWidth: 1, borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
     },
     countBadge: {
-      backgroundColor: colors.primary + '18', borderRadius: 12,
-      paddingHorizontal: 10, paddingVertical: 4, marginLeft: 10,
+      backgroundColor: colors.accent + '20',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      marginLeft: 10,
     },
-    countText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-    sortBtns: { flexDirection: 'row', gap: 6, marginRight: 10 },
-    sortBtn: {
-      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10,
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    countText: {
+      fontSize: 13,
+      fontFamily: 'Cairo-Bold',
+      color: colors.accent,
     },
-    sortBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    sortBtnText: { fontSize: 11, fontWeight: '700', color: colors.muted },
-    sortBtnTextActive: { color: '#fff' },
+    sortBtns: {
+      flexDirection: 'row',
+      gap: 6,
+      marginRight: 10,
+    },
     flex1: { flex: 1 },
-    // Bookmark card
+    // Bookmark card with glassmorphism
     card: {
-      marginHorizontal: 12, marginVertical: 6, borderRadius: 16,
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      marginHorizontal: 16,
+      marginVertical: 8,
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    cardInner: {
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 0.5,
+      borderColor: colors.cardBorder,
       overflow: 'hidden',
     },
     cardHeader: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14,
-      paddingTop: 12, paddingBottom: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 10,
+      gap: 10,
     },
     surahBadge: {
-      backgroundColor: colors.primary + '15', borderRadius: 20,
-      paddingHorizontal: 10, paddingVertical: 4,
+      backgroundColor: colors.accent + '20',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
     },
-    surahBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-    dateText: { flex: 1, fontSize: 11, color: colors.muted, textAlign: 'left', marginRight: 8 },
+    surahBadgeText: {
+      fontSize: 13,
+      fontFamily: 'Cairo-Bold',
+      color: colors.accent,
+    },
+    dateText: {
+      flex: 1,
+      fontSize: 12,
+      fontFamily: 'Cairo-Regular',
+      color: colors.muted,
+      textAlign: 'left',
+    },
+    iconBtn: {
+      padding: 6,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+    },
     ayahText: {
-      fontSize: 18, color: colors.foreground, textAlign: 'right',
-      lineHeight: 36, paddingHorizontal: 14, paddingBottom: 10,
+      fontSize: 20,
+      fontFamily: 'Amiri-Regular',
+      color: colors.foreground,
+      textAlign: 'right',
+      lineHeight: 42,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
     },
     noteBox: {
-      marginHorizontal: 14, marginBottom: 10, backgroundColor: colors.primary + '08',
-      borderRadius: 10, padding: 10, borderLeftWidth: 3, borderLeftColor: colors.primary,
+      marginHorizontal: 16,
+      marginBottom: 12,
+      backgroundColor: colors.accent + '12',
+      borderRadius: 12,
+      padding: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accent,
     },
-    noteText: { fontSize: 12, color: colors.muted, textAlign: 'right', fontStyle: 'italic' },
+    noteText: {
+      fontSize: 13,
+      fontFamily: 'Cairo-Regular',
+      color: colors.muted,
+      textAlign: 'right',
+    },
     // Actions bar
     actionsBar: {
-      flexDirection: 'row', borderTopWidth: 0.5, borderTopColor: colors.border,
+      flexDirection: 'row',
+      borderTopWidth: 0.5,
+      borderTopColor: colors.cardBorder,
     },
     actionBtn: {
-      flex: 1, paddingVertical: 10, alignItems: 'center', flexDirection: 'row',
-      justifyContent: 'center', gap: 4,
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 6,
     },
-    actionDivider: { width: 0.5, backgroundColor: colors.border },
-    actionText: { fontSize: 12, fontWeight: '600' },
+    actionDivider: {
+      width: 0.5,
+      backgroundColor: colors.cardBorder,
+    },
+    actionText: {
+      fontSize: 13,
+      fontFamily: 'Cairo-SemiBold',
+    },
     // Empty state
-    emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 80 },
-    emptyEmoji: { fontSize: 60, marginBottom: 16 },
-    emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, marginBottom: 8 },
-    emptyText: { fontSize: 14, color: colors.muted, textAlign: 'center', paddingHorizontal: 40, lineHeight: 22 },
+    emptyWrap: {
+      flex: 1,
+      alignItems: 'center',
+      paddingTop: 80,
+      paddingHorizontal: 32,
+    },
+    emptyEmoji: {
+      fontSize: 64,
+      marginBottom: 20,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontFamily: 'Cairo-Bold',
+      color: colors.foreground,
+      marginBottom: 10,
+    },
+    emptyText: {
+      fontSize: 15,
+      fontFamily: 'Cairo-Regular',
+      color: colors.muted,
+      textAlign: 'center',
+      lineHeight: 26,
+    },
+    // Tab bar
+    tabBar: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    // Azkar card with glassmorphism
+    azkarCard: {
+      marginHorizontal: 16,
+      marginTop: 8,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      backgroundColor: colors.card,
+      borderWidth: 0.5,
+      borderColor: colors.cardBorder,
+      borderBottomWidth: 0,
+      overflow: 'hidden',
+      padding: 16,
+    },
+    azkarText: {
+      fontSize: 20,
+      fontFamily: 'Amiri-Regular',
+      color: colors.foreground,
+      textAlign: 'right',
+      lineHeight: 40,
+      marginBottom: 12,
+    },
+    azkarMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    azkarRef: {
+      fontSize: 13,
+      fontFamily: 'Cairo-Regular',
+      color: colors.muted,
+      flex: 1,
+      textAlign: 'right',
+    },
+    azkarCount: {
+      fontSize: 12,
+      fontFamily: 'Cairo-Bold',
+      color: colors.accent,
+      backgroundColor: colors.accent + '18',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 10,
+      marginLeft: 8,
+    },
     // Export modal
-    modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 16 },
-    modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, padding: 10 },
+    modalWrap: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.85)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 16,
+    },
+    modalClose: {
+      position: 'absolute',
+      top: 50,
+      right: 20,
+      zIndex: 10,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 20,
+      padding: 10,
+    },
     modalCard: {
-      width: '100%', backgroundColor: colors.background, borderRadius: 24,
-      padding: 20, maxHeight: '90%',
+      width: '100%',
+      backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      borderRadius: 24,
+      padding: 20,
+      maxHeight: '90%',
     },
-    modalTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: 'center', marginBottom: 16 },
+    modalTitle: {
+      fontSize: 18,
+      fontFamily: 'Cairo-Bold',
+      color: colors.foreground,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
     // Theme selector
-    themesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 16 },
-    themeBtn: { width: 48, height: 48, borderRadius: 24, borderWidth: 3, justifyContent: 'center', alignItems: 'center' },
-    themeName: { fontSize: 11, color: colors.muted, textAlign: 'center', marginBottom: 8 },
-    // Preview card (inside modal)
-    previewWrap: { alignItems: 'center', marginBottom: 16 },
-    // Export actions
-    exportActions: { flexDirection: 'row', gap: 10 },
-    exportBtn: {
-      flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center',
-      flexDirection: 'row', justifyContent: 'center', gap: 8,
+    themesRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      justifyContent: 'center',
+      marginBottom: 16,
     },
-    exportBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+    themeBtn: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      borderWidth: 3,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    themeName: {
+      fontSize: 13,
+      fontFamily: 'Cairo-SemiBold',
+      color: colors.muted,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    // Preview card
+    previewWrap: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    // Export actions
+    exportActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    exportBtn: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 16,
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    exportBtnText: {
+      fontSize: 15,
+      fontFamily: 'Cairo-Bold',
+      color: '#fff',
+    },
     // Note modal
     noteModalCard: {
-      backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-      padding: 24, paddingBottom: 40,
+      backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      padding: 24,
+      paddingBottom: 40,
     },
-    noteHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-    noteTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 12 },
+    noteHandle: {
+      width: 40,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    noteTitle: {
+      fontSize: 18,
+      fontFamily: 'Cairo-Bold',
+      color: colors.foreground,
+      textAlign: 'right',
+      marginBottom: 12,
+    },
     noteInput: {
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-      borderRadius: 14, padding: 14, fontSize: 15, color: colors.foreground,
-      textAlign: 'right', minHeight: 80, marginBottom: 14,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+      borderRadius: 16,
+      padding: 16,
+      fontSize: 16,
+      fontFamily: 'Cairo-Regular',
+      color: colors.foreground,
+      textAlign: 'right',
+      minHeight: 100,
+      marginBottom: 16,
     },
-    noteSaveBtn: { backgroundColor: colors.primary, borderRadius: 14, padding: 14, alignItems: 'center' },
-    noteSaveBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+    noteSaveBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      padding: 16,
+      alignItems: 'center',
+    },
+    noteSaveBtnText: {
+      color: '#fff',
+      fontFamily: 'Cairo-Bold',
+      fontSize: 16,
+    },
   });
 
   const renderBookmark = ({ item, index }: { item: Bookmark; index: number }) => (
-    <Animated.View style={[s.card, { opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
-      {/* Header */}
-      <View style={s.cardHeader}>
-        <TouchableOpacity
-          style={s.iconBtn}
-          onPress={() => handleDelete(item)}
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).duration(400)}
+      style={s.card}
+    >
+      <BlurView
+        intensity={Platform.OS === 'ios' ? 60 : 30}
+        tint={isDarkMode ? 'dark' : 'light'}
+        style={{ borderRadius: 20, overflow: 'hidden' }}
+      >
+        <TouchableOpacity 
+          style={s.cardInner} 
+          activeOpacity={0.7}
+          onPress={() => navigateToAyah(item)}
         >
-          <IconSymbol name="trash" size={14} color={colors.muted} />
+          {/* Header */}
+          <View style={s.cardHeader}>
+            <TouchableOpacity
+              style={s.iconBtn}
+              onPress={() => handleDelete(item)}
+            >
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.muted} />
+            </TouchableOpacity>
+            <Text style={s.dateText}>
+              {new Date(item.createdAt).toLocaleDateString('ar-EG')}
+            </Text>
+            <TouchableOpacity 
+              style={s.surahBadge}
+              onPress={() => navigateToAyah(item)}
+            >
+              <Text style={s.surahBadgeText}>{item.surahName} • {item.ayahNumber}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Ayah Text */}
+          <Text style={s.ayahText}>{item.ayahText}</Text>
+
+          {/* Note */}
+          {item.note ? (
+            <View style={s.noteBox}>
+              <Text style={s.noteText}>📝 {item.note}</Text>
+            </View>
+          ) : null}
         </TouchableOpacity>
-        <Text style={s.dateText}>
-          {new Date(item.createdAt).toLocaleDateString('ar-EG')}
-        </Text>
-        <View style={s.surahBadge}>
-          <Text style={s.surahBadgeText}>{item.surahName} • {item.ayahNumber}</Text>
+
+        {/* Actions - outside TouchableOpacity to prevent gesture conflicts */}
+        <View style={s.actionsBar}>
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => navigateToAyah(item)}
+          >
+            <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={colors.accent} />
+            <Text style={[s.actionText, { color: colors.accent }]}>فتح</Text>
+          </TouchableOpacity>
+          <View style={s.actionDivider} />
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => { setSelectedBookmark(item); setShowExportModal(true); }}
+          >
+            <MaterialCommunityIcons name="image-outline" size={18} color={colors.accent} />
+            <Text style={[s.actionText, { color: colors.accent }]}>صورة</Text>
+          </TouchableOpacity>
+          <View style={s.actionDivider} />
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => handleShareText(item)}
+          >
+            <MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.accent} />
+            <Text style={[s.actionText, { color: colors.accent }]}>مشاركة</Text>
+          </TouchableOpacity>
+          <View style={s.actionDivider} />
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={() => {
+              setEditingBookmark(item);
+              setNoteText(item.note || '');
+              setShowNoteModal(true);
+            }}
+          >
+            <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.accent} />
+            <Text style={[s.actionText, { color: colors.accent }]}>ملاحظة</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </BlurView>
+    </Animated.View>
+  );
 
-      {/* Ayah Text */}
-      <Text style={s.ayahText}>{item.ayahText}</Text>
-
-      {/* Note */}
-      {item.note ? (
-        <View style={s.noteBox}>
-          <Text style={s.noteText}>📝 {item.note}</Text>
+  const renderAzkarItem = ({ item, index }: { item: Zikr; index: number }) => (
+    <Animated.View 
+      entering={FadeInDown.delay(index * 50).duration(400)}
+    >
+      <TouchableOpacity 
+        style={s.azkarCard}
+        activeOpacity={0.7}
+        onPress={() => navigateToAzkar(item)}
+      >
+        <Text style={s.azkarText}>{item.arabic}</Text>
+        <View style={s.azkarMeta}>
+          <Text style={s.azkarCount}>×{item.count}</Text>
+          <Text style={s.azkarRef}>{item.reference}</Text>
         </View>
-      ) : null}
-
-      {/* Actions */}
-      <View style={s.actionsBar}>
-        <TouchableOpacity
-          style={s.actionBtn}
-          onPress={() => { setSelectedBookmark(item); setShowExportModal(true); }}
-        >
-          <IconSymbol name="photo" size={14} color={colors.primary} />
-          <Text style={[s.actionText, { color: colors.primary }]}>صورة</Text>
+      </TouchableOpacity>
+      <View style={[s.actionsBar, { marginHorizontal: 16, marginTop: -8, marginBottom: 8, borderRadius: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.cardBorder, borderTopWidth: 0 }]}>
+        <TouchableOpacity style={s.actionBtn} onPress={() => navigateToAzkar(item)}>
+          <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={colors.accent} />
+          <Text style={[s.actionText, { color: colors.accent }]}>فتح</Text>
         </TouchableOpacity>
         <View style={s.actionDivider} />
-        <TouchableOpacity
-          style={s.actionBtn}
-          onPress={() => handleShareText(item)}
-        >
-          <IconSymbol name="square.and.arrow.up" size={14} color={colors.primary} />
-          <Text style={[s.actionText, { color: colors.primary }]}>مشاركة</Text>
+        <TouchableOpacity style={s.actionBtn} onPress={() => handleShareAzkar(item)}>
+          <MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.accent} />
+          <Text style={[s.actionText, { color: colors.accent }]}>مشاركة</Text>
         </TouchableOpacity>
         <View style={s.actionDivider} />
-        <TouchableOpacity
-          style={s.actionBtn}
-          onPress={() => {
-            setEditingBookmark(item);
-            setNoteText(item.note || '');
-            setShowNoteModal(true);
-          }}
-        >
-          <IconSymbol name="pencil" size={14} color={colors.primary} />
-          <Text style={[s.actionText, { color: colors.primary }]}>ملاحظة</Text>
+        <TouchableOpacity style={s.actionBtn} onPress={() => handleRemoveAzkar(item)}>
+          <MaterialCommunityIcons name="trash-can-outline" size={18} color="#EF4444" />
+          <Text style={[s.actionText, { color: '#EF4444' }]}>إزالة</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
   );
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={{ width: 36 }} />
-        <Text style={s.title}>⭐ المفضلة</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* Header */}
+        <Animated.View entering={FadeIn.duration(400)} style={s.header}>
+          <View style={{ width: 36 }} />
+          <Text style={s.title}>⭐ المفضلة</Text>
+          <View style={{ width: 36 }} />
+        </Animated.View>
 
-      {/* Stats & Sort Bar */}
-      <View style={s.statsBar}>
-        <View style={s.flex1} />
-        <View style={s.sortBtns}>
-          <TouchableOpacity
-            style={[s.sortBtn, sortBy === 'date' && s.sortBtnActive]}
-            onPress={() => setSortBy('date')}
-          >
-            <Text style={[s.sortBtnText, sortBy === 'date' && s.sortBtnTextActive]}>📅 التاريخ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.sortBtn, sortBy === 'surah' && s.sortBtnActive]}
-            onPress={() => setSortBy('surah')}
-          >
-            <Text style={[s.sortBtnText, sortBy === 'surah' && s.sortBtnTextActive]}>📖 السورة</Text>
-          </TouchableOpacity>
+        {/* Tab Switcher */}
+        <View style={s.tabBar}>
+          <GlassSegmentedControl
+            segments={[
+              { key: 'quran', label: `📖 القرآن (${bookmarks.length})` },
+              { key: 'azkar', label: `📿 الأذكار (${azkarFavorites.length})` },
+            ]}
+            selected={activeTab}
+            onSelect={(key) => setActiveTab(key as 'quran' | 'azkar')}
+          />
         </View>
-        <View style={s.countBadge}>
-          <Text style={s.countText}>{bookmarks.length} آية</Text>
-        </View>
-      </View>
 
-      {/* List */}
-      {loading ? (
-        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
-      ) : (
-        <FlatList
-          data={sortedBookmarks}
-          keyExtractor={item => item.id}
-          renderItem={renderBookmark}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 30, paddingTop: 4 }}
-          ListEmptyComponent={
-            <View style={s.emptyWrap}>
-              <Text style={s.emptyEmoji}>⭐</Text>
-              <Text style={s.emptyTitle}>لا توجد آيات محفوظة</Text>
-              <Text style={s.emptyText}>
-                افتح أي سورة وامسح مطولاً على الآية لحفظها هنا
-              </Text>
+        {activeTab === 'quran' && bookmarks.length > 0 && (
+          <View style={s.statsBar}>
+            <View style={s.flex1} />
+            <View style={s.sortBtns}>
+              <GlassSegmentedControl
+                segments={[
+                  { key: 'date', label: '📅 التاريخ' },
+                  { key: 'surah', label: '📖 السورة' },
+                ]}
+                selected={sortBy}
+                onSelect={(key) => setSortBy(key as 'date' | 'surah')}
+              />
             </View>
-          }
-        />
-      )}
+            <View style={s.countBadge}>
+              <Text style={s.countText}>{bookmarks.length} آية</Text>
+            </View>
+          </View>
+        )}
 
-      {/* ── Export as Image Modal ── */}
-      <Modal
-        visible={showExportModal && !!selectedBookmark}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowExportModal(false)}
-      >
-        <View style={s.modalWrap}>
-          <TouchableOpacity style={s.modalClose} onPress={() => setShowExportModal(false)}>
-            <IconSymbol name="xmark" size={18} color="#fff" />
-          </TouchableOpacity>
+        {/* List */}
+        {loading ? (
+          <View style={s.emptyWrap}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : activeTab === 'quran' ? (
+          <FlatList
+            data={sortedBookmarks}
+            keyExtractor={item => item.id}
+            renderItem={renderBookmark}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <Text style={s.emptyEmoji}>📖</Text>
+                <Text style={s.emptyTitle}>لا توجد آيات محفوظة</Text>
+                <Text style={s.emptyText}>
+                  افتح أي سورة واضغط مطولاً على الآية لحفظها هنا
+                </Text>
+              </View>
+            }
+          />
+        ) : (
+          <FlatList
+            data={azkarFavorites}
+            keyExtractor={item => String(item.id)}
+            renderItem={renderAzkarItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <Text style={s.emptyEmoji}>📿</Text>
+                <Text style={s.emptyTitle}>لا توجد أذكار محفوظة</Text>
+                <Text style={s.emptyText}>
+                  افتح أي ذكر واضغط على أيقونة القلب لحفظه هنا
+                </Text>
+              </View>
+            }
+          />
+        )}
 
-          <ScrollView contentContainerStyle={{ alignItems: 'center' }}>
-            <View style={s.modalCard}>
+        {/* ── Export as Image Modal ── */}
+        <Modal
+          visible={showExportModal && !!selectedBookmark}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowExportModal(false)}
+        >
+          <View style={s.modalWrap}>
+            <TouchableOpacity style={s.modalClose} onPress={() => setShowExportModal(false)}>
+              <MaterialCommunityIcons name="close" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            <ScrollView contentContainerStyle={{ alignItems: 'center' }}>
+              <View style={s.modalCard}>
               <Text style={s.modalTitle}>🖼️ تصدير الآية كصورة</Text>
 
               {/* Theme Selector */}
@@ -516,7 +896,7 @@ export default function FavoritesScreen() {
                   {exporting
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <>
-                        <IconSymbol name="photo" size={18} color="#fff" />
+                        <MaterialCommunityIcons name="image-outline" size={18} color="#fff" />
                         <Text style={s.exportBtnText}>حفظ صورة</Text>
                       </>
                   }
@@ -525,7 +905,7 @@ export default function FavoritesScreen() {
                   style={[s.exportBtn, { backgroundColor: '#2563EB' }]}
                   onPress={() => selectedBookmark && handleShareText(selectedBookmark)}
                 >
-                  <IconSymbol name="square.and.arrow.up" size={18} color="#fff" />
+                  <MaterialCommunityIcons name="share-variant-outline" size={18} color="#fff" />
                   <Text style={s.exportBtnText}>مشاركة نص</Text>
                 </TouchableOpacity>
               </View>
@@ -550,7 +930,7 @@ export default function FavoritesScreen() {
             <View style={s.noteHandle} />
             <Text style={s.noteTitle}>📝 إضافة ملاحظة</Text>
             {editingBookmark && (
-              <Text style={{ color: colors.primary, textAlign: 'right', fontSize: 13, marginBottom: 8, fontWeight: '700' }}>
+              <Text style={{ color: colors.accent, textAlign: 'right', fontSize: 14, marginBottom: 10, fontFamily: 'Cairo-Bold' }}>
                 {editingBookmark.surahName} • آية {editingBookmark.ayahNumber}
               </Text>
             )}
@@ -569,6 +949,7 @@ export default function FavoritesScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-    </ScreenContainer>
+      </SafeAreaView>
+    </BackgroundWrapper>
   );
 }

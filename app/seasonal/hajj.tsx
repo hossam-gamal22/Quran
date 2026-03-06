@@ -22,7 +22,6 @@ import Animated, {
   FadeInRight,
   FadeIn,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -260,7 +259,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
 
         {/* السهم */}
         <MaterialCommunityIcons
-          name="chevron-left"
+          name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
           size={24}
           color={isDarkMode ? '#666' : '#ccc'}
         />
@@ -361,7 +360,7 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
           <Text style={[styles.duaTitle, isDarkMode && styles.textLight]}>{dua.title}</Text>
           <Text style={[styles.duaOccasion, isDarkMode && styles.textMuted]}>{dua.occasion}</Text>
         </View>
-        <MaterialCommunityIcons name="chevron-left" size={20} color={isDarkMode ? '#666' : '#ccc'} />
+        <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -390,9 +389,8 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
           style={[styles.ritualModal, isDarkMode && styles.ritualModalDark]}
         >
           {/* Header */}
-          <LinearGradient
-            colors={dayInfo.isSpecial ? ['#DAA520', '#B8860B'] : HAJJ_GRADIENT}
-            style={styles.ritualModalHeader}
+          <View
+            style={[styles.ritualModalHeader, { backgroundColor: dayInfo.isSpecial ? 'rgba(218,165,32,0.85)' : `${HAJJ_GRADIENT[0]}CC` }]}
           >
             <View style={styles.ritualModalDay}>
               <Text style={styles.ritualModalDayNumber}>{dayInfo.day}</Text>
@@ -405,7 +403,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
               <MaterialCommunityIcons name="close" size={24} color="#fff" />
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
 
           <ScrollView style={styles.ritualModalContent} showsVerticalScrollIndicator={false}>
             {/* المناسك */}
@@ -418,7 +416,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
                 entering={FadeInRight.delay(index * 100).duration(400)}
                 style={[styles.ritualItem, isDarkMode && styles.ritualItemDark]}
               >
-                <View style={[styles.ritualItemIcon, { backgroundColor: `${HAJJ_COLOR}20` }]}>
+                <View style={styles.ritualItemIcon}>
                   <MaterialCommunityIcons name={ritual.icon as any} size={24} color={HAJJ_COLOR} />
                 </View>
                 <View style={styles.ritualItemContent}>
@@ -519,7 +517,7 @@ export default function HajjScreen() {
       />
 
       {/* Header */}
-      <LinearGradient colors={HAJJ_GRADIENT} style={styles.header}>
+      <View style={[styles.header, { backgroundColor: `${HAJJ_COLOR}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -527,7 +525,7 @@ export default function HajjScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>موسم الحج</Text>
@@ -539,9 +537,9 @@ export default function HajjScreen() {
 
         {/* زخرفة الكعبة */}
         <View style={styles.kaabaDecoration}>
-          <MaterialCommunityIcons name="kaaba" size={80} color="rgba(255,255,255,0.15)" />
+          <MaterialCommunityIcons name="star-crescent" size={80} color="rgba(255,255,255,0.15)" />
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scrollView}

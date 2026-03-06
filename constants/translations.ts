@@ -20,6 +20,7 @@ export interface TranslationKeys {
     prayer: string;
     tasbih: string;
     more: string;
+    settings: string;
   };
   
   // عام
@@ -62,6 +63,8 @@ export interface TranslationKeys {
     favorites: string;
     addToFavorites: string;
     removeFromFavorites: string;
+    appName: string;
+    none: string;
   };
   
   // الرئيسية
@@ -80,6 +83,22 @@ export interface TranslationKeys {
     todayProgress: string;
     streak: string;
     days: string;
+    azkarSection: string;
+    duasSection: string;
+    worshipSection: string;
+    surahKahf: string;
+    ayatKursi: string;
+    surahYasin: string;
+    surahMulk: string;
+    namesOfAllah: string;
+    salawat: string;
+    istighfar: string;
+    seerah: string;
+    benefitAzkar: string;
+    worshipTracker: string;
+    khatmaQuran: string;
+    qibla: string;
+    favorites: string;
   };
   
   // القرآن
@@ -209,6 +228,10 @@ export interface TranslationKeys {
     tahajjud: string;
     duha: string;
     witr: string;
+    extraTimes: string;
+    midnight: string;
+    lastThird: string;
+    lastThirdMessage: string;
   };
   
   // التسبيح
@@ -478,8 +501,8 @@ const ar: TranslationKeys = {
     prayer: 'الصلاة',
     tasbih: 'التسبيح',
     more: 'المزيد',
-  },
-  common: {
+    settings: 'الإعدادات',
+  },  common: {
     loading: 'جاري التحميل...',
     error: 'حدث خطأ',
     retry: 'إعادة المحاولة',
@@ -518,6 +541,10 @@ const ar: TranslationKeys = {
     favorites: 'المفضلة',
     addToFavorites: 'إضافة للمفضلة',
     removeFromFavorites: 'إزالة من المفضلة',
+    appName: 'روح المسلم',
+    none: 'بدون',
+    appName: 'روح المسلم',
+    none: 'بدون',
   },
   home: {
     welcome: 'أهلاً بك',
@@ -534,6 +561,22 @@ const ar: TranslationKeys = {
     todayProgress: 'تقدم اليوم',
     streak: 'أيام متتالية',
     days: 'يوم',
+    azkarSection: 'الأذكار',
+    duasSection: 'الأدعية والرقية',
+    worshipSection: 'عبادات',
+    surahKahf: 'سورة الكهف',
+    ayatKursi: 'آية الكرسي',
+    surahYasin: 'سورة يس',
+    surahMulk: 'سورة الملك',
+    namesOfAllah: 'أسماء الله الحسنى',
+    salawat: 'الصلاة على النبي',
+    istighfar: 'الاستغفار',
+    seerah: 'السيرة النبوية',
+    benefitAzkar: 'فضل الأذكار',
+    worshipTracker: 'تتبع العبادات',
+    khatmaQuran: 'ختمة القرآن',
+    qibla: 'القبلة',
+    favorites: 'المفضلة',
   },
   quran: {
     title: 'القرآن الكريم',
@@ -657,6 +700,10 @@ const ar: TranslationKeys = {
     tahajjud: 'التهجد',
     duha: 'الضحى',
     witr: 'الوتر',
+    extraTimes: 'أوقات إضافية',
+    midnight: 'منتصف الليل',
+    lastThird: 'الثلث الأخير',
+    lastThirdMessage: 'أنت الآن في الثلث الأخير من الليل - وقت استجابة الدعاء',
   },
   tasbih: {
     title: 'المسبحة',
@@ -912,8 +959,8 @@ const en: TranslationKeys = {
     prayer: 'Prayer',
     tasbih: 'Tasbih',
     more: 'More',
-  },
-  common: {
+    settings: 'Settings',
+  },  common: {
     loading: 'Loading...',
     error: 'An error occurred',
     retry: 'Retry',
@@ -952,6 +999,10 @@ const en: TranslationKeys = {
     favorites: 'Favorites',
     addToFavorites: 'Add to Favorites',
     removeFromFavorites: 'Remove from Favorites',
+    appName: 'Rooh Muslim',
+    none: 'None',
+    appName: 'Rooh Muslim',
+    none: 'None',
   },
   home: {
     welcome: 'Welcome',
@@ -968,6 +1019,22 @@ const en: TranslationKeys = {
     todayProgress: "Today's Progress",
     streak: 'Day Streak',
     days: 'days',
+    azkarSection: 'Azkar',
+    duasSection: 'Duas & Ruqyah',
+    worshipSection: 'Worship',
+    surahKahf: 'Surah Al-Kahf',
+    ayatKursi: 'Ayat Al-Kursi',
+    surahYasin: 'Surah Yasin',
+    surahMulk: 'Surah Al-Mulk',
+    namesOfAllah: 'Names of Allah',
+    salawat: 'Salawat',
+    istighfar: 'Istighfar',
+    seerah: 'Prophet\'s Biography',
+    benefitAzkar: 'Benefits of Azkar',
+    worshipTracker: 'Worship Tracker',
+    khatmaQuran: 'Quran Khatma',
+    qibla: 'Qibla',
+    favorites: 'Favorites',
   },
   quran: {
     title: 'Holy Quran',
@@ -1091,6 +1158,10 @@ const en: TranslationKeys = {
     tahajjud: 'Tahajjud',
     duha: 'Duha',
     witr: 'Witr',
+    extraTimes: 'Extra Times',
+    midnight: 'Midnight',
+    lastThird: 'Last Third',
+    lastThirdMessage: 'You are now in the last third of the night - a time for prayers',
   },
   tasbih: {
     title: 'Tasbih',
@@ -1346,6 +1417,7 @@ const fr: TranslationKeys = {
     prayer: 'Prière',
     tasbih: 'Tasbih',
     more: 'Plus',
+    settings: 'Paramètres',
   },
   common: {
     loading: 'Chargement...',
@@ -1386,6 +1458,10 @@ const fr: TranslationKeys = {
     favorites: 'Favoris',
     addToFavorites: 'Ajouter aux favoris',
     removeFromFavorites: 'Retirer des favoris',
+    appName: 'Rooh Muslim',
+    none: 'Aucun',
+    appName: 'Rooh Muslim',
+    none: 'Aucun',
   },
   home: {
     welcome: 'Bienvenue',
@@ -1402,6 +1478,22 @@ const fr: TranslationKeys = {
     todayProgress: "Progrès d'aujourd'hui",
     streak: 'Jours consécutifs',
     days: 'jours',
+    azkarSection: 'Azkar',
+    duasSection: 'Duas et Ruqya',
+    worshipSection: 'Adoration',
+    surahKahf: 'Sourate Al-Kahf',
+    ayatKursi: 'Ayat Al-Kursi',
+    surahYasin: 'Sourate Yasin',
+    surahMulk: 'Sourate Al-Mulk',
+    namesOfAllah: 'Noms d\'Allah',
+    salawat: 'Salawat',
+    istighfar: 'Istighfar',
+    seerah: 'Biographie du Prophète',
+    benefitAzkar: 'Bienfaits des Azkar',
+    worshipTracker: 'Suivi des adorations',
+    khatmaQuran: 'Khatma du Coran',
+    qibla: 'Qibla',
+    favorites: 'Favoris',
   },
   quran: {
     title: 'Saint Coran',
@@ -1781,6 +1873,7 @@ const de: TranslationKeys = {
     prayer: 'Gebet',
     tasbih: 'Tasbih',
     more: 'Mehr',
+    settings: 'Einstellungen',
   },
   common: {
     loading: 'Laden...',
@@ -1821,6 +1914,10 @@ const de: TranslationKeys = {
     favorites: 'Favoriten',
     addToFavorites: 'Zu Favoriten hinzufügen',
     removeFromFavorites: 'Aus Favoriten entfernen',
+    appName: 'Rooh Muslim',
+    none: 'Keine',
+    appName: 'Rooh Muslim',
+    none: 'Keine',
   },
   home: {
     welcome: 'Willkommen',
@@ -1837,6 +1934,22 @@ const de: TranslationKeys = {
     todayProgress: 'Heutiger Fortschritt',
     streak: 'Tage in Folge',
     days: 'Tage',
+    azkarSection: 'Azkar',
+    duasSection: 'Duas & Ruqya',
+    worshipSection: 'Anbetung',
+    surahKahf: 'Sure Al-Kahf',
+    ayatKursi: 'Ayat Al-Kursi',
+    surahYasin: 'Sure Yasin',
+    surahMulk: 'Sure Al-Mulk',
+    namesOfAllah: 'Namen Allahs',
+    salawat: 'Salawat',
+    istighfar: 'Istighfar',
+    seerah: 'Prophetenbiografie',
+    benefitAzkar: 'Nutzen der Azkar',
+    worshipTracker: 'Anbetungs-Tracker',
+    khatmaQuran: 'Koran Khatma',
+    qibla: 'Qibla',
+    favorites: 'Favoriten',
   },
   quran: {
     title: 'Heiliger Koran',
@@ -2216,6 +2329,7 @@ const tr: TranslationKeys = {
     prayer: 'Namaz',
     tasbih: 'Tesbih',
     more: 'Daha Fazla',
+    settings: 'Ayarlar',
   },
   common: {
     loading: 'Yükleniyor...',
@@ -2256,6 +2370,10 @@ const tr: TranslationKeys = {
     favorites: 'Favoriler',
     addToFavorites: 'Favorilere Ekle',
     removeFromFavorites: 'Favorilerden Çıkar',
+    appName: 'Rooh Muslim',
+    none: 'Yok',
+    appName: 'Rooh Muslim',
+    none: 'Yok',
   },
   home: {
     welcome: 'Hoş Geldiniz',
@@ -2272,6 +2390,22 @@ const tr: TranslationKeys = {
     todayProgress: 'Bugünün İlerleme',
     streak: 'Gün Seri',
     days: 'gün',
+    azkarSection: 'Zikirler',
+    duasSection: 'Dualar ve Rukye',
+    worshipSection: 'İbadet',
+    surahKahf: 'Kehf Suresi',
+    ayatKursi: 'Ayetel Kürsi',
+    surahYasin: 'Yasin Suresi',
+    surahMulk: 'Mülk Suresi',
+    namesOfAllah: 'Esmaul Hüsna',
+    salawat: 'Salavat',
+    istighfar: 'İstiğfar',
+    seerah: 'Siyer-i Nebi',
+    benefitAzkar: 'Zikrin Faziletleri',
+    worshipTracker: 'İbadet Takibi',
+    khatmaQuran: 'Hatim',
+    qibla: 'Kıble',
+    favorites: 'Favoriler',
   },
   quran: {
     title: 'Kuran-ı Kerim',
@@ -2651,6 +2785,7 @@ const es: TranslationKeys = {
     prayer: 'Oración',
     tasbih: 'Tasbih',
     more: 'Más',
+    settings: 'Configuración',
   },
   common: {
     loading: 'Cargando...',
@@ -2691,6 +2826,10 @@ const es: TranslationKeys = {
     favorites: 'Favoritos',
     addToFavorites: 'Añadir a favoritos',
     removeFromFavorites: 'Quitar de favoritos',
+    appName: 'Rooh Muslim',
+    none: 'Ninguno',
+    appName: 'Rooh Muslim',
+    none: 'Ninguno',
   },
   home: {
     welcome: 'Bienvenido',
@@ -2707,6 +2846,22 @@ const es: TranslationKeys = {
     todayProgress: 'Progreso de hoy',
     streak: 'Días consecutivos',
     days: 'días',
+    azkarSection: 'Azkar',
+    duasSection: 'Duas y Ruqyah',
+    worshipSection: 'Adoración',
+    surahKahf: 'Sura Al-Kahf',
+    ayatKursi: 'Ayat Al-Kursi',
+    surahYasin: 'Sura Yasin',
+    surahMulk: 'Sura Al-Mulk',
+    namesOfAllah: 'Nombres de Allah',
+    salawat: 'Salawat',
+    istighfar: 'Istighfar',
+    seerah: 'Biografía del Profeta',
+    benefitAzkar: 'Beneficios del Azkar',
+    worshipTracker: 'Seguimiento de adoración',
+    khatmaQuran: 'Khatma del Corán',
+    qibla: 'Qibla',
+    favorites: 'Favoritos',
   },
   quran: {
     title: 'Sagrado Corán',
@@ -3085,6 +3240,7 @@ const ur: TranslationKeys = {
     prayer: 'نماز',
     tasbih: 'تسبیح',
     more: 'مزید',
+    settings: 'سیٹنگز',
   },
   common: {
     loading: 'لوڈ ہو رہا ہے...',
@@ -3125,6 +3281,10 @@ const ur: TranslationKeys = {
     favorites: 'پسندیدہ',
     addToFavorites: 'پسندیدہ میں شامل کریں',
     removeFromFavorites: 'پسندیدہ سے ہٹائیں',
+    appName: 'روح المسلم',
+    none: 'کوئی نہیں',
+    appName: 'روح المسلم',
+    none: 'کوئی نہیں',
   },
   home: {
     welcome: 'خوش آمدید',
@@ -3141,6 +3301,22 @@ const ur: TranslationKeys = {
     todayProgress: 'آج کی پیشرفت',
     streak: 'مسلسل دن',
     days: 'دن',
+    azkarSection: 'اذکار',
+    duasSection: 'دعائیں اور رقیہ',
+    worshipSection: 'عبادات',
+    surahKahf: 'سورۃ الکہف',
+    ayatKursi: 'آیت الکرسی',
+    surahYasin: 'سورۃ یٰسین',
+    surahMulk: 'سورۃ الملک',
+    namesOfAllah: 'اسماء الحسنیٰ',
+    salawat: 'درود',
+    istighfar: 'استغفار',
+    seerah: 'سیرت النبی',
+    benefitAzkar: 'اذکار کے فضائل',
+    worshipTracker: 'عبادات ٹریکر',
+    khatmaQuran: 'ختم قرآن',
+    qibla: 'قبلہ',
+    favorites: 'پسندیدہ',
   },
   quran: {
     title: 'قرآن مجید',
@@ -3520,6 +3696,7 @@ const id: TranslationKeys = {
     prayer: 'Shalat',
     tasbih: 'Tasbih',
     more: 'Lainnya',
+    settings: 'Pengaturan',
   },
   common: {
     loading: 'Memuat...',
@@ -3560,6 +3737,10 @@ const id: TranslationKeys = {
     favorites: 'Favorit',
     addToFavorites: 'Tambah ke Favorit',
     removeFromFavorites: 'Hapus dari Favorit',
+    appName: 'Rooh Muslim',
+    none: 'Tidak ada',
+    appName: 'Rooh Muslim',
+    none: 'Tidak ada',
   },
   home: {
     welcome: 'Selamat Datang',
@@ -3576,6 +3757,22 @@ const id: TranslationKeys = {
     todayProgress: 'Kemajuan Hari Ini',
     streak: 'Hari Berturut',
     days: 'hari',
+    azkarSection: 'Dzikir',
+    duasSection: 'Doa & Ruqyah',
+    worshipSection: 'Ibadah',
+    surahKahf: 'Surah Al-Kahfi',
+    ayatKursi: 'Ayat Kursi',
+    surahYasin: 'Surah Yasin',
+    surahMulk: 'Surah Al-Mulk',
+    namesOfAllah: 'Asmaul Husna',
+    salawat: 'Shalawat',
+    istighfar: 'Istighfar',
+    seerah: 'Sirah Nabawiyah',
+    benefitAzkar: 'Keutamaan Dzikir',
+    worshipTracker: 'Pelacak Ibadah',
+    khatmaQuran: 'Khatam Quran',
+    qibla: 'Kiblat',
+    favorites: 'Favorit',
   },
   quran: {
     title: 'Al-Quran',
@@ -3955,6 +4152,7 @@ const ms: TranslationKeys = {
     prayer: 'Solat',
     tasbih: 'Tasbih',
     more: 'Lagi',
+    settings: 'Tetapan',
   },
   common: {
     loading: 'Memuatkan...',
@@ -3995,6 +4193,10 @@ const ms: TranslationKeys = {
     favorites: 'Kegemaran',
     addToFavorites: 'Tambah ke Kegemaran',
     removeFromFavorites: 'Buang dari Kegemaran',
+    appName: 'Rooh Muslim',
+    none: 'Tiada',
+    appName: 'Rooh Muslim',
+    none: 'Tiada',
   },
   home: {
     welcome: 'Selamat Datang',
@@ -4011,6 +4213,22 @@ const ms: TranslationKeys = {
     todayProgress: 'Kemajuan Hari Ini',
     streak: 'Hari Berturut',
     days: 'hari',
+    azkarSection: 'Zikir',
+    duasSection: 'Doa & Ruqyah',
+    worshipSection: 'Ibadah',
+    surahKahf: 'Surah Al-Kahfi',
+    ayatKursi: 'Ayat Kursi',
+    surahYasin: 'Surah Yasin',
+    surahMulk: 'Surah Al-Mulk',
+    namesOfAllah: 'Asmaul Husna',
+    salawat: 'Selawat',
+    istighfar: 'Istighfar',
+    seerah: 'Sirah Nabawiyyah',
+    benefitAzkar: 'Kelebihan Zikir',
+    worshipTracker: 'Penjejak Ibadah',
+    khatmaQuran: 'Khatam Quran',
+    qibla: 'Kiblat',
+    favorites: 'Kegemaran',
   },
   quran: {
     title: 'Al-Quran',
@@ -4389,6 +4607,7 @@ const hi: TranslationKeys = {
     prayer: 'नमाज़',
     tasbih: 'तसबीह',
     more: 'और',
+    settings: 'सेटिंग्स',
   },
   common: {
     loading: 'लोड हो रहा है...',
@@ -4429,6 +4648,10 @@ const hi: TranslationKeys = {
     favorites: 'पसंदीदा',
     addToFavorites: 'पसंदीदा में जोड़ें',
     removeFromFavorites: 'पसंदीदा से हटाएं',
+    appName: 'Rooh Muslim',
+    none: 'कोई नहीं',
+    appName: 'Rooh Muslim',
+    none: 'कोई नहीं',
   },
   home: {
     welcome: 'स्वागत है',
@@ -4445,6 +4668,22 @@ const hi: TranslationKeys = {
     todayProgress: 'आज की प्रगति',
     streak: 'लगातार दिन',
     days: 'दिन',
+    azkarSection: 'अज़कार',
+    duasSection: 'दुआ और रुक़्या',
+    worshipSection: 'इबादत',
+    surahKahf: 'सूरह अल-कहफ़',
+    ayatKursi: 'आयतुल कुर्सी',
+    surahYasin: 'सूरह यासीन',
+    surahMulk: 'सूरह अल-मुल्क',
+    namesOfAllah: 'अल्लाह के नाम',
+    salawat: 'सलवात',
+    istighfar: 'इस्तिग़फ़ार',
+    seerah: 'सीरत-ए-नबवी',
+    benefitAzkar: 'अज़कार के फ़ायदे',
+    worshipTracker: 'इबादत ट्रैकर',
+    khatmaQuran: 'कुरान ख़त्म',
+    qibla: 'किब्ला',
+    favorites: 'पसंदीदा',
   },
   quran: {
     title: 'पवित्र कुरान',
@@ -4825,6 +5064,7 @@ const bn: TranslationKeys = {
     prayer: 'নামাজ',
     tasbih: 'তাসবীহ',
     more: 'আরও',
+    settings: 'সেটিংস',
   },
   common: {
     loading: 'লোড হচ্ছে...',
@@ -4865,6 +5105,10 @@ const bn: TranslationKeys = {
     favorites: 'প্রিয়',
     addToFavorites: 'প্রিয়তে যোগ করুন',
     removeFromFavorites: 'প্রিয় থেকে সরান',
+    appName: 'Rooh Muslim',
+    none: 'কিছুই না',
+    appName: 'Rooh Muslim',
+    none: 'কিছুই না',
   },
   home: {
     welcome: 'স্বাগতম',
@@ -4881,6 +5125,22 @@ const bn: TranslationKeys = {
     todayProgress: 'আজকের অগ্রগতি',
     streak: 'ধারাবাহিক দিন',
     days: 'দিন',
+    azkarSection: 'আযকার',
+    duasSection: 'দোয়া ও রুকইয়াহ',
+    worshipSection: 'ইবাদত',
+    surahKahf: 'সূরা আল-কাহফ',
+    ayatKursi: 'আয়াতুল কুরসি',
+    surahYasin: 'সূরা ইয়াসীন',
+    surahMulk: 'সূরা আল-মুলক',
+    namesOfAllah: 'আল্লাহর নাম',
+    salawat: 'দরূদ',
+    istighfar: 'ইস্তিগফার',
+    seerah: 'সীরাতুন নবী',
+    benefitAzkar: 'যিকিরের ফজিলত',
+    worshipTracker: 'ইবাদত ট্র্যাকার',
+    khatmaQuran: 'কুরআন খতম',
+    qibla: 'কিবলা',
+    favorites: 'প্রিয়',
   },
   quran: {
     title: 'পবিত্র কুরআন',
@@ -5260,6 +5520,7 @@ const ru: TranslationKeys = {
     prayer: 'Намаз',
     tasbih: 'Тасбих',
     more: 'Ещё',
+    settings: 'Настройки',
   },
   common: {
     loading: 'Загрузка...',
@@ -5300,6 +5561,10 @@ const ru: TranslationKeys = {
     favorites: 'Избранное',
     addToFavorites: 'Добавить в избранное',
     removeFromFavorites: 'Удалить из избранного',
+    appName: 'Rooh Muslim',
+    none: 'Нет',
+    appName: 'Rooh Muslim',
+    none: 'Нет',
   },
   home: {
     welcome: 'Добро пожаловать',
@@ -5316,6 +5581,22 @@ const ru: TranslationKeys = {
     todayProgress: 'Прогресс за сегодня',
     streak: 'Дней подряд',
     days: 'дней',
+    azkarSection: 'Азкар',
+    duasSection: 'Дуа и Рукья',
+    worshipSection: 'Поклонение',
+    surahKahf: 'Сура Аль-Кахф',
+    ayatKursi: 'Аят Аль-Курси',
+    surahYasin: 'Сура Ясин',
+    surahMulk: 'Сура Аль-Мульк',
+    namesOfAllah: 'Имена Аллаха',
+    salawat: 'Салават',
+    istighfar: 'Истигфар',
+    seerah: 'Жизнеописание Пророка',
+    benefitAzkar: 'Польза азкар',
+    worshipTracker: 'Трекер поклонения',
+    khatmaQuran: 'Хатм Корана',
+    qibla: 'Кибла',
+    favorites: 'Избранное',
   },
   quran: {
     title: 'Священный Коран',

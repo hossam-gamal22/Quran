@@ -97,7 +97,7 @@ export default function TafsirSearchScreen() {
     const surahName = SURAH_NAMES_AR[item.surah.number - 1] || item.surah.name;
     return (
       <TouchableOpacity
-        style={[s.resultCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[s.resultCard, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}
         onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
         activeOpacity={0.8}
       >
@@ -107,7 +107,7 @@ export default function TafsirSearchScreen() {
               {surahName} ({item.surah.number}:{item.numberInSurah})
             </Text>
           </View>
-          <View style={[s.juzBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[s.juzBadge, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}>
             <Text style={[s.juzBadgeText, { color: colors.muted }]}>ج {item.juz}</Text>
           </View>
         </View>
@@ -136,7 +136,7 @@ export default function TafsirSearchScreen() {
     searchRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
     inputWrap: {
       flex: 1, flexDirection: 'row', alignItems: 'center',
-      backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, borderWidth: 1, borderColor: colors.border,
       paddingHorizontal: 14,
     },
     input: { flex: 1, height: 46, fontSize: 16, color: colors.foreground, textAlign: 'right' },
@@ -150,7 +150,7 @@ export default function TafsirSearchScreen() {
     langRow: { flexDirection: 'row', gap: 10 },
     langBtn: {
       flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center',
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
     },
     langBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     langBtnText: { fontSize: 13, fontWeight: '700', color: colors.muted },
@@ -159,7 +159,7 @@ export default function TafsirSearchScreen() {
     editionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
     editionChip: {
       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
     },
     editionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     editionChipText: { fontSize: 12, fontWeight: '700', color: colors.muted },
@@ -192,18 +192,18 @@ export default function TafsirSearchScreen() {
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.foreground },
-    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface },
+    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)' },
     modalContent: { padding: 20 },
     ayahRef: { fontSize: 14, color: colors.primary, textAlign: 'right', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
-      backgroundColor: colors.surface, borderRadius: 14, padding: 16,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, padding: 16,
       borderWidth: 1, borderColor: colors.border, marginBottom: 16,
     },
     arabicText: { fontSize: 22, color: colors.foreground, textAlign: 'right', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
     },
     editionTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     editionTabText: { fontSize: 12, fontWeight: '700', color: colors.muted },

@@ -17,7 +17,6 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 
@@ -197,7 +196,7 @@ export default function MawlidScreen() {
       <StatusBar barStyle="light-content" backgroundColor={MAWLID_COLOR} />
 
       {/* Header */}
-      <LinearGradient colors={MAWLID_GRADIENT} style={styles.header}>
+      <View style={[styles.header, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -205,7 +204,7 @@ export default function MawlidScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>ذكرى المولد النبوي</Text>
@@ -220,7 +219,7 @@ export default function MawlidScreen() {
           color="rgba(255,255,255,0.15)"
           style={styles.headerDecoration}
         />
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -237,9 +236,8 @@ export default function MawlidScreen() {
       >
         {/* بطاقة النبي ﷺ */}
         <Animated.View entering={FadeIn.duration(500)}>
-          <LinearGradient
-            colors={isDarkMode ? ['#1a2a1a', '#0d1a0d'] : ['#e8f5e9', '#c8e6c9']}
-            style={styles.prophetCard}
+          <View
+            style={[styles.prophetCard, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)' }]}
           >
             <View style={styles.prophetIconContainer}>
               <MaterialCommunityIcons name="star-crescent" size={40} color={MAWLID_COLOR} />
@@ -264,7 +262,7 @@ export default function MawlidScreen() {
                 </Text>
               </View>
             </View>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* عداد الصلاة على النبي */}
@@ -274,10 +272,10 @@ export default function MawlidScreen() {
               صلِّ على النبي ﷺ
             </Text>
             <TouchableOpacity style={styles.counterButton} onPress={handleSalawat} activeOpacity={0.8}>
-              <LinearGradient colors={MAWLID_GRADIENT} style={styles.counterButtonGradient}>
+              <View style={[styles.counterButtonGradient, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
                 <Text style={styles.counterValue}>{salawatCount}</Text>
                 <Text style={styles.counterButtonText}>اضغط للصلاة على النبي</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -321,7 +319,7 @@ export default function MawlidScreen() {
               entering={FadeInDown.delay(index * 80).duration(400)}
               style={styles.actionItem}
             >
-              <View style={[styles.actionIcon, { backgroundColor: `${action.color}20` }]}>
+              <View style={styles.actionIcon}>
                 <MaterialCommunityIcons name={action.icon as any} size={22} color={action.color} />
               </View>
               <Text style={[styles.actionTitle, isDarkMode && styles.textLight]}>{action.title}</Text>

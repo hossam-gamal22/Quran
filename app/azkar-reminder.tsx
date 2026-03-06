@@ -16,12 +16,12 @@ import {
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
 
 import { Language, getAllCategories, getCategoryName, AzkarCategoryType } from '@/lib/azkar-api';
+import { useSettings } from '@/contexts/SettingsContext';
 
 // ================================
 // الأنواع
@@ -88,7 +88,7 @@ const DEFAULT_REMINDERS: CategoryReminder = {
 };
 
 const DAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-const DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const STORAGE_KEY = 'azkar_reminders';
 
@@ -99,11 +99,12 @@ const STORAGE_KEY = 'azkar_reminders';
 export default function AzkarReminderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDarkMode, settings } = useSettings();
+  const darkMode = isDarkMode;
+  const language = (settings.language || 'ar') as Language;
 
   // الحالة
   const [reminders, setReminders] = useState<CategoryReminder>(DEFAULT_REMINDERS);
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<Language>('ar');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<keyof CategoryReminder | null>(null);
   const [hasPermission, setHasPermission] = useState(false);
@@ -114,14 +115,7 @@ export default function AzkarReminderScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [storedDarkMode, storedLanguage, storedReminders] = await Promise.all([
-        AsyncStorage.getItem('darkMode'),
-        AsyncStorage.getItem('app_language'),
-        AsyncStorage.getItem(STORAGE_KEY),
-      ]);
-
-      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
-      if (storedLanguage) setLanguage(storedLanguage as Language);
+      const storedReminders = await AsyncStorage.getItem(STORAGE_KEY);
       if (storedReminders) setReminders(JSON.parse(storedReminders));
 
       // التحقق من صلاحيات الإشعارات
@@ -175,8 +169,13 @@ export default function AzkarReminderScreen() {
   // ================================
 
   const scheduleNotifications = async (settings: CategoryReminder) => {
-    // إلغاء جميع الإشعارات المجدولة
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    // Cancel only azkar reminder notifications (not prayer/wird/kahf/daily)
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+      if (n.identifier.startsWith('azkar_')) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    }
 
     const categories = getAllCategories();
 
@@ -191,6 +190,7 @@ export default function AzkarReminderScreen() {
 
       for (const day of reminder.days) {
         await Notifications.scheduleNotificationAsync({
+          identifier: `azkar_${key}_day${day}`,
           content: {
             title: language === 'ar' ? '⏰ حان وقت الأذكار' : '⏰ Time for Adhkar',
             body: categoryName,
@@ -298,7 +298,7 @@ export default function AzkarReminderScreen() {
       >
         {/* Header */}
         <View style={styles.cardHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+          <View style={styles.iconContainer}>
             <Ionicons name={icon as any} size={24} color={color} />
           </View>
           
@@ -314,8 +314,9 @@ export default function AzkarReminderScreen() {
           <Switch
             value={reminder.enabled}
             onValueChange={() => toggleReminder(categoryKey)}
-            trackColor={{ false: '#D1D5DB', true: color + '80' }}
-            thumbColor={reminder.enabled ? color : '#F3F4F6'}
+            trackColor={{ false: darkMode ? '#39393D' : '#E9E9EB', true: color }}
+            thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+            ios_backgroundColor={darkMode ? '#39393D' : '#E9E9EB'}
           />
         </View>
 
@@ -358,8 +359,10 @@ export default function AzkarReminderScreen() {
                       styles.dayButtonText,
                       { color: reminder.days.includes(index) ? '#FFFFFF' : (darkMode ? '#9CA3AF' : '#6B7280') },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
                   >
-                    {day.substring(0, 2)}
+                    {day}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -380,9 +383,8 @@ export default function AzkarReminderScreen() {
       
       <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
         {/* Header */}
-        <LinearGradient
-          colors={['#10B981', '#059669']}
-          style={[styles.header, { paddingTop: insets.top }]}
+        <View
+          style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(16,185,129,0.85)' }]}
         >
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -395,7 +397,7 @@ export default function AzkarReminderScreen() {
             
             <View style={{ width: 40 }} />
           </View>
-        </LinearGradient>
+        </View>
 
         {/* تحذير عدم وجود صلاحيات */}
         {!hasPermission && (
@@ -511,11 +513,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -567,17 +565,19 @@ const styles = StyleSheet.create({
   },
   daysContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   dayButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    height: 38,
+    borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
   },
   dayButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

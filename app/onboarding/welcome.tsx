@@ -25,7 +25,6 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
 
@@ -97,9 +96,8 @@ export default function WelcomeScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
       
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.gradient}
+      <View
+        style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}
       >
         {/* زر التخطي */}
         <SafeAreaView edges={['top']} style={styles.topBar}>
@@ -119,12 +117,11 @@ export default function WelcomeScreen() {
         <View style={styles.content}>
           {/* الشعار */}
           <Animated.View entering={FadeIn.duration(800)} style={styles.logoContainer}>
-            <LinearGradient
-              colors={['#2f7659', '#1d5a3a']}
-              style={styles.logoGradient}
+            <View
+              style={[styles.logoGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
             >
               <MaterialCommunityIcons name="star-crescent" size={60} color="#fff" />
-            </LinearGradient>
+            </View>
           </Animated.View>
 
           {/* اسم التطبيق */}
@@ -150,7 +147,7 @@ export default function WelcomeScreen() {
                 entering={FadeInUp.delay(800 + index * 100).duration(400)}
                 style={styles.featureItem}
               >
-                <View style={[styles.featureIcon, { backgroundColor: `${feature.color}30` }]}>
+                <View style={styles.featureIcon}>
                   <MaterialCommunityIcons name={feature.icon as any} size={24} color={feature.color} />
                 </View>
                 <Text style={styles.featureLabel}>{feature.label}</Text>
@@ -167,15 +164,12 @@ export default function WelcomeScreen() {
               onPress={handleGetStarted}
               activeOpacity={0.8}
             >
-              <LinearGradient
-                colors={['#2f7659', '#1d5a3a']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.primaryButtonGradient}
+              <View
+                style={[styles.primaryButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
               >
                 <Text style={styles.primaryButtonText}>ابدأ الآن</Text>
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {/* مؤشر الصفحات */}
@@ -187,7 +181,7 @@ export default function WelcomeScreen() {
             </View>
           </Animated.View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -246,10 +240,6 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
     elevation: 10,
   },
   appName: {
@@ -308,10 +298,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
     elevation: 8,
   },
   primaryButtonGradient: {

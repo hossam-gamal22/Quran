@@ -159,7 +159,7 @@ const DEFAULT_SETTINGS: PrayerSettings = {
   notifications: {
     enabled: true,
     fajr: true,
-    sunrise: false,
+    sunrise: true,
     dhuhr: true,
     asr: true,
     maghrib: true,

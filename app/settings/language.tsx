@@ -36,21 +36,29 @@ interface LanguageInfo {
 }
 
 const LANGUAGES: LanguageInfo[] = [
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true, region: 'الشرق الأوسط' },
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸', rtl: false, region: 'عالمي' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true, region: 'جنوب آسيا' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false, region: 'جنوب شرق آسيا' },
-  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', rtl: false, region: 'الشرق الأوسط' },
-  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false, region: 'أوروبا' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false, region: 'أوروبا' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', rtl: false, region: 'جنوب آسيا' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', rtl: false, region: 'جنوب آسيا' },
-  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾', rtl: false, region: 'جنوب شرق آسيا' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false, region: 'أوروبا' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false, region: 'أوروبا' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true, region: 'middle_east' },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸', rtl: false, region: 'global' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true, region: 'south_asia' },
+  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false, region: 'southeast_asia' },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', rtl: false, region: 'middle_east' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false, region: 'europe' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false, region: 'europe' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', rtl: false, region: 'south_asia' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', rtl: false, region: 'south_asia' },
+  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾', rtl: false, region: 'southeast_asia' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false, region: 'europe' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false, region: 'europe' },
 ];
 
-const REGIONS = ['الشرق الأوسط', 'جنوب آسيا', 'جنوب شرق آسيا', 'أوروبا', 'عالمي'];
+const REGION_KEYS = ['middle_east', 'south_asia', 'southeast_asia', 'europe', 'global'];
+
+const REGION_NAMES: Record<string, Record<string, string>> = {
+  middle_east: { ar: 'الشرق الأوسط', en: 'Middle East', fr: 'Moyen-Orient', de: 'Naher Osten', es: 'Oriente Medio', tr: 'Orta Doğu', ur: 'مشرق وسطیٰ', id: 'Timur Tengah', ms: 'Timur Tengah', hi: 'मध्य पूर्व', bn: 'মধ্যপ্রাচ্য', ru: 'Ближний Восток' },
+  south_asia: { ar: 'جنوب آسيا', en: 'South Asia', fr: 'Asie du Sud', de: 'Südasien', es: 'Asia del Sur', tr: 'Güney Asya', ur: 'جنوبی ایشیا', id: 'Asia Selatan', ms: 'Asia Selatan', hi: 'दक्षिण एशिया', bn: 'দক্ষিণ এশিয়া', ru: 'Южная Азия' },
+  southeast_asia: { ar: 'جنوب شرق آسيا', en: 'Southeast Asia', fr: 'Asie du Sud-Est', de: 'Südostasien', es: 'Sudeste Asiático', tr: 'Güneydoğu Asya', ur: 'جنوب مشرقی ایشیا', id: 'Asia Tenggara', ms: 'Asia Tenggara', hi: 'दक्षिण पूर्व एशिया', bn: 'দক্ষিণ-পূর্ব এশিয়া', ru: 'Юго-Восточная Азия' },
+  europe: { ar: 'أوروبا', en: 'Europe', fr: 'Europe', de: 'Europa', es: 'Europa', tr: 'Avrupa', ur: 'یورپ', id: 'Eropa', ms: 'Eropah', hi: 'यूरोप', bn: 'ইউরোপ', ru: 'Европа' },
+  global: { ar: 'عالمي', en: 'Global', fr: 'Mondial', de: 'Global', es: 'Global', tr: 'Küresel', ur: 'عالمی', id: 'Global', ms: 'Global', hi: 'वैश्विक', bn: 'বৈশ্বিক', ru: 'Глобальный' },
+};
 
 // ========================================
 // مكونات فرعية
@@ -106,9 +114,9 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
             {language.name}
           </Text>
         </View>
-        {language.rtl && (
-          <View style={styles.rtlBadge}>
-            <Text style={styles.rtlBadgeText}>RTL</Text>
+        {isSelected && (
+          <View style={styles.checkIcon}>
+            <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
           </View>
         )}
         {isSelected && (
@@ -165,9 +173,15 @@ const RegionSection: React.FC<RegionSectionProps> = ({
 
 export default function LanguageScreen() {
   const router = useRouter();
-  const { settings, isDarkMode, updateLanguage } = useSettings();
+  const { settings, isDarkMode, updateLanguage, t } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
   const [isChanging, setIsChanging] = useState(false);
+  const isRTL = I18nManager.isRTL;
+
+  const getRegionName = (regionKey: string) => {
+    const names = REGION_NAMES[regionKey];
+    return names?.[settings.language] || names?.en || regionKey;
+  };
 
   const filteredLanguages = LANGUAGES.filter(
     (lang) =>
@@ -239,7 +253,7 @@ export default function LanguageScreen() {
   const groupedLanguages: { [key: string]: LanguageInfo[] } = {};
   let currentIndex = 0;
 
-  REGIONS.forEach((region) => {
+  REGION_KEYS.forEach((region) => {
     groupedLanguages[region] = filteredLanguages.filter((l) => l.region === region);
   });
 
@@ -266,12 +280,12 @@ export default function LanguageScreen() {
           }}
         >
           <MaterialCommunityIcons
-            name="arrow-right"
+            name={isRTL ? 'arrow-right' : 'arrow-left'}
             size={28}
             color={isDarkMode ? '#fff' : '#333'}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>اللغة</Text>
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.language')}</Text>
         <View style={styles.headerPlaceholder} />
       </Animated.View>
 
@@ -288,7 +302,7 @@ export default function LanguageScreen() {
           />
           <TextInput
             style={[styles.searchInput, isDarkMode && styles.textLight]}
-            placeholder="ابحث عن لغة..."
+            placeholder={t('common.search') + '...'}
             placeholderTextColor={isDarkMode ? '#666' : '#999'}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -313,7 +327,7 @@ export default function LanguageScreen() {
         <View style={[styles.infoCard, isDarkMode && styles.infoCardDark]}>
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
           <Text style={[styles.infoText, isDarkMode && styles.textMuted]}>
-            اللغة الحالية:{' '}
+            {t('settings.language')}:{' '}
             <Text style={styles.infoHighlight}>
               {LANGUAGES.find((l) => l.code === settings.language)?.nativeName}
             </Text>
@@ -349,14 +363,14 @@ export default function LanguageScreen() {
                   color={isDarkMode ? '#444' : '#ccc'}
                 />
                 <Text style={[styles.emptyText, isDarkMode && styles.textMuted]}>
-                  لا توجد نتائج للبحث
+                  {t('quran.noResults')}
                 </Text>
               </View>
             )}
           </Animated.View>
         ) : (
           // عرض مجمّع حسب المنطقة
-          REGIONS.map((region) => {
+          REGION_KEYS.map((region) => {
             const regionLangs = groupedLanguages[region];
             const sectionStartIndex = currentIndex;
             currentIndex += regionLangs.length;
@@ -364,7 +378,7 @@ export default function LanguageScreen() {
             return (
               <RegionSection
                 key={region}
-                region={region}
+                region={getRegionName(region)}
                 languages={regionLangs}
                 selectedLanguage={settings.language}
                 onSelectLanguage={handleSelectLanguage}
@@ -386,10 +400,10 @@ export default function LanguageScreen() {
             color={isDarkMode ? '#444' : '#ddd'}
           />
           <Text style={[styles.footerText, isDarkMode && styles.textMuted]}>
-            12 لغة مدعومة
+            12 {t('settings.language')}
           </Text>
           <Text style={[styles.footerSubtext, isDarkMode && styles.textMuted]}>
-            ترجمات القرآن والأذكار والواجهة
+            {t('app.slogan')}
           </Text>
         </Animated.View>
 
@@ -402,7 +416,7 @@ export default function LanguageScreen() {
           <View style={[styles.loadingCard, isDarkMode && styles.loadingCardDark]}>
             <MaterialCommunityIcons name="loading" size={40} color="#2f7659" />
             <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
-              جاري تغيير اللغة...
+              {t('common.loading')}
             </Text>
           </View>
         </View>
@@ -468,11 +482,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 15,
     height: 50,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   searchBarDark: {
     backgroundColor: '#1a1a2e',
@@ -483,7 +493,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Cairo-Regular',
     color: '#333',
-    textAlign: 'right',
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoCardContainer: {
     paddingHorizontal: 16,
@@ -505,7 +515,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Cairo-Regular',
     color: '#333',
-    textAlign: 'right',
+    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoHighlight: {
     fontFamily: 'Cairo-Bold',
@@ -534,11 +544,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   languageItemDark: {
     backgroundColor: '#1a1a2e',
@@ -554,10 +560,11 @@ const styles = StyleSheet.create({
   },
   languageFlag: {
     fontSize: 32,
-    marginLeft: 15,
+    marginRight: 16,
   },
   languageInfo: {
     flex: 1,
+    marginLeft: 0,
   },
   languageName: {
     fontSize: 18,

@@ -23,10 +23,10 @@ import Animated, {
   interpolate,
   Extrapolate,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 
 const { width, height } = Dimensions.get('window');
 const CIRCLE_SIZE = width * 0.65;
@@ -90,7 +90,7 @@ const Dot: React.FC<DotProps> = ({ index, total, count, target }) => {
 
 export default function TasbihScreen() {
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [count, setCount] = useState(0);
@@ -218,8 +218,9 @@ export default function TasbihScreen() {
   const textColor = '#fff';
 
   return (
-    <LinearGradient
-      colors={isDarkMode ? ['#11151c', '#1a2a20'] : ['#0d3d2d', '#1a5a40']}
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -243,7 +244,7 @@ export default function TasbihScreen() {
             <Text style={styles.adhkarText}>{currentDhikr.text}</Text>
           </View>
           <Pressable onPress={() => changeAdhkar('next')} style={styles.arrowButton}>
-            <MaterialCommunityIcons name="chevron-left" size={28} color="#4ade80" />
+            <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
           </Pressable>
         </View>
 
@@ -299,7 +300,7 @@ export default function TasbihScreen() {
         {/* تعليمات */}
         <Text style={styles.instructions}>اضغط على الدائرة للتسبيح</Text>
       </SafeAreaView>
-    </LinearGradient>
+    </BackgroundWrapper>
   );
 }
 
@@ -389,10 +390,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     backgroundColor: '#4ade80',
-    shadowColor: '#4ade80',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
   },
   dotCompleted: {
     backgroundColor: '#4ade80',

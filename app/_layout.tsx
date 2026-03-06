@@ -25,6 +25,8 @@ import { SeasonalProvider } from '@/contexts/SeasonalContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
+import { AdsProvider } from '@/lib/ads-context';
+import { AppConfigProvider } from '@/lib/app-config-context';
 
 // Firebase Integration
 import { registerUser, updateLastActive } from '@/lib/firebase-user';
@@ -33,6 +35,7 @@ import {
   trackAppOpen, 
   syncLocalStats 
 } from '@/lib/firebase-analytics';
+import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,6 +48,7 @@ export default function RootLayout() {
     'Amiri-Regular': require('../assets/fonts/Amiri-Regular.ttf'),
     'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
     'UthmanicHafs': require('../assets/fonts/UthmanicHafs.otf'),
+    'QCFSurahNames': require('../assets/fonts/qcf/surah-names.ttf'),
   });
 
   // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
@@ -127,12 +131,14 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SettingsProvider>
           <RemoteConfigProvider>
-            <NotificationsProvider>
-              <QuranProvider>
-                <KhatmaProvider>
-                  <WorshipProvider>
-                    <SeasonalProvider>
-                      <OnboardingProvider>
+            <AppConfigProvider>
+              <AdsProvider>
+                <NotificationsProvider>
+                  <QuranProvider>
+                    <KhatmaProvider>
+                      <WorshipProvider>
+                        <SeasonalProvider>
+                          <OnboardingProvider>
                         <StatusBar style="auto" />
                         <Stack
                           screenOptions={{
@@ -157,12 +163,15 @@ export default function RootLayout() {
                           <Stack.Screen name="azkar-search" />
                           <Stack.Screen name="azkar-reminder" />
                         </Stack>
-                      </OnboardingProvider>
-                    </SeasonalProvider>
-                  </WorshipProvider>
-                </KhatmaProvider>
-              </QuranProvider>
-            </NotificationsProvider>
+                        <AudioPlayerBar global />
+                          </OnboardingProvider>
+                        </SeasonalProvider>
+                      </WorshipProvider>
+                    </KhatmaProvider>
+                  </QuranProvider>
+                </NotificationsProvider>
+              </AdsProvider>
+            </AppConfigProvider>
           </RemoteConfigProvider>
         </SettingsProvider>
       </SafeAreaProvider>

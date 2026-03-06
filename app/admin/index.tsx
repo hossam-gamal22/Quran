@@ -246,7 +246,7 @@ export default function AdminDashboard() {
               style={styles.menuItem}
               onPress={() => router.push(item.route as any)}
             >
-              <View style={[styles.menuIcon, { backgroundColor: item.color + '20' }]}>
+              <View style={styles.menuIcon}>
                 <Ionicons name={item.icon as any} size={24} color={item.color} />
               </View>
               <View style={styles.menuContent}>

@@ -16,7 +16,6 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -288,7 +287,7 @@ export default function AshuraScreen() {
       <StatusBar barStyle="light-content" backgroundColor={ASHURA_COLOR} />
 
       {/* Header */}
-      <LinearGradient colors={ASHURA_GRADIENT} style={styles.header}>
+      <View style={[styles.header, { backgroundColor: `${ASHURA_COLOR}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -296,14 +295,14 @@ export default function AshuraScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name="arrow-right" size={28} color="#fff" />
+          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>{ASHURA_INFO.title}</Text>
           <Text style={styles.headerSubtitle}>{ASHURA_INFO.subtitle}</Text>
         </View>
         <View style={styles.headerPlaceholder} />
-      </LinearGradient>
+      </View>
 
       <ScrollView
         style={styles.scrollView}

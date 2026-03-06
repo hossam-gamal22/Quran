@@ -7,12 +7,14 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useKhatma } from '../../contexts/KhatmaContext';
-import { useColors } from '../../lib/theme-provider';
+import { useColors } from '../../hooks/use-colors';
 import { getKhatmaStats, getPageSurah, Khatma } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
 import {
@@ -59,6 +61,55 @@ export default function KhatmaListScreen() {
     [deleteKhatma]
   );
 
+  // Handle options menu for a khatma
+  const handleOptions = useCallback(
+    (khatma: Khatma) => {
+      const isActive = activeKhatma?.id === khatma.id;
+      const options = [
+        ...(isActive ? [] : ['تعيين كختمة نشطة']),
+        'تعديل التذكير',
+        'حذف الختمة',
+        'إلغاء',
+      ];
+      const destructiveIndex = options.indexOf('حذف الختمة');
+      const cancelIndex = options.indexOf('إلغاء');
+
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options,
+            destructiveButtonIndex: destructiveIndex,
+            cancelButtonIndex: cancelIndex,
+            title: khatma.name,
+          },
+          (buttonIndex) => {
+            const selected = options[buttonIndex];
+            if (selected === 'تعيين كختمة نشطة') handleSetActive(khatma);
+            else if (selected === 'تعديل التذكير') {
+              router.push(`/khatma/new?editReminder=${khatma.id}`);
+            }
+            else if (selected === 'حذف الختمة') handleDelete(khatma);
+          }
+        );
+      } else {
+        Alert.alert(
+          khatma.name,
+          'اختر إجراء',
+          [
+            ...(isActive ? [] : [{ text: 'تعيين كختمة نشطة', onPress: () => handleSetActive(khatma) }]),
+            {
+              text: 'تعديل التذكير',
+              onPress: () => router.push(`/khatma/new?editReminder=${khatma.id}`),
+            },
+            { text: 'حذف الختمة', style: 'destructive' as const, onPress: () => handleDelete(khatma) },
+            { text: 'إلغاء', style: 'cancel' as const },
+          ]
+        );
+      }
+    },
+    [activeKhatma, handleSetActive, handleDelete, router]
+  );
+
   // Handle set active
   const handleSetActive = useCallback(
     async (khatma: Khatma) => {
@@ -77,8 +128,8 @@ export default function KhatmaListScreen() {
       return (
         <TouchableOpacity
           onPress={() => handleSetActive(item)}
-          onLongPress={() => handleDelete(item)}
-          delayLongPress={800}
+          onLongPress={() => handleOptions(item)}
+          delayLongPress={500}
           activeOpacity={0.8}
         >
           <GlassCard
@@ -99,14 +150,21 @@ export default function KhatmaListScreen() {
                   </View>
                 )}
               </View>
-              
-              {item.isCompleted && (
-                <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.completedText}>مكتملة</Text>
-                </View>
-              )}
+              <TouchableOpacity
+                onPress={() => handleOptions(item)}
+                hitSlop={12}
+                style={styles.optionsBtn}
+              >
+                <Ionicons name="ellipsis-vertical" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
+              
+            {item.isCompleted && (
+              <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.completedText}>مكتملة</Text>
+              </View>
+            )}
 
             {/* Progress Bar */}
             <View style={styles.progressSection}>
@@ -323,6 +381,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    flex: 1,
+  },
+  optionsBtn: {
+    padding: 4,
   },
   khatmaName: {
     fontSize: FONT_SIZES.lg,
@@ -455,11 +517,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.lg,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)',
   },
   fabText: {
     color: '#FFFFFF',

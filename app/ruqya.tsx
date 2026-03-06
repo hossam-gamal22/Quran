@@ -19,7 +19,6 @@ import {
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -34,6 +33,9 @@ import {
   removeFromFavorites,
   isFavorite,
 } from '@/lib/azkar-api';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 
 const { width, height } = Dimensions.get('window');
 
@@ -46,13 +48,14 @@ export default function RuqyaScreen() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const { isDarkMode, settings } = useSettings();
+  const darkMode = isDarkMode;
+  const language = (settings.language || 'ar') as Language;
 
   // الحالة
   const [ruqyaList, setRuqyaList] = useState<Zikr[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<Language>('ar');
   const [showTranslation, setShowTranslation] = useState(true);
   const [showTransliteration, setShowTransliteration] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -70,17 +73,13 @@ export default function RuqyaScreen() {
   const loadData = useCallback(async () => {
     try {
       // تحميل الإعدادات
-      const [storedDarkMode, storedLanguage, storedShowTranslation, storedShowTransliteration, storedViewMode] = 
+      const [storedShowTranslation, storedShowTransliteration, storedViewMode] = 
         await Promise.all([
-          AsyncStorage.getItem('darkMode'),
-          AsyncStorage.getItem('app_language'),
           AsyncStorage.getItem('ruqya_show_translation'),
           AsyncStorage.getItem('ruqya_show_transliteration'),
           AsyncStorage.getItem('ruqya_view_mode'),
         ]);
 
-      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
-      if (storedLanguage) setLanguage(storedLanguage as Language);
       if (storedShowTranslation !== null) setShowTranslation(JSON.parse(storedShowTranslation));
       if (storedShowTransliteration !== null) setShowTransliteration(JSON.parse(storedShowTransliteration));
       if (storedViewMode) setViewMode(storedViewMode as 'single' | 'list');
@@ -122,7 +121,7 @@ export default function RuqyaScreen() {
   // تشغيل الصوت
   // =====================================
 
-  const playAudio = async (audioUrl: string, id: number) => {
+  const playAudio = async (audioUrl: string | undefined, id: number, textForTts: string) => {
     try {
       // إيقاف الصوت الحالي
       if (soundRef.current) {
@@ -137,17 +136,12 @@ export default function RuqyaScreen() {
         return;
       }
 
-      if (!audioUrl) {
-        // لا يوجد صوت
-        if (Platform.OS === 'ios') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
-        return;
-      }
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ar&q=${encodeURIComponent(textForTts)}`;
+      const resolvedAudioUrl = audioUrl || ttsUrl;
 
       // تشغيل الصوت الجديد
       const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
+        { uri: resolvedAudioUrl },
         { shouldPlay: true }
       );
       
@@ -224,7 +218,7 @@ export default function RuqyaScreen() {
   const shareRuqya = async (item: Zikr) => {
     try {
       const translation = getZikrTranslation(item, language);
-      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 الرقية الشرعية\nمن تطبيق القرآن والأذكار`;
+      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 الرؤية الشرعية\nمن تطبيق روح المسلم`;
       
       await Share.share({ message });
     } catch (error) {
@@ -238,7 +232,7 @@ export default function RuqyaScreen() {
 
   const shareAll = async () => {
     try {
-      let message = '🔒 الرقية الشرعية\n\n';
+      let message = '🔒 الرؤية الشرعية\n\n';
       
       ruqyaList.forEach((item, index) => {
         message += `${index + 1}. ${item.arabic}\n`;
@@ -246,7 +240,7 @@ export default function RuqyaScreen() {
         message += '\n';
       });
       
-      message += '\nمن تطبيق القرآن والأذكار';
+      message += '\nمن تطبيق روح المسلم';
       
       await Share.share({ message });
     } catch (error) {
@@ -298,18 +292,16 @@ export default function RuqyaScreen() {
                 />
               </TouchableOpacity>
 
-              {item.audio && (
-                <TouchableOpacity
-                  onPress={() => playAudio(item.audio!, item.id)}
-                  style={styles.actionButton}
-                >
-                  <Ionicons
-                    name={playingId === item.id && isPlaying ? 'pause-circle' : 'play-circle'}
-                    size={28}
-                    color="#6366F1"
-                  />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={() => playAudio(item.audio, item.id, item.arabic)}
+                style={styles.actionButton}
+              >
+                <Ionicons
+                  name={playingId === item.id && isPlaying ? 'pause-circle' : 'play-circle'}
+                  size={28}
+                  color="#6366F1"
+                />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => shareRuqya(item)}
@@ -441,27 +433,30 @@ export default function RuqyaScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       
-      <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+      <BackgroundWrapper
+        backgroundKey={settings.display.appBackground}
+        backgroundUrl={settings.display.appBackgroundUrl}
+        style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}
+      >
         {/* Header */}
-        <LinearGradient
-          colors={['#6366F1', '#4F46E5']}
-          style={[styles.header, { paddingTop: insets.top }]}
+        <View
+          style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(120,120,128,0.15)' }]}
         >
           <View style={styles.headerTop}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#FFF" />
+              <Ionicons name="arrow-back" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
             </TouchableOpacity>
             
-            <Text style={styles.headerTitle}>
-              {language === 'ar' ? 'الرقية الشرعية' : 'Ruqyah'}
+            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+              {language === 'ar' ? 'الرؤية الشرعية' : 'Legal Sighting'}
             </Text>
             
             <View style={styles.headerActions}>
               <TouchableOpacity onPress={toggleViewMode} style={styles.headerButton}>
-                <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color="#FFF" />
+                <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
               <TouchableOpacity onPress={shareAll} style={styles.headerButton}>
-                <Ionicons name="share-outline" size={22} color="#FFF" />
+                <Ionicons name="share-outline" size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
             </View>
           </View>
@@ -473,16 +468,16 @@ export default function RuqyaScreen() {
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${((currentIndex + 1) / ruqyaList.length) * 100}%` },
+                    { width: `${((currentIndex + 1) / ruqyaList.length) * 100}%`, backgroundColor: darkMode ? '#A78BFA' : '#6366F1' },
                   ]}
                 />
               </View>
-              <Text style={styles.progressText}>
+              <Text style={[styles.progressText, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
                 {currentIndex + 1} / {ruqyaList.length}
               </Text>
             </View>
           )}
-        </LinearGradient>
+        </View>
 
         {/* المحتوى */}
         {viewMode === 'single' ? (
@@ -508,7 +503,7 @@ export default function RuqyaScreen() {
             />
 
             {/* أزرار التنقل */}
-            <View style={[styles.navigationBar, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
+            <View style={[styles.navigationBar, { backgroundColor: 'rgba(120,120,128,0.12)' }]}>
               <TouchableOpacity
                 onPress={goToPrevious}
                 disabled={currentIndex === 0}
@@ -557,8 +552,9 @@ export default function RuqyaScreen() {
         )}
 
         {/* مساحة آمنة */}
+        <BannerAdComponent screen="ruqya" />
         <View style={{ height: insets.bottom }} />
-      </View>
+      </BackgroundWrapper>
     </>
   );
 }
@@ -594,7 +590,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FFFFFF',
   },
   headerActions: {
     flexDirection: 'row',
@@ -610,17 +605,15 @@ const styles = StyleSheet.create({
   progressBarBg: {
     flex: 1,
     height: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(120,120,128,0.2)',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
     borderRadius: 3,
   },
   progressText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 12,
@@ -639,11 +632,9 @@ const styles = StyleSheet.create({
   ruqyaCard: {
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: 'rgba(120,120,128,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -762,11 +753,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'rgba(120,120,128,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   listItemNumber: {
     width: 36,

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
 import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
@@ -31,6 +32,7 @@ const KAABA_LONGITUDE = 39.8262;
 
 export default function QiblaScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   // الحالات
   const [loading, setLoading] = useState(true);
@@ -101,16 +103,26 @@ export default function QiblaScreen() {
           accuracy: Location.Accuracy.High,
         });
         const { latitude, longitude } = loc.coords;
-
-        // الحصول على اسم المدينة
-        const [address] = await Location.reverseGeocodeAsync({ latitude, longitude });
-        const city = address?.city || address?.region || 'موقعك';
-
-        setLocation({ latitude, longitude, city });
+        setLocation({ latitude, longitude, city: 'موقعك' });
 
         // حساب اتجاه القبلة
         const qibla = calculateQiblaDirection(latitude, longitude);
         setQiblaDirection(qibla);
+
+        // إظهار الواجهة فورًا بعد توفر الاتجاه بدل انتظار reverse geocoding
+        setLoading(false);
+        startPulseAnimation();
+
+        // تحميل اسم المدينة بشكل غير متزامن بعد إظهار البوصلة
+        Location.reverseGeocodeAsync({ latitude, longitude })
+          .then((result) => {
+            const [address] = result;
+            const city = address?.city || address?.region || 'موقعك';
+            setLocation({ latitude, longitude, city });
+          })
+          .catch(() => {
+            // تجاهل خطأ reverse geocoding ولا نمنع عمل البوصلة
+          });
 
         // الاشتراك في بوصلة المغناطيسية
         const isAvailable = await Magnetometer.isAvailableAsync();
@@ -136,9 +148,6 @@ export default function QiblaScreen() {
         } else {
           Alert.alert('تنبيه', 'البوصلة غير متوفرة على هذا الجهاز');
         }
-
-        setLoading(false);
-        startPulseAnimation();
 
       } catch (error) {
         console.error('Error initializing qibla:', error);
@@ -255,7 +264,7 @@ export default function QiblaScreen() {
   return (
     <View style={styles.container}>
       {/* الهيدر */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-forward" size={24} color={Colors.text} />
         </TouchableOpacity>
@@ -425,10 +434,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    backgroundColor: 'rgba(120,120,128,0.12)',
   },
   backButton: {
     padding: Spacing.sm,
@@ -449,12 +456,11 @@ const styles = StyleSheet.create({
   locationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.md,
     gap: Spacing.sm,
-    ...Shadows.sm,
   },
   locationText: {
     fontSize: Typography.sizes.md,
@@ -541,13 +547,12 @@ const styles = StyleSheet.create({
     top: 0,
   },
   directionCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.lg,
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.xl,
     alignItems: 'center',
     minWidth: 200,
-    ...Shadows.sm,
   },
   directionCardSuccess: {
     backgroundColor: Colors.success + '10',
@@ -619,12 +624,11 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     gap: Spacing.sm,
-    ...Shadows.sm,
   },
   actionButtonText: {
     fontSize: Typography.sizes.md,

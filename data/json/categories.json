@@ -159,6 +159,166 @@
       "icon": "shield",
       "color": "#6366F1",
       "order": 8
+    },
+    {
+      "id": "eating",
+      "name": {
+        "ar": "أذكار الطعام",
+        "en": "Eating Adhkar"
+      },
+      "icon": "book",
+      "color": "#F97316",
+      "order": 9
+    },
+    {
+      "id": "mosque",
+      "name": {
+        "ar": "أذكار المسجد",
+        "en": "Mosque Adhkar"
+      },
+      "icon": "book",
+      "color": "#6366F1",
+      "order": 10
+    },
+    {
+      "id": "house",
+      "name": {
+        "ar": "أذكار المنزل",
+        "en": "Home Adhkar"
+      },
+      "icon": "book",
+      "color": "#8B5CF6",
+      "order": 11
+    },
+    {
+      "id": "travel",
+      "name": {
+        "ar": "أذكار السفر",
+        "en": "Travel Adhkar"
+      },
+      "icon": "book",
+      "color": "#06B6D4",
+      "order": 12
+    },
+    {
+      "id": "emotions",
+      "name": {
+        "ar": "أذكار الكرب والحزن",
+        "en": "Distress & Grief"
+      },
+      "icon": "book",
+      "color": "#D946EF",
+      "order": 13
+    },
+    {
+      "id": "wudu",
+      "name": {
+        "ar": "أذكار الوضوء",
+        "en": "Wudu Adhkar"
+      },
+      "icon": "book",
+      "color": "#14B8A6",
+      "order": 14
+    },
+    {
+      "id": "nature",
+      "name": {
+        "ar": "أذكار الطبيعة",
+        "en": "Nature Adhkar"
+      },
+      "icon": "book",
+      "color": "#84CC16",
+      "order": 15
+    },
+    {
+      "id": "fasting",
+      "name": {
+        "ar": "أذكار الصيام",
+        "en": "Fasting Adhkar"
+      },
+      "icon": "book",
+      "color": "#F59E0B",
+      "order": 16
+    },
+    {
+      "id": "protection",
+      "name": {
+        "ar": "أذكار الحماية",
+        "en": "Protection Adhkar"
+      },
+      "icon": "book",
+      "color": "#EF4444",
+      "order": 17
+    },
+    {
+      "id": "prayerSupplications",
+      "name": {
+        "ar": "أدعية الصلاة",
+        "en": "Prayer Supplications"
+      },
+      "icon": "book",
+      "color": "#EC4899",
+      "order": 18
+    },
+    {
+      "id": "salawat",
+      "name": {
+        "ar": "الصلاة على النبي",
+        "en": "Salawat",
+        "ur": "درود شریف",
+        "id": "Shalawat",
+        "tr": "Salavat",
+        "fr": "Prières sur le Prophète",
+        "de": "Salawat",
+        "hi": "दरूद शरीफ",
+        "bn": "দরূদ শরীফ",
+        "ms": "Selawat",
+        "ru": "Салават",
+        "es": "Salawat"
+      },
+      "icon": "star-crescent",
+      "color": "#E91E63",
+      "order": 19
+    },
+    {
+      "id": "istighfar",
+      "name": {
+        "ar": "الاستغفار",
+        "en": "Istighfar",
+        "ur": "استغفار",
+        "id": "Istighfar",
+        "tr": "İstiğfar",
+        "fr": "Demande de pardon",
+        "de": "Istighfar",
+        "hi": "इस्तिग़फ़ार",
+        "bn": "ইস্তিগফার",
+        "ms": "Istighfar",
+        "ru": "Истигфар",
+        "es": "Istighfar"
+      },
+      "icon": "heart",
+      "color": "#8B5CF6",
+      "order": 20
+    },
+    {
+      "id": "ayat_kursi",
+      "name": {
+        "ar": "آية الكرسي وخواتيم البقرة",
+        "en": "Ayat Al-Kursi & Last Verses of Al-Baqarah",
+        "ur": "آیۃ الکرسی اور خواتیم البقرة",
+        "id": "Ayat Kursi & Penutup Al-Baqarah",
+        "tr": "Ayet'el-Kürsi ve Bakara Sonu",
+        "fr": "Ayat Al-Kursi et derniers versets d'Al-Baqarah",
+        "de": "Ayat Al-Kursi und letzte Verse von Al-Baqarah",
+        "hi": "आयतुल कुर्सी और बकरा के अंतिम आयात",
+        "bn": "আয়াতুল কুরসী ও বাকারার শেষ আয়াত",
+        "ms": "Ayat Kursi & Penutup Al-Baqarah",
+        "ru": "Аят аль-Курси и последние аяты аль-Бакара",
+        "es": "Ayat Al-Kursi y últimos versos de Al-Baqarah"
+      },
+      "icon": "shield-star",
+      "color": "#DAA520",
+      "order": 21
     }
   ]
 }

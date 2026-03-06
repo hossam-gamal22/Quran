@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 
 import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
 import { getHijriDate, getHijriDateObject } from './hijri-date';
-import { allAzkar } from '@/data/azkar';
+import { getAllAzkar } from '@/lib/azkar-api';
 import { t } from '@/lib/i18n';
 
 // ========================================
@@ -229,6 +229,7 @@ export const prepareAzkarWidgetData = async (
   language: string = 'ar',
   categories: string[] = ['morning', 'evening', 'misc']
 ): Promise<WidgetAzkarData> => {
+  const allAzkar = getAllAzkar();
   // فلترة الأذكار حسب الفئات المختارة
   const filteredAzkar = allAzkar.filter(zikr => 
     categories.includes(zikr.category)
@@ -238,10 +239,11 @@ export const prepareAzkarWidgetData = async (
   const randomIndex = Math.floor(Math.random() * filteredAzkar.length);
   const randomZikr = filteredAzkar[randomIndex] || filteredAzkar[0];
   
-  // جلب الترجمة
-  const text = t(randomZikr.textKey, language);
-  const translation = language !== 'ar' ? t(randomZikr.textKey, 'en') : undefined;
-  const benefit = randomZikr.benefitKey ? t(randomZikr.benefitKey, language) : undefined;
+  // جلب النص والترجمة
+  const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
+  const text = language === 'ar' ? randomZikr.arabic : (randomZikr.translations?.[lang] || randomZikr.arabic);
+  const translation = language !== 'ar' ? randomZikr.translations?.['en'] : undefined;
+  const benefit = randomZikr.benefit?.[lang as 'ar' | 'en' | 'fr'] || undefined;
 
   // حالة إكمال الأذكار (من التخزين)
   let morningCompleted = false;

@@ -1,17 +1,31 @@
 // lib/share-service.ts
-// في بداية الملف، استيراد اسم التطبيق
+// نظام المشاركة المحسّن - نص وصورة
 
 import { Share, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { APP_CONFIG, APP_NAME } from '../constants/app';
 
 // ===============================
-// اسم التطبيق والتوقيع (ديناميكي)
+// أنواع
 // ===============================
-const APP_SIGNATURE = APP_CONFIG.getShareSignature();
 
-// أو استخدام الدالة مع رابط التحميل
-const getFullSignature = () => APP_CONFIG.getShareWithDownload();
+export interface ShareOptions {
+  includeAppName?: boolean;
+  includeTranslation?: boolean;
+  includeReference?: boolean;
+  includeBenefit?: boolean;
+}
+
+export interface ShareContent {
+  title?: string;
+  arabicText: string;
+  translation?: string;
+  reference?: string;
+  referenceNumber?: string;
+  benefit?: string;
+}
 
 // ===============================
 // تنسيق آية قرآنية
@@ -33,7 +47,7 @@ export function formatAyahForShare(
   }
   
   if (includeAppName) {
-    text += APP_CONFIG.getShareSignature(); // ✅ يستخدم "رُوح المسلم"
+    text += APP_CONFIG.getShareSignature();
   }
   
   return text;
@@ -67,10 +81,73 @@ export function formatZikrForShare(
   }
   
   if (includeAppName) {
-    text += APP_CONFIG.getShareSignature(); // ✅ يستخدم "رُوح المسلم"
+    text += APP_CONFIG.getShareSignature();
   }
   
   return text;
 }
 
-// ... باقي الدوال تستخدم نفس الطريقة
+// ===============================
+// تنسيق أوقات الصلاة
+// ===============================
+export function formatPrayerTimesForShare(
+  prayerTimes: { name: string; time: string }[],
+  date: string,
+  location?: string
+): string {
+  let text = `🕌 مواقيت الصلاة\n`;
+  if (location) text += `📍 ${location}\n`;
+  text += `📅 ${date}\n\n`;
+  
+  for (const prayer of prayerTimes) {
+    text += `${prayer.name}: ${prayer.time}\n`;
+  }
+  
+  text += APP_CONFIG.getShareSignature();
+  return text;
+}
+
+// ===============================
+// مشاركة نص
+// ===============================
+export async function shareText(text: string, title?: string): Promise<void> {
+  try {
+    await Share.share(
+      { message: text, title },
+      { dialogTitle: title || 'مشاركة من ' + APP_NAME }
+    );
+  } catch (error) {
+    console.error('Error sharing text:', error);
+  }
+}
+
+// ===============================
+// مشاركة صورة (من ViewShot URI)
+// ===============================
+export async function shareImage(imageUri: string, title?: string): Promise<void> {
+  try {
+    if (!(await Sharing.isAvailableAsync())) {
+      console.warn('Sharing is not available on this platform');
+      return;
+    }
+    
+    await Sharing.shareAsync(imageUri, {
+      mimeType: 'image/png',
+      dialogTitle: title || 'مشاركة من ' + APP_NAME,
+      UTI: 'public.png',
+    });
+  } catch (error) {
+    console.error('Error sharing image:', error);
+  }
+}
+
+// ===============================
+// نسخ للحافظة
+// ===============================
+export async function copyText(text: string): Promise<void> {
+  try {
+    await Clipboard.setStringAsync(text);
+  } catch (error) {
+    console.error('Error copying text:', error);
+  }
+}

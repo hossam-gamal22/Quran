@@ -8,6 +8,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Switch,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -35,6 +36,7 @@ interface PrayerListProps {
   notificationSettings?: Record<PrayerName, boolean>;
   onToggleNotification?: (prayer: PrayerName, enabled: boolean) => void;
   showNotificationToggle?: boolean;
+  showSunrise?: boolean;
 }
 
 interface PrayerItemProps {
@@ -72,6 +74,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   },
   onToggleNotification,
   showNotificationToggle = false,
+  showSunrise = true,
 }) => {
   const { t } = useSettings();
 
@@ -95,7 +98,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   const nextPrayer = getNextPrayer(prayerTimes);
   const prayers: { name: PrayerName; time: string }[] = [
     { name: 'fajr', time: prayerTimes.fajr },
-    { name: 'sunrise', time: prayerTimes.sunrise },
+    ...(showSunrise ? [{ name: 'sunrise' as PrayerName, time: prayerTimes.sunrise }] : []),
     { name: 'dhuhr', time: prayerTimes.dhuhr },
     { name: 'asr', time: prayerTimes.asr },
     { name: 'maghrib', time: prayerTimes.maghrib },
@@ -143,6 +146,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;
+  const activeGreen = '#2f7659';
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -172,14 +176,13 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           styles.prayerItem,
           isDarkMode && styles.prayerItemDark,
           isNext && styles.prayerItemNext,
-          isNext && { borderColor: accentColor },
           isPassed && !isNext && styles.prayerItemPassed,
         ]}
       >
         <View
           style={[
             styles.iconContainer,
-            { backgroundColor: isNext ? accentColor : `${accentColor}30` },
+            { backgroundColor: isNext ? activeGreen : `${accentColor}30` },
           ]}
         >
           <MaterialCommunityIcons
@@ -195,13 +198,13 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               styles.prayerName,
               isDarkMode && styles.textLight,
               isPassed && !isNext && styles.textPassed,
-              isNext && { color: accentColor },
+              isNext && { color: activeGreen },
             ]}
           >
             {prayerNameLocalized}
           </Text>
           {isNext && (
-            <View style={[styles.nextBadge, { backgroundColor: accentColor }]}>
+            <View style={[styles.nextBadge, { backgroundColor: activeGreen }]}>
               <Text style={styles.nextBadgeText}>
                 {t('prayer.nextPrayer')}
               </Text>
@@ -215,19 +218,19 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               styles.prayerTime,
               isDarkMode && styles.textLight,
               isPassed && !isNext && styles.textPassed,
-              isNext && { color: accentColor },
+              isNext && { color: activeGreen },
             ]}
           >
             {formatTime12h(time)}
           </Text>
 
-          {showNotificationToggle && name !== 'sunrise' && (
+          {showNotificationToggle && (
             <Switch
-              value={notificationEnabled}
-              onValueChange={handleToggle}
-              trackColor={{ false: '#767577', true: `${accentColor}80` }}
-              thumbColor={notificationEnabled ? accentColor : '#f4f3f4'}
-              style={styles.switch}
+              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+              thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+              ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+              onValueChange={(val) => handleToggle(val)}
+              value={notificationEnabled || false}
             />
           )}
 
@@ -249,17 +252,14 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 20,
     padding: 10,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   containerDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: 'rgba(120,120,128,0.18)',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -282,20 +282,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginVertical: 4,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 2,
+    backgroundColor: 'rgba(120,120,128,0.1)',
+    borderWidth: 1,
     borderColor: 'transparent',
   },
   prayerItemDark: {
-    backgroundColor: '#252540',
+    backgroundColor: 'rgba(120,120,128,0.2)',
   },
   prayerItemNext: {
-    backgroundColor: '#fff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    backgroundColor: 'rgba(47,118,89,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(47,118,89,0.35)',
   },
   prayerItemPassed: {
     opacity: 0.6,
@@ -340,9 +337,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Cairo-Bold',
     color: '#333',
-  },
-  switch: {
-    transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
   },
   passedIcon: {
     marginLeft: 4,

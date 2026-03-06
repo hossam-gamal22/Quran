@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKhatma } from '../../contexts/KhatmaContext';
-import { useColors } from '../../lib/theme-provider';
+import { useColors } from '../../hooks/use-colors';
 import { getPageSurah, getKhatmaStats } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
 import {

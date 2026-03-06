@@ -7,26 +7,38 @@ import {
   ScrollView,
   Modal,
   TextInput,
-  Animated,
   Vibration,
   Alert,
   Dimensions,
   Platform,
+  FlatList,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
-import { APP_CONFIG, APP_NAME } from '../../constants/app';
-import { ShareButton } from '../components/ShareButton';
-import { copyToClipboard } from '../../lib/share-service';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedProps,
+  withTiming,
+  withSpring,
+  useAnimatedStyle,
+  Easing,
+} from 'react-native-reanimated';
+import { useSettings } from '../../contexts/SettingsContext';
+import BackgroundWrapper from '../../components/ui/BackgroundWrapper';
+import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
+import { copyToClipboard } from '../../lib/clipboard';
+import { APP_CONFIG } from '../../constants/app';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { Share } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ============================================
-// الأنواع والواجهات
+// الأنواع
 // ============================================
 
 interface TasbihItem {
@@ -40,13 +52,6 @@ interface TasbihItem {
   grade?: string;
 }
 
-interface TasbihProgress {
-  itemId: number;
-  count: number;
-  date: string;
-  completed: boolean;
-}
-
 interface CustomTasbih {
   id: number;
   text: string;
@@ -55,7 +60,7 @@ interface CustomTasbih {
 }
 
 // ============================================
-// بيانات التسبيحات المعتمدة مع التخريج
+// بيانات التسبيحات المعتمدة
 // ============================================
 
 const PRESET_TASBIHAT: TasbihItem[] = [
@@ -94,7 +99,7 @@ const PRESET_TASBIHAT: TasbihItem[] = [
     text: 'لَا إِلَهَ إِلَّا اللهُ',
     transliteration: 'La ilaha illa Allah',
     target: 100,
-    virtue: 'كانت له عدل عشر رقاب، وكتبت له مائة حسنة، ومحيت عنه مائة سيئة، وكانت له حرزاً من الشيطان',
+    virtue: 'كانت له عدل عشر رقاب، وكتبت له مائة حسنة',
     reference: 'رواه البخاري (3293) ومسلم (2691)',
     source: 'hadith_sahih',
     grade: 'متفق عليه',
@@ -104,7 +109,7 @@ const PRESET_TASBIHAT: TasbihItem[] = [
     text: 'لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
     transliteration: 'La ilaha illa Allahu wahdahu la sharika lah...',
     target: 100,
-    virtue: 'كانت له عدل عشر رقاب، وكتبت له مائة حسنة، ومحيت عنه مائة سيئة، وكانت له حرزاً من الشيطان يومه ذلك حتى يمسي',
+    virtue: 'كانت له عدل عشر رقاب وكتبت له مائة حسنة ومحيت عنه مائة سيئة',
     reference: 'رواه البخاري (3293) ومسلم (2691)',
     source: 'hadith_sahih',
     grade: 'متفق عليه',
@@ -144,7 +149,7 @@ const PRESET_TASBIHAT: TasbihItem[] = [
     text: 'أَسْتَغْفِرُ اللهَ',
     transliteration: 'Astaghfirullah',
     target: 100,
-    virtue: 'من لزم الاستغفار جعل الله له من كل هم فرجاً، ومن كل ضيق مخرجاً',
+    virtue: 'من لزم الاستغفار جعل الله له من كل هم فرجاً',
     reference: 'رواه أبو داود (1518) وصححه الألباني',
     source: 'hadith_sahih',
     grade: 'صحيح',
@@ -164,7 +169,7 @@ const PRESET_TASBIHAT: TasbihItem[] = [
     text: 'سُبْحَانَ اللهِ، وَالْحَمْدُ لِلَّهِ، وَلَا إِلَهَ إِلَّا اللهُ، وَاللهُ أَكْبَرُ',
     transliteration: 'Subhan Allah, wal hamdulillah...',
     target: 100,
-    virtue: 'أحب الكلام إلى الله، ولا يضرك بأيهن بدأت',
+    virtue: 'أحب الكلام إلى الله',
     reference: 'رواه مسلم (2137)',
     source: 'hadith_sahih',
     grade: 'صحيح',
@@ -212,843 +217,655 @@ const PRESET_TASBIHAT: TasbihItem[] = [
 ];
 
 // ============================================
+// الثوابت
+// ============================================
+
+const RING_SIZE = SCREEN_WIDTH * 0.6;
+const RING_STROKE = 14;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const GREEN = '#2f7659';
+const GREEN_LIGHT = '#34D399';
+
+const STORAGE_KEYS = {
+  progress: 'tasbih_progress',
+  settings: 'tasbih_settings',
+  dailyStats: 'tasbih_daily_stats',
+  customTasbihat: 'custom_tasbihat',
+  completedToday: 'tasbih_completed_today',
+};
+
+// ============================================
 // المكون الرئيسي
 // ============================================
 
 export default function TasbihScreen() {
-  const router = useRouter();
-  
-  // الحالات
+  const { isDarkMode, settings, isRTL } = useSettings();
+
+  const C = {
+    bg: isDarkMode ? '#0f1117' : '#f5f5f5',
+    card: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.75)',
+    cardBorder: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+    text: isDarkMode ? '#fff' : '#1a1a1a',
+    textSec: isDarkMode ? '#8e8e93' : '#6c6c70',
+    ring: GREEN,
+    ringBg: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+  };
+
+  // ===== STATE =====
   const [selectedTasbih, setSelectedTasbih] = useState<TasbihItem>(PRESET_TASBIHAT[0]);
   const [count, setCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [rounds, setRounds] = useState(0);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
   const [showTasbihList, setShowTasbihList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [customTasbihat, setCustomTasbihat] = useState<CustomTasbih[]>([]);
   const [customText, setCustomText] = useState('');
   const [customTarget, setCustomTarget] = useState('33');
-  const [dailyStats, setDailyStats] = useState<{ [key: string]: number }>({});
-  const [showReference, setShowReference] = useState(true);
+  const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
   const [showVirtue, setShowVirtue] = useState(true);
-  
-  // الأنيميشن
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  const [completedTasbihat, setCompletedTasbihat] = useState<Record<number, boolean>>({});
 
-  // ============================================
-  // تحميل البيانات
-  // ============================================
+  // ===== ANIMATION =====
+  const progress = useSharedValue(0);
+  const tapScale = useSharedValue(1);
+
+  const animatedCircleProps = useAnimatedProps(() => ({
+    strokeDashoffset: RING_CIRCUMFERENCE * (1 - progress.value),
+  }));
+
+  const tapAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: tapScale.value }],
+  }));
+
+  // ===== DATA LOADING =====
+  useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    loadData();
-    startPulseAnimation();
-  }, []);
-
-  useEffect(() => {
-    // تحديث شريط التقدم
-    Animated.timing(progressAnim, {
-      toValue: count / selectedTasbih.target,
+    progress.value = withTiming(count / selectedTasbih.target, {
       duration: 300,
-      useNativeDriver: false,
-    }).start();
+      easing: Easing.out(Easing.cubic),
+    });
   }, [count, selectedTasbih.target]);
 
   const loadData = async () => {
     try {
-      // تحميل الإعدادات
-      const settings = await AsyncStorage.getItem('tasbih_settings');
-      if (settings) {
-        const parsed = JSON.parse(settings);
-        setVibrationEnabled(parsed.vibrationEnabled ?? true);
-        setSoundEnabled(parsed.soundEnabled ?? false);
-        setShowReference(parsed.showReference ?? true);
-        setShowVirtue(parsed.showVirtue ?? true);
-      }
+      const [settingsRaw, customRaw, progressRaw, statsRaw, completedRaw] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.settings),
+        AsyncStorage.getItem(STORAGE_KEYS.customTasbihat),
+        AsyncStorage.getItem(STORAGE_KEYS.progress),
+        AsyncStorage.getItem(STORAGE_KEYS.dailyStats),
+        AsyncStorage.getItem(STORAGE_KEYS.completedToday),
+      ]);
 
-      // تحميل التسبيحات المخصصة
-      const custom = await AsyncStorage.getItem('custom_tasbihat');
-      if (custom) {
-        setCustomTasbihat(JSON.parse(custom));
+      if (settingsRaw) {
+        const p = JSON.parse(settingsRaw);
+        setVibrationEnabled(p.vibrationEnabled ?? true);
+        setShowVirtue(p.showVirtue ?? true);
+        setAutoAdvance(p.autoAdvance ?? false);
       }
-
-      // تحميل التقدم المحفوظ
-      const today = new Date().toDateString();
-      const progress = await AsyncStorage.getItem('tasbih_progress');
-      if (progress) {
-        const parsed = JSON.parse(progress);
-        if (parsed.date === today) {
-          setCount(parsed.count || 0);
-          setTotalCount(parsed.totalCount || 0);
-          setRounds(parsed.rounds || 0);
-          if (parsed.selectedId) {
-            const found = PRESET_TASBIHAT.find(t => t.id === parsed.selectedId);
+      if (customRaw) setCustomTasbihat(JSON.parse(customRaw));
+      if (progressRaw) {
+        const p = JSON.parse(progressRaw);
+        if (p.date === new Date().toDateString()) {
+          setCount(p.count || 0);
+          setTotalCount(p.totalCount || 0);
+          setRounds(p.rounds || 0);
+          if (p.selectedId) {
+            const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
             if (found) setSelectedTasbih(found);
           }
         }
       }
-
-      // تحميل الإحصائيات
-      const stats = await AsyncStorage.getItem('tasbih_daily_stats');
-      if (stats) {
-        setDailyStats(JSON.parse(stats));
+      if (statsRaw) setDailyStats(JSON.parse(statsRaw));
+      if (completedRaw) {
+        const parsed = JSON.parse(completedRaw);
+        if (parsed.date === new Date().toDateString()) {
+          setCompletedTasbihat(parsed.completed || {});
+        }
       }
-    } catch (error) {
-      console.error('Error loading tasbih data:', error);
+    } catch (e) {
+      console.error('Error loading tasbih data:', e);
     }
   };
 
-  const saveProgress = async () => {
+  const saveProgress = useCallback(async (c: number, t: number, r: number) => {
     try {
       const today = new Date().toDateString();
-      await AsyncStorage.setItem('tasbih_progress', JSON.stringify({
-        date: today,
-        count,
-        totalCount,
-        rounds,
-        selectedId: selectedTasbih.id,
+      await AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({
+        date: today, count: c, totalCount: t, rounds: r, selectedId: selectedTasbih.id,
       }));
-
-      // تحديث الإحصائيات اليومية
-      const newStats = { ...dailyStats };
-      newStats[today] = totalCount;
+      const newStats = { ...dailyStats, [today]: t };
       setDailyStats(newStats);
-      await AsyncStorage.setItem('tasbih_daily_stats', JSON.stringify(newStats));
-    } catch (error) {
-      console.error('Error saving progress:', error);
-    }
-  };
+      await AsyncStorage.setItem(STORAGE_KEYS.dailyStats, JSON.stringify(newStats));
+    } catch (e) { console.error(e); }
+  }, [selectedTasbih.id, dailyStats]);
 
   const saveSettings = async () => {
-    try {
-      await AsyncStorage.setItem('tasbih_settings', JSON.stringify({
-        vibrationEnabled,
-        soundEnabled,
-        showReference,
-        showVirtue,
-      }));
-    } catch (error) {
-      console.error('Error saving settings:', error);
-    }
+    await AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({ vibrationEnabled, showVirtue, autoAdvance }));
   };
 
-  // ============================================
-  // الأنيميشن
-  // ============================================
-
-  const startPulseAnimation = () => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  };
-
-  const animatePress = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 50,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  // ============================================
-  // معالجة الضغط
-  // ============================================
-
+  // ===== HANDLERS =====
   const handlePress = useCallback(() => {
-    animatePress();
+    tapScale.value = withSpring(0.95, { damping: 10, stiffness: 300 }, () => {
+      tapScale.value = withSpring(1, { damping: 10, stiffness: 200 });
+    });
 
     if (vibrationEnabled) {
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        Vibration.vibrate(30);
-      }
+      Platform.OS === 'ios'
+        ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        : Vibration.vibrate(30);
     }
 
     const newCount = count + 1;
     const newTotal = totalCount + 1;
-    setCount(newCount);
-    setTotalCount(newTotal);
 
-    // التحقق من اكتمال الجولة
     if (newCount >= selectedTasbih.target) {
       if (vibrationEnabled) {
-        if (Platform.OS === 'ios') {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } else {
-          Vibration.vibrate([0, 100, 100, 100]);
-        }
+        Platform.OS === 'ios'
+          ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+          : Vibration.vibrate([0, 100, 100, 100]);
       }
-      setRounds(prev => prev + 1);
       setCount(0);
+      setRounds(r => r + 1);
+      setTotalCount(newTotal);
+      saveProgress(0, newTotal, rounds + 1);
+      const newCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
+      setCompletedTasbihat(newCompleted);
+      AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
+        date: new Date().toDateString(), completed: newCompleted,
+      }));
       
-      Alert.alert(
-        '🎉 ما شاء الله!',
-        `أكملت جولة من "${selectedTasbih.text}"\n\nإجمالي الجولات: ${rounds + 1}`,
-        [{ text: 'متابعة', style: 'default' }]
-      );
+      // Auto-advance to next tasbih if enabled
+      if (autoAdvance) {
+        const allItems: TasbihItem[] = [
+          ...PRESET_TASBIHAT,
+          ...customTasbihat.map(ct => ({
+            id: ct.id,
+            text: ct.text,
+            target: ct.target,
+            source: 'athar' as const,
+          })),
+        ];
+        const currentIndex = allItems.findIndex(t => t.id === selectedTasbih.id);
+        const nextIndex = (currentIndex + 1) % allItems.length;
+        setSelectedTasbih(allItems[nextIndex]);
+      }
+    } else {
+      setCount(newCount);
+      setTotalCount(newTotal);
+      saveProgress(newCount, newTotal, rounds);
     }
-
-    // حفظ التقدم
-    saveProgress();
-  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled]);
+  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress]);
 
   const handleReset = () => {
-    Alert.alert(
-      'إعادة تعيين',
-      'هل تريد إعادة تعيين العداد الحالي؟',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'إعادة تعيين',
-          style: 'destructive',
-          onPress: () => {
-            setCount(0);
-            saveProgress();
-          },
-        },
-      ]
-    );
+    Alert.alert('إعادة تعيين', 'هل تريد إعادة تعيين العداد؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'نعم', style: 'destructive', onPress: () => { setCount(0); saveProgress(0, totalCount, rounds); } },
+    ]);
   };
 
   const handleResetAll = () => {
-    Alert.alert(
-      'إعادة تعيين الكل',
-      'هل تريد إعادة تعيين جميع العدادات والجولات؟',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'إعادة تعيين',
-          style: 'destructive',
-          onPress: () => {
-            setCount(0);
-            setTotalCount(0);
-            setRounds(0);
-            saveProgress();
-          },
-        },
-      ]
-    );
-  };
-
-  // ============================================
-  // المشاركة والنسخ
-  // ============================================
-
-  const formatTasbihForShare = () => {
-    let shareText = `📿 تسبيح\n\n`;
-    shareText += `「 ${selectedTasbih.text} 」\n\n`;
-    shareText += `🔢 العدد المستهدف: ${selectedTasbih.target}\n`;
-    
-    if (selectedTasbih.virtue && showVirtue) {
-      shareText += `\n✨ الفضل:\n${selectedTasbih.virtue}\n`;
-    }
-    
-    if (selectedTasbih.reference && showReference) {
-      shareText += `\n📚 المصدر: ${selectedTasbih.reference}`;
-      if (selectedTasbih.grade) {
-        shareText += ` (${selectedTasbih.grade})`;
-      }
-    }
-    
-    shareText += `\n\n${APP_CONFIG.getShareSignature()}`;
-    
-    return shareText;
-  };
-
-  const handleShare = async () => {
-    try {
-      const shareText = formatTasbihForShare();
-      await Share.share({
-        message: shareText,
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
-  };
-
-  const handleCopy = async () => {
-    const shareText = formatTasbihForShare();
-    await copyToClipboard(shareText);
-    Alert.alert('تم النسخ', 'تم نسخ التسبيح إلى الحافظة');
-    setShowShareModal(false);
-  };
-
-  const shareProgress = async () => {
-    const shareText = `📿 إنجازاتي في التسبيح اليوم\n\n` +
-      `✅ التسبيح الحالي: ${selectedTasbih.text}\n` +
-      `🔢 العدد: ${count}/${selectedTasbih.target}\n` +
-      `🔄 الجولات المكتملة: ${rounds}\n` +
-      `📊 الإجمالي اليوم: ${totalCount}\n\n` +
-      `${APP_CONFIG.getShareSignature()}`;
-    
-    try {
-      await Share.share({ message: shareText });
-    } catch (error) {
-      console.error('Error sharing progress:', error);
-    }
-  };
-
-  // ============================================
-  // التسبيحات المخصصة
-  // ============================================
-
-  const addCustomTasbih = async () => {
-    if (!customText.trim()) {
-      Alert.alert('خطأ', 'يرجى إدخال نص التسبيح');
-      return;
-    }
-
-    const target = parseInt(customTarget) || 33;
-    const newCustom: CustomTasbih = {
-      id: Date.now(),
-      text: customText.trim(),
-      target,
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [...customTasbihat, newCustom];
-    setCustomTasbihat(updated);
-    await AsyncStorage.setItem('custom_tasbihat', JSON.stringify(updated));
-    
-    setCustomText('');
-    setCustomTarget('33');
-    setShowCustomModal(false);
-    
-    Alert.alert('تم', 'تمت إضافة التسبيح المخصص');
-  };
-
-  const deleteCustomTasbih = async (id: number) => {
-    Alert.alert(
-      'حذف التسبيح',
-      'هل تريد حذف هذا التسبيح المخصص؟',
-      [
-        { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'حذف',
-          style: 'destructive',
-          onPress: async () => {
-            const updated = customTasbihat.filter(t => t.id !== id);
-            setCustomTasbihat(updated);
-            await AsyncStorage.setItem('custom_tasbihat', JSON.stringify(updated));
-          },
-        },
-      ]
-    );
+    Alert.alert('إعادة تعيين الكل', 'هل تريد إعادة تعيين كل شيء؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'نعم', style: 'destructive', onPress: () => { setCount(0); setTotalCount(0); setRounds(0); saveProgress(0, 0, 0); } },
+    ]);
   };
 
   const selectTasbih = (tasbih: TasbihItem | CustomTasbih) => {
-    if ('virtue' in tasbih) {
-      setSelectedTasbih(tasbih);
-    } else {
-      setSelectedTasbih({
-        id: tasbih.id,
-        text: tasbih.text,
-        target: tasbih.target,
-        source: 'athar',
-      });
-    }
+    const item: TasbihItem = 'virtue' in tasbih
+      ? tasbih
+      : { id: tasbih.id, text: tasbih.text, target: tasbih.target, source: 'athar' as const };
+    setSelectedTasbih(item);
     setCount(0);
     setShowTasbihList(false);
   };
 
-  // ============================================
-  // حساب النسبة المئوية
-  // ============================================
+  const addCustomTasbih = async () => {
+    if (!customText.trim()) { Alert.alert('خطأ', 'يرجى إدخال نص التسبيح'); return; }
+    const newCustom: CustomTasbih = { id: Date.now(), text: customText.trim(), target: parseInt(customTarget) || 33, createdAt: new Date().toISOString() };
+    const updated = [...customTasbihat, newCustom];
+    setCustomTasbihat(updated);
+    await AsyncStorage.setItem(STORAGE_KEYS.customTasbihat, JSON.stringify(updated));
+    setCustomText(''); setCustomTarget('33'); setShowCustomModal(false);
+  };
 
-  const progressPercentage = Math.round((count / selectedTasbih.target) * 100);
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  });
+  const deleteCustomTasbih = async (id: number) => {
+    Alert.alert('حذف', 'هل تريد حذف هذا التسبيح؟', [
+      { text: 'إلغاء', style: 'cancel' },
+      { text: 'حذف', style: 'destructive', onPress: async () => {
+        const updated = customTasbihat.filter(t => t.id !== id);
+        setCustomTasbihat(updated);
+        await AsyncStorage.setItem(STORAGE_KEYS.customTasbihat, JSON.stringify(updated));
+      }},
+    ]);
+  };
 
-  // ============================================
-  // العرض
-  // ============================================
+  const handleDecrement = useCallback(() => {
+    if (count <= 0) return;
+    if (vibrationEnabled) {
+      Platform.OS === 'ios'
+        ? Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        : Vibration.vibrate(20);
+    }
+    const newCount = count - 1;
+    const newTotal = Math.max(0, totalCount - 1);
+    setCount(newCount);
+    setTotalCount(newTotal);
+    saveProgress(newCount, newTotal, rounds);
+  }, [count, totalCount, rounds, vibrationEnabled, saveProgress]);
 
+  const handleShare = async () => {
+    const text = `📿 تسبيح\n\n「 ${selectedTasbih.text} 」\n\n🔢 العدد: ${count}/${selectedTasbih.target}\n🔄 الجولات: ${rounds}\n📊 الإجمالي اليوم: ${totalCount}\n\n${APP_CONFIG.getShareSignature()}`;
+    try { await Share.share({ message: text }); } catch (e) { console.error(e); }
+  };
+
+  // ===== COMPUTED =====
+  const allTimeTotal = Object.values(dailyStats).reduce((a, b) => a + b, 0);
+  const daysCount = Object.keys(dailyStats).length || 1;
+  const avgPerDay = Math.round(allTimeTotal / daysCount);
+  const progressPct = Math.round((count / selectedTasbih.target) * 100);
+
+  // ===== RENDER =====
   return (
-    <View style={styles.container}>
-      {/* الهيدر */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={Colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>عداد التسبيح</Text>
-        
-        <View style={styles.headerActions}>
-          <TouchableOpacity 
-            onPress={() => setShowStatsModal(true)} 
-            style={styles.headerButton}
-          >
-            <Ionicons name="stats-chart-outline" size={22} color={Colors.text} />
+    <BackgroundWrapper backgroundKey={settings?.display?.appBackground} backgroundUrl={settings?.display?.appBackgroundUrl} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        {/* Header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => setShowStatsModal(true)} style={s.headerBtn}>
+            <MaterialCommunityIcons name="chart-bar" size={22} color={C.text} />
           </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => setShowSettings(true)} 
-            style={styles.headerButton}
-          >
-            <Ionicons name="settings-outline" size={22} color={Colors.text} />
+          <Text style={[s.headerTitle, { color: C.text }]}>التسبيح</Text>
+          <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
+            <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* الإحصائيات السريعة */}
-      <View style={styles.quickStats}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{totalCount}</Text>
-          <Text style={styles.statLabel}>الإجمالي</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{rounds}</Text>
-          <Text style={styles.statLabel}>الجولات</Text>
-        </View>
-      </View>
-
-      {/* بطاقة التسبيح */}
-      <TouchableOpacity 
-        style={styles.tasbihSelector}
-        onPress={() => setShowTasbihList(true)}
-      >
-        <Text style={styles.tasbihSelectorText} numberOfLines={1}>
-          {selectedTasbih.text}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color={Colors.primary} />
-      </TouchableOpacity>
-
-      {/* شريط التقدم */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <Animated.View 
-            style={[
-              styles.progressFill, 
-              { width: progressWidth }
-            ]} 
-          />
-        </View>
-        <Text style={styles.progressText}>{count} / {selectedTasbih.target}</Text>
-        <Text style={styles.progressPercentage}>{progressPercentage}%</Text>
-      </View>
-
-      {/* زر العداد الرئيسي */}
-      <View style={styles.counterContainer}>
-        <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+        {/* Horizontal Tasbih Slider */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.sliderContent}
+          style={s.slider}
+        >
+          {PRESET_TASBIHAT.map((t) => {
+            const isSelected = selectedTasbih.id === t.id;
+            const isCompleted = completedTasbihat[t.id];
+            return (
+              <TouchableOpacity
+                key={t.id}
+                onPress={() => selectTasbih(t)}
+                activeOpacity={0.7}
+                style={[
+                  s.sliderItem,
+                  { backgroundColor: isCompleted ? GREEN : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') },
+                  isSelected && { borderColor: GREEN, borderWidth: 2 },
+                ]}
+              >
+                {isCompleted && <MaterialCommunityIcons name="check-circle" size={14} color="#fff" style={{ marginLeft: 4 }} />}
+                <Text
+                  style={[
+                    s.sliderItemText,
+                    { color: isCompleted ? '#fff' : C.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t.text.length > 25 ? t.text.slice(0, 23) + '…' : t.text}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {customTasbihat.map((t) => {
+            const isSelected = selectedTasbih.id === t.id;
+            const isCompleted = completedTasbihat[t.id];
+            return (
+              <TouchableOpacity
+                key={t.id}
+                onPress={() => selectTasbih(t)}
+                activeOpacity={0.7}
+                style={[
+                  s.sliderItem,
+                  { backgroundColor: isCompleted ? GREEN : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') },
+                  isSelected && { borderColor: GREEN, borderWidth: 2 },
+                ]}
+              >
+                {isCompleted && <MaterialCommunityIcons name="check-circle" size={14} color="#fff" style={{ marginLeft: 4 }} />}
+                <Text
+                  style={[
+                    s.sliderItemText,
+                    { color: isCompleted ? '#fff' : C.text },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {t.text.length > 25 ? t.text.slice(0, 23) + '…' : t.text}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
           <TouchableOpacity
-            style={styles.counterButton}
-            onPress={handlePress}
-            activeOpacity={0.8}
+            onPress={() => setShowCustomModal(true)}
+            style={[s.sliderItem, { backgroundColor: GREEN + '18', borderColor: GREEN, borderStyle: 'dashed' }]}
           >
-            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-              <Text style={styles.counterNumber}>{count}</Text>
-              <Text style={styles.counterLabel}>اضغط للتسبيح</Text>
+            <MaterialCommunityIcons name="plus" size={18} color={GREEN} />
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Selected tasbih info with navigation */}
+        <View style={s.selectedInfo}>
+          <View style={s.navRow}>
+            <TouchableOpacity
+              onPress={() => {
+                const allItems = [...PRESET_TASBIHAT, ...customTasbihat];
+                const idx = allItems.findIndex(t => t.id === selectedTasbih.id);
+                // In RTL: left button goes to PREVIOUS, in LTR: left button goes to PREVIOUS
+                if (idx > 0) selectTasbih(allItems[idx - 1]);
+              }}
+              style={[s.navBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <MaterialCommunityIcons name={isRTL ? "chevron-right" : "chevron-left"} size={22} color={C.textSec} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={[s.selectedText, { color: C.text }]}>{selectedTasbih.text}</Text>
+              {selectedTasbih.transliteration && (
+                <Text style={[s.selectedTranslit, { color: C.textSec }]}>{selectedTasbih.transliteration}</Text>
+              )}
+              {selectedTasbih.virtue && showVirtue && (
+                <Text style={[s.selectedVirtue, { color: C.textSec }]} numberOfLines={2}>{selectedTasbih.virtue}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                const allItems = [...PRESET_TASBIHAT, ...customTasbihat];
+                const idx = allItems.findIndex(t => t.id === selectedTasbih.id);
+                // In RTL: right button goes to NEXT, in LTR: right button goes to NEXT
+                if (idx < allItems.length - 1) selectTasbih(allItems[idx + 1]);
+              }}
+              style={[s.navBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+            >
+              <MaterialCommunityIcons name={isRTL ? "chevron-left" : "chevron-right"} size={22} color={C.textSec} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ===== MAIN COUNTER with RING ===== */}
+        <View style={s.counterArea}>
+          <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
+            <Animated.View style={[s.ringContainer, tapAnimStyle, {
+              backgroundColor: isDarkMode ? 'rgba(47,118,89,0.04)' : 'rgba(47,118,89,0.03)',
+              borderRadius: (RING_SIZE + 20) / 2,
+              ...Platform.select({
+                ios: { shadowColor: GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 24 },
+                android: { elevation: 6 },
+              }),
+            }]}>
+              <Svg width={RING_SIZE} height={RING_SIZE} style={{ transform: [{ rotate: '-90deg' }] }}>
+                {/* Inner subtle fill */}
+                <Circle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  r={RING_RADIUS - RING_STROKE / 2 - 2}
+                  fill={GREEN + '06'}
+                />
+                {/* Background ring */}
+                <Circle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  r={RING_RADIUS}
+                  stroke={C.ringBg}
+                  strokeWidth={RING_STROKE}
+                  fill="transparent"
+                />
+                {/* Progress ring */}
+                <AnimatedCircle
+                  cx={RING_SIZE / 2}
+                  cy={RING_SIZE / 2}
+                  r={RING_RADIUS}
+                  stroke={GREEN}
+                  strokeWidth={RING_STROKE}
+                  fill="transparent"
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  animatedProps={animatedCircleProps}
+                  strokeLinecap="round"
+                />
+              </Svg>
+              {/* Center content */}
+              <View style={s.ringCenter}>
+                <Text style={[s.countNum, { color: C.text }]}>{count}</Text>
+                <View style={[s.countDivider, { backgroundColor: C.textSec }]} />
+                <Text style={[s.countTarget, { color: C.textSec }]}>{selectedTasbih.target}</Text>
+              </View>
             </Animated.View>
           </TouchableOpacity>
-        </Animated.View>
-      </View>
 
-      {/* أزرار التحكم */}
-      <View style={styles.controlButtons}>
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={handleReset}
-        >
-          <Ionicons name="refresh-outline" size={24} color={Colors.text} />
-          <Text style={styles.controlButtonText}>إعادة</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={() => setShowShareModal(true)}
-        >
-          <Ionicons name="share-outline" size={24} color={Colors.text} />
-          <Text style={styles.controlButtonText}>مشاركة</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.controlButton}
-          onPress={shareProgress}
-        >
-          <Ionicons name="trophy-outline" size={24} color={Colors.text} />
-          <Text style={styles.controlButtonText}>إنجازاتي</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* معلومات التسبيح */}
-      {(selectedTasbih.virtue && showVirtue) || (selectedTasbih.reference && showReference) ? (
-        <ScrollView style={styles.infoContainer} showsVerticalScrollIndicator={false}>
-          {selectedTasbih.virtue && showVirtue && (
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <Ionicons name="sparkles" size={18} color={Colors.primary} />
-                <Text style={styles.infoTitle}>الفضل</Text>
-              </View>
-              <Text style={styles.infoText}>{selectedTasbih.virtue}</Text>
+          {/* Stats chips */}
+          <View style={s.chipsRow}>
+            <View style={[s.chip, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+              <MaterialCommunityIcons name="sync" size={14} color={GREEN} />
+              <Text style={[s.chipText, { color: C.textSec }]}>{rounds} جولات</Text>
             </View>
-          )}
-          
-          {selectedTasbih.reference && showReference && (
-            <View style={styles.infoCard}>
-              <View style={styles.infoHeader}>
-                <Ionicons name="book" size={18} color={Colors.secondary} />
-                <Text style={styles.infoTitle}>المصدر</Text>
-                {selectedTasbih.grade && (
-                  <View style={styles.gradeBadge}>
-                    <Text style={styles.gradeText}>{selectedTasbih.grade}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.infoText}>{selectedTasbih.reference}</Text>
+            <View style={[s.chip, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+              <MaterialCommunityIcons name="counter" size={14} color={GREEN} />
+              <Text style={[s.chipText, { color: C.textSec }]}>{totalCount} إجمالي</Text>
             </View>
-          )}
-        </ScrollView>
-      ) : null}
+            <View style={[s.chip, { backgroundColor: C.card, borderColor: C.cardBorder }]}>
+              <MaterialCommunityIcons name="percent" size={14} color={GREEN} />
+              <Text style={[s.chipText, { color: C.textSec }]}>{progressPct}%</Text>
+            </View>
+          </View>
 
-      {/* ============================================ */}
-      {/* نافذة قائمة التسبيحات */}
-      {/* ============================================ */}
-      <Modal
-        visible={showTasbihList}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowTasbihList(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>اختر التسبيح</Text>
-              <TouchableOpacity onPress={() => setShowTasbihList(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+          <Text style={[s.tapHint, { color: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }]}>
+            اضغط الدائرة للتسبيح
+          </Text>
+        </View>
+
+        {/* Bottom actions */}
+        <BannerAdComponent screen="tasbih" />
+        <View style={[s.actionBar, { backgroundColor: isDarkMode ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.85)', borderTopColor: C.cardBorder }]}>
+          <TouchableOpacity style={s.actionBtn} onPress={handleReset}>
+            <MaterialCommunityIcons name="refresh" size={24} color={C.textSec} />
+            <Text style={[s.actionLabel, { color: C.textSec }]}>إعادة</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionBtn} onPress={() => setShowTasbihList(true)}>
+            <MaterialCommunityIcons name="format-list-bulleted" size={24} color={GREEN} />
+            <Text style={[s.actionLabel, { color: GREEN }]}>التسبيحات</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.actionBtn} onPress={handleShare}>
+            <MaterialCommunityIcons name="share-variant" size={24} color={C.textSec} />
+            <Text style={[s.actionLabel, { color: C.textSec }]}>مشاركة</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+
+      {/* ===== TASBIH LIST MODAL ===== */}
+      <Modal visible={showTasbihList} animationType="slide" transparent onRequestClose={() => setShowTasbihList(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: C.text }]}>اختر التسبيح</Text>
+              <TouchableOpacity onPress={() => setShowTasbihList(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.tasbihList}>
-              {/* التسبيحات المعتمدة */}
-              <Text style={styles.sectionTitle}>التسبيحات المعتمدة</Text>
-              {PRESET_TASBIHAT.map((tasbih) => (
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+              <Text style={[s.sectionLabel, { color: C.textSec }]}>التسبيحات المعتمدة</Text>
+              {PRESET_TASBIHAT.map((t) => (
                 <TouchableOpacity
-                  key={tasbih.id}
-                  style={[
-                    styles.tasbihItem,
-                    selectedTasbih.id === tasbih.id && styles.tasbihItemSelected,
-                  ]}
-                  onPress={() => selectTasbih(tasbih)}
+                  key={t.id}
+                  style={[s.listItem, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.06)' }, selectedTasbih.id === t.id && { borderColor: GREEN, borderWidth: 2 }]}
+                  onPress={() => selectTasbih(t)}
                 >
-                  <View style={styles.tasbihItemContent}>
-                    <Text style={styles.tasbihItemText}>{tasbih.text}</Text>
-                    <View style={styles.tasbihItemMeta}>
-                      <Text style={styles.tasbihItemTarget}>× {tasbih.target}</Text>
-                      {tasbih.grade && (
-                        <View style={styles.smallBadge}>
-                          <Text style={styles.smallBadgeText}>{tasbih.grade}</Text>
-                        </View>
-                      )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.listItemText, { color: C.text }]}>{t.text}</Text>
+                    <View style={s.listItemMeta}>
+                      <Text style={[s.listItemTarget, { color: C.textSec }]}>× {t.target}</Text>
+                      {t.grade && <View style={s.gradeBadge}><Text style={s.gradeBadgeText}>{t.grade}</Text></View>}
                     </View>
+                    {t.virtue && <Text style={[s.listItemVirtue, { color: C.textSec }]} numberOfLines={1}>{t.virtue}</Text>}
                   </View>
-                  {selectedTasbih.id === tasbih.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={Colors.primary} />
-                  )}
+                  {selectedTasbih.id === t.id && <MaterialCommunityIcons name="check-circle" size={24} color={GREEN} />}
                 </TouchableOpacity>
               ))}
 
-              {/* التسبيحات المخصصة */}
               {customTasbihat.length > 0 && (
                 <>
-                  <Text style={[styles.sectionTitle, { marginTop: 20 }]}>تسبيحاتي المخصصة</Text>
-                  {customTasbihat.map((tasbih) => (
+                  <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تسبيحاتي المخصصة</Text>
+                  {customTasbihat.map((t) => (
                     <TouchableOpacity
-                      key={tasbih.id}
-                      style={styles.tasbihItem}
-                      onPress={() => selectTasbih(tasbih)}
-                      onLongPress={() => deleteCustomTasbih(tasbih.id)}
+                      key={t.id}
+                      style={[s.listItem, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.06)' }]}
+                      onPress={() => selectTasbih(t)}
+                      onLongPress={() => deleteCustomTasbih(t.id)}
                     >
-                      <View style={styles.tasbihItemContent}>
-                        <Text style={styles.tasbihItemText}>{tasbih.text}</Text>
-                        <Text style={styles.tasbihItemTarget}>× {tasbih.target}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.listItemText, { color: C.text }]}>{t.text}</Text>
+                        <Text style={[s.listItemTarget, { color: C.textSec }]}>× {t.target}</Text>
                       </View>
-                      <Ionicons name="trash-outline" size={20} color={Colors.error} />
+                      <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
                     </TouchableOpacity>
                   ))}
                 </>
               )}
+              <View style={{ height: 20 }} />
             </ScrollView>
 
-            {/* زر إضافة تسبيح مخصص */}
             <TouchableOpacity
-              style={styles.addCustomButton}
-              onPress={() => {
-                setShowTasbihList(false);
-                setShowCustomModal(true);
-              }}
+              style={s.addBtn}
+              onPress={() => { setShowTasbihList(false); setShowCustomModal(true); }}
             >
-              <Ionicons name="add-circle-outline" size={24} color={Colors.white} />
-              <Text style={styles.addCustomButtonText}>إضافة تسبيح مخصص</Text>
+              <MaterialCommunityIcons name="plus-circle-outline" size={24} color="#fff" />
+              <Text style={s.addBtnText}>إضافة تسبيح مخصص</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ============================================ */}
-      {/* نافذة إضافة تسبيح مخصص */}
-      {/* ============================================ */}
-      <Modal
-        visible={showCustomModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowCustomModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>إضافة تسبيح مخصص</Text>
-              <TouchableOpacity onPress={() => setShowCustomModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+      {/* ===== CUSTOM TASBIH MODAL ===== */}
+      <Modal visible={showCustomModal} animationType="slide" transparent onRequestClose={() => setShowCustomModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { height: 'auto', backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: C.text }]}>إضافة تسبيح مخصص</Text>
+              <TouchableOpacity onPress={() => setShowCustomModal(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>نص التسبيح</Text>
+            <Text style={[s.inputLabel, { color: C.text }]}>نص التسبيح</Text>
+            <TextInput
+              style={[s.input, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
+              value={customText}
+              onChangeText={setCustomText}
+              placeholder="أدخل نص التسبيح..."
+              placeholderTextColor={C.textSec}
+              multiline
+              textAlign="right"
+            />
+            <Text style={[s.inputLabel, { color: C.text }]}>العدد</Text>
+            <View style={s.stepperRow}>
+              <TouchableOpacity
+                onPress={() => setCustomTarget(String(Math.max(1, (parseInt(customTarget) || 33) + 1)))}
+                style={[s.stepperBtn, { backgroundColor: GREEN + '18' }]}
+              >
+                <MaterialCommunityIcons name="plus" size={22} color={GREEN} />
+              </TouchableOpacity>
               <TextInput
-                style={styles.textInput}
-                value={customText}
-                onChangeText={setCustomText}
-                placeholder="أدخل نص التسبيح..."
-                placeholderTextColor={Colors.textLight}
-                multiline
-                textAlign="right"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>العدد المستهدف</Text>
-              <TextInput
-                style={[styles.textInput, { height: 50 }]}
+                style={[s.stepperInput, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
                 value={customTarget}
                 onChangeText={setCustomTarget}
                 placeholder="33"
-                placeholderTextColor={Colors.textLight}
+                placeholderTextColor={C.textSec}
                 keyboardType="number-pad"
                 textAlign="center"
               />
+              <TouchableOpacity
+                onPress={() => setCustomTarget(String(Math.max(1, (parseInt(customTarget) || 33) - 1)))}
+                style={[s.stepperBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }]}
+              >
+                <MaterialCommunityIcons name="minus" size={22} color={C.textSec} />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity style={styles.saveButton} onPress={addCustomTasbih}>
-              <Text style={styles.saveButtonText}>حفظ</Text>
+            <TouchableOpacity style={s.saveBtn} onPress={addCustomTasbih}>
+              <Text style={s.saveBtnText}>حفظ</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ============================================ */}
-      {/* نافذة الإعدادات */}
-      {/* ============================================ */}
-      <Modal
-        visible={showSettings}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowSettings(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>الإعدادات</Text>
-              <TouchableOpacity onPress={() => {
-                saveSettings();
-                setShowSettings(false);
-              }}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+      {/* ===== SETTINGS MODAL ===== */}
+      <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { height: 'auto', backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: C.text }]}>الإعدادات</Text>
+              <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
-
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="phone-portrait-outline" size={22} color={Colors.primary} />
-                <Text style={styles.settingLabel}>الاهتزاز</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.toggle, vibrationEnabled && styles.toggleActive]}
-                onPress={() => setVibrationEnabled(!vibrationEnabled)}
-              >
-                <View style={[styles.toggleKnob, vibrationEnabled && styles.toggleKnobActive]} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="book-outline" size={22} color={Colors.primary} />
-                <Text style={styles.settingLabel}>إظهار المصدر</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.toggle, showReference && styles.toggleActive]}
-                onPress={() => setShowReference(!showReference)}
-              >
-                <View style={[styles.toggleKnob, showReference && styles.toggleKnobActive]} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.settingItem}>
-              <View style={styles.settingInfo}>
-                <Ionicons name="sparkles-outline" size={22} color={Colors.primary} />
-                <Text style={styles.settingLabel}>إظهار الفضل</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.toggle, showVirtue && styles.toggleActive]}
-                onPress={() => setShowVirtue(!showVirtue)}
-              >
-                <View style={[styles.toggleKnob, showVirtue && styles.toggleKnobActive]} />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.saveButton, { backgroundColor: Colors.error, marginTop: 20 }]}
-              onPress={() => {
-                handleResetAll();
-                setShowSettings(false);
-              }}
-            >
-              <Text style={styles.saveButtonText}>إعادة تعيين كل شيء</Text>
+            <GlassToggle label="الاهتزاز" icon="cellphone" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />
+            <GlassToggle label="إظهار الفضل" icon="star-outline" enabled={showVirtue} onToggle={setShowVirtue} />
+            <GlassToggle label="الانتقال التلقائي" icon="arrow-right-circle-outline" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle="الانتقال للتسبيح التالي عند الإكمال" />
+            <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#EF4444', marginTop: 20 }]} onPress={() => { handleResetAll(); setShowSettings(false); }}>
+              <Text style={s.saveBtnText}>إعادة تعيين كل شيء</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ============================================ */}
-      {/* نافذة المشاركة */}
-      {/* ============================================ */}
-      <Modal
-        visible={showShareModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowShareModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>مشاركة التسبيح</Text>
-              <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+      {/* ===== STATS MODAL ===== */}
+      <Modal visible={showStatsModal} animationType="slide" transparent onRequestClose={() => setShowStatsModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalSheet, { backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
+            <View style={s.modalHeader}>
+              <Text style={[s.modalTitle, { color: C.text }]}>إحصائياتي</Text>
+              <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+                <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
-
-            {/* معاينة */}
-            <View style={styles.sharePreview}>
-              <Text style={styles.sharePreviewText}>{selectedTasbih.text}</Text>
-              {selectedTasbih.reference && (
-                <Text style={styles.sharePreviewRef}>{selectedTasbih.reference}</Text>
-              )}
-            </View>
-
-            {/* خيارات المشاركة */}
-            <View style={styles.shareOptions}>
-              <TouchableOpacity style={styles.shareOption} onPress={handleShare}>
-                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.primary }]}>
-                  <Ionicons name="share-outline" size={24} color={Colors.white} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Summary cards */}
+              <View style={s.statsGrid}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                  <MaterialCommunityIcons name="calendar-today" size={28} color={GREEN} />
+                  <Text style={[s.statValue, { color: C.text }]}>{totalCount}</Text>
+                  <Text style={[s.statLabel, { color: C.textSec }]}>تسبيحات اليوم</Text>
                 </View>
-                <Text style={styles.shareOptionText}>مشاركة</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.shareOption} onPress={handleCopy}>
-                <View style={[styles.shareOptionIcon, { backgroundColor: Colors.secondary }]}>
-                  <Ionicons name="copy-outline" size={24} color={Colors.white} />
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                  <MaterialCommunityIcons name="sync" size={28} color={GREEN} />
+                  <Text style={[s.statValue, { color: C.text }]}>{rounds}</Text>
+                  <Text style={[s.statLabel, { color: C.textSec }]}>جولات مكتملة</Text>
                 </View>
-                <Text style={styles.shareOptionText}>نسخ</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.shareOption} 
-                onPress={async () => {
-                  const text = formatTasbihForShare();
-                  await Share.share({ message: text });
-                }}
-              >
-                <View style={[styles.shareOptionIcon, { backgroundColor: '#25D366' }]}>
-                  <Ionicons name="logo-whatsapp" size={24} color={Colors.white} />
+              </View>
+              <View style={s.statsGrid}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                  <MaterialCommunityIcons name="sigma" size={28} color={GREEN} />
+                  <Text style={[s.statValue, { color: C.text }]}>{allTimeTotal}</Text>
+                  <Text style={[s.statLabel, { color: C.textSec }]}>الإجمالي الكلي</Text>
                 </View>
-                <Text style={styles.shareOptionText}>واتساب</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ============================================ */}
-      {/* نافذة الإحصائيات */}
-      {/* ============================================ */}
-      <Modal
-        visible={showStatsModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowStatsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>إحصائياتي</Text>
-              <TouchableOpacity onPress={() => setShowStatsModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.statsContainer}>
-              <View style={styles.statsCard}>
-                <Ionicons name="today-outline" size={32} color={Colors.primary} />
-                <Text style={styles.statsCardValue}>{totalCount}</Text>
-                <Text style={styles.statsCardLabel}>تسبيحات اليوم</Text>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                  <MaterialCommunityIcons name="chart-line" size={28} color={GREEN} />
+                  <Text style={[s.statValue, { color: C.text }]}>{avgPerDay}</Text>
+                  <Text style={[s.statLabel, { color: C.textSec }]}>متوسط يومي</Text>
+                </View>
               </View>
 
-              <View style={styles.statsCard}>
-                <Ionicons name="sync-outline" size={32} color={Colors.secondary} />
-                <Text style={styles.statsCardValue}>{rounds}</Text>
-                <Text style={styles.statsCardLabel}>جولات مكتملة</Text>
-              </View>
-
-              <View style={styles.statsCard}>
-                <Ionicons name="calendar-outline" size={32} color={Colors.success} />
-                <Text style={styles.statsCardValue}>
-                  {Object.values(dailyStats).reduce((a, b) => a + b, 0)}
-                </Text>
-                <Text style={styles.statsCardLabel}>الإجمالي الكلي</Text>
-              </View>
-
-              {/* آخر 7 أيام */}
-              <Text style={[styles.sectionTitle, { marginTop: 20 }]}>آخر 7 أيام</Text>
-              {Object.entries(dailyStats)
-                .slice(-7)
-                .reverse()
-                .map(([date, count]) => (
-                  <View key={date} style={styles.statsRow}>
-                    <Text style={styles.statsRowDate}>{date}</Text>
-                    <Text style={styles.statsRowValue}>{count} تسبيحة</Text>
-                  </View>
-                ))}
+              {/* Last 7 days */}
+              <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>آخر ٧ أيام</Text>
+              {Object.entries(dailyStats).slice(-7).reverse().map(([date, cnt]) => (
+                <View key={date} style={[s.statsRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(120,120,128,0.06)' }]}>
+                  <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>
+                  <Text style={[s.statsRowDate, { color: C.textSec }]}>{date}</Text>
+                </View>
+              ))}
+              <View style={{ height: 20 }} />
             </ScrollView>
           </View>
         </View>
       </Modal>
-    </View>
+    </BackgroundWrapper>
   );
 }
 
@@ -1056,438 +873,227 @@ export default function TasbihScreen() {
 // الأنماط
 // ============================================
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
-  backButton: {
-    padding: Spacing.sm,
+  headerBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
-    color: Colors.text,
+    fontSize: 20, fontFamily: 'Cairo-Bold',
   },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+
+  // Slider
+  slider: {
+    maxHeight: 44, marginTop: 8,
   },
-  headerButton: {
-    padding: Spacing.sm,
+  sliderContent: {
+    paddingHorizontal: 20, gap: 8,
   },
-  quickStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
+  sliderItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1, borderColor: 'transparent',
   },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
+  sliderItemText: {
+    fontSize: 13, fontFamily: 'Cairo-SemiBold',
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: Colors.primary,
+
+  // Selected info
+  selectedInfo: {
+    paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center',
   },
-  statLabel: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textLight,
-    marginTop: 4,
+  navRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%',
   },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: Colors.border,
-    marginHorizontal: Spacing.lg,
+  navBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
   },
-  tasbihSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
-    ...Shadows.sm,
+  selectedText: {
+    fontSize: 18, fontFamily: 'Cairo-Bold',
+    textAlign: 'center', lineHeight: 30,
   },
-  tasbihSelectorText: {
-    flex: 1,
-    fontSize: Typography.sizes.lg,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'right',
-    marginRight: Spacing.sm,
+  selectedTranslit: {
+    fontSize: 13, fontFamily: 'Cairo-Regular',
+    marginTop: 2, textAlign: 'center', fontStyle: 'italic',
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
+  selectedVirtue: {
+    fontSize: 12, fontFamily: 'Cairo-Regular',
+    marginTop: 4, textAlign: 'center',
   },
-  progressBar: {
-    flex: 1,
-    height: 8,
-    backgroundColor: Colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
+
+  // Counter area
+  counterArea: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 20,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 4,
+  ringRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 16, marginBottom: 16,
   },
-  progressText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
-    minWidth: 60,
-    textAlign: 'center',
+  pmBtn: {
+    width: 48, height: 48, borderRadius: 24,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1,
   },
-  progressPercentage: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.primary,
-    fontWeight: '600',
-    minWidth: 40,
+  ringContainer: {
+    width: RING_SIZE + 20, height: RING_SIZE + 20,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
   },
-  counterContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.xl,
+  ringCenter: {
+    position: 'absolute', alignItems: 'center', justifyContent: 'center',
   },
-  counterButton: {
-    width: SCREEN_WIDTH * 0.55,
-    height: SCREEN_WIDTH * 0.55,
-    borderRadius: SCREEN_WIDTH * 0.275,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.lg,
+  countNum: {
+    fontSize: 56, fontFamily: 'Cairo-Bold',
   },
-  counterNumber: {
-    fontSize: 72,
-    fontWeight: '700',
-    color: Colors.white,
-    textAlign: 'center',
+  countOf: {
+    fontSize: 14, fontFamily: 'Cairo-Medium', marginTop: -4,
   },
-  counterLabel: {
-    fontSize: Typography.sizes.md,
-    color: Colors.white,
-    opacity: 0.9,
-    marginTop: Spacing.sm,
+  countDivider: {
+    width: 36, height: 1.5, borderRadius: 1, marginVertical: 2, opacity: 0.3,
   },
-  controlButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
+  countTarget: {
+    fontSize: 18, fontFamily: 'Cairo-SemiBold', opacity: 0.6,
   },
-  controlButton: {
-    alignItems: 'center',
-    padding: Spacing.md,
+
+  // Chips
+  chipsRow: {
+    flexDirection: 'row', gap: 8, marginBottom: 12,
   },
-  controlButtonText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
-    marginTop: 4,
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1,
   },
-  infoContainer: {
-    maxHeight: 200,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
+  chipText: {
+    fontSize: 12, fontFamily: 'Cairo-Medium',
   },
-  infoCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+  tapHint: {
+    fontSize: 11, fontFamily: 'Cairo-Regular', marginTop: 4,
   },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    gap: Spacing.sm,
+
+  // Action bar
+  actionBar: {
+    flexDirection: 'row', justifyContent: 'space-around',
+    paddingVertical: 12, paddingBottom: 20,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  infoTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-    flex: 1,
-    textAlign: 'right',
+  actionBtn: {
+    alignItems: 'center', gap: 4, paddingHorizontal: 20,
   },
-  infoText: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textSecondary,
-    lineHeight: 24,
-    textAlign: 'right',
+  actionLabel: {
+    fontSize: 11, fontFamily: 'Cairo-Medium',
   },
-  gradeBadge: {
-    backgroundColor: Colors.success + '20',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  gradeText: {
-    fontSize: Typography.sizes.xs,
-    color: Colors.success,
-    fontWeight: '600',
-  },
-  // Modal styles
+
+  // Modal
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    height: '70%',
-    padding: Spacing.lg,
+  modalSheet: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    height: '72%', padding: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.lg,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '700',
-    color: Colors.text,
+    fontSize: 20, fontFamily: 'Cairo-Bold',
   },
-  tasbihList: {
-    flex: 1,
+  closeBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.textLight,
-    marginBottom: Spacing.md,
-    textAlign: 'right',
+
+  // List items
+  sectionLabel: {
+    fontSize: 15, fontFamily: 'Cairo-SemiBold', textAlign: 'right', marginBottom: 10,
   },
-  tasbihItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.sm,
+  listItem: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 14, borderRadius: 14, marginBottom: 8, borderWidth: 1, borderColor: 'transparent',
   },
-  tasbihItemSelected: {
-    borderColor: Colors.primary,
-    borderWidth: 2,
+  listItemText: {
+    fontSize: 15, fontFamily: 'Cairo-Medium', textAlign: 'right', marginBottom: 4,
   },
-  tasbihItemContent: {
-    flex: 1,
+  listItemMeta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8,
   },
-  tasbihItemText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '500',
-    color: Colors.text,
-    textAlign: 'right',
-    marginBottom: 4,
+  listItemTarget: {
+    fontSize: 13, fontFamily: 'Cairo-Regular',
   },
-  tasbihItemMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.sm,
+  listItemVirtue: {
+    fontSize: 12, fontFamily: 'Cairo-Regular', marginTop: 2, textAlign: 'right',
   },
-  tasbihItemTarget: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textLight,
+  gradeBadge: {
+    backgroundColor: 'rgba(16,185,129,0.15)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
   },
-  smallBadge: {
-    backgroundColor: Colors.success + '20',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 1,
-    borderRadius: BorderRadius.xs,
+  gradeBadgeText: {
+    fontSize: 10, color: '#10B981', fontFamily: 'Cairo-SemiBold',
   },
-  smallBadgeText: {
-    fontSize: 10,
-    color: Colors.success,
-    fontWeight: '600',
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: GREEN, padding: 14, borderRadius: 14, gap: 8, marginTop: 8,
   },
-  addCustomButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
+  addBtnText: {
+    fontSize: 15, fontFamily: 'Cairo-SemiBold', color: '#fff',
   },
-  addCustomButtonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.white,
-  },
-  inputContainer: {
-    marginBottom: Spacing.md,
-  },
+
+  // Inputs
   inputLabel: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: Spacing.sm,
-    textAlign: 'right',
+    fontSize: 15, fontFamily: 'Cairo-SemiBold', textAlign: 'right', marginBottom: 6,
   },
-  textInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: Typography.sizes.md,
-    color: Colors.text,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    ...Shadows.sm,
+  input: {
+    borderRadius: 12, padding: 14, fontSize: 15, fontFamily: 'Cairo-Regular',
+    minHeight: 80, textAlignVertical: 'top', marginBottom: 14,
   },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
+  stepperRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14,
   },
-  saveButtonText: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.white,
+  stepperBtn: {
+    width: 44, height: 44, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+  stepperInput: {
+    flex: 1, height: 44, borderRadius: 12,
+    fontSize: 18, fontFamily: 'Cairo-SemiBold',
   },
-  settingInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
+  saveBtn: {
+    backgroundColor: GREEN, padding: 14, borderRadius: 14, alignItems: 'center', marginTop: 4,
   },
-  settingLabel: {
-    fontSize: Typography.sizes.md,
-    color: Colors.text,
+  saveBtnText: {
+    fontSize: 15, fontFamily: 'Cairo-SemiBold', color: '#fff',
   },
-  toggle: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.border,
-    padding: 2,
+
+  // Stats
+  statsGrid: {
+    flexDirection: 'row', gap: 10, marginBottom: 10,
   },
-  toggleActive: {
-    backgroundColor: Colors.primary,
+  statCard: {
+    flex: 1, alignItems: 'center', padding: 16, borderRadius: 16, gap: 4,
   },
-  toggleKnob: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.white,
+  statValue: {
+    fontSize: 28, fontFamily: 'Cairo-Bold',
   },
-  toggleKnobActive: {
-    marginLeft: 22,
-  },
-  sharePreview: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-    alignItems: 'center',
-  },
-  sharePreviewText: {
-    fontSize: Typography.sizes.xl,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
-  },
-  sharePreviewRef: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textLight,
-    textAlign: 'center',
-  },
-  shareOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  shareOption: {
-    alignItems: 'center',
-  },
-  shareOptionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  shareOptionText: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.text,
-  },
-  statsContainer: {
-    flex: 1,
-  },
-  statsCard: {
-    backgroundColor: Colors.surface,
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    ...Shadows.sm,
-  },
-  statsCardValue: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: Colors.text,
-    marginVertical: Spacing.sm,
-  },
-  statsCardLabel: {
-    fontSize: Typography.sizes.md,
-    color: Colors.textLight,
+  statLabel: {
+    fontSize: 12, fontFamily: 'Cairo-Regular',
   },
   statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.sm,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 14, borderRadius: 12, marginBottom: 6,
   },
   statsRowDate: {
-    fontSize: Typography.sizes.sm,
-    color: Colors.textLight,
+    fontSize: 13, fontFamily: 'Cairo-Regular',
   },
-  statsRowValue: {
-    fontSize: Typography.sizes.md,
-    fontWeight: '600',
-    color: Colors.primary,
+  statsRowVal: {
+    fontSize: 14, fontFamily: 'Cairo-SemiBold',
   },
 });

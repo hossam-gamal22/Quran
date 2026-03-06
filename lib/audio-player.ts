@@ -27,7 +27,7 @@ class AudioPlayerManager {
     position: 0,
   };
   private listeners: Set<PlaybackCallback> = new Set();
-  private continuousPlay: boolean = false;
+  private continuousPlay: boolean = true;
   private surahAyahsCount: number = 0;
 
   constructor() {
@@ -213,6 +213,13 @@ class AudioPlayerManager {
   // ─── الحصول على الحالة الحالية ─────────────────────────────────────────────────
   getState(): PlaybackState {
     return this.state;
+  }
+
+  // ─── الانتقال لموضع معين ─────────────────────────────────────────────────
+  async seekTo(positionMillis: number): Promise<void> {
+    if (this.sound) {
+      await this.sound.setPositionAsync(positionMillis);
+    }
   }
 
   // ─── تعيين التشغيل المتواصل ─────────────────────────────────────────────────

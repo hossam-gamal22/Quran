@@ -67,6 +67,18 @@ export const RECITERS: Reciter[] = [
   { id: 'ar.saaborimatar', name: 'Saud Al-Shuraim', nameAr: 'سعود الشريم', bitrate: 128 },
   { id: 'ar.abduraborimatar', name: 'Abdurrahman As-Sudais', nameAr: 'عبدالرحمن السديس', bitrate: 128 },
   { id: 'ar.haborimatar', name: 'Hani Ar-Rifai', nameAr: 'هاني الرفاعي', bitrate: 128 },
+  { id: 'ar.abdullahbasfar', name: 'Abdullah Basfar', nameAr: 'عبدالله بصفر', bitrate: 128 },
+  { id: 'ar.ibrahimakhbar', name: 'Ibrahim Al-Akhdar', nameAr: 'إبراهيم الأخضر', bitrate: 128 },
+  { id: 'ar.shaaborimatar', name: 'Abu Bakr Al-Shatri', nameAr: 'أبو بكر الشاطري', bitrate: 128 },
+  { id: 'ar.parhizgar', name: 'Nasser Al-Qatami', nameAr: 'ناصر القطامي', bitrate: 128 },
+  { id: 'ar.aaborimatar', name: 'Yasser Al-Dosari', nameAr: 'ياسر الدوسري', bitrate: 128 },
+  { id: 'ar.abdulbarimatar', name: 'Saad Al-Ghamdi', nameAr: 'سعد الغامدي', bitrate: 128 },
+  { id: 'ar.akaborimatar', name: 'Ahmed Al-Hudhaify', nameAr: 'أحمد الحذيفي', bitrate: 128 },
+  { id: 'ar.abdulrahmanalsudais', name: 'Ali Al-Huthaify', nameAr: 'علي الحذيفي', bitrate: 128 },
+  { id: 'ar.bandarbalila', name: 'Bandar Baleela', nameAr: 'بندر بليلة', bitrate: 128 },
+  { id: 'ar.faborimatar', name: 'Fares Abbad', nameAr: 'فارس عباد', bitrate: 128 },
+  { id: 'ar.khalifatulttaniji', name: 'Khalifa Al-Tunaiji', nameAr: 'خليفة الطنيجي', bitrate: 128 },
+  { id: 'ar.mahmoudalielbanna', name: 'Mahmoud Ali Al-Banna', nameAr: 'محمود علي البنا', bitrate: 128 },
 ];
 
 // ============================================
@@ -214,18 +226,151 @@ export async function fetchJuz(juzNumber: number): Promise<Ayah[]> {
   }
 }
 
-export async function searchQuran(query: string): Promise<Ayah[]> {
+export async function searchQuran(
+  query: string,
+  edition: string = 'ar',
+  surah: string = 'all'
+): Promise<{ matches: any[]; count: number }> {
   try {
-    const response = await fetch(`${QURAN_API_BASE}/search/${encodeURIComponent(query)}/all/ar`);
+    const response = await fetch(
+      `${QURAN_API_BASE}/search/${encodeURIComponent(query)}/${surah}/${edition}`
+    );
     const data = await response.json();
-    
+
     if (data.code === 200) {
-      return data.data.matches;
+      return {
+        matches: data.data.matches || [],
+        count: data.data.count || data.data.matches?.length || 0,
+      };
     }
-    return [];
+    return { matches: [], count: 0 };
   } catch (error) {
     console.error('Error searching Quran:', error);
-    return [];
+    return { matches: [], count: 0 };
+  }
+}
+
+// ============================================
+// التفسير
+// ============================================
+
+export interface TafsirEdition {
+  identifier: string;
+  name: string;
+  language: string;
+}
+
+export const TAFSIR_EDITIONS: TafsirEdition[] = [
+  { identifier: 'ar.muyassar', name: 'التفسير الميسر', language: 'ar' },
+  { identifier: 'ar.jalalayn', name: 'تفسير الجلالين', language: 'ar' },
+  { identifier: 'ar.ibnkathir', name: 'تفسير ابن كثير', language: 'ar' },
+  { identifier: 'ar.qurtubi', name: 'تفسير القرطبي', language: 'ar' },
+  { identifier: 'ar.tabari', name: 'تفسير الطبري', language: 'ar' },
+];
+
+export const TRANSLATION_EDITIONS = [
+  // English
+  { identifier: 'en.sahih', name: 'Sahih International', language: 'en' },
+  { identifier: 'en.pickthall', name: 'Pickthall', language: 'en' },
+  { identifier: 'en.yusufali', name: 'Yusuf Ali', language: 'en' },
+  // Urdu
+  { identifier: 'ur.jalandhry', name: 'جالندھری', language: 'ur' },
+  { identifier: 'ur.junagarhi', name: 'جوناگڑھی', language: 'ur' },
+  // French
+  { identifier: 'fr.hamidullah', name: 'Hamidullah', language: 'fr' },
+  // Turkish
+  { identifier: 'tr.diyanet', name: 'Diyanet İşleri', language: 'tr' },
+  { identifier: 'tr.yazir', name: 'Elmalılı Hamdi Yazır', language: 'tr' },
+  // Indonesian
+  { identifier: 'id.indonesian', name: 'Bahasa Indonesia', language: 'id' },
+  // German
+  { identifier: 'de.bubenheim', name: 'Bubenheim & Elyas', language: 'de' },
+  { identifier: 'de.aburida', name: 'Abu Rida', language: 'de' },
+  // Spanish
+  { identifier: 'es.cortes', name: 'Julio Cortes', language: 'es' },
+  { identifier: 'es.asad', name: 'Muhammad Asad', language: 'es' },
+  // Hindi
+  { identifier: 'hi.hindi', name: 'फ़ारूक़ ख़ान & नदवी', language: 'hi' },
+  { identifier: 'hi.farooq', name: 'फ़ारूक़ ख़ान & अहमद', language: 'hi' },
+  // Bengali
+  { identifier: 'bn.bengali', name: 'মুহিউদ্দীন খান', language: 'bn' },
+  { identifier: 'bn.hoque', name: 'জহুরুল হক', language: 'bn' },
+  // Malay
+  { identifier: 'ms.basmeih', name: 'Abdullah Basmeih', language: 'ms' },
+  // Russian
+  { identifier: 'ru.kuliev', name: 'Эльмир Кулиев', language: 'ru' },
+  { identifier: 'ru.osmanov', name: 'Османов', language: 'ru' },
+];
+
+/**
+ * Get the default translation edition for a given language
+ */
+export function getDefaultTranslationForLanguage(language: string): string {
+  const LANGUAGE_DEFAULT_TRANSLATIONS: Record<string, string> = {
+    en: 'en.sahih',
+    ur: 'ur.jalandhry',
+    fr: 'fr.hamidullah',
+    tr: 'tr.diyanet',
+    id: 'id.indonesian',
+    de: 'de.bubenheim',
+    es: 'es.cortes',
+    hi: 'hi.hindi',
+    bn: 'bn.bengali',
+    ms: 'ms.basmeih',
+    ru: 'ru.kuliev',
+    ar: 'ar.muyassar',
+  };
+  return LANGUAGE_DEFAULT_TRANSLATIONS[language] || 'en.sahih';
+}
+
+/**
+ * Get all translation editions for a specific language
+ */
+export function getTranslationsForLanguage(language: string): typeof TRANSLATION_EDITIONS {
+  return TRANSLATION_EDITIONS.filter(t => t.language === language);
+}
+
+/**
+ * Fetch translation of a full surah
+ */
+export async function fetchSurahTranslation(
+  surahNumber: number,
+  edition: string
+): Promise<{ ayahs: { numberInSurah: number; text: string }[] }> {
+  try {
+    const response = await fetch(`${QURAN_API_BASE}/surah/${surahNumber}/${edition}`);
+    const data = await response.json();
+    if (data.code === 200) {
+      return { ayahs: data.data.ayahs.map((a: any) => ({ numberInSurah: a.numberInSurah, text: a.text })) };
+    }
+    throw new Error('Failed to fetch translation');
+  } catch (error) {
+    console.error('Error fetching surah translation:', error);
+    return { ayahs: [] };
+  }
+}
+
+export async function fetchTafsir(
+  surahNumber: number,
+  ayahNumber: number,
+  edition: string = 'ar.muyassar'
+): Promise<{ arabicText: string; tafsirText: string }> {
+  try {
+    const [arabicRes, tafsirRes] = await Promise.all([
+      fetch(`${QURAN_API_BASE}/ayah/${surahNumber}:${ayahNumber}`),
+      fetch(`${QURAN_API_BASE}/ayah/${surahNumber}:${ayahNumber}/${edition}`),
+    ]);
+
+    const arabicData = await arabicRes.json();
+    const tafsirData = await tafsirRes.json();
+
+    return {
+      arabicText: arabicData.code === 200 ? arabicData.data.text : '',
+      tafsirText: tafsirData.code === 200 ? tafsirData.data.text : 'تعذر تحميل التفسير',
+    };
+  } catch (error) {
+    console.error('Error fetching tafsir:', error);
+    return { arabicText: '', tafsirText: 'تعذر تحميل التفسير' };
   }
 }
 

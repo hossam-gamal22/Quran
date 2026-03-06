@@ -14,13 +14,16 @@ import {
   Vibration,
   Dimensions,
   Platform,
+  ActivityIndicator,
+  Modal,
+  I18nManager,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { Audio } from 'expo-av';
 
 import {
   Zikr,
@@ -37,6 +40,19 @@ import {
   removeFromFavorites,
   isFavorite,
 } from '@/lib/azkar-api';
+import { markAzkarCompleted, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
+
+// Map azkar category IDs → worship tracker keys
+const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date'>>> = {
+  morning: 'morning',
+  evening: 'evening',
+  sleep: 'sleep',
+  wakeup: 'wakeup',
+  after_prayer: 'afterPrayer',
+};
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +65,8 @@ export default function CategoryAzkarScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  const { isDarkMode, settings } = useSettings();
+  const darkMode = isDarkMode;
 
   // الحالة
   const [azkar, setAzkar] = useState<Zikr[]>([]);
@@ -56,10 +74,14 @@ export default function CategoryAzkarScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
-  const [darkMode, setDarkMode] = useState(false);
-  const [language, setLanguage] = useState<Language>('ar');
+  const language = (settings.language || 'ar') as Language;
   const [showTranslation, setShowTranslation] = useState(true);
   const [showTransliteration, setShowTransliteration] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [categoryLocked, setCategoryLocked] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -75,16 +97,12 @@ export default function CategoryAzkarScreen() {
 
     try {
       // تحميل الإعدادات
-      const [storedDarkMode, storedLanguage, storedShowTranslation, storedShowTransliteration] = 
+      const [storedShowTranslation, storedShowTransliteration] = 
         await Promise.all([
-          AsyncStorage.getItem('darkMode'),
-          AsyncStorage.getItem('app_language'),
           AsyncStorage.getItem('azkar_show_translation'),
           AsyncStorage.getItem('azkar_show_transliteration'),
         ]);
 
-      if (storedDarkMode !== null) setDarkMode(JSON.parse(storedDarkMode));
-      if (storedLanguage) setLanguage(storedLanguage as Language);
       if (storedShowTranslation !== null) setShowTranslation(JSON.parse(storedShowTranslation));
       if (storedShowTransliteration !== null) setShowTransliteration(JSON.parse(storedShowTransliteration));
 
@@ -107,6 +125,20 @@ export default function CategoryAzkarScreen() {
       setCounts(initialCounts);
       setFavorites(initialFavorites);
 
+      // التحقق من حالة القفل (صباح/مساء)
+      if (category === 'morning' || category === 'evening') {
+        const lockKey = `azkar_lock_${category}`;
+        const lockData = await AsyncStorage.getItem(lockKey);
+        if (lockData) {
+          const { until } = JSON.parse(lockData);
+          if (new Date().getTime() < until) {
+            setCategoryLocked(true);
+          } else {
+            await AsyncStorage.removeItem(lockKey);
+          }
+        }
+      }
+
       // تشغيل الأنيميشن
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -126,7 +158,50 @@ export default function CategoryAzkarScreen() {
   // التعامل مع العداد
   // ===================================
 
+  const handleCategoryCompleted = useCallback(async () => {
+    // تسجيل في تتبع العبادات
+    if (category) {
+      const worshipKey = WORSHIP_AZKAR_MAP[category];
+      if (worshipKey) {
+        await markAzkarCompleted(getTodayDate(), worshipKey);
+      }
+
+      // قفل أذكار الصباح والمساء حتى وقت التجديد
+      if (category === 'morning' || category === 'evening') {
+        const now = new Date();
+        let unlockTime: Date;
+        if (category === 'morning') {
+          // يتجدد عند آذان المغرب (تقريباً الساعة 6 مساءً)
+          unlockTime = new Date(now);
+          unlockTime.setHours(18, 0, 0, 0);
+          if (unlockTime.getTime() <= now.getTime()) {
+            // لو الوقت بعد المغرب، يتجدد بكرة الفجر
+            unlockTime.setDate(unlockTime.getDate() + 1);
+            unlockTime.setHours(4, 0, 0, 0);
+          }
+        } else {
+          // أذكار المساء تتجدد عند الفجر (تقريباً الساعة 4 صباحاً)
+          unlockTime = new Date(now);
+          unlockTime.setDate(unlockTime.getDate() + 1);
+          unlockTime.setHours(4, 0, 0, 0);
+        }
+        const lockKey = `azkar_lock_${category}`;
+        await AsyncStorage.setItem(lockKey, JSON.stringify({ until: unlockTime.getTime() }));
+        setCategoryLocked(true);
+      }
+    }
+
+    // عرض بوب أب التحفيز
+    setShowCompletionModal(true);
+  }, [category]);
+
+  const checkAllCompleted = useCallback((updatedCounts: Record<number, number>) => {
+    return azkar.every(z => (updatedCounts[z.id] || 0) >= z.count);
+  }, [azkar]);
+
   const handleCount = async (zikr: Zikr) => {
+    if (categoryLocked) return;
+    
     const currentCount = counts[zikr.id] || 0;
     
     if (currentCount >= zikr.count) {
@@ -176,12 +251,19 @@ export default function CategoryAzkarScreen() {
         Vibration.vibrate([0, 100, 50, 100]);
       }
 
-      // انتقال تلقائي بعد ثانية
-      setTimeout(() => {
-        if (currentIndex < azkar.length - 1) {
-          goToNext();
-        }
-      }, 1000);
+      const updatedCounts = { ...counts, [zikr.id]: newCount };
+      
+      // التحقق من اكتمال جميع الأذكار
+      if (checkAllCompleted(updatedCounts)) {
+        setTimeout(() => handleCategoryCompleted(), 500);
+      } else {
+        // انتقال تلقائي بعد ثانية
+        setTimeout(() => {
+          if (currentIndex < azkar.length - 1) {
+            goToNext();
+          }
+        }, 1000);
+      }
     }
   };
 
@@ -191,6 +273,12 @@ export default function CategoryAzkarScreen() {
 
   const goToNext = () => {
     if (currentIndex < azkar.length - 1) {
+      // إيقاف الصوت عند التنقل
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setAudioPlaying(false);
+      }
       setCurrentIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
@@ -205,6 +293,12 @@ export default function CategoryAzkarScreen() {
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
+      // إيقاف الصوت عند التنقل
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+        soundRef.current = null;
+        setAudioPlaying(false);
+      }
       setCurrentIndex(prev => prev - 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
@@ -243,13 +337,75 @@ export default function CategoryAzkarScreen() {
   const shareZikr = async (zikr: Zikr) => {
     try {
       const translation = getZikrTranslation(zikr, language);
-      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${zikr.reference}\n\nمن تطبيق القرآن والأذكار`;
+      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${zikr.reference}\n\nمن تطبيق روح المسلم`;
       
       await Share.share({ message });
     } catch (error) {
       console.error('Error sharing:', error);
     }
   };
+
+  // ===================================
+  // تشغيل صوت الذكر
+  // ===================================
+
+  const playZikrAudio = async (zikr: Zikr) => {
+    try {
+      // إيقاف الصوت الحالي
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+
+      if (audioPlaying) {
+        setAudioPlaying(false);
+        return;
+      }
+
+      setAudioLoading(true);
+
+      // fallback TTS يغطي كل الأذكار عند غياب ملف صوت مباشر
+      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ar&q=${encodeURIComponent(zikr.arabic)}`;
+      const audioUrl = zikr.audio || ttsUrl;
+      
+      if (!audioUrl) {
+        setAudioLoading(false);
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true },
+        (status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setAudioPlaying(false);
+            soundRef.current = null;
+          }
+        }
+      );
+
+      soundRef.current = sound;
+      setAudioPlaying(true);
+    } catch (error) {
+      console.error('Error playing azkar audio:', error);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
+  // تنظيف الصوت عند الخروج
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
 
   // ===================================
   // إعادة تعيين العداد
@@ -277,7 +433,9 @@ export default function CategoryAzkarScreen() {
   const currentZikr = azkar[currentIndex];
   const currentCount = counts[currentZikr.id] || 0;
   const isCompleted = currentCount >= currentZikr.count;
-  const progress = (currentIndex + 1) / azkar.length;
+  const currentItemProgress = Math.min(1, currentCount / Math.max(1, currentZikr.count));
+  const progress = (currentIndex + currentItemProgress) / azkar.length;
+  const progressPercent = Math.round(progress * 100);
 
   return (
     <>
@@ -287,24 +445,32 @@ export default function CategoryAzkarScreen() {
         }}
       />
       
-      <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+      <BackgroundWrapper
+        backgroundKey={settings.display.appBackground}
+        backgroundUrl={settings.display.appBackgroundUrl}
+        style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}
+      >
         {/* Header */}
-        <LinearGradient
-          colors={[categoryInfo.color, categoryInfo.color + 'CC']}
-          style={[styles.header, { paddingTop: insets.top }]}
+        <View
+          style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(120,120,128,0.15)' }]}
         >
           <View style={styles.headerTop}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color="#FFF" />
+              <MaterialCommunityIcons name="arrow-left" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
             </TouchableOpacity>
             
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]} numberOfLines={1}>
               {getCategoryName(categoryInfo, language)}
             </Text>
             
-            <TouchableOpacity onPress={() => shareZikr(currentZikr)} style={styles.shareButton}>
-              <Ionicons name="share-outline" size={24} color="#FFF" />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/favorites' as any)} style={styles.favoriteButton}>
+                <MaterialCommunityIcons name="heart-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => shareZikr(currentZikr)} style={styles.shareButton}>
+                <MaterialCommunityIcons name="share-variant" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Progress Bar */}
@@ -314,6 +480,7 @@ export default function CategoryAzkarScreen() {
                 style={[
                   styles.progressBarFill,
                   {
+                    backgroundColor: categoryInfo.color,
                     width: progressAnim.interpolate({
                       inputRange: [0, 1],
                       outputRange: ['0%', '100%'],
@@ -322,11 +489,11 @@ export default function CategoryAzkarScreen() {
                 ]}
               />
             </View>
-            <Text style={styles.progressText}>
-              {currentIndex + 1} / {azkar.length}
+            <Text style={[styles.progressText, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+              {progressPercent}%
             </Text>
           </View>
-        </LinearGradient>
+        </View>
 
         {/* المحتوى */}
         <ScrollView
@@ -348,10 +515,24 @@ export default function CategoryAzkarScreen() {
             {/* أزرار الإجراءات */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
+                onPress={() => playZikrAudio(currentZikr)}
+                style={styles.actionButton}
+              >
+                {audioLoading ? (
+                  <ActivityIndicator size="small" color={categoryInfo.color} />
+                ) : (
+                  <MaterialCommunityIcons
+                    name={audioPlaying ? 'pause-circle' : 'play-circle'}
+                    size={26}
+                    color={categoryInfo.color}
+                  />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => toggleFavorite(currentZikr.id)}
                 style={styles.actionButton}
               >
-                <Ionicons
+                <MaterialCommunityIcons
                   name={favorites[currentZikr.id] ? 'heart' : 'heart-outline'}
                   size={24}
                   color={favorites[currentZikr.id] ? '#EF4444' : (darkMode ? '#9CA3AF' : '#6B7280')}
@@ -362,7 +543,7 @@ export default function CategoryAzkarScreen() {
                 onPress={() => resetCount(currentZikr.id)}
                 style={styles.actionButton}
               >
-                <Ionicons
+                <MaterialCommunityIcons
                   name="refresh"
                   size={22}
                   color={darkMode ? '#9CA3AF' : '#6B7280'}
@@ -392,33 +573,26 @@ export default function CategoryAzkarScreen() {
             {/* الفضل */}
             {currentZikr.benefit && (
               <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}>
-                <Ionicons name="star" size={16} color={categoryInfo.color} />
+                <MaterialCommunityIcons name="star" size={16} color={categoryInfo.color} />
                 <Text style={[styles.benefitText, { color: categoryInfo.color }]}>
                   {getZikrBenefit(currentZikr, language)}
                 </Text>
               </View>
             )}
 
-            {/* المرجع */}
-            <View style={styles.referenceContainer}>
-              <Ionicons name="book-outline" size={14} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-              <Text style={[styles.referenceText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {currentZikr.reference}
-              </Text>
-            </View>
           </Animated.View>
         </ScrollView>
 
         {/* شريط العداد والتنقل */}
-        <View style={[styles.bottomBar, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
+        <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)' }]}>
           {/* زر السابق */}
           <TouchableOpacity
             onPress={goToPrevious}
             disabled={currentIndex === 0}
             style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
           >
-            <Ionicons
-              name="chevron-back"
+            <MaterialCommunityIcons
+              name="chevron-right"
               size={28}
               color={currentIndex === 0 ? '#9CA3AF' : categoryInfo.color}
             />
@@ -449,8 +623,8 @@ export default function CategoryAzkarScreen() {
             disabled={currentIndex === azkar.length - 1}
             style={[styles.navButton, currentIndex === azkar.length - 1 && styles.navButtonDisabled]}
           >
-            <Ionicons
-              name="chevron-forward"
+            <MaterialCommunityIcons
+              name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
               size={28}
               color={currentIndex === azkar.length - 1 ? '#9CA3AF' : categoryInfo.color}
             />
@@ -458,8 +632,67 @@ export default function CategoryAzkarScreen() {
         </View>
 
         {/* مساحة آمنة */}
+        <BannerAdComponent screen="azkar" />
         <View style={{ height: insets.bottom }} />
-      </View>
+      </BackgroundWrapper>
+
+      {/* بوب أب اكتمال الأذكار */}
+      <Modal
+        visible={showCompletionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCompletionModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
+            <Text style={styles.modalEmoji}>🎉</Text>
+            <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+              مبروك!
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+              تم اكتمال {categoryInfo ? getCategoryName(categoryInfo, language) : 'الأذكار'} بنجاح
+            </Text>
+            <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
+              تقبّل الله منك 🤲
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
+              onPress={() => {
+                setShowCompletionModal(false);
+                router.back();
+              }}
+            >
+              <Text style={styles.modalButtonText}>الحمد لله</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* بوب أب القفل */}
+      {categoryLocked && (
+        <Modal visible={categoryLocked} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
+              <Text style={styles.modalEmoji}>✅</Text>
+              <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                تم الإكمال
+              </Text>
+              <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+                لقد أكملت {categoryInfo ? getCategoryName(categoryInfo, language) : 'هذه الأذكار'} اليوم
+              </Text>
+              <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
+                ستتجدد في موعدها إن شاء الله
+              </Text>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
+                onPress={() => router.back()}
+              >
+                <Text style={styles.modalButtonText}>حسناً</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </>
   );
 }
@@ -496,11 +729,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
     textAlign: 'center',
     marginHorizontal: 8,
   },
   shareButton: {
+    padding: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  favoriteButton: {
     padding: 8,
   },
   progressBarContainer: {
@@ -510,17 +750,15 @@ const styles = StyleSheet.create({
   progressBarBg: {
     flex: 1,
     height: 6,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(120,120,128,0.2)',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FFFFFF',
     borderRadius: 3,
   },
   progressText: {
-    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',
     marginLeft: 12,
@@ -538,11 +776,9 @@ const styles = StyleSheet.create({
   zikrCard: {
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    backgroundColor: 'rgba(120,120,128,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   actionButtons: {
     flexDirection: 'row',
@@ -631,5 +867,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     marginLeft: 4,
+  },
+
+  // Completion Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+  },
+  modalEmoji: {
+    fontSize: 56,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 12,
+  },
+  modalDua: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+  },
+  modalButton: {
+    paddingHorizontal: 40,
+    paddingVertical: 14,
+    borderRadius: 30,
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

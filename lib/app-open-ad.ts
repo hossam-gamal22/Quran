@@ -1,31 +1,52 @@
 // lib/app-open-ad.ts
-// نسخة تجريبية للاختبار على Expo Go - الإعلانات معطلة
-// ⚠️ قبل النشر: استخدم النسخة الأصلية من app-open-ad.ts.backup
+// App Open Ad — يستخدم إعدادات الإعلانات من Firebase
+// ⚠️ قبل النشر: استخدم react-native-google-mobile-ads بدل الوضع التجريبي
 
 import { AppState, AppStateStatus } from 'react-native';
+import { fetchAdsConfig, getAdUnitId } from './ads-config';
 
-// معرفات الإعلانات (للاستخدام لاحقاً)
-const AD_UNIT_IDS = {
-  android: 'ca-app-pub-6103597967254377/5798712736',
-  ios: 'ca-app-pub-6103597967254377/3930767722',
-};
+let adConfig: Awaited<ReturnType<typeof fetchAdsConfig>> | null = null;
+let adReady = false;
 
-export const loadAppOpenAd = (): void => {
-  console.log('📢 App Open Ads: معطلة للتجربة على Expo Go');
+export const loadAppOpenAd = async (): Promise<void> => {
+  try {
+    adConfig = await fetchAdsConfig();
+    const adId = getAdUnitId('APP_OPEN', adConfig);
+    if (adConfig.enabled && adConfig.showAdOnAppOpen && adId) {
+      // في الإنتاج: تحميل الإعلان بواسطة react-native-google-mobile-ads
+      console.log('📢 App Open Ad: محمّل بـ', adId);
+      adReady = true;
+    }
+  } catch (e) {
+    console.log('📢 App Open Ad: خطأ في التحميل', e);
+  }
 };
 
 export const showAppOpenAd = async (): Promise<boolean> => {
-  console.log('📢 App Open Ads: معطلة للتجربة على Expo Go');
+  if (!adReady || !adConfig?.enabled || !adConfig.showAdOnAppOpen) {
+    return false;
+  }
+  // في الإنتاج: عرض الإعلان
+  console.log('📢 App Open Ad: جاهز للعرض');
   return false;
 };
 
 export const initializeAppOpenAds = (): (() => void) => {
-  console.log('📢 App Open Ads: تم تهيئة الوضع التجريبي');
+  loadAppOpenAd();
+
+  let appState = AppState.currentState;
+  const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+    if (appState.match(/inactive|background/) && nextState === 'active') {
+      showAppOpenAd();
+    }
+    appState = nextState;
+  });
+
   return () => {
-    console.log('📢 App Open Ads: تم إيقاف الوضع التجريبي');
+    subscription.remove();
   };
 };
 
 export const isAdReady = (): boolean => {
-  return false;
+  return adReady;
 };

@@ -4,6 +4,7 @@
 export interface QuranAyah {
   number: number;
   text: string;
+  numberInSurah?: number;
   surah: {
     number: number;
     name: string;

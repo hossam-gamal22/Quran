@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -128,41 +127,27 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={isDarkMode 
-          ? ['#1a2a3a', '#0d1520'] 
-          : ['#2f7659', '#1e5a3f']
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
+      <View
+        style={[styles.gradient, { backgroundColor: isDarkMode 
+          ? 'rgba(30,30,30,0.85)' 
+          : 'rgba(47,118,89,0.85)'
+        }]}
       >
         <Animated.View style={[styles.glowEffect, glowAnimatedStyle]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.1)', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
+          <View
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.03)' }]}
           />
         </Animated.View>
 
         <View style={styles.content}>
-          <View style={styles.topRow}>
+          <View style={styles.mainContent}>
             {hijriDate && (
               <View style={styles.dateContainer}>
-                <MaterialCommunityIcons name="calendar-islamic" size={16} color="#fff" />
+                <MaterialCommunityIcons name="moon-waning-crescent" size={16} color="#fff" />
                 <Text style={styles.dateText}>{hijriDate}</Text>
               </View>
             )}
-            {location && (
-              <View style={styles.locationContainer}>
-                <MaterialCommunityIcons name="map-marker" size={16} color="#fff" />
-                <Text style={styles.locationText}>{location}</Text>
-              </View>
-            )}
-          </View>
 
-          <View style={styles.mainContent}>
             <Text style={styles.nextLabel}>
               {t('prayer.nextPrayer')}
             </Text>
@@ -197,7 +182,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
             )}
           </View>
         </View>
-      </LinearGradient>
+      </View>
     </View>
   );
 };
@@ -224,11 +209,8 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     borderRadius: 24,
     overflow: 'hidden',
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   gradient: {
     borderRadius: 24,
@@ -258,36 +240,19 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    alignSelf: 'center',
+    marginBottom: 15,
   },
   dateText: {
-    color: '#fff',
-    fontSize: 13,
-    fontFamily: 'Cairo-Medium',
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  locationText: {
     color: '#fff',
     fontSize: 13,
     fontFamily: 'Cairo-Medium',

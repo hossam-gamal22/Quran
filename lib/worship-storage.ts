@@ -481,6 +481,34 @@ export const toggleAzkar = async (
   }
 };
 
+/**
+ * تسجيل إكمال أذكار (بدون toggle — يسجل true فقط)
+ */
+export const markAzkarCompleted = async (
+  date: string,
+  type: keyof Omit<DailyAzkarRecord, 'date'>
+): Promise<void> => {
+  try {
+    let record = await getAzkarRecord(date);
+    if (!record) {
+      record = {
+        date,
+        morning: false,
+        evening: false,
+        sleep: false,
+        wakeup: false,
+        afterPrayer: false,
+      };
+    }
+    if (!record[type]) {
+      record[type] = true;
+      await saveAzkarRecord(record);
+    }
+  } catch (error) {
+    console.error('Error marking azkar completed:', error);
+  }
+};
+
 // ========================================
 // دوال الإحصائيات
 // ========================================
@@ -862,6 +890,7 @@ export default {
   getAllAzkarRecords,
   saveAzkarRecord,
   toggleAzkar,
+  markAzkarCompleted,
   
   // الإحصائيات
   calculatePrayerStats,

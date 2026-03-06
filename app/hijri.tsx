@@ -9,12 +9,17 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
 import { Share } from 'react-native';
 import { copyToClipboard } from '../lib/share-service';
 import { fetchHijriDate } from '../lib/prayer-api';
+import { ISLAMIC_EVENTS } from '../lib/hijri-date';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 
 // ============================================
 // أسماء الأشهر والأيام
@@ -42,28 +47,7 @@ const GREGORIAN_MONTHS = [
 // ============================================
 // المناسبات الإسلامية
 // ============================================
-
-interface IslamicEvent {
-  month: number;
-  day: number;
-  name: string;
-  description: string;
-  type: 'holiday' | 'special' | 'fasting';
-}
-
-const ISLAMIC_EVENTS: IslamicEvent[] = [
-  { month: 1, day: 1, name: 'رأس السنة الهجرية', description: 'بداية العام الهجري الجديد', type: 'holiday' },
-  { month: 1, day: 10, name: 'يوم عاشوراء', description: 'يوم صيام مستحب', type: 'fasting' },
-  { month: 3, day: 12, name: 'المولد النبوي', description: 'ذكرى مولد النبي ﷺ', type: 'special' },
-  { month: 7, day: 27, name: 'ليلة الإسراء والمعراج', description: 'ذكرى رحلة الإسراء والمعراج', type: 'special' },
-  { month: 8, day: 15, name: 'ليلة النصف من شعبان', description: 'ليلة مباركة', type: 'special' },
-  { month: 9, day: 1, name: 'أول رمضان', description: 'بداية شهر الصيام', type: 'holiday' },
-  { month: 9, day: 27, name: 'ليلة القدر (المرجحة)', description: 'خير من ألف شهر', type: 'special' },
-  { month: 10, day: 1, name: 'عيد الفطر', description: 'عيد الفطر المبارك', type: 'holiday' },
-  { month: 12, day: 8, name: 'يوم التروية', description: 'اليوم الثامن من ذي الحجة', type: 'special' },
-  { month: 12, day: 9, name: 'يوم عرفة', description: 'أفضل أيام الدنيا - صيام مستحب', type: 'fasting' },
-  { month: 12, day: 10, name: 'عيد الأضحى', description: 'عيد الأضحى المبارك', type: 'holiday' },
-];
+// Islamic Events are imported from lib/hijri-date.ts - a trusted source
 
 // ============================================
 // المكون الرئيسي
@@ -71,10 +55,13 @@ const ISLAMIC_EVENTS: IslamicEvent[] = [
 
 export default function HijriScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { isDarkMode, settings } = useSettings();
+  const insets = useSafeAreaInsets();
   
   // الحالات
   const [loading, setLoading] = useState(true);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState<Date | null>(null);
   const [hijriDate, setHijriDate] = useState<{
     day: string;
     month: { number: number; ar: string; en: string };
@@ -84,13 +71,40 @@ export default function HijriScreen() {
   const [showEventsModal, setShowEventsModal] = useState(false);
   const [showConverterModal, setShowConverterModal] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(0);
+  const [dateParamProcessed, setDateParamProcessed] = useState(false);
 
   // ============================================
   // تحميل التاريخ
   // ============================================
 
+  // Process date param once when component mounts
   useEffect(() => {
-    loadHijriDate();
+    if (dateParamProcessed) return; // Only process once
+    
+    if (params?.date) {
+      try {
+        const decoded = decodeURIComponent(params.date as string);
+        const parsed = new Date(decoded);
+        if (!isNaN(parsed.getTime())) {
+          setCurrentDate(parsed);
+          setDateParamProcessed(true);
+          return;
+        }
+      } catch (e) {
+        console.warn('Failed to parse date param:', e);
+      }
+    }
+    
+    // If no valid date param, use today
+    setCurrentDate(new Date());
+    setDateParamProcessed(true);
+  }, [params?.date, dateParamProcessed]);
+
+  // Load hijri data whenever `currentDate` changes
+  useEffect(() => {
+    if (currentDate) {
+      loadHijriDate();
+    }
   }, [currentDate]);
 
   const loadHijriDate = async () => {
@@ -197,12 +211,12 @@ export default function HijriScreen() {
   // الحصول على مناسبة اليوم
   // ============================================
 
-  const getEventForDate = (month: number, day: number): IslamicEvent | undefined => {
-    return ISLAMIC_EVENTS.find(e => e.month === month && e.day === day);
+  const getEventForDate = (month: number, day: number) => {
+    return ISLAMIC_EVENTS.find(e => e.hijriMonth === month && e.hijriDay === day);
   };
 
-  const getEventsForMonth = (month: number): IslamicEvent[] => {
-    return ISLAMIC_EVENTS.filter(e => e.month === month);
+  const getEventsForMonth = (month: number) => {
+    return ISLAMIC_EVENTS.filter(e => e.hijriMonth === month);
   };
 
   const todayEvent = hijriDate 
@@ -223,17 +237,21 @@ export default function HijriScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }]}
+    >
       {/* الهيدر */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={Colors.text} />
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backButton, { backgroundColor: 'rgba(120,120,128,0.18)' }]}>
+          <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#fff' : Colors.text} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>التقويم الهجري</Text>
+        <Text style={[styles.headerTitle, isDarkMode && { color: '#fff' }]}>التقويم الهجري</Text>
         
-        <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-          <Ionicons name="share-outline" size={24} color={Colors.text} />
+        <TouchableOpacity onPress={handleShare} style={[styles.headerButton, { backgroundColor: 'rgba(120,120,128,0.18)' }]}>
+          <Ionicons name="share-outline" size={24} color={isDarkMode ? '#fff' : Colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -279,23 +297,27 @@ export default function HijriScreen() {
             styles.eventCard,
             todayEvent.type === 'holiday' && styles.eventCardHoliday,
             todayEvent.type === 'fasting' && styles.eventCardFasting,
+            todayEvent.type === 'special' && styles.eventCardSpecial,
+            todayEvent.type === 'observance' && styles.eventCardObservance,
           ]}>
             <View style={styles.eventIcon}>
               <Ionicons 
                 name={
                   todayEvent.type === 'holiday' ? 'star' : 
-                  todayEvent.type === 'fasting' ? 'restaurant-outline' : 'moon'
+                  todayEvent.type === 'fasting' ? 'restaurant-outline' :
+                  todayEvent.type === 'special' ? 'sparkles' : 'moon'
                 } 
                 size={24} 
                 color={
                   todayEvent.type === 'holiday' ? Colors.gold : 
-                  todayEvent.type === 'fasting' ? Colors.success : Colors.primary
+                  todayEvent.type === 'fasting' ? Colors.success :
+                  todayEvent.type === 'special' ? Colors.secondary : Colors.primary
                 } 
               />
             </View>
             <View style={styles.eventInfo}>
-              <Text style={styles.eventName}>{todayEvent.name}</Text>
-              <Text style={styles.eventDescription}>{todayEvent.description}</Text>
+              <Text style={styles.eventName}>{todayEvent.nameAr}</Text>
+              <Text style={styles.eventDescription}>{todayEvent.descriptionAr}</Text>
             </View>
           </View>
         )}
@@ -306,21 +328,21 @@ export default function HijriScreen() {
             style={styles.quickAction}
             onPress={() => setShowEventsModal(true)}
           >
-            <View style={[styles.quickActionIcon, { backgroundColor: Colors.primary + '15' }]}>
+            <View style={styles.quickActionIcon}>
               <Ionicons name="calendar" size={24} color={Colors.primary} />
             </View>
             <Text style={styles.quickActionText}>المناسبات</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickAction} onPress={handleShare}>
-            <View style={[styles.quickActionIcon, { backgroundColor: Colors.secondary + '15' }]}>
+            <View style={styles.quickActionIcon}>
               <Ionicons name="share-social" size={24} color={Colors.secondary} />
             </View>
             <Text style={styles.quickActionText}>مشاركة</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickAction} onPress={handleCopy}>
-            <View style={[styles.quickActionIcon, { backgroundColor: Colors.success + '15' }]}>
+            <View style={styles.quickActionIcon}>
               <Ionicons name="copy" size={24} color={Colors.success} />
             </View>
             <Text style={styles.quickActionText}>نسخ</Text>
@@ -371,6 +393,8 @@ export default function HijriScreen() {
             التقويم الهجري يعتمد على دورة القمر، وقد يختلف يوم أو يومين حسب رؤية الهلال في بلدك
           </Text>
         </View>
+
+        <BannerAdComponent screen="hijri" />
       </ScrollView>
 
       {/* ============================================ */}
@@ -463,7 +487,7 @@ export default function HijriScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </BackgroundWrapper>
   );
 }
 
@@ -492,10 +516,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.xl + 20,
     paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    ...Shadows.sm,
+    backgroundColor: 'transparent',
   },
   backButton: {
     padding: Spacing.sm,
@@ -513,12 +535,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   mainDateCard: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(47,118,89,0.85)',
     borderRadius: BorderRadius.xl,
     padding: Spacing.xl,
     marginTop: Spacing.md,
     alignItems: 'center',
-    ...Shadows.lg,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   weekdayText: {
     fontSize: Typography.sizes.lg,
@@ -583,11 +606,12 @@ const styles = StyleSheet.create({
   eventCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginTop: Spacing.md,
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   eventCardHoliday: {
     backgroundColor: Colors.gold + '10',
@@ -599,11 +623,21 @@ const styles = StyleSheet.create({
     borderColor: Colors.success,
     borderWidth: 1,
   },
+  eventCardSpecial: {
+    backgroundColor: Colors.secondary + '10',
+    borderColor: Colors.secondary,
+    borderWidth: 1,
+  },
+  eventCardObservance: {
+    backgroundColor: Colors.primary + '10',
+    borderColor: Colors.primary,
+    borderWidth: 1,
+  },
   eventIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.background,
+    backgroundColor: 'rgba(120,120,128,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -658,14 +692,15 @@ const styles = StyleSheet.create({
   },
   monthItem: {
     width: '31%',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: 'center',
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   monthItemActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(47,118,89,0.85)',
   },
   monthNumber: {
     fontSize: Typography.sizes.lg,
@@ -695,12 +730,14 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.info + '10',
+    backgroundColor: 'rgba(120,120,128,0.1)',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginTop: Spacing.lg,
     marginBottom: Spacing.xl,
     gap: Spacing.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   infoText: {
     flex: 1,
@@ -715,7 +752,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.background,
+    backgroundColor: 'rgba(30,30,30,0.95)',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     height: '80%',
@@ -740,10 +777,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     marginRight: Spacing.sm,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.15)',
   },
   monthTabActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(47,118,89,0.85)',
   },
   monthTabText: {
     fontSize: Typography.sizes.sm,
@@ -759,11 +796,12 @@ const styles = StyleSheet.create({
   eventListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.sm,
-    ...Shadows.sm,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   eventListIcon: {
     width: 44,
@@ -771,7 +809,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: 'rgba(120,120,128,0.1)',
   },
   eventListInfo: {
     flex: 1,
