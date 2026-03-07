@@ -34,7 +34,7 @@ interface BackgroundWrapperProps extends ViewProps {
 // المكون
 // ========================================
 
-export const BackgroundWrapper: React.FC<BackgroundWrapperProps> = ({
+const BackgroundWrapper: React.FC<BackgroundWrapperProps> = ({
   backgroundKey = 'none',
   backgroundUrl,
   children,

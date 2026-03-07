@@ -2,7 +2,7 @@
 // Native system tabs for iOS/Android behavior
 
 import React from 'react';
-import { DynamicColorIOS, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { NativeTabs, Icon, Label, VectorIcon } from 'expo-router/unstable-native-tabs';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -120,8 +120,13 @@ export default function TabsLayout() {
     [findItem]
   );
 
-  const iosActive = DynamicColorIOS({ light: '#111111', dark: '#FFFFFF' });
-  const iosInactive = DynamicColorIOS({ light: '#6B7280', dark: '#9CA3AF' });
+  // DynamicColorIOS only works on iOS native, fallback for web/other
+  const iosActive = Platform.OS === 'ios'
+    ? require('react-native').DynamicColorIOS({ light: '#111111', dark: '#FFFFFF' })
+    : '#111111';
+  const iosInactive = Platform.OS === 'ios'
+    ? require('react-native').DynamicColorIOS({ light: '#6B7280', dark: '#9CA3AF' })
+    : '#6B7280';
   const resolvedLabelSize = Math.max(tabLayout?.labelFontSize ?? 13, 15);
   const resolvedVerticalOffset = (tabLayout?.titleVerticalOffset ?? 7) + 3;
   const resolvedSelectedOpacity = Math.max(tabLayout?.selectedBgOpacity ?? 0.16, 0.22);

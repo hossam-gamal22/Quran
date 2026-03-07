@@ -36,10 +36,13 @@ import {
   syncLocalStats 
 } from '@/lib/firebase-analytics';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
+import { usePathname } from 'expo-router';
+import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const pathname = usePathname();
   const [fontsLoaded] = useFonts({
     'Cairo-Regular': require('../assets/fonts/Cairo-Regular.ttf'),
     'Cairo-Medium': require('../assets/fonts/Cairo-Medium.ttf'),
@@ -47,7 +50,8 @@ export default function RootLayout() {
     'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
     'QCF_Default': require('../assets/fonts/qcf/QCF4_tajweed_001.ttf'),
     'QCFSurahNames': require('../assets/fonts/qcf/surah-names.ttf'),
-    
+    'Amiri': require('../assets/fonts/Amiri-Regular.ttf'),
+    'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
   });
 
   // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
@@ -70,17 +74,21 @@ export default function RootLayout() {
         await initializeGlobalStats();
         await registerUser();
         await trackAppOpen();
-        console.log('✅ Firebase initialized in app');
+        console.log('Firebase initialized in app');
       } catch (error) {
         console.log('Firebase init error (non-blocking):', error);
       }
     };
-    
+
     initFirebase();
+
+    // Sync widget data to native storage on launch
+    syncWidgetDataToNative().catch(() => {});
     
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
+        syncWidgetDataToNative().catch(() => {});
       } else if (nextAppState === 'background') {
         syncLocalStats().catch(() => {});
       }
@@ -163,8 +171,10 @@ export default function RootLayout() {
                           <Stack.Screen name="night-reading" />
                           <Stack.Screen name="azkar-search" />
                           <Stack.Screen name="azkar-reminder" />
+                          <Stack.Screen name="widgets-gallery" />
+                          <Stack.Screen name="widget-settings" />
                         </Stack>
-                        <AudioPlayerBar global />
+                        {!(pathname && pathname.startsWith('/qibla')) && <AudioPlayerBar global />}
                           </OnboardingProvider>
                         </SeasonalProvider>
                       </WorshipProvider>

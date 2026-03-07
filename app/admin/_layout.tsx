@@ -63,6 +63,12 @@ export default function AdminLayout() {
           title: 'المشتركين',
         }}
       />
+      <Stack.Screen
+        name="widgets"
+        options={{
+          title: 'محرك الويدجت',
+        }}
+      />
     </Stack>
   );
 }

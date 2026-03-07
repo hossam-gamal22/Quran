@@ -298,8 +298,8 @@ export default function StoryOfDayScreen() {
       });
 
       setRenderedVideoUri(target);
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err) {
+      if (err && (err as any).name === 'AbortError') {
         Alert.alert('خطأ', 'انتهت مهلة إنشاء الفيديو. حاول مرة أخرى.');
       } else {
         Alert.alert('خطأ', 'تعذر إنشاء فيديو الستوري حالياً');

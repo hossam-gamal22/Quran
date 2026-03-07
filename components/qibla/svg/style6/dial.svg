@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <circle cx="150" cy="150" r="140" fill="#00838F" stroke="#FFFFFF" stroke-width="2" opacity="0.8"/>
+  <text x="150" y="40" fill="#FFFFFF" font-size="24" font-family="serif" font-style="italic" font-weight="bold" text-anchor="middle">N</text>
+  <text x="150" y="275" fill="#FFFFFF" font-size="24" font-family="serif" font-style="italic" font-weight="bold" text-anchor="middle">S</text>
+  <text x="275" y="158" fill="#FFFFFF" font-size="24" font-family="serif" font-style="italic" font-weight="bold" text-anchor="middle">E</text>
+  <text x="25" y="158" fill="#FFFFFF" font-size="24" font-family="serif" font-style="italic" font-weight="bold" text-anchor="middle">W</text>
+</svg>
