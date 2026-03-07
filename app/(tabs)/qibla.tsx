@@ -1,6 +1,7 @@
 // app/(tabs)/qibla.tsx
 // صفحة القبلة - روح المسلم
 // آخر تحديث: 2026-03-07
+// ✅ Fixed: Kaaba size, stability, 3D effect, compass direction, style switcher
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -23,18 +24,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
   withTiming,
   interpolate,
   Easing,
   runOnJS,
-  useDerivedValue,
-  SharedValue,
 } from 'react-native-reanimated';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from './qiblaAssets';
 
 // ---------------------------------------------------------------------------
-// SVG Renderer – handles Metro bundling SVGs as components or image sources
+// SVG Renderer
 // ---------------------------------------------------------------------------
 const SafeSvgRenderer = ({
   asset,
@@ -70,10 +68,9 @@ const SafeSvgRenderer = ({
 // ---------------------------------------------------------------------------
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COMPASS_SIZE = Math.min(SCREEN_WIDTH * 0.82, 360);
-const POINTER_SCALE = 0.75; // pointer is 75% of compass
-const POINTER_SIZE = COMPASS_SIZE * POINTER_SCALE;
-const KAABA_SIZE = COMPASS_SIZE * 0.18; // Big Kaaba inside compass
-const KAABA_ORBIT_RADIUS = COMPASS_SIZE * 0.32; // orbit inside compass circle
+const POINTER_SIZE = COMPASS_SIZE * 0.72;
+const KAABA_SIZE = 56; // Fixed large size — always clear & visible
+const KAABA_ORBIT_RADIUS = COMPASS_SIZE * 0.30; // orbit inside compass
 const THUMBNAIL_SIZE = 52;
 const QIBLA_STYLE_KEY = '@qibla_style';
 
@@ -81,7 +78,7 @@ const MECCA_LAT = 21.422487;
 const MECCA_LNG = 39.826206;
 
 // ---------------------------------------------------------------------------
-// Accurate Qibla bearing calculation (Great Circle)
+// Qibla bearing (Great Circle formula — standard, well-tested)
 // ---------------------------------------------------------------------------
 const calculateQiblaBearing = (lat: number, lng: number): number => {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -96,7 +93,7 @@ const calculateQiblaBearing = (lat: number, lng: number): number => {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
 
-// Aladhan API for authoritative qibla bearing
+// Aladhan API fallback
 const fetchQiblaFromAladhan = async (
   lat: number,
   lng: number,
@@ -114,12 +111,16 @@ const fetchQiblaFromAladhan = async (
 };
 
 // ---------------------------------------------------------------------------
-// Helper: shortest angular distance for smooth rotation across 0/360 boundary
+// Worklet: find shortest rotation path to avoid 360→0 spinning
 // ---------------------------------------------------------------------------
-function shortestAngleDeg(from: number, to: number): number {
+function normalizeToTarget(current: number, target: number): number {
   'worklet';
-  let diff = ((to - from + 540) % 360) - 180;
-  return from + diff;
+  // Find target equivalent that is closest to current (avoids full 360 spin)
+  let diff = target - current;
+  // Normalize diff to [-180, 180]
+  diff = ((diff + 180) % 360) - 180;
+  if (diff < -180) diff += 360;
+  return current + diff;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,16 +134,15 @@ const QiblaScreen = () => {
   const [currentStyleId, setCurrentStyleId] = useState('style1');
   const isAlignedRef = useRef(false);
 
-  // Smooth heading using shared values (avoiding 360→0 wrap-around jitter)
-  const rawHeading = useSharedValue(0);
-  const smoothHeading = useSharedValue(0);
-  const prevHeading = useSharedValue(0);
+  // We track a cumulative heading (not clamped to 0-360) to avoid wrap jitter
+  const headingCumulative = useSharedValue(0);
+  const lastRawHeading = useRef(0);
 
   const activeAssets =
     QIBLA_STYLES[currentStyleId as keyof typeof QIBLA_STYLES] ||
     QIBLA_STYLES.style1;
 
-  // ------ Load saved style preference ------
+  // Load saved style
   useEffect(() => {
     AsyncStorage.getItem(QIBLA_STYLE_KEY).then((val) => {
       if (val && QIBLA_STYLES[val as keyof typeof QIBLA_STYLES]) {
@@ -157,7 +157,7 @@ const QiblaScreen = () => {
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
   }, []);
 
-  // ------ Sensors init ------
+  // ------ Sensors ------
   useEffect(() => {
     let sub: { remove: () => void } | null = null;
 
@@ -192,24 +192,13 @@ const QiblaScreen = () => {
         const lat = location.coords.latitude;
         const lng = location.coords.longitude;
 
-        // Fetch from API first, fallback to local calculation
+        // Get bearing — try API, verify with local, fallback
         const apiBearing = await fetchQiblaFromAladhan(lat, lng);
         const localBearing = calculateQiblaBearing(lat, lng);
 
         if (typeof apiBearing === 'number') {
-          // Verify API result is reasonable (within 5° of local calc)
-          const diff = Math.abs(
-            ((apiBearing - localBearing + 540) % 360) - 180,
-          );
-          if (diff < 5) {
-            setQiblaBearing(apiBearing);
-          } else {
-            // API result seems off, use local
-            console.warn(
-              `Aladhan bearing ${apiBearing} differs from local ${localBearing} by ${diff}°, using local`,
-            );
-            setQiblaBearing(localBearing);
-          }
+          let diff = Math.abs(((apiBearing - localBearing + 540) % 360) - 180);
+          setQiblaBearing(diff < 5 ? apiBearing : localBearing);
         } else {
           setQiblaBearing(localBearing);
         }
@@ -221,35 +210,38 @@ const QiblaScreen = () => {
           return;
         }
 
-        Magnetometer.setUpdateInterval(60); // ~16fps for smooth compass
+        Magnetometer.setUpdateInterval(60);
 
         sub = Magnetometer.addListener((data) => {
-          // Correct heading calculation from magnetometer data
-          // atan2(y, x) gives angle from positive x-axis
-          // We need angle from North (positive y-axis) clockwise
-          let angle = Math.atan2(data.y, data.x) * (180 / Math.PI);
+          // ---------------------------------------------------------------
+          // CORRECT magnetometer → compass heading conversion
+          // ---------------------------------------------------------------
+          // atan2(y, x) gives radians from +X axis, counter-clockwise positive
+          // For compass: 0°=North, 90°=East, clockwise
+          //
+          // On iOS:
+          //   +x = Right, +y = Up (towards top of screen)
+          //   North = +y direction → atan2 angle = 90°
+          //   Compass heading = (90 - angleDeg + 360) % 360
+          //
+          // On Android:
+          //   Same convention with expo-sensors Magnetometer
+          // ---------------------------------------------------------------
+          const angleDeg = Math.atan2(data.y, data.x) * (180 / Math.PI);
+          const rawHeading = ((90 - angleDeg) % 360 + 360) % 360;
 
-          // Convert from math angle to compass heading:
-          // Math: 0=East, 90=North, counter-clockwise positive
-          // Compass: 0=North, 90=East, clockwise positive
-          // heading = (90 - angle + 360) % 360
-          let compassHeading = (90 - angle + 360) % 360;
+          // --- Cumulative heading to avoid 360/0 boundary spin ---
+          // Calculate shortest delta from last raw heading
+          let delta = rawHeading - lastRawHeading.current;
+          // Normalize delta to [-180, 180]
+          if (delta > 180) delta -= 360;
+          if (delta < -180) delta += 360;
+          lastRawHeading.current = rawHeading;
 
-          // On iOS, the magnetometer already returns data oriented to screen
-          // On Android, we may need to adjust
-          if (Platform.OS === 'android') {
-            // Android magnetometer: x points right, y points up
-            // heading = atan2(y, x) adjusted for North
-            compassHeading = (90 - angle + 360) % 360;
-          }
-
-          compassHeading = Math.round(compassHeading);
-
-          // Use shortest angle interpolation to avoid 360→0 jumps
-          const target = shortestAngleDeg(prevHeading.value, compassHeading);
-          prevHeading.value = target;
-          smoothHeading.value = withTiming(target, {
-            duration: 150,
+          // Apply delta to cumulative (this never wraps, so animation is smooth)
+          const newCumulative = headingCumulative.value + delta;
+          headingCumulative.value = withTiming(newCumulative, {
+            duration: 120,
             easing: Easing.out(Easing.quad),
           });
         });
@@ -264,7 +256,7 @@ const QiblaScreen = () => {
     };
   }, []);
 
-  // ------ Guidance callback ------
+  // ------ Guidance ------
   const onGuidanceUpdate = useCallback(
     (text: string, aligned: boolean) => {
       setGuidance(text);
@@ -280,26 +272,23 @@ const QiblaScreen = () => {
     [],
   );
 
-  // ------ DIAL rotation: rotates the whole compass dial opposite to heading ------
-  // When user faces North, dial shows N at top. The dial rotates = -heading
+  // ------ DIAL: rotates opposite to heading so N/S/E/W match real world ------
   const dialAnimatedStyle = useAnimatedStyle(() => {
-    const rotation = -smoothHeading.value;
     return {
-      transform: [{ rotate: `${rotation}deg` }],
+      transform: [{ rotate: `${-headingCumulative.value}deg` }],
     };
   });
 
-  // ------ POINTER rotation: points toward Qibla bearing on the dial ------
-  // The pointer rotates relative to the user = qiblaBearing - heading
+  // ------ POINTER: points toward Qibla relative to user ------
   const pointerAnimatedStyle = useAnimatedStyle(() => {
     const safeBearing =
       typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
         ? qiblaBearing
         : 0;
-    const rotation = safeBearing - smoothHeading.value;
+    const rotation = safeBearing - headingCumulative.value;
 
-    // Guidance
-    let delta = ((safeBearing - smoothHeading.value) % 360 + 360) % 360;
+    // Guidance calculation
+    let delta = ((safeBearing - headingCumulative.value) % 360 + 360) % 360;
     if (delta > 180) delta -= 360;
     let text: string;
     let aligned = false;
@@ -318,47 +307,41 @@ const QiblaScreen = () => {
     };
   }, [qiblaBearing]);
 
-  // ------ Kaaba: orbits around compass center, points to Qibla direction ------
-  // Kaaba position rotates with the pointer direction
-  const kaabaOrbitStyle = useAnimatedStyle(() => {
+  // ------ KAABA: fixed position on compass pointing to Qibla ------
+  // Uses cos/sin to place it at a stable orbit point — NO rotate+translate trick
+  const kaabaPositionStyle = useAnimatedStyle(() => {
     const safeBearing =
       typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
         ? qiblaBearing
         : 0;
-    const rotation = safeBearing - smoothHeading.value;
-    // Convert to radians for positioning
-    // -90 because CSS rotation 0deg = top (12 o'clock)
-    const rad = ((rotation - 90) * Math.PI) / 180;
-    const x = Math.cos(rad) * KAABA_ORBIT_RADIUS;
-    const y = Math.sin(rad) * KAABA_ORBIT_RADIUS;
+    const angleDeg = safeBearing - headingCumulative.value;
+    // Convert to radians, -90 because 0deg in CSS = 12 o'clock (top)
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+    const tx = Math.cos(angleRad) * KAABA_ORBIT_RADIUS;
+    const ty = Math.sin(angleRad) * KAABA_ORBIT_RADIUS;
 
     return {
-      transform: [{ translateX: x }, { translateY: y }],
+      transform: [{ translateX: tx }, { translateY: ty }],
     };
   }, [qiblaBearing]);
 
-  // ------ 3D Kaaba tilt effect: tilts based on how far user is from facing Qibla ------
+  // ------ KAABA 3D: realistic tilt based on angular offset from Qibla ------
   const kaaba3DStyle = useAnimatedStyle(() => {
     const safeBearing =
       typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
         ? qiblaBearing
         : 0;
-    let delta = ((safeBearing - smoothHeading.value) % 360 + 360) % 360;
+    let delta = ((safeBearing - headingCumulative.value) % 360 + 360) % 360;
     if (delta > 180) delta -= 360;
 
-    // Tilt intensity: more tilt when Qibla is to the side
-    const tiltY = interpolate(delta, [-180, 0, 180], [-25, 0, 25]);
-    const tiltX = interpolate(
-      Math.abs(delta),
-      [0, 90, 180],
-      [0, 15, 5],
-    );
-    // Scale: slightly larger when aligned
-    const scale = interpolate(Math.abs(delta), [0, 30, 180], [1.15, 1.0, 0.9]);
+    // Tilt: perspective-based 3D
+    const tiltY = interpolate(delta, [-180, 0, 180], [-30, 0, 30]);
+    const tiltX = interpolate(Math.abs(delta), [0, 90, 180], [5, 20, 8]);
+    const scale = interpolate(Math.abs(delta), [0, 20, 180], [1.2, 1.0, 0.85]);
 
     return {
       transform: [
-        { perspective: 600 },
+        { perspective: 500 },
         { rotateY: `${tiltY}deg` },
         { rotateX: `${tiltX}deg` },
         { scale },
@@ -366,7 +349,7 @@ const QiblaScreen = () => {
     };
   }, [qiblaBearing]);
 
-  // ------ Loading / Error states ------
+  // ------ Loading / Error ------
   if (!qiblaBearing && !errorMsg) {
     return (
       <View style={styles.centeredLoading}>
@@ -390,13 +373,13 @@ const QiblaScreen = () => {
 
   return (
     <View style={styles.root}>
-      {/* -------- Top Header -------- */}
+      {/* -------- Header -------- */}
       <View style={styles.header}>
         <Text style={styles.titleText}>اتجاه القبلة</Text>
         <Text style={styles.subtitleText}>{Math.round(qiblaBearing!)}°</Text>
       </View>
 
-      {/* -------- Compass Area -------- */}
+      {/* -------- Compass -------- */}
       <View style={styles.compassArea}>
         <View
           style={{
@@ -406,7 +389,7 @@ const QiblaScreen = () => {
             justifyContent: 'center',
           }}
         >
-          {/* Compass Dial — rotates with heading so N always points actual north */}
+          {/* DIAL — rotates so N/S/E/W match real world */}
           <Animated.View
             style={[
               {
@@ -424,11 +407,11 @@ const QiblaScreen = () => {
             />
           </Animated.View>
 
-          {/* Pointer — rotates to point toward Qibla */}
+          {/* POINTER — rotates to point toward Qibla */}
           <Animated.View
             style={[
               StyleSheet.absoluteFillObject,
-              styles.pointerCenter,
+              styles.centered,
               pointerAnimatedStyle,
             ]}
             pointerEvents="none"
@@ -442,12 +425,12 @@ const QiblaScreen = () => {
             />
           </Animated.View>
 
-          {/* Kaaba — orbits inside compass, has 3D parallax effect */}
+          {/* KAABA — orbits inside compass via translateX/Y (stable, no jitter) */}
           <Animated.View
-            style={[styles.kaabaOrbitWrapper, kaabaOrbitStyle]}
+            style={[styles.kaabaAnchor, kaabaPositionStyle]}
             pointerEvents="none"
           >
-            <Animated.View style={[styles.kaabaMarker, kaaba3DStyle]}>
+            <Animated.View style={[styles.kaabaBox, kaaba3DStyle]}>
               <SafeSvgRenderer
                 asset={require('../../components/qibla/svg/kaaba.svg')}
                 width={KAABA_SIZE}
@@ -460,15 +443,12 @@ const QiblaScreen = () => {
         </View>
       </View>
 
-      {/* -------- Guidance Text -------- */}
+      {/* -------- Guidance -------- */}
       <View style={styles.guidanceContainer}>
         <BlurView
           intensity={30}
           tint="dark"
-          style={[
-            styles.guidanceBlur,
-            isAligned && styles.guidanceActive,
-          ]}
+          style={[styles.guidanceBlur, isAligned && styles.guidanceActive]}
         >
           <Text
             style={[
@@ -481,8 +461,8 @@ const QiblaScreen = () => {
         </BlurView>
       </View>
 
-      {/* -------- Style Switcher (10 compass styles) -------- */}
-      <View style={styles.styleSwitcherContainer}>
+      {/* -------- Style Switcher (10 styles) -------- */}
+      <View style={styles.styleSwitcherWrap}>
         <BlurView
           intensity={40}
           tint="dark"
@@ -493,9 +473,9 @@ const QiblaScreen = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.styleSwitcherScroll}
           >
-            {AVAILABLE_STYLES.map((styleId, index) => {
+            {AVAILABLE_STYLES.map((styleId) => {
               const isActive = currentStyleId === styleId;
-              const styleAssets =
+              const assets =
                 QIBLA_STYLES[styleId as keyof typeof QIBLA_STYLES];
               return (
                 <TouchableOpacity
@@ -508,11 +488,11 @@ const QiblaScreen = () => {
                   ]}
                 >
                   <SafeSvgRenderer
-                    asset={styleAssets.dial}
-                    width={THUMBNAIL_SIZE - 12}
-                    height={THUMBNAIL_SIZE - 12}
+                    asset={assets.dial}
+                    width={THUMBNAIL_SIZE - 14}
+                    height={THUMBNAIL_SIZE - 14}
                   />
-                  {isActive && <View style={styles.thumbnailDot} />}
+                  {isActive && <View style={styles.activeDot} />}
                 </TouchableOpacity>
               );
             })}
@@ -531,11 +511,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
-  // ---- Header ----
   header: {
     alignItems: 'center',
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   titleText: {
     color: '#fff',
@@ -548,45 +527,43 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Regular',
     marginTop: 2,
   },
-  // ---- Compass ----
   compassArea: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pointerCenter: {
+  centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  kaabaOrbitWrapper: {
+  // Kaaba anchor sits at center of compass, then translateX/Y moves it
+  kaabaAnchor: {
     position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Center of compass — translateX/Y shift from center
     width: KAABA_SIZE,
     height: KAABA_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  kaabaMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  kaabaBox: {
     width: KAABA_SIZE,
     height: KAABA_SIZE,
-    // Subtle shadow for depth
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Drop shadow for depth
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
   },
-  // ---- Guidance ----
   guidanceContainer: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
   },
   guidanceBlur: {
     borderRadius: 18,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
     backgroundColor: 'rgba(0,0,0,0.15)',
     alignItems: 'center',
     overflow: 'hidden',
@@ -610,8 +587,8 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
-  // ---- Style Switcher ----
-  styleSwitcherContainer: {
+  // Style switcher
+  styleSwitcherWrap: {
     paddingHorizontal: 12,
     paddingBottom: 8,
   },
@@ -624,9 +601,8 @@ const styles = StyleSheet.create({
   styleSwitcherScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     gap: 8,
-    minHeight: THUMBNAIL_SIZE + 8,
   },
   styleThumbnail: {
     width: THUMBNAIL_SIZE,
@@ -635,27 +611,22 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: 'transparent',
     overflow: 'hidden',
   },
   styleThumbnailActive: {
     borderColor: '#2f7659',
-    backgroundColor: 'rgba(47, 118, 89, 0.15)',
-    shadowColor: '#2f7659',
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
+    backgroundColor: 'rgba(47,118,89,0.15)',
   },
-  thumbnailDot: {
+  activeDot: {
     position: 'absolute',
-    bottom: 4,
+    bottom: 3,
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#2ECC71',
   },
-  // ---- Loading / Error ----
   centeredLoading: {
     flex: 1,
     justifyContent: 'center',
