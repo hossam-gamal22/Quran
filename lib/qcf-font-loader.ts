@@ -12,6 +12,7 @@ import * as Font from 'expo-font';
 import * as FileSystem from 'expo-file-system/legacy';
 import pako from 'pako';
 import { patchCpalTableAllPalettes, DARK_UNIFIED_COLOR } from './ttf-cpal-patcher';
+import QCF_FONT_MODULES from './qcf-font-assets';
 
 const CDN_BASE =
   'https://cdn.jsdelivr.net/gh/alheekmahlib/quran_library@main/assets/fonts/quran_fonts_qfc4';
@@ -69,41 +70,49 @@ export async function loadPageFont(
       await ensureCacheDir();
       const familyName = getPageFontFamily(page);
       // Use different cache for dark mode
-      const cachedPath = CACHE_DIR + `page${page}${darkMode ? '_dark' : ''}.ttf`;
+        const cachedPath = CACHE_DIR + `page${page}${darkMode ? '_dark' : ''}.ttf`;
 
-      // Check if already cached on disk
-      const cacheInfo = await FileSystem.getInfoAsync(cachedPath);
-      if (cacheInfo.exists) {
+        // If we have a bundled QCF module for this page, load it directly
+        const bundled = QCF_FONT_MODULES[page];
+        if (bundled) {
+          await Font.loadAsync({ [familyName]: bundled });
+          loadedPages.add(page);
+          return;
+        }
+
+        // Fallback: check if already cached on disk
+        const cacheInfo = await FileSystem.getInfoAsync(cachedPath);
+        if (cacheInfo.exists) {
+          await Font.loadAsync({ [familyName]: cachedPath });
+          loadedPages.add(page);
+          return;
+        }
+
+        // Download .ttf.gz from CDN (legacy fallback)
+        const url = `${CDN_BASE}/QCF4_tajweed_${pad3(page)}.ttf.gz`;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Font download failed: ${response.status} for page ${page}`);
+        }
+
+        // Decompress gzip → raw TTF bytes
+        const gzBuffer = await response.arrayBuffer();
+        let ttfBytes = pako.ungzip(new Uint8Array(gzBuffer));
+
+        // Patch ALL palettes for dark mode
+        if (darkMode) {
+          ttfBytes = patchCpalTableAllPalettes(ttfBytes, DARK_UNIFIED_COLOR);
+        }
+
+        // Convert to base64 and write to cache
+        const base64 = uint8ArrayToBase64(ttfBytes);
+        await FileSystem.writeAsStringAsync(cachedPath, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        // Load font into memory
         await Font.loadAsync({ [familyName]: cachedPath });
         loadedPages.add(page);
-        return;
-      }
-
-      // Download .ttf.gz from CDN
-      const url = `${CDN_BASE}/QCF4_tajweed_${pad3(page)}.ttf.gz`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Font download failed: ${response.status} for page ${page}`);
-      }
-
-      // Decompress gzip → raw TTF bytes
-      const gzBuffer = await response.arrayBuffer();
-      let ttfBytes = pako.ungzip(new Uint8Array(gzBuffer));
-
-      // Patch ALL palettes for dark mode
-      if (darkMode) {
-        ttfBytes = patchCpalTableAllPalettes(ttfBytes, DARK_UNIFIED_COLOR);
-      }
-
-      // Convert to base64 and write to cache
-      const base64 = uint8ArrayToBase64(ttfBytes);
-      await FileSystem.writeAsStringAsync(cachedPath, base64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Load font into memory
-      await Font.loadAsync({ [familyName]: cachedPath });
-      loadedPages.add(page);
     } catch (err) {
       console.warn(`[QCF4] Failed to load font for page ${page}:`, err);
       throw err;

@@ -37,8 +37,23 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
     surahs,
   } = useQuran();
 
+  // Subscribe to global events (e.g., tafsir visibility)
+  React.useEffect(() => {
+    let unsub: (() => void) | null = null;
+    try {
+      const ge = require('@/lib/global-events');
+      unsub = ge.on('tafsir:visibility', (v: boolean) => {
+        setTafsirVisible(!!v);
+      });
+    } catch (e) {
+      // ignore if emitter not available
+    }
+    return () => { if (unsub) unsub(); };
+  }, []);
+
   const [minimized, setMinimized] = useState(false);
   const [hidden, setHidden] = useState(false);
+  const [tafsirVisible, setTafsirVisible] = useState(false);
   const { isPlaying, isLoading, currentSurah, currentAyah, duration, position } = playbackState;
 
   // All hooks must be called before any early return (Rules of Hooks)
@@ -77,7 +92,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   };
 
   // If user hid the UI, render a small reopen floating button (audio keeps playing)
-  if (hidden) {
+  if (hidden || tafsirVisible) {
     return (
       <Pressable
         onPress={() => setHidden(false)}
@@ -115,6 +130,14 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
             ]}
           >
             <Pressable
+              onPress={(e) => { e.stopPropagation && e.stopPropagation(); handlePress(stopPlayback); }}
+              hitSlop={8}
+              style={styles.closeCircle}
+            >
+              <MaterialCommunityIcons name="close" size={14} color="#fff" />
+            </Pressable>
+
+            <Pressable
               onPress={(e) => { e.stopPropagation && e.stopPropagation(); handlePress(togglePlayPause); }}
               style={[styles.miniPlayBtn, { backgroundColor: primaryColor }]}
             >
@@ -138,14 +161,6 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
               hitSlop={8}
             >
               <MaterialCommunityIcons name="chevron-up" size={18} color={textSecondary} />
-            </Pressable>
-
-            <Pressable
-              onPress={(e) => { e.stopPropagation && e.stopPropagation(); /* no-op on tap to avoid accidental stop */ }}
-              onLongPress={(e) => { e.stopPropagation && e.stopPropagation(); handlePress(stopPlayback); }}
-              hitSlop={8}
-            >
-              <MaterialCommunityIcons name="close-circle" size={20} color="#FF3B30" />
             </Pressable>
           </View>
         </BlurView>
@@ -174,13 +189,13 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
             },
           ]}
         >
-          {/* Absolute close in top-right corner (hides UI without stopping playback) */}
+          {/* Absolute close in top-left corner — stops playback */}
           <Pressable
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHidden(true); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handlePress(stopPlayback); }}
             hitSlop={8}
-            style={[styles.absoluteClose, global && styles.absoluteCloseGlobal]}
+            style={[styles.absoluteClose, styles.closeCircle, global && styles.absoluteCloseGlobal]}
           >
-            <MaterialCommunityIcons name="close" size={20} color="#FF3B30" />
+            <MaterialCommunityIcons name="close" size={16} color="#fff" />
           </Pressable>
 
           {/* Top row: info + controls */}
@@ -354,14 +369,14 @@ const styles = StyleSheet.create({
   absoluteClose: {
     position: 'absolute',
     top: Spacing.sm,
-    right: Spacing.sm,
+    left: Spacing.sm,
     zIndex: 20,
     padding: 6,
   },
   absoluteCloseGlobal: {
     // when the bar is rendered in global mode, nudge the close slightly outward
     top: -8,
-    right: Spacing.md,
+    left: Spacing.md,
   },
   reopenButton: {
     width: 46,
@@ -378,5 +393,13 @@ const styles = StyleSheet.create({
   reopenGlobal: {
     // slightly higher when global is true
     bottom: 96,
+  },
+  closeCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF3B30',
   },
 });

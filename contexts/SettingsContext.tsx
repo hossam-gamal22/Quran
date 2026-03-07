@@ -11,7 +11,7 @@ import React, {
   ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName, I18nManager } from 'react-native';
+import { Appearance, ColorSchemeName, I18nManager, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { 
@@ -83,8 +83,6 @@ export interface DisplaySettings {
   homeLayout: HomeLayout;
   /** Font size adjustment for Mushaf reader (-4 to +8, default 0) */
   quranFontSizeAdjust: number;
-  /** Fallback font selection: 'page' = per-page QPC font, or bundled Uthmanic variants */
-  quranFontFallback?: 'page' | 'uthmanic3' | 'uthmanic2' | 'uthmanic1';
   /** Use CDN page images instead of text rendering */
   quranUseCdnPages?: boolean;
   /** Show tafsir panel below Mushaf reader */
@@ -106,6 +104,7 @@ export interface PrayerSettings {
   };
   showSunrise: boolean;
   show24Hour: boolean;
+  layout?: 'list' | 'widget';
 }
 
 export interface AppSettings {
@@ -183,7 +182,6 @@ const defaultDisplay: DisplaySettings = {
   quranBackground: 'quranbg1',
   quranFontSizeAdjust: 0,
   quranThemeIndex: 0,
-  quranFontFallback: 'page',
   quranUseCdnPages: false,
   homeLayout: 'grid',
   showTafsir: false,
@@ -203,6 +201,7 @@ const defaultPrayer: PrayerSettings = {
   },
   showSunrise: true,
   show24Hour: false,
+  layout: 'list',
 };
 
 const defaultSettings: AppSettings = {
@@ -335,7 +334,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       try {
         await Updates.reloadAsync();
       } catch (e) {
-        console.log('Could not reload app:', e);
+        Alert.alert(
+          'يلزم إعادة التشغيل',
+          'يرجى إعادة تشغيل التطبيق لتطبيق اتجاه النص الجديد.',
+          [{ text: 'حسناً' }]
+        );
       }
     }
   }, [settings]);

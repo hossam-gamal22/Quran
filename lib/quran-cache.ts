@@ -124,10 +124,26 @@ export function getAyahAudioUrl(reciterIdentifier: string, ayahNumber: number): 
   return `https://cdn.islamic.network/quran/audio/128/${reciterIdentifier}/${ayahNumber}.mp3`;
 }
 
-// ─── رابط صوت السورة كاملة ───────────────────────────────────────────────────────
+// ─── رابط صوت السورة كاملة (QuranicAudio CDN — proven to work) ────────────────────
+// Maps alquran.cloud reciter IDs to quranicaudio.com directory names
+const QURANIC_AUDIO_PATHS: Record<string, string> = {
+  'ar.alafasy':              'mishaari_raashid_al_3afaasee',
+  'ar.abdullahbasfar':       'abdullaah_basfar',
+  'ar.abdurrahmaansudais':   'abdurrahmaan_as-sudais',
+  'ar.shaatree':             'abu_bakr_ash-shaatree',
+  'ar.husary':               'mahmood_khaleel_al-husaree',
+  'ar.minshawi':             'muhammad_siddeeq_al-minshaawee',
+  'ar.hudhaify':             'ali_ibn_abi_taalib_al-hudhaifee',
+  'ar.muhammadjibreel':      'muhammad_jibreel',
+};
+
 export function getSurahAudioUrl(reciterIdentifier: string, surahNumber: number): string {
-  // بعض القراء يوفرون السورة كاملة
   const paddedNumber = surahNumber.toString().padStart(3, '0');
+  const path = QURANIC_AUDIO_PATHS[reciterIdentifier];
+  if (path) {
+    return `https://download.quranicaudio.com/quran/${path}/${paddedNumber}.mp3`;
+  }
+  // Generic fallback using alquran.cloud CDN per-edition path
   return `https://cdn.islamic.network/quran/audio-surah/128/${reciterIdentifier}/${paddedNumber}.mp3`;
 }
 

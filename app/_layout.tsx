@@ -45,10 +45,9 @@ export default function RootLayout() {
     'Cairo-Medium': require('../assets/fonts/Cairo-Medium.ttf'),
     'Cairo-SemiBold': require('../assets/fonts/Cairo-SemiBold.ttf'),
     'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
-    'Amiri-Regular': require('../assets/fonts/Amiri-Regular.ttf'),
-    'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
-    'UthmanicHafs': require('../assets/fonts/UthmanicHafs.otf'),
+    'QCF_Default': require('../assets/fonts/qcf/QCF4_tajweed_001.ttf'),
     'QCFSurahNames': require('../assets/fonts/qcf/surah-names.ttf'),
+    
   });
 
   // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده

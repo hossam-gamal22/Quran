@@ -536,6 +536,14 @@ export default function SettingsScreen() {
             onPress={() => router.push('/settings/prayer-adjustments')}
             isDarkMode={isDarkMode}
           />
+          <SettingItem
+            icon="view-dashboard"
+            iconColor="#2f7659"
+            title="شكل عرض مواقيت الصلاة"
+            subtitle="قائمة أو لوحة تفاعلية"
+            onPress={() => router.push('/settings/prayer-layout')}
+            isDarkMode={isDarkMode}
+          />
         </SettingSection>
 
         {/* إعدادات القرآن */}

@@ -45,6 +45,7 @@ interface CountdownTimerProps {
   isDarkMode?: boolean;
   primaryColor?: string;
   secondaryColor?: string;
+  variant?: 'classic' | 'creative';
 }
 
 // ========================================
@@ -59,6 +60,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   isDarkMode = false,
   primaryColor = '#2f7659',
   secondaryColor = '#4ade80',
+  variant = 'creative',
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
@@ -166,8 +168,16 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     );
   }
 
-  const prayerNameLocalized = t(`ui.prayer.${nextPrayer.name}`, language);
+  const prayerNameLocalized = t(`ui.prayer.${nextPrayer.name}`);
   const prayerIcon = getPrayerIcon(nextPrayer.name);
+
+  const formatHMS = (t: typeof timeRemaining) => {
+    if (!t) return '00:00:00';
+    const h = String(t.hours).padStart(2, '0');
+    const m = String(t.minutes).padStart(2, '0');
+    const s = String(t.seconds).padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  };
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -208,33 +218,61 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
       {/* المحتوى الداخلي */}
       <View style={styles.innerContent}>
-        {/* أيقونة الصلاة */}
-        <Animated.View style={[styles.iconContainer, pulseStyle]}>
-          <MaterialCommunityIcons
-            name={prayerIcon as any}
-            size={32}
-            color={primaryColor}
-          />
-        </Animated.View>
+        {variant === 'creative' ? (
+          <>
+            <Animated.View style={[styles.iconContainer, pulseStyle]}>
+              <MaterialCommunityIcons
+                name={prayerIcon as any}
+                size={36}
+                color={primaryColor}
+              />
+            </Animated.View>
 
-        {/* اسم الصلاة */}
-        <Text style={[styles.prayerName, isDarkMode && styles.textLight]}>
-          {prayerNameLocalized}
-        </Text>
+            <Text style={[styles.prayerNameCreative, isDarkMode && styles.textLight]}>
+              {prayerNameLocalized}
+            </Text>
 
-        {/* الوقت المتبقي */}
-        <View style={styles.timeContainer}>
-          <TimeDigit value={timeRemaining.hours} label="س" isDarkMode={isDarkMode} />
-          <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-          <TimeDigit value={timeRemaining.minutes} label="د" isDarkMode={isDarkMode} />
-          <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-          <TimeDigit value={timeRemaining.seconds} label="ث" isDarkMode={isDarkMode} />
-        </View>
+            <Text style={[styles.bigTime, isDarkMode && styles.textLight]}>
+              {formatHMS(timeRemaining)}
+            </Text>
 
-        {/* وقت الأذان */}
-        <Text style={[styles.adhanTime, isDarkMode && styles.textMuted]}>
-          {formatTime12h(nextPrayer.time)}
-        </Text>
+            <Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>باقي على الأذان</Text>
+
+            <Text style={[styles.adhanTimeCreative, isDarkMode && styles.textMuted]}>
+              {formatTime12h(nextPrayer.time)}
+            </Text>
+          </>
+        ) : (
+          <>
+            {/* أيقونة الصلاة */}
+            <Animated.View style={[styles.iconContainer, pulseStyle]}>
+              <MaterialCommunityIcons
+                name={prayerIcon as any}
+                size={32}
+                color={primaryColor}
+              />
+            </Animated.View>
+
+            {/* اسم الصلاة */}
+            <Text style={[styles.prayerName, isDarkMode && styles.textLight]}>
+              {prayerNameLocalized}
+            </Text>
+
+            {/* الوقت المتبقي */}
+            <View style={styles.timeContainer}>
+              <TimeDigit value={timeRemaining.hours} label="س" isDarkMode={isDarkMode} />
+              <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
+              <TimeDigit value={timeRemaining.minutes} label="د" isDarkMode={isDarkMode} />
+              <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
+              <TimeDigit value={timeRemaining.seconds} label="ث" isDarkMode={isDarkMode} />
+            </View>
+
+            {/* وقت الأذان */}
+            <Text style={[styles.adhanTime, isDarkMode && styles.textMuted]}>
+              {formatTime12h(nextPrayer.time)}
+            </Text>
+          </>
+        )}
       </View>
 
       {/* عقرب الثواني */}
@@ -306,6 +344,28 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Bold',
     color: '#333',
     marginBottom: 4,
+  },
+  prayerNameCreative: {
+    fontSize: 22,
+    fontFamily: 'Cairo-Bold',
+    color: '#e6fff6',
+    marginBottom: 6,
+  },
+  bigTime: {
+    fontSize: 56,
+    fontFamily: 'Cairo-Bold',
+    color: '#fff',
+    marginTop: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 6,
+  },
+  adhanTimeCreative: {
+    fontSize: 13,
+    color: '#94a3b8',
+    marginTop: 8,
   },
   textLight: {
     color: '#fff',

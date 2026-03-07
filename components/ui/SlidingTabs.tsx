@@ -55,6 +55,8 @@ export interface SlidingTabsProps {
   fontFamily?: string;
   /** Font size for tab labels */
   fontSize?: number;
+  /** Subtle border on the sliding pill (glass edge) */
+  pillBorderColor?: string;
 }
 
 // ========================================
@@ -142,6 +144,7 @@ export function SlidingTabs({
   style,
   fontFamily = 'Cairo-SemiBold',
   fontSize = 14,
+  pillBorderColor,
 }: SlidingTabsProps) {
   const indicatorX = useSharedValue(0);
   const indicatorW = useSharedValue(0);
@@ -224,6 +227,8 @@ export function SlidingTabs({
               {
                 backgroundColor: activeColor,
                 borderRadius: pillBorderRadius,
+                borderWidth: pillBorderColor ? StyleSheet.hairlineWidth : 0,
+                borderColor: pillBorderColor,
               },
             ]}
           />

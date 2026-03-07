@@ -381,26 +381,45 @@ export default function AzkarScreen() {
         style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: 'rgba(120,120,128,0.15)' }]}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/favorites')}
-            style={styles.viewToggle}
-          >
-            <Ionicons name="heart" size={22} color="#EF4444" />
-          </TouchableOpacity>
-          <View style={{ flex: 1 }} />
-          <View style={{ width: 110 }}>
-            <GlassSegmentedControl
-              segments={[
-                { key: 'grid', label: 'شبكة', icon: 'view-grid' },
-                { key: 'list', label: 'قائمة', icon: 'view-list' },
-              ]}
-              selected={viewMode}
-              onSelect={async (key) => {
-                const newMode = key as 'grid' | 'list';
-                setViewMode(newMode);
-                await AsyncStorage.setItem('azkar_view_mode', newMode);
-              }}
-            />
+          {/* Left: worship tracker + favorites */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/worship-tracker?context=azkar' as any)}
+              style={styles.viewToggle}
+            >
+              <MaterialCommunityIcons name="chart-bar" size={22} color={darkMode ? '#fff' : '#333'} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/favorites')}
+              style={styles.viewToggle}
+            >
+              <Ionicons name="heart" size={22} color="#EF4444" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Center: title — absolutely centered */}
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20, fontFamily: 'Cairo-Bold' }]}>
+              {language === 'ar' ? 'الأذكار' : 'Azkar'}
+            </Text>
+          </View>
+
+          {/* Right: view toggle */}
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <View style={{ width: 110 }}>
+              <GlassSegmentedControl
+                segments={[
+                  { key: 'grid', label: 'شبكة', icon: 'view-grid' },
+                  { key: 'list', label: 'قائمة', icon: 'view-list' },
+                ]}
+                selected={viewMode}
+                onSelect={async (key) => {
+                  const newMode = key as 'grid' | 'list';
+                  setViewMode(newMode);
+                  await AsyncStorage.setItem('azkar_view_mode', newMode);
+                }}
+              />
+            </View>
           </View>
         </View>
       </View>

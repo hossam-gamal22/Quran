@@ -26,6 +26,7 @@ import Animated, {
   useAnimatedStyle,
   Easing,
 } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 import { useSettings } from '../../contexts/SettingsContext';
 import BackgroundWrapper from '../../components/ui/BackgroundWrapper';
 import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
@@ -240,6 +241,7 @@ const STORAGE_KEYS = {
 // ============================================
 
 export default function TasbihScreen() {
+  const router = useRouter();
   const { isDarkMode, settings, isRTL } = useSettings();
 
   const C = {
@@ -476,13 +478,25 @@ export default function TasbihScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => setShowStatsModal(true)} style={s.headerBtn}>
-            <MaterialCommunityIcons name="chart-bar" size={22} color={C.text} />
-          </TouchableOpacity>
-          <Text style={[s.headerTitle, { color: C.text }]}>التسبيح</Text>
-          <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
-            <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
-          </TouchableOpacity>
+          {/* Left: worship tracker + favorites */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity onPress={() => router.push('/worship-tracker?context=tasbih' as any)} style={s.headerBtn}>
+              <MaterialCommunityIcons name="chart-bar" size={22} color={C.text} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/favorites' as any)} style={s.headerBtn}>
+              <MaterialCommunityIcons name="bookmark-outline" size={22} color={C.text} />
+            </TouchableOpacity>
+          </View>
+          {/* Center: title — absolutely centered */}
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+            <Text style={[s.headerTitle, { color: C.text }]}>التسبيح</Text>
+          </View>
+          {/* Right: settings */}
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
+              <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Horizontal Tasbih Slider */}

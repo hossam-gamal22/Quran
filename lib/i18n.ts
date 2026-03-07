@@ -78,9 +78,9 @@ export const t = (key: string, params?: Record<string, string | number>): string
     }
   }
   
-  // إذا لم يوجد، جرب العربية
+  // إذا لم يوجد، جرب الإنجليزية (fallback)
   if (value === null || value === undefined) {
-    value = translations['ar'];
+    value = translations['en'];
     for (const k of keys) {
       if (value && typeof value === 'object' && k in value) {
         value = value[k];

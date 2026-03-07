@@ -1,7 +1,7 @@
 // app/(tabs)/prayer.tsx
 // صفحة مواقيت الصلاة الرئيسية - روح المسلم
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,8 @@ import SegmentedControl from '@react-native-segmented-control/segmented-control'
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import QiblaScreen from './qibla';
 import Animated, {
   FadeInDown,
 } from 'react-native-reanimated';
@@ -84,7 +85,6 @@ export default function PrayerScreen() {
   const { config } = useAppConfig();
   const language = settings.language;
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string }>();
 
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationType | null>(null);
@@ -94,8 +94,8 @@ export default function PrayerScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-
-  const showClock = params.view === 'clock';
+  // Read layout preference from global settings: 'list' | 'widget'
+  const viewIsWidget = settings.prayer?.layout === 'widget';
 
   const prayerTopSegments = React.useMemo(() => {
     const defaults = {
@@ -164,9 +164,12 @@ export default function PrayerScreen() {
 
   const prayerViewKeys = React.useMemo(() => prayerViewSegments.map((segment) => segment.key as 'list' | 'clock'), [prayerViewSegments]);
   const prayerViewLabels = React.useMemo(() => prayerViewSegments.map((segment) => segment.label), [prayerViewSegments]);
-  const prayerViewSelectedIndex = showClock
+  const [topSelectedKey, setTopSelectedKey] = useState<'prayer' | 'qibla'>('prayer');
+
+  const prayerViewSelectedIndex = viewIsWidget
     ? Math.max(0, prayerViewKeys.indexOf('clock'))
     : Math.max(0, prayerViewKeys.indexOf('list'));
+  const prayerTopSelectedIndex = Math.max(0, prayerTopKeys.indexOf(topSelectedKey));
 
   const fetchLocation = async (): Promise<LocationType | null> => {
     try {
@@ -254,13 +257,45 @@ export default function PrayerScreen() {
     }
   };
 
-  useEffect(() => {
+  // ======= Qibla helpers (compact preview uses these) =======
+  const KAABA_LATITUDE = 21.4225;
+  const KAABA_LONGITUDE = 39.8262;
+
+  const calculateQiblaDirection = (latitude: number, longitude: number): number => {
+    const lat1 = (latitude * Math.PI) / 180;
+    const lat2 = (KAABA_LATITUDE * Math.PI) / 180;
+    const lonDiff = ((KAABA_LONGITUDE - longitude) * Math.PI) / 180;
+
+    const y = Math.sin(lonDiff);
+    const x = Math.cos(lat1) * Math.tan(lat2) - Math.sin(lat1) * Math.cos(lonDiff);
+
+    let qibla = (Math.atan2(y, x) * 180) / Math.PI;
+    qibla = (qibla + 360) % 360;
+
+    return qibla;
+  };
+
+  const calculateDistance = (latitude: number, longitude: number): number => {
+    const R = 6371; // km
+    const lat1 = (latitude * Math.PI) / 180;
+    const lat2 = (KAABA_LATITUDE * Math.PI) / 180;
+    const dLat = lat2 - lat1;
+    const dLon = ((KAABA_LONGITUDE - longitude) * Math.PI) / 180;
+
+    const a = Math.sin(dLat / 2) ** 2 + 
+              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+  };
+
+  useFocusEffect(useCallback(() => {
     loadPrayerTimes();
     const hijri = getHijriDate();
     if (hijri) {
       setHijriDate(`${hijri.day} ${hijri.monthNameAr} ${hijri.year}`);
     }
-  }, []);
+  }, [])); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -268,10 +303,7 @@ export default function PrayerScreen() {
     loadPrayerTimes(true);
   }, []);
 
-  const toggleViewMode = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setShowClock(prev => !prev);
-  };
+  // View mode is controlled via Settings (Prayer Screen Layout)
 
   const handleToggleNotification = async (prayer: PrayerName, enabled: boolean) => {
     if (!prayerSettings) return;
@@ -320,25 +352,31 @@ export default function PrayerScreen() {
         entering={FadeInDown.duration(500)}
         style={[styles.header, isDarkMode && styles.headerDark]}
       >
-        <View style={styles.headerLeft}>
+        {/* Left: worship tracker only (no bookmark per spec) */}
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            onPress={() => router.push('/worship-tracker?context=prayer' as any)}
+            style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
+          >
+            <MaterialCommunityIcons name="chart-bar" size={22} color={isDarkMode ? '#fff' : '#333'} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Center: title + location — absolutely centered */}
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
           <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
             {t('prayer.title')}
           </Text>
           {locationName && (
             <View style={styles.locationBadge}>
-              <MaterialCommunityIcons
-                name="map-marker"
-                size={14}
-                color={isDarkMode ? '#aaa' : '#666'}
-              />
-              <Text style={[styles.locationText, isDarkMode && styles.textMuted]}>
-                {locationName}
-              </Text>
+              <MaterialCommunityIcons name="map-marker" size={14} color={isDarkMode ? '#aaa' : '#666'} />
+              <Text style={[styles.locationText, isDarkMode && styles.textMuted]}>{locationName}</Text>
             </View>
           )}
         </View>
 
-        <View style={styles.headerRight}>
+        {/* Right: settings */}
+        <View style={[styles.headerRight, { flex: 1, justifyContent: 'flex-end' }]}>
           <TouchableOpacity
             onPress={openSettings}
             style={[styles.headerButton, isDarkMode && styles.headerButtonDark]}
@@ -351,13 +389,11 @@ export default function PrayerScreen() {
       <View style={styles.topNavTabsWrap}>
         <SegmentedControl
           values={prayerTopLabels}
-          selectedIndex={0}
+          selectedIndex={prayerTopSelectedIndex}
           onChange={(event) => {
             const key = prayerTopKeys[event.nativeEvent.selectedSegmentIndex] || 'prayer';
-            if (key === 'qibla') {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/qibla');
-            }
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setTopSelectedKey(key);
           }}
           tintColor={Platform.OS === 'ios' ? '#2f7659' : undefined}
           backgroundColor={isDarkMode ? 'rgba(34,38,46,0.82)' : 'rgba(255,255,255,0.65)'}
@@ -366,6 +402,25 @@ export default function PrayerScreen() {
           activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isDarkMode ? '#F9FAFB' : '#111827' }}
         />
       </View>
+
+      {/* Qibla preview: hidden when top tab is Qibla (we show full Qibla view) */}
+      {location && topSelectedKey !== 'qibla' && (
+        <TouchableOpacity
+          style={[styles.qiblaPreview, isDarkMode && styles.qiblaPreviewDark]}
+          activeOpacity={0.85}
+          onPress={() => router.push('/qibla')}
+        >
+          <View style={styles.qiblaPreviewLeft}>
+            <MaterialCommunityIcons name="compass" size={28} color={isDarkMode ? '#fff' : '#111'} />
+          </View>
+          <View style={styles.qiblaPreviewBody}>
+            <Text style={[styles.qiblaPreviewTitle, isDarkMode && styles.textLight]}>اتجاه القبلة</Text>
+            <Text style={[styles.qiblaPreviewSubtitle, isDarkMode && styles.textMuted]}>
+              {Math.round(calculateQiblaDirection(location.latitude, location.longitude))}° · {Math.round(calculateDistance(location.latitude, location.longitude))} كم
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -396,7 +451,13 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {showClock ? (
+        {/* View mode controlled by settings — toggle removed from main UI */}
+
+        {topSelectedKey === 'qibla' ? (
+          <Animated.View entering={FadeInDown.duration(300)}>
+            <QiblaScreen />
+          </Animated.View>
+        ) : viewIsWidget ? (
           <Animated.View
             entering={FadeInDown.delay(100).duration(500)}
             style={styles.circularContainer}
@@ -419,112 +480,116 @@ export default function PrayerScreen() {
           </Animated.View>
         )}
 
-        {inLastThird && (
-          <Animated.View
-            entering={FadeInDown.delay(200).duration(500)}
-            style={styles.lastThirdBanner}
-          >
-            <MaterialCommunityIcons name="star-crescent" size={20} color="#ffd700" />
-            <Text style={styles.lastThirdText}>
-              {t('prayer.lastThirdMessage')}
-            </Text>
-          </Animated.View>
-        )}
-
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <PrayerList
-            prayerTimes={prayerTimes}
-            language={language}
-            isDarkMode={isDarkMode}
-            notificationSettings={prayerSettings?.notifications}
-            onToggleNotification={handleToggleNotification}
-            showNotificationToggle={true}
-            showSunrise={settings.prayer.showSunrise}
-          />
-        </Animated.View>
-
-        {prayerTimes && (
-          <Animated.View
-            entering={FadeInDown.delay(400).duration(500)}
-            style={[styles.extraInfo, isDarkMode && styles.extraInfoDark]}
-          >
-            <Text style={[styles.extraTitle, isDarkMode && styles.textLight]}>
-              {t('prayer.extraTimes')}
-            </Text>
-
-            <View style={styles.extraRow}>
-              <View style={styles.extraItem}>
-                <MaterialCommunityIcons
-                  name="weather-night"
-                  size={20}
-                  color={isDarkMode ? '#aaa' : '#666'}
-                />
-                <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
-                  {t('prayer.midnight')}
+        {topSelectedKey !== 'qibla' && (
+          <>
+            {inLastThird && (
+              <Animated.View
+                entering={FadeInDown.delay(200).duration(500)}
+                style={styles.lastThirdBanner}
+              >
+                <MaterialCommunityIcons name="star-crescent" size={20} color="#ffd700" />
+                <Text style={styles.lastThirdText}>
+                  {t('prayer.lastThirdMessage')}
                 </Text>
-                <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
-                  {formatTime12h(prayerTimes.midnight)}
-                </Text>
-              </View>
+              </Animated.View>
+            )}
 
-              <View style={styles.extraItem}>
-                <MaterialCommunityIcons
-                  name="star-crescent"
-                  size={20}
-                  color={isDarkMode ? '#aaa' : '#666'}
-                />
-                <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
-                  {t('prayer.lastThird')}
-                </Text>
-                <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
-                  {formatTime12h(prayerTimes.lastThird)}
-                </Text>
-              </View>
-            </View>
-          </Animated.View>
-        )}
+            <Animated.View entering={FadeInDown.delay(300).duration(500)}>
+              <PrayerList
+                prayerTimes={prayerTimes}
+                language={language}
+                isDarkMode={isDarkMode}
+                notificationSettings={prayerSettings?.notifications}
+                onToggleNotification={handleToggleNotification}
+                showNotificationToggle={true}
+                showSunrise={settings.prayer.showSunrise}
+              />
+            </Animated.View>
 
-        {/* Qibla Quick Access Button */}
-        <Animated.View
-          entering={FadeInDown.delay(500).duration(500)}
-          style={styles.qiblaContainer}
-        >
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push('/(tabs)/qibla' as any);
-            }}
-            activeOpacity={0.85}
-            style={[styles.qiblaButton, isDarkMode && styles.qiblaButtonDark]}
-          >
-            <BlurView
-              intensity={Platform.OS === 'ios' ? 60 : 30}
-              tint={isDarkMode ? 'dark' : 'light'}
-              style={styles.qiblaButtonBlur}
+            {prayerTimes && (
+              <Animated.View
+                entering={FadeInDown.delay(400).duration(500)}
+                style={[styles.extraInfo, isDarkMode && styles.extraInfoDark]}
+              >
+                <Text style={[styles.extraTitle, isDarkMode && styles.textLight]}>
+                  {t('prayer.extraTimes')}
+                </Text>
+
+                <View style={styles.extraRow}>
+                  <View style={styles.extraItem}>
+                    <MaterialCommunityIcons
+                      name="weather-night"
+                      size={20}
+                      color={isDarkMode ? '#aaa' : '#666'}
+                    />
+                    <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
+                      {t('prayer.midnight')}
+                    </Text>
+                    <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
+                      {formatTime12h(prayerTimes.midnight)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.extraItem}>
+                    <MaterialCommunityIcons
+                      name="star-crescent"
+                      size={20}
+                      color={isDarkMode ? '#aaa' : '#666'}
+                    />
+                    <Text style={[styles.extraLabel, isDarkMode && styles.textMuted]}>
+                      {t('prayer.lastThird')}
+                    </Text>
+                    <Text style={[styles.extraValue, isDarkMode && styles.textLight]}>
+                      {formatTime12h(prayerTimes.lastThird)}
+                    </Text>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+
+            {/* Qibla Quick Access Button */}
+            <Animated.View
+              entering={FadeInDown.delay(500).duration(500)}
+              style={styles.qiblaContainer}
             >
-              <View style={[styles.qiblaButtonContent, isDarkMode && styles.qiblaButtonContentDark]}>
-                <View style={styles.qiblaIconWrapper}>
-                  <MaterialCommunityIcons name="compass" size={32} color="#5856D6" />
-                </View>
-                <View style={styles.qiblaTextWrapper}>
-                  <Text style={[styles.qiblaTitle, isDarkMode && styles.textLight]}>
-                    {t('prayer.qiblaDirection') || 'اتجاه القبلة'}
-                  </Text>
-                  <Text style={[styles.qiblaSubtitle, isDarkMode && styles.textMuted]}>
-                    {t('prayer.qiblaSubtitle') || 'بوصلة تحديد اتجاه القبلة'}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-left"
-                  size={24}
-                  color={isDarkMode ? '#8e8e93' : '#aaa'}
-                />
-              </View>
-            </BlurView>
-          </TouchableOpacity>
-        </Animated.View>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push('/(tabs)/qibla' as any);
+                }}
+                activeOpacity={0.85}
+                style={[styles.qiblaButton, isDarkMode && styles.qiblaButtonDark]}
+              >
+                <BlurView
+                  intensity={Platform.OS === 'ios' ? 60 : 30}
+                  tint={isDarkMode ? 'dark' : 'light'}
+                  style={styles.qiblaButtonBlur}
+                >
+                  <View style={[styles.qiblaButtonContent, isDarkMode && styles.qiblaButtonContentDark]}>
+                    <View style={styles.qiblaIconWrapper}>
+                      <MaterialCommunityIcons name="compass" size={32} color="#5856D6" />
+                    </View>
+                    <View style={styles.qiblaTextWrapper}>
+                      <Text style={[styles.qiblaTitle, isDarkMode && styles.textLight]}>
+                        {t('prayer.qiblaDirection') || 'اتجاه القبلة'}
+                      </Text>
+                      <Text style={[styles.qiblaSubtitle, isDarkMode && styles.textMuted]}>
+                        {t('prayer.qiblaSubtitle') || 'بوصلة تحديد اتجاه القبلة'}
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons
+                      name="chevron-left"
+                      size={24}
+                      color={isDarkMode ? '#8e8e93' : '#aaa'}
+                    />
+                  </View>
+                </BlurView>
+              </TouchableOpacity>
+            </Animated.View>
 
-        <View style={styles.bottomSpace} />
+            <View style={styles.bottomSpace} />
+          </>
+        )}
       </ScrollView>
 
       <BannerAdComponent screen="prayer" />

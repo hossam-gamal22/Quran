@@ -1,7 +1,7 @@
 // app/worship-tracker/index.tsx
 // الصفحة الرئيسية لمتتبع العبادات - روح المسلم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -218,6 +219,7 @@ const QuickAction: React.FC<QuickActionProps> = ({
 
 export default function WorshipTrackerScreen() {
   const router = useRouter();
+  const { context } = useSearchParams();
   const {
     isLoading,
     stats,
@@ -264,6 +266,17 @@ export default function WorshipTrackerScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(`/worship-tracker/${screen}` as any);
   };
+
+  // If a caller provided a ?context= parameter (e.g. ?context=quran), forward to that sub-screen
+  useEffect(() => {
+    if (!context) return;
+    // Normalize to known keys
+    const allowed = ['quran', 'prayer', 'azkar', 'tasbih'];
+    const key = String(context).toLowerCase();
+    if (allowed.includes(key)) {
+      navigateTo(key);
+    }
+  }, [context]);
 
   // أزرار سريعة
   const handleToggleFasting = async () => {

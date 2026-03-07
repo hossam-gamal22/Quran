@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,18 @@ import {
   Alert,
   Dimensions,
   Platform,
+  ScrollView,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Magnetometer } from 'expo-sensors';
-import { Colors, Spacing, BorderRadius, Shadows, Typography } from '../../constants/theme';
+import { Colors, DarkColors, Spacing, BorderRadius, Shadows, Typography, GlassStyles } from '../../constants/theme';
 import { APP_CONFIG } from '../../constants/app';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { Share } from 'react-native';
 import { copyToClipboard } from '../../lib/share-service';
 
@@ -33,6 +37,14 @@ const KAABA_LONGITUDE = 39.8262;
 export default function QiblaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isDarkMode } = useSettings();
+
+  // High-contrast colors for accessibility on this screen
+  const CONTRAST_WHITE = '#FFFFFF';
+  const CONTRAST_LIGHT = '#E0E0E0';
+  const ICON_COLOR = isDarkMode ? CONTRAST_WHITE : Colors.text;
+  const TEXT_COLOR = isDarkMode ? CONTRAST_WHITE : Colors.text;
+  const MUTED_COLOR = isDarkMode ? CONTRAST_LIGHT : Colors.textSecondary;
   
   // الحالات
   const [loading, setLoading] = useState(true);
@@ -42,6 +54,13 @@ export default function QiblaScreen() {
   const [compassHeading, setCompassHeading] = useState(0);
   const [accuracy, setAccuracy] = useState<'low' | 'medium' | 'high'>('low');
   const [showShareModal, setShowShareModal] = useState(false);
+  const THEMES = [
+    { key: 'modern', label: 'عصري' },
+    { key: 'classic', label: 'كلاسيكي' },
+    { key: 'minimal', label: 'بسيط' },
+  ] as const;
+
+  const [theme, setTheme] = useState<typeof THEMES[number]['key']>('modern');
   
   // الأنيميشن
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -84,86 +103,86 @@ export default function QiblaScreen() {
   // تحميل البيانات
   // ============================================
 
-  useEffect(() => {
-    let magnetometerSubscription: any;
+  // Initialize location + magnetometer only when this screen is focused (mounted/visible)
+  useFocusEffect(
+    useCallback(() => {
+      let magnetometerSubscription: any;
+      let active = true;
 
-    const initializeQibla = async () => {
-      try {
-        // طلب إذن الموقع
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('خطأ', 'يرجى السماح بالوصول إلى الموقع لتحديد اتجاه القبلة');
+      const initializeQibla = async () => {
+        try {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            if (!active) return;
+            Alert.alert('خطأ', 'يرجى السماح بالوصول إلى الموقع لتحديد اتجاه القبلة');
+            setLoading(false);
+            return;
+          }
+          if (!active) return;
+          setHasPermission(true);
+
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          if (!active) return;
+          const { latitude, longitude } = loc.coords;
+          setLocation({ latitude, longitude, city: 'موقعك' });
+
+          const qibla = calculateQiblaDirection(latitude, longitude);
+          setQiblaDirection(qibla);
+
           setLoading(false);
-          return;
+          startPulseAnimation();
+
+          // resolve city asynchronously
+          Location.reverseGeocodeAsync({ latitude, longitude })
+            .then((result) => {
+              if (!active) return;
+              const [address] = result;
+              const city = address?.city || address?.region || 'موقعك';
+              setLocation({ latitude, longitude, city });
+            })
+            .catch(() => {});
+
+          const isAvailable = await Magnetometer.isAvailableAsync();
+          if (!active) return;
+          if (isAvailable) {
+            Magnetometer.setUpdateInterval(100);
+            magnetometerSubscription = Magnetometer.addListener((data) => {
+              if (!active) return;
+              let heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
+              heading = (heading + 360) % 360;
+              setCompassHeading(heading);
+
+              const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
+              if (magnitude > 45) {
+                setAccuracy('high');
+              } else if (magnitude > 25) {
+                setAccuracy('medium');
+              } else {
+                setAccuracy('low');
+              }
+            });
+          } else {
+            Alert.alert('تنبيه', 'البوصلة غير متوفرة على هذا الجهاز');
+          }
+        } catch (error) {
+          console.error('Error initializing qibla:', error);
+          if (active) {
+            Alert.alert('خطأ', 'حدث خطأ أثناء تحديد اتجاه القبلة');
+            setLoading(false);
+          }
         }
-        setHasPermission(true);
+      };
 
-        // الحصول على الموقع
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-        const { latitude, longitude } = loc.coords;
-        setLocation({ latitude, longitude, city: 'موقعك' });
+      initializeQibla();
 
-        // حساب اتجاه القبلة
-        const qibla = calculateQiblaDirection(latitude, longitude);
-        setQiblaDirection(qibla);
-
-        // إظهار الواجهة فورًا بعد توفر الاتجاه بدل انتظار reverse geocoding
-        setLoading(false);
-        startPulseAnimation();
-
-        // تحميل اسم المدينة بشكل غير متزامن بعد إظهار البوصلة
-        Location.reverseGeocodeAsync({ latitude, longitude })
-          .then((result) => {
-            const [address] = result;
-            const city = address?.city || address?.region || 'موقعك';
-            setLocation({ latitude, longitude, city });
-          })
-          .catch(() => {
-            // تجاهل خطأ reverse geocoding ولا نمنع عمل البوصلة
-          });
-
-        // الاشتراك في بوصلة المغناطيسية
-        const isAvailable = await Magnetometer.isAvailableAsync();
-        if (isAvailable) {
-          Magnetometer.setUpdateInterval(100);
-          
-          magnetometerSubscription = Magnetometer.addListener((data) => {
-            let heading = Math.atan2(data.y, data.x) * (180 / Math.PI);
-            heading = (heading + 360) % 360;
-            
-            setCompassHeading(heading);
-            
-            // تحديث دقة البوصلة
-            const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
-            if (magnitude > 45) {
-              setAccuracy('high');
-            } else if (magnitude > 25) {
-              setAccuracy('medium');
-            } else {
-              setAccuracy('low');
-            }
-          });
-        } else {
-          Alert.alert('تنبيه', 'البوصلة غير متوفرة على هذا الجهاز');
+      return () => {
+        active = false;
+        if (magnetometerSubscription) {
+          magnetometerSubscription.remove();
         }
-
-      } catch (error) {
-        console.error('Error initializing qibla:', error);
-        Alert.alert('خطأ', 'حدث خطأ أثناء تحديد اتجاه القبلة');
-        setLoading(false);
-      }
-    };
-
-    initializeQibla();
-
-    return () => {
-      if (magnetometerSubscription) {
-        magnetometerSubscription.remove();
-      }
-    };
-  }, []);
+      };
+    }, [])
+  );
 
   // تحديث الأنيميشن عند تغير اتجاه البوصلة
   useEffect(() => {
@@ -244,10 +263,10 @@ export default function QiblaScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <BackgroundWrapper backgroundKey={isDarkMode ? 'dynamic' : 'none'} style={[styles.loadingContainer, isDarkMode && styles.loadingContainerDark]}>
         <Ionicons name="compass-outline" size={48} color={Colors.primary} />
         <Text style={styles.loadingText}>جاري تحديد اتجاه القبلة...</Text>
-      </View>
+      </BackgroundWrapper>
     );
   }
 
@@ -262,53 +281,100 @@ export default function QiblaScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <BackgroundWrapper
+      backgroundKey={isDarkMode ? 'dynamic' : 'none'}
+      style={[styles.container, isDarkMode && styles.containerDark]}
+    >
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       {/* الهيدر */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={Colors.text} />
+          <Ionicons name="arrow-forward" size={24} color={ICON_COLOR} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>اتجاه القبلة</Text>
+        <Text style={[styles.headerTitle, { color: TEXT_COLOR }]}>اتجاه القبلة</Text>
         
         <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-          <Ionicons name="share-outline" size={24} color={Colors.text} />
+          <Ionicons name="share-outline" size={24} color={ICON_COLOR} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
         {/* معلومات الموقع */}
-        <View style={styles.locationCard}>
+        <BlurView intensity={60} tint={isDarkMode ? 'dark' : 'light'} style={[styles.locationCard, isDarkMode ? GlassStyles.cardDark : GlassStyles.card]}>
           <Ionicons name="location" size={20} color={Colors.primary} />
-          <Text style={styles.locationText}>{location?.city || 'موقعك'}</Text>
+          <Text style={[styles.locationText, { color: TEXT_COLOR }]}>{location?.city || 'موقعك'}</Text>
           {location && (
-            <Text style={styles.distanceText}>
+            <Text style={[styles.distanceText, { color: MUTED_COLOR }]}>
               {Math.round(calculateDistance(location.latitude, location.longitude))} كم من الكعبة
             </Text>
           )}
-        </View>
+        </BlurView>
 
         {/* البوصلة */}
+        {/* اختيار نمط العرض للبوصلة */}
+        <View style={styles.themeCarousel}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {THEMES.map((t) => (
+              <TouchableOpacity
+                key={t.key}
+                onPress={() => setTheme(t.key)}
+                style={[
+                  styles.themeItem,
+                  theme === t.key && styles.themeItemActive,
+                ]}
+                activeOpacity={0.8}
+              >
+                <View
+                  style={[
+                    styles.themePreviewCircle,
+                    t.key === 'modern' && styles.modernPreview,
+                    t.key === 'classic' && styles.classicPreview,
+                    t.key === 'minimal' && styles.minimalPreview,
+                    theme === t.key && styles.themePreviewActive,
+                    // ensure visible border on dark backgrounds
+                    isDarkMode ? { borderColor: CONTRAST_WHITE } : {},
+                    theme === t.key && (isDarkMode ? { borderColor: CONTRAST_WHITE, borderWidth: 2 } : {}),
+                  ]}
+                />
+                <Text style={[styles.themeLabel, { color: isDarkMode ? CONTRAST_LIGHT : Colors.textSecondary }]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
         <View style={styles.compassContainer}>
           {/* خلفية البوصلة */}
           <Animated.View 
             style={[
               styles.compassBackground,
-              { transform: [{ rotate: rotateInterpolate }] }
+              theme === 'modern' && styles.modernBackground,
+              theme === 'classic' && styles.classicBackground,
+              theme === 'minimal' && styles.minimalBackground,
+              { transform: [{ rotate: rotateInterpolate }] },
             ]}
           >
             {/* علامات الاتجاهات */}
             <View style={styles.directionMarkers}>
-              <Text style={[styles.directionText, styles.northText]}>ش</Text>
-              <Text style={[styles.directionText, styles.eastText]}>شر</Text>
-              <Text style={[styles.directionText, styles.southText]}>ج</Text>
-              <Text style={[styles.directionText, styles.westText]}>غ</Text>
+              <Text style={[styles.directionText, styles.northText, { color: isDarkMode ? CONTRAST_WHITE : Colors.textSecondary }]}>ش</Text>
+              <Text style={[styles.directionText, styles.eastText, { color: isDarkMode ? CONTRAST_WHITE : Colors.textSecondary }]}>شر</Text>
+              <Text style={[styles.directionText, styles.southText, { color: isDarkMode ? CONTRAST_WHITE : Colors.textSecondary }]}>ج</Text>
+              <Text style={[styles.directionText, styles.westText, { color: isDarkMode ? CONTRAST_WHITE : Colors.textSecondary }]}>غ</Text>
             </View>
             
             {/* الدوائر */}
-            <View style={styles.compassCircle} />
-            <View style={[styles.compassCircle, { width: COMPASS_SIZE * 0.7, height: COMPASS_SIZE * 0.7 }]} />
-            <View style={[styles.compassCircle, { width: COMPASS_SIZE * 0.4, height: COMPASS_SIZE * 0.4 }]} />
+            <View style={[styles.compassCircle, theme === 'modern' && styles.modernCircle, isDarkMode ? { borderColor: CONTRAST_WHITE } : {}]} />
+            <View style={[
+              styles.compassCircle,
+              { width: COMPASS_SIZE * 0.7, height: COMPASS_SIZE * 0.7 },
+              theme === 'classic' && styles.classicInnerCircle,
+              isDarkMode ? { borderColor: CONTRAST_WHITE } : {},
+            ]} />
+            <View style={[
+              styles.compassCircle,
+              { width: COMPASS_SIZE * 0.4, height: COMPASS_SIZE * 0.4 },
+              theme === 'minimal' && styles.minimalInnerCircle,
+              isDarkMode ? { borderColor: CONTRAST_WHITE } : {},
+            ]} />
           </Animated.View>
 
           {/* سهم القبلة */}
@@ -328,10 +394,10 @@ export default function QiblaScreen() {
               isFacingQibla && styles.qiblaArrowActive,
               isCloseToQibla && !isFacingQibla && styles.qiblaArrowClose,
             ]}>
-              <Ionicons 
-                name="caret-up" 
-                size={60} 
-                color={isFacingQibla ? Colors.success : isCloseToQibla ? Colors.warning : Colors.primary} 
+              <Ionicons
+                name="caret-up"
+                size={60}
+                color={Colors.primary}
               />
             </View>
             
@@ -343,7 +409,7 @@ export default function QiblaScreen() {
 
           {/* مؤشر الاتجاه الثابت */}
           <View style={styles.fixedIndicator}>
-            <Ionicons name="navigate" size={24} color={Colors.error} />
+            <Ionicons name="navigate" size={24} color={Colors.primary} />
           </View>
         </View>
 
@@ -359,8 +425,8 @@ export default function QiblaScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.directionDegree}>{Math.round(qiblaDirection)}°</Text>
-              <Text style={styles.directionCardText}>
+              <Text style={[styles.directionDegree, { color: isDarkMode ? TEXT_COLOR : Colors.primary }]}>{Math.round(qiblaDirection)}°</Text>
+              <Text style={[styles.directionCardText, { color: isDarkMode ? MUTED_COLOR : Colors.textSecondary }]}>
                 {qiblaOffset < 90 
                   ? `أدر ${Math.round(qiblaOffset)}° ${qiblaDirection > compassHeading ? 'يميناً' : 'يساراً'}`
                   : `القبلة خلفك، أدر ${Math.round(180 - qiblaOffset)}°`
@@ -372,40 +438,39 @@ export default function QiblaScreen() {
 
         {/* دقة البوصلة */}
         <View style={styles.accuracyCard}>
-          <Text style={styles.accuracyLabel}>دقة البوصلة:</Text>
+          <Text style={[styles.accuracyLabel, { color: MUTED_COLOR }]}>دقة البوصلة:</Text>
           <View style={styles.accuracyIndicator}>
             <View style={[styles.accuracyDot, accuracy !== 'low' && styles.accuracyDotActive]} />
             <View style={[styles.accuracyDot, accuracy === 'high' && styles.accuracyDotActive]} />
             <View style={[styles.accuracyDot, accuracy === 'high' && styles.accuracyDotActive]} />
           </View>
-          <Text style={styles.accuracyText}>
+          <Text style={[styles.accuracyText, { color: MUTED_COLOR }]}> 
             {accuracy === 'high' ? 'ممتازة' : accuracy === 'medium' ? 'جيدة' : 'ضعيفة'}
           </Text>
         </View>
 
         {accuracy === 'low' && (
-          <View style={styles.calibrationTip}>
-            <Ionicons name="information-circle" size={20} color={Colors.warning} />
-            <Text style={styles.calibrationText}>
-              حرّك هاتفك بشكل رقم 8 لمعايرة البوصلة
-            </Text>
+          <View style={[styles.calibrationTip, isDarkMode ? { backgroundColor: 'rgba(255,255,255,0.06)' } : {}]}>
+            <Ionicons name="information-circle" size={20} color={MUTED_COLOR} />
+            <Text style={[styles.calibrationText, { color: MUTED_COLOR }]}>حرّك هاتفك بشكل رقم 8 لمعايرة البوصلة</Text>
           </View>
         )}
 
         {/* أزرار الإجراءات */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+          <TouchableOpacity style={[styles.actionButton, isDarkMode ? GlassStyles.buttonDark : {}]} onPress={handleShare}>
             <Ionicons name="share-outline" size={22} color={Colors.primary} />
-            <Text style={styles.actionButtonText}>مشاركة</Text>
+            <Text style={[styles.actionButtonText, { color: TEXT_COLOR }]}>مشاركة</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
+          <TouchableOpacity style={[styles.actionButton, isDarkMode ? GlassStyles.buttonDark : {}]} onPress={handleCopy}>
             <Ionicons name="copy-outline" size={22} color={Colors.secondary} />
-            <Text style={styles.actionButtonText}>نسخ</Text>
+            <Text style={[styles.actionButtonText, { color: TEXT_COLOR }]}>نسخ</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+      </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -418,11 +483,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  loadingContainerDark: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: DarkColors.background,
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.background,
+  },
+  containerDark: {
+    backgroundColor: DarkColors.background,
   },
   loadingText: {
     fontSize: Typography.sizes.md,
@@ -508,7 +582,7 @@ const styles = StyleSheet.create({
   northText: {
     top: 10,
     left: COMPASS_SIZE / 2 - 10,
-    color: Colors.error,
+    color: Colors.textSecondary,
   },
   eastText: {
     right: 10,
@@ -605,7 +679,7 @@ const styles = StyleSheet.create({
   calibrationTip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.warning + '10',
+    backgroundColor: Colors.textSecondary + '08',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginTop: Spacing.md,
@@ -633,5 +707,72 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: Typography.sizes.md,
     color: Colors.text,
+  },
+  /* Theme carousel */
+  themeCarousel: {
+    width: '100%',
+    marginTop: Spacing.md,
+    paddingVertical: 6,
+  },
+  themeItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  themeItemActive: {
+    // subtle scale or highlight could be added
+  },
+  themePreviewCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.xs,
+  },
+  themePreviewActive: {
+    borderWidth: 2,
+    transform: [{ scale: 1.05 }],
+  },
+  themeLabel: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textSecondary,
+  },
+
+  modernPreview: {
+    backgroundColor: Colors.primary + '22',
+    borderColor: Colors.primary,
+  },
+  classicPreview: {
+    backgroundColor: Colors.textSecondary + '10',
+    borderStyle: 'dashed',
+  },
+  minimalPreview: {
+    backgroundColor: 'transparent',
+    borderColor: Colors.border,
+  },
+
+  modernBackground: {
+    // intentionally no visible debug border to avoid rotating green box
+  },
+  classicBackground: {
+    // subtle classic background (no bright borders)
+  },
+  minimalBackground: {
+    // minimal background - no border
+  },
+
+  modernCircle: {
+    // use subtle ring that follows theme border color
+    borderColor: Colors.border,
+    borderWidth: 1.2,
+  },
+  classicInnerCircle: {
+    borderColor: Colors.textSecondary,
+    borderStyle: 'dashed',
+  },
+  minimalInnerCircle: {
+    borderColor: Colors.border,
   },
 });

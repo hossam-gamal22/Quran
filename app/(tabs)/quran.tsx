@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -217,7 +217,7 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
 
 export default function QuranScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
+
   const { isDarkMode, settings, updateDisplay, isRTL } = useSettings();
   const { config } = useAppConfig();
   const colors = useColors();
@@ -242,11 +242,7 @@ export default function QuranScreen() {
   const [lastReadPage, setLastReadPage] = useState<number | null>(null);
   const [firstBookmarkPage, setFirstBookmarkPage] = useState<number | null>(null);
 
-  const activeTab = useMemo<'surahs' | 'juz' | 'listen'>(() => {
-    const tab = params.tab;
-    if (tab === 'juz' || tab === 'listen' || tab === 'surahs') return tab;
-    return 'surahs';
-  }, [params.tab]);
+  const [activeTab, setActiveTab] = useState<'surahs' | 'juz' | 'listen'>('surahs');
 
   const quranSegments = useMemo(() => {
     const defaults = {
@@ -284,7 +280,7 @@ export default function QuranScreen() {
   const quranSegmentLabels = useMemo(() => quranSegments.map((segment) => segment.label), [quranSegments]);
   const quranSelectedIndex = Math.max(0, quranSegmentKeys.indexOf(activeTab));
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
     const loadLastRead = async () => {
@@ -314,7 +310,7 @@ export default function QuranScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, []));
 
   // فلترة السور حسب البحث
   const filteredSurahs = useMemo(() => {
@@ -691,31 +687,38 @@ export default function QuranScreen() {
                   : 'rgba(20,20,22,0.15)',
               },
             ]}>
-              <TouchableOpacity
-                style={styles.headerBtn}
-                onPress={() => setShowSettings(true)}
-              >
-                <MaterialCommunityIcons
-                  name="cog"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
+              {/* Left: worship tracker + favorites */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <TouchableOpacity
+                  style={styles.headerBtn}
+                  onPress={() => router.push('/worship-tracker?context=quran' as any)}
+                >
+                  <MaterialCommunityIcons name="chart-bar" size={20} color={colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.headerBtn}
+                  onPress={() => router.push('/(tabs)/favorites' as any)}
+                >
+                  <MaterialCommunityIcons name="bookmark-outline" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
 
-              <Text style={[styles.headerTitle, { color: colors.text }]}>
-                القرآن الكريم
-              </Text>
+              {/* Center: title — absolutely centered regardless of icon widths */}
+              <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                  القرآن الكريم
+                </Text>
+              </View>
 
-              <TouchableOpacity
-                style={styles.headerBtn}
-                onPress={() => router.push('/quran-search')}
-              >
-                <MaterialCommunityIcons
-                  name="format-list-bulleted"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
+              {/* Right: settings */}
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <TouchableOpacity
+                  style={styles.headerBtn}
+                  onPress={() => router.push('/quran-search')}
+                >
+                  <MaterialCommunityIcons name="cog-outline" size={20} color={colors.text} />
+                </TouchableOpacity>
+              </View>
             </View>
           </BlurView>
         </View>
@@ -727,10 +730,7 @@ export default function QuranScreen() {
             selectedIndex={quranSelectedIndex}
             onChange={(event) => {
               const nextKey = quranSegmentKeys[event.nativeEvent.selectedSegmentIndex] || 'surahs';
-              router.replace({
-                pathname: '/(tabs)/quran',
-                params: { tab: nextKey },
-              });
+              setActiveTab(nextKey);
             }}
             tintColor={Platform.OS === 'ios' ? '#D4AF37' : undefined}
             backgroundColor={isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(34,38,46,0.82)'}

@@ -49,7 +49,9 @@ export function AyahText({
               style={[
                 highlightedAyah === ayah.numberInSurah && {
                   backgroundColor: colors.primary + '30',
-                  borderRadius: 4,
+                  borderRadius: Math.ceil(fontSize * 0.25),
+                  paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
+                  paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
                 },
               ]}
             >

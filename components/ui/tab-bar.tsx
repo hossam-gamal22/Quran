@@ -317,6 +317,8 @@ const styles = StyleSheet.create({
   tabButtonInner: {
     alignItems: "center",
     justifyContent: "center",
+    paddingVertical: 6,
+    minHeight: 56,
   },
   tabIconContainer: {
     width: 44,
@@ -324,11 +326,12 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 2,
+    marginBottom: 6,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: "600",
     textAlign: "center",
+    marginTop: 4,
   },
 });
