@@ -14,7 +14,7 @@ import {
   I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -219,7 +219,7 @@ const QuickAction: React.FC<QuickActionProps> = ({
 
 export default function WorshipTrackerScreen() {
   const router = useRouter();
-  const { context } = useSearchParams();
+  const { context } = useLocalSearchParams();
   const {
     isLoading,
     stats,
@@ -271,10 +271,10 @@ export default function WorshipTrackerScreen() {
   useEffect(() => {
     if (!context) return;
     // Normalize to known keys
-    const allowed = ['quran', 'prayer', 'azkar', 'tasbih'];
+    const allowed = ['quran', 'prayer', 'fasting', 'azkar', 'tasbih'];
     const key = String(context).toLowerCase();
     if (allowed.includes(key)) {
-      navigateTo(key);
+      router.replace(`/worship-tracker/${key}` as any);
     }
   }, [context]);
 
@@ -303,12 +303,23 @@ export default function WorshipTrackerScreen() {
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+        backgroundColor="transparent"
+        translucent
       />
       
       {/* الهيدر */}
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <View>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => router.back()}
+        >
+          <MaterialCommunityIcons
+            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
+            size={26}
+            color={isDarkMode ? '#fff' : '#333'}
+          />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
             متتبع العبادات
           </Text>
@@ -318,7 +329,7 @@ export default function WorshipTrackerScreen() {
         </View>
         <TouchableOpacity
           style={styles.settingsButton}
-          onPress={() => {/* إعدادات المتتبع */}}
+          onPress={() => router.push('/settings/worship-tracking')}
         >
           <MaterialCommunityIcons
             name="cog-outline"

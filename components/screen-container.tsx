@@ -3,6 +3,7 @@ import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { cn } from "@/lib/utils";
 import BackgroundWrapper from "@/components/ui/BackgroundWrapper";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useColors } from "@/hooks/use-colors";
 
 export interface ScreenContainerProps extends ViewProps {
   edges?: Edge[];
@@ -27,6 +28,7 @@ export function ScreenContainer({
   ...props
 }: ScreenContainerProps) {
   const { settings, isDarkMode } = useSettings();
+  const colors = useColors();
   const bgKey = settings.display.appBackground;
   const hasBg = useAppBackground && bgKey !== 'none';
 
@@ -57,7 +59,7 @@ export function ScreenContainer({
   return (
     <View
       className={cn("flex-1", "bg-background", containerClassName)}
-      style={[styles.container, { backgroundColor: isDarkMode ? '#111827' : '#FAFAF8' }]}
+      style={[styles.container, { backgroundColor: colors.background }]}
       {...props}
     >
       {content}

@@ -13,6 +13,7 @@ import {
   Dimensions,
   StatusBar,
   Alert,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -318,7 +319,8 @@ export default function QuranTrackerScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+        backgroundColor="transparent"
+        translucent
       />
       
       {/* الهيدر */}
@@ -572,9 +574,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'transparent',
   },
   backButton: {
     width: 40,

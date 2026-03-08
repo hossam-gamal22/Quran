@@ -1,118 +1,228 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { BlurView } from 'expo-blur';
-import CircularAnalogClock from './CircularAnalogClock';
+// components/ui/prayer/LargeWidgetVariants.tsx
+// Large prayer widget – matches design/mockups/prayer-clock/mockup-clock-large.svg
 
-interface PrayerTime {
-  name: string;
-  time: string;
-  isNext?: boolean;
-}
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image } from 'react-native';
+
+import {
+  PrayerTimes,
+  PrayerName,
+  getNextPrayer,
+  getTimeRemaining,
+  formatTime12h,
+} from '@/lib/prayer-times';
+import { t } from '@/lib/i18n';
 
 interface LargeWidgetVariantsProps {
-  variant?: 'next' | 'schedule';
-  nextPrayer?: PrayerTime;
-  schedule?: PrayerTime[];
+  prayerTimes?: PrayerTimes | null;
+  isDarkMode?: boolean;
 }
 
+const PRAYER_KEYS: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+
 const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
-  variant = 'next',
-  nextPrayer = { name: 'الفجر', time: '04:12', isNext: true },
-  schedule = [
-    { name: 'الفجر', time: '04:12' },
-    { name: 'الظهر', time: '12:03' },
-    { name: 'العصر', time: '15:27' },
-    { name: 'المغرب', time: '18:45' },
-    { name: 'العشاء', time: '20:00' },
-  ],
+  prayerTimes = null,
+  isDarkMode = false,
 }) => {
-  if (variant === 'schedule') {
-    return (
-      <BlurView intensity={60} tint="default" style={styles.container}>
-        <Text style={styles.header}>مواقيت اليوم</Text>
-        <View style={styles.scheduleList}>
-          {schedule.map((p) => (
-            <View
-              key={p.name}
-              style={[styles.scheduleRow, p.name === nextPrayer.name && styles.nextRow]}
-            >
-              <Text style={[styles.scheduleName, p.name === nextPrayer.name && styles.nextName]}>{p.name}</Text>
-              <Text style={[styles.scheduleTime, p.name === nextPrayer.name && styles.nextTime]}>{p.time}</Text>
-            </View>
-          ))}
-        </View>
-      </BlurView>
-    );
-  }
+  const [timeRemaining, setTimeRemaining] = useState<{
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
+  const [nextPrayer, setNextPrayer] = useState<{
+    name: PrayerName;
+    time: string;
+  } | null>(null);
 
-  // Next Prayer Focus
+  useEffect(() => {
+    if (!prayerTimes) return;
+    const update = () => {
+      setNextPrayer(getNextPrayer(prayerTimes));
+      setTimeRemaining(getTimeRemaining(prayerTimes));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [prayerTimes]);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const nextName = nextPrayer?.name ?? 'fajr';
+  const prayerName = t(`prayer.${nextName}`);
+
+  const countdownStr = timeRemaining
+    ? `${pad(timeRemaining.hours)}:${pad(timeRemaining.minutes)}:${pad(timeRemaining.seconds)}`
+    : '00:47:00';
+
+  const textColor = isDarkMode ? '#e0e0e0' : '#081827';
+  const mutedColor = isDarkMode ? '#aaa' : 'rgba(8,24,39,0.6)';
+
+  // Build schedule from prayerTimes
+  const schedule = PRAYER_KEYS.map((key) => ({
+    key,
+    name: t(`prayer.${key}`),
+    time: prayerTimes ? prayerTimes[key] : '--:--',
+    isNext: key === nextName,
+  }));
+
   return (
-    <BlurView intensity={70} tint="default" style={styles.container}>
-      <View style={styles.nextRowMain}>
-        <View style={styles.nextLeft}>
-          <View style={styles.iconBubble} />
-          <Text style={styles.prayerName}>{nextPrayer.name}</Text>
+    <View style={[styles.container, isDarkMode && styles.containerDark]}>
+      {/* Top section: Countdown (left) + Logo (right) */}
+      <View style={styles.topRow}>
+        {/* Left: Countdown + label */}
+        <View style={styles.topLeft}>
+          <Text style={[styles.countdown, { color: textColor }]}>{countdownStr}</Text>
+          <Text style={[styles.topLabel, { color: mutedColor }]}>
+            الوقت المتبقي على الصلاة القادمة
+          </Text>
         </View>
 
-        <View style={styles.nextCenter}>
-          <CircularAnalogClock size={120} timeLabel={nextPrayer.time} />
-          <Text style={styles.countdownLabel}>باقي على الأذان</Text>
-        </View>
-
-        <View style={styles.nextRight}>
-          <TouchableOpacity style={styles.pill}>
-            <Text style={styles.pillText}>التذكير</Text>
-          </TouchableOpacity>
+        {/* Right: Logo (static) */}
+        <View style={styles.topRight}>
+          <Image
+            source={require('@/assets/images/icon.png')}
+            style={styles.logo}
+          />
+          <Text style={styles.appName}>روح المسلم</Text>
         </View>
       </View>
-    </BlurView>
+
+      {/* Current prayer bar (green bordered) */}
+      <View style={styles.currentBar}>
+        {/* Time pill (left) */}
+        <View style={styles.currentTimePill}>
+          <Text style={styles.currentTimeText}>{countdownStr}</Text>
+        </View>
+        {/* Prayer name (right) */}
+        <Text style={styles.currentPrayerName}>صلاة {prayerName}</Text>
+      </View>
+
+      {/* Prayer schedule rows */}
+      {schedule.map((prayer) => (
+        <View key={prayer.key} style={styles.prayerRow}>
+          {/* Time pill */}
+          <View style={[
+            styles.timePill,
+            prayer.isNext ? styles.timePillActive : styles.timePillInactive,
+          ]}>
+            <Text style={styles.timePillText}>
+              {prayer.time !== '--:--' ? formatTime12h(prayer.time) : '--:--'}
+            </Text>
+          </View>
+          {/* Prayer name */}
+          <Text style={[styles.prayerNameText, { color: textColor }]}>
+            صلاة {prayer.name}
+          </Text>
+        </View>
+      ))}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    borderRadius: 18,
-    padding: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.09)',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  header: {
-    color: '#eafbf4',
-    fontSize: 14,
-    fontFamily: 'Cairo-Medium',
-    marginBottom: 12,
-    textAlign: 'left',
+  containerDark: {
+    backgroundColor: 'rgba(255,255,255,0.09)',
   },
-  scheduleList: {
-    width: '100%',
-  },
-  scheduleRow: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 6,
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  topLeft: {
+    flex: 1,
+  },
+  countdown: {
+    fontSize: 32,
+    fontFamily: 'Cairo-Bold',
+    letterSpacing: 1,
+    lineHeight: 40,
+  },
+  topLabel: {
+    fontSize: 9,
+    fontFamily: 'Cairo-SemiBold',
+    marginTop: 2,
+  },
+  topRight: {
     alignItems: 'center',
+    marginLeft: 12,
   },
-  nextRow: {
-    backgroundColor: 'rgba(126,249,222,0.06)',
+  logo: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+  },
+  appName: {
+    fontSize: 8,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#0f987f',
+    marginTop: 3,
+  },
+  currentBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(8,24,39,0.17)',
+    borderWidth: 1,
+    borderColor: '#00a651',
     borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
-  scheduleName: { color: '#dffbf4', fontSize: 16, fontFamily: 'Cairo-Medium' },
-  scheduleTime: { color: '#ffffff', fontSize: 16, fontFamily: 'Cairo-Bold' },
-  nextName: { color: '#0b3f34' },
-  nextTime: { color: '#0b3f34' },
-
-  nextRowMain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nextLeft: { width: 120, alignItems: 'center' },
-  iconBubble: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.03)', marginBottom: 8 },
-  prayerName: { color: '#eafbf4', fontSize: 16, fontFamily: 'Cairo-Bold' },
-  nextCenter: { flex: 1, alignItems: 'center' },
-  countdownLabel: { color: '#d7f3eb', marginTop: 8, fontFamily: 'Cairo-Medium' },
-  nextRight: { width: 120, alignItems: 'center' },
-  pill: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 12, borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)' },
-  pillText: { color: '#7ef9de', fontFamily: 'Cairo-SemiBold' },
+  currentTimePill: {
+    backgroundColor: '#00a651',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginRight: 12,
+  },
+  currentTimeText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Cairo-Bold',
+  },
+  currentPrayerName: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    flex: 1,
+    textAlign: 'right',
+  },
+  prayerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  timePill: {
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    minWidth: 68,
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  timePillActive: {
+    backgroundColor: 'rgba(15,152,127,0.9)',
+  },
+  timePillInactive: {
+    backgroundColor: 'rgba(0,0,0,0.38)',
+  },
+  timePillText: {
+    color: '#fff',
+    fontSize: 13,
+    fontFamily: 'Cairo-Bold',
+  },
+  prayerNameText: {
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
+    flex: 1,
+    textAlign: 'right',
+  },
 });
 
 export default LargeWidgetVariants;

@@ -48,6 +48,8 @@ export interface AdsConfig {
   bannerScreens: Record<string, boolean>;
   // App Open Ad
   showAdOnAppOpen: boolean;
+  // Qibla compass style change ad
+  showAdOnQiblaStyleChange: boolean;
   // Interstitial settings
   interstitialMode: 'pages' | 'time' | 'session';
   interstitialFrequency: number;
@@ -86,6 +88,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     worship: false,
   },
   showAdOnAppOpen: false,
+  showAdOnQiblaStyleChange: true,
   interstitialMode: 'pages',
   interstitialFrequency: 5,
   interstitialTimeInterval: 3,

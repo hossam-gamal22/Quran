@@ -104,7 +104,10 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = React.memo(
         <View style={styles.tabIconContainer}>
           <IconSymbol name={iconName} size={22} color={color} />
         </View>
-        <AnimatedText style={[styles.tabLabel, animatedLabelStyle]}>
+        <AnimatedText
+          style={[styles.tabLabel, animatedLabelStyle]}
+          numberOfLines={1}
+        >
           {tab.label}
         </AnimatedText>
       </View>
@@ -221,6 +224,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
               handleTabLayout(index, x, width);
             }}
             style={styles.tabButton}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
           >
             <AnimatedTabIcon
               tab={tab}
@@ -317,21 +321,20 @@ const styles = StyleSheet.create({
   tabButtonInner: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
-    minHeight: 56,
+    paddingVertical: 4,
+    minHeight: 48,
+    gap: 3,
   },
   tabIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.md,
+    width: 28,
+    height: 28,
+    borderRadius: BORDER_RADIUS.sm,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 6,
   },
   tabLabel: {
     fontSize: 10,
     fontWeight: "600",
     textAlign: "center",
-    marginTop: 4,
   },
 });

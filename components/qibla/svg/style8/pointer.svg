@@ -1,6 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
-  <circle cx="150" cy="150" r="10" fill="#FFFFFF" opacity="0.5"/>
-  <circle cx="150" cy="150" r="4" fill="#FB8C00"/>
-  <line x1="150" y1="150" x2="150" y2="55" stroke="#FB8C00" stroke-width="4" stroke-dasharray="8 4"/>
-  <polygon points="150,45 140,65 160,65" fill="#FB8C00" />
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 300 300">
+  <!-- Generator: Adobe Illustrator 30.2.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 1)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: url(#Foliage_9);
+      }
+    </style>
+    <linearGradient id="Foliage_9" data-name="Foliage 9" x1="118.23" y1="119.95" x2="183.44" y2="119.95" gradientUnits="userSpaceOnUse">
+      <stop offset=".01" stop-color="#f5e19a"/>
+      <stop offset=".51" stop-color="#ecc91a"/>
+      <stop offset="1" stop-color="#bf9d17"/>
+    </linearGradient>
+  </defs>
+  <path class="st0" d="M152.37,81.55c.35.15.62.44.77.79l30.19,74.12c.31.75-.05,1.6-.8,1.91-.41.17-.87.14-1.26-.07l-29.14-16.13c-.42-.23-.93-.24-1.36-.03l-30.41,15.12c-.72.36-1.6.06-1.96-.66-.19-.39-.2-.84-.03-1.24l32.09-73.05c.33-.74,1.19-1.08,1.93-.75Z"/>
 </svg>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Alert,
   ScrollView,
   Share,
-  Dimensions,
   Platform,
   I18nManager,
 } from 'react-native';
@@ -17,28 +16,37 @@ import { useRouter } from 'expo-router';
 import { Video, ResizeMode } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Buffer } from 'buffer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import ViewShot from 'react-native-view-shot';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { QuranAyahWithAudio } from '@/lib/api/quran-cloud-api';
-import { searchPhotos } from '@/lib/api/pexels';
+import { searchVideos, VideoFile } from '@/lib/api/pexels';
 import { Image } from 'react-native';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
 
 const STORY_RENDERER_URL = process.env.EXPO_PUBLIC_STORY_RENDERER_URL || '';
 const STORY_CACHE_KEY = 'story_of_day_cache';
+const VIDEO_CACHE_KEY = '@story_video_cache';
+
+const VIDEO_SEARCH_TERMS = [
+  'nature peaceful', 'sky clouds', 'ocean waves',
+  'sunrise', 'sunset', 'stars night',
+  'forest', 'mountain landscape', 'waterfall',
+];
+
+interface VideoCache {
+  date: string;
+  url: string;
+}
 
 const RECITERS = [
   { id: 'ar.alafasy', name: 'مشاري العفاسي' },
@@ -48,24 +56,18 @@ const RECITERS = [
   { id: 'ar.saoodshuraym', name: 'الشريم' },
 ];
 
-// Nature search queries for Pexels - sky, sea, clouds, nature
-const NATURE_QUERIES = [
-  'sky clouds sunset',
-  'ocean sea waves',
-  'mountains nature landscape',
-  'clouds sky blue',
-  'sunrise nature',
-  'starry night sky',
-  'calm sea horizon',
-  'green forest nature',
-  'desert sand dunes',
-  'waterfall nature',
+// Solid dark colors cycled by day of year
+const STORY_BG_COLORS = [
+  '#1a3a2a', // Deep forest green
+  '#1a2a3a', // Deep navy blue
+  '#2a1a2a', // Deep purple
+  '#3a2a1a', // Deep brown
+  '#1a2a2a', // Deep teal
 ];
 
 interface StoryCache {
   date: string;
   ayah: QuranAyahWithAudio;
-  photoUrl: string;
 }
 
 // Deterministic daily ayah number based on day of year
@@ -107,20 +109,42 @@ async function fetchAyahWithReciter(ayahNumber: number, reciterEdition: string):
   }
 }
 
-async function pickNaturePhoto(): Promise<string | null> {
+function getDayOfYear(): number {
+  const today = new Date();
+  return Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000);
+}
+
+function getDailyBgColor(): string {
+  return STORY_BG_COLORS[getDayOfYear() % STORY_BG_COLORS.length];
+}
+
+async function fetchDailyVideoUrl(): Promise<string | null> {
   try {
-    const now = new Date();
-    const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / (1000 * 60 * 60 * 24));
-    const queryIndex = dayOfYear % NATURE_QUERIES.length;
-    const query = NATURE_QUERIES[queryIndex];
-    const page = (dayOfYear % 3) + 1;
-    
-    const result = await searchPhotos(query, page, 10);
-    if (!result.photos || result.photos.length === 0) return null;
-    
-    const photoIndex = dayOfYear % result.photos.length;
-    const photo = result.photos[photoIndex];
-    return photo.src.large2x || photo.src.large || photo.src.original;
+    // Check cache first
+    const cached = await AsyncStorage.getItem(VIDEO_CACHE_KEY);
+    if (cached) {
+      const parsed: VideoCache = JSON.parse(cached);
+      if (parsed.date === getTodayDateString() && parsed.url) {
+        return parsed.url;
+      }
+    }
+
+    const dayOfYear = getDayOfYear();
+    const term = VIDEO_SEARCH_TERMS[dayOfYear % VIDEO_SEARCH_TERMS.length];
+    const data = await searchVideos(term, 1, 5);
+
+    if (data.videos?.length > 0) {
+      const video = data.videos[dayOfYear % data.videos.length];
+      const hdFile = video.video_files.find((f: VideoFile) => f.quality === 'hd' && f.file_type === 'video/mp4')
+        || video.video_files.find((f: VideoFile) => f.quality === 'hd')
+        || video.video_files[0];
+      if (hdFile?.link) {
+        const cacheData: VideoCache = { date: getTodayDateString(), url: hdFile.link };
+        await AsyncStorage.setItem(VIDEO_CACHE_KEY, JSON.stringify(cacheData));
+        return hdFile.link;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -132,40 +156,25 @@ export default function StoryOfDayScreen() {
 
   const [ayah, setAyah] = useState<QuranAyahWithAudio | null>(null);
   const [selectedReciter, setSelectedReciter] = useState(RECITERS[0].id);
-  const [bgPhotoUrl, setBgPhotoUrl] = useState<string | null>(null);
   const [renderedVideoUri, setRenderedVideoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [exportingImage, setExportingImage] = useState(false);
+
+  const viewShotRef = useRef<ViewShot>(null);
 
   // QCF state
   const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
   const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
 
-  // Ken Burns subtle animation
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
+  // Video background state
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoLoaded, setVideoLoaded] = useState(false);
 
-  useEffect(() => {
-    scale.value = withRepeat(
-      withTiming(1.08, { duration: 12000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-    translateX.value = withRepeat(
-      withTiming(-10, { duration: 14000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-  }, []);
-
-  const imageAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { translateX: translateX.value },
-    ],
-  }));
+  // Deterministic daily background color (fallback)
+  const bgColor = useMemo(() => getDailyBgColor(), []);
 
   const colors = useMemo(
     () => ({
@@ -187,28 +196,21 @@ export default function StoryOfDayScreen() {
       const cached = await AsyncStorage.getItem(STORY_CACHE_KEY);
       if (cached) {
         const parsedCache: StoryCache = JSON.parse(cached);
-        if (parsedCache.date === todayStr && parsedCache.ayah && parsedCache.photoUrl) {
+        if (parsedCache.date === todayStr && parsedCache.ayah) {
           setAyah(parsedCache.ayah);
-          setBgPhotoUrl(parsedCache.photoUrl);
           setLoading(false);
           return;
         }
       }
 
-      const [dailyAyah, photoUrl] = await Promise.all([
-        fetchDailyAyah(),
-        pickNaturePhoto(),
-      ]);
-      
+      const dailyAyah = await fetchDailyAyah();
       setAyah(dailyAyah);
-      setBgPhotoUrl(photoUrl);
 
       // Cache for today
-      if (dailyAyah && photoUrl) {
+      if (dailyAyah) {
         const cacheData: StoryCache = {
           date: todayStr,
           ayah: dailyAyah,
-          photoUrl,
         };
         await AsyncStorage.setItem(STORY_CACHE_KEY, JSON.stringify(cacheData));
       }
@@ -222,6 +224,13 @@ export default function StoryOfDayScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Fetch daily video background
+  useEffect(() => {
+    fetchDailyVideoUrl().then((url) => {
+      if (url) setVideoUrl(url);
+    });
+  }, []);
 
   // Load QCF font when ayah is available
   useEffect(() => {
@@ -251,13 +260,59 @@ export default function StoryOfDayScreen() {
     router.push(`/surah/${ayah.surah.number}${ayah.numberInSurah ? `?ayah=${ayah.numberInSurah}` : ''}` as any);
   }, [ayah, router]);
 
+  const exportAsImage = useCallback(async () => {
+    if (!ayah) {
+      Alert.alert('تنبيه', 'لا توجد آية جاهزة حالياً');
+      return;
+    }
+    setExportingImage(true);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (!viewShotRef.current?.capture) {
+        Alert.alert('خطأ', 'تعذر التقاط الصورة');
+        return;
+      }
+      const uri = await viewShotRef.current.capture();
+
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        // Even without gallery permission, try sharing directly
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/png',
+            dialogTitle: 'ستوري اليوم - روح المسلم',
+            UTI: 'public.png',
+          });
+        } else {
+          Alert.alert('تنبيه', 'نحتاج إذن الوصول للصور لحفظ الصورة');
+        }
+        return;
+      }
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('تم ✅', 'تم حفظ صورة الستوري في جهازك');
+    } catch {
+      Alert.alert('خطأ', 'تعذر حفظ الصورة');
+    } finally {
+      setExportingImage(false);
+    }
+  }, [ayah]);
+
   const renderStory = useCallback(async () => {
     if (!ayah) {
       Alert.alert('تنبيه', 'لا توجد آية جاهزة حالياً');
       return;
     }
     if (!STORY_RENDERER_URL) {
-      Alert.alert('تنبيه', 'خدمة إنشاء الفيديو غير متوفرة حالياً. يمكنك مشاركة الآية كنص بدلاً من ذلك.');
+      // No video API available — offer image export as fallback
+      Alert.alert(
+        'إنشاء ستوري',
+        'خدمة إنشاء الفيديو غير متوفرة حالياً. هل تريد حفظ الستوري كصورة بدلاً من ذلك؟',
+        [
+          { text: 'إلغاء', style: 'cancel' },
+          { text: 'حفظ كصورة', onPress: exportAsImage },
+        ]
+      );
       return;
     }
 
@@ -277,11 +332,9 @@ export default function StoryOfDayScreen() {
           text: ayah.text,
           lang: 'ar',
           reciterAudioUrl,
-          backgroundImageUrl: bgPhotoUrl,
+          backgroundVideoUrl: null,
+          backgroundColor: bgColor,
           duration: 12,
-          width: 1080,
-          height: 1920,
-          watermark: 'روح المسلم',
         }),
       });
       clearTimeout(timeoutId);
@@ -299,15 +352,23 @@ export default function StoryOfDayScreen() {
 
       setRenderedVideoUri(target);
     } catch (err) {
-      if (err && (err as any).name === 'AbortError') {
-        Alert.alert('خطأ', 'انتهت مهلة إنشاء الفيديو. حاول مرة أخرى.');
-      } else {
-        Alert.alert('خطأ', 'تعذر إنشاء فيديو الستوري حالياً');
-      }
+      const isTimeout = err && (err as any).name === 'AbortError';
+      const message = isTimeout
+        ? 'انتهت مهلة إنشاء الفيديو.'
+        : 'تعذر إنشاء فيديو الستوري حالياً.';
+
+      Alert.alert(
+        'تعذر إنشاء الفيديو',
+        `${message}\nهل تريد حفظ الستوري كصورة بدلاً من ذلك؟`,
+        [
+          { text: 'إلغاء', style: 'cancel' },
+          { text: 'حفظ كصورة', onPress: exportAsImage },
+        ]
+      );
     } finally {
       setRendering(false);
     }
-  }, [ayah, bgPhotoUrl, selectedReciter]);
+  }, [ayah, bgColor, selectedReciter, exportAsImage]);
 
   const shareStory = useCallback(async () => {
     if (!ayah) return;
@@ -346,8 +407,14 @@ export default function StoryOfDayScreen() {
 
   const refreshStory = useCallback(async () => {
     await AsyncStorage.removeItem(STORY_CACHE_KEY);
+    await AsyncStorage.removeItem(VIDEO_CACHE_KEY);
     setRenderedVideoUri(null);
+    setVideoUrl(null);
+    setVideoLoaded(false);
     load();
+    fetchDailyVideoUrl().then((url) => {
+      if (url) setVideoUrl(url);
+    });
   }, [load]);
 
   return (
@@ -369,22 +436,33 @@ export default function StoryOfDayScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.content}>
-            {/* Story Card with animated nature photo */}
+            {/* Story Card with solid color background */}
+            <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
             <View style={styles.storyCard}>
-              {bgPhotoUrl ? (
-                <View style={styles.imageContainer}>
-                  <Animated.Image
-                    source={{ uri: bgPhotoUrl }}
-                    style={[styles.storyImage, imageAnimatedStyle]}
-                    resizeMode="cover"
+              {/* Background: Video or solid color fallback */}
+              <View style={[styles.imageContainer, { backgroundColor: bgColor }]}>
+                {videoUrl && (
+                  <Video
+                    source={{ uri: videoUrl }}
+                    style={StyleSheet.absoluteFill}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay
+                    isLooping
+                    isMuted
+                    onLoad={() => setVideoLoaded(true)}
                   />
-                  <View style={styles.imageOverlay} />
-                </View>
-              ) : (
-                <View style={[styles.imageContainer, { backgroundColor: '#1a2332' }]}>
-                  <View style={styles.imageOverlay} />
+                )}
+              </View>
+              {/* Loading indicator while video loads */}
+              {videoUrl && !videoLoaded && (
+                <View style={styles.videoLoadingOverlay}>
+                  <ActivityIndicator size="small" color="rgba(255,255,255,0.6)" />
                 </View>
               )}
+              <LinearGradient
+                colors={['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.7)']}
+                style={styles.gradientOverlay}
+              />
               
               <TouchableOpacity
                 style={styles.storyTextContainer}
@@ -393,7 +471,7 @@ export default function StoryOfDayScreen() {
                 delayLongPress={500}
               >
                 {qcfGlyphs && qcfFontFamily ? (
-                  <Text style={[styles.storyAyah, { fontFamily: qcfFontFamily, fontSize: 28, lineHeight: 52 }]}>
+                  <Text style={[styles.storyAyah, { fontFamily: qcfFontFamily, fontSize: 22, lineHeight: 42 }]}>
                     {qcfGlyphs.join('')}
                   </Text>
                 ) : (
@@ -402,7 +480,7 @@ export default function StoryOfDayScreen() {
                 <Text style={styles.storyMeta}>
                   {ayah?.surah?.name || ''} {ayah?.numberInSurah ? `- ${ayah.numberInSurah}` : ''}
                 </Text>
-                <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 6 }}>
+                <Text style={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 6 }}>
                   اضغط مطولاً للذهاب للآية في المصحف
                 </Text>
               </TouchableOpacity>
@@ -413,6 +491,7 @@ export default function StoryOfDayScreen() {
                 <Text style={styles.brandingText}>روح المسلم</Text>
               </View>
             </View>
+            </ViewShot>
 
             <Text style={[styles.sectionTitle, { color: colors.text }]}>القارئ</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recitersRow}>
@@ -433,6 +512,27 @@ export default function StoryOfDayScreen() {
             </ScrollView>
 
             <TouchableOpacity
+              onPress={exportAsImage}
+              disabled={exportingImage}
+              activeOpacity={0.8}
+            >
+              <BlurView
+                intensity={Platform.OS === 'ios' ? 60 : 40}
+                tint="dark"
+                style={styles.glassBtn}
+              >
+                {exportingImage ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="image-outline" size={20} color="#fff" />
+                    <Text style={styles.primaryBtnText}>حفظ كصورة</Text>
+                  </>
+                )}
+              </BlurView>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               onPress={renderStory}
               disabled={rendering}
               activeOpacity={0.8}
@@ -443,7 +543,10 @@ export default function StoryOfDayScreen() {
                 style={styles.glassBtn}
               >
                 {rendering ? (
-                  <ActivityIndicator color="#fff" />
+                  <>
+                    <ActivityIndicator color="#fff" />
+                    <Text style={styles.primaryBtnText}>جاري إنشاء الفيديو...</Text>
+                  </>
                 ) : (
                   <>
                     <MaterialCommunityIcons name="movie-open-play" size={20} color="#fff" />
@@ -537,10 +640,15 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 120 },
   storyCard: { borderRadius: 20, overflow: 'hidden', aspectRatio: 9 / 16, position: 'relative' as const },
   imageContainer: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' as const },
-  storyImage: { width: '120%', height: '120%', marginLeft: '-10%', marginTop: '-10%' } as any,
-  imageOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  gradientOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
+  videoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
   storyTextContainer: { flex: 1, justifyContent: 'center' as const, padding: 20, zIndex: 2 },
-  storyAyah: { fontSize: 24, lineHeight: 44, textAlign: 'center' as const, fontFamily: 'Cairo-Bold', color: '#fff' },
+  storyAyah: { fontSize: 20, lineHeight: 38, textAlign: 'center' as const, fontFamily: 'Cairo-Bold', color: '#fff' },
   storyMeta: { marginTop: 12, textAlign: 'center' as const, fontFamily: 'Cairo-Regular', color: 'rgba(255,255,255,0.8)', fontSize: 14 },
   sectionTitle: { marginTop: 14, marginBottom: 8, fontFamily: 'Cairo-Bold', fontSize: 16, textAlign: 'right' },
   recitersRow: { gap: 8, paddingVertical: 4 },

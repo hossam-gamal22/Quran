@@ -34,9 +34,15 @@ import { copyToClipboard } from '../../lib/clipboard';
 import { APP_CONFIG } from '../../constants/app';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { Share } from 'react-native';
+import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Strip tashkeel (diacritics) from Arabic text for display
+function stripTashkeel(text: string): string {
+  return text.replace(/[\u064B-\u065F\u0670]/g, '');
+}
 
 // ============================================
 // الأنواع
@@ -234,7 +240,15 @@ const STORAGE_KEYS = {
   dailyStats: 'tasbih_daily_stats',
   customTasbihat: 'custom_tasbihat',
   completedToday: 'tasbih_completed_today',
+  typeStats: 'tasbih_type_stats',
+  lastDate: '@tasbih_last_date',
+  dailyHistory: '@tasbih_daily_history',
 };
+
+function getTodayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 // ============================================
 // المكون الرئيسي
@@ -270,11 +284,15 @@ export default function TasbihScreen() {
   const [customTarget, setCustomTarget] = useState('33');
   const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
   const [showVirtue, setShowVirtue] = useState(true);
+  const [showTranslation, setShowTranslation] = useState(false);
   const [completedTasbihat, setCompletedTasbihat] = useState<Record<number, boolean>>({});
+  const [typeStats, setTypeStats] = useState<Record<string, Record<string, number>>>({});
+  const [resetToastVisible, setResetToastVisible] = useState(false);
 
   // ===== ANIMATION =====
   const progress = useSharedValue(0);
   const tapScale = useSharedValue(1);
+  const sliderRef = useRef<ScrollView>(null);
 
   const animatedCircleProps = useAnimatedProps(() => ({
     strokeDashoffset: RING_CIRCUMFERENCE * (1 - progress.value),
@@ -294,14 +312,30 @@ export default function TasbihScreen() {
     });
   }, [count, selectedTasbih.target]);
 
+  // Auto-scroll slider to selected tasbih
+  useEffect(() => {
+    const allItems = [...PRESET_TASBIHAT, ...customTasbihat];
+    const idx = allItems.findIndex(t => t.id === selectedTasbih.id);
+    if (idx >= 0 && sliderRef.current) {
+      const estimatedItemWidth = 120;
+      sliderRef.current.scrollTo({
+        x: Math.max(0, idx * estimatedItemWidth - SCREEN_WIDTH / 2 + estimatedItemWidth / 2),
+        animated: true,
+      });
+    }
+  }, [selectedTasbih.id, customTasbihat]);
+
   const loadData = async () => {
     try {
-      const [settingsRaw, customRaw, progressRaw, statsRaw, completedRaw] = await Promise.all([
+      const [settingsRaw, customRaw, progressRaw, statsRaw, completedRaw, typeStatsRaw, lastDateRaw, dailyHistoryRaw] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.settings),
         AsyncStorage.getItem(STORAGE_KEYS.customTasbihat),
         AsyncStorage.getItem(STORAGE_KEYS.progress),
         AsyncStorage.getItem(STORAGE_KEYS.dailyStats),
         AsyncStorage.getItem(STORAGE_KEYS.completedToday),
+        AsyncStorage.getItem(STORAGE_KEYS.typeStats),
+        AsyncStorage.getItem(STORAGE_KEYS.lastDate),
+        AsyncStorage.getItem(STORAGE_KEYS.dailyHistory),
       ]);
 
       if (settingsRaw) {
@@ -309,26 +343,89 @@ export default function TasbihScreen() {
         setVibrationEnabled(p.vibrationEnabled ?? true);
         setShowVirtue(p.showVirtue ?? true);
         setAutoAdvance(p.autoAdvance ?? false);
+        setShowTranslation(p.showTranslation ?? false);
       }
       if (customRaw) setCustomTasbihat(JSON.parse(customRaw));
-      if (progressRaw) {
-        const p = JSON.parse(progressRaw);
-        if (p.date === new Date().toDateString()) {
-          setCount(p.count || 0);
-          setTotalCount(p.totalCount || 0);
-          setRounds(p.rounds || 0);
-          if (p.selectedId) {
-            const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
-            if (found) setSelectedTasbih(found);
+
+      // --- Daily auto-reset logic ---
+      const todayISO = getTodayISO();
+      const lastDate = lastDateRaw || '';
+      let didReset = false;
+
+      if (lastDate && lastDate !== todayISO) {
+        // Date changed — save yesterday's progress to daily history
+        let dailyHistory: Record<string, Record<string, number>> = {};
+        if (dailyHistoryRaw) {
+          try { dailyHistory = JSON.parse(dailyHistoryRaw); } catch {}
+        }
+        // Save type stats for the previous day
+        let parsedTypeStats: Record<string, Record<string, number>> = {};
+        if (typeStatsRaw) {
+          try { parsedTypeStats = JSON.parse(typeStatsRaw); } catch {}
+        }
+        if (parsedTypeStats[lastDate]) {
+          dailyHistory[lastDate] = parsedTypeStats[lastDate];
+        } else if (progressRaw) {
+          // Fallback: save total from progress
+          try {
+            const p = JSON.parse(progressRaw);
+            if (p.totalCount > 0 && p.selectedId) {
+              const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
+              const name = found ? found.text : 'تسبيح';
+              dailyHistory[lastDate] = { [name]: p.totalCount };
+            }
+          } catch {}
+        }
+        await AsyncStorage.setItem(STORAGE_KEYS.dailyHistory, JSON.stringify(dailyHistory));
+
+        // Reset progress for the new day
+        setCount(0);
+        setTotalCount(0);
+        setRounds(0);
+        setCompletedTasbihat({});
+        await AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({
+          date: todayISO, count: 0, totalCount: 0, rounds: 0, selectedId: PRESET_TASBIHAT[0].id,
+        }));
+        await AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({ date: todayISO, completed: {} }));
+        didReset = true;
+      } else if (progressRaw) {
+        // Same day — restore progress
+        try {
+          const p = JSON.parse(progressRaw);
+          const progressDate = p.date || '';
+          if (progressDate === todayISO || progressDate === new Date().toDateString()) {
+            setCount(p.count || 0);
+            setTotalCount(p.totalCount || 0);
+            setRounds(p.rounds || 0);
+            if (p.selectedId) {
+              const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
+              if (found) setSelectedTasbih(found);
+            }
           }
-        }
+        } catch {}
       }
+
+      // Save today as last active date
+      await AsyncStorage.setItem(STORAGE_KEYS.lastDate, todayISO);
+
       if (statsRaw) setDailyStats(JSON.parse(statsRaw));
-      if (completedRaw) {
-        const parsed = JSON.parse(completedRaw);
-        if (parsed.date === new Date().toDateString()) {
-          setCompletedTasbihat(parsed.completed || {});
-        }
+      if (!didReset && completedRaw) {
+        try {
+          const parsed = JSON.parse(completedRaw);
+          const compDate = parsed.date || '';
+          if (compDate === todayISO || compDate === new Date().toDateString()) {
+            setCompletedTasbihat(parsed.completed || {});
+          }
+        } catch {}
+      }
+      if (typeStatsRaw) {
+        try { setTypeStats(JSON.parse(typeStatsRaw)); } catch {} 
+      }
+
+      // Show reset toast after state is settled
+      if (didReset) {
+        setTimeout(() => setResetToastVisible(true), 500);
+        setTimeout(() => setResetToastVisible(false), 3500);
       }
     } catch (e) {
       console.error('Error loading tasbih data:', e);
@@ -337,10 +434,11 @@ export default function TasbihScreen() {
 
   const saveProgress = useCallback(async (c: number, t: number, r: number) => {
     try {
-      const today = new Date().toDateString();
+      const today = getTodayISO();
       await AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify({
         date: today, count: c, totalCount: t, rounds: r, selectedId: selectedTasbih.id,
       }));
+      await AsyncStorage.setItem(STORAGE_KEYS.lastDate, today);
       const newStats = { ...dailyStats, [today]: t };
       setDailyStats(newStats);
       await AsyncStorage.setItem(STORAGE_KEYS.dailyStats, JSON.stringify(newStats));
@@ -348,13 +446,24 @@ export default function TasbihScreen() {
   }, [selectedTasbih.id, dailyStats]);
 
   const saveSettings = async () => {
-    await AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({ vibrationEnabled, showVirtue, autoAdvance }));
+    await AsyncStorage.setItem(STORAGE_KEYS.settings, JSON.stringify({ vibrationEnabled, showVirtue, autoAdvance, showTranslation }));
   };
 
+  const trackTypeIncrement = useCallback(async (tasbihText: string) => {
+    try {
+      const today = getTodayISO();
+      const updated = { ...typeStats };
+      if (!updated[today]) updated[today] = {};
+      updated[today][tasbihText] = (updated[today][tasbihText] || 0) + 1;
+      setTypeStats(updated);
+      await AsyncStorage.setItem(STORAGE_KEYS.typeStats, JSON.stringify(updated));
+    } catch (e) { console.error(e); }
+  }, [typeStats]);
+
   // ===== HANDLERS =====
-  const handlePress = useCallback(() => {
-    tapScale.value = withSpring(0.95, { damping: 10, stiffness: 300 }, () => {
-      tapScale.value = withSpring(1, { damping: 10, stiffness: 200 });
+  const handlePress = useCallback(async () => {
+    tapScale.value = withSpring(0.9, { damping: 12, stiffness: 400 }, () => {
+      tapScale.value = withSpring(1, { damping: 8, stiffness: 200 });
     });
 
     if (vibrationEnabled) {
@@ -365,6 +474,7 @@ export default function TasbihScreen() {
 
     const newCount = count + 1;
     const newTotal = totalCount + 1;
+    trackTypeIncrement(selectedTasbih.text);
 
     if (newCount >= selectedTasbih.target) {
       if (vibrationEnabled) {
@@ -379,12 +489,21 @@ export default function TasbihScreen() {
       const newCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
       setCompletedTasbihat(newCompleted);
       AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({
-        date: new Date().toDateString(), completed: newCompleted,
+        date: getTodayISO(), completed: newCompleted,
       }));
+
+      // Log completion to worship tracker
+      try {
+        const today = getTodayDate();
+        const azkarRecord = await getAzkarRecord(today);
+        const record = azkarRecord || { date: today, morning: false, evening: false, sleep: false, wakeup: false, afterPrayer: false };
+        record.afterPrayer = true;
+        await saveAzkarRecord(record);
+      } catch (e) { console.error('Error logging to worship tracker:', e); }
       
       // Auto-advance to next tasbih if enabled
       if (autoAdvance) {
-        const allItems: TasbihItem[] = [
+        const advanceItems: TasbihItem[] = [
           ...PRESET_TASBIHAT,
           ...customTasbihat.map(ct => ({
             id: ct.id,
@@ -393,16 +512,19 @@ export default function TasbihScreen() {
             source: 'athar' as const,
           })),
         ];
-        const currentIndex = allItems.findIndex(t => t.id === selectedTasbih.id);
-        const nextIndex = (currentIndex + 1) % allItems.length;
-        setSelectedTasbih(allItems[nextIndex]);
+        const curIdx = advanceItems.findIndex(t => t.id === selectedTasbih.id);
+        const nextIdx = (curIdx + 1) % advanceItems.length;
+        setSelectedTasbih(advanceItems[nextIdx]);
+        setTimeout(() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        }, 200);
       }
     } else {
       setCount(newCount);
       setTotalCount(newTotal);
       saveProgress(newCount, newTotal, rounds);
     }
-  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress]);
+  }, [count, totalCount, rounds, selectedTasbih, vibrationEnabled, autoAdvance, customTasbihat, completedTasbihat, saveProgress, trackTypeIncrement]);
 
   const handleReset = () => {
     Alert.alert('إعادة تعيين', 'هل تريد إعادة تعيين العداد؟', [
@@ -433,7 +555,12 @@ export default function TasbihScreen() {
     const updated = [...customTasbihat, newCustom];
     setCustomTasbihat(updated);
     await AsyncStorage.setItem(STORAGE_KEYS.customTasbihat, JSON.stringify(updated));
+    // Auto-select the newly added tasbih
+    const asTasbihItem: TasbihItem = { id: newCustom.id, text: newCustom.text, target: newCustom.target, source: 'athar' as const };
+    setSelectedTasbih(asTasbihItem);
+    setCount(0);
     setCustomText(''); setCustomTarget('33'); setShowCustomModal(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const deleteCustomTasbih = async (id: number) => {
@@ -461,12 +588,22 @@ export default function TasbihScreen() {
     saveProgress(newCount, newTotal, rounds);
   }, [count, totalCount, rounds, vibrationEnabled, saveProgress]);
 
+  const handleQuickReset = useCallback(() => {
+    if (count === 0) return;
+    setCount(0);
+    saveProgress(0, totalCount, rounds);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, [count, totalCount, rounds, saveProgress]);
+
   const handleShare = async () => {
-    const text = `📿 تسبيح\n\n「 ${selectedTasbih.text} 」\n\n🔢 العدد: ${count}/${selectedTasbih.target}\n🔄 الجولات: ${rounds}\n📊 الإجمالي اليوم: ${totalCount}\n\n${APP_CONFIG.getShareSignature()}`;
+    const text = `📿 تسبيح\n\n「 ${stripTashkeel(selectedTasbih.text)} 」\n\n🔢 العدد: ${count}/${selectedTasbih.target}\n🔄 الجولات: ${rounds}\n📊 الإجمالي اليوم: ${totalCount}\n\n${APP_CONFIG.getShareSignature()}`;
     try { await Share.share({ message: text }); } catch (e) { console.error(e); }
   };
 
   // ===== COMPUTED =====
+  const allTasbihItems: (TasbihItem | CustomTasbih)[] = [...PRESET_TASBIHAT, ...customTasbihat];
+  const completedCount = Object.values(completedTasbihat).filter(Boolean).length;
+  const currentIndex = allTasbihItems.findIndex(t => t.id === selectedTasbih.id);
   const allTimeTotal = Object.values(dailyStats).reduce((a, b) => a + b, 0);
   const daysCount = Object.keys(dailyStats).length || 1;
   const avgPerDay = Math.round(allTimeTotal / daysCount);
@@ -474,17 +611,14 @@ export default function TasbihScreen() {
 
   // ===== RENDER =====
   return (
-    <BackgroundWrapper backgroundKey={settings?.display?.appBackground} backgroundUrl={settings?.display?.appBackgroundUrl} style={{ flex: 1 }}>
+    <BackgroundWrapper backgroundKey={settings?.display?.appBackground} backgroundUrl={settings?.display?.appBackgroundUrl} style={{ flex: 1, backgroundColor: C.bg }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
         <View style={s.header}>
-          {/* Left: worship tracker + favorites */}
+          {/* Left: worship tracker */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <TouchableOpacity onPress={() => router.push('/worship-tracker?context=tasbih' as any)} style={s.headerBtn}>
+            <TouchableOpacity onPress={() => setShowStatsModal(true)} style={s.headerBtn}>
               <MaterialCommunityIcons name="chart-bar" size={22} color={C.text} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/favorites' as any)} style={s.headerBtn}>
-              <MaterialCommunityIcons name="bookmark-outline" size={22} color={C.text} />
             </TouchableOpacity>
           </View>
           {/* Center: title — absolutely centered */}
@@ -499,8 +633,19 @@ export default function TasbihScreen() {
           </View>
         </View>
 
+        {/* Progress indicator */}
+        <View style={s.progressRow}>
+          <Text style={[s.progressText, { color: GREEN }]}>
+            {completedCount}/{allTasbihItems.length}
+          </Text>
+          <Text style={[s.positionText, { color: C.textSec }]}>
+            {currentIndex + 1} من {allTasbihItems.length}
+          </Text>
+        </View>
+
         {/* Horizontal Tasbih Slider */}
         <ScrollView
+          ref={sliderRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.sliderContent}
@@ -528,7 +673,7 @@ export default function TasbihScreen() {
                   ]}
                   numberOfLines={1}
                 >
-                  {t.text.length > 25 ? t.text.slice(0, 23) + '…' : t.text}
+                  {(() => { const stripped = stripTashkeel(t.text); return stripped.length > 25 ? stripped.slice(0, 23) + '…' : stripped; })()}
                 </Text>
               </TouchableOpacity>
             );
@@ -555,7 +700,7 @@ export default function TasbihScreen() {
                   ]}
                   numberOfLines={1}
                 >
-                  {t.text.length > 25 ? t.text.slice(0, 23) + '…' : t.text}
+                  {(() => { const stripped = stripTashkeel(t.text); return stripped.length > 25 ? stripped.slice(0, 23) + '…' : stripped; })()}
                 </Text>
               </TouchableOpacity>
             );
@@ -575,16 +720,16 @@ export default function TasbihScreen() {
               onPress={() => {
                 const allItems = [...PRESET_TASBIHAT, ...customTasbihat];
                 const idx = allItems.findIndex(t => t.id === selectedTasbih.id);
-                // In RTL: left button goes to PREVIOUS, in LTR: left button goes to PREVIOUS
-                if (idx > 0) selectTasbih(allItems[idx - 1]);
+                // RTL: right chevron = next (visually right in RTL = forward)
+                if (idx < allItems.length - 1) selectTasbih(allItems[idx + 1]);
               }}
               style={[s.navBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
             >
-              <MaterialCommunityIcons name={isRTL ? "chevron-right" : "chevron-left"} size={22} color={C.textSec} />
+              <MaterialCommunityIcons name="chevron-right" size={22} color={C.textSec} />
             </TouchableOpacity>
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={[s.selectedText, { color: C.text }]}>{selectedTasbih.text}</Text>
-              {selectedTasbih.transliteration && (
+              <Text style={[s.selectedText, { color: C.text }]}>{stripTashkeel(selectedTasbih.text)}</Text>
+              {selectedTasbih.transliteration && showTranslation && (
                 <Text style={[s.selectedTranslit, { color: C.textSec }]}>{selectedTasbih.transliteration}</Text>
               )}
               {selectedTasbih.virtue && showVirtue && (
@@ -595,12 +740,12 @@ export default function TasbihScreen() {
               onPress={() => {
                 const allItems = [...PRESET_TASBIHAT, ...customTasbihat];
                 const idx = allItems.findIndex(t => t.id === selectedTasbih.id);
-                // In RTL: right button goes to NEXT, in LTR: right button goes to NEXT
-                if (idx < allItems.length - 1) selectTasbih(allItems[idx + 1]);
+                // RTL: left chevron = previous (visually left in RTL = backward)
+                if (idx > 0) selectTasbih(allItems[idx - 1]);
               }}
               style={[s.navBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
             >
-              <MaterialCommunityIcons name={isRTL ? "chevron-left" : "chevron-right"} size={22} color={C.textSec} />
+              <MaterialCommunityIcons name="chevron-left" size={22} color={C.textSec} />
             </TouchableOpacity>
           </View>
         </View>
@@ -647,8 +792,8 @@ export default function TasbihScreen() {
                 />
               </Svg>
               {/* Center content */}
-              <View style={s.ringCenter}>
-                <Text style={[s.countNum, { color: C.text }]}>{count}</Text>
+              <View style={[s.ringCenter, { overflow: 'visible', width: RING_SIZE * 0.75, height: RING_SIZE * 0.55 }]}>
+                <Text style={[s.countNum, { color: C.text, fontSize: count >= 1000 ? 36 : count >= 100 ? 52 : 72, lineHeight: count >= 1000 ? 48 : count >= 100 ? 64 : 84 }]} adjustsFontSizeToFit numberOfLines={1}>{count}</Text>
                 <View style={[s.countDivider, { backgroundColor: C.textSec }]} />
                 <Text style={[s.countTarget, { color: C.textSec }]}>{selectedTasbih.target}</Text>
               </View>
@@ -670,6 +815,19 @@ export default function TasbihScreen() {
               <Text style={[s.chipText, { color: C.textSec }]}>{progressPct}%</Text>
             </View>
           </View>
+
+          {/* Reset button */}
+          <TouchableOpacity
+            style={[s.resetBtn, {
+              backgroundColor: count > 0 ? (isDarkMode ? 'rgba(47,118,89,0.12)' : 'rgba(47,118,89,0.08)') : (isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+              borderColor: count > 0 ? GREEN + '30' : C.cardBorder,
+            }]}
+            onPress={handleQuickReset}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="restart" size={18} color={count > 0 ? GREEN : C.textSec} />
+            <Text style={[s.resetBtnText, { color: count > 0 ? GREEN : C.textSec }]}>إعادة العداد</Text>
+          </TouchableOpacity>
 
           <Text style={[s.tapHint, { color: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }]}>
             اضغط الدائرة للتسبيح
@@ -694,6 +852,16 @@ export default function TasbihScreen() {
         </View>
       </SafeAreaView>
 
+      {/* Reset toast */}
+      {resetToastVisible && (
+        <View style={s.toastContainer}>
+          <View style={[s.toast, { backgroundColor: isDarkMode ? 'rgba(47,118,89,0.95)' : 'rgba(47,118,89,0.9)' }]}>
+            <MaterialCommunityIcons name="check-circle" size={18} color="#fff" />
+            <Text style={s.toastText}>تم حفظ تسبيحات الأمس وإعادة تعيين العداد</Text>
+          </View>
+        </View>
+      )}
+
       {/* ===== TASBIH LIST MODAL ===== */}
       <Modal visible={showTasbihList} animationType="slide" transparent onRequestClose={() => setShowTasbihList(false)}>
         <View style={s.modalOverlay}>
@@ -714,7 +882,7 @@ export default function TasbihScreen() {
                   onPress={() => selectTasbih(t)}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.listItemText, { color: C.text }]}>{t.text}</Text>
+                    <Text style={[s.listItemText, { color: C.text }]}>{stripTashkeel(t.text)}</Text>
                     <View style={s.listItemMeta}>
                       <Text style={[s.listItemTarget, { color: C.textSec }]}>× {t.target}</Text>
                       {t.grade && <View style={s.gradeBadge}><Text style={s.gradeBadgeText}>{t.grade}</Text></View>}
@@ -736,7 +904,7 @@ export default function TasbihScreen() {
                       onLongPress={() => deleteCustomTasbih(t.id)}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={[s.listItemText, { color: C.text }]}>{t.text}</Text>
+                        <Text style={[s.listItemText, { color: C.text }]}>{stripTashkeel(t.text)}</Text>
                         <Text style={[s.listItemTarget, { color: C.textSec }]}>× {t.target}</Text>
                       </View>
                       <MaterialCommunityIcons name="delete-outline" size={20} color="#EF4444" />
@@ -761,7 +929,12 @@ export default function TasbihScreen() {
       {/* ===== CUSTOM TASBIH MODAL ===== */}
       <Modal visible={showCustomModal} animationType="slide" transparent onRequestClose={() => setShowCustomModal(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { height: 'auto', backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
+          <View style={[s.modalSheet, {
+            height: 'auto',
+            backgroundColor: isDarkMode ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.88)',
+            borderWidth: 0.5,
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+          }]}>
             <View style={s.modalHeader}>
               <Text style={[s.modalTitle, { color: C.text }]}>إضافة تسبيح مخصص</Text>
               <TouchableOpacity onPress={() => setShowCustomModal(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
@@ -822,6 +995,7 @@ export default function TasbihScreen() {
             <GlassToggle label="الاهتزاز" icon="cellphone" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />
             <GlassToggle label="إظهار الفضل" icon="star-outline" enabled={showVirtue} onToggle={setShowVirtue} />
             <GlassToggle label="الانتقال التلقائي" icon="arrow-right-circle-outline" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle="الانتقال للتسبيح التالي عند الإكمال" />
+            <GlassToggle label="إظهار الترجمة" icon="translate" enabled={showTranslation} onToggle={setShowTranslation} />
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: '#EF4444', marginTop: 20 }]} onPress={() => { handleResetAll(); setShowSettings(false); }}>
               <Text style={s.saveBtnText}>إعادة تعيين كل شيء</Text>
             </TouchableOpacity>
@@ -866,14 +1040,42 @@ export default function TasbihScreen() {
                 </View>
               </View>
 
+              {/* Today's breakdown by type */}
+              {(typeStats[getTodayISO()] || typeStats[new Date().toDateString()]) && Object.keys(typeStats[getTodayISO()] || typeStats[new Date().toDateString()] || {}).length > 0 && (
+                <>
+                  <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تفصيل اليوم</Text>
+                  {Object.entries(typeStats[getTodayISO()] || typeStats[new Date().toDateString()] || {}).sort((a, b) => b[1] - a[1]).map(([text, cnt]) => (
+                    <View key={text} style={[s.statsRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(120,120,128,0.06)' }]}>
+                      <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt}</Text>
+                      <Text style={[s.statsRowDate, { color: C.text }]} numberOfLines={1}>{text.length > 30 ? text.slice(0, 28) + '…' : text}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+
               {/* Last 7 days */}
               <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>آخر ٧ أيام</Text>
-              {Object.entries(dailyStats).slice(-7).reverse().map(([date, cnt]) => (
-                <View key={date} style={[s.statsRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(120,120,128,0.06)' }]}>
-                  <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>
-                  <Text style={[s.statsRowDate, { color: C.textSec }]}>{date}</Text>
-                </View>
-              ))}
+              {Object.entries(dailyStats).slice(-7).reverse().map(([date, cnt]) => {
+                const dayTypeStats = typeStats[date];
+                return (
+                  <View key={date} style={[s.statsRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(120,120,128,0.06)', flexDirection: 'column', alignItems: 'stretch' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>
+                      <Text style={[s.statsRowDate, { color: C.textSec }]}>{date}</Text>
+                    </View>
+                    {dayTypeStats && Object.keys(dayTypeStats).length > 0 && (
+                      <View style={{ marginTop: 8, gap: 4 }}>
+                        {Object.entries(dayTypeStats).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([text, c]) => (
+                          <View key={text} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={{ fontSize: 11, fontFamily: 'Cairo-Medium', color: GREEN, opacity: 0.8 }}>{c}</Text>
+                            <Text style={{ fontSize: 11, fontFamily: 'Cairo-Regular', color: C.textSec }} numberOfLines={1}>{text.length > 25 ? text.slice(0, 23) + '…' : text}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
               <View style={{ height: 20 }} />
             </ScrollView>
           </View>
@@ -927,12 +1129,12 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8, width: '100%',
   },
   navBtn: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
   selectedText: {
-    fontSize: 18, fontFamily: 'Cairo-Bold',
-    textAlign: 'center', lineHeight: 30,
+    fontSize: 22, fontFamily: 'Cairo-Bold',
+    textAlign: 'center', lineHeight: 34,
   },
   selectedTranslit: {
     fontSize: 13, fontFamily: 'Cairo-Regular',
@@ -947,6 +1149,7 @@ const s = StyleSheet.create({
   counterArea: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 20,
+    overflow: 'visible' as const,
   },
   ringRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
@@ -961,12 +1164,13 @@ const s = StyleSheet.create({
     width: RING_SIZE + 20, height: RING_SIZE + 20,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 12,
+    overflow: 'visible' as const,
   },
   ringCenter: {
     position: 'absolute', alignItems: 'center', justifyContent: 'center',
   },
   countNum: {
-    fontSize: 56, fontFamily: 'Cairo-Bold',
+    fontSize: 72, fontFamily: 'Cairo-Bold', lineHeight: 82,
   },
   countOf: {
     fontSize: 14, fontFamily: 'Cairo-Medium', marginTop: -4,
@@ -1109,5 +1313,44 @@ const s = StyleSheet.create({
   },
   statsRowVal: {
     fontSize: 14, fontFamily: 'Cairo-SemiBold',
+  },
+  progressRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, marginTop: 8,
+  },
+  progressText: {
+    fontSize: 13, fontFamily: 'Cairo-SemiBold',
+  },
+  positionText: {
+    fontSize: 12, fontFamily: 'Cairo-Medium',
+  },
+  resetBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingHorizontal: 20, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1, marginTop: 4,
+  },
+  resetBtnText: {
+    fontSize: 13, fontFamily: 'Cairo-SemiBold',
+  },
+  toastContainer: {
+    position: 'absolute' as const,
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center' as const,
+    zIndex: 9999,
+  },
+  toast: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  toastText: {
+    fontSize: 13,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#fff',
   },
 });

@@ -9,6 +9,7 @@ import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './p
 import { getHijriDate, getHijriDateObject } from './hijri-date';
 import { getAllAzkar } from '@/lib/azkar-api';
 import { t } from '@/lib/i18n';
+import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
 
 // ========================================
 // الثوابت
@@ -16,6 +17,17 @@ import { t } from '@/lib/i18n';
 
 const WIDGET_DATA_KEY = 'widget_shared_data';
 const WIDGET_SETTINGS_KEY = 'widget_settings';
+
+/**
+ * مسارات أيقونات الويدجت
+ * يتم استبدال هذه بملفات PNG فعلية عند توفرها في assets/images/widgets/
+ */
+export const WIDGET_ICON_PATHS: Record<string, string> = {
+  prayer: 'assets/images/widgets/widget_prayer_times.png',
+  ayah: 'assets/images/widgets/widget_verse.png',
+  dhikr: 'assets/images/widgets/widget_dhikr.png',
+  hijri: 'assets/images/widgets/widget_hijri.png',
+};
 
 // مسار مشاركة البيانات مع الويدجت
 const SHARED_GROUP_ID = 'group.com.roohmuslim.app';
@@ -61,6 +73,40 @@ export interface WidgetAzkarData {
   lastUpdated: string;
 }
 
+export interface VerseWidgetData {
+  arabic: string;
+  translation?: string;
+  surahName: string;
+  surahNameEn: string;
+  ayahNumber: number;
+  numberInSurah: number;
+  date: string;
+  lastUpdated: string;
+}
+
+export interface DhikrWidgetData {
+  arabic: string;
+  translation?: string;
+  count: number;
+  category: string;
+  categoryName: string;
+  benefit?: string;
+  date: string;
+  lastUpdated: string;
+}
+
+export interface PrayerCompletionData {
+  date: string;
+  prayers: {
+    fajr: boolean;
+    dhuhr: boolean;
+    asr: boolean;
+    maghrib: boolean;
+    isha: boolean;
+  };
+  lastUpdated: string;
+}
+
 export interface WidgetSettings {
   enabled: boolean;
   prayerWidget: {
@@ -68,6 +114,7 @@ export interface WidgetSettings {
     showAllPrayers: boolean;
     showHijriDate: boolean;
     showLocation: boolean;
+    showCompletion: boolean;
     colorScheme: 'auto' | 'light' | 'dark';
     accentColor: string;
   };
@@ -82,11 +129,24 @@ export interface WidgetSettings {
     enabled: boolean;
     showGregorian: boolean;
   };
+  verseWidget: {
+    enabled: boolean;
+    showTranslation: boolean;
+    colorScheme: 'auto' | 'light' | 'dark';
+  };
+  dhikrWidget: {
+    enabled: boolean;
+    showTranslation: boolean;
+    showBenefit: boolean;
+  };
 }
 
 export interface SharedWidgetData {
   prayer: WidgetPrayerData;
   azkar: WidgetAzkarData;
+  verse: VerseWidgetData;
+  dhikr: DhikrWidgetData;
+  prayerCompletion: PrayerCompletionData;
   settings: WidgetSettings;
 }
 
@@ -101,6 +161,7 @@ export const defaultWidgetSettings: WidgetSettings = {
     showAllPrayers: true,
     showHijriDate: true,
     showLocation: true,
+    showCompletion: true,
     colorScheme: 'auto',
     accentColor: '#2f7659',
   },
@@ -114,6 +175,16 @@ export const defaultWidgetSettings: WidgetSettings = {
   hijriWidget: {
     enabled: true,
     showGregorian: true,
+  },
+  verseWidget: {
+    enabled: true,
+    showTranslation: false,
+    colorScheme: 'auto',
+  },
+  dhikrWidget: {
+    enabled: true,
+    showTranslation: false,
+    showBenefit: true,
   },
 };
 
@@ -166,7 +237,9 @@ export const preparePrayerWidgetData = async (
   const hijri = getHijriDateObject();
   
   // الصلاة القادمة
-  const nextPrayerKey = prayerTimes ? getNextPrayer(prayerTimes) : 'fajr';
+  const nextPrayerResult = prayerTimes ? getNextPrayer(prayerTimes) : null;
+  const nextPrayerKey = nextPrayerResult?.name || 'fajr';
+  const nextPrayerTime = nextPrayerResult?.time || '--:--';
   const timeRemaining = prayerTimes ? getTimeRemaining(prayerTimes) : null;
   
   // أسماء الصلوات
@@ -200,7 +273,7 @@ export const preparePrayerWidgetData = async (
     nextPrayer: nextPrayerKey,
     nextPrayerName: prayerNames[nextPrayerKey]?.en || nextPrayerKey,
     nextPrayerNameAr: prayerNames[nextPrayerKey]?.ar || nextPrayerKey,
-    nextPrayerTime: prayerTimes ? formatTime12h(prayerTimes[nextPrayerKey as keyof PrayerTimes] as string) : '--:--',
+    nextPrayerTime: prayerTimes ? formatTime12h(nextPrayerTime) : '--:--',
     timeRemaining: timeRemaining 
       ? `${timeRemaining.hours}:${String(timeRemaining.minutes).padStart(2, '0')}`
       : '--:--',
@@ -277,6 +350,186 @@ export const prepareAzkarWidgetData = async (
 };
 
 // ========================================
+// بيانات آية اليوم للويدجت
+// ========================================
+
+/**
+ * حساب رقم آية يومي ثابت بناءً على يوم السنة
+ */
+function getDailyVerseNumber(): number {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - startOfYear.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return (dayOfYear % 6236) + 1;
+}
+
+/**
+ * الحصول على ذكر يومي ثابت (مختلف عن ذكر الأذكار العشوائي)
+ */
+function getDailyDhikrIndex(totalAzkar: number): number {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - startOfYear.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  // Offset by 137 to differentiate from verse-of-the-day numbering
+  return ((dayOfYear + 137) % totalAzkar);
+}
+
+const DHIKR_CATEGORY_NAMES_AR: Record<string, string> = {
+  morning: 'أذكار الصباح',
+  evening: 'أذكار المساء',
+  sleep: 'أذكار النوم',
+  wakeup: 'أذكار الاستيقاظ',
+  after_prayer: 'بعد الصلاة',
+  quran_duas: 'أدعية قرآنية',
+  sunnah_duas: 'أدعية نبوية',
+  ruqya: 'رقية شرعية',
+  protection: 'أذكار الحماية',
+  misc: 'أذكار متنوعة',
+};
+
+/**
+ * تحضير بيانات آية اليوم للويدجت
+ */
+export const prepareVerseWidgetData = async (
+  language: string = 'ar'
+): Promise<VerseWidgetData> => {
+  const todayDate = new Date().toISOString().split('T')[0]!;
+
+  // Try cached verse first
+  try {
+    const cached = await AsyncStorage.getItem(`widget_verse_${todayDate}`);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch { /* proceed to fetch */ }
+
+  // Fetch from API
+  try {
+    const ayah = await getTodayAyah();
+    if (ayah) {
+      const verseData: VerseWidgetData = {
+        arabic: ayah.text,
+        surahName: ayah.surah.name,
+        surahNameEn: ayah.surah.englishName,
+        ayahNumber: ayah.number,
+        numberInSurah: ayah.numberInSurah || ayah.number,
+        date: todayDate,
+        lastUpdated: new Date().toISOString(),
+      };
+      // Cache for the day
+      await AsyncStorage.setItem(`widget_verse_${todayDate}`, JSON.stringify(verseData));
+      return verseData;
+    }
+  } catch (error) {
+    console.error('Error fetching verse for widget:', error);
+  }
+
+  // Fallback: Al-Fatiha first verse
+  return {
+    arabic: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+    surahName: 'سورة الفاتحة',
+    surahNameEn: 'Al-Fatiha',
+    ayahNumber: 1,
+    numberInSurah: 1,
+    date: todayDate,
+    lastUpdated: new Date().toISOString(),
+  };
+};
+
+/**
+ * تحضير بيانات الذكر اليومي للويدجت
+ */
+export const prepareDhikrWidgetData = async (
+  language: string = 'ar'
+): Promise<DhikrWidgetData> => {
+  const todayDate = new Date().toISOString().split('T')[0]!;
+  const allAzkar = getAllAzkar();
+
+  if (allAzkar.length === 0) {
+    return {
+      arabic: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ',
+      count: 3,
+      category: 'misc',
+      categoryName: 'أذكار متنوعة',
+      date: todayDate,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  const index = getDailyDhikrIndex(allAzkar.length);
+  const zikr = allAzkar[index]!;
+
+  const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
+  const translation = language !== 'ar' ? (zikr.translations?.[lang] || zikr.translations?.['en']) : undefined;
+  const benefitVal = zikr.benefit;
+  const benefit = typeof benefitVal === 'string'
+    ? benefitVal
+    : benefitVal?.[lang] || benefitVal?.['ar'] || undefined;
+
+  return {
+    arabic: zikr.arabic,
+    translation,
+    count: zikr.count,
+    category: zikr.category,
+    categoryName: DHIKR_CATEGORY_NAMES_AR[zikr.category] || 'أذكار',
+    benefit,
+    date: todayDate,
+    lastUpdated: new Date().toISOString(),
+  };
+};
+
+// ========================================
+// تتبع إكمال الصلوات من الويدجت
+// ========================================
+
+const PRAYER_COMPLETION_KEY = 'widget_prayer_completion';
+
+/**
+ * جلب حالة إكمال الصلوات لليوم
+ */
+export const getPrayerCompletion = async (): Promise<PrayerCompletionData> => {
+  const todayDate = new Date().toISOString().split('T')[0]!;
+  try {
+    const data = await AsyncStorage.getItem(PRAYER_COMPLETION_KEY);
+    if (data) {
+      const parsed: PrayerCompletionData = JSON.parse(data);
+      if (parsed.date === todayDate) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error('Error getting prayer completion:', error);
+  }
+
+  return {
+    date: todayDate,
+    prayers: { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false },
+    lastUpdated: new Date().toISOString(),
+  };
+};
+
+/**
+ * حفظ حالة إكمال صلاة
+ */
+export const setPrayerCompleted = async (
+  prayer: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha',
+  completed: boolean
+): Promise<void> => {
+  try {
+    const current = await getPrayerCompletion();
+    current.prayers[prayer] = completed;
+    current.lastUpdated = new Date().toISOString();
+    await AsyncStorage.setItem(PRAYER_COMPLETION_KEY, JSON.stringify(current));
+    // Update shared widget data
+    await updateSharedData();
+  } catch (error) {
+    console.error('Error setting prayer completion:', error);
+  }
+};
+
+// ========================================
 // مشاركة البيانات مع الويدجت
 // ========================================
 
@@ -309,10 +562,16 @@ export const updateSharedData = async (
     
     const prayerData = await preparePrayerWidgetData(prayerTimes || null, location);
     const azkarData = await prepareAzkarWidgetData('ar', settings.azkarWidget.categories);
+    const verseData = await prepareVerseWidgetData('ar');
+    const dhikrData = await prepareDhikrWidgetData('ar');
+    const prayerCompletion = await getPrayerCompletion();
     
     const sharedData: SharedWidgetData = {
       prayer: prayerData,
       azkar: azkarData,
+      verse: verseData,
+      dhikr: dhikrData,
+      prayerCompletion,
       settings,
     };
     
@@ -432,8 +691,14 @@ export default {
   // البيانات
   preparePrayerWidgetData,
   prepareAzkarWidgetData,
+  prepareVerseWidgetData,
+  prepareDhikrWidgetData,
   updateSharedData,
   getSharedData,
+  
+  // إكمال الصلوات
+  getPrayerCompletion,
+  setPrayerCompleted,
   
   // التحديث
   requestWidgetUpdate,
@@ -442,4 +707,5 @@ export default {
   // مساعدة
   getWidgetBackgroundColor,
   getWidgetPrayerIcon,
+  WIDGET_ICON_PATHS,
 };

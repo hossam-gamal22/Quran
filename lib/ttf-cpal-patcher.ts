@@ -89,3 +89,5 @@ export function patchCpalTableAllPalettes(ttf: Uint8Array, color: {r:number,g:nu
 // لون موحد للوضع الداكن (أبيض فاتح)
 export const DARK_TAJWEED_PALETTE = Array(16).fill({r:243,g:243,b:243,a:255});
 export const DARK_UNIFIED_COLOR = {r:243,g:243,b:243,a:255};
+// لون موحد للوضع الفاتح (أسود)
+export const LIGHT_UNIFIED_COLOR = {r:0, g:0, b:0, a:255};

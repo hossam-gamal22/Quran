@@ -1,7 +1,7 @@
 {
   "version": "3.0",
   "lastUpdate": "2026-03-06",
-  "totalCount": 247,
+  "totalCount": 249,
   "azkar": [
     {
       "id": 1,
@@ -769,7 +769,8 @@
       "count": 1,
       "reference": "مسلم 1/414",
       "benefit": "",
-      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n62.mp3"
+      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n62.mp3",
+      "subcategory": "general"
     },
     {
       "id": 33,
@@ -793,7 +794,8 @@
       "count": 1,
       "reference": "مسلم 1/418",
       "benefit": "من سبح الله في دبر كل صلاة ثلاثاً وثلاثين... غُفرت له خطاياه وإن كانت مثل زبد البحر",
-      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n63.mp3"
+      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n63.mp3",
+      "subcategory": "general"
     },
     {
       "id": 34,
@@ -1337,7 +1339,8 @@
       "reference": "البخاري ومسلم",
       "benefit": "من أذكار دبر الصلاة",
       "audio": "",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "general"
     },
     {
       "id": 46,
@@ -1399,7 +1402,8 @@
       "reference": "مسلم",
       "benefit": "إعلان التوحيد بعد الصلاة",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n64.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "general"
     },
     {
       "id": 47,
@@ -1461,7 +1465,8 @@
       "reference": "مسلم",
       "benefit": "غُفرت خطاياه وإن كانت مثل زبد البحر",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n65.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "general"
     },
     {
       "id": 48,
@@ -1523,7 +1528,8 @@
       "reference": "أبو داود والنسائي",
       "benefit": "حماية وتحصين",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n66.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "general"
     },
     {
       "id": 49,
@@ -1585,7 +1591,8 @@
       "reference": "النسائي وابن السني",
       "benefit": "لم يمنعه من دخول الجنة إلا أن يموت",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n67.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "general"
     },
     {
       "id": 50,
@@ -1647,7 +1654,8 @@
       "reference": "الترمذي وأحمد",
       "benefit": "ذكر مخصوص بعد المغرب والفجر",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n68.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "after_fajr_maghrib"
     },
     {
       "id": 51,
@@ -1709,7 +1717,8 @@
       "reference": "ابن ماجه",
       "benefit": "دعاء مخصوص بعد صلاة الفجر",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n69.mp3",
-      "audioSource": "Archive.org"
+      "audioSource": "Archive.org",
+      "subcategory": "after_fajr"
     },
     {
       "id": 53,
@@ -6805,6 +6814,62 @@
       "count": 1,
       "reference": "البقرة: 286",
       "benefit": "من قرأ الآيتين من آخر سورة البقرة في ليلة كفتاه - البخاري ومسلم",
+      "audio": ""
+    },
+    {
+      "id": 253,
+      "category": "after_prayer",
+      "subcategory": "after_fajr_maghrib",
+      "arabic": "اللَّهُمَّ أَجِرْنِي مِنَ النَّارِ",
+      "transliteration": "Allahumma ajirni minan-nar",
+      "translations": {
+        "ar": "اللهم أجرني من النار - يقال 7 مرات بعد صلاة الفجر وبعد صلاة المغرب",
+        "en": "O Allah, protect me from the Fire - said 7 times after Fajr and Maghrib prayers",
+        "fr": "O Allah, protège-moi du Feu - à dire 7 fois après les prières du Fajr et du Maghrib",
+        "de": "O Allah, schütze mich vor dem Feuer - 7 Mal nach dem Fajr- und Maghrib-Gebet zu sagen",
+        "tr": "Allah'ım! Beni ateşten koru - Sabah ve akşam namazından sonra 7 kere söylenir",
+        "es": "Oh Allah, protégeme del Fuego - se dice 7 veces después del Fajr y Maghrib",
+        "ur": "اے اللہ! مجھے آگ سے بچا - فجر اور مغرب کے بعد 7 بار کہا جائے",
+        "id": "Ya Allah, lindungilah aku dari api neraka - diucapkan 7 kali setelah Subuh dan Maghrib",
+        "ms": "Ya Allah, lindungilah aku dari api neraka - dibaca 7 kali selepas Subuh dan Maghrib",
+        "hi": "ऐ अल्लाह! मुझे आग से बचा - फज्र और मगरिब के बाद 7 बार कहा जाए",
+        "bn": "হে আল্লাহ! আমাকে জাহান্নামের আগুন থেকে রক্ষা করো - ফজর ও মাগরিবের পর ৭ বার বলতে হয়",
+        "ru": "О Аллах, защити меня от Огня - произносится 7 раз после Фаджр и Магриб"
+      },
+      "count": 7,
+      "reference": "أبو داود 5079",
+      "benefit": {
+        "ar": "من قالها سبع مرات بعد صلاة الفجر أو المغرب فمات في يومه أو ليلته أجاره الله من النار",
+        "en": "Whoever says it seven times after Fajr or Maghrib prayer, if he dies that day or night, Allah will protect him from the Fire"
+      },
+      "audio": ""
+    },
+    {
+      "id": 254,
+      "category": "after_prayer",
+      "subcategory": "after_fajr",
+      "arabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ",
+      "transliteration": "Subhan-Allahi wa bihamdihi, 'adada khalqihi, wa rida nafsihi, wa zinata 'arshihi, wa midada kalimatihi",
+      "translations": {
+        "ar": "سبحان الله وبحمده عدد خلقه ورضا نفسه وزنة عرشه ومداد كلماته - تقال بعد صلاة الفجر",
+        "en": "Glory be to Allah and praise Him, as many as the number of His creation, as pleases Him, as heavy as His Throne, and as extensive as His Words - said after Fajr",
+        "fr": "Gloire à Allah et louange à Lui, autant que le nombre de Ses créatures - après le Fajr",
+        "de": "Gepriesen sei Allah und Lob sei Ihm, so viele wie Seine Geschöpfe - nach dem Fajr",
+        "tr": "Allah'ı yaratıklarının sayısınca tesbih ederim - sabah namazından sonra",
+        "es": "Gloria a Allah, tantas como el número de Sus criaturas - después del Fajr",
+        "ur": "اللہ کی پاکی بیان کرتا ہوں - فجر کے بعد",
+        "id": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya - setelah Subuh",
+        "ms": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya - selepas Subuh",
+        "hi": "अल्लाह की पाकी है - फज्र के बाद",
+        "bn": "আল্লাহর পবিত্রতা - ফজরের পর",
+        "ru": "Слава Аллаху и хвала Ему - после Фаджр"
+      },
+      "count": 3,
+      "reference": "مسلم 2726",
+      "benefit": {
+        "ar": "كلمات تعدل ثواب التسبيح من صلاة الفجر إلى الضحى",
+        "en": "Words that equal the reward of glorifying Allah from Fajr prayer until mid-morning"
+      },
       "audio": ""
     }
   ]

@@ -1,0 +1,27 @@
+{
+  "name": "Prayer Times Widget",
+  "nameAr": "ودجت مواقيت الصلاة",
+  "version": "1.0",
+  "sizes": ["small", "medium", "large"],
+  "colors": {
+    "text": "#081827",
+    "accent": "#0f987f",
+    "background": "#FFFFFF"
+  },
+  "fonts": {
+    "title": "Cairo-Bold",
+    "body": "Cairo-Regular",
+    "numbers": "Cairo-SemiBold"
+  },
+  "elements": {
+    "logo": true,
+    "appName": true,
+    "dividers": true,
+    "nextPrayerHighlight": true,
+    "countdownTimer": true,
+    "allPrayersList": true,
+    "mosquePlaceholder": true
+  },
+  "icon": "mosque",
+  "refreshInterval": "per_prayer"
+}

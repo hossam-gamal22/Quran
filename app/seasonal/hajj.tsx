@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Dimensions,
   Modal,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -436,15 +437,19 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
                 <Text style={[styles.ritualSectionTitle, isDarkMode && styles.textLight]}>
                   الفضائل
                 </Text>
-                <View style={[styles.virtuesCard, isDarkMode && styles.virtuesCardDark]}>
-                  {dayInfo.virtues.map((virtue, index) => (
-                    <View key={index} style={styles.virtueItem}>
-                      <MaterialCommunityIcons name="star" size={16} color="#DAA520" />
-                      <Text style={[styles.virtueText, isDarkMode && styles.textMuted]}>
-                        {virtue}
-                      </Text>
-                    </View>
-                  ))}
+                <View style={styles.virtuesStarWrapper}>
+                  <View style={styles.virtuesStarCircle}>
+                    <MaterialCommunityIcons name="star" size={16} color="#DAA520" />
+                  </View>
+                  <View style={[styles.virtuesCard, isDarkMode && styles.virtuesCardDark]}>
+                    {dayInfo.virtues.map((virtue, index) => (
+                      <View key={index} style={styles.virtueItem}>
+                        <Text style={[styles.virtueText, isDarkMode && styles.textMuted]}>
+                          {virtue}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
               </>
             )}
@@ -1053,10 +1058,24 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  virtuesStarWrapper: {
+    alignItems: 'center',
+  },
+  virtuesStarCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(218,165,32,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -18,
+    zIndex: 1,
+  },
   virtuesCard: {
     backgroundColor: '#fffde7',
     borderRadius: 14,
     padding: 14,
+    paddingTop: 26,
   },
   virtuesCardDark: {
     backgroundColor: '#2a2a1e',

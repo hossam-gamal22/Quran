@@ -265,7 +265,7 @@ export default function RecitationsScreen() {
     return (
       <View style={[s.surahItem, isCurrentlyPlaying && { backgroundColor: colors.primary + '08' }]}>
         <TouchableOpacity style={s.favBtn} onPress={() => toggleFav(item.num)}>
-          <IconSymbol name={favorites.includes(item.num) ? 'heart.fill' : 'heart'} size={16} color={favorites.includes(item.num) ? '#DC2626' : colors.muted} />
+          <IconSymbol name={favorites.includes(item.num) ? 'bookmark.fill' : 'bookmark'} size={16} color={favorites.includes(item.num) ? '#DC2626' : colors.muted} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.playBtn, { backgroundColor: isCurrentlyPlaying ? colors.primary : colors.primary + '15' }]}

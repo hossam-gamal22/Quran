@@ -59,6 +59,20 @@ class WidgetUpdateService : Service() {
         }
         
         /**
+         * تحديث ويدجت آية اليوم
+         */
+        fun updateQuranAyahWidget(context: Context) {
+            QuranAyahWidget.updateWidget(context)
+        }
+        
+        /**
+         * تحديث ويدجت ذكر اليوم
+         */
+        fun updateDhikrWidget(context: Context) {
+            DhikrWidget.updateWidget(context)
+        }
+        
+        /**
          * حفظ البيانات المشتركة للويدجت
          */
         fun saveWidgetData(context: Context, data: String) {
@@ -106,6 +120,8 @@ class WidgetUpdateService : Service() {
             NextPrayerWidget.updateWidget(this@WidgetUpdateService)
             AzkarWidget.updateWidget(this@WidgetUpdateService)
             HijriDateWidget.updateWidget(this@WidgetUpdateService)
+            QuranAyahWidget.updateWidget(this@WidgetUpdateService)
+            DhikrWidget.updateWidget(this@WidgetUpdateService)
         }
     }
 

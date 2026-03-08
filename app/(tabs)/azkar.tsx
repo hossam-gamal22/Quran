@@ -20,8 +20,10 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { NativeTabs } from '@/components/ui/NativeTabs';
 
 import AzkarAPI, {
   AzkarCategory,
@@ -235,7 +237,7 @@ export default function AzkarScreen() {
 
             {/* العدد */}
             <Text style={[styles.azkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-              {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+              {azkarCount} {t('azkar.count')}
             </Text>
 
             {/* شريط التقدم */}
@@ -310,7 +312,7 @@ export default function AzkarScreen() {
                 {categoryName}
               </Text>
               <Text style={[styles.listAzkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {azkarCount} {language === 'ar' ? 'ذكر' : 'adhkar'}
+                {azkarCount} {t('azkar.count')}
               </Text>
             </View>
 
@@ -335,15 +337,15 @@ export default function AzkarScreen() {
 
   const renderQuickLinks = () => {
     const quickLinks = [
-      { id: 'tasbih', icon: 'hand-left', label: language === 'ar' ? 'التسبيح' : 'Tasbih', route: '/tasbih', color: '#10B981' },
-      { id: 'ruqya', icon: 'shield', label: language === 'ar' ? 'الرؤية الشرعية' : 'Legal Sighting', route: '/ruqya', color: '#6366F1' },
-      { id: 'names', icon: 'list', label: language === 'ar' ? 'الأسماء الحسنى' : 'Names', route: '/names', color: '#EC4899' },
+      { id: 'tasbih', icon: 'hand-left', label: t('tabs.tasbih'), route: '/tasbih', color: '#10B981' },
+      { id: 'ruqya', icon: 'shield', label: t('azkar.ruqya'), route: '/ruqya', color: '#6366F1' },
+      { id: 'names', icon: 'list', label: t('home.namesOfAllah'), route: '/names', color: '#EC4899' },
     ];
 
     return (
       <View style={styles.quickLinksContainer}>
         <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-          {language === 'ar' ? 'روابط سريعة' : 'Quick Links'}
+          {t('home.quickAccess')}
         </Text>
         <View style={styles.quickLinksRow}>
           {quickLinks.map(link => (
@@ -390,27 +392,27 @@ export default function AzkarScreen() {
               <MaterialCommunityIcons name="chart-bar" size={22} color={darkMode ? '#fff' : '#333'} />
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/favorites')}
+              onPress={() => router.push('/all-favorites' as any)}
               style={styles.viewToggle}
             >
-              <Ionicons name="heart" size={22} color="#EF4444" />
+              <MaterialCommunityIcons name="bookmark" size={22} color="#EF4444" />
             </TouchableOpacity>
           </View>
 
           {/* Center: title — absolutely centered */}
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
             <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20, fontFamily: 'Cairo-Bold' }]}>
-              {language === 'ar' ? 'الأذكار' : 'Azkar'}
+              {t('azkar.title')}
             </Text>
           </View>
 
           {/* Right: view toggle */}
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={{ width: 110 }}>
-              <GlassSegmentedControl
-                segments={[
-                  { key: 'grid', label: 'شبكة', icon: 'view-grid' },
-                  { key: 'list', label: 'قائمة', icon: 'view-list' },
+              <NativeTabs
+                tabs={[
+                  { key: 'grid', label: 'شبكة' },
+                  { key: 'list', label: 'قائمة' },
                 ]}
                 selected={viewMode}
                 onSelect={async (key) => {
@@ -418,6 +420,7 @@ export default function AzkarScreen() {
                   setViewMode(newMode);
                   await AsyncStorage.setItem('azkar_view_mode', newMode);
                 }}
+                indicatorColor="#2f7659"
               />
             </View>
           </View>
@@ -435,7 +438,7 @@ export default function AzkarScreen() {
       >
         {/* الفئات */}
         <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-          {language === 'ar' ? 'الفئات' : 'Categories'}
+          {t('azkar.categories')}
         </Text>
 
         {viewMode === 'grid' ? (

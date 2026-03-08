@@ -1,7 +1,7 @@
 // app/settings/quran.tsx
 // إعدادات القرآن الموحدة - جميع خيارات المصحف في مكان واحد
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,6 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { QURAN_THEMES } from '@/constants/quran-themes';
 
 // Background images
 const QURAN_BG_IMAGES: Record<string, any> = {
@@ -35,7 +34,7 @@ const QURAN_BG_IMAGES: Record<string, any> = {
 
 export default function QuranSettingsScreen() {
   const router = useRouter();
-  const { settings, isDarkMode, updateDisplay } = useSettings();
+  const { settings, isDarkMode, updateDisplay, updateNotifications } = useSettings();
 
   const colors = {
     primary: '#2f7659',
@@ -46,14 +45,8 @@ export default function QuranSettingsScreen() {
     accent: isDarkMode ? '#4ADE80' : '#2f7659',
   };
 
-  const currentThemeIndex = settings.display.quranThemeIndex ?? 0;
   const currentFontAdjust = settings.display.quranFontSizeAdjust ?? 0;
   const currentBackground = settings.display.quranBackground ?? 'quranbg1';
-
-  const handleThemeSelect = (index: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateDisplay({ quranThemeIndex: index });
-  };
 
   const handleFontAdjust = (delta: number) => {
     const newVal = Math.max(-4, Math.min(8, currentFontAdjust + delta));
@@ -66,9 +59,50 @@ export default function QuranSettingsScreen() {
     updateDisplay({ quranBackground: key as any });
   };
 
-  const handleToggle = (key: string, value: boolean) => {
+  // Quran reading reminder
+  const reminderEnabled = settings.notifications.quranReadingReminder ?? false;
+  const reminderTime = settings.notifications.quranReadingReminderTime ?? '20:00';
+  const reminderDays = settings.notifications.quranReminderDays ?? [0, 1, 2, 3, 4, 5, 6];
+  const reminder24Hour = settings.notifications.quranReminder24Hour ?? true;
+
+  // Custom time picker state
+  const [selectedHour, setSelectedHour] = useState(() => parseInt(reminderTime.split(':')[0]));
+  const [selectedMinute, setSelectedMinute] = useState(() => parseInt(reminderTime.split(':')[1]));
+
+  const handleReminderToggle = (value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateDisplay({ [key]: value });
+    updateNotifications({ quranReadingReminder: value });
+  };
+
+  const handleTimeFormatToggle = (use24: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateNotifications({ quranReminder24Hour: use24 });
+  };
+
+  const handleDayToggle = (dayIndex: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newDays = reminderDays.includes(dayIndex)
+      ? reminderDays.filter(d => d !== dayIndex)
+      : [...reminderDays, dayIndex].sort();
+    updateNotifications({ quranReminderDays: newDays });
+  };
+
+  const handleTimeChange = (hour: number, minute: number) => {
+    setSelectedHour(hour);
+    setSelectedMinute(minute);
+    const time = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    updateNotifications({ quranReadingReminderTime: time });
+  };
+
+  const DAY_NAMES = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+
+  const formatTime = (h: number, m: number) => {
+    if (reminder24Hour) {
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    const period = h >= 12 ? 'م' : 'ص';
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return `${h12}:${String(m).padStart(2, '0')} ${period}`;
   };
 
   return (
@@ -99,56 +133,14 @@ export default function QuranSettingsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* ─── Theme Selection ─── */}
+          {/* ─── 1. إعدادات الخط (Font Settings) ─── */}
           <Animated.View entering={FadeInDown.delay(50).duration(400)}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              <MaterialCommunityIcons name="palette-outline" size={18} /> سمة المصحف
+              <MaterialCommunityIcons name="format-size" size={18} /> إعدادات الخط
             </Text>
             <GlassCard style={styles.card}>
-              <View style={styles.themeGrid}>
-                {QURAN_THEMES.map((theme, index) => {
-                  const isSelected = currentThemeIndex === index;
-                  return (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.themeItem,
-                        { backgroundColor: theme.background },
-                        isSelected && styles.themeItemSelected,
-                      ]}
-                      onPress={() => handleThemeSelect(index)}
-                    >
-                      <View
-                        style={[
-                          styles.themePreview,
-                          { backgroundColor: theme.primary + '40' },
-                        ]}
-                      />
-                      {isSelected && (
-                        <View style={styles.themeCheck}>
-                          <MaterialCommunityIcons
-                            name="check"
-                            size={12}
-                            color="#fff"
-                          />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <Text style={[styles.themeLabel, { color: colors.muted }]}>
-                سمة رقم {currentThemeIndex + 1} من {QURAN_THEMES.length}
-              </Text>
-            </GlassCard>
-          </Animated.View>
-
-          {/* ─── Font Size ─── */}
-          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              <MaterialCommunityIcons name="format-size" size={18} /> حجم الخط
-            </Text>
-            <GlassCard style={styles.card}>
+              {/* Font Size */}
+              <Text style={[styles.subLabel, { color: colors.muted }]}>حجم الخط</Text>
               <View style={styles.fontSizeRow}>
                 <TouchableOpacity
                   style={[styles.fontBtn, { backgroundColor: colors.accent + '20' }]}
@@ -185,7 +177,165 @@ export default function QuranSettingsScreen() {
             </GlassCard>
           </Animated.View>
 
-          {/* ─── Background Selection ─── */}
+          {/* ─── 2. إعدادات التذكير بقراءة القرآن ─── */}
+          <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              <MaterialCommunityIcons name="bell-ring-outline" size={18} /> إعدادات التذكير بقراءة القرآن
+            </Text>
+            <GlassCard style={styles.card}>
+              {/* Enable/Disable */}
+              <View style={styles.toggleRow}>
+                <Switch
+                  value={reminderEnabled}
+                  onValueChange={handleReminderToggle}
+                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
+                  thumbColor={reminderEnabled ? colors.accent : '#f4f3f4'}
+                />
+                <View style={styles.toggleTextWrap}>
+                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
+                    تفعيل التذكير
+                  </Text>
+                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
+                    تذكير بقراءة القرآن الكريم
+                  </Text>
+                </View>
+              </View>
+
+              {reminderEnabled && (
+                <>
+                  <View style={styles.divider} />
+
+                  {/* Time format toggle */}
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8 }]}>
+                    صيغة الوقت
+                  </Text>
+                  <View style={styles.timeFormatRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeFormatBtn,
+                        { backgroundColor: reminder24Hour ? colors.accent : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') },
+                      ]}
+                      onPress={() => handleTimeFormatToggle(true)}
+                    >
+                      <Text style={{ color: reminder24Hour ? '#fff' : colors.foreground, fontFamily: 'Cairo-SemiBold', fontSize: 13 }}>
+                        ٢٤ ساعة
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeFormatBtn,
+                        { backgroundColor: !reminder24Hour ? colors.accent : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') },
+                      ]}
+                      onPress={() => handleTimeFormatToggle(false)}
+                    >
+                      <Text style={{ color: !reminder24Hour ? '#fff' : colors.foreground, fontFamily: 'Cairo-SemiBold', fontSize: 13 }}>
+                        ١٢ ساعة (ص/م)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  {/* Custom time picker */}
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8 }]}>
+                    وقت التذكير
+                  </Text>
+                  <View style={styles.customTimeRow}>
+                    <View style={styles.timePickerGroup}>
+                      <Text style={[styles.timePickerLabel, { color: colors.muted }]}>الساعة</Text>
+                      <View style={styles.timePickerControls}>
+                        <TouchableOpacity
+                          style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                          onPress={() => handleTimeChange((selectedHour + 1) % 24, selectedMinute)}
+                        >
+                          <MaterialCommunityIcons name="chevron-up" size={22} color={colors.foreground} />
+                        </TouchableOpacity>
+                        <Text style={[styles.timePickerValue, { color: colors.foreground }]}>
+                          {reminder24Hour
+                            ? String(selectedHour).padStart(2, '0')
+                            : String(selectedHour === 0 ? 12 : selectedHour > 12 ? selectedHour - 12 : selectedHour)}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                          onPress={() => handleTimeChange((selectedHour - 1 + 24) % 24, selectedMinute)}
+                        >
+                          <MaterialCommunityIcons name="chevron-down" size={22} color={colors.foreground} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <Text style={[styles.timeSeparator, { color: colors.foreground }]}>:</Text>
+
+                    <View style={styles.timePickerGroup}>
+                      <Text style={[styles.timePickerLabel, { color: colors.muted }]}>الدقيقة</Text>
+                      <View style={styles.timePickerControls}>
+                        <TouchableOpacity
+                          style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                          onPress={() => handleTimeChange(selectedHour, (selectedMinute + 5) % 60)}
+                        >
+                          <MaterialCommunityIcons name="chevron-up" size={22} color={colors.foreground} />
+                        </TouchableOpacity>
+                        <Text style={[styles.timePickerValue, { color: colors.foreground }]}>
+                          {String(selectedMinute).padStart(2, '0')}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
+                          onPress={() => handleTimeChange(selectedHour, (selectedMinute - 5 + 60) % 60)}
+                        >
+                          <MaterialCommunityIcons name="chevron-down" size={22} color={colors.foreground} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {!reminder24Hour && (
+                      <View style={styles.timePickerGroup}>
+                        <Text style={[styles.timePickerLabel, { color: colors.muted }]}> </Text>
+                        <View style={styles.timePickerControls}>
+                          <Text style={[styles.amPmLabel, { color: colors.accent }]}>
+                            {selectedHour >= 12 ? 'م' : 'ص'}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.selectedTimeDisplay, { color: colors.accent }]}>
+                    {formatTime(selectedHour, selectedMinute)}
+                  </Text>
+
+                  <View style={styles.divider} />
+
+                  {/* Day selection */}
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8 }]}>
+                    أيام التذكير
+                  </Text>
+                  <View style={styles.daysGrid}>
+                    {DAY_NAMES.map((dayName, index) => {
+                      const isSelected = reminderDays.includes(index);
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          style={[
+                            styles.dayChip,
+                            { backgroundColor: isSelected ? colors.accent : (isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') },
+                          ]}
+                          onPress={() => handleDayToggle(index)}
+                        >
+                          <Text style={[
+                            styles.dayChipText,
+                            { color: isSelected ? '#fff' : colors.foreground },
+                          ]}>
+                            {dayName}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+            </GlassCard>
+          </Animated.View>
+
+          {/* ─── 3. خلفية المصحف ─── */}
           <Animated.View entering={FadeInDown.delay(150).duration(400)}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
               <MaterialCommunityIcons name="image-outline" size={18} /> خلفية المصحف
@@ -226,109 +376,31 @@ export default function QuranSettingsScreen() {
             </GlassCard>
           </Animated.View>
 
-          {/* ─── Reading Options ─── */}
+          {/* ─── 4. الترجمة للغات أخرى ─── */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              <MaterialCommunityIcons name="book-open-variant" size={18} /> خيارات القراءة
+              <MaterialCommunityIcons name="translate" size={18} /> الترجمة للغات أخرى
             </Text>
             <GlassCard style={styles.card}>
-              {/* Show Tashkeel */}
-              <View style={styles.toggleRow}>
-                <Switch
-                  value={settings.display.showTashkeel !== false}
-                  onValueChange={(v) => handleToggle('showTashkeel', v)}
-                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
-                  thumbColor={settings.display.showTashkeel !== false ? colors.accent : '#f4f3f4'}
+              <TouchableOpacity
+                style={styles.navRow}
+                onPress={() => router.push('/settings/translations')}
+              >
+                <MaterialCommunityIcons
+                  name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+                  size={22}
+                  color={colors.muted}
                 />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
-                    إظهار التشكيل
+                <View style={styles.navRowContent}>
+                  <Text style={[styles.navRowTitle, { color: colors.foreground }]}>
+                    اختيار لغة الترجمة
                   </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
-                    عرض علامات التشكيل (الحركات)
+                  <Text style={[styles.navRowDesc, { color: colors.muted }]}>
+                    اختر الترجمة المفضلة لعرضها مع الآيات
                   </Text>
                 </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Show Translation */}
-              <View style={styles.toggleRow}>
-                <Switch
-                  value={settings.display.showTranslation ?? false}
-                  onValueChange={(v) => handleToggle('showTranslation', v)}
-                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
-                  thumbColor={settings.display.showTranslation ? colors.accent : '#f4f3f4'}
-                />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
-                    إظهار الترجمة
-                  </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
-                    عرض ترجمة الآيات
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Highlight Tajweed */}
-              <View style={styles.toggleRow}>
-                <Switch
-                  value={settings.display.highlightTajweed ?? false}
-                  onValueChange={(v) => handleToggle('highlightTajweed', v)}
-                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
-                  thumbColor={settings.display.highlightTajweed ? colors.accent : '#f4f3f4'}
-                />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
-                    تمييز التجويد
-                  </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
-                    تلوين أحكام التجويد
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Show Tafsir */}
-              <View style={styles.toggleRow}>
-                <Switch
-                  value={settings.display.showTafsir ?? false}
-                  onValueChange={(v) => handleToggle('showTafsir', v)}
-                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
-                  thumbColor={settings.display.showTafsir ? colors.accent : '#f4f3f4'}
-                />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
-                    لوحة التفسير
-                  </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
-                    عرض التفسير أثناء القراءة
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.divider} />
-
-              {/* Focus Mode */}
-              <View style={styles.toggleRow}>
-                <Switch
-                  value={settings.display.focusMode ?? false}
-                  onValueChange={(v) => handleToggle('focusMode', v)}
-                  trackColor={{ false: '#767577', true: colors.accent + '80' }}
-                  thumbColor={settings.display.focusMode ? colors.accent : '#f4f3f4'}
-                />
-                <View style={styles.toggleTextWrap}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground }]}>
-                    وضع التركيز
-                  </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted }]}>
-                    إخفاء عناصر الواجهة للتركيز على القراءة
-                  </Text>
-                </View>
-              </View>
+                <MaterialCommunityIcons name="translate" size={22} color={colors.accent} />
+              </TouchableOpacity>
             </GlassCard>
           </Animated.View>
 
@@ -379,50 +451,11 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
   },
-  // Theme grid
-  themeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  themeItem: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  themeItemSelected: {
-    borderColor: '#2f7659',
-    shadowColor: '#2f7659',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  themePreview: {
-    width: 20,
-    height: 4,
-    borderRadius: 2,
-  },
-  themeCheck: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#2f7659',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  themeLabel: {
+  subLabel: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'center',
-    marginTop: 12,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'right',
+    marginBottom: 10,
   },
   // Font size
   fontSizeRow: {
@@ -455,6 +488,18 @@ const styles = StyleSheet.create({
   resetText: {
     fontSize: 13,
     fontFamily: 'Cairo-Regular',
+  },
+  fontTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  fontTypeName: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Regular',
+    textAlign: 'right',
   },
   // Background grid
   bgGrid: {
@@ -513,5 +558,122 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: 'rgba(128,128,128,0.15)',
     marginVertical: 4,
+  },
+  // Time grid
+  timeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  timeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  timeChipText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
+  },
+  // Time format toggle
+  timeFormatRow: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  timeFormatBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  // Custom time picker
+  customTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 8,
+  },
+  timePickerGroup: {
+    alignItems: 'center',
+  },
+  timePickerLabel: {
+    fontSize: 11,
+    fontFamily: 'Cairo-Regular',
+    marginBottom: 4,
+  },
+  timePickerControls: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  timePickerBtn: {
+    width: 40,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timePickerValue: {
+    fontSize: 22,
+    fontFamily: 'Cairo-Bold',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  timeSeparator: {
+    fontSize: 22,
+    fontFamily: 'Cairo-Bold',
+    marginTop: 16,
+  },
+  amPmLabel: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    marginTop: 8,
+  },
+  selectedTimeDisplay: {
+    fontSize: 14,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  // Day selection grid
+  daysGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  dayChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  dayChipText: {
+    fontSize: 13,
+    fontFamily: 'Cairo-SemiBold',
+  },
+  // Navigation row
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  navRowContent: {
+    flex: 1,
+    marginRight: 12,
+    marginLeft: 8,
+  },
+  navRowTitle: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'right',
+  },
+  navRowDesc: {
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    textAlign: 'right',
+    marginTop: 2,
   },
 });

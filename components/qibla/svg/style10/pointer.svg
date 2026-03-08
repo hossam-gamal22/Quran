@@ -1,6 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
-  <circle cx="150" cy="150" r="10" fill="#FFFFFF" opacity="0.5"/>
-  <circle cx="150" cy="150" r="4" fill="#D4E157"/>
-  <line x1="150" y1="150" x2="150" y2="55" stroke="#D4E157" stroke-width="4" stroke-dasharray="8 4"/>
-  <polygon points="150,45 140,65 160,65" fill="#D4E157" />
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 300 300">
+  <!-- Generator: Adobe Illustrator 30.2.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 1)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: url(#Amethyst);
+      }
+    </style>
+    <linearGradient id="Amethyst" x1="118.25" y1="182.04" x2="183.44" y2="182.04" gradientTransform="translate(0 302) scale(1 -1)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7f5793"/>
+      <stop offset=".21" stop-color="#805994"/>
+      <stop offset=".35" stop-color="#87629a"/>
+      <stop offset=".47" stop-color="#9171a3"/>
+      <stop offset=".5" stop-color="#9677a7"/>
+      <stop offset=".53" stop-color="#8b6a9d"/>
+      <stop offset=".6" stop-color="#734e88"/>
+      <stop offset=".68" stop-color="#603878"/>
+      <stop offset=".76" stop-color="#53286c"/>
+      <stop offset=".86" stop-color="#4b1f66"/>
+      <stop offset="1" stop-color="#491d64"/>
+    </linearGradient>
+  </defs>
+  <path class="st0" d="M152.37,81.55c.35.15.62.44.77.79l30.19,74.12c.31.75-.05,1.6-.8,1.91-.41.17-.87.14-1.26-.07l-29.14-16.13c-.42-.23-.93-.24-1.36-.03l-30.41,15.12c-.72.36-1.6.06-1.96-.66-.19-.39-.2-.84-.03-1.24l32.09-73.05c.33-.74,1.19-1.08,1.93-.75h-.02Z"/>
 </svg>

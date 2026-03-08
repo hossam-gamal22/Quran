@@ -40,10 +40,8 @@ const DEFAULT_CONFIG: RemoteAppConfig = {
       { key: 'prayer', labelAr: 'الصلاة', labelEn: 'Prayer', icon: { mode: 'material', name: 'clock-time-four-outline' } },
       { key: 'qibla', labelAr: 'القبلة', labelEn: 'Qibla', icon: { mode: 'material', name: 'compass' } },
     ],
-    prayerViewSegments: [
-      { key: 'list', labelAr: 'قائمة', labelEn: 'List', icon: { mode: 'material', name: 'format-list-text' } },
-      { key: 'clock', labelAr: 'ساعة', labelEn: 'Clock', icon: { mode: 'material', name: 'clock-outline' } },
-    ],
+    // Removed default prayer view segments (list / clock) — configurable remotely
+    prayerViewSegments: [],
     tabBarLayout: {
       labelFontSize: 12,
       titleVerticalOffset: 4,

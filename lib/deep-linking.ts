@@ -27,7 +27,6 @@ export const DEEP_LINK_ROUTES = {
   // In-app navigation
   widgetsGallery: `${URL_SCHEME}://widgets-gallery`,
   widgetSettings: `${URL_SCHEME}://widget-settings`,
-  nightReading: `${URL_SCHEME}://night-reading`,
   tasbih: `${URL_SCHEME}://tasbih`,
   names: `${URL_SCHEME}://names`,
   ruqya: `${URL_SCHEME}://ruqya`,
@@ -40,7 +39,7 @@ export const DEEP_LINK_ROUTES = {
 /**
  * Linking configuration for expo-router.
  * Expo Router auto-maps file paths to URLs, so `rooh-almuslim://daily-ayah`
- * resolves to `app/(tabs)/daily-ayah.tsx` automatically.
+ * resolves to `app/daily-ayah.tsx` automatically.
  *
  * Tab group `(tabs)` is transparent — routes inside it are accessible
  * directly without the group prefix.
@@ -54,16 +53,15 @@ export const LINKING_CONFIG = {
     screens: {
       '(tabs)': {
         screens: {
-          'daily-ayah': 'daily-ayah',
           prayer: 'prayer',
           qibla: 'qibla',
           tasbih: 'tasbih',
           'hijri-calendar': 'hijri-calendar',
         },
       },
+      'daily-ayah': 'daily-ayah',
       hijri: 'hijri',
       'azkar/[category]': 'azkar/:category',
-      'night-reading': 'night-reading',
       'widget-settings': 'widget-settings',
       'widgets-gallery': 'widgets-gallery',
       names: 'names',

@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { NativeTabs } from '@/components/ui/NativeTabs';
 import { getBookmarks, removeBookmark, Bookmark, addBookmark } from '@/lib/storage';
 import { SURAH_NAMES_AR } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
@@ -25,6 +26,13 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import { getFavoriteAzkar, removeFromFavorites, Zikr } from '@/lib/azkar-api';
+import {
+  getColoredBookmarks,
+  removeColoredBookmark,
+  type ColoredBookmark,
+  BOOKMARK_COLORS,
+  BOOKMARK_COLOR_LABELS,
+} from '@/lib/quran-bookmarks';
 
 // ─── Image Card Themes ───────────────────────────────────────────────────────
 const CARD_THEMES = [
@@ -120,9 +128,10 @@ function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
 export default function FavoritesScreen() {
   const { isDarkMode, settings, t } = useSettings();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'quran' | 'azkar'>('quran');
+  const [activeTab, setActiveTab] = useState<'quran' | 'bookmarks' | 'azkar'>('quran');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [azkarFavorites, setAzkarFavorites] = useState<Zikr[]>([]);
+  const [coloredBookmarks, setColoredBookmarks] = useState<ColoredBookmark[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -151,6 +160,8 @@ export default function FavoritesScreen() {
     setBookmarks(bms);
     const favAzkar = await getFavoriteAzkar();
     setAzkarFavorites(favAzkar);
+    const colored = await getColoredBookmarks();
+    setColoredBookmarks(colored);
     setLoading(false);
   }, []);
 
@@ -227,7 +238,7 @@ export default function FavoritesScreen() {
           'اختر طريقة التصدير:',
           [
             {
-              text: '💾 حفظ في الاستوديو',
+              text: 'حفظ في الاستوديو',
               onPress: async () => {
                 if (status === 'granted') {
                   await MediaLibrary.saveToLibraryAsync(uri);
@@ -239,7 +250,7 @@ export default function FavoritesScreen() {
               },
             },
             canShare ? {
-              text: '📤 مشاركة',
+              text: 'مشاركة',
               onPress: async () => {
                 await Sharing.shareAsync(uri, {
                   mimeType: 'image/png',
@@ -672,7 +683,7 @@ export default function FavoritesScreen() {
           {/* Note */}
           {item.note ? (
             <View style={s.noteBox}>
-              <Text style={s.noteText}>📝 {item.note}</Text>
+              <Text style={s.noteText}>{item.note}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -762,20 +773,24 @@ export default function FavoritesScreen() {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
         <Animated.View entering={FadeIn.duration(400)} style={s.header}>
-          <View style={{ width: 36 }} />
-          <Text style={s.title}>⭐ المفضلة</Text>
-          <View style={{ width: 36 }} />
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+            <Ionicons name="chevron-forward" size={26} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={s.title}>المفضلة</Text>
+          <View style={{ width: 34 }} />
         </Animated.View>
 
         {/* Tab Switcher */}
         <View style={s.tabBar}>
-          <GlassSegmentedControl
-            segments={[
-              { key: 'quran', label: `📖 القرآن (${bookmarks.length})` },
-              { key: 'azkar', label: `📿 الأذكار (${azkarFavorites.length})` },
+          <NativeTabs
+            tabs={[
+              { key: 'quran', label: `القرآن (${bookmarks.length})` },
+              { key: 'bookmarks', label: `الفواصل (${coloredBookmarks.length})` },
+              { key: 'azkar', label: `الأذكار (${azkarFavorites.length})` },
             ]}
             selected={activeTab}
-            onSelect={(key) => setActiveTab(key as 'quran' | 'azkar')}
+            onSelect={(key) => setActiveTab(key as 'quran' | 'bookmarks' | 'azkar')}
+            indicatorColor="#2f7659"
           />
         </View>
 
@@ -783,13 +798,14 @@ export default function FavoritesScreen() {
           <View style={s.statsBar}>
             <View style={s.flex1} />
             <View style={s.sortBtns}>
-              <GlassSegmentedControl
-                segments={[
-                  { key: 'date', label: '📅 التاريخ' },
-                  { key: 'surah', label: '📖 السورة' },
+              <NativeTabs
+                tabs={[
+                  { key: 'date', label: 'التاريخ' },
+                  { key: 'surah', label: 'السورة' },
                 ]}
                 selected={sortBy}
                 onSelect={(key) => setSortBy(key as 'date' | 'surah')}
+                indicatorColor="#2f7659"
               />
             </View>
             <View style={s.countBadge}>
@@ -812,10 +828,76 @@ export default function FavoritesScreen() {
             contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
-                <Text style={s.emptyEmoji}>📖</Text>
+                <MaterialCommunityIcons name="book-open-variant" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
                 <Text style={s.emptyTitle}>لا توجد آيات محفوظة</Text>
                 <Text style={s.emptyText}>
                   افتح أي سورة واضغط مطولاً على الآية لحفظها هنا
+                </Text>
+              </View>
+            }
+          />
+        ) : activeTab === 'bookmarks' ? (
+          <FlatList
+            data={coloredBookmarks}
+            keyExtractor={item => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4, paddingHorizontal: 16 }}
+            renderItem={({ item, index }) => (
+              <Animated.View entering={FadeInDown.delay(index * 40).duration(300)}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(`/surah/${item.surahNumber}?ayah=${item.ayahNumber}`);
+                  }}
+                  onLongPress={() => {
+                    Alert.alert(
+                      'حذف الفاصل',
+                      `هل تريد حذف فاصل "${item.surahName} - آية ${item.ayahNumber}"؟`,
+                      [
+                        { text: 'إلغاء', style: 'cancel' },
+                        {
+                          text: 'حذف', style: 'destructive',
+                          onPress: async () => {
+                            await removeColoredBookmark(item.id);
+                            const updated = await getColoredBookmarks();
+                            setColoredBookmarks(updated);
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  style={{
+                    backgroundColor: colors.card,
+                    borderRadius: 14,
+                    padding: 14,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.cardBorder,
+                    borderLeftWidth: 4,
+                    borderLeftColor: BOOKMARK_COLORS[item.color],
+                  }}
+                >
+                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                    <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: colors.foreground, textAlign: 'right' }}>
+                      {item.surahName} - آية {item.ayahNumber}
+                    </Text>
+                    <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                      صفحة {item.page} • {BOOKMARK_COLOR_LABELS[item.color]}
+                    </Text>
+                  </View>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: BOOKMARK_COLORS[item.color], marginLeft: 10 }} />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+            ListEmptyComponent={
+              <View style={s.emptyWrap}>
+                <MaterialCommunityIcons name="bookmark-outline" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
+                <Text style={s.emptyTitle}>لا توجد فواصل</Text>
+                <Text style={s.emptyText}>
+                  افتح المصحف واضغط مطولاً على أي آية لإضافة فاصل ملون
                 </Text>
               </View>
             }
@@ -829,7 +911,7 @@ export default function FavoritesScreen() {
             contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
-                <Text style={s.emptyEmoji}>📿</Text>
+                <MaterialCommunityIcons name="hands-pray" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
                 <Text style={s.emptyTitle}>لا توجد أذكار محفوظة</Text>
                 <Text style={s.emptyText}>
                   افتح أي ذكر واضغط على أيقونة القلب لحفظه هنا
@@ -853,7 +935,7 @@ export default function FavoritesScreen() {
 
             <ScrollView contentContainerStyle={{ alignItems: 'center' }}>
               <View style={s.modalCard}>
-              <Text style={s.modalTitle}>🖼️ تصدير الآية كصورة</Text>
+              <Text style={s.modalTitle}>تصدير الآية كصورة</Text>
 
               {/* Theme Selector */}
               <Text style={s.themeName}>اختر التصميم</Text>
@@ -928,7 +1010,7 @@ export default function FavoritesScreen() {
         >
           <View style={s.noteModalCard}>
             <View style={s.noteHandle} />
-            <Text style={s.noteTitle}>📝 إضافة ملاحظة</Text>
+            <Text style={s.noteTitle}>إضافة ملاحظة</Text>
             {editingBookmark && (
               <Text style={{ color: colors.accent, textAlign: 'right', fontSize: 14, marginBottom: 10, fontFamily: 'Cairo-Bold' }}>
                 {editingBookmark.surahName} • آية {editingBookmark.ayahNumber}

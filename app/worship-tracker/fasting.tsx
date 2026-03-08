@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -29,6 +30,7 @@ import Animated, {
 import { useFastingTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { DailyFastingRecord } from '@/lib/worship-storage';
+import { getHijriDateObject } from '@/lib/hijri-date';
 import GlassCard from '@/components/ui/GlassCard';
 
 const { width } = Dimensions.get('window');
@@ -279,7 +281,10 @@ export default function FastingTrackerScreen() {
   } = useFastingTracker();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedType, setSelectedType] = useState<DailyFastingRecord['type']>('voluntary');
+  const [selectedType, setSelectedType] = useState<DailyFastingRecord['type']>(() => {
+    const hijri = getHijriDateObject();
+    return hijri.month === 9 ? 'ramadan' : 'voluntary';
+  });
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthFastingDays, setMonthFastingDays] = useState<number[]>([]);
   
@@ -342,7 +347,8 @@ export default function FastingTrackerScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
+        backgroundColor="transparent"
+        translucent
       />
       
       {/* الهيدر */}
@@ -542,9 +548,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'transparent',
   },
   backButton: {
     width: 40,

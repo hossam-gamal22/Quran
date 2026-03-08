@@ -21,7 +21,9 @@ import {
   Users,
   CreditCard,
   Megaphone,
-  DollarSign
+  DollarSign,
+  Globe,
+  Volume2
 } from 'lucide-react';
 
 // استيراد الصفحات
@@ -41,6 +43,9 @@ import Pricing from './pages/Pricing';
 import WelcomeBanner from './pages/WelcomeBanner';
 import HighlightsManager from './pages/HighlightsManager';
 import NavigationUI from './pages/NavigationUI';
+import AppContentManager from './pages/AppContentManager';
+import HomePageManager from './pages/HomePageManager';
+import SoundManager from './pages/SoundManager';
 
 // ==================== Mobile Preview Component ====================
 const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
@@ -374,6 +379,9 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
     { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
     { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
+    { path: '/app-content', icon: Globe, label: 'محتوى التطبيق' },
+    { path: '/home-page', icon: LayoutDashboard, label: 'إدارة الرئيسية' },
+    { path: '/sounds', icon: Volume2, label: 'إدارة الأصوات' },
     { path: '/settings', icon: Settings, label: 'الإعدادات' },
   ];
 
@@ -490,6 +498,9 @@ const App: React.FC = () => {
               <Route path="/ads" element={<Ads />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/navigation-ui" element={<NavigationUI />} />
+              <Route path="/app-content" element={<AppContentManager />} />
+              <Route path="/home-page" element={<HomePageManager />} />
+              <Route path="/sounds" element={<SoundManager />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

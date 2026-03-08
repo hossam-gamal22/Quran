@@ -1,0 +1,28 @@
+{
+  "name": "Hijri Date Widget",
+  "nameAr": "ودجت التاريخ الهجري",
+  "version": "1.0",
+  "sizes": ["small", "medium"],
+  "colors": {
+    "text": "#081827",
+    "accent": "#0f987f",
+    "background": "#FFFFFF"
+  },
+  "fonts": {
+    "title": "Cairo-Bold",
+    "body": "Cairo-Regular",
+    "numbers": "Cairo-SemiBold"
+  },
+  "elements": {
+    "logo": true,
+    "appName": true,
+    "dividers": true,
+    "hijriDay": true,
+    "hijriMonth": true,
+    "hijriYear": true,
+    "gregorianDate": true,
+    "islamicEvent": true
+  },
+  "icon": "calendar-month-outline",
+  "refreshInterval": "daily"
+}

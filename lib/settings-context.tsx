@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 24,
   translationEdition: 'en.sahih',
   reciter: 'ar.alafasy',
-  showTranslation: true,
+  showTranslation: false,
   calculationMethod: 4,
   language: 'ar',
   showAyahNumbers: true,

@@ -1,0 +1,27 @@
+{
+  "name": "Tasbih Counter Widget",
+  "nameAr": "ودجت التسبيح",
+  "version": "1.0",
+  "sizes": ["small", "medium"],
+  "colors": {
+    "text": "#081827",
+    "accent": "#0f987f",
+    "background": "#FFFFFF"
+  },
+  "fonts": {
+    "title": "Cairo-Bold",
+    "body": "Cairo-Regular",
+    "numbers": "Cairo-Bold"
+  },
+  "elements": {
+    "logo": true,
+    "appName": false,
+    "dividers": false,
+    "counterDisplay": true,
+    "targetCount": true,
+    "tasbihName": true,
+    "tapArea": true
+  },
+  "icon": "counter",
+  "refreshInterval": "manual"
+}

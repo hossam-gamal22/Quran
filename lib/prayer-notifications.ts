@@ -16,16 +16,7 @@ import {
 // Re-export للتوافق
 export { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './notification-types';
 
-// ─── إعداد سلوك الإشعارات ────────────────────────────────────────────────────
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// ─── Note: setNotificationHandler is configured in app/_layout.tsx ────────────
 
 // ─── أسماء الصلوات ──────────────────────────────────────────────────────────
 const PRAYER_KEYS: readonly PrayerKey[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'];
@@ -99,7 +90,9 @@ export async function checkNotificationPermissions(): Promise<boolean> {
 
 // ─── تحويل وقت الصلاة لـ Date object ─────────────────────────────────────────
 function prayerTimeToDate(timeStr: string, advanceMinutes: number = 0): Date {
-  const [hours, minutes] = timeStr.replace(' (PST)', '').replace(' (EST)', '').trim().split(':').map(Number);
+  // Strip any timezone marker like (PST), (EST), (AST), (EET), etc.
+  const cleaned = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
+  const [hours, minutes] = cleaned.split(':').map(Number);
   const now = new Date();
   const target = new Date(
     now.getFullYear(),
@@ -130,7 +123,7 @@ export async function schedulePrayerNotifications(
 
   if (!notifSettings.enabled) return;
 
-  const hasPermission = await checkNotificationPermissions();
+  const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
   const location = await getPrayerLocation();
@@ -170,6 +163,7 @@ export async function schedulePrayerNotifications(
             data: { prayer: prayerKey, time: timeStr },
             sound: 'default',
             priority: Notifications.AndroidNotificationPriority.HIGH,
+            ...(Platform.OS === 'android' && { channelId: 'prayer-times' }),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,

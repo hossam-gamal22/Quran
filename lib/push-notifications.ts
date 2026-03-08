@@ -47,14 +47,7 @@ const STORAGE_KEYS = {
 
 // ==================== Configure Notifications ====================
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Note: setNotificationHandler is configured in app/_layout.tsx
 
 // ==================== Permission Functions ====================
 
@@ -98,7 +91,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: 'مواقيت الصلاة',
     description: 'إشعارات أوقات الصلاة',
     importance: Notifications.AndroidImportance.HIGH,
-    sound: 'adhan.wav',
+    sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#10B981',
   });
@@ -108,7 +101,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: 'الأذكار',
     description: 'تذكيرات الأذكار',
     importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'notification.wav',
+    sound: 'default',
   });
 
   // Daily Ayah Channel
@@ -145,7 +138,7 @@ export const getFCMToken = async (): Promise<string | null> => {
 
     // Get Expo push token (works with FCM on Android, APNs on iOS)
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: 'your-expo-project-id', // Replace with your Expo project ID
+      projectId: '12ffec15-6357-43b4-a309-8e71cc2afc8c',
     });
 
     if (token.data) {
@@ -260,7 +253,7 @@ export const scheduleLocalNotification = async (
       title: notification.title,
       body: notification.body,
       data: notification.data,
-      sound: true,
+      sound: 'default',
     },
     trigger,
   });
@@ -275,6 +268,9 @@ export const schedulePrayerNotification = async (
   const triggerDate = new Date(prayerTime);
   triggerDate.setMinutes(triggerDate.getMinutes() - minutesBefore);
 
+  // Don't schedule if time is in the past
+  if (triggerDate <= new Date()) return '';
+
   const notification: PushNotificationData = {
     title: minutesBefore > 0 
       ? `⏰ ${prayerName} بعد ${minutesBefore} دقيقة`
@@ -286,6 +282,7 @@ export const schedulePrayerNotification = async (
   };
 
   return scheduleLocalNotification(notification, {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: triggerDate,
     channelId: 'prayer-times',
   });
@@ -295,6 +292,9 @@ export const scheduleAzkarReminder = async (
   azkarType: 'morning' | 'evening' | 'sleep',
   time: Date
 ): Promise<string> => {
+  // Don't schedule if time is in the past
+  if (time <= new Date()) return '';
+
   const titles = {
     morning: '☀️ أذكار الصباح',
     evening: '🌅 أذكار المساء',
@@ -308,6 +308,7 @@ export const scheduleAzkarReminder = async (
   };
 
   return scheduleLocalNotification(notification, {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: time,
     channelId: 'azkar',
   });

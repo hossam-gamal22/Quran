@@ -30,6 +30,9 @@ class NextPrayerWidget : AppWidgetProvider() {
         const val WIDGET_DATA_KEY = "widget_shared_data"
         const val ACTION_REFRESH = "com.roohmuslim.app.ACTION_REFRESH_PRAYER_WIDGET"
         const val ACTION_OPEN_APP = "com.roohmuslim.app.ACTION_OPEN_APP"
+        const val ACTION_TOGGLE_PRAYER = "com.roohmuslim.app.ACTION_TOGGLE_PRAYER"
+        const val EXTRA_PRAYER_NAME = "prayer_name"
+        const val PRAYER_COMPLETION_KEY = "widget_prayer_completion"
         
         // ألوان الصلوات
         val PRAYER_COLORS = mapOf(
@@ -93,6 +96,16 @@ class NextPrayerWidget : AppWidgetProvider() {
                     it.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                     context.startActivity(it)
                 }
+            }
+            ACTION_TOGGLE_PRAYER -> {
+                val prayerName = intent.getStringExtra(EXTRA_PRAYER_NAME) ?: return
+                togglePrayerCompletion(context, prayerName)
+                // Refresh widget after toggling
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val ids = appWidgetManager.getAppWidgetIds(
+                    ComponentName(context, NextPrayerWidget::class.java)
+                )
+                onUpdate(context, appWidgetManager, ids)
             }
         }
     }
@@ -167,6 +180,11 @@ class NextPrayerWidget : AppWidgetProvider() {
         
         // إعداد الضغطات
         setupClickListeners(context, views)
+        
+        // إعداد أزرار إكمال الصلاة
+        if (settings?.optBoolean("showCompletion", true) != false) {
+            setupPrayerCheckboxes(context, views)
+        }
         
         // تحديث الويدجت
         appWidgetManager.updateAppWidget(appWidgetId, views)
@@ -259,6 +277,123 @@ class NextPrayerWidget : AppWidgetProvider() {
             fullData.optJSONObject("settings")?.optJSONObject("prayerWidget")
         } catch (e: Exception) {
             null
+        }
+    }
+
+    /**
+     * تبديل حالة إكمال صلاة
+     */
+    private fun togglePrayerCompletion(context: Context, prayerName: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+        try {
+            val completionJson = prefs.getString(PRAYER_COMPLETION_KEY, null)
+            val completion = if (completionJson != null) JSONObject(completionJson) else JSONObject()
+
+            val date = completion.optString("date", "")
+            val prayers: JSONObject
+            if (date == todayDate) {
+                prayers = completion.optJSONObject("prayers") ?: JSONObject()
+            } else {
+                prayers = JSONObject()
+            }
+
+            // Toggle the prayer
+            val current = prayers.optBoolean(prayerName, false)
+            prayers.put(prayerName, !current)
+
+            completion.put("date", todayDate)
+            completion.put("prayers", prayers)
+            completion.put("lastUpdated", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).format(Date()))
+
+            prefs.edit().putString(PRAYER_COMPLETION_KEY, completion.toString()).apply()
+
+            // Also update in the shared widget data for the app to read
+            val widgetDataStr = prefs.getString(WIDGET_DATA_KEY, null)
+            if (widgetDataStr != null) {
+                val widgetData = JSONObject(widgetDataStr)
+                widgetData.put("prayerCompletion", completion)
+                prefs.edit().putString(WIDGET_DATA_KEY, widgetData.toString()).apply()
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
+
+    /**
+     * جلب حالة إكمال الصلوات
+     */
+    private fun getPrayerCompletion(context: Context): JSONObject {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val todayDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+        try {
+            // Check shared widget data first
+            val widgetDataStr = prefs.getString(WIDGET_DATA_KEY, null)
+            if (widgetDataStr != null) {
+                val widgetData = JSONObject(widgetDataStr)
+                val completion = widgetData.optJSONObject("prayerCompletion")
+                if (completion != null && completion.optString("date") == todayDate) {
+                    return completion.optJSONObject("prayers") ?: JSONObject()
+                }
+            }
+
+            // Fallback to dedicated completion key
+            val completionJson = prefs.getString(PRAYER_COMPLETION_KEY, null)
+            if (completionJson != null) {
+                val completion = JSONObject(completionJson)
+                if (completion.optString("date") == todayDate) {
+                    return completion.optJSONObject("prayers") ?: JSONObject()
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+
+        return JSONObject()
+    }
+
+    /**
+     * إعداد أزرار إكمال الصلاة
+     */
+    private fun setupPrayerCheckboxes(context: Context, views: RemoteViews) {
+        val prayers = listOf("fajr", "dhuhr", "asr", "maghrib", "isha")
+        val checkboxIds = mapOf(
+            "fajr" to R.id.cb_fajr,
+            "dhuhr" to R.id.cb_dhuhr,
+            "asr" to R.id.cb_asr,
+            "maghrib" to R.id.cb_maghrib,
+            "isha" to R.id.cb_isha
+        )
+
+        val completion = getPrayerCompletion(context)
+
+        for (prayer in prayers) {
+            val checkboxId = checkboxIds[prayer] ?: continue
+            val isCompleted = completion.optBoolean(prayer, false)
+
+            // Set the checkbox icon
+            if (isCompleted) {
+                views.setImageViewResource(checkboxId, R.drawable.ic_check_circle)
+                views.setInt(checkboxId, "setColorFilter", Color.parseColor("#4CAF50"))
+            } else {
+                views.setImageViewResource(checkboxId, R.drawable.ic_circle_outline)
+                views.setInt(checkboxId, "setColorFilter", Color.parseColor("#80FFFFFF"))
+            }
+
+            // Set click listener for toggling
+            val toggleIntent = Intent(context, NextPrayerWidget::class.java).apply {
+                action = ACTION_TOGGLE_PRAYER
+                putExtra(EXTRA_PRAYER_NAME, prayer)
+            }
+            val togglePendingIntent = PendingIntent.getBroadcast(
+                context,
+                prayer.hashCode(),
+                toggleIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            views.setOnClickPendingIntent(checkboxId, togglePendingIntent)
         }
     }
 }

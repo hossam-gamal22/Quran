@@ -270,6 +270,7 @@ export interface DynamicBackground {
   fullUrl: string;
   enabled: boolean;
   order: number;
+  textColor?: 'white' | 'black';
   createdAt?: string;
 }
 
@@ -503,4 +504,130 @@ export const clearSDUICache = async (): Promise<void> => {
   } catch (error) {
     console.error('❌ خطأ في مسح ذاكرة SDUI:', error);
   }
+};
+
+// ========================================
+// Home Page Config API
+// إعدادات الصفحة الرئيسية
+// ========================================
+
+const HOME_PAGE_CONFIG_CACHE_KEY = 'home_page_config';
+
+export interface HomeHighlightItem {
+  id: string;
+  name: string;
+  icon: string;
+  enabled: boolean;
+  order: number;
+  builtIn: boolean;
+}
+
+export interface HomeSectionItem {
+  id: string;
+  name: string;
+  titleAr: string;
+  titleEn: string;
+  enabled: boolean;
+  order: number;
+}
+
+export interface DailyContentConfig {
+  storyMode: 'auto' | 'manual';
+  storyVerse: { surah: number; ayah: number } | null;
+  storyCustomText: string;
+  verseMode: 'auto' | 'manual';
+  verse: { surah: number; ayah: number } | null;
+  verseCustomText: string;
+}
+
+export interface HomeThemeConfig {
+  primary: string;
+  accent: string;
+  background: string;
+  cardBackground: string;
+  textPrimary: string;
+  textSecondary: string;
+  headerGradientStart: string;
+  headerGradientEnd: string;
+  backgroundImageUrl: string;
+  appIconUrl: string;
+}
+
+export interface HomePageConfig {
+  highlights: { items: HomeHighlightItem[] };
+  sections: { items: HomeSectionItem[] };
+  dailyContent: DailyContentConfig;
+  theme: HomeThemeConfig;
+  updatedAt?: string;
+}
+
+/**
+ * Fetch home page configuration from Firestore
+ * جلب إعدادات الصفحة الرئيسية
+ */
+export const fetchHomePageConfig = async (): Promise<HomePageConfig | null> => {
+  try {
+    console.log('🔄 جاري جلب إعدادات الصفحة الرئيسية...');
+
+    const docRef = doc(db, 'appConfig', 'homePageConfig');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data() as HomePageConfig;
+
+      // Cache locally
+      await AsyncStorage.setItem(HOME_PAGE_CONFIG_CACHE_KEY, JSON.stringify(data));
+
+      console.log('✅ تم جلب إعدادات الصفحة الرئيسية');
+      return data;
+    } else {
+      console.log('⚠️ لا توجد إعدادات للصفحة الرئيسية في Firebase');
+    }
+  } catch (error) {
+    console.log('❌ خطأ في جلب إعدادات الصفحة الرئيسية:', error);
+  }
+
+  // Try cache
+  try {
+    const cached = await AsyncStorage.getItem(HOME_PAGE_CONFIG_CACHE_KEY);
+    if (cached) {
+      console.log('✅ تم استخدام إعدادات الصفحة الرئيسية المحفوظة');
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    console.log('⚠️ فشل قراءة Cache للصفحة الرئيسية');
+  }
+
+  return null;
+};
+
+/**
+ * Subscribe to real-time updates for home page config
+ * الاشتراك في تحديثات إعدادات الصفحة الرئيسية
+ */
+export const subscribeToHomePageConfig = (
+  onUpdate: (config: HomePageConfig) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const docRef = doc(db, 'appConfig', 'homePageConfig');
+
+  const unsubscribe = onSnapshot(
+    docRef,
+    async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as HomePageConfig;
+
+        await AsyncStorage.setItem(HOME_PAGE_CONFIG_CACHE_KEY, JSON.stringify(data));
+
+        console.log('🔄 تم تحديث إعدادات الصفحة الرئيسية (Real-time)');
+        onUpdate(data);
+      }
+    },
+    (error) => {
+      console.error('❌ خطأ في الاشتراك بتحديثات الصفحة الرئيسية:', error);
+      if (onError) onError(error);
+    }
+  );
+
+  return unsubscribe;
 };

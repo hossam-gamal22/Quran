@@ -48,9 +48,45 @@ struct WidgetSettings: Codable {
         var showAllPrayers: Bool
         var showHijriDate: Bool
         var showLocation: Bool
+        var showCompletion: Bool?
         var colorScheme: String
         var accentColor: String
     }
+}
+
+/// بيانات إكمال الصلوات
+struct PrayerCompletionData: Codable {
+    var date: String
+    var prayers: PrayerCompletionPrayers
+    var lastUpdated: String
+    
+    struct PrayerCompletionPrayers: Codable {
+        var fajr: Bool
+        var dhuhr: Bool
+        var asr: Bool
+        var maghrib: Bool
+        var isha: Bool
+    }
+}
+
+/// قراءة بيانات إكمال الصلوات من الحاوية المشتركة
+func loadPrayerCompletion() -> PrayerCompletionData? {
+    guard let containerURL = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: WidgetConstants.appGroupId
+    ) else { return nil }
+    
+    let fileURL = containerURL.appendingPathComponent(WidgetConstants.sharedDataFile)
+    
+    guard let data = try? Data(contentsOf: fileURL),
+          let jsonData = try? JSONDecoder().decode(PrayerCompletionContainer.self, from: data) else {
+        return nil
+    }
+    
+    return jsonData.prayerCompletion
+}
+
+struct PrayerCompletionContainer: Codable {
+    var prayerCompletion: PrayerCompletionData?
 }
 
 // ========================================
@@ -439,6 +475,15 @@ struct LargePrayerWidgetView: View {
                 VStack(spacing: 8) {
                     ForEach(entry.data?.allPrayers ?? []) { prayer in
                         HStack {
+                            // علامة الإكمال
+                            if entry.settings?.prayerWidget.showCompletion ?? true {
+                                let isCompleted = isPrayerCompleted(prayer.name)
+                                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 14))
+                                    .frame(width: 20)
+                                    .foregroundColor(isCompleted ? .green : .white.opacity(0.3))
+                            }
+                            
                             // الأيقونة
                             Image(systemName: iconForPrayer(prayer.name))
                                 .font(.system(size: 14))
@@ -495,6 +540,25 @@ struct LargePrayerWidgetView: View {
         case "maghrib": return "sunset"
         case "isha": return "moon.stars"
         default: return "clock"
+        }
+    }
+    
+    /// التحقق من إكمال صلاة معينة
+    func isPrayerCompleted(_ prayerName: String) -> Bool {
+        guard let completion = loadPrayerCompletion() else { return false }
+        let todayDate = {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.string(from: Date())
+        }()
+        guard completion.date == todayDate else { return false }
+        switch prayerName.lowercased() {
+        case "fajr": return completion.prayers.fajr
+        case "dhuhr": return completion.prayers.dhuhr
+        case "asr": return completion.prayers.asr
+        case "maghrib": return completion.prayers.maghrib
+        case "isha": return completion.prayers.isha
+        default: return false
         }
     }
 }

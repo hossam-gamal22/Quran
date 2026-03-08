@@ -19,6 +19,12 @@ struct RoohMuslimWidgetBundle: WidgetBundle {
         
         // ويدجت التاريخ الهجري
         HijriDateWidget()
+        
+        // ويدجت آية اليوم
+        QuranAyahWidget()
+        
+        // ويدجت ذكر اليوم
+        DhikrWidget()
     }
 }
 

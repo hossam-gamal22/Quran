@@ -7,6 +7,8 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { schedulePrayerNotifications } from './prayer-notifications';
+import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
 const KEYS = {
@@ -248,5 +250,160 @@ export async function cancelAllCustomNotifications(): Promise<void> {
     if (!id.startsWith('prayer_')) {
       await Notifications.cancelScheduledNotificationAsync(id);
     }
+  }
+}
+
+// ─── Bridge: Schedule from SettingsContext notification settings ───────────────
+/**
+ * Maps the SettingsContext's NotificationSettings shape to the scheduling
+ * functions used by prayer-notifications.ts and this module.
+ * Called when notification settings change and on app init.
+ */
+export async function scheduleNotificationsFromSettings(notifSettings: {
+  enabled: boolean;
+  prayerTimes: boolean;
+  prayerReminder: boolean;
+  reminderMinutes: number;
+  morningAzkar: boolean;
+  morningAzkarTime: string;
+  eveningAzkar: boolean;
+  eveningAzkarTime: string;
+  sleepAzkar: boolean;
+  sleepAzkarTime: string;
+  wakeupAzkar: boolean;
+  wakeupAzkarTime: string;
+  afterPrayerAzkar: boolean;
+  dailyVerse: boolean;
+  dailyVerseTime: string;
+  sound: boolean;
+}): Promise<void> {
+  try {
+    if (!notifSettings.enabled) {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      return;
+    }
+
+    const hasPermission = await requestNotifPermission();
+    if (!hasPermission) return;
+
+    // 1) Schedule prayer time notifications
+    const prayerSettings: PrayerNotifSettings = {
+      enabled: notifSettings.prayerTimes,
+      prayers: {
+        fajr: true,
+        sunrise: false,
+        dhuhr: true,
+        asr: true,
+        maghrib: true,
+        isha: true,
+      },
+      advanceMinutes: notifSettings.prayerReminder ? notifSettings.reminderMinutes : 0,
+      adhanSound: notifSettings.sound,
+    };
+    await schedulePrayerNotifications(prayerSettings);
+
+    // 2) Schedule morning azkar
+    const wirdSettings: AllNotificationSettings = {
+      ...DEFAULT_ALL_NOTIF,
+      wirdEnabled: notifSettings.morningAzkar || notifSettings.eveningAzkar,
+      wirdMorningTime: notifSettings.morningAzkarTime || '06:00',
+      wirdEveningTime: notifSettings.eveningAzkarTime || '18:00',
+      dailyAyahEnabled: notifSettings.dailyVerse,
+      dailyAyahTime: notifSettings.dailyVerseTime || '08:00',
+    };
+
+    // Cancel existing wird notifications before re-scheduling selectively
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+      if (n.identifier.startsWith('wird_')) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    }
+
+    // Schedule morning wird if enabled
+    if (notifSettings.morningAzkar) {
+      const morning = parseTime(wirdSettings.wirdMorningTime);
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'wird_morning',
+        content: {
+          title: '🌅 الورد الصباحي',
+          body: 'حان وقت أذكار الصباح — ابدأ يومك بذكر الله',
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'wird', period: 'morning' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: morning.hour,
+          minute: morning.minute,
+        },
+      });
+    }
+
+    // Schedule evening wird if enabled
+    if (notifSettings.eveningAzkar) {
+      const evening = parseTime(wirdSettings.wirdEveningTime);
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'wird_evening',
+        content: {
+          title: '🌇 الورد المسائي',
+          body: 'حان وقت أذكار المساء — اختم يومك بحمد الله',
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'wird', period: 'evening' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: evening.hour,
+          minute: evening.minute,
+        },
+      });
+    }
+
+    // Schedule sleep azkar if enabled
+    if (notifSettings.sleepAzkar) {
+      const sleep = parseTime(notifSettings.sleepAzkarTime || '22:00');
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'wird_sleep',
+        content: {
+          title: '🌙 أذكار النوم',
+          body: 'حان وقت أذكار النوم — نم على ذكر الله',
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'wird', period: 'sleep' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: sleep.hour,
+          minute: sleep.minute,
+        },
+      });
+    }
+
+    // Schedule wakeup azkar if enabled
+    if (notifSettings.wakeupAzkar) {
+      const wakeup = parseTime(notifSettings.wakeupAzkarTime || '05:30');
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'wird_wakeup',
+        content: {
+          title: '🌤️ أذكار الاستيقاظ',
+          body: 'الحمد لله الذي أحيانا بعد ما أماتنا وإليه النشور',
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'wird', period: 'wakeup' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: wakeup.hour,
+          minute: wakeup.minute,
+        },
+      });
+    }
+
+    // Note: afterPrayerAzkar notifications are tied to prayer times
+    // They are handled by the azkar_reminders system in AsyncStorage
+
+    // 3) Schedule daily ayah
+    await scheduleDailyAyahNotification(wirdSettings);
+
+    console.log('✅ All notifications scheduled from settings');
+  } catch (error) {
+    console.error('Error scheduling notifications from settings:', error);
   }
 }

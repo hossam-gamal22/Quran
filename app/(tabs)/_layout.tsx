@@ -28,7 +28,7 @@ const TAB_ACCENTS = {
 const TAB_FALLBACKS = {
   settings: { sf: { default: 'gearshape', selected: 'gearshape.fill' }, material: { default: 'cog-outline', selected: 'cog' } },
   prayer: { sf: { default: 'building.columns', selected: 'building.columns.fill' }, material: { default: 'mosque', selected: 'mosque' } },
-  tasbih: { sf: { default: 'hand.raised', selected: 'hand.raised.fill' }, material: { default: 'hand-heart', selected: 'hand-heart' } },
+  tasbih: { sf: { default: 'hand.raised', selected: 'hand.raised.fill' }, material: { default: 'counter', selected: 'counter' } },
   quran: { sf: { default: 'book', selected: 'book.fill' }, material: { default: 'book-open-variant', selected: 'book-open-variant' } },
   index: { sf: { default: 'house', selected: 'house.fill' }, material: { default: 'home-variant-outline', selected: 'home-variant' } },
 } as const;
@@ -127,15 +127,16 @@ export default function TabsLayout() {
   const iosInactive = Platform.OS === 'ios'
     ? require('react-native').DynamicColorIOS({ light: '#6B7280', dark: '#9CA3AF' })
     : '#6B7280';
-  const resolvedLabelSize = Math.max(tabLayout?.labelFontSize ?? 13, 15);
-  const resolvedVerticalOffset = (tabLayout?.titleVerticalOffset ?? 7) + 3;
+  const resolvedLabelSize = tabLayout?.labelFontSize ?? 11;
+  const resolvedVerticalOffset = tabLayout?.titleVerticalOffset ?? 2;
   const resolvedSelectedOpacity = Math.max(tabLayout?.selectedBgOpacity ?? 0.16, 0.22);
+  const ACTIVE_GREEN = '#22C55E';
 
   return (
     <NativeTabs
       // Keep native bar visual stable on iOS scroll edges
       disableTransparentOnScrollEdge
-      tintColor={Platform.OS === 'ios' ? iosActive : '#FFFFFF'}
+      tintColor={ACTIVE_GREEN}
       labelStyle={{
         fontFamily: 'Cairo-Medium',
         fontSize: resolvedLabelSize,
@@ -146,11 +147,10 @@ export default function TabsLayout() {
     >
       <NativeTabs.Trigger
         name="settings"
-        selectedIconColor={TAB_ACCENTS.settings}
-        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: TAB_ACCENTS.settings }}
-        selectedLabelStyle={{ color: TAB_ACCENTS.settings, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 3 }}
+        selectedIconColor={ACTIVE_GREEN}
+        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: ACTIVE_GREEN }}
+        selectedLabelStyle={{ color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 1 }}
         titlePositionAdjustment={{ vertical: resolvedVerticalOffset }}
-        backgroundColor={`rgba(96,165,250,${resolvedSelectedOpacity})`}
       >
         <Label>{resolveLabel('settings', 'settings')}</Label>
         {renderTabIcon('settings')}
@@ -158,11 +158,10 @@ export default function TabsLayout() {
 
       <NativeTabs.Trigger
         name="prayer"
-        selectedIconColor={TAB_ACCENTS.prayer}
-        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: TAB_ACCENTS.prayer }}
-        selectedLabelStyle={{ color: TAB_ACCENTS.prayer, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 3 }}
+        selectedIconColor={ACTIVE_GREEN}
+        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: ACTIVE_GREEN }}
+        selectedLabelStyle={{ color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 1 }}
         titlePositionAdjustment={{ vertical: resolvedVerticalOffset }}
-        backgroundColor={`rgba(34,197,94,${resolvedSelectedOpacity})`}
       >
         <Label>{resolveLabel('prayer', 'prayer')}</Label>
         {renderTabIcon('prayer')}
@@ -170,11 +169,10 @@ export default function TabsLayout() {
 
       <NativeTabs.Trigger
         name="tasbih"
-        selectedIconColor={TAB_ACCENTS.tasbih}
-        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: TAB_ACCENTS.tasbih }}
-        selectedLabelStyle={{ color: TAB_ACCENTS.tasbih, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 3 }}
+        selectedIconColor={ACTIVE_GREEN}
+        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: ACTIVE_GREEN }}
+        selectedLabelStyle={{ color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 1 }}
         titlePositionAdjustment={{ vertical: resolvedVerticalOffset }}
-        backgroundColor={`rgba(245,158,11,${resolvedSelectedOpacity})`}
       >
         <Label>{resolveLabel('tasbih', 'tasbih')}</Label>
         {renderTabIcon('tasbih')}
@@ -182,11 +180,10 @@ export default function TabsLayout() {
 
       <NativeTabs.Trigger
         name="quran"
-        selectedIconColor={TAB_ACCENTS.quran}
-        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: TAB_ACCENTS.quran }}
-        selectedLabelStyle={{ color: TAB_ACCENTS.quran, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 3 }}
+        selectedIconColor={ACTIVE_GREEN}
+        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: ACTIVE_GREEN }}
+        selectedLabelStyle={{ color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 1 }}
         titlePositionAdjustment={{ vertical: resolvedVerticalOffset }}
-        backgroundColor={`rgba(139,92,246,${resolvedSelectedOpacity})`}
       >
         <Label>{resolveLabel('quran', 'quran')}</Label>
         {renderTabIcon('quran')}
@@ -194,11 +191,10 @@ export default function TabsLayout() {
 
       <NativeTabs.Trigger
         name="index"
-        selectedIconColor={TAB_ACCENTS.index}
-        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: TAB_ACCENTS.index }}
-        selectedLabelStyle={{ color: TAB_ACCENTS.index, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 3 }}
+        selectedIconColor={ACTIVE_GREEN}
+        iconColor={{ default: Platform.OS === 'ios' ? iosInactive : '#B8C0CC', selected: ACTIVE_GREEN }}
+        selectedLabelStyle={{ color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: resolvedLabelSize + 1 }}
         titlePositionAdjustment={{ vertical: resolvedVerticalOffset }}
-        backgroundColor={`rgba(239,68,68,${resolvedSelectedOpacity})`}
       >
         <Label>{resolveLabel('index', 'home')}</Label>
         {renderTabIcon('index')}

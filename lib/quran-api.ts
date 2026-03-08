@@ -300,6 +300,9 @@ export const TRANSLATION_EDITIONS = [
   // Russian
   { identifier: 'ru.kuliev', name: 'Эльмир Кулиев', language: 'ru' },
   { identifier: 'ru.osmanov', name: 'Османов', language: 'ru' },
+  // Persian
+  { identifier: 'fa.makarem', name: 'مکارم شیرازی', language: 'fa' },
+  { identifier: 'fa.ansarian', name: 'حسین انصاریان', language: 'fa' },
 ];
 
 /**

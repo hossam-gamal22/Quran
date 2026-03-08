@@ -11,15 +11,14 @@
 import * as Font from 'expo-font';
 import * as FileSystem from 'expo-file-system/legacy';
 import pako from 'pako';
-import { patchCpalTableAllPalettes, DARK_UNIFIED_COLOR } from './ttf-cpal-patcher';
-import QCF_FONT_MODULES from './qcf-font-assets';
+import { patchCpalTableAllPalettes, DARK_UNIFIED_COLOR, LIGHT_UNIFIED_COLOR } from './ttf-cpal-patcher';
 
 const CDN_BASE =
   'https://cdn.jsdelivr.net/gh/alheekmahlib/quran_library@main/assets/fonts/quran_fonts_qfc4';
 const CACHE_DIR = (FileSystem.documentDirectory ?? '') + 'qcf4_cache/';
 
-const loadedPages = new Set<number>();
-const loadingPromises = new Map<number, Promise<void>>();
+const loadedPages = new Map<number, boolean>();  // page -> darkMode used
+const loadingPromises = new Map<string, Promise<void>>();
 let cacheDirReady = false;
 
 /** Total pages in the Quran Mushaf */
@@ -62,33 +61,28 @@ export async function loadPageFont(
   page: number,
   darkMode: boolean = false,
 ): Promise<void> {
-  if (loadedPages.has(page)) return;
-  if (loadingPromises.has(page)) return loadingPromises.get(page);
+  // If already loaded with same mode, skip
+  if (loadedPages.has(page) && loadedPages.get(page) === darkMode) return;
+  const promiseKey = `${page}_${darkMode}`;
+  if (loadingPromises.has(promiseKey)) return loadingPromises.get(promiseKey);
 
   const promise = (async () => {
     try {
       await ensureCacheDir();
       const familyName = getPageFontFamily(page);
-      // Use different cache for dark mode
-        const cachedPath = CACHE_DIR + `page${page}${darkMode ? '_dark' : ''}.ttf`;
+      const patchColor = darkMode ? DARK_UNIFIED_COLOR : LIGHT_UNIFIED_COLOR;
+      const cacheKey = darkMode ? '_dark' : '_light';
+      const cachedPath = CACHE_DIR + `page${page}${cacheKey}.ttf`;
 
-        // If we have a bundled QCF module for this page, load it directly
-        const bundled = QCF_FONT_MODULES[page];
-        if (bundled) {
-          await Font.loadAsync({ [familyName]: bundled });
-          loadedPages.add(page);
-          return;
-        }
-
-        // Fallback: check if already cached on disk
+        // Check if CPAL-patched version is already cached on disk
         const cacheInfo = await FileSystem.getInfoAsync(cachedPath);
         if (cacheInfo.exists) {
           await Font.loadAsync({ [familyName]: cachedPath });
-          loadedPages.add(page);
+          loadedPages.set(page, darkMode);
           return;
         }
 
-        // Download .ttf.gz from CDN (legacy fallback)
+        // Download color font (.ttf.gz with COLR/CPAL) from CDN
         const url = `${CDN_BASE}/QCF4_tajweed_${pad3(page)}.ttf.gz`;
         const response = await fetch(url);
         if (!response.ok) {
@@ -99,10 +93,8 @@ export async function loadPageFont(
         const gzBuffer = await response.arrayBuffer();
         let ttfBytes = pako.ungzip(new Uint8Array(gzBuffer));
 
-        // Patch ALL palettes for dark mode
-        if (darkMode) {
-          ttfBytes = patchCpalTableAllPalettes(ttfBytes, DARK_UNIFIED_COLOR);
-        }
+        // Patch CPAL to uniform color (black for light, cream for dark)
+        ttfBytes = patchCpalTableAllPalettes(ttfBytes, patchColor);
 
         // Convert to base64 and write to cache
         const base64 = uint8ArrayToBase64(ttfBytes);
@@ -112,16 +104,16 @@ export async function loadPageFont(
 
         // Load font into memory
         await Font.loadAsync({ [familyName]: cachedPath });
-        loadedPages.add(page);
+        loadedPages.set(page, darkMode);
     } catch (err) {
       console.warn(`[QCF4] Failed to load font for page ${page}:`, err);
       throw err;
     } finally {
-      loadingPromises.delete(page);
+      loadingPromises.delete(promiseKey);
     }
   })();
 
-  loadingPromises.set(page, promise);
+  loadingPromises.set(promiseKey, promise);
   return promise;
 }
 
@@ -132,10 +124,11 @@ export async function loadPageFont(
 export async function ensurePagesLoaded(
   centerPage: number,
   radius: number = 2,
+  darkMode: boolean = false,
 ): Promise<void> {
   // Load center page first (blocking)
   if (isValidPage(centerPage)) {
-    await loadPageFont(centerPage);
+    await loadPageFont(centerPage, darkMode);
   }
 
   // Load surrounding pages (non-blocking, parallel)
@@ -145,7 +138,7 @@ export async function ensurePagesLoaded(
     if (isValidPage(centerPage + d)) surrounding.push(centerPage + d);
   }
   // Fire-and-forget so we don't block rendering
-  Promise.all(surrounding.map((p) => loadPageFont(p).catch(() => {}))).catch(
+  Promise.all(surrounding.map((p) => loadPageFont(p, darkMode).catch(() => {}))).catch(
     () => {},
   );
 }

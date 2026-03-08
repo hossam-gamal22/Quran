@@ -2,19 +2,20 @@
 // شاشة البحث في الأذكار
 // ==========================
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TextInput,
   FlatList,
+  SectionList,
   TouchableOpacity,
   Keyboard,
   Animated,
   Share,
 } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,7 +25,10 @@ import {
   Zikr,
   Language,
   searchAzkar,
+  getAllAzkar,
+  getAllCategories,
   getZikrTranslation,
+  getZikrBenefit,
   getCategoryById,
   getCategoryName,
   addToFavorites,
@@ -38,18 +42,36 @@ import {
 
 export default function AzkarSearchScreen() {
   const router = useRouter();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
   const language = (settings.language || 'ar') as Language;
+  const isBenefitsMode = mode === 'benefits';
 
   // الحالة
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Zikr[]>([]);
+  const [allAzkarWithBenefits, setAllAzkarWithBenefits] = useState<Zikr[]>([]);
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Group benefits by category for SectionList
+  const benefitSections = useMemo(() => {
+    const grouped: Record<string, Zikr[]> = {};
+    for (const z of allAzkarWithBenefits) {
+      if (!grouped[z.category]) grouped[z.category] = [];
+      grouped[z.category].push(z);
+    }
+    return Object.entries(grouped).map(([catId, data]) => {
+      const cat = getCategoryById(catId as any);
+      const title = cat ? getCategoryName(cat, language) : catId;
+      const color = cat?.color || '#10B981';
+      return { title, color, catId, data };
+    });
+  }, [allAzkarWithBenefits, language]);
 
   // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -63,12 +85,28 @@ export default function AzkarSearchScreen() {
       const storedRecent = await AsyncStorage.getItem('azkar_recent_searches');
       if (storedRecent) setRecentSearches(JSON.parse(storedRecent));
 
-      // تركيز على حقل البحث
-      setTimeout(() => inputRef.current?.focus(), 300);
+      // في وضع فضل الأذكار، نعرض جميع الأذكار التي لها فضل
+      if (isBenefitsMode) {
+        const all = getAllAzkar().filter(z => {
+          const benefit = getZikrBenefit(z, language);
+          return benefit && benefit.trim().length > 0;
+        });
+        setAllAzkarWithBenefits(all);
+
+        // تحميل المفضلة
+        const favs: Record<number, boolean> = {};
+        for (const zikr of all) {
+          favs[zikr.id] = await isFavorite(zikr.id);
+        }
+        setFavorites(favs);
+      } else {
+        // تركيز على حقل البحث
+        setTimeout(() => inputRef.current?.focus(), 300);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
-  }, []);
+  }, [isBenefitsMode, language]);
 
   useEffect(() => {
     loadSettings();
@@ -260,6 +298,60 @@ export default function AzkarSearchScreen() {
   };
 
   // ==========================
+  // رندر ذكر مع الفضل
+  // ==========================
+
+  const renderBenefitItem = ({ item }: { item: Zikr }) => {
+    const cat = getCategoryById(item.category);
+    const categoryName = cat ? getCategoryName(cat, language) : '';
+    const benefit = getZikrBenefit(item, language);
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.resultCard,
+          { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+        ]}
+        onPress={() => navigateToZikr(item)}
+        activeOpacity={0.7}
+      >
+        {/* التصنيف */}
+        <View style={[styles.categoryBadge, { backgroundColor: (cat?.color || '#10B981') + '20' }]}>
+          <Text style={[styles.categoryBadgeText, { color: cat?.color || '#10B981' }]}>
+            {categoryName}
+          </Text>
+        </View>
+
+        {/* النص العربي */}
+        <Text
+          style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
+          numberOfLines={3}
+        >
+          {item.arabic}
+        </Text>
+
+        {/* الفضل */}
+        {benefit ? (
+          <View style={[styles.benefitBox, { backgroundColor: (cat?.color || '#10B981') + '12' }]}>
+            <Ionicons name="star" size={14} color={cat?.color || '#10B981'} />
+            <Text style={[styles.benefitText, { color: cat?.color || '#10B981' }]}>
+              {benefit}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* المرجع */}
+        <View style={styles.referenceContainer}>
+          <Ionicons name="book-outline" size={12} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+          <Text style={[styles.referenceText, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
+            {item.reference}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // ==========================
   // رندر البحث الأخير
   // ==========================
 
@@ -295,32 +387,74 @@ export default function AzkarSearchScreen() {
               <Ionicons name="arrow-back" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
             </TouchableOpacity>
 
-            <View style={[
-              styles.searchContainer,
-              { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
-            ]}>
-              <Ionicons name="search" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-              <TextInput
-                ref={inputRef}
-                style={[styles.searchInput, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
-                placeholder={language === 'ar' ? 'ابحث في الأذكار...' : 'Search adhkar...'}
-                placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
-                value={query}
-                onChangeText={handleSearch}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {query.length > 0 && (
-                <TouchableOpacity onPress={() => handleSearch('')}>
-                  <Ionicons name="close-circle" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-                </TouchableOpacity>
-              )}
-            </View>
+            {isBenefitsMode ? (
+              <Text style={[styles.benefitsHeaderTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                {language === 'ar' ? 'فضل الأذكار' : 'Benefits of Adhkar'}
+              </Text>
+            ) : (
+              <View style={[
+                styles.searchContainer,
+                { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+              ]}>
+                <Ionicons name="search" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+                <TextInput
+                  ref={inputRef}
+                  style={[styles.searchInput, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
+                  placeholder={language === 'ar' ? 'ابحث في الأذكار...' : 'Search adhkar...'}
+                  placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
+                  value={query}
+                  onChangeText={handleSearch}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity onPress={() => handleSearch('')}>
+                    <Ionicons name="close-circle" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
         </View>
 
         {/* المحتوى */}
-        {query.length < 2 ? (
+        {isBenefitsMode ? (
+          // وضع فضل الأذكار - عرض الأذكار مجمعة حسب التصنيف
+          <SectionList
+            sections={benefitSections}
+            renderItem={renderBenefitItem}
+            renderSectionHeader={({ section }) => (
+              <View style={[styles.sectionHeader, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+                <View style={[styles.sectionHeaderDot, { backgroundColor: (section as any).color }]} />
+                <Text style={[styles.sectionHeaderText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                  {section.title}
+                </Text>
+                <Text style={[styles.sectionHeaderCount, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
+                  ({section.data.length})
+                </Text>
+              </View>
+            )}
+            keyExtractor={item => item.id.toString()}
+            contentContainerStyle={styles.resultsContainer}
+            showsVerticalScrollIndicator={false}
+            stickySectionHeadersEnabled
+            ListHeaderComponent={
+              <Text style={[styles.resultsCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+                {language === 'ar'
+                  ? `${allAzkarWithBenefits.length} ذكر له فضل`
+                  : `${allAzkarWithBenefits.length} adhkar with virtues`}
+              </Text>
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="star-outline" size={64} color={darkMode ? '#374151' : '#D1D5DB'} />
+                <Text style={[styles.emptyTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                  {language === 'ar' ? 'لا توجد أذكار بفضل' : 'No adhkar with virtues'}
+                </Text>
+              </View>
+            }
+          />
+        ) : query.length < 2 ? (
           // البحث الأخير
           <View style={styles.recentContainer}>
             {recentSearches.length > 0 && (
@@ -548,5 +682,45 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+  },
+  benefitsHeaderTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  benefitBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    gap: 6,
+  },
+  benefitText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    marginBottom: 4,
+  },
+  sectionHeaderDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  sectionHeaderText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sectionHeaderCount: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

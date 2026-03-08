@@ -11,6 +11,7 @@ import {
   StatusBar,
   RefreshControl,
   Share,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -150,9 +151,13 @@ const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode,
           </TouchableOpacity>
         </View>
         <Text style={[styles.salawatArabic, isDarkMode && styles.textLight]}>{salawat.arabic}</Text>
-        <View style={styles.salawatVirtue}>
-          <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
-          <Text style={[styles.salawatVirtueText, isDarkMode && styles.textMuted]}>{salawat.virtue}</Text>
+        <View style={styles.salawatVirtueWrapper}>
+          <View style={styles.salawatVirtueStarCircle}>
+            <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
+          </View>
+          <View style={styles.salawatVirtue}>
+            <Text style={[styles.salawatVirtueText, isDarkMode && styles.textMuted]}>{salawat.virtue}</Text>
+          </View>
         </View>
       </View>
     </Animated.View>
@@ -600,11 +605,27 @@ const styles = StyleSheet.create({
     lineHeight: 32,
     marginBottom: 12,
   },
-  salawatVirtue: {
-    flexDirection: 'row',
+  salawatVirtueWrapper: {
+    alignItems: 'center',
+  },
+  salawatVirtueStarCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245,166,35,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    marginBottom: -14,
+    zIndex: 1,
+  },
+  salawatVirtue: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245,166,35,0.08)',
+    borderRadius: 10,
+    paddingTop: 18,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
   },
   salawatVirtueText: {
     fontSize: 12,

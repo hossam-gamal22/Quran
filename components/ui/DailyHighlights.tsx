@@ -11,17 +11,37 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Modal,
+  LayoutAnimation,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import { getHijriDate } from '../../lib/hijri-date';
 import { getTodayAyahWithAudio, QuranAyahWithAudio } from '../../lib/api/quran-cloud-api';
-import { searchPhotos } from '../../lib/api/pexels';
 import { fetchAppConfig, HighlightItemConfig } from '../../lib/app-config-api';
+import { getDuaOfTheDay } from '../../data/daily-duas';
 
 const STORY_CACHE_KEY = 'story_of_day_cache';
+const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
+
+// Match SOLID_BACKGROUNDS from story-of-day page
+const STORY_COLORS = ['#1a3a2a', '#1a2744', '#2d2d2d', '#2d1b4e', '#1a3044'];
+
+function getDayOfYear(): number {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  return Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getTodayDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CIRCLE_SIZE = Math.round(SCREEN_WIDTH * 0.17);
@@ -40,63 +60,54 @@ interface DailyHighlight {
 
 interface DailyHighlightsProps {
   onStoryPress?: (storyId: string) => void;
+  showReorderButton?: boolean;
 }
 
-const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
+const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton }) => {
   const router = useRouter();
   const { isDarkMode } = useSettings();
 
   const hijriDate = getHijriDate();
 
   const [ayah, setAyah] = useState<QuranAyahWithAudio | null>(null);
-  const [storyImageUrl, setStoryImageUrl] = useState<string | null>(null);
   const [storyAyahText, setStoryAyahText] = useState<string | null>(null);
+  const [storySurahName, setStorySurahName] = useState<string | null>(null);
   const [adminHighlights, setAdminHighlights] = useState<DailyHighlight[]>([]);
   const [loading, setLoading] = useState(true);
+  const [highlightOrder, setHighlightOrder] = useState<string[]>([]);
+  const [showReorderModal, setShowReorderModal] = useState(false);
+  const [tempOrder, setTempOrder] = useState<string[]>([]);
+
+  const storyBgColor = STORY_COLORS[getDayOfYear() % STORY_COLORS.length];
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
-      let gotCachedPhoto = false;
-      let gotCachedText = false;
       try {
-        // Try reading story cache first (same source as story-of-day page)
+        // Try reading story cache for ayah text
+        const todayStr = getTodayDateString();
         const cached = await AsyncStorage.getItem(STORY_CACHE_KEY);
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
-            const todayStr = new Date().toISOString().slice(0, 10);
-            if (parsed.date === todayStr && parsed.photoUrl && parsed.ayah?.text) {
+            if (parsed.date === todayStr && parsed.ayah?.text) {
               if (mounted) {
-                setStoryImageUrl(parsed.photoUrl);
                 setStoryAyahText(parsed.ayah.text);
-                gotCachedPhoto = true;
-                gotCachedText = true;
+                setStorySurahName(parsed.ayah.surah?.name || null);
               }
+              return;
             }
           } catch { /* ignore parse errors */ }
         }
 
-        const [ayahResult, photosResult] = await Promise.allSettled([
-          getTodayAyahWithAudio(),
-          !gotCachedPhoto ? searchPhotos('islamic nature sky serene mosque', 1, 15) : Promise.resolve({ photos: [] }),
-        ]);
-
+        // Fetch today's ayah if not cached
+        const ayahResult = await getTodayAyahWithAudio();
         if (!mounted) return;
-
-        if (ayahResult.status === 'fulfilled' && ayahResult.value) {
-          setAyah(ayahResult.value);
-          if (!gotCachedText) {
-            setStoryAyahText(ayahResult.value.text || null);
-          }
-        }
-
-        if (!gotCachedPhoto && photosResult.status === 'fulfilled' && photosResult.value.photos.length > 0) {
-          const idx = Math.floor(
-            Math.random() * Math.min(photosResult.value.photos.length, 10)
-          );
-          setStoryImageUrl(photosResult.value.photos[idx].src.large);
+        if (ayahResult) {
+          setAyah(ayahResult);
+          setStoryAyahText(ayahResult.text || null);
+          setStorySurahName(ayahResult.surah?.name || null);
         }
       } catch {
         // Silently degrade
@@ -132,6 +143,17 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
     return () => { mounted = false; };
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem(HIGHLIGHTS_ORDER_KEY).then(stored => {
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) setHighlightOrder(parsed);
+        } catch {}
+      }
+    });
+  }, []);
+
   const handlePress = (highlight: DailyHighlight) => {
     onStoryPress?.(highlight.id);
     if (highlight.htmlContent) {
@@ -145,7 +167,9 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
     }
   };
 
-  // ===== ORDER (من اليمين): التاريخ الهجري, أذكار, آية اليوم, ستوري, الصلاة =====
+  // ===== ORDER (من اليمين): التاريخ الهجري, أذكار, دعاء اليوم, آية اليوم, ستوري, الصلاة =====
+  const dailyDua = getDuaOfTheDay();
+
   const builtInHighlights: DailyHighlight[] = [
     {
       id: 'hijri-date',
@@ -162,18 +186,24 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
       route: '/azkar/morning',
     },
     {
+      id: 'daily-dua',
+      title: 'دعاء اليوم',
+      icon: 'book-heart',
+      color: '#7c3aed',
+      route: `/daily-dua`,
+    },
+    {
       id: 'daily-ayah',
       title: 'آية اليوم',
       icon: 'book-open-page-variant',
       color: '#1e40af',
-      route: '/(tabs)/daily-ayah',
+      route: '/daily-ayah',
     },
     {
       id: 'daily-story',
       title: 'ستوري اليوم',
-      icon: 'play-circle-outline',
-      color: '#5b21b6',
-      imageUrl: storyImageUrl ?? undefined,
+      icon: 'book-open-variant',
+      color: storyBgColor,
       route: '/story-of-day',
     },
     {
@@ -188,8 +218,52 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
   // Merge admin-managed highlights from Firestore
   const highlights = [...adminHighlights, ...builtInHighlights];
 
+  const sortedHighlights = highlightOrder.length > 0
+    ? [...highlights].sort((a, b) => {
+        const indexA = highlightOrder.indexOf(a.id);
+        const indexB = highlightOrder.indexOf(b.id);
+        if (indexA === -1 && indexB === -1) return 0;
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      })
+    : highlights;
+
+  const openReorderModal = () => {
+    const currentIds = highlights.map(h => h.id);
+    const ordered = highlightOrder.length > 0
+      ? highlightOrder.filter(id => currentIds.includes(id))
+      : currentIds;
+    const missing = currentIds.filter(id => !ordered.includes(id));
+    setTempOrder([...ordered, ...missing]);
+    setShowReorderModal(true);
+  };
+
+  const moveHighlightItem = (index: number, direction: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTempOrder(prev => {
+      const arr = [...prev];
+      const targetIndex = index + direction;
+      [arr[index], arr[targetIndex]] = [arr[targetIndex], arr[index]];
+      return arr;
+    });
+  };
+
+  const saveHighlightOrder = async () => {
+    setHighlightOrder(tempOrder);
+    await AsyncStorage.setItem(HIGHLIGHTS_ORDER_KEY, JSON.stringify(tempOrder));
+    setShowReorderModal(false);
+  };
+
+  const resetHighlightOrder = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTempOrder(highlights.map(h => h.id));
+  };
+
   const labelColor = isDarkMode ? '#ccc' : '#555';
-  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.2)';
+  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
 
   const scrollRef = useRef<ScrollView>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(true);
@@ -220,7 +294,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name="chevron-left" size={22} color={arrowColor} />
+          <MaterialCommunityIcons name="chevron-left" size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 
@@ -229,12 +303,13 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        style={{ overflow: 'visible' }}
         snapToInterval={ITEM_WIDTH}
         decelerationRate="fast"
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
-        {highlights.map((h) => (
+        {sortedHighlights.map((h) => (
           <TouchableOpacity
             key={h.id}
             style={styles.itemWrapper}
@@ -242,20 +317,22 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
             activeOpacity={0.75}
           >
             <View style={[styles.ring, { borderColor: h.color }]}>  
-              {h.id === 'daily-story' && h.imageUrl ? (
-                <View style={styles.storyThumbWrapper}>
-                  <Image
-                    source={{ uri: h.imageUrl }}
-                    style={styles.circleImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.storyThumbOverlay} />
+              {h.id === 'daily-story' ? (
+                <View style={[styles.storyThumbWrapper, { backgroundColor: storyBgColor }]}>
                   {storyAyahText ? (
-                    <Text style={styles.storyThumbText} numberOfLines={3}>
-                      {storyAyahText.slice(0, 60)}
-                    </Text>
+                    <View style={styles.storyThumbContent}>
+                      <Text style={styles.storyThumbText} numberOfLines={3}>
+                        {storyAyahText.slice(0, 50)}
+                      </Text>
+                      <View style={styles.storyThumbDivider} />
+                      {storySurahName ? (
+                        <Text style={styles.storyThumbSurah} numberOfLines={1}>
+                          {storySurahName}
+                        </Text>
+                      ) : null}
+                    </View>
                   ) : (
-                    <MaterialCommunityIcons name="play-circle-outline" size={20} color="#fff" style={{ zIndex: 2 }} />
+                    <MaterialCommunityIcons name="book-open-variant" size={22} color="#fff" />
                   )}
                 </View>
               ) : h.imageUrl ? (
@@ -292,7 +369,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name="chevron-right" size={22} color={arrowColor} />
+          <MaterialCommunityIcons name="chevron-right" size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 
@@ -301,6 +378,122 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress }) => {
           <ActivityIndicator size="small" color="#2f7659" />
         </View>
       )}
+
+      {/* Full-width reorder button */}
+      {showReorderButton && (
+        <BlurView
+          intensity={80}
+          tint={isDarkMode ? 'dark' : 'light'}
+          style={styles.fullReorderBlur}
+        >
+          <TouchableOpacity
+            style={styles.fullReorderBtn}
+            onPress={openReorderModal}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="swap-vertical" size={18} color={isDarkMode ? '#fff' : '#333'} style={{ marginLeft: 8 }} />
+            <Text style={[styles.fullReorderBtnText, { color: isDarkMode ? '#fff' : '#333' }]}>ترتيب الأقسام</Text>
+          </TouchableOpacity>
+        </BlurView>
+      )}
+
+      {/* Reorder Modal */}
+      <Modal
+        visible={showReorderModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReorderModal(false)}
+      >
+        <View style={styles.reorderOverlay}>
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 90 : 50}
+            tint={isDarkMode ? 'dark' : 'light'}
+            style={styles.reorderBlur}
+          >
+            <View style={[
+              styles.reorderContent,
+              {
+                backgroundColor: isDarkMode
+                  ? 'rgba(30,30,32,0.55)'
+                  : 'rgba(255,255,255,0.7)',
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.2)',
+              },
+            ]}>
+              <Text style={[
+                styles.reorderTitle,
+                { color: isDarkMode ? '#fff' : '#333' },
+              ]}>
+                ترتيب الأبرز
+              </Text>
+
+              <ScrollView style={styles.reorderList} showsVerticalScrollIndicator={false}>
+                {tempOrder.map((id, index) => {
+                  const item = highlights.find(h => h.id === id);
+                  if (!item) return null;
+                  return (
+                    <View
+                      key={id}
+                      style={[
+                        styles.reorderItem,
+                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        <View style={[styles.reorderItemIcon, { backgroundColor: item.color }]}>
+                          <MaterialCommunityIcons name={item.icon as any} size={18} color="#fff" />
+                        </View>
+                        <Text style={[
+                          styles.reorderItemLabel,
+                          { color: isDarkMode ? '#fff' : '#333' },
+                        ]}>
+                          {item.title}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        <TouchableOpacity
+                          disabled={index === 0}
+                          onPress={() => moveHighlightItem(index, -1)}
+                          style={[styles.reorderArrow, index === 0 && { opacity: 0.3 }]}
+                        >
+                          <MaterialCommunityIcons name="chevron-up" size={22} color={isDarkMode ? '#fff' : '#333'} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          disabled={index === tempOrder.length - 1}
+                          onPress={() => moveHighlightItem(index, 1)}
+                          style={[styles.reorderArrow, index === tempOrder.length - 1 && { opacity: 0.3 }]}
+                        >
+                          <MaterialCommunityIcons name="chevron-down" size={22} color={isDarkMode ? '#fff' : '#333'} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.reorderButtons}>
+                <TouchableOpacity
+                  style={[styles.reorderBtn2, styles.reorderResetBtn]}
+                  onPress={resetHighlightOrder}
+                >
+                  <Text style={[
+                    styles.reorderBtnText,
+                    { color: isDarkMode ? '#aaa' : '#666' },
+                  ]}>
+                    إعادة تعيين
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.reorderBtn2, styles.reorderDoneBtn]}
+                  onPress={saveHighlightOrder}
+                >
+                  <Text style={styles.reorderDoneBtnText}>تم</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -309,33 +502,36 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 8,
     position: 'relative' as const,
+    overflow: 'visible' as const,
   },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     gap: 14,
     flexDirection: 'row-reverse',
     alignItems: 'flex-start',
+    paddingVertical: 4,
   },
   arrowBtn: {
     position: 'absolute' as const,
-    top: (RING_SIZE / 2) - 11,
-    zIndex: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(128,128,128,0.12)',
+    top: (RING_SIZE / 2) - 15,
+    zIndex: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(128,128,128,0.25)',
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
   arrowLeft: {
-    left: 0,
+    left: 2,
   },
   arrowRight: {
-    right: 0,
+    right: 2,
   },
   itemWrapper: {
     alignItems: 'center',
     width: RING_SIZE + 8,
+    overflow: 'visible' as const,
   },
   ring: {
     width: RING_SIZE,
@@ -366,31 +562,138 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
-  storyThumbOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    zIndex: 1,
+  storyThumbContent: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
   },
   storyThumbText: {
-    position: 'absolute' as const,
-    zIndex: 2,
     color: '#fff',
-    fontSize: 8,
-    lineHeight: 12,
+    fontSize: 7,
+    lineHeight: 11,
     fontFamily: 'Cairo-Bold',
     textAlign: 'center' as const,
-    paddingHorizontal: 4,
+  },
+  storyThumbDivider: {
+    width: '40%' as any,
+    height: 0.5,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    marginVertical: 1,
+  },
+  storyThumbSurah: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 5.5,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'center' as const,
   },
   label: {
     fontSize: 11,
     fontFamily: 'Cairo-Medium',
     marginTop: 4,
     textAlign: 'center',
+    width: RING_SIZE + 12,
   },
   loadingBadge: {
     position: 'absolute',
     top: 4,
     right: 12,
+  },
+  fullReorderBlur: {
+    borderRadius: 12,
+    overflow: 'hidden' as const,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  fullReorderBtn: {
+    flexDirection: 'row-reverse' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  fullReorderBtnText: {
+    fontSize: 14,
+    fontFamily: 'Cairo-Bold',
+  },
+  reorderOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: 24,
+  },
+  reorderBlur: {
+    width: '100%' as const,
+    maxHeight: '70%' as const,
+    borderRadius: 16,
+    overflow: 'hidden' as const,
+  },
+  reorderContent: {
+    width: '100%' as const,
+    borderRadius: 16,
+    padding: 20,
+  },
+  reorderTitle: {
+    fontSize: 18,
+    fontFamily: 'Cairo-Bold',
+    textAlign: 'center' as const,
+    marginBottom: 16,
+  },
+  reorderList: {
+    maxHeight: 340,
+  },
+  reorderItem: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  reorderItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  reorderItemLabel: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'right' as const,
+  },
+  reorderArrow: {
+    padding: 4,
+  },
+  reorderButtons: {
+    flexDirection: 'row' as const,
+    gap: 10,
+    marginTop: 16,
+  },
+  reorderBtn2: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center' as const,
+  },
+  reorderResetBtn: {
+    backgroundColor: 'rgba(120,120,128,0.12)',
+  },
+  reorderDoneBtn: {
+    backgroundColor: '#2f7659',
+  },
+  reorderBtnText: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+  },
+  reorderDoneBtnText: {
+    fontSize: 15,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#fff',
   },
 });
 

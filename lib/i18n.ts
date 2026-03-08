@@ -117,7 +117,7 @@ export const getTranslations = (lang?: Language): TranslationKeys => {
  */
 export const isRTL = (lang?: Language): boolean => {
   const checkLang = lang || currentLanguage;
-  return ['ar', 'ur'].includes(checkLang);
+  return ['ar', 'ur', 'fa'].includes(checkLang);
 };
 
 /**

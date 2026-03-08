@@ -1,188 +1,127 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, ScrollView, TouchableOpacity } from 'react-native';
-import { BlurView } from 'expo-blur';
-import LargeWidgetVariants from './LargeWidgetVariants';
+// components/ui/prayer/GlassWidgetPreview.tsx
+// Rounded prayer widget – matches design/mockups/prayer-clock/mockup-clock-rounded.svg
 
-const { width } = Dimensions.get('window');
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image } from 'react-native';
+
+import {
+  PrayerTimes,
+  PrayerName,
+  getNextPrayer,
+  getTimeRemaining,
+} from '@/lib/prayer-times';
+import { t } from '@/lib/i18n';
 
 interface GlassWidgetPreviewProps {
-  size?: 'small' | 'medium' | 'large';
+  prayerTimes?: PrayerTimes | null;
+  isDarkMode?: boolean;
 }
 
-export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({ size = 'large' }) => {
-  // layout grid tokens
-  const padding = size === 'large' ? 24 : size === 'medium' ? 16 : 12;
-  const [variant, setVariant] = useState<'next' | 'schedule'>('next');
+export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
+  prayerTimes = null,
+  isDarkMode = false,
+}) => {
+  const [timeRemaining, setTimeRemaining] = useState<{
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
+  const [nextPrayer, setNextPrayer] = useState<{
+    name: PrayerName;
+    time: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!prayerTimes) return;
+    const update = () => {
+      setNextPrayer(getNextPrayer(prayerTimes));
+      setTimeRemaining(getTimeRemaining(prayerTimes));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [prayerTimes]);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const prayerName = nextPrayer ? t(`prayer.${nextPrayer.name}`) : 'الفجر';
+
+  const countdownStr = timeRemaining
+    ? `${pad(timeRemaining.hours)}:${pad(timeRemaining.minutes)}:${pad(timeRemaining.seconds)}`
+    : '00:47:00';
+
+  const textColor = isDarkMode ? '#e0e0e0' : '#081827';
 
   return (
-    <ScrollView contentContainerStyle={{ padding }}>
-      <View style={styles.container}>
-        {/* Variant toggle */}
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            onPress={() => setVariant('next')}
-            style={[styles.toggleButton, variant === 'next' && styles.toggleActive]}
-          >
-            <Text style={[styles.toggleText, variant === 'next' && styles.toggleTextActive]}>Next Prayer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setVariant('schedule')}
-            style={[styles.toggleButton, variant === 'schedule' && styles.toggleActive]}
-          >
-            <Text style={[styles.toggleText, variant === 'schedule' && styles.toggleTextActive]}>Full Schedule</Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.wrapper}>
+      <View style={[styles.card, isDarkMode && styles.cardDark]}>
+        {/* Logo (static) */}
+        <Image
+          source={require('@/assets/images/icon.png')}
+          style={styles.logo}
+        />
 
-        {/* Large widget variants (embedded) */}
-        <View style={{ width: '100%', marginBottom: 12 }}>
-          <LargeWidgetVariants variant={variant} />
-        </View>
+        {/* App name (static) */}
+        <Text style={styles.appName}>روح المسلم</Text>
 
-        {/* Secondary row: two medium cards */}
-        <View style={styles.row}>
-          <BlurView intensity={50} tint="default" style={[styles.card, { marginRight: 12 }]}>
-            <Text style={styles.cardTitle}>التالي</Text>
-            <Text style={styles.cardTime}>الظهر · 12:03</Text>
-          </BlurView>
+        {/* Countdown timer (dynamic) */}
+        <Text style={[styles.countdown, { color: textColor }]}>
+          {countdownStr}
+        </Text>
 
-          <BlurView intensity={50} tint="default" style={styles.card}>
-            <Text style={styles.cardTitle}>التذكير</Text>
-            <Text style={styles.cardTime}>مفعل</Text>
-          </BlurView>
-        </View>
-
-        {/* Small card row */}
-        <View style={styles.smallRow}>
-          <BlurView intensity={40} tint="default" style={styles.smallCard}>
-            <Text style={styles.smallTime}>00:47</Text>
-            <Text style={styles.smallLabel}>باقي على الظهر</Text>
-          </BlurView>
-
-          <BlurView intensity={40} tint="default" style={styles.smallCard}>
-            <Text style={styles.smallTime}>04</Text>
-            <Text style={styles.smallLabel}>تنبيهات</Text>
-          </BlurView>
-        </View>
+        {/* Prayer label (dynamic) */}
+        <Text style={[styles.label, { color: textColor, opacity: 0.6 }]}>
+          الوقت المتبقي على صلاة {prayerName}
+        </Text>
       </View>
-    </ScrollView>
+    </View>
   );
 };
 
-const BORDER = 'rgba(255,255,255,0.2)';
-
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     alignItems: 'center',
-  },
-  heroCard: {
-    width: width - 48,
-    borderRadius: 18,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginBottom: 16,
-  },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  leftCol: {
-    width: 120,
-    alignItems: 'center',
-  },
-  iconBubble: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    marginBottom: 6,
-  },
-  prayerName: {
-    color: '#eafbf4',
-    fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-  },
-  centerCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  heroTime: {
-    color: '#fff',
-    fontSize: 62,
-    fontFamily: 'Cairo-ExtraLight',
-    lineHeight: 66,
-  },
-  heroLabel: {
-    color: '#d7f3eb',
-    fontSize: 14,
-    marginTop: 6,
-    fontFamily: 'Cairo-Medium',
-  },
-  rightCol: {
-    width: 120,
-    alignItems: 'center',
-  },
-  pill: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderWidth: 0.5,
-    borderColor: BORDER,
-  },
-  pillText: {
-    color: '#7ef9de',
-    fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
-  },
-  row: {
-    flexDirection: 'row',
-    marginTop: 12,
+    justifyContent: 'center',
+    padding: 16,
   },
   card: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    width: 200,
+    height: 200,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0,0,0,0.04)',
     borderWidth: 0.5,
-    borderColor: BORDER,
-  },
-  cardTitle: {
-    color: '#dffbf4',
-    fontSize: 12,
-    fontFamily: 'Cairo-Medium',
-  },
-  cardTime: {
-    color: '#fff',
-    fontSize: 18,
-    marginTop: 6,
-    fontFamily: 'Cairo-Bold',
-  },
-  smallRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-  },
-  smallCard: {
-    width: (width - 72) / 2,
-    borderRadius: 14,
-    padding: 10,
-    marginRight: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5,
-    borderColor: BORDER,
+    borderColor: 'rgba(0,0,0,0.04)',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
-  smallTime: {
-    color: '#fff',
-    fontSize: 22,
-    fontFamily: 'Cairo-ExtraLight',
+  cardDark: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  smallLabel: {
-    color: '#cfeee7',
-    fontSize: 11,
-    marginTop: 6,
-    fontFamily: 'Cairo-Regular',
+  logo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    marginBottom: 6,
+  },
+  appName: {
+    fontSize: 10,
+    fontFamily: 'Cairo-SemiBold',
+    color: '#0f987f',
+    marginBottom: 8,
+  },
+  countdown: {
+    fontSize: 28,
+    fontFamily: 'Cairo-Bold',
+    letterSpacing: 1,
+    textAlign: 'center',
+    lineHeight: 36,
+  },
+  label: {
+    fontSize: 9,
+    fontFamily: 'Cairo-SemiBold',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
 

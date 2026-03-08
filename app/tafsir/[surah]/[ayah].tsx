@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SURAH_NAMES_AR, fetchTafsir, TAFSIR_EDITIONS } from '@/lib/quran-api';
 
 export default function TafsirScreen() {
@@ -46,21 +46,17 @@ export default function TafsirScreen() {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: colors.foreground },
+    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', fontFamily: 'Cairo-Bold', color: colors.text },
     closeBtn: { padding: 8 },
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
     surahRef: {
       fontSize: 14,
       color: colors.primary,
       textAlign: 'right',
-      fontWeight: '600',
+      fontFamily: 'Cairo-SemiBold',
       marginBottom: 12,
     },
     arabicText: {
-      fontSize: 22,
-      color: colors.foreground,
-      textAlign: 'right',
-      lineHeight: 40,
       backgroundColor: 'rgba(120,120,128,0.12)',
       padding: 16,
       borderRadius: 12,
@@ -86,20 +82,21 @@ export default function TafsirScreen() {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
-    editionTabText: { fontSize: 12, color: colors.muted, fontWeight: '600' },
+    editionTabText: { fontSize: 12, color: colors.textLight, fontFamily: 'Cairo-SemiBold' },
     editionTabTextActive: { color: '#fff' },
     tafsirTitle: {
       fontSize: 16,
-      fontWeight: '700',
-      color: colors.foreground,
+      fontFamily: 'Cairo-Bold',
+      color: colors.text,
       textAlign: 'right',
       marginBottom: 10,
     },
     tafsirText: {
       fontSize: 16,
-      color: colors.foreground,
+      color: colors.text,
       textAlign: 'right',
       lineHeight: 30,
+      fontFamily: 'Cairo-Regular',
     },
   });
 
@@ -109,7 +106,7 @@ export default function TafsirScreen() {
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
       <View style={s.header}>
         <TouchableOpacity style={s.closeBtn} onPress={() => router.back()}>
-          <IconSymbol name="xmark" size={22} color={colors.foreground} />
+          <MaterialCommunityIcons name="close" size={22} color={colors.text} />
         </TouchableOpacity>
         <Text style={s.title}>التفسير</Text>
         <View style={{ width: 38 }} />
@@ -120,9 +117,17 @@ export default function TafsirScreen() {
       ) : (
         <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
           <Text style={s.surahRef}>
-            {SURAH_NAMES_AR[surahNum - 1]} - آية {ayahNum}
+            {SURAH_NAMES_AR[surahNum] || `سورة ${surahNum}`} - آية {ayahNum}
           </Text>
-          {arabicText ? <Text style={s.arabicText}>{arabicText}</Text> : null}
+          {arabicText ? (
+            <View style={s.arabicText}>
+              <Text style={{ fontSize: 22, color: colors.text, textAlign: 'center', lineHeight: 40, fontFamily: 'Amiri-Bold' }}>
+                {arabicText}
+                {'  '}
+                <Text style={{ color: colors.primary, fontSize: 16 }}>﴿{ayahNum}﴾</Text>
+              </Text>
+            </View>
+          ) : null}
 
           <View style={s.editionTabs}>
             {TAFSIR_EDITIONS.map(ed => (

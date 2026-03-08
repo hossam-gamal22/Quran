@@ -29,7 +29,7 @@ const FONT_SIZES: { value: FontSize; label: string; sample: number }[] = [
 
 export default function DisplaySettingsScreen() {
   const router = useRouter();
-  const { settings, isDarkMode, updateDisplay } = useSettings();
+  const { settings, isDarkMode, updateDisplay, t } = useSettings();
 
   const handleFontSize = (size: FontSize) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -54,7 +54,7 @@ export default function DisplaySettingsScreen() {
             />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-            إعدادات العرض
+            {t('settings.displaySettings')}
           </Text>
           <View style={{ width: 28 }} />
         </View>
@@ -152,60 +152,12 @@ export default function DisplaySettingsScreen() {
             </View>
           </Animated.View>
 
-          {/* خيارات إضافية */}
-          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-              خيارات إضافية
-            </Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-              <ToggleRow
-                label="عرض التشكيل"
-                value={settings.display.showTashkeel}
-                onToggle={(v) => updateDisplay({ showTashkeel: v })}
-                isDarkMode={isDarkMode}
-              />
-              <ToggleRow
-                label="عرض الترجمة"
-                value={settings.display.showTranslation}
-                onToggle={(v) => updateDisplay({ showTranslation: v })}
-                isDarkMode={isDarkMode}
-              />
-              <ToggleRow
-                label="تمييز التجويد"
-                value={settings.display.highlightTajweed}
-                onToggle={(v) => updateDisplay({ highlightTajweed: v })}
-                isDarkMode={isDarkMode}
-              />
-            </View>
-          </Animated.View>
-
           <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
     </BackgroundWrapper>
   );
 }
-
-// ToggleRow component
-const ToggleRow: React.FC<{
-  label: string;
-  value: boolean;
-  onToggle: (v: boolean) => void;
-  isDarkMode: boolean;
-}> = ({ label, value, onToggle, isDarkMode }) => (
-  <TouchableOpacity
-    style={styles.toggleRow}
-    onPress={() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      onToggle(!value);
-    }}
-  >
-    <Text style={[styles.toggleLabel, isDarkMode && styles.textLight]}>{label}</Text>
-    <View style={[styles.toggleTrack, value && styles.toggleTrackActive]}>
-      <View style={[styles.toggleThumb, value && styles.toggleThumbActive]} />
-    </View>
-  </TouchableOpacity>
-);
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
@@ -273,37 +225,5 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(120,120,128,0.2)',
-  },
-  toggleLabel: {
-    fontFamily: 'Cairo-Medium',
-    fontSize: 16,
-    color: '#333',
-  },
-  toggleTrack: {
-    width: 51,
-    height: 31,
-    borderRadius: 16,
-    backgroundColor: 'rgba(120,120,128,0.32)',
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleTrackActive: {
-    backgroundColor: 'rgba(47,118,89,0.55)',
-  },
-  toggleThumb: {
-    width: 27,
-    height: 27,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-  },
-  toggleThumbActive: {
-    alignSelf: 'flex-end',
-  },
+
 });

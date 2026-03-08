@@ -16,6 +16,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/pricing', label: 'الأسعار' },
     { path: '/subscriptions', label: 'الاشتراكات' },
     { path: '/content', label: 'المحتوى' },
+    { path: '/home-page', label: 'إدارة الرئيسية' },
     { path: '/notifications', label: 'الإشعارات' },
   ];
 

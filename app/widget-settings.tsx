@@ -331,6 +331,28 @@ export default function WidgetSettingsScreen() {
     []
   );
 
+  const updateVerseWidget = useCallback(
+    (updates: Partial<WidgetSettings['verseWidget']>) => {
+      setSettings((prev) => ({
+        ...prev,
+        verseWidget: { ...prev.verseWidget, ...updates },
+      }));
+      setHasChanges(true);
+    },
+    []
+  );
+
+  const updateDhikrWidget = useCallback(
+    (updates: Partial<WidgetSettings['dhikrWidget']>) => {
+      setSettings((prev) => ({
+        ...prev,
+        dhikrWidget: { ...prev.dhikrWidget, ...updates },
+      }));
+      setHasChanges(true);
+    },
+    []
+  );
+
   // تبديل فئة الأذكار
   const toggleAzkarCategory = useCallback((category: string) => {
     setSettings((prev) => {
@@ -490,6 +512,13 @@ export default function WidgetSettingsScreen() {
             onValueChange={(value) => updatePrayerWidget({ showLocation: value })}
             isDarkMode={isDarkMode}
           />
+          <SettingRow
+            label="تسجيل إكمال الصلاة"
+            description="عرض علامة إكمال الصلاة في الويدجت"
+            value={settings.prayerWidget.showCompletion}
+            onValueChange={(value) => updatePrayerWidget({ showCompletion: value })}
+            isDarkMode={isDarkMode}
+          />
 
           <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, isDarkMode && styles.textLight]}>
@@ -578,6 +607,57 @@ export default function WidgetSettingsScreen() {
             description="عرض التاريخ الميلادي مع الهجري"
             value={settings.hijriWidget.showGregorian}
             onValueChange={(value) => updateHijriWidget({ showGregorian: value })}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* ويدجت آية اليوم */}
+        <SettingSection
+          title="ويدجت آية اليوم"
+          icon="book-open-page-variant"
+          index={4}
+          isDarkMode={isDarkMode}
+        >
+          <SettingRow
+            label="تفعيل"
+            value={settings.verseWidget.enabled}
+            onValueChange={(value) => updateVerseWidget({ enabled: value })}
+            isDarkMode={isDarkMode}
+          />
+          <SettingRow
+            label="عرض الترجمة"
+            description="عرض ترجمة الآية"
+            value={settings.verseWidget.showTranslation}
+            onValueChange={(value) => updateVerseWidget({ showTranslation: value })}
+            isDarkMode={isDarkMode}
+          />
+        </SettingSection>
+
+        {/* ويدجت ذكر اليوم */}
+        <SettingSection
+          title="ويدجت ذكر اليوم"
+          icon="hand-heart"
+          index={5}
+          isDarkMode={isDarkMode}
+        >
+          <SettingRow
+            label="تفعيل"
+            value={settings.dhikrWidget.enabled}
+            onValueChange={(value) => updateDhikrWidget({ enabled: value })}
+            isDarkMode={isDarkMode}
+          />
+          <SettingRow
+            label="عرض الترجمة"
+            description="عرض ترجمة الذكر"
+            value={settings.dhikrWidget.showTranslation}
+            onValueChange={(value) => updateDhikrWidget({ showTranslation: value })}
+            isDarkMode={isDarkMode}
+          />
+          <SettingRow
+            label="عرض الفضل"
+            description="عرض فضل الذكر"
+            value={settings.dhikrWidget.showBenefit}
+            onValueChange={(value) => updateDhikrWidget({ showBenefit: value })}
             isDarkMode={isDarkMode}
           />
         </SettingSection>

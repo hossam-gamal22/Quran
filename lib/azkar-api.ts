@@ -38,17 +38,14 @@ export type AzkarCategoryType =
 export interface Zikr {
   id: number;
   category: AzkarCategoryType;
+  subcategory?: string;
   arabic: string;
   transliteration: string;
   translation?: Record<Language, string>;
   translations?: Record<Language, string>;
   count: number;
   reference: string;
-  benefit?: {
-    ar?: string;
-    en?: string;
-    fr?: string;
-  };
+  benefit?: Record<string, string> | string;
   audio?: string;
   currentCount?: number;
 }
@@ -148,11 +145,19 @@ export const getCategoryById = (id: AzkarCategoryType): AzkarCategory | undefine
 // ===================================================
 
 /**
- * الحصول على ترجمة الذكر
+ * Extracts a plain string from a translation value that might be
+ * either a string or { text: string; verified?: boolean }.
  */
+const resolveTranslationValue = (val: unknown): string | undefined => {
+  if (!val) return undefined;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'object' && val !== null && 'text' in val) return (val as { text: string }).text;
+  return undefined;
+};
+
 export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
   const t = zikr.translations || zikr.translation;
-  return t?.[language] || t?.[DEFAULT_LANGUAGE] || zikr.arabic;
+  return resolveTranslationValue(t?.[language]) || resolveTranslationValue(t?.[DEFAULT_LANGUAGE]) || zikr.arabic;
 };
 
 /**
@@ -168,9 +173,11 @@ export const getCategoryName = (category: AzkarCategory, language: Language): st
 export const getZikrBenefit = (zikr: Zikr, language: Language): string | undefined => {
   if (!zikr.benefit) return undefined;
   
-  if (language === 'ar') return zikr.benefit.ar;
-  if (language === 'fr') return zikr.benefit.fr;
-  return zikr.benefit.en || zikr.benefit.ar;
+  // Handle case where benefit is a plain string (legacy format)
+  if (typeof zikr.benefit === 'string') return zikr.benefit;
+  
+  // Try requested language, then English, then Arabic fallback
+  return zikr.benefit[language] || zikr.benefit.en || zikr.benefit.ar;
 };
 
 // ===================================================
@@ -194,8 +201,8 @@ export const searchAzkar = (query: string, language: Language = 'ar'): Zikr[] =>
     
     // البحث في الترجمة
     const t = zikr.translations || zikr.translation;
-    const translation = t?.[language];
-    if (translation && translation.toLowerCase().includes(normalizedQuery)) return true;
+    const translationText = resolveTranslationValue(t?.[language]);
+    if (translationText && translationText.toLowerCase().includes(normalizedQuery)) return true;
     
     // البحث في المرجع
     if (zikr.reference?.toLowerCase().includes(normalizedQuery)) return true;

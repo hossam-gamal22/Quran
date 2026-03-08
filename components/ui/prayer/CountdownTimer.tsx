@@ -168,7 +168,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     );
   }
 
-  const prayerNameLocalized = t(`ui.prayer.${nextPrayer.name}`);
+  const prayerNameLocalized = t(`prayer.${nextPrayer.name}`);
   const prayerIcon = getPrayerIcon(nextPrayer.name);
 
   const formatHMS = (t: typeof timeRemaining) => {

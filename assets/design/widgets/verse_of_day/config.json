@@ -1,0 +1,27 @@
+{
+  "name": "Verse of the Day Widget",
+  "nameAr": "ودجت آية اليوم",
+  "version": "1.0",
+  "sizes": ["medium", "large"],
+  "colors": {
+    "text": "#081827",
+    "accent": "#0f987f",
+    "background": "#FFF8F0"
+  },
+  "fonts": {
+    "title": "Cairo-Bold",
+    "body": "KFGQPCUthmanic",
+    "numbers": "Cairo-SemiBold"
+  },
+  "elements": {
+    "logo": true,
+    "appName": true,
+    "dividers": true,
+    "surahName": true,
+    "verseNumber": true,
+    "ornamentalBrackets": true,
+    "translation": false
+  },
+  "icon": "book-open-variant",
+  "refreshInterval": "daily"
+}

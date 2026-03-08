@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance, ColorSchemeName, I18nManager, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
+import { scheduleNotificationsFromSettings } from '@/lib/notifications-manager';
 import { 
   t as translate, 
   setLanguage as setI18nLanguage, 
@@ -61,6 +62,34 @@ export interface NotificationSettings {
   vibration: boolean;
   soundType: NotificationSoundType;
   adhanSoundType: AdhanSoundType;
+  // Worship tracking notifications
+  worshipPrayerLogging: boolean;
+  worshipDailySummary: boolean;
+  worshipDailySummaryTime: string;
+  worshipStreakAlerts: boolean;
+  worshipWeeklyReport: boolean;
+  worshipQuietHoursEnabled: boolean;
+  worshipQuietHoursStart: string;
+  worshipQuietHoursEnd: string;
+  // Quran reading reminder
+  quranReadingReminder: boolean;
+  quranReadingReminderTime: string;
+  quranReminderDays: number[]; // 0=Sat, 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri
+  quranReminder24Hour: boolean;
+  quranReminderSoundType: NotificationSoundType;
+  // Salawat, Istighfar, Tasbih reminders
+  salawatReminder?: boolean;
+  salawatReminderTime?: string;
+  istighfarReminder?: boolean;
+  istighfarReminderTime?: string;
+  tasbihReminder?: boolean;
+  tasbihReminderTime?: string;
+  // Additional Adhkar reminders
+  sleepAzkar: boolean;
+  sleepAzkarTime: string;
+  wakeupAzkar: boolean;
+  wakeupAzkarTime: string;
+  afterPrayerAzkar: boolean;
 }
 
 export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7' | 'dynamic';
@@ -75,9 +104,11 @@ export interface DisplaySettings {
   showTashkeel: boolean;
   showTranslation: boolean;
   showTransliteration: boolean;
+  translationEdition: string;
   highlightTajweed: boolean;
   appBackground: AppBackgroundKey;
   appBackgroundUrl?: string; // For dynamic/remote backgrounds
+  appBackgroundTextColor?: 'white' | 'black'; // Text color for dynamic backgrounds
   quranBackground: QuranBackgroundKey;
   quranThemeIndex: number;
   homeLayout: HomeLayout;
@@ -168,6 +199,34 @@ const defaultNotifications: NotificationSettings = {
   vibration: true,
   soundType: 'default',
   adhanSoundType: 'default',
+  // Worship tracking notifications
+  worshipPrayerLogging: true,
+  worshipDailySummary: false,
+  worshipDailySummaryTime: '22:00',
+  worshipStreakAlerts: true,
+  worshipWeeklyReport: false,
+  worshipQuietHoursEnabled: false,
+  worshipQuietHoursStart: '23:00',
+  worshipQuietHoursEnd: '06:00',
+  // Quran reading reminder
+  quranReadingReminder: false,
+  quranReadingReminderTime: '20:00',
+  quranReminderDays: [0, 1, 2, 3, 4, 5, 6],
+  quranReminder24Hour: true,
+  quranReminderSoundType: 'default',
+  // Salawat, Istighfar, Tasbih reminders
+  salawatReminder: false,
+  salawatReminderTime: '09:00',
+  istighfarReminder: false,
+  istighfarReminderTime: '12:00',
+  tasbihReminder: false,
+  tasbihReminderTime: '15:00',
+  // Additional Adhkar reminders
+  sleepAzkar: false,
+  sleepAzkarTime: '22:00',
+  wakeupAzkar: false,
+  wakeupAzkarTime: '05:30',
+  afterPrayerAzkar: false,
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -175,8 +234,9 @@ const defaultDisplay: DisplaySettings = {
   arabicFontSize: 24,
   translationFontSize: 16,
   showTashkeel: true,
-  showTranslation: true,
+  showTranslation: false,
   showTransliteration: false,
+  translationEdition: 'en.sahih',
   highlightTajweed: true,
   appBackground: 'none',
   quranBackground: 'quranbg1',
@@ -284,6 +344,29 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
           I18nManager.allowRTL(shouldBeRTL);
           I18nManager.forceRTL(shouldBeRTL);
         }
+
+        // Schedule notifications on app init based on saved settings
+        const n = loadedSettings.notifications;
+        if (n.enabled) {
+          scheduleNotificationsFromSettings({
+            enabled: n.enabled,
+            prayerTimes: n.prayerTimes,
+            prayerReminder: n.prayerReminder,
+            reminderMinutes: n.reminderMinutes,
+            morningAzkar: n.morningAzkar,
+            morningAzkarTime: n.morningAzkarTime,
+            eveningAzkar: n.eveningAzkar,
+            eveningAzkarTime: n.eveningAzkarTime,
+            sleepAzkar: n.sleepAzkar ?? false,
+            sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
+            wakeupAzkar: n.wakeupAzkar ?? false,
+            wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
+            afterPrayerAzkar: n.afterPrayerAzkar ?? false,
+            dailyVerse: n.dailyVerse,
+            dailyVerseTime: n.dailyVerseTime,
+            sound: n.sound,
+          }).catch((e) => console.log('Init notification scheduling error (non-blocking):', e));
+        }
       } else {
         // أول تشغيل - محاولة تحديد اللغة من الجهاز
         await setI18nLanguage('ar');
@@ -355,10 +438,26 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     };
     await saveSettings(newSettings);
     
-    // إلغاء الإشعارات إذا تم تعطيلها
-    if (notifications.enabled === false) {
-      await Notifications.cancelAllScheduledNotificationsAsync();
-    }
+    // Schedule or cancel notifications based on updated settings
+    const n = newSettings.notifications;
+    await scheduleNotificationsFromSettings({
+      enabled: n.enabled,
+      prayerTimes: n.prayerTimes,
+      prayerReminder: n.prayerReminder,
+      reminderMinutes: n.reminderMinutes,
+      morningAzkar: n.morningAzkar,
+      morningAzkarTime: n.morningAzkarTime,
+      eveningAzkar: n.eveningAzkar,
+      eveningAzkarTime: n.eveningAzkarTime,
+      sleepAzkar: n.sleepAzkar,
+      sleepAzkarTime: n.sleepAzkarTime,
+      wakeupAzkar: n.wakeupAzkar,
+      wakeupAzkarTime: n.wakeupAzkarTime,
+      afterPrayerAzkar: n.afterPrayerAzkar,
+      dailyVerse: n.dailyVerse,
+      dailyVerseTime: n.dailyVerseTime,
+      sound: n.sound,
+    });
   }, [settings]);
 
   const updateDisplay = useCallback(async (display: Partial<DisplaySettings>) => {

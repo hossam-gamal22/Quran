@@ -2,6 +2,8 @@
 // ألوان ثيمات القرآن — مطابقة لتطبيق Skoon
 // كل ثيم يحتوي على: لون النص الرئيسي، لون الخلفية، لون ثانوي (أرقام الآيات)، لون التمييز
 
+import { isColorLight, getContrastTextColor, getContrastPalette } from '@/lib/contrast-helper';
+
 export interface QuranTheme {
   primary: string;       // لون نص القرآن
   background: string;    // لون خلفية الصفحة
@@ -52,13 +54,11 @@ export const DEFAULT_THEME_INDEX = 0;
 // هل الثيم لون خلفية فاتح؟
 export function isThemeLight(index: number): boolean {
   const bg = QURAN_THEMES[index]?.background ?? '#FFF8F0';
-  // حساب السطوع
-  const hex = bg.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+  return isColorLight(bg);
 }
+
+// Re-export contrast utilities for convenience
+export { isColorLight, getContrastTextColor, getContrastPalette } from '@/lib/contrast-helper';
 
 // ثيمات معينة تحتفظ بلون زخرفة الأورنمنت الأصلي (بدون tintColor)
 export const ORNAMENT_NO_TINT_INDICES = [0, 1, 2, 6, 13, 15];

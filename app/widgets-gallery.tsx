@@ -40,17 +40,33 @@ interface WidgetCategory {
 
 const CATEGORIES: WidgetCategory[] = [
   {
+    id: 'prayer',
+    title: 'مواقيت الصلاة',
+    icon: 'mosque',
+    gradient: ['#2f7659', '#1d4a3a'],
+    deepLink: 'rooh-almuslim://prayer',
+    description: 'يعرض جميع مواقيت الصلاة مع تحديد القادمة وإمكانية تسجيل الإكمال',
+  },
+  {
     id: 'ayah',
-    title: 'آيات قرآنية',
+    title: 'آية اليوم',
     icon: 'book-open-page-variant',
     gradient: ['#1e3a5f', '#2f7659'],
     deepLink: 'rooh-almuslim://daily-ayah',
-    description: 'يعرض آية يومية متجددة مع خلفية جميلة',
+    description: 'يعرض آية يومية متجددة مع اسم السورة ورقم الآية',
+  },
+  {
+    id: 'dhikr',
+    title: 'ذكر اليوم',
+    icon: 'hand-heart',
+    gradient: ['#5d4e8c', '#7c3aed'],
+    deepLink: 'rooh-almuslim://azkar',
+    description: 'يعرض ذكراً يومياً متجدداً مع فضله وعدد التكرار',
   },
   {
     id: 'azkar',
     title: 'أدعية وأذكار',
-    icon: 'hand-heart',
+    icon: 'star-crescent',
     gradient: ['#4c1d95', '#5b21b6'],
     deepLink: 'rooh-almuslim://azkar/morning',
     description: 'يعرض أذكار وأدعية متنوعة تتجدد تلقائياً',
@@ -129,9 +145,131 @@ function AyahPreviewText({ size }: { size: WidgetSize }) {
         بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
       </Text>
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        الحمد لله رب العالمين
+        الفاتحة - آية ١
       </Text>
       <Text style={styles.previewLabel}>آية اليوم</Text>
+    </>
+  );
+}
+
+function PrayerPreview({ size }: { size: WidgetSize }) {
+  const dims = WIDGET_PREVIEW_SIZE[size];
+  return (
+    <LinearGradient
+      colors={['#2f7659', '#1d4a3a']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
+    >
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+          <View style={styles.previewContent}>
+            <PrayerPreviewText size={size} />
+          </View>
+        </BlurView>
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.androidOverlay]}>
+          <View style={styles.previewContent}>
+            <PrayerPreviewText size={size} />
+          </View>
+        </View>
+      )}
+    </LinearGradient>
+  );
+}
+
+function PrayerPreviewText({ size }: { size: WidgetSize }) {
+  const prayers = [
+    { name: 'الفجر', time: '٤:٣٠', done: true },
+    { name: 'الظهر', time: '١٢:١٥', done: false, isNext: true },
+    { name: 'العصر', time: '٣:٤٥', done: false },
+  ];
+  return (
+    <>
+      <MaterialCommunityIcons
+        name="mosque"
+        size={size === 'small' ? 16 : 20}
+        color="rgba(255,255,255,0.5)"
+        style={styles.previewIcon}
+      />
+      {size === 'small' ? (
+        <>
+          <Text style={[styles.previewArabic, styles.previewArabicSmall]}>
+            الظهر
+          </Text>
+          <Text style={{ fontFamily: 'Cairo-Bold', fontSize: 20, color: '#fff' }}>
+            ١٢:١٥ م
+          </Text>
+          <Text style={styles.previewLabel}>الصلاة القادمة</Text>
+        </>
+      ) : (
+        <View style={{ width: '100%', gap: 4 }}>
+          {prayers.map((p) => (
+            <View key={p.name} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialCommunityIcons
+                  name={p.done ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+                  size={14}
+                  color={p.done ? '#4CAF50' : p.isNext ? '#FFD700' : 'rgba(255,255,255,0.5)'}
+                />
+                <Text style={{ fontFamily: 'Cairo-Medium', fontSize: 13, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+                  {p.name}
+                </Text>
+              </View>
+              <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+                {p.time}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.previewLabel}>مواقيت الصلاة</Text>
+        </View>
+      )}
+    </>
+  );
+}
+
+function DhikrPreview({ size }: { size: WidgetSize }) {
+  const dims = WIDGET_PREVIEW_SIZE[size];
+  return (
+    <LinearGradient
+      colors={['#5d4e8c', '#7c3aed']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
+    >
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+          <View style={styles.previewContent}>
+            <DhikrPreviewText size={size} />
+          </View>
+        </BlurView>
+      ) : (
+        <View style={[StyleSheet.absoluteFill, styles.androidOverlay]}>
+          <View style={styles.previewContent}>
+            <DhikrPreviewText size={size} />
+          </View>
+        </View>
+      )}
+    </LinearGradient>
+  );
+}
+
+function DhikrPreviewText({ size }: { size: WidgetSize }) {
+  return (
+    <>
+      <MaterialCommunityIcons
+        name="hand-heart"
+        size={size === 'small' ? 18 : 22}
+        color="rgba(255,255,255,0.5)"
+        style={styles.previewIcon}
+      />
+      <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
+        سبحان الله وبحمده
+      </Text>
+      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
+        ٣ مرات
+      </Text>
+      <Text style={styles.previewLabel}>ذكر اليوم</Text>
     </>
   );
 }
@@ -227,44 +365,124 @@ function HijriPreviewText({ size }: { size: WidgetSize }) {
 }
 
 const PREVIEW_MAP: Record<string, React.FC<{ size: WidgetSize }>> = {
+  prayer: PrayerPreview,
   ayah: AyahPreview,
+  dhikr: DhikrPreview,
   azkar: AzkarPreview,
   hijri: HijriPreview,
 };
 
-// -- Widget Card --
+// -- Widget Thumbnail --
 
-function WidgetCard({ category, index }: { category: WidgetCategory; index: number }) {
-  const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
-  const router = useRouter();
+function WidgetThumbnail({
+  category,
+  isSelected,
+  onPress,
+}: {
+  category: WidgetCategory;
+  isSelected: boolean;
+  onPress: () => void;
+}) {
   const PreviewComponent = PREVIEW_MAP[category.id];
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={[
+        styles.thumbnail,
+        isSelected
+          ? styles.thumbnailSelected
+          : styles.thumbnailUnselected,
+      ]}
+    >
+      {PreviewComponent && <PreviewComponent size="small" />}
+    </TouchableOpacity>
+  );
+}
+
+// -- Main Screen --
+
+export default function WidgetsGalleryScreen() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('ayah');
+  const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
+
+  const activeCategory = CATEGORIES.find((c) => c.id === activeTab) ?? CATEGORIES[0];
+
+  const onTabPress = useCallback((id: string) => {
+    Haptics.selectionAsync();
+    setActiveTab(id);
+  }, []);
 
   const onSizeChange = useCallback((size: WidgetSize) => {
     Haptics.selectionAsync();
     setSelectedSize(size);
   }, []);
 
-  return (
-    <Animated.View
-      entering={FadeInDown.delay(index * 120).duration(500).springify()}
-      style={styles.cardContainer}
-    >
-      <View style={styles.card}>
-        {/* Preview area */}
-        <View style={styles.previewArea}>
-          {PreviewComponent && <PreviewComponent size={selectedSize} />}
-        </View>
+  const PreviewComponent = PREVIEW_MAP[activeCategory.id];
 
-        {/* Info section */}
-        <View style={styles.cardInfo}>
+  return (
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          hitSlop={12}
+          style={styles.backButton}
+        >
+          <MaterialCommunityIcons
+            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
+            size={28}
+            color="#fff"
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>معرض الويدجت</Text>
+        <View style={{ width: 40 }} />
+      </Animated.View>
+
+      {/* Horizontal widget thumbnails */}
+      <Animated.View entering={FadeInRight.duration(500).delay(100)}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.thumbnailsContainer}
+        >
+          {CATEGORIES.map((cat) => (
+            <WidgetThumbnail
+              key={cat.id}
+              category={cat}
+              isSelected={activeTab === cat.id}
+              onPress={() => onTabPress(cat.id)}
+            />
+          ))}
+        </ScrollView>
+      </Animated.View>
+
+      {/* Selected widget detail */}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Large preview */}
+        <Animated.View
+          key={activeCategory.id}
+          entering={FadeInDown.duration(400).springify()}
+          style={styles.largePreviewArea}
+        >
+          {PreviewComponent && <PreviewComponent size={selectedSize} />}
+        </Animated.View>
+
+        {/* Info */}
+        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.detailInfo}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
               <MaterialCommunityIcons
-                name={category.icon as any}
+                name={activeCategory.icon as any}
                 size={22}
                 color="#3d9970"
               />
-              <Text style={styles.cardTitle}>{category.title}</Text>
+              <Text style={styles.cardTitle}>{activeCategory.title}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -278,7 +496,7 @@ function WidgetCard({ category, index }: { category: WidgetCategory; index: numb
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.cardDescription}>{category.description}</Text>
+          <Text style={styles.cardDescription}>{activeCategory.description}</Text>
 
           {/* Size pills */}
           <View style={styles.sizePills}>
@@ -316,85 +534,7 @@ function WidgetCard({ category, index }: { category: WidgetCategory; index: numb
               <Text style={styles.addButtonText}>إضافة للشاشة الرئيسية</Text>
             </LinearGradient>
           </TouchableOpacity>
-        </View>
-      </View>
-    </Animated.View>
-  );
-}
-
-// -- Main Screen --
-
-export default function WidgetsGalleryScreen() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState('ayah');
-
-  const activeCategory = CATEGORIES.find((c) => c.id === activeTab) ?? CATEGORIES[0];
-
-  const onTabPress = useCallback((id: string) => {
-    Haptics.selectionAsync();
-    setActiveTab(id);
-  }, []);
-
-  return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
-      <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
-            size={28}
-            color="#fff"
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>معرض الويدجت</Text>
-        <View style={{ width: 40 }} />
-      </Animated.View>
-
-      {/* Category Tabs */}
-      <Animated.View entering={FadeInRight.duration(500).delay(100)}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContainer}
-        >
-          {CATEGORIES.map((cat) => {
-            const isActive = activeTab === cat.id;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                onPress={() => onTabPress(cat.id)}
-                style={[styles.tab, isActive && styles.tabActive]}
-                activeOpacity={0.7}
-              >
-                <MaterialCommunityIcons
-                  name={cat.icon as any}
-                  size={18}
-                  color={isActive ? '#fff' : 'rgba(255,255,255,0.5)'}
-                />
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {cat.title}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </Animated.View>
-
-      {/* Widget Cards */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <WidgetCard
-          key={activeCategory.id}
-          category={activeCategory}
-          index={0}
-        />
+        </Animated.View>
 
         {/* Bottom link */}
         <Animated.View entering={FadeInDown.delay(300).duration(400)}>
@@ -449,35 +589,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Tabs
-  tabsContainer: {
+  // Tabs – replaced by thumbnail strip
+  thumbnailsContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    gap: 10,
+    gap: 12,
   },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+  thumbnail: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  tabActive: {
-    backgroundColor: 'rgba(61,153,112,0.25)',
-    borderColor: 'rgba(61,153,112,0.5)',
+  thumbnailSelected: {
+    borderWidth: 2,
+    borderColor: '#22C55E',
+    opacity: 1,
   },
-  tabText: {
-    fontFamily: 'Cairo-Medium',
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  tabTextActive: {
-    color: '#fff',
-    fontFamily: 'Cairo-Bold',
+  thumbnailUnselected: {
+    borderWidth: 0,
+    opacity: 0.7,
   },
 
   // Scroll
@@ -489,30 +618,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Card
-  cardContainer: {
-    marginBottom: 20,
-  },
-  card: {
-    backgroundColor: 'rgba(26,31,43,0.85)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
-    ...(Platform.OS === 'web'
-      ? { boxShadow: '0px 8px 32px rgba(0,0,0,0.3)' }
-      : {
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.3,
-          shadowRadius: 24,
-          elevation: 10,
-        }),
-  },
-  previewArea: {
+  // Large preview (shown for selected widget)
+  largePreviewArea: {
     alignItems: 'center',
     paddingTop: 24,
     paddingBottom: 16,
+  },
+
+  // Detail info (below large preview)
+  detailInfo: {
+    paddingHorizontal: 4,
+    paddingTop: 8,
   },
 
   // Widget Preview
@@ -599,9 +715,6 @@ const styles = StyleSheet.create({
   },
 
   // Card Info
-  cardInfo: {
-    padding: 20,
-  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',

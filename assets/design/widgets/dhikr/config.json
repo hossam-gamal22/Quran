@@ -1,0 +1,27 @@
+{
+  "name": "Dhikr Widget",
+  "nameAr": "ودجت الأذكار",
+  "version": "1.0",
+  "sizes": ["small", "medium", "large"],
+  "colors": {
+    "text": "#081827",
+    "accent": "#0f987f",
+    "background": "#FFFFFF"
+  },
+  "fonts": {
+    "title": "Cairo-Bold",
+    "body": "Cairo-Regular",
+    "numbers": "Cairo-SemiBold"
+  },
+  "elements": {
+    "logo": true,
+    "appName": true,
+    "dividers": true,
+    "dhikrText": true,
+    "repeatCount": true,
+    "categoryLabel": true,
+    "refreshButton": true
+  },
+  "icon": "hand-heart-outline",
+  "refreshInterval": "daily"
+}

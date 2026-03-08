@@ -24,14 +24,24 @@ export interface Reciter {
   englishName: string;
 }
 
+/**
+ * حساب رقم آية يومي ثابت بناءً على يوم السنة
+ */
+function getDailyAyahNumber(): number {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - startOfYear.getTime();
+  const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+  return (dayOfYear % 6236) + 1;
+}
+
 // الحصول على آية اليوم
 export async function getTodayAyah(): Promise<QuranAyah | null> {
   try {
-    // حساب رقم عشوائي بين 1-6236 (إجمالي آيات القرآن)
-    const randomAyah = Math.floor(Math.random() * 6236) + 1;
+    const ayahNumber = getDailyAyahNumber();
     
     const response = await fetch(
-      `https://api.alquran.cloud/v1/ayah/${randomAyah}/ar.asad`
+      `https://api.alquran.cloud/v1/ayah/${ayahNumber}/quran-uthmani`
     );
     
     if (!response.ok) throw new Error('Failed to fetch ayah');
@@ -80,13 +90,14 @@ export async function getAyahAudio(
 }
 
 /**
- * الحصول على آية عشوائية مع التلاوة الصوتية بصوت الشيخ مشاري راشد العفاسي
+ * الحصول على آية اليوم مع التلاوة الصوتية بصوت الشيخ مشاري راشد العفاسي
+ * تعتمد على يوم السنة للحصول على نفس الآية طوال اليوم
  */
 export async function getTodayAyahWithAudio(): Promise<QuranAyahWithAudio | null> {
   try {
-    const randomAyah = Math.floor(Math.random() * 6236) + 1;
+    const ayahNumber = getDailyAyahNumber();
     const response = await fetch(
-      `https://api.alquran.cloud/v1/ayah/${randomAyah}/ar.alafasy`
+      `https://api.alquran.cloud/v1/ayah/${ayahNumber}/ar.alafasy`
     );
     if (!response.ok) throw new Error('Failed to fetch ayah');
     const data = await response.json();

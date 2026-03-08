@@ -567,10 +567,11 @@ const calculatePrayerStreak = (records: DailyPrayerRecord[]): { streak: number; 
   
   let currentStreak = 0;
   let bestStreak = 0;
-  let tempStreak = 0;
+  let streakBroken = false;
   
   const prayers: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
   
+  let tempStreak = 0;
   for (const record of sortedRecords) {
     const allPrayed = prayers.every(p => 
       record[p] === 'prayed' || record[p] === 'late'
@@ -578,14 +579,20 @@ const calculatePrayerStreak = (records: DailyPrayerRecord[]): { streak: number; 
     
     if (allPrayed) {
       tempStreak++;
-      if (currentStreak === 0) currentStreak = tempStreak;
     } else {
+      if (!streakBroken) {
+        currentStreak = tempStreak;
+        streakBroken = true;
+      }
       bestStreak = Math.max(bestStreak, tempStreak);
       tempStreak = 0;
     }
   }
   
   bestStreak = Math.max(bestStreak, tempStreak);
+  if (!streakBroken) {
+    currentStreak = tempStreak;
+  }
   
   return { streak: currentStreak, bestStreak };
 };

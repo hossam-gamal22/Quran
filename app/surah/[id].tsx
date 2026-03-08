@@ -6,7 +6,6 @@
  * - Horizontal RTL page swiping (Medina Mushaf layout)
  * - Multi-color ayah bookmarks (yellow / red / green) with highlighting
  * - Current ayah highlighting during audio playback
- * - Bottom sheet with 3 tabs: الفواصل | البحث | الفهرس
  * - Quran text search
  * - Tafsir panel (تفسير الميسر)
  * - Ayah long-press menu (bookmark, tafsir, copy, play)
@@ -66,10 +65,10 @@ function getTargetAyahBg(themeIndex: number): string {
   const b = parseInt(hex.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, 0.25)`;
 }
-import { SlidingTabs } from '@/components/ui/SlidingTabs';
 import { setLastRead, addBookmark, removeBookmark, isBookmarked } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
 import { ShareableCard } from '@/components/ui/ShareableCard';
+import { shareImage } from '@/lib/share-service';
 import {
   buildPageBlocks,
   getJuzForPage,
@@ -80,7 +79,6 @@ import {
   getPageLines,
   getWord,
   TOTAL_PAGES,
-  getAllSurahs,
   getVerseQcfData,
 } from '@/lib/qcf-page-data';
 import {
@@ -103,6 +101,7 @@ import {
   BOOKMARK_COLOR_LABELS,
 } from '@/lib/quran-bookmarks';
 import tafsirData from '@/data/json/tafsir-muyassar.json';
+import { fetchSurahTranslation, TRANSLATION_EDITIONS } from '@/lib/quran-api';
 
 // ══════════════════════════════════════════════
 // Constants
@@ -111,17 +110,6 @@ import tafsirData from '@/data/json/tafsir-muyassar.json';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAGES = Array.from({ length: TOTAL_PAGES }, (_, i) => i + 1);
 const LAST_PAGE_KEY = 'quran_last_page';
-const ALL_SURAHS = getAllSurahs();
-
-const JUZ_PAGE_STARTS = [1,22,42,62,82,102,122,142,162,182,202,222,242,262,282,302,322,342,362,382,402,422,442,462,482,502,522,542,562,582];
-const JUZ_NAMES = [
-  'الأول','الثاني','الثالث','الرابع','الخامس',
-  'السادس','السابع','الثامن','التاسع','العاشر',
-  'الحادي عشر','الثاني عشر','الثالث عشر','الرابع عشر','الخامس عشر',
-  'السادس عشر','السابع عشر','الثامن عشر','التاسع عشر','العشرون',
-  'الحادي والعشرون','الثاني والعشرون','الثالث والعشرون','الرابع والعشرون','الخامس والعشرون',
-  'السادس والعشرون','السابع والعشرون','الثامن والعشرون','التاسع والعشرون','الثلاثون',
-];
 
 const BOOKMARK_COLOR_ORDER: BookmarkColor[] = ['yellow', 'red', 'green'];
 
@@ -155,14 +143,6 @@ const getTafsir = (surah: number, ayah: number): string => {
   const entry = surahEntries.find((a: any) => a.id === ayah);
   return entry?.text || '';
 };
-
-interface SearchResult {
-  surah: number;
-  surahName: string;
-  ayah: number;
-  page: number;
-  text: string;
-}
 
 // ══════════════════════════════════════════════
 // Image Assets
@@ -249,16 +229,40 @@ interface MushafPageProps {
   playingAyahKey: string | null;
   highlightAyahKey: string | null;
   onAyahLongPress?: (surah: number, ayah: number, page: number) => void;
+  translationMap?: Record<string, string>;
+  showTranslation?: boolean;
+  translationFontSize?: number;
+  translationIsRTL?: boolean;
 }
 
 const MushafPage = React.memo(function MushafPage({
   page, themeIndex, width, fontSizeAdjust, forceLightText, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
+  translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false,
 }: MushafPageProps) {
   const { isDarkMode } = useSettings();
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page));
   const [fontError, setFontError] = useState(false);
   const baseTextColor = getQuranTextColor('', themeIndex);
-  const textColor = forceLightText ? '#F3EBDD' : baseTextColor;
+  // Determine if the theme's primary color is dark (i.e., designed for light backgrounds)
+  const isBaseColorDark = (() => {
+    const hex = (baseTextColor || '#000000').replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+  })();
+
+  // Dynamic text color based on background image:
+  // - Dark backgrounds (quranbg3, quranbg4) → white/light text
+  // - Light backgrounds (quranbg1, quranbg2) → black/dark text
+  let textColor: string;
+  if (forceLightText) {
+    // Dark background: if theme's base color is dark, override to white
+    textColor = isBaseColorDark ? '#FFFFFF' : baseTextColor;
+  } else {
+    // Light background: if theme's base color is light, override to black
+    textColor = !isBaseColorDark ? '#000000' : baseTextColor;
+  }
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
 
@@ -355,43 +359,70 @@ const MushafPage = React.memo(function MushafPage({
             curr.parts.push({ glyph: seg.glyph, isEnd: seg.isAyahEnd });
           }
 
+          // Collect ayahs that END on this line (for translation display)
+          const endingAyahs = showTranslation && translationMap
+            ? ayahGroups.filter(g => g.parts.some(p => p.isEnd))
+            : [];
+
           return (
-            <Text
-              key={i}
-              style={{
-                fontFamily: fontLoaded ? fontFamily : 'Amiri-Regular',
-                fontSize,
-                textAlign: 'center',
-                lineHeight,
-                writingDirection: 'rtl',
-                paddingTop: extraTopPadding,
-                paddingBottom: extraTopPadding > 0 ? 2 : 0,
-              }}
-              allowFontScaling={false}
-            >
-              {ayahGroups.map((group, gi) => {
-                const ayahKey = `${group.surah}:${group.ayah}`;
-                const bcolor = bookmarkMap[ayahKey];
-                const isPlaying = playingAyahKey === ayahKey;
-                const isHighlighted = highlightAyahKey === ayahKey;
+            <View key={i}>
+              <Text
+                style={{
+                  fontFamily: fontLoaded ? fontFamily : 'Amiri-Regular',
+                  fontSize,
+                  textAlign: 'center',
+                  lineHeight,
+                  writingDirection: 'rtl',
+                  paddingTop: extraTopPadding,
+                  paddingBottom: extraTopPadding > 0 ? 2 : 0,
+                }}
+                allowFontScaling={false}
+              >
+                {ayahGroups.map((group, gi) => {
+                  const ayahKey = `${group.surah}:${group.ayah}`;
+                  const bcolor = bookmarkMap[ayahKey];
+                  const isPlaying = playingAyahKey === ayahKey;
+                  const isHighlighted = highlightAyahKey === ayahKey;
 
-                let bgColor: string | undefined;
-                if (bcolor) bgColor = BOOKMARK_BG_COLORS[bcolor];
-                else if (isPlaying) bgColor = PLAYING_AYAH_BG;
-                else if (isHighlighted) bgColor = targetAyahBg;
+                  let bgColor: string | undefined;
+                  if (bcolor) bgColor = BOOKMARK_BG_COLORS[bcolor];
+                  else if (isPlaying) bgColor = PLAYING_AYAH_BG;
+                  else if (isHighlighted) bgColor = targetAyahBg;
 
-                // If we have a Unicode Uthmani text for this ayah, use it —
-                // but prefer rendering the original QCF glyphs when the per-page
-                // QCF font is loaded. This ensures the in-app rendering matches
-                // the QCF font preview you see on your laptop. Fall back to
-                // Unicode text only when the page font isn't available.
-                const surahData = getSurahData(group.surah);
-                const ayahObj = surahData?.ayahs.find(a => a.ns === group.ayah);
-                const ayahText = ayahObj?.t;
+                  const surahData = getSurahData(group.surah);
+                  const ayahObj = surahData?.ayahs.find(a => a.ns === group.ayah);
+                  const ayahText = ayahObj?.t;
 
-                if (ayahText && !fontLoaded) {
-                  const wordsFromAyah = ayahText.split(/\s+/).filter(Boolean);
-                  let wordIndex = 0;
+                  if (ayahText && !fontLoaded) {
+                    const wordsFromAyah = ayahText.split(/\s+/).filter(Boolean);
+                    let wordIndex = 0;
+                    return (
+                      <Text
+                        key={gi}
+                        onLongPress={() => {
+                          if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          onAyahLongPress?.(group.surah, group.ayah, page);
+                        }}
+                        style={{
+                          backgroundColor: bgColor,
+                          paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
+                          paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
+                          borderRadius: Math.round(fontSize * 0.28),
+                        }}
+                      >
+                        {group.parts.map((part, pi) => {
+                          const mapped = wordsFromAyah[wordIndex] ?? part.glyph;
+                          wordIndex += 1;
+                          return (
+                            <Text key={pi} style={{ color: textColor }}>
+                              {mapped}{' '}
+                            </Text>
+                          );
+                        })}
+                      </Text>
+                    );
+                  }
+
                   return (
                     <Text
                       key={gi}
@@ -401,47 +432,45 @@ const MushafPage = React.memo(function MushafPage({
                       }}
                       style={{
                         backgroundColor: bgColor,
-                        // make highlight match text size and be rounded
                         paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
                         paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
                         borderRadius: Math.round(fontSize * 0.28),
                       }}
                     >
-                      {group.parts.map((part, pi) => {
-                        const mapped = wordsFromAyah[wordIndex] ?? part.glyph;
-                        wordIndex += 1;
-                        return (
-                          <Text key={pi} style={{ color: textColor }}>
-                            {mapped}{' '}
-                          </Text>
-                        );
-                      })}
+                      {group.parts.map((part, pi) => (
+                        <Text key={pi} style={{ color: textColor }}>{part.glyph}</Text>
+                      ))}
                     </Text>
                   );
-                }
-
-                // Fallback: render original glyphs
+                })}
+              </Text>
+              {/* Translation text for ayahs ending on this line */}
+              {endingAyahs.map((g) => {
+                const key = `${g.surah}:${g.ayah}`;
+                const tText = translationMap?.[key];
+                if (!tText) return null;
+                const dir = translationIsRTL ? 'rtl' : 'ltr';
+                const ayahLabel = translationIsRTL ? `﴿${g.ayah}﴾` : `(${g.ayah})`;
                 return (
-                  <Text
-                    key={gi}
-                    onLongPress={() => {
-                      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      onAyahLongPress?.(group.surah, group.ayah, page);
-                    }}
-                    style={{
-                      backgroundColor: bgColor,
-                      paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
-                      paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
-                      borderRadius: Math.round(fontSize * 0.28),
-                    }}
-                  >
-                    {group.parts.map((part, pi) => (
-                      <Text key={pi} style={{ color: textColor }}>{part.glyph}</Text>
-                    ))}
-                  </Text>
+                  <View key={`tr-${key}`} style={{ direction: dir }}>
+                    <Text
+                      style={{
+                        fontSize: translationFontSize,
+                        color: forceLightText ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)',
+                        textAlign: translationIsRTL ? 'right' : 'left',
+                        writingDirection: dir,
+                        fontFamily: 'Cairo-Regular',
+                        lineHeight: translationFontSize * 1.6,
+                        paddingHorizontal: 12,
+                        paddingVertical: 2,
+                      }}
+                    >
+                      {ayahLabel} {tText}
+                    </Text>
+                  </View>
                 );
               })}
-            </Text>
+            </View>
           );
         }
         return null;
@@ -461,14 +490,15 @@ interface GlassHeaderProps {
   juz: number;
   tafsirActive: boolean;
   isPageFavorited: boolean;
+  currentPage: number;
   onTafsir: () => void;
   onPlay: () => void;
-  onIndex: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
+  onShare: () => void;
 }
 
-function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isPageFavorited, onTafsir, onPlay, onIndex, onBack, onToggleFavorite }: GlassHeaderProps) {
+function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isPageFavorited, currentPage, onTafsir, onPlay, onBack, onToggleFavorite, onShare }: GlassHeaderProps) {
   return (
     <View style={gh.wrapper}>
       <BlurView
@@ -477,7 +507,7 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isP
         style={gh.blur}
       >
         <View style={gh.inner}>
-          {/* Left: tafsir toggle + play + heart (save page) */}
+          {/* Left: tafsir toggle + play + heart (save page) + share */}
           <View style={gh.left}>
             <TouchableOpacity hitSlop={8} onPress={onTafsir}>
               <MaterialCommunityIcons
@@ -496,20 +526,23 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isP
                 color={isPageFavorited ? '#EF4444' : goldenColor}
               />
             </TouchableOpacity>
+            <TouchableOpacity hitSlop={8} onPress={onShare}>
+              <MaterialCommunityIcons name="share-variant-outline" size={20} color={goldenColor} />
+            </TouchableOpacity>
           </View>
 
-          {/* Center: juz info */}
+          {/* Center: page number + juz info */}
           <View style={gh.center}>
-            <Text style={[gh.name, { color: goldenColor }]}>
+            <Text style={[gh.pageNum, { color: goldenColor }]}>
+              {toArabicNumber(currentPage)}
+            </Text>
+            <Text style={[gh.juzLabel, { color: isLightBg ? '#555' : '#bbb' }]}>
               الجزء {toArabicNumber(juz)}
             </Text>
           </View>
 
-          {/* Right: index + back */}
+          {/* Right: back */}
           <View style={gh.right}>
-            <TouchableOpacity hitSlop={8} onPress={onIndex}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={22} color={goldenColor} />
-            </TouchableOpacity>
             <TouchableOpacity hitSlop={8} onPress={onBack}>
               <Ionicons name="chevron-forward" size={28} color={goldenColor} />
             </TouchableOpacity>
@@ -538,10 +571,11 @@ const gh = StyleSheet.create({
     height: 48,
     paddingHorizontal: 12,
   },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 90 },
+  left: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 70, justifyContent: 'flex-end' },
-  center: { flex: 1, alignItems: 'center' },
-  name: { fontSize: 15, fontFamily: 'Amiri-Bold' },
+  center: { alignItems: 'center', paddingHorizontal: 8 },
+  pageNum: { fontSize: 17, fontFamily: 'Amiri-Bold' },
+  juzLabel: { fontSize: 11, fontFamily: 'Cairo-Regular', marginTop: -2 },
 });
 
 // ══════════════════════════════════════════════
@@ -564,15 +598,24 @@ export default function SurahScreen() {
   const defaultBg = isDarkMode ? 'quranbg3' : 'quranbg1';
   const quranBgKey = settings.display.quranBackground ?? defaultBg;
   const hasDarkBackgroundImage = quranBgKey === 'quranbg3' || quranBgKey === 'quranbg4';
+  const hasLightBackgroundImage = quranBgKey === 'quranbg1' || quranBgKey === 'quranbg2';
   const isLightBg = isThemeLight(themeIndex) && !hasDarkBackgroundImage;
-  const forceLightText = isDarkMode || hasDarkBackgroundImage;
+  // Text color based on BACKGROUND IMAGE only (not system dark mode)
+  // quranbg1/2 = light bg → dark/black text; quranbg3/4 = dark bg → light/white text
+  const forceLightText = hasDarkBackgroundImage;
   const textColor = getQuranTextColor('', themeIndex);
   const goldenColor = getGoldenColor(themeIndex);
 
   // Display settings for toggles
   const showTashkeel = settings.display.showTashkeel ?? true;
   const showTranslation = settings.display.showTranslation ?? false;
+  const translationEdition = settings.display.translationEdition ?? 'en.sahih';
+  const translationFontSize = settings.display.translationFontSize ?? 14;
   const highlightTajweed = settings.display.highlightTajweed ?? false;
+
+  // Translation language direction
+  const translationLang = TRANSLATION_EDITIONS.find(e => e.identifier === translationEdition)?.language ?? 'en';
+  const translationIsRTL = ['ar', 'ur', 'fa'].includes(translationLang);
 
   const flatListRef = useRef<FlatList>(null);
   const pageViewShotRef = useRef<ViewShot>(null);
@@ -597,14 +640,33 @@ export default function SurahScreen() {
   const [bookmarks, setBookmarks] = useState<ColoredBookmark[]>([]);
   const bookmarkMap = useMemo(() => buildBookmarkMap(bookmarks), [bookmarks]);
 
-  // Bottom sheet
-  const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [bottomSheetTab, setBottomSheetTab] = useState<'bookmarks' | 'search' | 'index'>('index');
-  const [indexSubTab, setIndexSubTab] = useState<'surahs' | 'juz'>('surahs');
+  // Translation data: map of "surah:ayah" → translation text
+  const [translationMap, setTranslationMap] = useState<Record<string, string>>({});
+  const translationCacheRef = useRef<Record<string, Record<string, string>>>({});
 
-  // Search
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  // Fetch translation for surahs visible on current page
+  useEffect(() => {
+    if (!showTranslation) return;
+    const surahNum = getFirstSurahOnPage(currentPage);
+    if (!surahNum) return;
+    const cacheKey = `${translationEdition}:${surahNum}`;
+    if (translationCacheRef.current[cacheKey]) {
+      setTranslationMap(prev => ({ ...prev, ...translationCacheRef.current[cacheKey] }));
+      return;
+    }
+    fetchSurahTranslation(surahNum, translationEdition)
+      .then(data => {
+        const map: Record<string, string> = {};
+        for (const a of data.ayahs) {
+          map[`${surahNum}:${a.numberInSurah}`] = a.text;
+        }
+        translationCacheRef.current[cacheKey] = map;
+        setTranslationMap(prev => ({ ...prev, ...map }));
+      })
+      .catch(() => {});
+  }, [currentPage, showTranslation, translationEdition]);
+
+
 
   // Ayah action menu
   const [showAyahMenu, setShowAyahMenu] = useState(false);
@@ -635,8 +697,7 @@ export default function SurahScreen() {
   // Settings
   const [showSettings, setShowSettings] = useState(false);
 
-  // Bookmarks: expanded groups
-  const [expandedGroups, setExpandedGroups] = useState<Record<BookmarkColor, boolean>>({ yellow: true, red: true, green: true });
+
 
   // Long-press onboarding tooltip — shown once on first visit
   const [showLongPressHint, setShowLongPressHint] = useState(false);
@@ -727,7 +788,7 @@ export default function SurahScreen() {
   }, []);
 
   useEffect(() => {
-    ensurePagesLoaded(currentPage, 3);
+    ensurePagesLoaded(currentPage, 3, isDarkMode);
   }, [currentPage]);
 
   // Surah names on current page
@@ -761,22 +822,6 @@ export default function SurahScreen() {
 
   // ── Handlers ──
 
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    if (!query || query.length < 2) { setSearchResults([]); return; }
-    const stripped = stripTashkeel(query.trim());
-    const results: SearchResult[] = [];
-    for (const surah of ALL_SURAHS) {
-      for (const ayah of surah.ayahs) {
-        if (ayah.e.includes(stripped) || stripTashkeel(ayah.t).includes(stripped)) {
-          results.push({ surah: surah.number, surahName: surah.name, ayah: ayah.ns, page: ayah.p, text: ayah.t });
-          if (results.length >= 50) { setSearchResults(results); return; }
-        }
-      }
-    }
-    setSearchResults(results);
-  }, []);
-
   const handlePlayPage = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const sn = getFirstSurahOnPage(currentPage);
@@ -806,19 +851,9 @@ export default function SurahScreen() {
   }, []);
 
   const handleOpenTafsir = useCallback((surah: number, ayah: number) => {
-    const surahData = getSurahData(surah);
-    const ayahData = surahData?.ayahs.find(a => a.ns === ayah);
-    // Use first 3 words of the ayah (stripped of tashkeel) as the search query
-    const ayahText = ayahData?.t || '';
-    const firstWords = stripTashkeel(ayahText).split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
     setShowAyahMenu(false);
-    if (firstWords) {
-      setSearchQuery(firstWords);
-      handleSearch(firstWords);
-    }
-    setBottomSheetTab('search');
-    setShowBottomSheet(true);
-  }, [handleSearch]);
+    router.push(`/tafsir/${surah}/${ayah}` as any);
+  }, [router]);
 
   const handleCopyAyah = useCallback(async () => {
     if (!selectedAyah) return;
@@ -846,6 +881,18 @@ export default function SurahScreen() {
     }
   }, [selectedAyah]);
 
+  const handleSharePage = useCallback(async () => {
+    try {
+      if (shareViewShotRef.current?.capture) {
+        const uri = await shareViewShotRef.current.capture();
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        await shareImage(uri, `صفحة ${currentPage} - ${APP_NAME}`);
+      }
+    } catch (e) {
+      console.error('Error sharing page:', e);
+    }
+  }, [currentPage]);
+
   const handlePlayAyah = useCallback(() => {
     if (!selectedAyah) return;
     playAyah(selectedAyah.surah, selectedAyah.ayah, true);
@@ -859,7 +906,6 @@ export default function SurahScreen() {
     const idx = Math.max(0, Math.min(page - 1, TOTAL_PAGES - 1));
     flatListRef.current?.scrollToIndex({ index: idx, animated: false });
     setCurrentPage(page);
-    setShowBottomSheet(false);
   }, []);
 
   // Auto-sync page to audio while playing — jump to verse page when playback moves
@@ -907,23 +953,15 @@ export default function SurahScreen() {
           playingAyahKey={playingAyahKey}
           highlightAyahKey={highlightAyahKey}
           onAyahLongPress={handleAyahLongPress}
+          translationMap={showTranslation ? translationMap : undefined}
+          showTranslation={showTranslation}
+          translationFontSize={translationFontSize}
+          translationIsRTL={translationIsRTL}
         />
       </TouchableOpacity>
     ),
-    [themeIndex, fontSizeAdjust, bookmarkMap, playingAyahKey, highlightAyahKey, handleAyahLongPress],
+    [themeIndex, fontSizeAdjust, bookmarkMap, playingAyahKey, highlightAyahKey, handleAyahLongPress, showTranslation, translationMap, translationFontSize, translationIsRTL],
   );
-
-  // ── Bottom sheet helpers ──
-
-  const bookmarksByColor = useMemo(() => {
-    const grouped: Record<BookmarkColor, ColoredBookmark[]> = { yellow: [], red: [], green: [] };
-    for (const b of bookmarks) grouped[b.color]?.push(b);
-    return grouped;
-  }, [bookmarks]);
-
-  const toggleGroup = (color: BookmarkColor) => {
-    setExpandedGroups(prev => ({ ...prev, [color]: !prev[color] }));
-  };
 
   // ══════════════════════════════════════════════
   // RENDER
@@ -1110,11 +1148,12 @@ export default function SurahScreen() {
               juz={juz}
               tafsirActive={showTafsirPanel}
               isPageFavorited={isPageFavorited}
+              currentPage={currentPage}
               onTafsir={() => updateDisplay({ showTafsir: !showTafsirPanel } as any)}
               onPlay={handlePlayPage}
-              onIndex={() => { setShowBottomSheet(true); setBottomSheetTab('index'); }}
               onBack={() => router.back()}
               onToggleFavorite={handleToggleFavorite}
+              onShare={handleSharePage}
             />
           )}
 
@@ -1171,246 +1210,7 @@ export default function SurahScreen() {
             </View>
           )}
 
-          {/* ═══ BOTTOM PAGE INDICATOR ═══ */}
-          {showControls && (
-            <View style={s.bottomBar}>
-              <Text style={[s.pageIndicator, { color: goldenColor }]}>
-                {toArabicNumber(currentPage)}
-              </Text>
-            </View>
-          )}
-
           {/* ═══ AUDIO PLAYER (handled globally in _layout.tsx) ═══ */}
-
-          {/* ══════════════════════════════════════════ */}
-          {/* BOTTOM SHEET — الفواصل | البحث | الفهرس    */}
-          {/* ══════════════════════════════════════════ */}
-          <Modal visible={showBottomSheet} animationType="slide" transparent onRequestClose={() => setShowBottomSheet(false)}>
-            <View style={s.sheetOverlay}>
-              <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowBottomSheet(false)} />
-              <View style={s.sheetContainer}>
-                <BlurView intensity={Platform.OS === 'ios' ? 90 : 50} tint={isLightBg ? 'light' : 'dark'} style={s.sheetBlur}>
-                  <View style={[s.sheetContent, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.8)' : 'rgba(28,28,30,0.8)' }]}>
-                    {/* Handle */}
-                    <View style={s.sheetHandle}>
-                      <View style={[s.sheetHandleBar, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
-                    </View>
-
-                    {/* Tabs */}
-                    <SlidingTabs
-                      tabs={[
-                        { key: 'bookmarks', label: 'الفواصل' },
-                        { key: 'search', label: 'البحث' },
-                        { key: 'index', label: 'الفهرس' },
-                      ]}
-                      selected={bottomSheetTab}
-                      onSelect={(key) => setBottomSheetTab(key as 'bookmarks' | 'search' | 'index')}
-                      activeColor={isLightBg ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.14)'}
-                      activeTextColor={goldenColor}
-                      inactiveTextColor={isLightBg ? '#666' : '#9CA3AF'}
-                      containerBg={isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)'}
-                      pillBorderColor={isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)'}
-                      style={{
-                        marginHorizontal: 16,
-                        marginBottom: 10,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
-                      }}
-                    />
-
-                    {/* ── TAB: الفهرس (Index) ── */}
-                    {bottomSheetTab === 'index' && (
-                      <View style={{ flex: 1 }}>
-                        <SlidingTabs
-                          tabs={[
-                            { key: 'surahs', label: 'السور' },
-                            { key: 'juz', label: 'الأجزاء' },
-                          ]}
-                          selected={indexSubTab}
-                          onSelect={(key) => setIndexSubTab(key as 'surahs' | 'juz')}
-                          activeColor={isLightBg ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.14)'}
-                          activeTextColor={goldenColor}
-                          inactiveTextColor={isLightBg ? '#666' : '#9CA3AF'}
-                          containerBg={isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.07)'}
-                          pillBorderColor={isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)'}
-                          tabPaddingVertical={8}
-                          pillBorderRadius={10}
-                          style={{
-                            marginHorizontal: 16,
-                            marginBottom: 4,
-                            borderWidth: StyleSheet.hairlineWidth,
-                            borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
-                          }}
-                        />
-
-                        {indexSubTab === 'surahs' ? (
-                          <FlatList
-                            data={ALL_SURAHS}
-                            keyExtractor={item => String(item.number)}
-                            renderItem={({ item }) => (
-                              <TouchableOpacity
-                                style={[s.indexItem, { backgroundColor: isLightBg ? 'rgba(0,150,136,0.06)' : 'rgba(0,150,136,0.1)' }]}
-                                onPress={() => jumpToPage(getSurahStartPage(item.number))}
-                              >
-                                <View style={[s.indexNumBadge, { borderColor: goldenColor }]}>
-                                  <Text style={[s.indexNumText, { color: goldenColor }]}>{toArabicNumber(item.number)}</Text>
-                                </View>
-                                <View style={s.indexInfo}>
-                                  <Text style={[s.indexName, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>{item.name}</Text>
-                                  <Text style={[s.indexSub, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                    {item.englishName}    {toArabicNumber(item.ayahs.length)} آيات
-                                  </Text>
-                                </View>
-                                <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={18} color={isLightBg ? '#999' : '#666'} />
-                              </TouchableOpacity>
-                            )}
-                            contentContainerStyle={{ paddingBottom: 30 }}
-                          />
-                        ) : (
-                          <FlatList
-                            data={JUZ_PAGE_STARTS.map((startPage, i) => ({ number: i + 1, name: JUZ_NAMES[i], startPage }))}
-                            keyExtractor={item => String(item.number)}
-                            renderItem={({ item }) => (
-                              <TouchableOpacity
-                                style={[s.indexItem, { backgroundColor: isLightBg ? 'rgba(0,150,136,0.06)' : 'rgba(0,150,136,0.1)' }]}
-                                onPress={() => jumpToPage(item.startPage)}
-                              >
-                                <View style={[s.indexNumBadge, { borderColor: goldenColor }]}>
-                                  <Text style={[s.indexNumText, { color: goldenColor }]}>{toArabicNumber(item.number)}</Text>
-                                </View>
-                                <View style={s.indexInfo}>
-                                  <Text style={[s.indexName, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>الجزء {item.name}</Text>
-                                  <Text style={[s.indexSub, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                    صفحة {toArabicNumber(item.startPage)}
-                                  </Text>
-                                </View>
-                                <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={18} color={isLightBg ? '#999' : '#666'} />
-                              </TouchableOpacity>
-                            )}
-                            contentContainerStyle={{ paddingBottom: 30 }}
-                          />
-                        )}
-                      </View>
-                    )}
-
-                    {/* ── TAB: البحث (Search) ── */}
-                    {bottomSheetTab === 'search' && (
-                      <View style={{ flex: 1 }}>
-                        <View style={[s.searchBar, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.08)' }]}>
-                          <MaterialCommunityIcons name="magnify" size={20} color={isLightBg ? '#999' : '#777'} />
-                          <TextInput
-                            style={[s.searchInput, { color: isLightBg ? '#1a1a2e' : '#fff' }]}
-                            placeholder="ابحث في القرآن..."
-                            placeholderTextColor={isLightBg ? '#999' : '#777'}
-                            value={searchQuery}
-                            onChangeText={handleSearch}
-                            textAlign="right"
-                            autoFocus
-                          />
-                          {searchQuery.length > 0 && (
-                            <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
-                              <MaterialCommunityIcons name="close-circle" size={18} color={isLightBg ? '#999' : '#777'} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-
-                        <FlatList
-                          data={searchResults}
-                          keyExtractor={(item, i) => `${item.surah}-${item.ayah}-${i}`}
-                          renderItem={({ item }) => (
-                            <TouchableOpacity
-                              style={[s.searchResult, { borderBottomColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]}
-                              onPress={() => jumpToPage(item.page)}
-                            >
-                              <Text style={[s.searchAyahText, { color: isLightBg ? '#1a1a2e' : '#fff' }]} numberOfLines={3}>
-                                {item.text}
-                              </Text>
-                              <Text style={[s.searchMeta, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                {item.surahName}  صفحة: {toArabicNumber(item.page)}
-                              </Text>
-                            </TouchableOpacity>
-                          )}
-                          contentContainerStyle={{ paddingBottom: 30 }}
-                          ListEmptyComponent={
-                            searchQuery.length >= 2 ? (
-                              <Text style={[s.emptyText, { color: isLightBg ? '#999' : '#666' }]}>لا توجد نتائج</Text>
-                            ) : null
-                          }
-                        />
-                      </View>
-                    )}
-
-                    {/* ── TAB: الفواصل (Bookmarks) ── */}
-                    {bottomSheetTab === 'bookmarks' && (
-                      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 30 }}>
-                        {BOOKMARK_COLOR_ORDER.map(color => {
-                          const items = bookmarksByColor[color] || [];
-                          const expanded = expandedGroups[color];
-                          return (
-                            <View key={color} style={[s.bmGroup, { borderColor: BOOKMARK_BORDER_COLORS[color], backgroundColor: BOOKMARK_BG_COLORS[color] }]}>
-                              <TouchableOpacity style={s.bmGroupHeader} onPress={() => toggleGroup(color)}>
-                                <MaterialCommunityIcons name="bookmark" size={24} color={BOOKMARK_COLORS[color]} />
-                                <View style={{ flex: 1, marginHorizontal: 10 }}>
-                                  <Text style={[s.bmGroupTitle, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>
-                                    {BOOKMARK_COLOR_LABELS[color]}
-                                  </Text>
-                                  <Text style={[s.bmGroupCount, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                    عدد: {toArabicNumber(items.length)}
-                                  </Text>
-                                </View>
-                                <MaterialCommunityIcons
-                                  name={expanded ? 'chevron-up' : 'chevron-down'}
-                                  size={22}
-                                  color={isLightBg ? '#999' : '#666'}
-                                />
-                              </TouchableOpacity>
-
-                              {expanded && items.map(bm => (
-                                <TouchableOpacity
-                                  key={bm.id}
-                                  style={[s.bmItem, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(40,40,44,0.5)' }]}
-                                  onPress={() => jumpToPage(bm.page)}
-                                >
-                                  <View style={[s.bmItemIcon, { backgroundColor: BOOKMARK_BG_COLORS[color] }]}>
-                                    <MaterialCommunityIcons name="bookmark" size={18} color={BOOKMARK_COLORS[color]} />
-                                  </View>
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={[s.bmItemName, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>{bm.surahName}</Text>
-                                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                                      <Text style={[s.bmItemMeta, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                        آية {toArabicNumber(bm.ayahNumber)}
-                                      </Text>
-                                      <Text style={[s.bmItemMeta, { color: isLightBg ? '#666' : '#aaa' }]}>
-                                        صفحة {toArabicNumber(bm.page)}
-                                      </Text>
-                                    </View>
-                                  </View>
-                                  <TouchableOpacity hitSlop={12} onPress={() => handleRemoveBookmark(bm.id)}>
-                                    <MaterialCommunityIcons name="close" size={16} color={isLightBg ? '#999' : '#666'} />
-                                  </TouchableOpacity>
-                                  <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={18} color={isLightBg ? '#999' : '#666'} />
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-                          );
-                        })}
-
-                        {bookmarks.length === 0 && (
-                          <View style={s.emptyBm}>
-                            <MaterialCommunityIcons name="bookmark-outline" size={48} color={isLightBg ? '#ccc' : '#555'} />
-                            <Text style={[s.emptyText, { color: isLightBg ? '#999' : '#666' }]}>لا توجد فواصل بعد</Text>
-                            <Text style={[s.emptyHint, { color: isLightBg ? '#bbb' : '#555' }]}>
-                              اضغط مطولاً على أي آية لإضافة فاصل
-                            </Text>
-                          </View>
-                        )}
-                      </ScrollView>
-                    )}
-                  </View>
-                </BlurView>
-              </View>
-            </View>
-          </Modal>
 
           {/* ══════════════════════════════════════════ */}
           {/* AYAH ACTION MENU                           */}
@@ -1774,8 +1574,8 @@ const s = StyleSheet.create({
   // Bottom bar - transparent, no background shape
   bottomBar: {
     alignItems: 'center',
-    paddingVertical: 4,
-    marginBottom: 16,
+    paddingVertical: 2,
+    marginBottom: 4,
   },
   bottomBarBlur: {
     borderRadius: 12,
@@ -1838,35 +1638,6 @@ const s = StyleSheet.create({
   sheetTabText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold', fontWeight: '600' },
   tafsirActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   tafsirMiniBar: { position: 'absolute', left: Spacing.md, right: Spacing.md, bottom: 140, borderRadius: 12, paddingVertical: 10, zIndex: 80, overflow: 'hidden' },
-
-  // ── Index ──
-  indexItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, marginHorizontal: 16, marginBottom: 4, borderRadius: 12 },
-  indexNumBadge: { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  indexNumText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Bold' },
-  indexInfo: { flex: 1, alignItems: 'flex-end', marginRight: 12 },
-  indexName: { fontSize: FONT_SIZES.lg, fontFamily: 'Cairo-SemiBold', fontWeight: '600' },
-  indexSub: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular', marginTop: 2 },
-
-  // ── Search ──
-  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, paddingHorizontal: 12, paddingVertical: Platform.OS === 'ios' ? 10 : 6, borderRadius: 12, gap: 8 },
-  searchInput: { flex: 1, fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Regular', paddingVertical: 0 },
-  searchResult: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-  searchAyahText: { fontSize: FONT_SIZES.lg, textAlign: 'right', lineHeight: 32 },
-  searchMeta: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular', marginTop: 4, textAlign: 'right' },
-
-  // ── Bookmarks ──
-  bmGroup: { marginHorizontal: 16, marginBottom: 12, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  bmGroupHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14 },
-  bmGroupTitle: { fontSize: FONT_SIZES.lg, fontFamily: 'Cairo-Bold' },
-  bmGroupCount: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular' },
-  bmItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, marginHorizontal: 8, marginBottom: 8, borderRadius: 12, gap: 10 },
-  bmItemIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  bmItemName: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold' },
-  bmItemMeta: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular', backgroundColor: 'rgba(120,120,128,0.08)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-
-  emptyBm: { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Medium', textAlign: 'center', marginTop: 16 },
-  emptyHint: { fontSize: FONT_SIZES.sm, fontFamily: 'Cairo-Regular', textAlign: 'center' },
 
   // ── Ayah Action Menu ──
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },

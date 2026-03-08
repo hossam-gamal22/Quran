@@ -1,7 +1,9 @@
 // app/(tabs)/qibla.tsx
 // صفحة القبلة - روح المسلم
 // آخر تحديث: 2026-03-07
-// ✅ Fixed: Kaaba size, stability, 3D effect, compass direction, style switcher
+// ✅ Uses Location.watchHeadingAsync for correct heading (like Google Qibla Finder)
+// ✅ Kaaba is FIXED on screen, compass dial rotates behind it
+// ✅ Qibla bearing from Aladhan API
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -16,7 +18,6 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Magnetometer } from 'expo-sensors';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
@@ -24,12 +25,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
-  interpolate,
-  Easing,
+  withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from './qiblaAssets';
+import { useInterstitialAd } from '@/components/ads/InterstitialAdManager';
+import { useAds } from '@/lib/ads-context';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -69,20 +71,80 @@ const SafeSvgRenderer = ({
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COMPASS_SIZE = Math.min(SCREEN_WIDTH * 0.82, 360);
 const POINTER_SIZE = COMPASS_SIZE * 0.72;
-const KAABA_SIZE = 56; // Fixed large size — always clear & visible
-const KAABA_ORBIT_RADIUS = COMPASS_SIZE * 0.30; // orbit inside compass
-const THUMBNAIL_SIZE = 52;
+const KAABA_SIZE = 90;
+const THUMBNAIL_SIZE = 62;
 const QIBLA_STYLE_KEY = '@qibla_style';
 
-const MECCA_LAT = 21.422487;
-const MECCA_LNG = 39.826206;
+// ---------------------------------------------------------------------------
+// Network connectivity check
+// ---------------------------------------------------------------------------
+const checkConnectivity = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://clients3.google.com/generate_204', {
+      method: 'HEAD',
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return res.status === 204 || res.ok;
+  } catch {
+    return false;
+  }
+};
 
 // ---------------------------------------------------------------------------
-// Qibla bearing (Great Circle formula — standard, well-tested)
+// Fetch Qibla bearing from UmmahAPI
+// GET https://ummahapi.com/api/qibla?lat={lat}&lng={lng}
+// Returns { success, data: { qibla_direction, ... } }
 // ---------------------------------------------------------------------------
-const calculateQiblaBearing = (lat: number, lng: number): number => {
+const fetchQiblaDirection = async (
+  lat: number,
+  lng: number,
+): Promise<number | null> => {
+  try {
+    const res = await fetch(
+      `https://ummahapi.com/api/qibla?lat=${lat}&lng=${lng}`,
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const dir = json?.data?.qibla_direction;
+    if (typeof dir === 'number' && !isNaN(dir)) return dir;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Fallback: AlAdhan Qibla API
+// GET https://api.aladhan.com/v1/qibla/{latitude}/{longitude}
+// Returns { data: { direction } }
+// ---------------------------------------------------------------------------
+const fetchQiblaFromAladhan = async (
+  lat: number,
+  lng: number,
+): Promise<number | null> => {
+  try {
+    const res = await fetch(
+      `https://api.aladhan.com/v1/qibla/${lat}/${lng}`,
+    );
+    if (!res.ok) return null;
+    const json = await res.json();
+    const dir = json?.data?.direction;
+    if (typeof dir === 'number' && !isNaN(dir)) return dir;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Local great-circle fallback (only used if both APIs fail)
+const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
   const toRad = (d: number) => (d * Math.PI) / 180;
   const toDeg = (r: number) => (r * 180) / Math.PI;
+  const MECCA_LAT = 21.422487;
+  const MECCA_LNG = 39.826206;
   const lat1 = toRad(lat);
   const lat2 = toRad(MECCA_LAT);
   const dLng = toRad(MECCA_LNG - lng);
@@ -93,36 +155,6 @@ const calculateQiblaBearing = (lat: number, lng: number): number => {
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 };
 
-// Aladhan API fallback
-const fetchQiblaFromAladhan = async (
-  lat: number,
-  lng: number,
-): Promise<number | null> => {
-  try {
-    const res = await fetch(`https://api.aladhan.com/v1/qibla/${lat}/${lng}`);
-    if (!res.ok) return null;
-    const json = await res.json();
-    const dir = json?.data?.direction;
-    if (typeof dir === 'number') return dir;
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-// ---------------------------------------------------------------------------
-// Worklet: find shortest rotation path to avoid 360→0 spinning
-// ---------------------------------------------------------------------------
-function normalizeToTarget(current: number, target: number): number {
-  'worklet';
-  // Find target equivalent that is closest to current (avoids full 360 spin)
-  let diff = target - current;
-  // Normalize diff to [-180, 180]
-  diff = ((diff + 180) % 360) - 180;
-  if (diff < -180) diff += 360;
-  return current + diff;
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -130,13 +162,21 @@ const QiblaScreen = () => {
   const insets = useSafeAreaInsets();
   const [qiblaBearing, setQiblaBearing] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [guidance, setGuidance] = useState('');
   const [currentStyleId, setCurrentStyleId] = useState('style1');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const isAlignedRef = useRef(false);
 
-  // We track a cumulative heading (not clamped to 0-360) to avoid wrap jitter
+  // Ads
+  const { showAd } = useInterstitialAd();
+  const { config: adsConfig } = useAds();
+
+  // Cumulative heading to avoid 360→0 wrap-around jitter
   const headingCumulative = useSharedValue(0);
-  const lastRawHeading = useRef(0);
+  const targetCumulative = useRef(0); // true target (never read from animated value)
+  const lastHeading = useRef(0);
 
   const activeAssets =
     QIBLA_STYLES[currentStyleId as keyof typeof QIBLA_STYLES] ||
@@ -151,110 +191,105 @@ const QiblaScreen = () => {
     });
   }, []);
 
-  const handleStyleChange = useCallback((styleId: string) => {
+  const handleStyleChange = useCallback(async (styleId: string) => {
+    if (styleId === currentStyleId) return;
+    // Show interstitial ad if enabled via admin config
+    if (adsConfig?.showAdOnQiblaStyleChange) {
+      await showAd();
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCurrentStyleId(styleId);
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
-  }, []);
+  }, [currentStyleId, adsConfig?.showAdOnQiblaStyleChange, showAd]);
 
-  // ------ Sensors ------
+  // ------ Location + Heading ------
   useEffect(() => {
-    let sub: { remove: () => void } | null = null;
+    let headingSub: Location.LocationSubscription | null = null;
+    let mounted = true;
 
     (async () => {
       try {
+        // 0. Check internet connectivity
+        const online = await checkConnectivity();
+        if (!online) {
+          if (mounted) setIsOffline(true);
+          return;
+        }
+
+        // 1. Request location permission
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setErrorMsg('يرجى السماح بإذن الموقع لتحديد اتجاه القبلة');
+          if (mounted) setErrorMsg('يرجى السماح بإذن الموقع لتحديد اتجاه القبلة');
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
-          setErrorMsg(
-            'خدمات الموقع معطلة من إعدادات الجهاز. يرجى تفعيلها ثم إعادة المحاولة.',
-          );
+          if (mounted)
+            setErrorMsg(
+              'خدمات الموقع معطلة من إعدادات الجهاز. يرجى تفعيلها ثم إعادة المحاولة.',
+            );
           return;
         }
 
-        let location: Location.LocationObject;
+        // 2. Get current position
+        let position: Location.LocationObject;
         try {
-          location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Highest,
-            maximumAge: 5000,
-            timeout: 20000,
+          position = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
           });
         } catch {
-          setErrorMsg(
-            'تعذر تحديد الموقع. يرجى تفعيل خدمات الموقع من إعدادات الجهاز.',
-          );
+          if (mounted)
+            setErrorMsg(
+              'تعذر تحديد الموقع. يرجى تفعيل خدمات الموقع من إعدادات الجهاز.',
+            );
           return;
         }
 
-        const lat = location.coords.latitude;
-        const lng = location.coords.longitude;
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
 
-        // Get bearing — try API, verify with local, fallback
-        const apiBearing = await fetchQiblaFromAladhan(lat, lng);
-        const localBearing = calculateQiblaBearing(lat, lng);
+        if (mounted) setUserCoords({ lat, lng });
 
-        if (typeof apiBearing === 'number') {
-          let diff = Math.abs(((apiBearing - localBearing + 540) % 360) - 180);
-          setQiblaBearing(diff < 5 ? apiBearing : localBearing);
-        } else {
-          setQiblaBearing(localBearing);
+        // 3. Get Qibla bearing: UmmahAPI → AlAdhan → local calculation
+        let bearing = await fetchQiblaDirection(lat, lng);
+        if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
+        if (mounted) {
+          setQiblaBearing(bearing ?? calculateQiblaBearingLocal(lat, lng));
         }
 
-        if (!(await Magnetometer.isAvailableAsync())) {
-          setErrorMsg(
-            'مستشعر البوصلة غير متاح على هذا الجهاز. يرجى التجربة على هاتف حقيقي.',
-          );
-          return;
-        }
+        // 4. Subscribe to compass heading via expo-location
+        //    This returns magHeading (0-360, degrees from magnetic North)
+        //    This is the SAME data source the built-in iOS/Android compass uses.
+        headingSub = await Location.watchHeadingAsync((headingData) => {
+          if (!mounted) return;
+          const newHeading = headingData.trueHeading >= 0
+            ? headingData.trueHeading  // Use true north if available
+            : headingData.magHeading;  // Fall back to magnetic north
 
-        Magnetometer.setUpdateInterval(60);
-
-        sub = Magnetometer.addListener((data) => {
-          // ---------------------------------------------------------------
-          // CORRECT magnetometer → compass heading conversion
-          // ---------------------------------------------------------------
-          // atan2(y, x) gives radians from +X axis, counter-clockwise positive
-          // For compass: 0°=North, 90°=East, clockwise
-          //
-          // On iOS:
-          //   +x = Right, +y = Up (towards top of screen)
-          //   North = +y direction → atan2 angle = 90°
-          //   Compass heading = (90 - angleDeg + 360) % 360
-          //
-          // On Android:
-          //   Same convention with expo-sensors Magnetometer
-          // ---------------------------------------------------------------
-          const angleDeg = Math.atan2(data.y, data.x) * (180 / Math.PI);
-          const rawHeading = ((90 - angleDeg) % 360 + 360) % 360;
-
-          // --- Cumulative heading to avoid 360/0 boundary spin ---
-          // Calculate shortest delta from last raw heading
-          let delta = rawHeading - lastRawHeading.current;
-          // Normalize delta to [-180, 180]
+          // --- Cumulative heading to prevent 360→0 jump ---
+          let delta = newHeading - lastHeading.current;
           if (delta > 180) delta -= 360;
           if (delta < -180) delta += 360;
-          lastRawHeading.current = rawHeading;
+          lastHeading.current = newHeading;
 
-          // Apply delta to cumulative (this never wraps, so animation is smooth)
-          const newCumulative = headingCumulative.value + delta;
-          headingCumulative.value = withTiming(newCumulative, {
-            duration: 120,
-            easing: Easing.out(Easing.quad),
+          // Track target separately from animated value to prevent drift
+          targetCumulative.current += delta;
+          headingCumulative.value = withSpring(targetCumulative.current, {
+            damping: 28,
+            stiffness: 170,
+            mass: 1,
           });
         });
       } catch (err) {
-        console.warn('Sensor/Location Error:', err);
-        setErrorMsg('فشل في تهيئة أجهزة الاستشعار.');
+        console.warn('Qibla init error:', err);
+        if (mounted) setErrorMsg('فشل في تهيئة أجهزة الاستشعار.');
       }
     })();
 
     return () => {
-      sub?.remove();
+      mounted = false;
+      headingSub?.remove();
     };
-  }, []);
+  }, [retryKey]);
 
   // ------ Guidance ------
   const onGuidanceUpdate = useCallback(
@@ -272,14 +307,28 @@ const QiblaScreen = () => {
     [],
   );
 
-  // ------ DIAL: rotates opposite to heading so N/S/E/W match real world ------
+  // =====================================================================
+  // HOW IT WORKS:
+  //
+  // - The KAABA is FIXED at the top of the screen — it never moves.
+  //   It serves as the target reference point.
+  //
+  // - The COMPASS DIAL rotates = -(heading). So N/S/E/W labels on the
+  //   dial SVG always face their real-world directions.
+  //
+  // - The POINTER rotates = qiblaBearing - heading. When the pointer
+  //   arrow aligns upward toward the fixed Kaaba icon, the user is
+  //   facing Qibla.
+  // =====================================================================
+
+  // DIAL: rotates opposite to heading
   const dialAnimatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ rotate: `${-headingCumulative.value}deg` }],
     };
   });
 
-  // ------ POINTER: points toward Qibla relative to user ------
+  // POINTER: rotates to point toward Qibla
   const pointerAnimatedStyle = useAnimatedStyle(() => {
     const safeBearing =
       typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
@@ -287,7 +336,7 @@ const QiblaScreen = () => {
         : 0;
     const rotation = safeBearing - headingCumulative.value;
 
-    // Guidance calculation
+    // Calculate guidance
     let delta = ((safeBearing - headingCumulative.value) % 360 + 360) % 360;
     if (delta > 180) delta -= 360;
     let text: string;
@@ -307,49 +356,34 @@ const QiblaScreen = () => {
     };
   }, [qiblaBearing]);
 
-  // ------ KAABA: fixed position on compass pointing to Qibla ------
-  // Uses cos/sin to place it at a stable orbit point — NO rotate+translate trick
-  const kaabaPositionStyle = useAnimatedStyle(() => {
-    const safeBearing =
-      typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
-        ? qiblaBearing
-        : 0;
-    const angleDeg = safeBearing - headingCumulative.value;
-    // Convert to radians, -90 because 0deg in CSS = 12 o'clock (top)
-    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
-    const tx = Math.cos(angleRad) * KAABA_ORBIT_RADIUS;
-    const ty = Math.sin(angleRad) * KAABA_ORBIT_RADIUS;
+  // ------ Loading / Error / Offline ------
+  if (isOffline) {
+    return (
+      <View style={styles.centeredLoading}>
+        <MaterialCommunityIcons name="wifi-off" size={56} color="#FF6B6B" />
+        <Text style={[styles.loadingText, { color: '#FF6B6B', marginTop: 16 }]}>
+          يتطلب اتصال بالإنترنت
+        </Text>
+        <Text style={[styles.loadingText, { color: '#aaa', fontSize: 14, marginTop: 6 }]}>
+          يرجى الاتصال بالإنترنت لتحديد اتجاه القبلة
+        </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setIsOffline(false);
+            setQiblaBearing(null);
+            setErrorMsg(null);
+            setRetryKey((k) => k + 1);
+          }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+          <Text style={styles.retryText}>إعادة المحاولة</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-    return {
-      transform: [{ translateX: tx }, { translateY: ty }],
-    };
-  }, [qiblaBearing]);
-
-  // ------ KAABA 3D: realistic tilt based on angular offset from Qibla ------
-  const kaaba3DStyle = useAnimatedStyle(() => {
-    const safeBearing =
-      typeof qiblaBearing === 'number' && !isNaN(qiblaBearing)
-        ? qiblaBearing
-        : 0;
-    let delta = ((safeBearing - headingCumulative.value) % 360 + 360) % 360;
-    if (delta > 180) delta -= 360;
-
-    // Tilt: perspective-based 3D
-    const tiltY = interpolate(delta, [-180, 0, 180], [-30, 0, 30]);
-    const tiltX = interpolate(Math.abs(delta), [0, 90, 180], [5, 20, 8]);
-    const scale = interpolate(Math.abs(delta), [0, 20, 180], [1.2, 1.0, 0.85]);
-
-    return {
-      transform: [
-        { perspective: 500 },
-        { rotateY: `${tiltY}deg` },
-        { rotateX: `${tiltX}deg` },
-        { scale },
-      ],
-    };
-  }, [qiblaBearing]);
-
-  // ------ Loading / Error ------
   if (!qiblaBearing && !errorMsg) {
     return (
       <View style={styles.centeredLoading}>
@@ -362,9 +396,7 @@ const QiblaScreen = () => {
   if (errorMsg) {
     return (
       <View style={styles.centeredLoading}>
-        <Text style={[styles.loadingText, { color: '#FF6B6B' }]}>
-          {errorMsg}
-        </Text>
+        <Text style={[styles.loadingText, { color: '#FF6B6B' }]}>{errorMsg}</Text>
       </View>
     );
   }
@@ -372,15 +404,101 @@ const QiblaScreen = () => {
   const isAligned = guidance.includes('القبلة');
 
   return (
-    <View style={styles.root}>
-      {/* -------- Header -------- */}
-      <View style={styles.header}>
-        <Text style={styles.titleText}>اتجاه القبلة</Text>
-        <Text style={styles.subtitleText}>{Math.round(qiblaBearing!)}°</Text>
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 }]}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      {/* 1. Guidance text */}
+      <View style={styles.guidanceContainer}>
+        <BlurView
+          intensity={30}
+          tint="dark"
+          style={[styles.guidanceBlur, isAligned && styles.guidanceActive]}
+        >
+          <Text
+            style={[styles.guidanceText, isAligned && styles.guidanceTextActive]}
+          >
+            {guidance}
+          </Text>
+        </BlurView>
       </View>
 
-      {/* -------- Compass -------- */}
+      {/* 2. Style Switcher */}
+      <View style={styles.styleSwitcherWrap}>
+        <BlurView intensity={40} tint="dark" style={styles.styleSwitcherBlur}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.styleSwitcherScroll}
+          >
+            {AVAILABLE_STYLES.map((styleId) => {
+              const isActive = currentStyleId === styleId;
+              const assets =
+                QIBLA_STYLES[styleId as keyof typeof QIBLA_STYLES];
+              const thumbDialSize = THUMBNAIL_SIZE - 10;
+              const thumbPointerSize = thumbDialSize * 0.65;
+              const thumbKaabaSize = thumbDialSize * 0.35;
+              return (
+                <TouchableOpacity
+                  key={styleId}
+                  onPress={() => handleStyleChange(styleId)}
+                  activeOpacity={0.7}
+                  style={[
+                    styles.styleThumbnail,
+                    isActive && styles.styleThumbnailActive,
+                  ]}
+                >
+                  <View style={{ width: thumbDialSize, height: thumbDialSize, alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Dial background */}
+                    <View style={{ position: 'absolute', width: thumbDialSize, height: thumbDialSize }}>
+                      <SafeSvgRenderer
+                        asset={assets.dial}
+                        width={thumbDialSize}
+                        height={thumbDialSize}
+                      />
+                    </View>
+                    {/* Pointer overlay */}
+                    <SafeSvgRenderer
+                      asset={assets.pointer}
+                      width={thumbPointerSize}
+                      height={thumbPointerSize}
+                      viewBox="0 0 300 300"
+                      preserveAspectRatio="xMidYMid meet"
+                    />
+                    {/* Kaaba at top */}
+                    <View style={{ position: 'absolute', top: -2, alignItems: 'center' }}>
+                      <SafeSvgRenderer
+                        asset={assets.kaaba}
+                        width={thumbKaabaSize}
+                        height={thumbKaabaSize}
+                        viewBox="0 0 300 300"
+                        preserveAspectRatio="xMidYMid meet"
+                      />
+                    </View>
+                  </View>
+                  {isActive && <View style={styles.activeDot} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </BlurView>
+      </View>
+
+      {/* 3. Kaaba + Compass */}
       <View style={styles.compassArea}>
+        {/* KAABA — static, fixed above compass */}
+        <View style={styles.fixedKaabaContainer}>
+          <SafeSvgRenderer
+            asset={activeAssets.kaaba}
+            width={KAABA_SIZE}
+            height={KAABA_SIZE}
+            viewBox="0 0 300 300"
+            preserveAspectRatio="xMidYMid meet"
+          />
+        </View>
+
         <View
           style={{
             width: COMPASS_SIZE,
@@ -389,14 +507,10 @@ const QiblaScreen = () => {
             justifyContent: 'center',
           }}
         >
-          {/* DIAL — rotates so N/S/E/W match real world */}
+          {/* DIAL — rotates with heading so N/S/E/W match real world */}
           <Animated.View
             style={[
-              {
-                width: COMPASS_SIZE,
-                height: COMPASS_SIZE,
-                position: 'absolute',
-              },
+              { width: COMPASS_SIZE, height: COMPASS_SIZE, position: 'absolute' },
               dialAnimatedStyle,
             ]}
           >
@@ -424,82 +538,20 @@ const QiblaScreen = () => {
               preserveAspectRatio="xMidYMid meet"
             />
           </Animated.View>
-
-          {/* KAABA — orbits inside compass via translateX/Y (stable, no jitter) */}
-          <Animated.View
-            style={[styles.kaabaAnchor, kaabaPositionStyle]}
-            pointerEvents="none"
-          >
-            <Animated.View style={[styles.kaabaBox, kaaba3DStyle]}>
-              <SafeSvgRenderer
-                asset={require('../../components/qibla/svg/kaaba.svg')}
-                width={KAABA_SIZE}
-                height={KAABA_SIZE}
-                viewBox="0 0 300 300"
-                preserveAspectRatio="xMidYMid meet"
-              />
-            </Animated.View>
-          </Animated.View>
         </View>
       </View>
 
-      {/* -------- Guidance -------- */}
-      <View style={styles.guidanceContainer}>
-        <BlurView
-          intensity={30}
-          tint="dark"
-          style={[styles.guidanceBlur, isAligned && styles.guidanceActive]}
-        >
-          <Text
-            style={[
-              styles.guidanceText,
-              isAligned && styles.guidanceTextActive,
-            ]}
-          >
-            {guidance}
+      {/* 4. Title + degree + coordinates at the bottom */}
+      <View style={styles.header}>
+        <Text style={styles.titleText}>اتجاه القبلة</Text>
+        <Text style={styles.subtitleText}>{Math.round(qiblaBearing!)}°</Text>
+        {userCoords && (
+          <Text style={styles.coordsText}>
+            {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
           </Text>
-        </BlurView>
+        )}
       </View>
-
-      {/* -------- Style Switcher (10 styles) -------- */}
-      <View style={styles.styleSwitcherWrap}>
-        <BlurView
-          intensity={40}
-          tint="dark"
-          style={styles.styleSwitcherBlur}
-        >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.styleSwitcherScroll}
-          >
-            {AVAILABLE_STYLES.map((styleId) => {
-              const isActive = currentStyleId === styleId;
-              const assets =
-                QIBLA_STYLES[styleId as keyof typeof QIBLA_STYLES];
-              return (
-                <TouchableOpacity
-                  key={styleId}
-                  onPress={() => handleStyleChange(styleId)}
-                  activeOpacity={0.7}
-                  style={[
-                    styles.styleThumbnail,
-                    isActive && styles.styleThumbnailActive,
-                  ]}
-                >
-                  <SafeSvgRenderer
-                    asset={assets.dial}
-                    width={THUMBNAIL_SIZE - 14}
-                    height={THUMBNAIL_SIZE - 14}
-                  />
-                  {isActive && <View style={styles.activeDot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </BlurView>
-      </View>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -511,10 +563,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
+  scrollContainer: {
+    flexGrow: 1,
+  },
   header: {
     alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingTop: 8,
+    paddingBottom: 2,
   },
   titleText: {
     color: '#fff',
@@ -527,29 +582,28 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Regular',
     marginTop: 2,
   },
+  coordsText: {
+    color: '#777',
+    fontSize: 12,
+    fontFamily: 'Cairo-Regular',
+    marginTop: 2,
+  },
   compassArea: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 10,
   },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Kaaba anchor sits at center of compass, then translateX/Y moves it
-  kaabaAnchor: {
-    position: 'absolute',
-    width: KAABA_SIZE,
-    height: KAABA_SIZE,
+  // Kaaba is FIXED above the compass — never rotates
+  fixedKaabaContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  kaabaBox: {
-    width: KAABA_SIZE,
-    height: KAABA_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Drop shadow for depth
+    marginBottom: -KAABA_SIZE * 0.35,
+    zIndex: 10,
+    // Shadow for depth
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
@@ -558,7 +612,7 @@ const styles = StyleSheet.create({
   },
   guidanceContainer: {
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   guidanceBlur: {
     borderRadius: 18,
@@ -587,9 +641,9 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
-  // Style switcher
   styleSwitcherWrap: {
     paddingHorizontal: 12,
+    paddingTop: 4,
     paddingBottom: 8,
   },
   styleSwitcherBlur: {
@@ -607,7 +661,7 @@ const styles = StyleSheet.create({
   styleThumbnail: {
     width: THUMBNAIL_SIZE,
     height: THUMBNAIL_SIZE,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -640,6 +694,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Regular',
     fontSize: 16,
     textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#2f7659',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 20,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Cairo-SemiBold',
   },
 });
 

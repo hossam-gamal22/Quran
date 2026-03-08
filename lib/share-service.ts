@@ -142,6 +142,26 @@ export async function shareImage(imageUri: string, title?: string): Promise<void
 }
 
 // ===============================
+// التقاط مع علامة التطبيق
+// ===============================
+
+/**
+ * Captures a ViewShot ref and shares the resulting image.
+ * Use with BrandedCapture component for automatic branding.
+ */
+export async function captureWithBranding(
+  captureHandle: { capture: () => Promise<string> },
+  title?: string
+): Promise<void> {
+  try {
+    const uri = await captureHandle.capture();
+    await shareImage(uri, title);
+  } catch (error) {
+    console.error('Error capturing branded image:', error);
+  }
+}
+
+// ===============================
 // نسخ للحافظة
 // ===============================
 export async function copyText(text: string): Promise<void> {

@@ -11,6 +11,7 @@ import {
   StatusBar,
   RefreshControl,
   Dimensions,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -160,15 +161,18 @@ interface SpecialDayCardProps {
 const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDarkMode }) => {
   return (
     <Animated.View entering={FadeIn.duration(500)}>
-      <View
-        style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
-      >
-        <View style={styles.specialDayHeader}>
+      <View style={styles.starAboveCardWrapper}>
+        <View style={styles.starAboveCard}>
           <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
-          <Text style={[styles.specialDayTitle, isDarkMode && styles.textLight]}>
-            يوم مميز: {day.nameAr}
-          </Text>
         </View>
+        <View
+          style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
+        >
+          <View style={styles.specialDayHeader}>
+            <Text style={[styles.specialDayTitle, isDarkMode && styles.textLight]}>
+              يوم مميز: {day.nameAr}
+            </Text>
+          </View>
         <Text style={[styles.specialDayDesc, isDarkMode && styles.textMuted]}>
           {day.description}
         </Text>
@@ -196,6 +200,7 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
             ))}
           </View>
         )}
+        </View>
       </View>
     </Animated.View>
   );
@@ -642,9 +647,24 @@ const styles = StyleSheet.create({
   specialDaySection: {
     marginTop: 16,
   },
+  starAboveCardWrapper: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  starAboveCard: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(245,166,35,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -20,
+    zIndex: 1,
+  },
   specialDayCard: {
     borderRadius: 16,
     padding: 16,
+    paddingTop: 28,
   },
   specialDayHeader: {
     flexDirection: 'row',

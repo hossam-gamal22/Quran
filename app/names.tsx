@@ -24,6 +24,7 @@ import { useTranslation } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { NativeTabs } from '@/components/ui/NativeTabs';
 import { copyToClipboard, shareText } from '../lib/clipboard';
 import namesTranslations from '@/data/json/names-of-allah-translations.json';
 
@@ -926,7 +927,9 @@ export default function AllahNamesScreen() {
   
   // المشاركة
   const handleShareName = async (name: AllahName) => {
-    await shareAllahName(name.name, name.meaning, name.description);
+    const localizedMeaning = getNameMeaning(name, currentLang);
+    const text = `\u2728 \u0645\u0646 \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0644\u0647 \u0627\u0644\u062d\u0633\u0646\u0649 \u2728\n\n\ud83c\udf1f ${name.name}\n\n\ud83d\udc8e \u0627\u0644\u0645\u0639\u0646\u0649: ${localizedMeaning}\n\n\ud83d\udcdd \u0627\u0644\u0634\u0631\u062d:\n${name.description}${name.evidence ? `\n\n\ud83d\udcd6 \u0627\u0644\u062f\u0644\u064a\u0644:\n${name.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
+    await shareText(text, `${name.name} - \u0623\u0633\u0645\u0627\u0621 \u0627\u0644\u0644\u0647 \u0627\u0644\u062d\u0633\u0646\u0649`);
     setShowShareModal(false);
   };
   
@@ -1053,13 +1056,14 @@ export default function AllahNamesScreen() {
         <Text style={[styles.headerTitle, isDarkMode && { color: '#fff' }]}>أسماء الله الحسنى</Text>
         
         <View style={{ width: 110 }}>
-          <GlassSegmentedControl
-            segments={[
-              { key: 'grid', label: 'شبكة', icon: 'view-grid' },
-              { key: 'list', label: 'قائمة', icon: 'view-list' },
+          <NativeTabs
+            tabs={[
+              { key: 'grid', label: 'شبكة' },
+              { key: 'list', label: 'قائمة' },
             ]}
             selected={viewMode}
             onSelect={(key) => setViewMode(key as 'grid' | 'list')}
+            indicatorColor="#2f7659"
           />
         </View>
       </View>
@@ -1503,7 +1507,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: 'Cairo-Bold',
-    color: Colors.text,
+    color: '#FFFFFF',
   },
   
   meaningSection: {
@@ -1514,7 +1518,7 @@ const styles = StyleSheet.create({
   meaningText: {
     fontSize: 18,
     fontFamily: 'Cairo-SemiBold',
-    color: Colors.text,
+    color: '#FFFFFF',
     textAlign: 'center',
   },
   
@@ -1526,7 +1530,7 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 15,
     fontFamily: 'Cairo-Regular',
-    color: Colors.text,
+    color: '#E0E0E0',
     lineHeight: 26,
     textAlign: 'justify',
   },
@@ -1541,7 +1545,7 @@ const styles = StyleSheet.create({
   evidenceText: {
     fontSize: 16,
     fontFamily: 'Amiri-Regular',
-    color: Colors.text,
+    color: '#E0E0E0',
     textAlign: 'center',
     lineHeight: 28,
   },

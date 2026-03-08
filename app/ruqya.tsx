@@ -218,7 +218,7 @@ export default function RuqyaScreen() {
   const shareRuqya = async (item: Zikr) => {
     try {
       const translation = getZikrTranslation(item, language);
-      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 الرؤية الشرعية\nمن تطبيق روح المسلم`;
+      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 الرقية الشرعية\nمن تطبيق روح المسلم`;
       
       await Share.share({ message });
     } catch (error) {
@@ -232,7 +232,7 @@ export default function RuqyaScreen() {
 
   const shareAll = async () => {
     try {
-      let message = '🔒 الرؤية الشرعية\n\n';
+      let message = '🔒 الرقية الشرعية\n\n';
       
       ruqyaList.forEach((item, index) => {
         message += `${index + 1}. ${item.arabic}\n`;
@@ -351,11 +351,15 @@ export default function RuqyaScreen() {
 
             {/* الفضل */}
             {item.benefit && (
-              <View style={[styles.benefitContainer, { backgroundColor: '#6366F115' }]}>
-                <Ionicons name="star" size={16} color="#6366F1" />
-                <Text style={[styles.benefitText, { color: '#6366F1' }]}>
-                  {getZikrBenefit(item, language)}
-                </Text>
+              <View style={styles.benefitStarWrapper}>
+                <View style={[styles.benefitStarCircle, { backgroundColor: '#6366F115' }]}>
+                  <Ionicons name="star" size={16} color="#6366F1" />
+                </View>
+                <View style={[styles.benefitContainer, { backgroundColor: '#6366F115' }]}>
+                  <Text style={[styles.benefitText, { color: '#6366F1' }]}>
+                    {getZikrBenefit(item, language)}
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -448,7 +452,7 @@ export default function RuqyaScreen() {
             </TouchableOpacity>
             
             <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {language === 'ar' ? 'الرؤية الشرعية' : 'Legal Sighting'}
+              {language === 'ar' ? 'الرقية الشرعية' : 'Ruqyah'}
             </Text>
             
             <View style={styles.headerActions}>
@@ -694,13 +698,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6366F1',
   },
-  benefitContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 12,
+  benefitStarWrapper: {
+    alignItems: 'center',
     marginBottom: 16,
-    gap: 8,
+  },
+  benefitStarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -16,
+    zIndex: 1,
+  },
+  benefitContainer: {
+    alignItems: 'center',
+    padding: 12,
+    paddingTop: 22,
+    borderRadius: 12,
   },
   benefitText: {
     flex: 1,

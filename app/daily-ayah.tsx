@@ -11,14 +11,13 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import { getVerseQcfData } from '@/lib/qcf-page-data';
-import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
+import { useRouter, Stack } from 'expo-router';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -81,6 +80,11 @@ const BG_CATEGORIES = [
       'https://images.unsplash.com/photo-1619608802079-d9c42e3d93fe?w=800&q=80',
     ],
   },
+  {
+    id: 'solid',
+    label: '🎨 ألوان',
+    images: ['#1a1a2e', '#1B5E20', '#0D47A1'],
+  },
 ];
 
 // ─── Card themes ──────────────────────────────────────────────────────────────
@@ -92,65 +96,71 @@ const CARD_STYLES = [
 ];
 
 // ─── Ayah Image Card (off-screen for capture) ─────────────────────────────────
+// ─── Uthmani font for Mushaf-style display ────────────────────────────────────
+const UTHMANI_FONT = 'KFGQPCUthmanic';
+const UTHMANI_FALLBACK = 'Amiri';
+
 interface AyahCardProps {
   ayah: typeof DAILY_AYAHS[0];
   bgUrl: string;
   cardStyle: typeof CARD_STYLES[0];
   cardRef: React.RefObject<ViewShot>;
   showTranslation: boolean;
-  qcfGlyphs: string[] | null;
-  qcfFontFamily: string | null;
 }
 
-function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily }: AyahCardProps) {
+const toArabicNumeral = (n: number) => n.toString().replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+
+const TEXT_SHADOW = {
+  textShadowColor: 'rgba(0,0,0,0.5)',
+  textShadowOffset: { width: 0, height: 1 } as const,
+  textShadowRadius: 3,
+};
+
+function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
-  const useQcf = qcfGlyphs && qcfGlyphs.length > 0 && qcfFontFamily;
+  const isSolidBg = bgUrl.startsWith('#');
+  const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
 
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}>
-      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: '#000' }}>
+      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: isSolidBg ? bgUrl : '#000' }}>
         {/* Background image */}
-        <RNImage
-          source={{ uri: bgUrl }}
-          style={{ width: '100%', height: '100%', position: 'absolute' }}
-          resizeMode="cover"
-        />
+        {!isSolidBg && (
+          <RNImage
+            source={{ uri: bgUrl }}
+            style={{ width: '100%', height: '100%', position: 'absolute' }}
+            resizeMode="cover"
+          />
+        )}
         {/* Color overlay */}
         <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: cardStyle.overlayColor }} />
 
         {/* Content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-          {/* Top ornament */}
-          <Text style={{ fontSize: 24, marginBottom: 12, opacity: 0.9 }}>☽</Text>
-
-          {/* Bismillah */}
-          <Text style={{ color: cardStyle.accentColor, fontSize: 14, fontWeight: '700', marginBottom: 16, opacity: 0.9 }}>
-            بسم الله الرحمن الرحيم
+          {/* Surah name */}
+          <Text style={{ fontSize: 15, color: cardStyle.accentColor, fontFamily: UTHMANI_FALLBACK, textAlign: 'center', marginBottom: 12, ...TEXT_SHADOW }}>
+            سورة {ayah.ref.split(' ')[0]}
           </Text>
 
-          <View style={{ width: 50, height: 1.5, backgroundColor: cardStyle.accentColor, opacity: 0.6, marginBottom: 20, borderRadius: 1 }} />
+          {/* Ornamental top divider */}
+          <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14, letterSpacing: 6 }}>✦ ─── ✦</Text>
 
-          {/* Arabic — QCF or fallback */}
-          {useQcf ? (
-            <Text style={{ fontSize: 28, color: cardStyle.textColor, textAlign: 'center', lineHeight: 52, fontFamily: qcfFontFamily, marginBottom: 20 }}>
-              {qcfGlyphs.join('')}
-            </Text>
-          ) : (
-            <Text style={{ fontSize: 22, color: cardStyle.textColor, textAlign: 'center', lineHeight: 42, fontWeight: '600', marginBottom: 20 }}>
-              {ayah.arabic}
-            </Text>
-          )}
+          {/* Arabic verse in Uthmani script with inline verse number */}
+          <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
+            {verseWithNumber}
+          </Text>
 
-          <View style={{ width: 50, height: 1.5, backgroundColor: cardStyle.accentColor, opacity: 0.6, marginBottom: 16, borderRadius: 1 }} />
+          {/* Ornamental bottom divider */}
+          <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14, letterSpacing: 6 }}>✦ ─── ✦</Text>
 
           {/* Ref badge */}
-          <View style={{ backgroundColor: `${cardStyle.accentColor}25`, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: `${cardStyle.accentColor}50`, marginBottom: 12 }}>
-            <Text style={{ color: cardStyle.accentColor, fontWeight: '800', fontSize: 13 }}>﴿ {ayah.ref} ﴾</Text>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>
+            <Text style={{ color: '#FFFFFF', fontFamily: UTHMANI_FALLBACK, fontSize: 13, ...TEXT_SHADOW }}>﴿ {ayah.ref} ﴾</Text>
           </View>
 
           {/* Translation */}
           {showTranslation && (
-            <Text style={{ color: cardStyle.textColor, opacity: 0.75, fontSize: 12, textAlign: 'center', fontStyle: 'italic', paddingHorizontal: 10 }}>
+            <Text style={{ color: '#FFFFFF', opacity: 0.85, fontSize: 12, textAlign: 'center', fontStyle: 'italic', paddingHorizontal: 10, direction: 'ltr', writingDirection: 'ltr', ...TEXT_SHADOW }}>
               {ayah.trans}
             </Text>
           )}
@@ -159,7 +169,7 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
         {/* Branding watermark */}
         <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <RNImage source={require('@/assets/images/App-icon.png')} style={{ width: 20, height: 20, borderRadius: 5 }} />
-          <Text style={{ color: cardStyle.accentColor, opacity: 0.6, fontSize: 11, fontWeight: '600' }}>
+          <Text style={{ color: '#FFFFFF', opacity: 0.6, fontSize: 11, fontWeight: '600', ...TEXT_SHADOW }}>
             روح المسلم
           </Text>
         </View>
@@ -171,6 +181,7 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function DailyAyahVideoScreen() {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
   const router = useRouter();
   const cardRef = useRef<ViewShot>(null);
 
@@ -186,35 +197,14 @@ export default function DailyAyahVideoScreen() {
   const [exporting, setExporting] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
 
-  // QCF state
-  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
-  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
-  const [qcfLoading, setQcfLoading] = useState(true);
+
 
   const currentAyah = DAILY_AYAHS[selectedAyahIdx];
   const currentBg = selectedCat.images[selectedBgIdx];
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Load QCF font when ayah changes
-  useEffect(() => {
-    let cancelled = false;
-    setQcfLoading(true);
-    const data = getVerseQcfData(currentAyah.surah, currentAyah.ayah);
-    if (!data) {
-      setQcfGlyphs(null);
-      setQcfFontFamily(null);
-      setQcfLoading(false);
-      return;
-    }
-    loadPageFont(data.page).then(() => {
-      if (cancelled) return;
-      setQcfGlyphs(data.glyphs);
-      setQcfFontFamily(getPageFontFamily(data.page));
-      setQcfLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [currentAyah.surah, currentAyah.ayah]);
+
 
   // Navigate to ayah in Mushaf on long-press
   const handleLongPress = useCallback(() => {
@@ -275,7 +265,7 @@ export default function DailyAyahVideoScreen() {
   }, [currentAyah]);
 
   const s = StyleSheet.create({
-    header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'center' },
+    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },
     subtitle: { fontSize: 13, color: colors.textLight },
     sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: 'right', marginBottom: 8, marginTop: 4 },
@@ -295,11 +285,19 @@ export default function DailyAyahVideoScreen() {
   });
 
   return (
+    <>
+    <Stack.Screen options={{ headerShown: false }} />
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>✨ آية اليوم</Text>
-        <Text style={s.subtitle}>شارك كلام الله مع أحبائك</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={{ alignItems: 'center', flex: 1 }}>
+          <Text style={s.title}>✨ آية اليوم</Text>
+          <Text style={s.subtitle}>شارك كلام الله مع أحبائك</Text>
+        </View>
+        <View style={{ width: 32 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -387,8 +385,6 @@ export default function DailyAyahVideoScreen() {
               cardStyle={selectedCardStyle}
               cardRef={cardRef}
               showTranslation={showTranslation}
-              qcfGlyphs={qcfGlyphs}
-              qcfFontFamily={qcfFontFamily}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -418,36 +414,57 @@ export default function DailyAyahVideoScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Ayah text preview */}
+        {/* Ayah text preview — Mushaf style */}
         <TouchableOpacity
           activeOpacity={0.85}
           onLongPress={handleLongPress}
           delayLongPress={500}
-          style={{ marginHorizontal: 16, padding: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border }}
+          style={{
+            marginHorizontal: 16,
+            padding: 20,
+            backgroundColor: isDarkMode ? 'rgba(50,45,35,0.6)' : 'rgba(253,248,235,0.95)',
+            borderRadius: 16,
+            borderWidth: 1.5,
+            borderColor: isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)',
+          }}
         >
-          {qcfGlyphs && qcfFontFamily ? (
-            <Text style={{ fontSize: 24, color: colors.text, textAlign: 'center', lineHeight: 46, fontFamily: qcfFontFamily, marginBottom: 8 }}>
-              {qcfGlyphs.join('')}
-            </Text>
-          ) : (
-            <Text style={{ fontSize: 18, color: colors.text, textAlign: 'right', lineHeight: 34, fontWeight: '600', marginBottom: 8 }}>
-              {currentAyah.arabic}
-            </Text>
-          )}
-          <Text style={{ fontSize: 13, color: colors.primary, textAlign: 'right', fontWeight: '700' }}>
+          {/* Surah name */}
+          <Text style={{ fontSize: 16, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK, marginBottom: 8 }}>
+            سورة {currentAyah.ref.split(' ')[0]}
+          </Text>
+
+          {/* Ornamental divider */}
+          <Text style={{ fontSize: 14, color: isDarkMode ? 'rgba(180,160,100,0.5)' : 'rgba(140,120,60,0.4)', textAlign: 'center', marginBottom: 10, letterSpacing: 4 }}>✦ ─────── ✦</Text>
+
+          {/* Verse text with inline number */}
+          <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 10, writingDirection: 'rtl' }}>
+            {currentAyah.arabic} ﴿{toArabicNumeral(currentAyah.ayah)}﴾
+          </Text>
+
+          {/* Ornamental divider */}
+          <Text style={{ fontSize: 14, color: isDarkMode ? 'rgba(180,160,100,0.5)' : 'rgba(140,120,60,0.4)', textAlign: 'center', marginBottom: 8, letterSpacing: 4 }}>✦ ─────── ✦</Text>
+
+          {/* Surah reference */}
+          <Text style={{ fontSize: 14, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK }}>
             ﴿ {currentAyah.ref} ﴾
           </Text>
-          <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 4, opacity: 0.6 }}>
+
+          <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 8, opacity: 0.6 }}>
             اضغط مطولاً للذهاب للآية في المصحف
           </Text>
+
+          {/* Translation with proper direction */}
           {showTranslation && (
-            <Text style={{ fontSize: 13, color: colors.textLight, marginTop: 8, fontStyle: 'italic' }}>
-              {currentAyah.trans}
-            </Text>
+            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border, direction: 'ltr' }}>
+              <Text style={{ fontSize: 14, color: colors.textLight, textAlign: 'left', writingDirection: 'ltr', fontStyle: 'italic', lineHeight: 22 }}>
+                {currentAyah.trans}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
 
       </ScrollView>
     </ScreenContainer>
+    </>
   );
 }

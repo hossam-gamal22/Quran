@@ -13,10 +13,11 @@ import {
   ScrollView,
   Image,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -33,6 +34,7 @@ import { useColors } from '../../hooks/use-colors';
 import { getLastRead } from '../../lib/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import { NativeTabs } from '../../components/ui/NativeTabs';
 import {
   GlassCard,
   GlassToggle,
@@ -218,7 +220,7 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
 export default function QuranScreen() {
   const router = useRouter();
 
-  const { isDarkMode, settings, updateDisplay, isRTL } = useSettings();
+  const { isDarkMode, settings, updateDisplay, updateNotifications, isRTL } = useSettings();
   const { config } = useAppConfig();
   const colors = useColors();
   const isLightBg = !isDarkMode;
@@ -253,7 +255,7 @@ export default function QuranScreen() {
 
     const byKey = new Map((config.uiCustomization?.quranSegments || []).map((item) => [item.key, item]));
 
-    return (['surahs', 'juz', 'listen'] as const).map((key) => {
+    return (['listen', 'juz', 'surahs'] as const).map((key) => {
       const item = byKey.get(key);
       const label = settings.language === 'ar'
         ? (item?.labelAr || defaults[key].label)
@@ -380,7 +382,7 @@ export default function QuranScreen() {
       'احفظ فاصلًا أولًا من شاشة المصحف عبر الضغط المطول على الآية، أو افتح المفضلة.',
       [
         { text: 'إلغاء', style: 'cancel' },
-        { text: 'فتح المفضلة', onPress: () => router.push('/favorites') },
+        { text: 'فتح المفضلة', onPress: () => router.push('/all-favorites' as any) },
       ]
     );
   }, [firstBookmarkPage, router]);
@@ -697,7 +699,7 @@ export default function QuranScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.headerBtn}
-                  onPress={() => router.push('/(tabs)/favorites' as any)}
+                  onPress={() => router.push('/all-favorites' as any)}
                 >
                   <MaterialCommunityIcons name="bookmark-outline" size={20} color={colors.text} />
                 </TouchableOpacity>
@@ -714,7 +716,7 @@ export default function QuranScreen() {
               <View style={{ flex: 1, alignItems: 'flex-end' }}>
                 <TouchableOpacity
                   style={styles.headerBtn}
-                  onPress={() => router.push('/quran-search')}
+                  onPress={() => setShowSettings(true)}
                 >
                   <MaterialCommunityIcons name="cog-outline" size={20} color={colors.text} />
                 </TouchableOpacity>
@@ -723,20 +725,13 @@ export default function QuranScreen() {
           </BlurView>
         </View>
 
-        {/* التبويبات - iOS Glass Segmented Control */}
+        {/* التبويبات - Native Tabs */}
         <View style={{ marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
-          <SegmentedControl
-            values={quranSegmentLabels}
-            selectedIndex={quranSelectedIndex}
-            onChange={(event) => {
-              const nextKey = quranSegmentKeys[event.nativeEvent.selectedSegmentIndex] || 'surahs';
-              setActiveTab(nextKey);
-            }}
-            tintColor={Platform.OS === 'ios' ? '#D4AF37' : undefined}
-            backgroundColor={isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(34,38,46,0.82)'}
-            style={{ height: 44 }}
-            fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isLightBg ? '#1F2937' : '#D1D5DB' }}
-            activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isLightBg ? '#111827' : '#F9FAFB' }}
+          <NativeTabs
+            tabs={quranSegments.map(s => ({ key: s.key, label: s.label }))}
+            selected={activeTab}
+            onSelect={(key) => setActiveTab(key as 'surahs' | 'juz' | 'listen')}
+            indicatorColor="#D4AF37"
           />
         </View>
 
@@ -832,7 +827,7 @@ export default function QuranScreen() {
               <GlassActionButton
                 icon="book-search-outline"
                 label="التفسير"
-                onPress={() => router.push('/tafsir-search')}
+                onPress={() => router.push('/browse-tafsir' as any)}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
                 accentColor="#2563EB"
@@ -850,7 +845,7 @@ export default function QuranScreen() {
               <GlassActionButton
                 icon="bookmark-outline"
                 label="الفاصل"
-                onPress={openBookmarkPage}
+                onPress={() => router.push('/all-favorites' as any)}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
                 accentColor="#D97706"
@@ -1019,7 +1014,14 @@ export default function QuranScreen() {
               activeOpacity={1}
               onPress={() => setShowSettings(false)}
             />
-            <GlassCard style={{ ...styles.settingsContent, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderRadius: 0 }}>
+            <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', height: Dimensions.get('window').height * 0.7 }}>
+              <BlurView
+                intensity={Platform.OS === 'ios' ? 60 : 40}
+                tint={isLightBg ? 'systemChromeMaterialLight' : 'systemChromeMaterialDark'}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.4)' : 'rgba(30,30,32,0.55)', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 0.5, borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)' }]} />
+              <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
               <View style={styles.settingsHeader}>
                 <Text style={[styles.settingsTitle, { color: colors.text }]}>إعدادات القرآن</Text>
                 <TouchableOpacity
@@ -1031,9 +1033,11 @@ export default function QuranScreen() {
               </View>
 
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
-                {/* ─── Font Size ─── */}
+                {/* ─── 1. إعدادات الخط (Font Settings) ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>حجم الخط</Text>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="format-size" size={14} /> إعدادات الخط
+                  </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 8 }}>
                     <TouchableOpacity
                       style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
@@ -1061,9 +1065,31 @@ export default function QuranScreen() {
                   </View>
                 </View>
 
-                {/* ─── Background Image ─── */}
+                {/* ─── 2. إعدادات التذكير بقراءة القرآن ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>خلفية المصحف</Text>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="bell-ring-outline" size={14} /> التذكير بقراءة القرآن
+                  </Text>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, backgroundColor: isLightBg ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.06)' }}
+                    onPress={() => { setShowSettings(false); router.push('/quran-reminder'); }}
+                  >
+                    <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                      <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: colors.text }}>إعدادات التذكير</Text>
+                      <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
+                        {(settings.notifications.quranReadingReminder ?? false) ? `مفعّل · ${settings.notifications.quranReadingReminderTime ?? '20:00'}` : 'غير مفعّل'}
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons name="bell-ring-outline" size={22} color={colors.primary} style={{ marginStart: 10 }} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* ─── 3. خلفية المصحف ─── */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="image-outline" size={14} /> خلفية المصحف
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
                     {(['quranbg1', 'quranbg2', 'quranbg3', 'quranbg4'] as const).map(key => {
                       const isSelected = (settings.display.quranBackground ?? 'quranbg1') === key;
@@ -1094,53 +1120,101 @@ export default function QuranScreen() {
                   </View>
                 </View>
 
-                {/* ─── Reciter ─── */}
+                {/* ─── 4. الترجمة للغات أخرى ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>القارئ</Text>
-                  <ScrollView style={{ maxHeight: 200, marginTop: 8 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    {reciters.map(r => {
-                      const isActive = currentReciter === r.identifier;
-                      return (
-                        <TouchableOpacity
-                          key={r.identifier}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            paddingVertical: 10,
-                            paddingHorizontal: 12,
-                            borderRadius: 10,
-                            marginBottom: 4,
-                            backgroundColor: isActive
-                              ? (isLightBg ? 'rgba(201,169,78,0.12)' : 'rgba(212,175,55,0.15)')
-                              : 'transparent',
-                            borderWidth: isActive ? 1 : 0,
-                            borderColor: isActive ? colors.primary : 'transparent',
-                          }}
-                          onPress={() => {
-                            setReciter(r.identifier);
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          }}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: colors.text }}>{r.name}</Text>
-                            <Text style={{ fontFamily: 'Cairo', fontSize: 12, color: colors.textSecondary }}>{r.englishName}</Text>
-                          </View>
-                          {isActive && <MaterialCommunityIcons name="check-circle" size={22} color={colors.primary} />}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="translate" size={14} /> الترجمة للغات أخرى
+                  </Text>
+                  {(() => {
+                    const LANG_FLAGS: Record<string, string> = { en: '🇺🇸', fr: '🇫🇷', tr: '🇹🇷', ur: '🇵🇰', id: '🇮🇩', de: '🇩🇪', es: '🇪🇸', hi: '🇮🇳', bn: '🇧🇩', ms: '🇲🇾', ru: '🇷🇺', fa: '🇮🇷' };
+                    const LANG_NAMES: Record<string, string> = { en: 'الانجليزية', fr: 'الفرنسية', tr: 'التركية', ur: 'الأردية', id: 'الإندونيسية', de: 'الألمانية', es: 'الإسبانية', hi: 'الهندية', bn: 'البنغالية', ms: 'الملايوية', ru: 'الروسية', fa: 'الفارسية' };
+                    const selEdition = settings.display.showTranslation ? (settings.display.translationEdition || '') : '';
+                    const selLang = selEdition ? selEdition.split('.')[0] : '';
+                    const flag = LANG_FLAGS[selLang] || '🌐';
+                    const langName = LANG_NAMES[selLang] || 'بدون ترجمة';
+                    return (
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          paddingHorizontal: 12,
+                          borderRadius: 12,
+                          marginTop: 8,
+                          backgroundColor: isLightBg ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                        }}
+                        onPress={() => {
+                          setShowSettings(false);
+                          router.push('/settings/translations' as any);
+                        }}
+                      >
+                        <Text style={{ fontSize: 26, marginEnd: 2 }}>{flag}</Text>
+                        <View style={{ flex: 1, marginHorizontal: 10 }}>
+                          <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: colors.text }}>
+                            اختيار لغة الترجمة
+                          </Text>
+                          <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
+                            {selLang ? `${langName} ${flag}` : 'اختر الترجمة المفضلة لعرضها مع الآيات'}
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
 
-                {/* ─── Show Tafsir Toggle ─── */}
-                <GlassToggle
-                  label="إظهار التفسير"
-                  icon="book-open-page-variant-outline"
-                  enabled={settings.display.showTafsir ?? false}
-                  onToggle={(v) => updateDisplay({ showTafsir: v } as any)}
-                />
+                {/* ─── 5. اختيار القارئ (Reciter Selection) ─── */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="account-music-outline" size={14} /> اختيار القارئ
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 12,
+                      borderRadius: 12,
+                      marginTop: 8,
+                      backgroundColor: isLightBg ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                    }}
+                    onPress={() => {
+                      setShowSettings(false);
+                      setShowReciterModal(true);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="account-music" size={20} color={colors.primary} />
+                    <View style={{ flex: 1, marginHorizontal: 10 }}>
+                      <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: colors.text }}>
+                        {currentReciterName}
+                      </Text>
+                      <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
+                        اختر القارئ المفضل للاستماع
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* ─── 6. عرض التفسير (Tafsir Split Screen Toggle) ─── */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
+                    <MaterialCommunityIcons name="book-open-page-variant-outline" size={14} /> عرض التفسير
+                  </Text>
+                  <GlassToggle
+                    label="تفسير تلقائي"
+                    subtitle="عرض التفسير الميسر أسفل صفحة المصحف"
+                    icon="book-open-variant"
+                    enabled={settings.display.showTafsir ?? false}
+                    onToggle={(v) => {
+                      updateDisplay({ showTafsir: v } as any);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  />
+                </View>
               </ScrollView>
-            </GlassCard>
+              </View>
+            </View>
           </View>
         </Modal>
       </SafeAreaView>

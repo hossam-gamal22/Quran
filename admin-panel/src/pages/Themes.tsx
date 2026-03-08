@@ -23,7 +23,23 @@ import {
   Sparkles,
   Star,
   Calendar,
+  ImagePlus,
 } from 'lucide-react';
+import { db, storage } from '../firebase';
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+  query,
+  orderBy,
+} from 'firebase/firestore';
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from 'firebase/storage';
 
 // ========================================
 // الأنواع
@@ -72,6 +88,17 @@ interface FontSettings {
   quranFont: string;
   baseFontSize: number;
   headingScale: number;
+}
+
+interface DynamicBackground {
+  id: string;
+  name: string;
+  thumbnailUrl: string;
+  fullUrl: string;
+  enabled: boolean;
+  order: number;
+  textColor: 'white' | 'black';
+  createdAt?: string;
 }
 
 // ========================================
@@ -149,6 +176,7 @@ const FONT_OPTIONS = {
 const ThemesPage: React.FC = () => {
   const [themes, setThemes] = useState<AppTheme[]>([]);
   const [seasonalThemes, setSeasonalThemes] = useState<SeasonalTheme[]>([]);
+  const [backgrounds, setBackgrounds] = useState<DynamicBackground[]>([]);
   const [fontSettings, setFontSettings] = useState<FontSettings>({
     arabicFont: 'Cairo',
     latinFont: 'Cairo',
@@ -156,15 +184,18 @@ const ThemesPage: React.FC = () => {
     baseFontSize: 16,
     headingScale: 1.25,
   });
-  const [activeTab, setActiveTab] = useState<'themes' | 'seasonal' | 'fonts'>('themes');
+  const [activeTab, setActiveTab] = useState<'themes' | 'seasonal' | 'backgrounds' | 'fonts'>('themes');
   const [editingTheme, setEditingTheme] = useState<AppTheme | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
+  const [loadingBGs, setLoadingBGs] = useState(false);
+  const [bgSaveStatus, setBgSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // تحميل البيانات
   useEffect(() => {
     loadThemes();
+    loadBackgrounds();
   }, []);
 
   const loadThemes = async () => {
@@ -216,6 +247,78 @@ const ThemesPage: React.FC = () => {
     await new Promise(resolve => setTimeout(resolve, 1500));
     setIsSaving(false);
     // TODO: API call
+  };
+
+  // ========================================
+  // إدارة الخلفيات الديناميكية
+  // ========================================
+
+  const loadBackgrounds = async () => {
+    setLoadingBGs(true);
+    try {
+      const q = query(collection(db, 'backgrounds'), orderBy('order', 'asc'));
+      const snapshot = await getDocs(q);
+      setBackgrounds(
+        snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DynamicBackground))
+      );
+    } catch (error) {
+      console.error('Error loading backgrounds:', error);
+    }
+    setLoadingBGs(false);
+  };
+
+  const addBackground = () => {
+    const newBg: DynamicBackground = {
+      id: `bg_${Date.now()}`,
+      name: 'خلفية جديدة',
+      thumbnailUrl: '',
+      fullUrl: '',
+      enabled: true,
+      order: backgrounds.length,
+      textColor: 'white',
+    };
+    setBackgrounds(prev => [...prev, newBg]);
+  };
+
+  const updateBackground = (id: string, updates: Partial<DynamicBackground>) => {
+    setBackgrounds(prev =>
+      prev.map(bg => (bg.id === id ? { ...bg, ...updates } : bg))
+    );
+  };
+
+  const deleteBackground = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الخلفية؟')) return;
+    try {
+      await deleteDoc(doc(db, 'backgrounds', id));
+      setBackgrounds(prev => prev.filter(bg => bg.id !== id));
+    } catch (error) {
+      console.error('Error deleting background:', error);
+    }
+  };
+
+  const saveBackground = async (bg: DynamicBackground) => {
+    setBgSaveStatus('saving');
+    try {
+      const { id, ...data } = bg;
+      await setDoc(doc(db, 'backgrounds', id), { ...data, createdAt: bg.createdAt || new Date().toISOString() });
+      setBgSaveStatus('saved');
+      setTimeout(() => setBgSaveStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Error saving background:', error);
+      setBgSaveStatus('error');
+      setTimeout(() => setBgSaveStatus('idle'), 3000);
+    }
+  };
+
+  const handleBgImageUpload = async (file: File, bgId: string, field: 'thumbnailUrl' | 'fullUrl') => {
+    try {
+      const storageRef = ref(storage, `backgrounds/${bgId}_${field}_${Date.now()}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      updateBackground(bgId, { [field]: url });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    }
   };
 
   // تحديث لون في الثيم
@@ -288,6 +391,7 @@ const ThemesPage: React.FC = () => {
       <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4">
         {[
           { id: 'themes', label: 'الثيمات الأساسية', icon: Palette },
+          { id: 'backgrounds', label: 'الخلفيات', icon: ImagePlus },
           { id: 'seasonal', label: 'الثيمات الموسمية', icon: Calendar },
           { id: 'fonts', label: 'الخطوط', icon: Type },
         ].map(tab => (
@@ -506,6 +610,250 @@ const ThemesPage: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* الخلفيات الديناميكية */}
+      {activeTab === 'backgrounds' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-400 text-sm">
+              إدارة صور الخلفيات التي تظهر في إعدادات التطبيق — يمكن للمستخدمين اختيارها كخلفية.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={loadBackgrounds}
+                className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded-lg transition-colors text-sm"
+              >
+                <RefreshCw size={16} />
+                <span>تحديث</span>
+              </button>
+              <button
+                onClick={addBackground}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors text-sm"
+              >
+                <Plus size={18} />
+                <span>إضافة خلفية</span>
+              </button>
+            </div>
+          </div>
+
+          {bgSaveStatus === 'saved' && (
+            <div className="bg-green-600/20 border border-green-600/40 rounded-lg p-3 text-green-400 text-sm flex items-center gap-2">
+              <Check size={16} /> تم الحفظ بنجاح
+            </div>
+          )}
+          {bgSaveStatus === 'error' && (
+            <div className="bg-red-600/20 border border-red-600/40 rounded-lg p-3 text-red-400 text-sm flex items-center gap-2">
+              <X size={16} /> حدث خطأ أثناء الحفظ
+            </div>
+          )}
+
+          {loadingBGs ? (
+            <div className="text-center py-12 text-gray-400">
+              <RefreshCw size={32} className="mx-auto mb-3 animate-spin" />
+              <p>جاري تحميل الخلفيات...</p>
+            </div>
+          ) : backgrounds.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Image size={48} className="mx-auto mb-4 opacity-50" />
+              <p>لا توجد خلفيات ديناميكية</p>
+              <p className="text-sm mt-1">اضغط "إضافة خلفية" لإنشاء واحدة جديدة</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {backgrounds.map(bg => (
+                <div key={bg.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                  {/* معاينة الصورة */}
+                  <div
+                    className="h-40 relative flex items-center justify-center"
+                    style={{
+                      backgroundColor: '#1a1a2e',
+                      backgroundImage: bg.fullUrl ? `url(${bg.fullUrl})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }}
+                  >
+                    {!bg.fullUrl && (
+                      <span className="text-gray-500 text-sm">لا توجد صورة</span>
+                    )}
+                    {bg.fullUrl && (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center"
+                      >
+                        <span
+                          className="text-lg font-bold px-3 py-1 rounded"
+                          style={{ color: bg.textColor === 'white' ? '#fff' : '#000' }}
+                        >
+                          نص تجريبي — Sample Text
+                        </span>
+                      </div>
+                    )}
+                    {/* شارة التفعيل */}
+                    <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      bg.enabled ? 'bg-green-500/80 text-white' : 'bg-gray-600/80 text-gray-300'
+                    }`}>
+                      {bg.enabled ? 'مفعّل' : 'معطّل'}
+                    </div>
+                  </div>
+
+                  {/* بيانات الخلفية */}
+                  <div className="p-4 space-y-4">
+                    {/* الاسم */}
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">الاسم</label>
+                      <input
+                        type="text"
+                        value={bg.name}
+                        onChange={e => updateBackground(bg.id, { name: e.target.value })}
+                        className="w-full bg-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </div>
+
+                    {/* رفع الصور */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">الصورة الكاملة</label>
+                        <label className="flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 rounded-lg px-3 py-2 text-sm cursor-pointer transition">
+                          <Upload size={14} />
+                          <span>{bg.fullUrl ? 'تغيير' : 'رفع'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleBgImageUpload(file, bg.id, 'fullUrl');
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">الصورة المصغرة</label>
+                        <label className="flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 rounded-lg px-3 py-2 text-sm cursor-pointer transition">
+                          <Upload size={14} />
+                          <span>{bg.thumbnailUrl ? 'تغيير' : 'رفع'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleBgImageUpload(file, bg.id, 'thumbnailUrl');
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* OR: روابط يدوية */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">أو رابط الصورة الكاملة</label>
+                        <input
+                          type="text"
+                          value={bg.fullUrl}
+                          onChange={e => updateBackground(bg.id, { fullUrl: e.target.value })}
+                          placeholder="https://..."
+                          className="w-full bg-gray-700 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-green-500 outline-none"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">أو رابط المصغرة</label>
+                        <input
+                          type="text"
+                          value={bg.thumbnailUrl}
+                          onChange={e => updateBackground(bg.id, { thumbnailUrl: e.target.value })}
+                          placeholder="https://..."
+                          className="w-full bg-gray-700 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-green-500 outline-none"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+
+                    {/* لون النص + الترتيب + التفعيل */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* لون النص */}
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">لون النص</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateBackground(bg.id, { textColor: 'white' })}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                              bg.textColor === 'white'
+                                ? 'bg-gray-600 text-white ring-2 ring-green-500'
+                                : 'bg-gray-700 text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            <Sun size={14} />
+                            أبيض
+                          </button>
+                          <button
+                            onClick={() => updateBackground(bg.id, { textColor: 'black' })}
+                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                              bg.textColor === 'black'
+                                ? 'bg-white text-gray-900 ring-2 ring-green-500'
+                                : 'bg-gray-700 text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            <Moon size={14} />
+                            أسود
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* الترتيب */}
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">الترتيب</label>
+                        <input
+                          type="number"
+                          value={bg.order}
+                          onChange={e => updateBackground(bg.id, { order: parseInt(e.target.value) || 0 })}
+                          className="w-full bg-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                          min={0}
+                        />
+                      </div>
+
+                      {/* التفعيل */}
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-2">التفعيل</label>
+                        <button
+                          onClick={() => updateBackground(bg.id, { enabled: !bg.enabled })}
+                          className={`relative w-full h-10 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm ${
+                            bg.enabled ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400'
+                          }`}
+                        >
+                          {bg.enabled ? <><Check size={16} /> مفعّل</> : <><X size={16} /> معطّل</>}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* أزرار الإجراءات */}
+                    <div className="flex gap-2 pt-2 border-t border-gray-700">
+                      <button
+                        onClick={() => saveBackground(bg)}
+                        disabled={bgSaveStatus === 'saving'}
+                        className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 px-4 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50"
+                      >
+                        {bgSaveStatus === 'saving' ? (
+                          <><RefreshCw size={14} className="animate-spin" /> جاري الحفظ...</>
+                        ) : (
+                          <><Save size={14} /> حفظ</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => deleteBackground(bg.id)}
+                        className="flex items-center gap-1 bg-gray-700 hover:bg-red-600 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

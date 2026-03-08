@@ -75,7 +75,7 @@ const ROUTE_OPTIONS = [
   { value: '/(tabs)', label: 'الرئيسية' },
   { value: '/(tabs)/quran', label: 'القرآن' },
   { value: '/(tabs)/prayer', label: 'الصلاة' },
-  { value: '/(tabs)/daily-ayah', label: 'آية اليوم' },
+  { value: '/daily-ayah', label: 'آية اليوم' },
   { value: '/azkar/morning', label: 'أذكار الصباح' },
   { value: '/azkar/evening', label: 'أذكار المساء' },
   { value: '/hijri', label: 'التقويم الهجري' },
@@ -85,7 +85,6 @@ const ROUTE_OPTIONS = [
   { value: '/worship-tracker', label: 'تتبع العبادات' },
   { value: '/hajj-umrah', label: 'الحج والعمرة' },
   { value: '/ruqya', label: 'الرقية الشرعية' },
-  { value: '/night-reading', label: 'أذكار النوم' },
 ];
 
 const COLOR_PRESETS = [

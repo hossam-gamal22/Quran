@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Dimensions,
   Modal,
+  I18nManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -413,13 +414,17 @@ export default function RamadanScreen() {
         {/* بطاقة اليوم المميز */}
         {specialDay && isRamadanActive && (
           <Animated.View entering={FadeIn.duration(500)}>
-            <View
-              style={[styles.specialDayBanner, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
-            >
-              <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
-              <View style={styles.specialDayContent}>
-                <Text style={styles.specialDayTitle}>{specialDay.nameAr}</Text>
-                <Text style={styles.specialDayDesc}>{specialDay.description}</Text>
+            <View style={styles.starAboveCardWrapper}>
+              <View style={styles.starAboveCard}>
+                <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
+              </View>
+              <View
+                style={[styles.specialDayBanner, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
+              >
+                <View style={styles.specialDayContent}>
+                  <Text style={styles.specialDayTitle}>{specialDay.nameAr}</Text>
+                  <Text style={styles.specialDayDesc}>{specialDay.description}</Text>
+                </View>
               </View>
             </View>
           </Animated.View>
@@ -639,12 +644,27 @@ const styles = StyleSheet.create({
   },
 
   // بطاقة اليوم المميز
+  starAboveCardWrapper: {
+    marginTop: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  starAboveCard: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(245,166,35,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -20,
+    zIndex: 1,
+  },
   specialDayBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
+    paddingTop: 28,
     gap: 12,
   },
   specialDayContent: {

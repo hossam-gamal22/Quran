@@ -6,12 +6,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  FlatList, ActivityIndicator, Modal, Animated, Platform,
+  FlatList, ActivityIndicator, Modal, Animated, Platform, Share,
 } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 
 // ─── Hijri month names ────────────────────────────────────────────────────────
 const HIJRI_MONTHS = [
@@ -102,6 +103,29 @@ export default function HijriCalendarScreen() {
   const monthEvents = ISLAMIC_EVENTS.filter(e => e.month === hMonth);
   const eventDays = new Set(monthEvents.map(e => e.day));
 
+  const getDateString = () => {
+    try {
+      const selectedGreg = hijriToGregorian(hYear, hMonth, selectedDay);
+      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} هـ\n${selectedGreg.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+    } catch {
+      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} هـ`;
+    }
+  };
+
+  const handleCopy = async () => {
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await Clipboard.setStringAsync(getDateString());
+    } catch {}
+  };
+
+  const handleShare = async () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Share.share({ message: `🌙 ${getDateString()}\n\n— روح المسلم` });
+    } catch {}
+  };
+
   const navigate = (dir: -1 | 1) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
@@ -117,16 +141,24 @@ export default function HijriCalendarScreen() {
   const isToday = (d: number) =>
     d === todayHijri[2] && hMonth === todayHijri[1] && hYear === todayHijri[0];
 
-  const selectedGregorian = hijriToGregorian(hYear, hMonth, selectedDay);
-  const selectedEvents = ISLAMIC_EVENTS.filter(e => e.month === hMonth && e.day === selectedDay);
+  const safeSelectedDay = Math.min(selectedDay, daysInMonth);
+  const selectedGregorian = (() => {
+    try { return hijriToGregorian(hYear, hMonth, safeSelectedDay); }
+    catch { return new Date(); }
+  })();
+  const selectedEvents = ISLAMIC_EVENTS.filter(e => e.month === hMonth && e.day === safeSelectedDay);
 
   // All events for upcoming section (sorted)
   const upcomingEvents = ISLAMIC_EVENTS
     .map(e => {
-      const evDate = hijriToGregorian(todayHijri[0], e.month, e.day);
-      if (evDate < today) evDate.setFullYear(evDate.getFullYear() + 1);
-      const diff = Math.ceil((evDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      return { ...e, diff, evDate };
+      try {
+        const evDate = hijriToGregorian(todayHijri[0], e.month, e.day);
+        if (evDate < today) evDate.setFullYear(evDate.getFullYear() + 1);
+        const diff = Math.ceil((evDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        return { ...e, diff, evDate };
+      } catch {
+        return { ...e, diff: 999, evDate: new Date() };
+      }
     })
     .sort((a, b) => a.diff - b.diff)
     .slice(0, 8);
@@ -259,10 +291,16 @@ export default function HijriCalendarScreen() {
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
       {/* Header */}
       <View style={s.header}>
+        <TouchableOpacity style={s.iconBtn} onPress={handleCopy}>
+          <IconSymbol name="doc.on.doc" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
+          <IconSymbol name="square.and.arrow.up" size={20} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={s.title}>🌙 التقويم الهجري</Text>
         <TouchableOpacity style={s.iconBtn} onPress={() => { setHYear(todayHijri[0]); setHMonth(todayHijri[1]); setSelectedDay(todayHijri[2]); }}>
           <IconSymbol name="calendar.circle" size={20} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={s.title}>🌙 التقويم الهجري</Text>
         <TouchableOpacity style={s.iconBtn} onPress={() => setShowConverter(v => !v)}>
           <IconSymbol name="arrow.left.arrow.right" size={20} color={colors.foreground} />
         </TouchableOpacity>

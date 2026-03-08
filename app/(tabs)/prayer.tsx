@@ -15,16 +15,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import { NativeTabs } from '../../components/ui/NativeTabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import QiblaScreen from './qibla';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
   FadeInDown,
 } from 'react-native-reanimated';
 
@@ -53,28 +50,18 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { GlassCard, GlassToggle } from '@/components/ui/GlassCard';
 import { BlurView } from 'expo-blur';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Svg, { Circle, Line, G } from 'react-native-svg';
 
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
+import RectangleWidgetView from '@/components/ui/prayer/RectangleWidgetView';
+import AnalogClockView from '@/components/ui/prayer/AnalogClockView';
+import DigitalTypographyView from '@/components/ui/prayer/DigitalTypographyView';
 
-// Placeholder components for the three clock views
-const RectangleWidgetView = ({ nextPrayer, countdown }) => (
-  <View style={styles.widgetContainer}>
-    <Text style={styles.placeholderText}>[Rectangle Widget View]</Text>
-  </View>
-);
-const AnalogClockView = ({ nextPrayer, countdown }) => (
-  <View style={styles.widgetContainer}>
-    <Text style={styles.placeholderText}>[Analog Clock View]</Text>
-  </View>
-);
-const DigitalTypographyView = ({ nextPrayer, countdown }) => (
-  <View style={styles.widgetContainer}>
-    <Text style={styles.placeholderText}>[Digital Typography View]</Text>
-  </View>
-);
+const CLOCK_STYLE_KEY = '@prayer_clock_style';
+const CLOCK_THUMB_SIZE = 72;
 
 const PRAYER_METHODS: { value: CalculationMethod; label: string; subtitle: string }[] = [
   { value: 4, label: 'أم القرى', subtitle: 'مكة المكرمة' },
@@ -108,35 +95,29 @@ export default function PrayerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Clock style state for tab bar
+  // Clock style state
   const [activeClockStyle, setActiveClockStyle] = useState<'widget' | 'analog' | 'digital'>('widget');
 
-  // Tab bar icons
-  const clockTabs = [
-    { key: 'widget', icon: 'rectangle.on.rectangle', label: 'Widget' },
-    { key: 'analog', icon: 'clock', label: 'Analog' },
-    { key: 'digital', icon: 'digitalcrown.arrow.clockwise', label: 'Digital' },
+  const clockStyles: { key: 'widget' | 'analog' | 'digital'; label: string }[] = [
+    { key: 'widget', label: 'ويدجت' },
+    { key: 'analog', label: 'تناظرية' },
+    { key: 'digital', label: 'رقمية' },
   ];
 
-  // Reanimated shared values and layout state
-  const indicatorX = useSharedValue(0);
-  const indicatorW = useSharedValue(0);
-  const [tabLayouts, setTabLayouts] = useState<Array<{ x: number; width: number }>>([]);
-  const [layoutsReady, setLayoutsReady] = useState(false);
-  const activeIndex = clockTabs.findIndex((t) => t.key === activeClockStyle);
-
+  // Persist clock style
   useEffect(() => {
-    if (!layoutsReady || activeIndex < 0) return;
-    const layout = tabLayouts[activeIndex];
-    if (!layout) return;
-    indicatorX.value = withSpring(layout.x, { damping: 18, stiffness: 220 });
-    indicatorW.value = withSpring(layout.width, { damping: 18, stiffness: 220 });
-  }, [activeIndex, layoutsReady, tabLayouts]);
+    AsyncStorage.getItem(CLOCK_STYLE_KEY).then((val) => {
+      if (val && ['widget', 'analog', 'digital'].includes(val)) {
+        setActiveClockStyle(val as 'widget' | 'analog' | 'digital');
+      }
+    });
+  }, []);
 
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.value }],
-    width: indicatorW.value,
-  }));
+  const handleClockStyleChange = useCallback((styleKey: 'widget' | 'analog' | 'digital') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActiveClockStyle(styleKey);
+    AsyncStorage.setItem(CLOCK_STYLE_KEY, styleKey).catch(() => {});
+  }, []);
 
   const prayerTopSegments = useMemo(() => {
     const defaults = {
@@ -169,28 +150,38 @@ export default function PrayerScreen() {
   const prayerTopLabels = useMemo(() => prayerTopSegments.map((segment) => segment.label), [prayerTopSegments]);
 
   const prayerViewSegments = useMemo(() => {
-    const defaults = { list: { label: 'قائمة', icon: 'format-list-text' }, clock: { label: 'ساعة', icon: 'clock-outline' } } as const;
-    const byKey = new Map((config?.uiCustomization?.prayerViewSegments || []).map((item: any) => [item.key, item]));
-    return (['list', 'clock'] as const).map((key) => {
-      const item = byKey.get(key);
-      const label = settings?.language === 'ar'
-        ? (item?.labelAr || defaults[key].label)
-        : (item?.labelEn || item?.labelAr || defaults[key].label);
+    const defaults: Record<string, { label: string; icon: string }> = {
+      list: { label: 'قائمة', icon: 'format-list-text' },
+      clock: { label: 'ساعة', icon: 'clock-outline' },
+    };
 
-      const iconMode = item?.icon?.mode;
-      const iconName = item?.icon?.name;
-      const iconPng = item?.icon?.pngUrl;
+    const configured = config?.uiCustomization?.prayerViewSegments || [];
+    if (configured.length > 0) {
+      return configured.map((item: any) => {
+        const key = item.key as string;
+        const def = defaults[key] || { label: item?.labelAr || item?.labelEn || key, icon: item?.icon?.name || '' };
+        const label = settings?.language === 'ar'
+          ? (item?.labelAr || def.label)
+          : (item?.labelEn || item?.labelAr || def.label);
 
-      let icon = defaults[key].icon;
-      if (iconMode === 'png' && iconPng) icon = `img:${iconPng}`;
-      else if (iconMode === 'ionicons' && iconName) icon = `ion:${iconName}`;
-      else if ((iconMode === 'material' || iconMode === 'sf') && iconName) icon = iconName;
+        const iconMode = item?.icon?.mode;
+        const iconName = item?.icon?.name;
+        const iconPng = item?.icon?.pngUrl;
 
-      return { key, label, icon };
-    });
+        let icon = def.icon;
+        if (iconMode === 'png' && iconPng) icon = `img:${iconPng}`;
+        else if (iconMode === 'ionicons' && iconName) icon = `ion:${iconName}`;
+        else if ((iconMode === 'material' || iconMode === 'sf') && iconName) icon = iconName;
+
+        return { key, label, icon };
+      });
+    }
+
+    // Fallback to single 'list' view when none configured
+    return [{ key: 'list', label: settings?.language === 'ar' ? 'قائمة' : 'List', icon: 'format-list-text' }];
   }, [config?.uiCustomization?.prayerViewSegments, settings?.language]);
 
-  const prayerViewKeys = useMemo(() => prayerViewSegments.map((s) => s.key as 'list' | 'clock'), [prayerViewSegments]);
+  const prayerViewKeys = useMemo(() => prayerViewSegments.map((s) => s.key as string), [prayerViewSegments]);
   const prayerViewLabels = useMemo(() => prayerViewSegments.map((s) => s.label), [prayerViewSegments]);
 
   const [topSelectedKey, setTopSelectedKey] = useState<'prayer' | 'qibla'>('prayer');
@@ -302,6 +293,15 @@ export default function PrayerScreen() {
   const locationName = location ? `${location.city}${location.country ? `, ${location.country}` : ''}` : '';
   const inLastThird = prayerTimes ? isInLastThird(prayerTimes) : false;
 
+  const gregorianDate = useMemo(() => {
+    try {
+      const locale = language === 'ar' ? 'ar-EG' : language === 'en' ? 'en-US' : language;
+      return new Date().toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    } catch {
+      return new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+  }, [language]);
+
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} style={[styles.container, isDarkMode && styles.containerDark]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -322,6 +322,12 @@ export default function PrayerScreen() {
                 <Text style={[styles.locationText, isDarkMode && styles.textMuted]}>{locationName}</Text>
               </View>
             )}
+            {hijriDate ? (
+              <Text style={[styles.hijriDateText, isDarkMode && styles.textMuted]}>{hijriDate}</Text>
+            ) : null}
+            {gregorianDate ? (
+              <Text style={[styles.gregorianDateText, isDarkMode && { color: '#777' }]}>{gregorianDate}</Text>
+            ) : null}
           </View>
 
           <View style={[styles.headerRight, { flex: 1, justifyContent: 'flex-end' }]}>
@@ -332,15 +338,11 @@ export default function PrayerScreen() {
         </Animated.View>
 
         <View style={styles.topNavTabsWrap}>
-          <SegmentedControl
-            values={prayerTopLabels}
-            selectedIndex={prayerTopSelectedIndex}
-            onChange={(event) => { const key = prayerTopKeys[event.nativeEvent.selectedSegmentIndex] || 'prayer'; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTopSelectedKey(key); }}
-            tintColor={Platform.OS === 'ios' ? '#2f7659' : undefined}
-            backgroundColor={isDarkMode ? 'rgba(34,38,46,0.82)' : 'rgba(255,255,255,0.65)'}
-            style={{ height: 44 }}
-            fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isDarkMode ? '#D1D5DB' : '#1F2937' }}
-            activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isDarkMode ? '#F9FAFB' : '#111827' }}
+          <NativeTabs
+            tabs={prayerTopSegments.map(s => ({ key: s.key, label: s.label }))}
+            selected={topSelectedKey}
+            onSelect={(key) => setTopSelectedKey(key as 'prayer' | 'qibla')}
+            indicatorColor="#2f7659"
           />
         </View>
 
@@ -359,14 +361,106 @@ export default function PrayerScreen() {
             <Animated.View entering={FadeInDown.duration(300)}>
               <QiblaScreen />
             </Animated.View>
-          ) : viewIsWidget ? (
-            <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.circularContainer}>
-              <CountdownTimer prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} />
-            </Animated.View>
           ) : (
-            <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-              <PrayerCard prayerTimes={prayerTimes} hijriDate={hijriDate} location={locationName} language={language} isDarkMode={isDarkMode} />
-            </Animated.View>
+            <>
+              {/* Clock style selector with thumbnails — always visible */}
+              <View style={styles.clockStyleSelectorWrap}>
+                <BlurView intensity={40} tint={isDarkMode ? 'dark' : 'light'} style={styles.clockStyleSelectorBlur}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.clockStyleSelectorScroll}
+                  >
+                    {clockStyles.map((style) => {
+                      const isActive = activeClockStyle === style.key;
+                      return (
+                        <TouchableOpacity
+                          key={style.key}
+                          onPress={() => handleClockStyleChange(style.key)}
+                          activeOpacity={0.7}
+                          style={[
+                            styles.clockStyleThumbnail,
+                            isActive && styles.clockStyleThumbnailActive,
+                          ]}
+                        >
+                          {/* Thumbnail preview */}
+                          {style.key === 'widget' && (
+                            <View style={styles.thumbWidgetContainer}>
+                              <View style={styles.thumbWidgetGradient}>
+                                <View style={styles.thumbWidgetTopRow}>
+                                  <View style={[styles.thumbWidgetDot, { backgroundColor: '#2ECC71' }]} />
+                                  <Text style={styles.thumbWidgetLabel}>الفجر</Text>
+                                </View>
+                                <View style={styles.thumbWidgetTimeRow}>
+                                  <View style={styles.thumbWidgetTimeBox}><Text style={styles.thumbWidgetTimeText}>05</Text></View>
+                                  <Text style={styles.thumbWidgetColon}>:</Text>
+                                  <View style={styles.thumbWidgetTimeBox}><Text style={styles.thumbWidgetTimeText}>23</Text></View>
+                                  <Text style={styles.thumbWidgetColon}>:</Text>
+                                  <View style={styles.thumbWidgetTimeBox}><Text style={styles.thumbWidgetTimeText}>41</Text></View>
+                                </View>
+                                <View style={styles.thumbWidgetBottomRow}>
+                                  {['الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء'].map((p, i) => (
+                                    <View key={i} style={styles.thumbWidgetPrayerDot}>
+                                      <View style={[styles.thumbWidgetSmallDot, i === 0 && { backgroundColor: '#2ECC71' }]} />
+                                    </View>
+                                  ))}
+                                </View>
+                              </View>
+                            </View>
+                          )}
+                          {style.key === 'analog' && (
+                            <View style={styles.thumbAnalogContainer}>
+                              <Svg width={CLOCK_THUMB_SIZE - 20} height={CLOCK_THUMB_SIZE - 20} viewBox="0 0 100 100">
+                                <Circle cx="50" cy="50" r="45" stroke={isDarkMode ? '#555' : '#ccc'} strokeWidth="2" fill="none" />
+                                {/* Hour markers */}
+                                {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle) => (
+                                  <Line
+                                    key={angle}
+                                    x1={50 + 38 * Math.sin((angle * Math.PI) / 180)}
+                                    y1={50 - 38 * Math.cos((angle * Math.PI) / 180)}
+                                    x2={50 + 43 * Math.sin((angle * Math.PI) / 180)}
+                                    y2={50 - 43 * Math.cos((angle * Math.PI) / 180)}
+                                    stroke={isDarkMode ? '#aaa' : '#666'}
+                                    strokeWidth={angle % 90 === 0 ? 2.5 : 1.5}
+                                  />
+                                ))}
+                                {/* Hour hand */}
+                                <Line x1="50" y1="50" x2="50" y2="24" stroke={isDarkMode ? '#fff' : '#333'} strokeWidth="3" strokeLinecap="round" />
+                                {/* Minute hand */}
+                                <Line x1="50" y1="50" x2="68" y2="35" stroke={isDarkMode ? '#ddd' : '#555'} strokeWidth="2" strokeLinecap="round" />
+                                {/* Second hand */}
+                                <Line x1="50" y1="50" x2="45" y2="18" stroke="#2f7659" strokeWidth="1" strokeLinecap="round" />
+                                {/* Center dot */}
+                                <Circle cx="50" cy="50" r="3" fill="#2f7659" />
+                              </Svg>
+                            </View>
+                          )}
+                          {style.key === 'digital' && (
+                            <View style={styles.thumbDigitalContainer}>
+                              <Text style={[styles.thumbDigitalTime, isDarkMode && { color: '#fff' }]}>05:23</Text>
+                              <Text style={[styles.thumbDigitalLabel, isDarkMode && { color: '#aaa' }]}>الفجر</Text>
+                              <View style={styles.thumbDigitalSeparator} />
+                              <Text style={[styles.thumbDigitalCountdown, isDarkMode && { color: '#ddd' }]}>٠٢:٤١</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </BlurView>
+              </View>
+
+              {/* Clock view based on active style */}
+              <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+                {activeClockStyle === 'widget' ? (
+                  <RectangleWidgetView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} />
+                ) : activeClockStyle === 'analog' ? (
+                  <AnalogClockView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} />
+                ) : (
+                  <DigitalTypographyView prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} />
+                )}
+              </Animated.View>
+            </>
           )}
 
           {topSelectedKey !== 'qibla' && (
@@ -409,9 +503,7 @@ export default function PrayerScreen() {
 
         <BannerAdComponent screen="prayer" />
 
-        <View style={styles.toggleContainer}>
-          <SegmentedControl values={prayerViewLabels} selectedIndex={prayerViewSelectedIndex} onChange={(event) => { const key = prayerViewKeys[event.nativeEvent.selectedSegmentIndex] || 'list'; router.replace({ pathname: '/(tabs)/prayer', params: { view: key } }); }} tintColor={Platform.OS === 'ios' ? '#2f7659' : undefined} backgroundColor={isDarkMode ? 'rgba(34,38,46,0.82)' : 'rgba(255,255,255,0.65)'} style={{ height: 44 }} fontStyle={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: isDarkMode ? '#D1D5DB' : '#1F2937' }} activeFontStyle={{ fontFamily: 'Cairo-Bold', fontSize: 15, color: isDarkMode ? '#F9FAFB' : '#111827' }} />
-        </View>
+
 
         <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
           <View style={settingsStyles.overlay}>
@@ -463,6 +555,8 @@ const styles = StyleSheet.create({
   textMuted: { color: '#999' },
   locationBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   locationText: { fontSize: 13, fontFamily: 'Cairo-Regular', color: '#666' },
+  hijriDateText: { fontSize: 12, fontFamily: 'Cairo-Medium', color: '#555', marginTop: 2 },
+  gregorianDateText: { fontSize: 11, fontFamily: 'Cairo-Regular', color: '#888', marginTop: 1 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#f5f5f5', alignItems: 'center', justifyContent: 'center' },
   headerButtonDark: { backgroundColor: '#252540' },
@@ -488,6 +582,47 @@ const styles = StyleSheet.create({
   toggleContainer: { marginHorizontal: 16, marginBottom: 16 },
   widgetContainer: { minHeight: 180, minWidth: 320, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', marginVertical: 18, padding: 18 },
   placeholderText: { color: '#fff', fontSize: 18, opacity: 0.7, fontFamily: 'Cairo-Bold' },
+  // Clock style selector (thumbnail-based, similar to Qibla)
+  clockStyleSelectorWrap: { paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8 },
+  clockStyleSelectorBlur: { borderRadius: 18, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.12)', overflow: 'hidden' },
+  clockStyleSelectorScroll: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, gap: 10, justifyContent: 'center' },
+  clockStyleThumbnail: {
+    width: CLOCK_THUMB_SIZE + 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2.5,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  clockStyleThumbnailActive: { borderColor: '#2f7659', backgroundColor: 'rgba(47,118,89,0.15)' },
+  clockStyleLabel: { fontSize: 10, fontFamily: 'Cairo-SemiBold', color: '#777', marginTop: 3 },
+  clockStyleLabelActive: { color: '#2ECC71' },
+  clockStyleActiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#2ECC71', marginTop: 2 },
+  // Widget thumbnail
+  thumbWidgetContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
+  thumbWidgetGradient: { width: CLOCK_THUMB_SIZE - 4, height: CLOCK_THUMB_SIZE - 16, borderRadius: 8, backgroundColor: '#2f7659', alignItems: 'center', justifyContent: 'center', padding: 3 },
+  thumbWidgetTopRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
+  thumbWidgetDot: { width: 4, height: 4, borderRadius: 2 },
+  thumbWidgetLabel: { fontSize: 6, fontFamily: 'Cairo-Bold', color: '#fff' },
+  thumbWidgetTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  thumbWidgetTimeBox: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 3, paddingHorizontal: 2, paddingVertical: 0.5 },
+  thumbWidgetTimeText: { fontSize: 8, fontFamily: 'Cairo-Bold', color: '#fff' },
+  thumbWidgetColon: { fontSize: 8, fontFamily: 'Cairo-Bold', color: 'rgba(255,255,255,0.7)' },
+  thumbWidgetBottomRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  thumbWidgetPrayerDot: { alignItems: 'center' },
+  thumbWidgetSmallDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: 'rgba(255,255,255,0.4)' },
+  // Analog thumbnail
+  thumbAnalogContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
+  // Digital thumbnail
+  thumbDigitalContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
+  thumbDigitalTime: { fontSize: 14, fontFamily: 'Cairo-Bold', color: '#333', letterSpacing: 1 },
+  thumbDigitalLabel: { fontSize: 7, fontFamily: 'Cairo-SemiBold', color: '#666', marginTop: -2 },
+  thumbDigitalSeparator: { width: 20, height: 1, backgroundColor: 'rgba(47,118,89,0.4)', marginVertical: 2 },
+  thumbDigitalCountdown: { fontSize: 9, fontFamily: 'Cairo-Bold', color: '#555' },
 });
 
 const settingsStyles = StyleSheet.create({
