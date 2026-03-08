@@ -101,6 +101,117 @@ const DUA_CATEGORIES = [
   { id: 'sunnah_duas', nameKey: 'azkar.sunnahDuas', icon: 'book-cross', color: '#2f7659' },
 ];
 
+// ========================================
+// 7 أقسام الصفحة الرئيسية المطوية
+// ========================================
+interface HomeSectionItem {
+  id: string;
+  label: string;
+  icon: string;
+  color: string;
+  route?: string;
+  nameKey?: string;
+}
+
+interface HomeSectionDef {
+  id: string;
+  title: string;
+  icon: string;
+  color: string;
+  items: HomeSectionItem[];
+}
+
+const HOME_SECTIONS: HomeSectionDef[] = [
+  {
+    id: 'azkar',
+    title: 'أذكار',
+    icon: 'book-open-variant',
+    color: '#f5a623',
+    items: [
+      { id: 'morning', label: 'أذكار الصباح', icon: 'weather-sunny', color: '#f5a623', route: '/azkar/morning' },
+      { id: 'evening', label: 'أذكار المساء', icon: 'weather-night', color: '#5d4e8c', route: '/azkar/evening' },
+      { id: 'sleep', label: 'أذكار النوم', icon: 'bed', color: '#3a7ca5', route: '/azkar/sleep' },
+      { id: 'wakeup', label: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', route: '/azkar/wakeup' },
+      { id: 'after_prayer', label: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', route: '/azkar/after_prayer' },
+      { id: 'benefit_azkar', label: 'فضل الأذكار', icon: 'information', color: '#f5a623', route: '/azkar-search?mode=benefits' },
+    ],
+  },
+  {
+    id: 'stories',
+    title: 'قصص',
+    icon: 'book-account',
+    color: '#6366F1',
+    items: [
+      { id: 'seerah', label: 'قصص الأنبياء', icon: 'book-account', color: '#6366F1', route: '/seerah' },
+      { id: 'companions', label: 'قصص الصحابة', icon: 'account-group', color: '#2f7659', route: '/companions' },
+    ],
+  },
+  {
+    id: 'hajj_umrah',
+    title: 'مناسك الحج والعمرة',
+    icon: 'star-crescent',
+    color: '#0D9488',
+    items: [
+      { id: 'hajj_duas', label: 'أدعية الحج', icon: 'hands-pray', color: '#0D9488', route: '/hajj-umrah?tab=hajj' },
+      { id: 'umrah_duas', label: 'أدعية العمرة', icon: 'hands-pray', color: '#2f7659', route: '/hajj-umrah?tab=umrah' },
+      { id: 'hajj_steps', label: 'المناسك خطوة بخطوة', icon: 'format-list-numbered', color: '#c17f59', route: '/hajj-umrah' },
+      { id: 'hajj_places', label: 'أماكن المناسك', icon: 'map-marker-radius', color: '#3a7ca5', route: '/hajj-umrah' },
+    ],
+  },
+  {
+    id: 'quran_surahs',
+    title: 'سور وآيات قرآنية',
+    icon: 'book-open-page-variant',
+    color: '#3a7ca5',
+    items: [
+      { id: 'surah_kahf', label: 'سورة الكهف', icon: 'book-open-page-variant', color: '#3a7ca5', route: '/surah/18' },
+      { id: 'surah_yasin', label: 'سورة يس', icon: 'book-open-page-variant', color: '#5d4e8c', route: '/surah/36' },
+      { id: 'surah_mulk', label: 'سورة الملك', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah/67' },
+      { id: 'ayat_kursi', label: 'آية الكرسي', icon: 'shield-star', color: '#DAA520', route: '/surah/2?ayah=255' },
+      { id: 'daily_ayah', label: 'آية اليوم', icon: 'star-four-points', color: '#f5a623', route: '/daily-ayah' },
+      { id: 'full_mushaf', label: 'المصحف الكامل', icon: 'book-open-variant', color: '#2f7659', route: '/(tabs)/quran' },
+    ],
+  },
+  {
+    id: 'duas_hadith',
+    title: 'أدعية وأحاديث',
+    icon: 'hands-pray',
+    color: '#c17f59',
+    items: [
+      { id: 'general_duas', label: 'أدعية عامة', icon: 'hands-pray', color: '#c17f59', route: '/azkar/sunnah_duas' },
+      { id: 'daily_dua', label: 'دعاء اليوم', icon: 'calendar-heart', color: '#e91e63', route: '/daily-dua' },
+      { id: 'daily_hadith', label: 'حديث اليوم', icon: 'format-quote-open', color: '#6366F1', route: '/daily-ayah' },
+      { id: 'ruqya', label: 'الرقية الشرعية', icon: 'shield-check', color: '#e91e63', route: '/ruqya' },
+      { id: 'quran_duas', label: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5', route: '/azkar/quran_duas' },
+    ],
+  },
+  {
+    id: 'worship',
+    title: 'عبادات',
+    icon: 'mosque',
+    color: '#2f7659',
+    items: [
+      { id: 'prayer_times', label: 'مواقيت الصلاة', icon: 'clock-outline', color: '#2f7659', route: '/(tabs)/prayer' },
+      { id: 'qibla', label: 'القبلة', icon: 'compass', color: '#5856D6', route: '/qibla-fullscreen' },
+      { id: 'next_prayer', label: 'صلاتي القادمة', icon: 'mosque', color: '#0D9488', route: '/(tabs)/prayer' },
+      { id: 'worship_tracker', label: 'تتبع الصلوات', icon: 'chart-line', color: '#2f7659', route: '/worship-tracker' },
+      { id: 'hijri_calendar', label: 'التقويم الهجري', icon: 'calendar-month', color: '#0D9488', route: '/hijri' },
+    ],
+  },
+  {
+    id: 'tasbih_section',
+    title: 'تسبيح واستغفار',
+    icon: 'circle-multiple',
+    color: '#8B5CF6',
+    items: [
+      { id: 'tasbih', label: 'المسبحة', icon: 'circle-multiple', color: '#2f7659', route: '/(tabs)/tasbih' },
+      { id: 'istighfar', label: 'الاستغفار', icon: 'heart', color: '#8B5CF6', route: '/(tabs)/tasbih?mode=istighfar' },
+      { id: 'salawat', label: 'الصلاة على النبي', icon: 'star-crescent', color: '#e91e63', route: '/(tabs)/tasbih?mode=salawat' },
+      { id: 'tasbih_log', label: 'سجل التسبيح', icon: 'history', color: '#3a7ca5', route: '/worship-tracker' },
+    ],
+  },
+];
+
 interface ModalCategoryItem { id: string; label: string; icon: string; color: string; route?: string; }
 interface ModalCategoryDef { id: string; title: string; icon: string; color: string; items: ModalCategoryItem[]; }
 
@@ -786,84 +897,90 @@ export default function HomeScreen() {
           </CollapsibleSection>
         </Animated.View>
 
-        {/* أقسام الأذكار */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <CollapsibleSection title={t('home.azkarSection')} icon="book-open-variant" sectionId="azkar" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
-          <View style={isGrid ? styles.categoriesGridWrap : styles.categoriesGrid}>
-            {AZKAR_CATEGORIES.map((category, index) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                onPress={() => navigateToCategory(category.id)}
-                isDarkMode={isDarkMode}
-                index={index}
-                t={t}
-                isGrid={isGrid}
-              />
-            ))}
-          </View>
-          </CollapsibleSection>
-        </Animated.View>
-
-        {/* الأدعية والرقية */}
-        <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <CollapsibleSection title={t('home.duasSection')} icon="hands-pray" sectionId="duas" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
-          <View style={styles.duasContainer}>
-            {DUA_CATEGORIES.map((category, index) => (
-              <Animated.View
-                key={category.id}
-                entering={FadeInRight.delay(300 + index * 80).duration(400)}
-              >
-                <ColoredButton
-                  label={t(category.nameKey)}
-                  icon={category.icon}
-                  backgroundColor={category.color}
-                  iconColor="#fff"
-                  textColor="#fff"
-                  size="medium"
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    navigateToDuas(category.id);
-                  }}
-                />
-              </Animated.View>
-            ))}
-          </View>
-          </CollapsibleSection>
-        </Animated.View>
-
-        {/* عبادات */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-          <CollapsibleSection title={t('home.worshipSection')} icon="chart-line" sectionId="worship" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
-          <View style={styles.extraLinks}>
-            <ColoredButton
-              label={t('home.worshipTracker')}
-              icon="chart-line"
-              backgroundColor="#2f7659"
-              iconColor="#fff"
-              textColor="#fff"
-              size="medium"
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/worship-tracker');
-              }}
-            />
-
-            <ColoredButton
-              label={t('home.khatmaQuran')}
-              icon="book-check"
-              backgroundColor="#3a7ca5"
-              iconColor="#fff"
-              textColor="#fff"
-              size="medium"
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/khatma');
-              }}
-            />
-          </View>
-          </CollapsibleSection>
-        </Animated.View>
+        {/* 7 الأقسام الرئيسية المطوية */}
+        {HOME_SECTIONS.map((section, sectionIndex) => (
+          <Animated.View
+            key={section.id}
+            entering={FadeInDown.delay(200 + sectionIndex * 80).duration(500)}
+          >
+            <CollapsibleSection
+              title={section.title}
+              icon={section.icon}
+              sectionId={section.id}
+              collapsedSections={collapsedSections}
+              toggleSection={toggleSection}
+              isDarkMode={isDarkMode}
+            >
+              <View style={isGrid ? styles.categoriesGridWrap : styles.categoriesGrid}>
+                {section.items.map((item, index) => (
+                  <Animated.View
+                    key={item.id}
+                    entering={FadeInRight.delay(index * 60).duration(400)}
+                    style={isGrid ? { width: (SCREEN_WIDTH - 32 - 10) / 2 } : undefined}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        if (item.route) {
+                          router.push(item.route as any);
+                        }
+                      }}
+                      activeOpacity={0.8}
+                      style={isGrid ? styles.gridCardOuter : styles.listCardOuter}
+                    >
+                      <BlurView
+                        intensity={Platform.OS === 'ios' ? 80 : 40}
+                        tint={isDarkMode ? 'dark' : 'light'}
+                        style={isGrid ? styles.gridCardBlur : styles.listCardBlur}
+                      >
+                        <View
+                          style={[
+                            isGrid ? styles.gridCard : styles.listCard,
+                            {
+                              backgroundColor: isDarkMode
+                                ? 'rgba(255,255,255,0.08)'
+                                : 'rgba(255,255,255,0.40)',
+                              borderColor: isDarkMode
+                                ? 'rgba(255,255,255,0.15)'
+                                : 'rgba(0,0,0,0.06)',
+                            },
+                          ]}
+                        >
+                          {isGrid ? (
+                            <>
+                              <View style={styles.gridCardIcon}>
+                                <MaterialCommunityIcons name={item.icon as any} size={28} color={item.color} />
+                              </View>
+                              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2}>
+                                {item.label}
+                              </Text>
+                            </>
+                          ) : (
+                            <>
+                              <View style={styles.listCardLeft}>
+                                <View style={[styles.listCardIcon, { backgroundColor: `${item.color}18` }]}>
+                                  <MaterialCommunityIcons name={item.icon as any} size={24} color={item.color} />
+                                </View>
+                                <Text style={[styles.listCardLabel, isDarkMode && styles.textLight]}>
+                                  {item.label}
+                                </Text>
+                              </View>
+                              <MaterialCommunityIcons
+                                name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+                                size={20}
+                                color={isDarkMode ? '#666' : '#ccc'}
+                              />
+                            </>
+                          )}
+                        </View>
+                      </BlurView>
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            </CollapsibleSection>
+          </Animated.View>
+        ))}
 
         <BannerAdComponent screen="home" />
         <View style={styles.bottomSpace} />
@@ -1335,11 +1452,18 @@ const styles = StyleSheet.create({
   listCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderWidth: StyleSheet.hairlineWidth,
     gap: 12,
+  },
+  listCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
   },
   listCardIcon: {
     width: 40,
