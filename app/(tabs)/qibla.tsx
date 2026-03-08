@@ -29,7 +29,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { QIBLA_STYLES, AVAILABLE_STYLES } from './qiblaAssets';
+import { QIBLA_STYLES, AVAILABLE_STYLES } from '@/lib/qiblaAssets';
 import { useInterstitialAd } from '@/components/ads/InterstitialAdManager';
 import { useAds } from '@/lib/ads-context';
 
