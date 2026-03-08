@@ -12,7 +12,12 @@ config.transformer = {
 config.resolver = {
   ...resolver,
   assetExts: resolver.assetExts.filter((ext) => ext !== "svg"),
-  sourceExts: [...resolver.sourceExts, "svg"]
+  sourceExts: [...resolver.sourceExts, "svg"],
+  // Add buffer polyfill for React Native
+  extraNodeModules: {
+    ...resolver.extraNodeModules,
+    buffer: require.resolve('buffer/'),
+  },
 };
 
 module.exports = config;
