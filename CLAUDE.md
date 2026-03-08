@@ -649,3 +649,52 @@ Settings page organized into 8 sections (in order):
 - التسبيح → `counter` (MaterialCommunityIcons)
 - الصلاة → `mosque` (MaterialCommunityIcons)
 - الإعدادات → `cog-outline` (MaterialCommunityIcons)
+
+## Deployment Verification Protocol
+
+### After EVERY change, verify on ALL platforms:
+1. Web (incognito browser)
+2. Android (fresh install via Expo Go or dev build)
+3. iOS (fresh install via Expo Go or dev build)
+4. iPhone Simulator (after reset if needed)
+
+### Before marking any task as "complete":
+- [ ] Code is committed and pushed (`git push origin main`)
+- [ ] Build completed without errors
+- [ ] Manually verified on Web
+- [ ] Manually verified on Android
+- [ ] Manually verified on iOS
+
+### Cache Clearing Checklist:
+```bash
+# Stop all processes
+pkill -f "expo" 2>/dev/null; pkill -f "metro" 2>/dev/null
+
+# Clear all build artifacts
+rm -rf node_modules .expo android/app/build ios/build ios/Pods
+rm -rf ~/Library/Developer/Xcode/DerivedData
+rm -rf $TMPDIR/metro-* $TMPDIR/haste-*
+watchman watch-del-all
+
+# Fresh install
+pnpm install
+npx pod-install  # for iOS native builds
+
+# Start with cleared cache
+npx expo start --clear
+```
+
+### Common Deployment Issues:
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Changes in code ≠ deployed | Unpushed commits | Run `git push origin main` |
+| Hot reload shows old code | Metro cache | Run `npx expo start --clear` |
+| iOS build fails | Stale Pods | Delete ios/Pods, run `pod install` |
+| Android build fails | Stale Gradle cache | Run `cd android && ./gradlew clean` |
+| Web shows stale content | Browser cache | Use incognito mode |
+
+### Expo Managed Workflow Notes:
+- Native builds require `eas build` or `expo prebuild` for native project generation
+- `ios/` and `android/` folders only contain widget code, not full native projects
+- Use Expo Go for development testing, EAS Build for production builds
+- OTA updates via `expo-updates` require version bump in app.json
