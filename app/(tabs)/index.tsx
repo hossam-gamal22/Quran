@@ -428,6 +428,16 @@ export default function HomeScreen() {
   const [modalSearch, setModalSearch] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
+  // Debug: Log when modal opens
+  useEffect(() => {
+    if (showCustomizeModal) {
+      console.log('=== MODAL DEBUG ===' );
+      console.log('MODAL_CATEGORIES count:', MODAL_CATEGORIES.length);
+      console.log('filteredCategories count:', filteredCategories.length);
+      console.log('Categories:', MODAL_CATEGORIES.map(c => c.title));
+    }
+  }, [showCustomizeModal]);
+
   const filteredCategories = useMemo(() => {
     if (!modalSearch.trim()) return MODAL_CATEGORIES;
     const q = modalSearch.trim();
@@ -1397,7 +1407,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-SemiBold',
   },
   modalList: {
-    maxHeight: 380,
+    flex: 1,
+    minHeight: 200,
   },
   modalItem: {
     flexDirection: 'row',
