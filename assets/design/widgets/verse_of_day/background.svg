@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <!-- Background artwork for Verse of the Day widget -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f987f" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#3a7ca5" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" rx="20" fill="url(#bg)"/>
+  <path d="M20 180 Q200 140 380 180" fill="none" stroke="#0f987f" opacity="0.08" stroke-width="1"/>
+  <path d="M20 170 Q200 130 380 170" fill="none" stroke="#0f987f" opacity="0.05" stroke-width="1"/>
+</svg>

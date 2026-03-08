@@ -42,15 +42,20 @@ import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import * as ExpoNotifications from 'expo-notifications';
 
 // Configure notification handler at the top level (before any component renders)
-ExpoNotifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Wrapped in try-catch to avoid console error on Expo Go (SDK 53+ removed push notifications from Expo Go)
+try {
+  ExpoNotifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch (e) {
+  // Silently ignore — Expo Go doesn't support push notifications
+}
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

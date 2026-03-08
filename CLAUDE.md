@@ -585,3 +585,67 @@ Settings page organized into 8 sections (in order):
 - Before fixing: CHECK if issue exists
 - If working correctly: DO NOT modify
 - After fixing: VERIFY from user perspective
+
+## Bottom Navigation
+- Text-only labels, no icons
+- 5 tabs: الإعدادات, الصلاة, تسبيح, القرآن, الرئيسية
+- Active color: `#22C55E` (green)
+- Font: Cairo-Medium (inactive), Cairo-SemiBold (active)
+- Labels resolved via `t('tabs.key')` with Arabic fallbacks
+
+## Display Settings (`app/settings/display.tsx`)
+- Font size selection (small/medium/large/xlarge)
+- Preview with Bismillah + Al-Fatiha
+- Home layout toggle (grid/list)
+- App background picker (none + 7 built-in images)
+- Background images: `assets/images/background1–7.png`
+- Uses `updateDisplay({ appBackground: key })` from SettingsContext
+
+## Verse of the Day Format
+- Single surah reference below verse (format: "سورة: ١٢٣")
+- No duplicate surah name at top
+- No decorative "✦ ─── ✦" separators
+- Ornamental brackets around verse: ﴿ آية ﴾
+
+## Tasbih Counter
+- Ring container: `width: RING_SIZE * 0.8`, `height: RING_SIZE * 0.65`
+- `overflow: 'visible'` on ringCenter + style sheet
+- `includeFontPadding: false` and `textAlignVertical: 'center'` on count number
+- Dynamic font: 72px (1-2 digits), 52px (3), 36px (4+)
+
+## Widget Design Assets
+- Location: `assets/design/widgets/{type}/`
+- 6 types: prayer_times, verse_of_day, dhikr, tasbih, hijri_date, countdown
+- Each has: `config.json`, `icon.svg`, `background.svg`
+- All SVGs use `#0f987f` accent color
+
+## Customization Modal Structure
+- Organize all app sections by category in `MODAL_CATEGORIES` constant
+- Categories are collapsible with smooth `LayoutAnimation` transitions
+- Search/filter bar at top filters by Arabic text across labels and category titles
+- Full section list (7 categories, 32 items):
+  - 📿 أذكار (6 items): صباح، مساء، نوم، استيقاظ، بعد الصلاة، فضل الأذكار
+  - 📖 قصص (2 items): قصص الأنبياء، قصص الصحابة
+  - 🕋 مناسك الحج والعمرة (4 items): أدعية الحج، أدعية العمرة، خطوة بخطوة، أماكن
+  - 📜 سور وآيات قرآنية (6 items): الكهف، يس، الملك، آية الكرسي، آية اليوم، المصحف
+  - 🤲 أدعية وأحاديث (5 items): أدعية عامة، دعاء اليوم، حديث اليوم، رقية، أدعية القرآن
+  - 🕌 عبادات (5 items): مواقيت الصلاة، القبلة، صلاتي القادمة، تتبع، التقويم الهجري
+  - 📿 تسبيح واستغفار (4 items): المسبحة، الاستغفار، الصلاة على النبي، السجل
+- Items map to either built-in `QUICK_ACCESS` items or custom items with routes
+- "إضافة أخرى" section at bottom for surahs and extra app pages
+- Glass morphism style applied to modal on iOS
+
+## Bottom Navigation Bar Standards
+- Icons rendered above text labels using `NativeTabs` `Icon` + `VectorIcon` components
+- Import: `Icon`, `VectorIcon` from `expo-router/unstable-native-tabs`
+- Import: `MaterialCommunityIcons` from `@expo/vector-icons/MaterialCommunityIcons`
+- `selectedLabelStyle` goes inside `options` prop (not directly on Trigger)
+- Minimum touch target: 44x44
+- Test on multiple screen sizes before considering complete
+
+## Icon Mapping for Navigation
+- الرئيسية → `home-variant` (MaterialCommunityIcons)
+- القرآن → `book-open-variant` (MaterialCommunityIcons)
+- التسبيح → `counter` (MaterialCommunityIcons)
+- الصلاة → `mosque` (MaterialCommunityIcons)
+- الإعدادات → `cog-outline` (MaterialCommunityIcons)

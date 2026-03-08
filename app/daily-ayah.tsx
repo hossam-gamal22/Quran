@@ -137,25 +137,14 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
 
         {/* Content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-          {/* Surah name */}
-          <Text style={{ fontSize: 15, color: cardStyle.accentColor, fontFamily: UTHMANI_FALLBACK, textAlign: 'center', marginBottom: 12, ...TEXT_SHADOW }}>
-            سورة {ayah.ref.split(' ')[0]}
-          </Text>
-
-          {/* Ornamental top divider */}
-          <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14, letterSpacing: 6 }}>✦ ─── ✦</Text>
-
-          {/* Arabic verse in Uthmani script with inline verse number */}
+          {/* Arabic verse with ornamental brackets */}
           <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
-            {verseWithNumber}
+            ﴿ {ayah.arabic} ﴾
           </Text>
 
-          {/* Ornamental bottom divider */}
-          <Text style={{ fontSize: 20, color: 'rgba(255,255,255,0.4)', textAlign: 'center', marginBottom: 14, letterSpacing: 6 }}>✦ ─── ✦</Text>
-
-          {/* Ref badge */}
+          {/* Ref badge — single instance */}
           <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>
-            <Text style={{ color: '#FFFFFF', fontFamily: UTHMANI_FALLBACK, fontSize: 13, ...TEXT_SHADOW }}>﴿ {ayah.ref} ﴾</Text>
+            <Text style={{ color: '#FFFFFF', fontFamily: UTHMANI_FALLBACK, fontSize: 13, ...TEXT_SHADOW }}>{ayah.ref.split(' ')[0]}: {toArabicNumeral(ayah.ayah)}</Text>
           </View>
 
           {/* Translation */}
@@ -428,25 +417,14 @@ export default function DailyAyahVideoScreen() {
             borderColor: isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)',
           }}
         >
-          {/* Surah name */}
-          <Text style={{ fontSize: 16, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK, marginBottom: 8 }}>
-            سورة {currentAyah.ref.split(' ')[0]}
+          {/* Verse text with ornamental brackets */}
+          <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
+            ﴿ {currentAyah.arabic} ﴾
           </Text>
 
-          {/* Ornamental divider */}
-          <Text style={{ fontSize: 14, color: isDarkMode ? 'rgba(180,160,100,0.5)' : 'rgba(140,120,60,0.4)', textAlign: 'center', marginBottom: 10, letterSpacing: 4 }}>✦ ─────── ✦</Text>
-
-          {/* Verse text with inline number */}
-          <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 10, writingDirection: 'rtl' }}>
-            {currentAyah.arabic} ﴿{toArabicNumeral(currentAyah.ayah)}﴾
-          </Text>
-
-          {/* Ornamental divider */}
-          <Text style={{ fontSize: 14, color: isDarkMode ? 'rgba(180,160,100,0.5)' : 'rgba(140,120,60,0.4)', textAlign: 'center', marginBottom: 8, letterSpacing: 4 }}>✦ ─────── ✦</Text>
-
-          {/* Surah reference */}
-          <Text style={{ fontSize: 14, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK }}>
-            ﴿ {currentAyah.ref} ﴾
+          {/* Surah reference — single instance */}
+          <Text style={{ fontSize: 15, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK }}>
+            {currentAyah.ref.split(' ')[0]}: {toArabicNumeral(currentAyah.ayah)}
           </Text>
 
           <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 8, opacity: 0.6 }}>

@@ -69,6 +69,8 @@ const QUICK_ACCESS = [
   { id: 'benefit_azkar', nameKey: 'home.benefitAzkar', icon: 'information', color: '#f5a623' },
 ];
 
+const QUICK_ACCESS_IDS = new Set(QUICK_ACCESS.map(q => q.id));
+
 interface CustomQuickAccessItem {
   id: string;
   icon: string;
@@ -97,6 +99,79 @@ const COLLAPSED_SECTIONS_KEY = '@home_collapsed_sections';
 const DUA_CATEGORIES = [
   { id: 'quran_duas', nameKey: 'azkar.quranDuas', icon: 'book-open-variant', color: '#3a7ca5' },
   { id: 'sunnah_duas', nameKey: 'azkar.sunnahDuas', icon: 'book-cross', color: '#2f7659' },
+];
+
+interface ModalCategoryItem { id: string; label: string; icon: string; color: string; route?: string; }
+interface ModalCategoryDef { id: string; title: string; icon: string; color: string; items: ModalCategoryItem[]; }
+
+const MODAL_CATEGORIES: ModalCategoryDef[] = [
+  {
+    id: 'cat_azkar', title: 'أذكار', icon: 'book-open-variant', color: '#f5a623',
+    items: [
+      { id: 'morning_azkar', label: 'أذكار الصباح', icon: 'weather-sunny', color: '#f5a623', route: '/azkar/morning' },
+      { id: 'evening_azkar', label: 'أذكار المساء', icon: 'weather-night', color: '#5d4e8c', route: '/azkar/evening' },
+      { id: 'sleep_azkar', label: 'أذكار النوم', icon: 'bed', color: '#3a7ca5', route: '/azkar/sleep' },
+      { id: 'wakeup_azkar', label: 'أذكار الاستيقاظ', icon: 'weather-sunset-up', color: '#c17f59', route: '/azkar/wakeup' },
+      { id: 'after_prayer_azkar', label: 'أذكار بعد الصلاة', icon: 'mosque', color: '#2f7659', route: '/azkar/after_prayer' },
+      { id: 'benefit_azkar', label: 'فضل الأذكار', icon: 'information', color: '#f5a623' },
+    ],
+  },
+  {
+    id: 'cat_stories', title: 'قصص', icon: 'book-account', color: '#6366F1',
+    items: [
+      { id: 'seerah', label: 'قصص الأنبياء', icon: 'book-account', color: '#6366F1' },
+      { id: 'companions_stories', label: 'قصص الصحابة', icon: 'account-group', color: '#2f7659', route: '/companions' },
+    ],
+  },
+  {
+    id: 'cat_hajj', title: 'مناسك الحج والعمرة', icon: 'star-crescent', color: '#0D9488',
+    items: [
+      { id: 'hajj_duas', label: 'أدعية الحج', icon: 'hands-pray', color: '#0D9488', route: '/hajj-umrah' },
+      { id: 'umrah_duas', label: 'أدعية العمرة', icon: 'hands-pray', color: '#2f7659', route: '/hajj-umrah' },
+      { id: 'hajj_steps', label: 'المناسك خطوة بخطوة', icon: 'format-list-numbered', color: '#c17f59', route: '/hajj-umrah' },
+      { id: 'hajj_places', label: 'أماكن المناسك', icon: 'map-marker-radius', color: '#3a7ca5', route: '/hajj-umrah' },
+    ],
+  },
+  {
+    id: 'cat_quran', title: 'سور وآيات قرآنية', icon: 'book-open-page-variant', color: '#3a7ca5',
+    items: [
+      { id: 'surah_kahf', label: 'سورة الكهف', icon: 'book-open-page-variant', color: '#3a7ca5' },
+      { id: 'surah_yasin', label: 'سورة يس', icon: 'book-open-page-variant', color: '#5d4e8c' },
+      { id: 'surah_mulk', label: 'سورة الملك', icon: 'book-open-page-variant', color: '#0D9488' },
+      { id: 'ayat_kursi', label: 'آية الكرسي', icon: 'shield-star', color: '#DAA520' },
+      { id: 'daily_ayah', label: 'آية اليوم', icon: 'star-four-points', color: '#f5a623', route: '/daily-ayah' },
+      { id: 'full_mushaf', label: 'المصحف الكامل', icon: 'book-open-variant', color: '#2f7659', route: '/(tabs)/quran' },
+    ],
+  },
+  {
+    id: 'cat_duas', title: 'أدعية وأحاديث', icon: 'hands-pray', color: '#c17f59',
+    items: [
+      { id: 'general_duas', label: 'أدعية عامة', icon: 'hands-pray', color: '#c17f59', route: '/azkar/sunnah_duas' },
+      { id: 'daily_dua', label: 'دعاء اليوم', icon: 'calendar-heart', color: '#e91e63', route: '/daily-dua' },
+      { id: 'daily_hadith', label: 'حديث اليوم', icon: 'format-quote-open', color: '#6366F1', route: '/daily-ayah' },
+      { id: 'ruqya', label: 'الرقية الشرعية', icon: 'shield-check', color: '#e91e63', route: '/ruqya' },
+      { id: 'quran_duas', label: 'أدعية من القرآن', icon: 'book-open-variant', color: '#3a7ca5', route: '/azkar/quran_duas' },
+    ],
+  },
+  {
+    id: 'cat_worship', title: 'عبادات', icon: 'mosque', color: '#2f7659',
+    items: [
+      { id: 'prayer_times', label: 'مواقيت الصلاة', icon: 'clock-outline', color: '#2f7659', route: '/(tabs)/prayer' },
+      { id: 'qibla', label: 'القبلة', icon: 'compass', color: '#5856D6' },
+      { id: 'next_prayer', label: 'صلاتي القادمة', icon: 'mosque', color: '#0D9488', route: '/(tabs)/prayer' },
+      { id: 'worship_tracker', label: 'تتبع الصلوات', icon: 'chart-line', color: '#2f7659', route: '/worship-tracker' },
+      { id: 'hijri_calendar', label: 'التقويم الهجري', icon: 'calendar-month', color: '#0D9488', route: '/hijri' },
+    ],
+  },
+  {
+    id: 'cat_tasbih', title: 'تسبيح واستغفار', icon: 'circle-multiple', color: '#8B5CF6',
+    items: [
+      { id: 'tasbih', label: 'المسبحة', icon: 'circle-multiple', color: '#2f7659' },
+      { id: 'istighfar', label: 'الاستغفار', icon: 'heart', color: '#8B5CF6' },
+      { id: 'salawat', label: 'الصلاة على النبي', icon: 'star-crescent', color: '#e91e63' },
+      { id: 'tasbih_log', label: 'سجل التسبيح', icon: 'history', color: '#3a7ca5', route: '/worship-tracker' },
+    ],
+  },
 ];
 
 // ========================================
@@ -350,6 +425,45 @@ export default function HomeScreen() {
   const [pendingCustomItems, setPendingCustomItems] = useState<CustomQuickAccessItem[]>([]);
   const [addOtherMode, setAddOtherMode] = useState<null | 'pages' | 'surahs'>(null);
   const [surahSearch, setSurahSearch] = useState('');
+  const [modalSearch, setModalSearch] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+
+  const filteredCategories = useMemo(() => {
+    if (!modalSearch.trim()) return MODAL_CATEGORIES;
+    const q = modalSearch.trim();
+    return MODAL_CATEGORIES.map(cat => ({
+      ...cat,
+      items: cat.items.filter(item =>
+        item.label.includes(q) || cat.title.includes(q)
+      ),
+    })).filter(cat => cat.items.length > 0);
+  }, [modalSearch]);
+
+  const toggleModalCategory = useCallback((catId: string) => {
+    setExpandedCategories(prev =>
+      prev.includes(catId)
+        ? prev.filter(id => id !== catId)
+        : [...prev, catId]
+    );
+  }, []);
+
+  const toggleModalItem = useCallback((item: ModalCategoryItem) => {
+    Haptics.selectionAsync();
+    const isBuiltIn = QUICK_ACCESS_IDS.has(item.id);
+    setPendingIds(prev => {
+      const isSelected = prev.includes(item.id);
+      return isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id];
+    });
+    if (!isBuiltIn && item.route) {
+      setPendingCustomItems(prev => {
+        const exists = prev.some(c => c.id === item.id);
+        if (exists) return prev.filter(c => c.id !== item.id);
+        return [...prev, { id: item.id, icon: item.icon, color: item.color, label: item.label, route: item.route! }];
+      });
+    } else if (!isBuiltIn) {
+      setPendingCustomItems(prev => prev.filter(c => c.id !== item.id));
+    }
+  }, []);
 
   const allSurahs = useMemo(() => getAllSurahs(), []);
   const filteredSurahs = useMemo(() => {
@@ -641,6 +755,8 @@ export default function HomeScreen() {
                   setPendingCustomItems([...customItems]);
                   setAddOtherMode(null);
                   setSurahSearch('');
+                  setModalSearch('');
+                  setExpandedCategories([]);
                   setModalMode('select');
                   setShowCustomizeModal(true);
                 }}
@@ -659,428 +775,6 @@ export default function HomeScreen() {
           </ScrollView>
           </CollapsibleSection>
         </Animated.View>
-
-        {/* Quick Access Customize Modal */}
-        <Modal
-          visible={showCustomizeModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            if (addOtherMode) { setAddOtherMode(null); setSurahSearch(''); }
-            else setShowCustomizeModal(false);
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <BlurView
-              intensity={Platform.OS === 'ios' ? 90 : 50}
-              tint={isDarkMode ? 'dark' : 'light'}
-              style={styles.modalBlur}
-            >
-              <View style={[
-                styles.modalContent,
-                {
-                  backgroundColor: isDarkMode
-                    ? 'rgba(30,30,32,0.55)'
-                    : 'rgba(255,255,255,0.7)',
-                  borderWidth: 0.5,
-                  borderColor: 'rgba(255,255,255,0.2)',
-                },
-              ]}>
-                <Text style={[
-                  styles.modalTitle,
-                  { color: isDarkMode ? '#fff' : '#333' },
-                ]}>
-                  {addOtherMode === 'pages' ? 'صفحة من التطبيق'
-                    : addOtherMode === 'surahs' ? 'سورة من القرآن'
-                    : 'تخصيص الوصول السريع'}
-                </Text>
-
-                {/* Back button for sub-views */}
-                {addOtherMode && (
-                  <TouchableOpacity
-                    style={styles.modalBackBtn}
-                    onPress={() => { setAddOtherMode(null); setSurahSearch(''); }}
-                  >
-                    <MaterialCommunityIcons name="arrow-right" size={20} color={isDarkMode ? '#aaa' : '#666'} />
-                    <Text style={[styles.modalBackText, { color: isDarkMode ? '#aaa' : '#666' }]}>رجوع</Text>
-                  </TouchableOpacity>
-                )}
-
-                {/* Mode toggle (select / reorder) */}
-                {!addOtherMode && (
-                  <View style={styles.modalModeToggle}>
-                    <TouchableOpacity
-                      style={[styles.modalModeBtn, modalMode === 'select' && styles.modalModeBtnActive]}
-                      onPress={() => setModalMode('select')}
-                    >
-                      <Text style={[
-                        styles.modalModeBtnText,
-                        modalMode === 'select' && styles.modalModeBtnTextActive,
-                        { color: isDarkMode ? '#aaa' : '#666' },
-                      ]}>
-                        اختيار
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalModeBtn, modalMode === 'reorder' && styles.modalModeBtnActive]}
-                      onPress={() => setModalMode('reorder')}
-                    >
-                      <Text style={[
-                        styles.modalModeBtnText,
-                        modalMode === 'reorder' && styles.modalModeBtnTextActive,
-                        { color: isDarkMode ? '#aaa' : '#666' },
-                      ]}>
-                        ترتيب
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-
-                {/* Main items list */}
-                {!addOtherMode && modalMode === 'select' && (
-                  <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                    {/* Built-in items */}
-                    {QUICK_ACCESS.map(item => {
-                      const isSelected = pendingIds.includes(item.id);
-                      return (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[
-                            styles.modalItem,
-                            { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                          ]}
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            Haptics.selectionAsync();
-                            setPendingIds(prev =>
-                              isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
-                            );
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}> 
-                              <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                            </View>
-                            <Text style={[
-                              styles.modalItemLabel,
-                              { color: isDarkMode ? '#fff' : '#333' },
-                            ]}>
-                              {t(item.nameKey)}
-                            </Text>
-                          </View>
-                          <MaterialCommunityIcons
-                            name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                            size={24}
-                            color={isSelected ? '#2f7659' : (isDarkMode ? '#666' : '#ccc')}
-                          />
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    {/* Custom items already added */}
-                    {pendingCustomItems.map(item => {
-                      const isSelected = pendingIds.includes(item.id);
-                      return (
-                        <TouchableOpacity
-                          key={item.id}
-                          style={[
-                            styles.modalItem,
-                            { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                          ]}
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            Haptics.selectionAsync();
-                            setPendingIds(prev =>
-                              isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
-                            );
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}> 
-                              <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                            </View>
-                            <Text style={[
-                              styles.modalItemLabel,
-                              { color: isDarkMode ? '#fff' : '#333' },
-                            ]}>
-                              {item.label}
-                            </Text>
-                          </View>
-                          <MaterialCommunityIcons
-                            name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                            size={24}
-                            color={isSelected ? '#2f7659' : (isDarkMode ? '#666' : '#ccc')}
-                          />
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    {/* Divider + Add Other section */}
-                    <View style={[
-                      styles.modalDivider,
-                      { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' },
-                    ]} />
-                    <Text style={[
-                      styles.modalSectionHeader,
-                      { color: isDarkMode ? '#aaa' : '#888' },
-                    ]}>
-                      إضافة أخرى
-                    </Text>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.modalItem,
-                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        setAddOtherMode('pages');
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                        <View style={[styles.modalItemIcon, { backgroundColor: 'rgba(99,102,241,0.15)' }]}> 
-                          <MaterialCommunityIcons name="view-grid-plus" size={20} color="#6366F1" />
-                        </View>
-                        <Text style={[
-                          styles.modalItemLabel,
-                          { color: isDarkMode ? '#fff' : '#333' },
-                        ]}>
-                          صفحة من التطبيق
-                        </Text>
-                      </View>
-                      <MaterialCommunityIcons name="chevron-left" size={22} color={isDarkMode ? '#666' : '#ccc'} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.modalItem,
-                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                      ]}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        setAddOtherMode('surahs');
-                      }}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                        <View style={[styles.modalItemIcon, { backgroundColor: 'rgba(13,148,136,0.15)' }]}> 
-                          <MaterialCommunityIcons name="book-open-page-variant" size={20} color="#0D9488" />
-                        </View>
-                        <Text style={[
-                          styles.modalItemLabel,
-                          { color: isDarkMode ? '#fff' : '#333' },
-                        ]}>
-                          سورة من القرآن
-                        </Text>
-                      </View>
-                      <MaterialCommunityIcons name="chevron-left" size={22} color={isDarkMode ? '#666' : '#ccc'} />
-                    </TouchableOpacity>
-                  </ScrollView>
-                )}
-
-                {/* App Pages sub-view */}
-                {addOtherMode === 'pages' && (
-                  <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                    {EXTRA_APP_PAGES.map(page => {
-                      const alreadyAdded = pendingCustomItems.some(c => c.id === page.id);
-                      return (
-                        <TouchableOpacity
-                          key={page.id}
-                          style={[
-                            styles.modalItem,
-                            { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                            alreadyAdded && { opacity: 0.5 },
-                          ]}
-                          activeOpacity={0.7}
-                          disabled={alreadyAdded}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setPendingCustomItems(prev => [...prev, page]);
-                            setPendingIds(prev => [...prev, page.id]);
-                            setAddOtherMode(null);
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modalItemIcon, { backgroundColor: `${page.color}20` }]}> 
-                              <MaterialCommunityIcons name={page.icon as any} size={20} color={page.color} />
-                            </View>
-                            <Text style={[
-                              styles.modalItemLabel,
-                              { color: isDarkMode ? '#fff' : '#333' },
-                            ]}>
-                              {page.label}
-                            </Text>
-                          </View>
-                          {alreadyAdded && (
-                            <MaterialCommunityIcons name="check" size={20} color="#2f7659" />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                )}
-
-                {/* Surah Picker sub-view */}
-                {addOtherMode === 'surahs' && (
-                  <View style={{ flex: 1 }}>
-                    <View style={[
-                      styles.surahSearchContainer,
-                      { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' },
-                    ]}>
-                      <MaterialCommunityIcons name="magnify" size={20} color={isDarkMode ? '#aaa' : '#888'} />
-                      <TextInput
-                        style={[
-                          styles.surahSearchInput,
-                          { color: isDarkMode ? '#fff' : '#333' },
-                        ]}
-                        placeholder="ابحث عن سورة..."
-                        placeholderTextColor={isDarkMode ? '#666' : '#aaa'}
-                        value={surahSearch}
-                        onChangeText={setSurahSearch}
-                        autoCorrect={false}
-                        textAlign="right"
-                      />
-                    </View>
-                    <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                      {filteredSurahs.map(surah => {
-                        const surahItemId = `surah_custom_${surah.number}`;
-                        const alreadyAdded = pendingCustomItems.some(c => c.id === surahItemId);
-                        const startPage = surah.ayahs[0]?.p || 1;
-                        return (
-                          <TouchableOpacity
-                            key={surah.number}
-                            style={[
-                              styles.modalItem,
-                              { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                              alreadyAdded && { opacity: 0.5 },
-                            ]}
-                            activeOpacity={0.7}
-                            disabled={alreadyAdded}
-                            onPress={() => {
-                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              const newItem: CustomQuickAccessItem = {
-                                id: surahItemId,
-                                icon: 'book-open-page-variant',
-                                color: '#0D9488',
-                                label: surah.name,
-                                route: `/surah/${surah.number}?page=${startPage}`,
-                              };
-                              setPendingCustomItems(prev => [...prev, newItem]);
-                              setPendingIds(prev => [...prev, surahItemId]);
-                              setAddOtherMode(null);
-                              setSurahSearch('');
-                            }}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                              <View style={[
-                                styles.surahNumber,
-                                { backgroundColor: isDarkMode ? 'rgba(13,148,136,0.2)' : 'rgba(13,148,136,0.1)' },
-                              ]}>
-                                <Text style={[
-                                  styles.surahNumberText,
-                                  { color: isDarkMode ? '#5EEAD4' : '#0D9488' },
-                                ]}>
-                                  {surah.number}
-                                </Text>
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={[
-                                  styles.modalItemLabel,
-                                  { color: isDarkMode ? '#fff' : '#333' },
-                                ]}>
-                                  {surah.name}
-                                </Text>
-                                <Text style={[
-                                  styles.surahSubtitle,
-                                  { color: isDarkMode ? '#888' : '#999' },
-                                ]}>
-                                  {surah.englishName} · {surah.ayahs.length} آيات
-                                </Text>
-                              </View>
-                            </View>
-                            {alreadyAdded && (
-                              <MaterialCommunityIcons name="check" size={20} color="#2f7659" />
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                )}
-
-                {/* Reorder view */}
-                {!addOtherMode && modalMode === 'reorder' && (
-                  <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                    {pendingIds.map((id, index) => {
-                      const item = pendingAllQuickAccessItems.find(i => i.id === id);
-                      if (!item) return null;
-                      return (
-                        <View
-                          key={id}
-                          style={[
-                            styles.modalItem,
-                            { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
-                          ]}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}>
-                              <MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} />
-                            </View>
-                            <Text style={[
-                              styles.modalItemLabel,
-                              { color: isDarkMode ? '#fff' : '#333' },
-                            ]}>
-                              {item.nameKey ? t(item.nameKey) : ((item as any).label || '')}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', gap: 4 }}>
-                            <TouchableOpacity
-                              disabled={index === 0}
-                              onPress={() => moveQuickAccessItem(index, -1)}
-                              style={{ opacity: index === 0 ? 0.3 : 1, padding: 4 }}
-                            >
-                              <MaterialCommunityIcons name="chevron-up" size={22} color={isDarkMode ? '#fff' : '#333'} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              disabled={index === pendingIds.length - 1}
-                              onPress={() => moveQuickAccessItem(index, 1)}
-                              style={{ opacity: index === pendingIds.length - 1 ? 0.3 : 1, padding: 4 }}
-                            >
-                              <MaterialCommunityIcons name="chevron-down" size={22} color={isDarkMode ? '#fff' : '#333'} />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                )}
-
-                {/* Action buttons */}
-                {!addOtherMode && (
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity
-                      style={[styles.modalBtn, styles.modalBtnCancel]}
-                      onPress={() => setShowCustomizeModal(false)}
-                    >
-                      <Text style={[styles.modalBtnText, { color: isDarkMode ? '#aaa' : '#666' }]}>إلغاء</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]}
-                      disabled={!pendingIds.length}
-                      onPress={() => {
-                        saveQuickAccessIds(pendingIds, pendingCustomItems);
-                        setShowCustomizeModal(false);
-                      }}
-                    >
-                      <Text style={styles.modalBtnConfirmText}>حفظ</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            </BlurView>
-          </View>
-        </Modal>
 
         {/* أقسام الأذكار */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
@@ -1165,6 +859,244 @@ export default function HomeScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
       </SafeAreaView>
+
+      {/* Quick Access Customize Modal — rendered outside ScrollView to prevent stacking on mobile */}
+      <Modal
+        visible={showCustomizeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (addOtherMode) { setAddOtherMode(null); setSurahSearch(''); }
+          else setShowCustomizeModal(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <BlurView
+            intensity={Platform.OS === 'ios' ? 90 : 50}
+            tint={isDarkMode ? 'dark' : 'light'}
+            style={styles.modalBlur}
+          >
+            <View style={[
+              styles.modalContent,
+              {
+                backgroundColor: isDarkMode
+                  ? 'rgba(30,30,32,0.55)'
+                  : 'rgba(255,255,255,0.7)',
+                borderWidth: 0.5,
+                borderColor: 'rgba(255,255,255,0.2)',
+              },
+            ]}>
+              <Text style={[
+                styles.modalTitle,
+                { color: isDarkMode ? '#fff' : '#333' },
+              ]}>
+                {addOtherMode === 'pages' ? 'صفحة من التطبيق'
+                  : addOtherMode === 'surahs' ? 'سورة من القرآن'
+                  : 'تخصيص الوصول السريع'}
+              </Text>
+
+              {addOtherMode && (
+                <TouchableOpacity
+                  style={styles.modalBackBtn}
+                  onPress={() => { setAddOtherMode(null); setSurahSearch(''); }}
+                >
+                  <MaterialCommunityIcons name="arrow-right" size={20} color={isDarkMode ? '#aaa' : '#666'} />
+                  <Text style={[styles.modalBackText, { color: isDarkMode ? '#aaa' : '#666' }]}>رجوع</Text>
+                </TouchableOpacity>
+              )}
+
+              {!addOtherMode && (
+                <View style={styles.modalModeToggle}>
+                  <TouchableOpacity
+                    style={[styles.modalModeBtn, modalMode === 'select' && styles.modalModeBtnActive]}
+                    onPress={() => setModalMode('select')}
+                  >
+                    <Text style={[styles.modalModeBtnText, modalMode === 'select' && styles.modalModeBtnTextActive, { color: isDarkMode ? '#aaa' : '#666' }]}>اختيار</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalModeBtn, modalMode === 'reorder' && styles.modalModeBtnActive]}
+                    onPress={() => setModalMode('reorder')}
+                  >
+                    <Text style={[styles.modalModeBtnText, modalMode === 'reorder' && styles.modalModeBtnTextActive, { color: isDarkMode ? '#aaa' : '#666' }]}>ترتيب</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!addOtherMode && modalMode === 'select' && (
+                <>
+                  <View style={[styles.surahSearchContainer, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={isDarkMode ? '#aaa' : '#888'} />
+                    <TextInput
+                      style={[styles.surahSearchInput, { color: isDarkMode ? '#fff' : '#333' }]}
+                      placeholder="ابحث عن قسم..."
+                      placeholderTextColor={isDarkMode ? '#666' : '#aaa'}
+                      value={modalSearch}
+                      onChangeText={setModalSearch}
+                      autoCorrect={false}
+                      textAlign="right"
+                    />
+                    {modalSearch.length > 0 && (
+                      <TouchableOpacity onPress={() => setModalSearch('')}>
+                        <MaterialCommunityIcons name="close-circle" size={18} color={isDarkMode ? '#666' : '#aaa'} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+                    {filteredCategories.map(category => {
+                      const isExpanded = expandedCategories.includes(category.id);
+                      return (
+                        <View key={category.id}>
+                          <TouchableOpacity
+                            style={[styles.modalCategoryHeader, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}
+                            activeOpacity={0.7}
+                            onPress={() => { Haptics.selectionAsync(); toggleModalCategory(category.id); }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                              <View style={[styles.modalItemIcon, { backgroundColor: `${category.color}20` }]}>
+                                <MaterialCommunityIcons name={category.icon as any} size={20} color={category.color} />
+                              </View>
+                              <Text style={[styles.modalCategoryTitle, { color: isDarkMode ? '#fff' : '#333' }]}>
+                                {category.title}
+                              </Text>
+                              <View style={[styles.modalCategoryBadge, { backgroundColor: `${category.color}20` }]}>
+                                <Text style={[styles.modalCategoryBadgeText, { color: category.color }]}>{category.items.length}</Text>
+                              </View>
+                            </View>
+                            <MaterialCommunityIcons
+                              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                              size={22}
+                              color={isDarkMode ? '#666' : '#999'}
+                            />
+                          </TouchableOpacity>
+                          {isExpanded && category.items.map(item => {
+                            const isSelected = pendingIds.includes(item.id) || pendingCustomItems.some(c => c.id === item.id);
+                            return (
+                              <TouchableOpacity
+                                key={item.id}
+                                style={[styles.modalItem, styles.modalCategoryItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }]}
+                                activeOpacity={0.7}
+                                onPress={() => toggleModalItem(item)}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                                  <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}15`, width: 32, height: 32, borderRadius: 16 }]}>
+                                    <MaterialCommunityIcons name={item.icon as any} size={18} color={item.color} />
+                                  </View>
+                                  <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#ddd' : '#444' }]}>{item.label}</Text>
+                                </View>
+                                <MaterialCommunityIcons
+                                  name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                                  size={24}
+                                  color={isSelected ? '#2f7659' : (isDarkMode ? '#666' : '#ccc')}
+                                />
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      );
+                    })}
+                    <View style={[styles.modalDivider, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]} />
+                    <Text style={[styles.modalSectionHeader, { color: isDarkMode ? '#aaa' : '#888' }]}>إضافة أخرى</Text>
+                    <TouchableOpacity style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); setAddOtherMode('pages'); }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        <View style={[styles.modalItemIcon, { backgroundColor: 'rgba(99,102,241,0.15)' }]}><MaterialCommunityIcons name="view-grid-plus" size={20} color="#6366F1" /></View>
+                        <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#fff' : '#333' }]}>صفحة من التطبيق</Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-left" size={22} color={isDarkMode ? '#666' : '#ccc'} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]} activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); setAddOtherMode('surahs'); }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                        <View style={[styles.modalItemIcon, { backgroundColor: 'rgba(13,148,136,0.15)' }]}><MaterialCommunityIcons name="book-open-page-variant" size={20} color="#0D9488" /></View>
+                        <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#fff' : '#333' }]}>سورة من القرآن</Text>
+                      </View>
+                      <MaterialCommunityIcons name="chevron-left" size={22} color={isDarkMode ? '#666' : '#ccc'} />
+                    </TouchableOpacity>
+                  </ScrollView>
+                </>
+              )}
+
+              {addOtherMode === 'pages' && (
+                <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+                  {EXTRA_APP_PAGES.map(page => {
+                    const alreadyAdded = pendingCustomItems.some(c => c.id === page.id);
+                    return (
+                      <TouchableOpacity key={page.id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, alreadyAdded && { opacity: 0.5 }]} activeOpacity={0.7} disabled={alreadyAdded} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPendingCustomItems(prev => [...prev, page]); setPendingIds(prev => [...prev, page.id]); setAddOtherMode(null); }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <View style={[styles.modalItemIcon, { backgroundColor: `${page.color}20` }]}><MaterialCommunityIcons name={page.icon as any} size={20} color={page.color} /></View>
+                          <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#fff' : '#333' }]}>{page.label}</Text>
+                        </View>
+                        {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#2f7659" />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {addOtherMode === 'surahs' && (
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.surahSearchContainer, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+                    <MaterialCommunityIcons name="magnify" size={20} color={isDarkMode ? '#aaa' : '#888'} />
+                    <TextInput style={[styles.surahSearchInput, { color: isDarkMode ? '#fff' : '#333' }]} placeholder="ابحث عن سورة..." placeholderTextColor={isDarkMode ? '#666' : '#aaa'} value={surahSearch} onChangeText={setSurahSearch} autoCorrect={false} textAlign="right" />
+                  </View>
+                  <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+                    {filteredSurahs.map(surah => {
+                      const surahItemId = `surah_custom_${surah.number}`;
+                      const alreadyAdded = pendingCustomItems.some(c => c.id === surahItemId);
+                      const startPage = surah.ayahs[0]?.p || 1;
+                      return (
+                        <TouchableOpacity key={surah.number} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, alreadyAdded && { opacity: 0.5 }]} activeOpacity={0.7} disabled={alreadyAdded} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); const newItem: CustomQuickAccessItem = { id: surahItemId, icon: 'book-open-page-variant', color: '#0D9488', label: surah.name, route: `/surah/${surah.number}?page=${startPage}` }; setPendingCustomItems(prev => [...prev, newItem]); setPendingIds(prev => [...prev, surahItemId]); setAddOtherMode(null); setSurahSearch(''); }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                            <View style={[styles.surahNumber, { backgroundColor: isDarkMode ? 'rgba(13,148,136,0.2)' : 'rgba(13,148,136,0.1)' }]}>
+                              <Text style={[styles.surahNumberText, { color: isDarkMode ? '#5EEAD4' : '#0D9488' }]}>{surah.number}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#fff' : '#333' }]}>{surah.name}</Text>
+                              <Text style={[styles.surahSubtitle, { color: isDarkMode ? '#888' : '#999' }]}>{surah.englishName} · {surah.ayahs.length} آيات</Text>
+                            </View>
+                          </View>
+                          {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#2f7659" />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {!addOtherMode && modalMode === 'reorder' && (
+                <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+                  {pendingIds.map((id, index) => {
+                    const item = pendingAllQuickAccessItems.find(i => i.id === id);
+                    if (!item) return null;
+                    return (
+                      <View key={id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                          <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}><MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} /></View>
+                          <Text style={[styles.modalItemLabel, { color: isDarkMode ? '#fff' : '#333' }]}>{item.nameKey ? t(item.nameKey) : ((item as any).label || '')}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 4 }}>
+                          <TouchableOpacity disabled={index === 0} onPress={() => moveQuickAccessItem(index, -1)} style={{ opacity: index === 0 ? 0.3 : 1, padding: 4 }}><MaterialCommunityIcons name="chevron-up" size={22} color={isDarkMode ? '#fff' : '#333'} /></TouchableOpacity>
+                          <TouchableOpacity disabled={index === pendingIds.length - 1} onPress={() => moveQuickAccessItem(index, 1)} style={{ opacity: index === pendingIds.length - 1 ? 0.3 : 1, padding: 4 }}><MaterialCommunityIcons name="chevron-down" size={22} color={isDarkMode ? '#fff' : '#333'} /></TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
+
+              {!addOtherMode && (
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setShowCustomizeModal(false)}>
+                    <Text style={[styles.modalBtnText, { color: isDarkMode ? '#aaa' : '#666' }]}>إلغاء</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]} disabled={!pendingIds.length} onPress={() => { saveQuickAccessIds(pendingIds, pendingCustomItems); setShowCustomizeModal(false); }}>
+                    <Text style={styles.modalBtnConfirmText}>حفظ</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
     </BackgroundWrapper>
   );
 }
@@ -1495,6 +1427,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Cairo-Bold',
     textAlign: 'right',
     marginBottom: 8,
+  },
+  modalCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalCategoryTitle: {
+    fontSize: 16,
+    fontFamily: 'Cairo-Bold',
+    textAlign: 'right',
+  },
+  modalCategoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  modalCategoryBadgeText: {
+    fontSize: 12,
+    fontFamily: 'Cairo-SemiBold',
+  },
+  modalCategoryItem: {
+    paddingLeft: 20,
   },
   modalButtons: {
     flexDirection: 'row',

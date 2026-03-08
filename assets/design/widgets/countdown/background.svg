@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <!-- Background artwork for Countdown widget -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#081827" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#0f987f" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" rx="20" fill="url(#bg)"/>
+  <circle cx="200" cy="100" r="70" fill="none" stroke="#0f987f" opacity="0.05" stroke-width="2" stroke-dasharray="12 6"/>
+</svg>

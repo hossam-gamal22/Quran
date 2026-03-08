@@ -1,5 +1,5 @@
 // app/settings/display.tsx
-// إعدادات العرض - حجم الخط ونوعه وطريقة العرض
+// إعدادات العرض - حجم الخط ونوعه وطريقة العرض والخلفية
 
 import React from 'react';
 import {
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   StatusBar,
   I18nManager,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,7 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
-import { useSettings, FontSize, HomeLayout } from '@/contexts/SettingsContext';
+import { useSettings, FontSize, HomeLayout, AppBackgroundKey } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 
 const FONT_SIZES: { value: FontSize; label: string; sample: number }[] = [
@@ -25,6 +26,17 @@ const FONT_SIZES: { value: FontSize; label: string; sample: number }[] = [
   { value: 'medium', label: 'متوسط', sample: 18 },
   { value: 'large', label: 'كبير', sample: 22 },
   { value: 'xlarge', label: 'كبير جداً', sample: 26 },
+];
+
+const BACKGROUND_OPTIONS: { key: AppBackgroundKey; source: any }[] = [
+  { key: 'none', source: null },
+  { key: 'background1', source: require('@/assets/images/background1.png') },
+  { key: 'background2', source: require('@/assets/images/background2.png') },
+  { key: 'background3', source: require('@/assets/images/background3.png') },
+  { key: 'background4', source: require('@/assets/images/background4.png') },
+  { key: 'background5', source: require('@/assets/images/background5.png') },
+  { key: 'background6', source: require('@/assets/images/background6.png') },
+  { key: 'background7', source: require('@/assets/images/background7.png') },
 ];
 
 export default function DisplaySettingsScreen() {
@@ -152,6 +164,46 @@ export default function DisplaySettingsScreen() {
             </View>
           </Animated.View>
 
+          {/* خلفية التطبيق */}
+          <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
+              خلفية التطبيق
+            </Text>
+            <View style={[styles.section, isDarkMode && styles.sectionDark, { padding: 16 }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                {BACKGROUND_OPTIONS.map((bg) => {
+                  const isSelected = (settings.display.appBackground || 'none') === bg.key;
+                  return (
+                    <TouchableOpacity
+                      key={bg.key}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        updateDisplay({ appBackground: bg.key });
+                      }}
+                      style={[
+                        styles.bgThumb,
+                        isSelected && styles.bgThumbSelected,
+                      ]}
+                    >
+                      {bg.source ? (
+                        <Image source={bg.source} style={styles.bgThumbImage} />
+                      ) : (
+                        <View style={[styles.bgThumbImage, { backgroundColor: isDarkMode ? '#1a1a2e' : '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
+                          <MaterialCommunityIcons name="cancel" size={24} color={isDarkMode ? '#666' : '#999'} />
+                        </View>
+                      )}
+                      {isSelected && (
+                        <View style={styles.bgCheck}>
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </Animated.View>
+
           <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
@@ -225,5 +277,25 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-
+  bgThumb: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  bgThumbSelected: {
+    borderColor: '#2f7659',
+  },
+  bgThumbImage: {
+    width: 72,
+    height: 110,
+    borderRadius: 10,
+  },
+  bgCheck: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+  },
 });

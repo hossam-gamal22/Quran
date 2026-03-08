@@ -792,7 +792,7 @@ export default function TasbihScreen() {
                 />
               </Svg>
               {/* Center content */}
-              <View style={[s.ringCenter, { overflow: 'visible', width: RING_SIZE * 0.75, height: RING_SIZE * 0.55 }]}>
+              <View style={[s.ringCenter, { overflow: 'visible', width: RING_SIZE * 0.8, height: RING_SIZE * 0.65 }]}>
                 <Text style={[s.countNum, { color: C.text, fontSize: count >= 1000 ? 36 : count >= 100 ? 52 : 72, lineHeight: count >= 1000 ? 48 : count >= 100 ? 64 : 84 }]} adjustsFontSizeToFit numberOfLines={1}>{count}</Text>
                 <View style={[s.countDivider, { backgroundColor: C.textSec }]} />
                 <Text style={[s.countTarget, { color: C.textSec }]}>{selectedTasbih.target}</Text>
@@ -1168,9 +1168,12 @@ const s = StyleSheet.create({
   },
   ringCenter: {
     position: 'absolute', alignItems: 'center', justifyContent: 'center',
+    overflow: 'visible' as const,
   },
   countNum: {
     fontSize: 72, fontFamily: 'Cairo-Bold', lineHeight: 82,
+    includeFontPadding: false,
+    textAlignVertical: 'center' as const,
   },
   countOf: {
     fontSize: 14, fontFamily: 'Cairo-Medium', marginTop: -4,

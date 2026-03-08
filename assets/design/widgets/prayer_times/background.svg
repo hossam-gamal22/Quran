@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
+  <!-- Background artwork for Prayer Times widget -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f987f" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#081827" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="200" rx="20" fill="url(#bg)"/>
+  <circle cx="360" cy="40" r="60" fill="#0f987f" opacity="0.06"/>
+  <circle cx="40" cy="170" r="40" fill="#0f987f" opacity="0.04"/>
+</svg>
