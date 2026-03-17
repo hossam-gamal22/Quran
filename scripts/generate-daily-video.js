@@ -184,35 +184,64 @@ async function fetchReciterAudio(ayahNumber, reciterId, tmpDir) {
 
 // ─── Fetch Nature Image ──────────────────────────────────────────────
 
+/** Generate a solid dark gradient fallback image using FFmpeg */
+function generateFallbackImage(tmpDir) {
+  console.log('   ⚠️  Using FFmpeg-generated gradient fallback image');
+  const imgPath = path.join(tmpDir, 'background.png');
+  // Dark teal-to-navy gradient, 1080x1920
+  const cmd = [
+    'ffmpeg', '-y',
+    '-f', 'lavfi',
+    `-i`, `color=c=#0a2e2e:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:d=1,format=rgb24`,
+    '-frames:v', '1',
+    `"${imgPath}"`,
+  ].join(' ');
+  execSync(cmd, { stdio: 'pipe', timeout: 15000 });
+  return imgPath;
+}
+
 async function fetchNatureImage(tmpDir) {
   console.log('🖼️  Fetching nature image from Pexels...');
-  if (!PEXELS_API_KEY) throw new Error('PEXELS_API_KEY is not set');
 
-  const dayOfYear = Math.floor(
-    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
-  );
-  const searchTerm = PHOTO_SEARCH_TERMS[dayOfYear % PHOTO_SEARCH_TERMS.length];
+  if (!PEXELS_API_KEY) {
+    console.log('   ⚠️  PEXELS_API_KEY is not set — using fallback');
+    return generateFallbackImage(tmpDir);
+  }
 
-  const response = await axios.get('https://api.pexels.com/v1/search', {
-    headers: { Authorization: PEXELS_API_KEY },
-    params: {
-      query: searchTerm + ' no people no animals',
-      orientation: 'portrait',
-      per_page: 15,
-      page: 1,
-    },
-  });
+  try {
+    const dayOfYear = Math.floor(
+      (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000
+    );
+    const searchTerm = PHOTO_SEARCH_TERMS[dayOfYear % PHOTO_SEARCH_TERMS.length];
 
-  const photos = response.data.photos;
-  if (!photos?.length) throw new Error(`No Pexels photos for: "${searchTerm}"`);
+    const response = await axios.get('https://api.pexels.com/v1/search', {
+      headers: { Authorization: PEXELS_API_KEY },
+      params: {
+        query: searchTerm + ' no people no animals',
+        orientation: 'portrait',
+        per_page: 15,
+        page: 1,
+      },
+      timeout: 15000,
+    });
 
-  const photo = photos[dayOfYear % photos.length];
-  console.log(`   ✅ Photo #${photo.id} by ${photo.photographer}`);
+    const photos = response.data.photos;
+    if (!photos?.length) {
+      console.log(`   ⚠️  No photos found for "${searchTerm}" — using fallback`);
+      return generateFallbackImage(tmpDir);
+    }
 
-  const imgPath = path.join(tmpDir, 'background.jpg');
-  const imgResponse = await axios.get(photo.src.portrait, { responseType: 'arraybuffer' });
-  fs.writeFileSync(imgPath, Buffer.from(imgResponse.data));
-  return imgPath;
+    const photo = photos[dayOfYear % photos.length];
+    console.log(`   ✅ Photo #${photo.id} by ${photo.photographer}`);
+
+    const imgPath = path.join(tmpDir, 'background.jpg');
+    const imgResponse = await axios.get(photo.src.portrait, { responseType: 'arraybuffer', timeout: 30000 });
+    fs.writeFileSync(imgPath, Buffer.from(imgResponse.data));
+    return imgPath;
+  } catch (err) {
+    console.error(`   ⚠️  Pexels failed: ${err.message} — using fallback`);
+    return generateFallbackImage(tmpDir);
+  }
 }
 
 // ─── Compose Video ───────────────────────────────────────────────────
@@ -383,6 +412,12 @@ async function main() {
   console.log('  روح المسلم — Daily Video Generator (5 Reciters)');
   console.log('══════════════════════════════════════════════════\n');
 
+  // Debug: confirm environment
+  console.log(`🔑 PEXELS_API_KEY: ${PEXELS_API_KEY ? 'SET (' + PEXELS_API_KEY.length + ' chars)' : '❌ NOT SET'}`);
+  console.log(`📂 Font exists: ${fs.existsSync(FONT_PATH) ? '✅ ' + FONT_PATH : '❌ MISSING'}`);
+  console.log(`🔧 FFmpeg drawtext: ${hasDrawtext() ? '✅ available' : '⚠️ not available'}`);
+  console.log('');
+
   const date = todayStr();
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'daily-video-'));
 
@@ -445,5 +480,6 @@ async function main() {
 
 main().catch((err) => {
   console.error('\n❌ Fatal error:', err.message);
+  if (err.stack) console.error(err.stack);
   process.exit(1);
 });

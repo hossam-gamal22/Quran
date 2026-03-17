@@ -39,7 +39,11 @@ jobs:
         working-directory: scripts
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-        run: node generate-daily-video.js
+        run: |
+          echo "🔑 PEXELS_API_KEY length: ${#PEXELS_API_KEY}"
+          echo "📂 Font file: $(ls -la fonts/KFGQPC-Uthmanic-Script.ttf 2>&1)"
+          echo "🔧 FFmpeg: $(ffmpeg -version | head -1)"
+          node generate-daily-video.js
 
       - name: Commit and push
         run: |
