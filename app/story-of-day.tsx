@@ -9,6 +9,7 @@ import {
   Platform,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
+import { captureRef } from 'react-native-view-shot';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -73,6 +75,7 @@ export default function StoryOfDayScreen() {
 
   const videoRef = useRef<Video>(null);
   const reciterScrollRef = useRef<ScrollView>(null);
+  const videoCardRef = useRef<View>(null);
   const [dayData, setDayData] = useState<DayData | null>(null);
   const [selectedReciterIdx, setSelectedReciterIdx] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -247,45 +250,52 @@ export default function StoryOfDayScreen() {
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
 
   const handleDownload = useCallback(async () => {
-    if (!currentVideo?.url) return;
+    if (!videoCardRef.current) return;
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
-      if (!download?.uri) throw new Error('download failed');
+      const uri = await captureRef(videoCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
       const perm = await MediaLibrary.requestPermissionsAsync();
-      if (!perm.granted) return;
-      await MediaLibrary.saveToLibraryAsync(download.uri);
+      if (!perm.granted) {
+        Alert.alert('', t('storyOfDay.photoPermissionRequired'));
+        return;
+      }
+      await MediaLibrary.saveToLibraryAsync(uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('✅', t('storyOfDay.imageSaved'));
     } catch (e) {
-      // silent
+      Alert.alert('', t('storyOfDay.videoSaveError'));
     } finally {
       setSaving(false);
     }
-  }, [currentVideo]);
+  }, []);
 
   const handleShare = useCallback(async () => {
-    if (!dayData || !currentVideo) return;
+    if (!dayData || !videoCardRef.current) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
-      if (download?.uri) {
-        if (Platform.OS === 'ios') {
-          const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
-          await Share.share({
-            message: dayData.ayahText + '\n\n' + sl + '\n\n' + t('storyOfDay.shareText'),
-            url: download.uri,
+      const uri = await captureRef(videoCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+      });
+      const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
+      if (Platform.OS === 'ios') {
+        await Share.share({
+          message: dayData.ayahText + '\n\n' + sl + '\n\n' + t('storyOfDay.shareText'),
+          url: uri,
+        });
+      } else {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/png',
+            dialogTitle: t('storyOfDay.shareText'),
           });
-        } else {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(download.uri, {
-              mimeType: 'video/mp4',
-              dialogTitle: t('storyOfDay.shareText'),
-            });
-          }
         }
       }
     } catch (e) {
@@ -293,7 +303,7 @@ export default function StoryOfDayScreen() {
     } finally {
       setSharing(false);
     }
-  }, [dayData, currentVideo, isArabic]);
+  }, [dayData, isArabic]);
 
   const surahLabel = dayData ? (isArabic ? dayData.surahName : dayData.surahEnglish) : '';
   const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
@@ -371,10 +381,11 @@ export default function StoryOfDayScreen() {
               )}
 
               {/* Video Card */}
+              <View ref={videoCardRef} collapsable={false} style={styles.videoCard}>
               <TouchableOpacity
                 activeOpacity={1}
                 onPress={handleVideoTap}
-                style={styles.videoCard}
+                style={StyleSheet.absoluteFillObject}
               >
                 <Video
                   ref={videoRef}
@@ -466,6 +477,7 @@ export default function StoryOfDayScreen() {
                   </View>
                 )}
               </TouchableOpacity>
+              </View>
 
               {/* Action Buttons */}
               <View style={styles.actionsSection}>
