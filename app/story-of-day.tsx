@@ -17,7 +17,9 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Video, ResizeMode } from 'expo-av';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
+import Slider from '@react-native-community/slider';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -54,6 +56,13 @@ interface DayData {
 
 type RollingData = Record<string, DayData>;
 
+function formatTime(ms: number) {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
 export default function StoryOfDayScreen() {
   const isRTL = useIsRTL();
   const { settings } = useSettings();
@@ -63,6 +72,7 @@ export default function StoryOfDayScreen() {
   const isArabic = (settings.language || 'ar') === 'ar';
 
   const videoRef = useRef<Video>(null);
+  const reciterScrollRef = useRef<ScrollView>(null);
   const [dayData, setDayData] = useState<DayData | null>(null);
   const [selectedReciterIdx, setSelectedReciterIdx] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -74,6 +84,84 @@ export default function StoryOfDayScreen() {
   const [qcfPage, setQcfPage] = useState<number | null>(null);
   const [qcfGlyphs, setQcfGlyphs] = useState<string[]>([]);
 
+  // Playback state
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetControlsTimer = useCallback(() => {
+    if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+    controlsTimeout.current = setTimeout(() => setShowControls(false), 4000);
+  }, []);
+
+  const togglePlayPause = useCallback(async () => {
+    if (!videoRef.current) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (isPlaying) {
+      await videoRef.current.pauseAsync();
+    } else {
+      await videoRef.current.playAsync();
+    }
+    setIsPlaying(!isPlaying);
+    resetControlsTimer();
+  }, [isPlaying, resetControlsTimer]);
+
+  const toggleMute = useCallback(async () => {
+    if (!videoRef.current) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await videoRef.current.setIsMutedAsync(!isMuted);
+    setIsMuted(!isMuted);
+    resetControlsTimer();
+  }, [isMuted, resetControlsTimer]);
+
+  const handleVideoTap = useCallback(() => {
+    setShowControls((prev) => {
+      if (!prev) {
+        resetControlsTimer();
+        return true;
+      }
+      if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+      return false;
+    });
+  }, [resetControlsTimer]);
+
+  const onPlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    if (!isSeeking) {
+      setPositionMs(status.positionMillis ?? 0);
+    }
+    setDurationMs(status.durationMillis ?? 0);
+    setIsPlaying(status.isPlaying);
+  }, [isSeeking]);
+
+  const handleSeek = useCallback(async (value: number) => {
+    setIsSeeking(false);
+    if (videoRef.current) {
+      await videoRef.current.setPositionAsync(value);
+    }
+    resetControlsTimer();
+  }, [resetControlsTimer]);
+
+  const skipForward = useCallback(async () => {
+    if (!videoRef.current) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newPos = Math.min(positionMs + 10000, durationMs);
+    await videoRef.current.setPositionAsync(newPos);
+    resetControlsTimer();
+  }, [positionMs, durationMs, resetControlsTimer]);
+
+  const skipBack = useCallback(async () => {
+    if (!videoRef.current) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const newPos = Math.max(positionMs - 10000, 0);
+    await videoRef.current.setPositionAsync(newPos);
+    resetControlsTimer();
+  }, [positionMs, resetControlsTimer]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -83,12 +171,9 @@ export default function StoryOfDayScreen() {
         const json = await res.json();
 
         let resolved: DayData | null = null;
-
-        // Extract date-keyed entries (handles both pure rolling and mixed/legacy formats)
         const dateKeys = Object.keys(json).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
 
         if (dateKeys.length > 0) {
-          // Rolling format: pick latest date with non-empty videos
           const sorted = dateKeys.sort().reverse();
           for (const dk of sorted) {
             const entry = json[dk];
@@ -99,7 +184,6 @@ export default function StoryOfDayScreen() {
           }
         }
 
-        // Fallback: legacy flat format { url, ayahText, ... }
         if (!resolved && json.url && json.ayahText) {
           resolved = {
             ayahText: json.ayahText,
@@ -151,6 +235,14 @@ export default function StoryOfDayScreen() {
     })();
     return () => { cancelled = true; };
   }, [dayData?.surahNumber, dayData?.ayahNumber]);
+
+  // Auto-hide controls after 4s
+  useEffect(() => {
+    resetControlsTimer();
+    return () => {
+      if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+    };
+  }, []);
 
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
 
@@ -236,43 +328,19 @@ export default function StoryOfDayScreen() {
             </View>
           ) : (
             <>
-              <View style={styles.videoCard}>
-                <Video
-                  ref={videoRef}
-                  source={{ uri: currentVideo.url }}
-                  style={styles.videoPlayer}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay
-                  isLooping
-                  isMuted={false}
-                />
-                <View style={styles.videoOverlay} />
-                <View style={styles.videoTextOverlay}>
-                  <Text
-                    style={[styles.ayahText, { fontFamily: ayahFontFamily, fontSize: ayahFontSize, lineHeight: ayahLineHeight }]}
-                    allowFontScaling={false}
-                  >
-                    {isQcf ? qcfGlyphs.join('') : dayData.ayahText}
-                  </Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.surahRef}>
-                    {surahLabel} - {dayData.ayahNumber}
-                  </Text>
-                  {!isPremium && (
-                    <View style={styles.brandingRow}>
-                      <Image source={logoSource} style={styles.brandingLogo} resizeMode="contain" />
-                      <Text style={styles.brandingLabel}>{appName}</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {dayData.videos.length > 1 && (
+              {/* Reciter Chips — starts from far right in RTL */}
+              {dayData.videos.length > 0 && (
                 <ScrollView
+                  ref={reciterScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={[styles.reciterChips, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   style={styles.reciterScroll}
+                  onContentSizeChange={() => {
+                    if (isRTL && reciterScrollRef.current) {
+                      reciterScrollRef.current.scrollToEnd({ animated: false });
+                    }
+                  }}
                 >
                   {dayData.videos.map((v, idx) => {
                     const active = idx === selectedReciterIdx;
@@ -281,6 +349,7 @@ export default function StoryOfDayScreen() {
                         key={v.reciterId}
                         onPress={() => {
                           setSelectedReciterIdx(idx);
+                          setIsPlaying(true);
                           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                         activeOpacity={0.7}
@@ -301,6 +370,104 @@ export default function StoryOfDayScreen() {
                 </ScrollView>
               )}
 
+              {/* Video Card */}
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={handleVideoTap}
+                style={styles.videoCard}
+              >
+                <Video
+                  ref={videoRef}
+                  source={{ uri: currentVideo.url }}
+                  style={styles.videoPlayer}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={isPlaying}
+                  isLooping
+                  isMuted={isMuted}
+                  onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+                />
+                {/* Subtle gradient for text readability */}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
+                  locations={[0, 0.45, 1]}
+                  style={StyleSheet.absoluteFillObject}
+                  pointerEvents="none"
+                />
+
+                {/* QCF Text overlay — centered, no duplicated verse number */}
+                <View style={styles.videoTextOverlay} pointerEvents="none">
+                  <Text
+                    style={[styles.ayahText, { fontFamily: ayahFontFamily, fontSize: ayahFontSize, lineHeight: ayahLineHeight }]}
+                    allowFontScaling={false}
+                  >
+                    {isQcf ? qcfGlyphs.join('') : dayData.ayahText}
+                  </Text>
+                  <View style={styles.divider} />
+                  <Text style={styles.surahRef}>
+                    {surahLabel}
+                  </Text>
+                </View>
+
+                {/* Branding — bigger, pinned to very bottom */}
+                {!isPremium && (
+                  <View style={styles.brandingRow} pointerEvents="none">
+                    <Image source={logoSource} style={styles.brandingLogo} resizeMode="contain" />
+                    <Text style={styles.brandingLabel}>{appName}</Text>
+                  </View>
+                )}
+
+                {/* Full controls overlay */}
+                {showControls && (
+                  <View style={styles.controlsOverlay} pointerEvents="box-none">
+                    {/* Center: skip back, play/pause, skip forward */}
+                    <View style={styles.centerControls}>
+                      <TouchableOpacity onPress={skipBack} style={styles.skipBtn}>
+                        <MaterialCommunityIcons name="rewind-10" size={32} color="rgba(255,255,255,0.9)" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtn}>
+                        <MaterialCommunityIcons
+                          name={isPlaying ? 'pause-circle' : 'play-circle'}
+                          size={64}
+                          color="rgba(255,255,255,0.95)"
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={skipForward} style={styles.skipBtn}>
+                        <MaterialCommunityIcons name="fast-forward-10" size={32} color="rgba(255,255,255,0.9)" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Bottom bar: time + seekbar + mute */}
+                    <View style={styles.bottomBar}>
+                      <View style={[styles.bottomBarRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <Text style={styles.timeText}>{formatTime(positionMs)}</Text>
+                        <View style={styles.sliderContainer}>
+                          <Slider
+                            style={styles.slider}
+                            minimumValue={0}
+                            maximumValue={durationMs || 1}
+                            value={positionMs}
+                            onSlidingStart={() => setIsSeeking(true)}
+                            onSlidingComplete={handleSeek}
+                            minimumTrackTintColor={colors.primary}
+                            maximumTrackTintColor="rgba(255,255,255,0.3)"
+                            thumbTintColor="#fff"
+                          />
+                        </View>
+                        <Text style={styles.timeText}>{formatTime(durationMs)}</Text>
+                        <TouchableOpacity onPress={toggleMute} style={styles.muteBtn}>
+                          <MaterialCommunityIcons
+                            name={isMuted ? 'volume-off' : 'volume-high'}
+                            size={20}
+                            color="rgba(255,255,255,0.9)"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              {/* Action Buttons */}
               <View style={styles.actionsSection}>
                 <TouchableOpacity
                   onPress={handleDownload}
@@ -309,18 +476,17 @@ export default function StoryOfDayScreen() {
                   style={[styles.actionBtn, {
                     backgroundColor: colors.card,
                     borderColor: colors.border,
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                   }]}
                 >
-                  <View style={[styles.actionBtnInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    {saving ? (
-                      <ActivityIndicator color={colors.primary} size="small" />
-                    ) : (
-                      <MaterialCommunityIcons name="download" size={20} color={colors.primary} />
-                    )}
-                    <Text style={[styles.btnText, { color: colors.text }]}>
-                      {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
-                    </Text>
-                  </View>
+                  {saving ? (
+                    <ActivityIndicator color={colors.primary} size="small" />
+                  ) : (
+                    <MaterialCommunityIcons name="download" size={20} color={colors.primary} />
+                  )}
+                  <Text style={[styles.btnText, { color: colors.text }]}>
+                    {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -330,18 +496,17 @@ export default function StoryOfDayScreen() {
                   style={[styles.actionBtn, {
                     backgroundColor: colors.card,
                     borderColor: colors.border,
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                   }]}
                 >
-                  <View style={[styles.actionBtnInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    {sharing ? (
-                      <ActivityIndicator color={colors.primary} size="small" />
-                    ) : (
-                      <MaterialCommunityIcons name="share-variant" size={20} color={colors.primary} />
-                    )}
-                    <Text style={[styles.btnText, { color: colors.text }]}>
-                      {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
-                    </Text>
-                  </View>
+                  {sharing ? (
+                    <ActivityIndicator color={colors.primary} size="small" />
+                  ) : (
+                    <MaterialCommunityIcons name="share-variant" size={20} color={colors.primary} />
+                  )}
+                  <Text style={[styles.btnText, { color: colors.text }]}>
+                    {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -365,18 +530,26 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontFamily: fontBold() },
   errorText: { fontSize: 16, fontFamily: fontRegular(), textAlign: 'center' },
+
+  // Reciter chips
+  reciterScroll: { marginTop: 8, marginBottom: 10, maxHeight: 44 },
+  reciterChips: { gap: 8, paddingHorizontal: 2 },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  chipText: { fontFamily: fontBold(), fontSize: 14 },
+
+  // Video card
   videoCard: {
     borderRadius: 20,
     overflow: 'hidden',
     aspectRatio: 9 / 16,
     width: '100%',
-    marginTop: 8,
   },
   videoPlayer: { ...StyleSheet.absoluteFillObject },
-  videoOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
   videoTextOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -388,6 +561,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     writingDirection: 'rtl',
     paddingHorizontal: 4,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   divider: {
     width: 60,
@@ -402,32 +578,98 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: 'rgba(255,255,255,0.85)',
     writingDirection: 'rtl',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
+
+  // Branding — pinned at very bottom of video
   brandingRow: {
+    position: 'absolute',
+    bottom: 52,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 20,
+    gap: 8,
   },
-  brandingLogo: { width: 28, height: 28, borderRadius: 6 },
+  brandingLogo: { width: 36, height: 36, borderRadius: 8 },
   brandingLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
     fontFamily: fontBold(),
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  reciterScroll: { marginTop: 14, maxHeight: 44 },
-  reciterChips: { gap: 8, paddingHorizontal: 2 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+
+  // Full controls overlay
+  controlsOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+  },
+  playPauseBtn: {
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  skipBtn: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    paddingTop: 8,
+  },
+  bottomBarRow: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  sliderContainer: {
+    flex: 1,
+    height: 30,
+    justifyContent: 'center',
+  },
+  slider: {
+    width: '100%',
+    height: 30,
+  },
+  timeText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    minWidth: 36,
+    textAlign: 'center',
+  },
+  muteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Action buttons
+  actionsSection: { gap: 10, marginTop: 14 },
+  actionBtn: {
+    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-  },
-  chipText: { fontFamily: fontBold(), fontSize: 13 },
-  actionsSection: { gap: 10, marginTop: 16 },
-  actionBtn: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
-  actionBtnInner: {
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
