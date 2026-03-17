@@ -100,10 +100,25 @@ function getAudioDuration(audioPath) {
 
 function hasDrawtext() {
   try {
-    const out = execSync('ffmpeg -filters 2>&1', { encoding: 'utf8', timeout: 5000 });
-    return /\bdrawtext\b/.test(out);
+    // FFmpeg prints filters to stderr, so we must capture both streams
+    const out = execSync('ffmpeg -filters 2>&1 || true', {
+      encoding: 'utf8',
+      timeout: 5000,
+      shell: true,
+    });
+    return /drawtext/i.test(out);
   } catch {
-    return false;
+    // Fallback: check if libfreetype is compiled in (from ffmpeg -version)
+    try {
+      const ver = execSync('ffmpeg -version 2>&1 || true', {
+        encoding: 'utf8',
+        timeout: 5000,
+        shell: true,
+      });
+      return /enable-libfreetype/i.test(ver);
+    } catch {
+      return false;
+    }
   }
 }
 
