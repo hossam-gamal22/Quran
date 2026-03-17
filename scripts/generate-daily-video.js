@@ -84,16 +84,18 @@ function escapeDrawtext(input) {
 }
 
 function getAudioDuration(audioPath) {
-  // Use ffmpeg -i (ffprobe may not be in PATH on some CI runners)
-  const raw = execSync(
-    `ffmpeg -i "${audioPath}" 2>&1 || true`,
-    { encoding: 'utf8', timeout: 10000 }
-  );
-  const match = raw.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+  // ffmpeg -i always exits non-zero (no output file) — duration is in stderr
+  let output = '';
+  try {
+    execSync(`ffmpeg -i "${audioPath}"`, { encoding: 'utf8', timeout: 10000 });
+  } catch (err) {
+    output = (err.stderr || '') + '\n' + (err.stdout || '');
+  }
+  const match = output.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
   if (match) {
     return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
   }
-  throw new Error(`Could not parse audio duration from: ${audioPath}`);
+  throw new Error(`Could not parse audio duration from: ${audioPath}\nffmpeg output: ${output.slice(0, 500)}`);
 }
 
 function hasDrawtext() {

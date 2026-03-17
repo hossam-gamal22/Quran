@@ -28,10 +28,13 @@ jobs:
         with:
           node-version: 20
 
-      - name: Verify FFmpeg
+      - name: Install full FFmpeg
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
           ffmpeg -version | head -1
-          which ffprobe && ffprobe -version | head -1 || echo 'ffprobe not in PATH (will use ffmpeg -i instead)'
+          ffprobe -version | head -1
+          ffmpeg -filters 2>&1 | grep drawtext || echo 'drawtext not available'
 
       - name: Install dependencies
         working-directory: scripts
