@@ -13,38 +13,66 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useOnboarding } from '@/contexts/OnboardingContext';
+import { t, getDateLocale } from '@/lib/i18n';
 
 // ========================================
 // الثوابت
 // ========================================
 
-const BACKUP_VERSION = '1.0';
+const BACKUP_VERSION = '2.0';
 const BACKUP_FILENAME = 'rooh_muslim_backup';
+
+// Keys to exclude from backup/restore (device-specific or sensitive)
+const EXCLUDED_KEYS = [
+  '@fcm_token',
+  '@rooh_fcm_token',
+  '@device_registered',
+  '@rooh_user_id',
+  '@rooh_first_open',
+  '@app_version',
+  'auth_token',
+  'last_backup_date',
+  // Cache keys that regenerate automatically
+  '@quran_cache_timestamp',
+  '@sound_settings_cache',
+  'ads_config_cache',
+  'remote_app_config',
+  'dynamic_backgrounds',
+  'sdui_screen_configs',
+  'home_page_config',
+  'performance_data',
+  'cache_index',
+  'image_cache_index',
+  'current_session',
+  'seasonal_content_cache',
+  'seasonal_last_update',
+  'cached_api_data',
+];
 
 interface BackupData {
   version: string;
   createdAt: string;
   device: string;
-  data: {
-    settings: any;
-    worship: any;
-    khatma: any;
-    bookmarks: any;
-    progress: any;
-  };
+  keyCount?: number;
+  data: Record<string, any>;
 }
 
 interface BackupInfo {
@@ -78,9 +106,11 @@ const ActionCard: React.FC<ActionCardProps> = ({
   isLoading = false,
   isDarkMode,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <TouchableOpacity
-      style={[styles.actionCard, isDarkMode && styles.actionCardDark]}
+      style={[styles.actionCard, isDarkMode && styles.actionCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
       onPress={() => {
         if (!isLoading) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -99,12 +129,12 @@ const ActionCard: React.FC<ActionCardProps> = ({
           <MaterialCommunityIcons name={icon} size={28} color="#fff" />
         )}
       </View>
-      <View style={styles.actionContent}>
-        <Text style={[styles.actionTitle, isDarkMode && styles.textLight]}>{title}</Text>
-        <Text style={[styles.actionSubtitle, isDarkMode && styles.textMuted]}>{subtitle}</Text>
+      <View style={[styles.actionContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
+        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subtitle}</Text>
       </View>
       <MaterialCommunityIcons
-        name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+        name={isRTL ? 'chevron-left' : 'chevron-right'}
         size={24}
         color={isDarkMode ? '#666' : '#ccc'}
       />
@@ -119,10 +149,12 @@ interface InfoRowProps {
 }
 
 const InfoRow: React.FC<InfoRowProps> = ({ label, value, isDarkMode }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
-    <View style={styles.infoRow}>
-      <Text style={[styles.infoLabel, isDarkMode && styles.textMuted]}>{label}</Text>
-      <Text style={[styles.infoValue, isDarkMode && styles.textLight]}>{value}</Text>
+    <View style={[styles.infoRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <Text style={[styles.infoLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: colors.text, textAlign: isRTL ? 'left' : 'right' }]}>{value}</Text>
     </View>
   );
 };
@@ -132,8 +164,11 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value, isDarkMode }) => {
 // ========================================
 
 export default function BackupScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { settings, isDarkMode, exportSettings, importSettings } = useSettings();
+  const { settings, isDarkMode, exportSettings, importSettings, reloadSettings } = useSettings();
+  const colors = useColors();
+  const { resetOnboarding } = useOnboarding();
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [lastBackup, setLastBackup] = useState<BackupInfo>({
@@ -170,16 +205,30 @@ export default function BackupScreen() {
 
   const loadDataStats = async () => {
     try {
-      const bookmarks = await AsyncStorage.getItem('quran_bookmarks');
-      const khatmas = await AsyncStorage.getItem('khatmas');
-      const worship = await AsyncStorage.getItem('worship_records');
-      const quranProgress = await AsyncStorage.getItem('quran_progress');
+      const bookmarks = await AsyncStorage.getItem('@quran_bookmarks');
+      const khatmas = await AsyncStorage.getItem('@rooh_muslim_khatmas');
+      const worship = await AsyncStorage.getItem('worship_prayer_records');
+      const quranLastRead = await AsyncStorage.getItem('@quran_last_read');
+
+      let bookmarkCount = 0;
+      try { bookmarkCount = bookmarks ? JSON.parse(bookmarks).length : 0; } catch { }
+      let khatmaCount = 0;
+      try { khatmaCount = khatmas ? JSON.parse(khatmas).length : 0; } catch { }
+      let worshipCount = 0;
+      try { worshipCount = worship ? Object.keys(JSON.parse(worship)).length : 0; } catch { }
+      let lastPage = 0;
+      try {
+        if (quranLastRead) {
+          const parsed = JSON.parse(quranLastRead);
+          lastPage = parsed.page || parsed.lastPage || 0;
+        }
+      } catch { }
 
       setDataStats({
-        bookmarks: bookmarks ? JSON.parse(bookmarks).length : 0,
-        khatmas: khatmas ? JSON.parse(khatmas).length : 0,
-        worshipDays: worship ? Object.keys(JSON.parse(worship)).length : 0,
-        quranProgress: quranProgress ? JSON.parse(quranProgress).lastPage || 0 : 0,
+        bookmarks: bookmarkCount,
+        khatmas: khatmaCount,
+        worshipDays: worshipCount,
+        quranProgress: lastPage,
       });
     } catch (error) {
       console.error('Error loading data stats:', error);
@@ -188,17 +237,21 @@ export default function BackupScreen() {
 
   const gatherAllData = async (): Promise<BackupData> => {
     const keys = await AsyncStorage.getAllKeys();
-    const allData: { [key: string]: any } = {};
+    const data: Record<string, any> = {};
 
     for (const key of keys) {
+      if (EXCLUDED_KEYS.includes(key)) continue;
       try {
         const value = await AsyncStorage.getItem(key);
-        if (value) {
-          allData[key] = JSON.parse(value);
+        if (value !== null) {
+          try {
+            data[key] = JSON.parse(value);
+          } catch {
+            data[key] = value;
+          }
         }
       } catch {
-        const value = await AsyncStorage.getItem(key);
-        allData[key] = value;
+        // Skip unreadable keys
       }
     }
 
@@ -206,16 +259,8 @@ export default function BackupScreen() {
       version: BACKUP_VERSION,
       createdAt: new Date().toISOString(),
       device: Platform.OS,
-      data: {
-        settings: allData['app_settings'] || {},
-        worship: allData['worship_records'] || {},
-        khatma: allData['khatmas'] || [],
-        bookmarks: allData['quran_bookmarks'] || [],
-        progress: {
-          quran: allData['quran_progress'] || {},
-          azkar: allData['azkar_progress'] || {},
-        },
-      },
+      keyCount: Object.keys(data).length,
+      data,
     };
   };
 
@@ -241,22 +286,22 @@ export default function BackupScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filePath, {
           mimeType: 'application/json',
-          dialogTitle: 'حفظ النسخة الاحتياطية',
+          dialogTitle: t('backup.saveBackup'),
           UTI: 'public.json',
         });
       } else {
         await Share.share({
           message: jsonString,
-          title: 'نسخة روح المسلم الاحتياطية',
+          title: t('backup.backupFileName'),
         });
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('تم بنجاح', 'تم إنشاء النسخة الاحتياطية بنجاح');
+      Alert.alert(t('settings.success'), t('backup.createdSuccess'));
     } catch (error) {
       console.error('Error creating backup:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء إنشاء النسخة الاحتياطية');
+      Alert.alert(t('common.error'), t('backup.errorCreating'));
     } finally {
       setIsCreatingBackup(false);
     }
@@ -264,12 +309,12 @@ export default function BackupScreen() {
 
   const restoreBackup = async () => {
     Alert.alert(
-      'استعادة البيانات',
-      'سيتم استبدال جميع البيانات الحالية بالبيانات من النسخة الاحتياطية. هل تريد المتابعة؟',
+      t('backup.restoreConfirm'),
+      t('backup.restoreConfirmMsg'),
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'استعادة',
+          text: t('backup.restore'),
           style: 'destructive',
           onPress: performRestore,
         },
@@ -299,49 +344,82 @@ export default function BackupScreen() {
       const backupData: BackupData = JSON.parse(content);
 
       // التحقق من صحة النسخة
-      if (!backupData.version || !backupData.data) {
-        throw new Error('ملف النسخة الاحتياطية غير صالح');
+      if (!backupData.version || !backupData.data || typeof backupData.data !== 'object') {
+        throw new Error(t('backup.invalidBackupFile'));
       }
 
-      // استعادة الإعدادات
-      if (backupData.data.settings) {
-        await AsyncStorage.setItem('app_settings', JSON.stringify(backupData.data.settings));
-      }
+      let restored = 0;
+      let failed = 0;
+      const failedKeys: string[] = [];
 
-      // استعادة سجلات العبادة
-      if (backupData.data.worship) {
-        await AsyncStorage.setItem('worship_records', JSON.stringify(backupData.data.worship));
-      }
-
-      // استعادة الختمات
-      if (backupData.data.khatma) {
-        await AsyncStorage.setItem('khatmas', JSON.stringify(backupData.data.khatma));
-      }
-
-      // استعادة المفضلة
-      if (backupData.data.bookmarks) {
-        await AsyncStorage.setItem('quran_bookmarks', JSON.stringify(backupData.data.bookmarks));
-      }
-
-      // استعادة التقدم
-      if (backupData.data.progress) {
-        if (backupData.data.progress.quran) {
-          await AsyncStorage.setItem('quran_progress', JSON.stringify(backupData.data.progress.quran));
+      if (backupData.version === '2.0') {
+        // V2: Raw dump of all keys
+        const entries = Object.entries(backupData.data);
+        for (const [key, value] of entries) {
+          if (EXCLUDED_KEYS.includes(key)) continue;
+          try {
+            const strValue = typeof value === 'string' ? value : JSON.stringify(value);
+            await AsyncStorage.setItem(key, strValue);
+            restored++;
+          } catch (e) {
+            failed++;
+            failedKeys.push(key);
+            console.warn(`⚠️ Failed to restore key: ${key}`, e);
+          }
         }
-        if (backupData.data.progress.azkar) {
-          await AsyncStorage.setItem('azkar_progress', JSON.stringify(backupData.data.progress.azkar));
+      } else {
+        // V1 backward compatibility: old categorized format
+        const v1Map: Record<string, string> = {
+          settings: 'app_settings',
+          worship: 'worship_prayer_records',
+          khatma: '@rooh_muslim_khatmas',
+          bookmarks: '@quran_bookmarks',
+        };
+        for (const [dataKey, storageKey] of Object.entries(v1Map)) {
+          if (backupData.data[dataKey]) {
+            try {
+              await AsyncStorage.setItem(storageKey, JSON.stringify(backupData.data[dataKey]));
+              restored++;
+            } catch (e) {
+              failed++;
+              failedKeys.push(storageKey);
+              console.warn(`⚠️ Failed to restore V1 key: ${storageKey}`, e);
+            }
+          }
+        }
+        if (backupData.data.progress?.quran) {
+          try {
+            await AsyncStorage.setItem('@quran_last_read', JSON.stringify(backupData.data.progress.quran));
+            restored++;
+          } catch (e) {
+            failed++;
+            failedKeys.push('@quran_last_read');
+            console.warn('⚠️ Failed to restore V1 quran progress', e);
+          }
         }
       }
 
       await loadDataStats();
+      // Reload settings context to apply restored settings and reschedule notifications
+      await reloadSettings();
+
+      if (failed > 0) {
+        console.warn(`⚠️ Restore completed with ${failed} failures:`, failedKeys);
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+      const backupDate = new Date(backupData.createdAt).toLocaleDateString(getDateLocale());
+      const summary = `${t('backup.restoredSuccess')} (${backupDate})\n\n` +
+        `✅ ${restored} ${t('backup.keysRestored')}` +
+        (failed > 0 ? `\n⚠️ ${failed} ${t('backup.keysFailed')}` : '');
+
       Alert.alert(
-        'تم بنجاح',
-        `تمت استعادة البيانات من نسخة ${new Date(backupData.createdAt).toLocaleDateString('ar-SA')}`,
+        t('settings.success'),
+        summary,
         [
           {
-            text: 'حسناً',
+            text: t('common.ok'),
             onPress: () => router.back(),
           },
         ]
@@ -349,7 +427,7 @@ export default function BackupScreen() {
     } catch (error) {
       console.error('Error restoring backup:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء استعادة النسخة الاحتياطية. تأكد من صحة الملف.');
+      Alert.alert(t('common.error'), t('backup.errorRestoring'));
     } finally {
       setIsRestoring(false);
     }
@@ -359,10 +437,11 @@ export default function BackupScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
-      const settingsJson = exportSettings();
+      const settingsJson = await exportSettings();
+      if (!settingsJson) return;
       await Share.share({
         message: settingsJson,
-        title: 'إعدادات روح المسلم',
+        title: t('backup.appSettings'),
       });
     } catch (error) {
       console.error('Error sharing settings:', error);
@@ -371,12 +450,12 @@ export default function BackupScreen() {
 
   const clearAllData = async () => {
     Alert.alert(
-      'مسح جميع البيانات',
-      'سيتم حذف جميع البيانات المحلية بما في ذلك الإعدادات والتقدم والمفضلة. لا يمكن التراجع عن هذا الإجراء.',
+      t('backup.clearDataConfirm'),
+      t('backup.clearDataConfirmMsg'),
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'مسح الكل',
+          text: t('backup.clearAll'),
           style: 'destructive',
           onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -389,9 +468,10 @@ export default function BackupScreen() {
                 quranProgress: 0,
               });
               setLastBackup({ exists: false, date: null, size: null });
-              Alert.alert('تم', 'تم مسح جميع البيانات بنجاح');
+              // إعادة تعيين حالة الـ Onboarding والتوجيه لشاشة الترحيب
+              await resetOnboarding();
             } catch (error) {
-              Alert.alert('خطأ', 'حدث خطأ أثناء مسح البيانات');
+              Alert.alert(t('common.error'), t('backup.errorClearing'));
             }
           },
         },
@@ -400,9 +480,9 @@ export default function BackupScreen() {
   };
 
   const formatDate = (dateString: string | null): string => {
-    if (!dateString) return 'لا يوجد';
+    if (!dateString) return t('backup.noData');
     const date = new Date(dateString);
-    return date.toLocaleDateString('ar-SA', {
+    return date.toLocaleDateString(getDateLocale(), {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -412,29 +492,15 @@ export default function BackupScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(500)}
-        style={[styles.header, isDarkMode && styles.headerDark]}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>النسخ الاحتياطي</Text>
-        <View style={styles.headerPlaceholder} />
-      </Animated.View>
+      <UniversalHeader title={t('settings.backupSection')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -454,37 +520,37 @@ export default function BackupScreen() {
               />
             </View>
             <Text style={styles.statusTitle}>
-              {lastBackup.exists ? 'النسخة الاحتياطية محدثة' : 'لا توجد نسخة احتياطية'}
+              {lastBackup.exists ? t('backup.backupUpToDate') : t('backup.noBackup')}
             </Text>
             <Text style={styles.statusSubtitle}>
               {lastBackup.exists
-                ? `آخر نسخة: ${formatDate(lastBackup.date)}`
-                : 'أنشئ نسخة احتياطية للحفاظ على بياناتك'}
+                ? `${t('backup.lastBackupPrefix')} ${formatDate(lastBackup.date)}`
+                : t('backup.createBackupPrompt')}
             </Text>
           </View>
         </Animated.View>
 
         {/* Data Stats */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>البيانات المحفوظة</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.savedData')}</Text>
           <View style={[styles.statsCard, isDarkMode && styles.statsCardDark]}>
-            <InfoRow label="المفضلة والعلامات" value={`${dataStats.bookmarks} عنصر`} isDarkMode={isDarkMode} />
-            <InfoRow label="الختمات" value={`${dataStats.khatmas} ختمة`} isDarkMode={isDarkMode} />
-            <InfoRow label="أيام العبادة" value={`${dataStats.worshipDays} يوم`} isDarkMode={isDarkMode} />
-            <InfoRow label="تقدم القرآن" value={`صفحة ${dataStats.quranProgress}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.favoritesAndBookmarks')} value={`${dataStats.bookmarks} ${t('backup.item')}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.khatmasLabel')} value={`${dataStats.khatmas} ${t('backup.khatmaUnit')}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.worshipDays')} value={`${dataStats.worshipDays} ${t('backup.day')}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.quranProgress')} value={`${t('backup.page')} ${dataStats.quranProgress}`} isDarkMode={isDarkMode} />
           </View>
         </Animated.View>
 
         {/* Actions */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>الإجراءات</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.actions')}</Text>
 
           <ActionCard
             icon="cloud-upload"
             iconColor="#fff"
             gradientColors={['#2f7659', '#1d4a3a']}
-            title="إنشاء نسخة احتياطية"
-            subtitle="حفظ جميع البيانات في ملف"
+            title={t('backup.createBackup')}
+            subtitle={t('backup.createBackupDesc')}
             onPress={createBackup}
             isLoading={isCreatingBackup}
             isDarkMode={isDarkMode}
@@ -494,8 +560,8 @@ export default function BackupScreen() {
             icon="cloud-download"
             iconColor="#fff"
             gradientColors={['#3a7ca5', '#2a5a7a']}
-            title="استعادة من نسخة"
-            subtitle="استيراد البيانات من ملف سابق"
+            title={t('backup.restoreFromBackup')}
+            subtitle={t('backup.restoreFromBackupDesc')}
             onPress={restoreBackup}
             isLoading={isRestoring}
             isDarkMode={isDarkMode}
@@ -505,8 +571,8 @@ export default function BackupScreen() {
             icon="share-variant"
             iconColor="#fff"
             gradientColors={['#5d4e8c', '#4a3d6e']}
-            title="مشاركة الإعدادات"
-            subtitle="مشاركة إعدادات التطبيق كنص"
+            title={t('backup.shareSettings')}
+            subtitle={t('backup.shareSettingsDesc')}
             onPress={shareBackupAsText}
             isDarkMode={isDarkMode}
           />
@@ -514,31 +580,31 @@ export default function BackupScreen() {
 
         {/* Danger Zone */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: '#ef5350' }]}>منطقة الخطر</Text>
+          <Text style={[styles.sectionTitle, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.dangerZone')}</Text>
 
           <ActionCard
             icon="delete-forever"
             iconColor="#fff"
             gradientColors={['#ef5350', '#c62828']}
-            title="مسح جميع البيانات"
-            subtitle="حذف كل البيانات المحلية نهائياً"
+            title={t('backup.clearAllData')}
+            subtitle={t('backup.clearAllDataDesc')}
             onPress={clearAllData}
             isDarkMode={isDarkMode}
           />
         </Animated.View>
 
         {/* Info Card */}
-        <Animated.View entering={FadeInDown.delay(250).duration(500)} style={styles.infoCard}>
+        <Animated.View entering={FadeInDown.delay(250).duration(500)} style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(58,124,165,0.15)' : '#e8f4fd' }]}>
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
           <View style={styles.infoContent}>
-            <Text style={[styles.infoText, isDarkMode && styles.textMuted]}>
-              • النسخة الاحتياطية تشمل: الإعدادات، التقدم، المفضلة، والختمات
+            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+              • {t('backup.infoIncludes')}
             </Text>
-            <Text style={[styles.infoText, isDarkMode && styles.textMuted]}>
-              • يمكنك حفظ الملف في iCloud أو Google Drive
+            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+              • {t('backup.infoSaveCloud')}
             </Text>
-            <Text style={[styles.infoText, isDarkMode && styles.textMuted]}>
-              • ننصح بعمل نسخة احتياطية أسبوعياً
+            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+              • {t('backup.infoWeekly')}
             </Text>
           </View>
         </Animated.View>
@@ -546,6 +612,7 @@ export default function BackupScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -560,40 +627,6 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerDark: {
-    backgroundColor: '#1a1a2e',
-    borderBottomColor: '#2a2a3e',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   scrollView: {
     flex: 1,
@@ -618,19 +651,19 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginBottom: 5,
   },
   statusSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginTop: 20,
     marginBottom: 12,
@@ -653,12 +686,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
   infoValue: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   actionCard: {
@@ -686,12 +719,12 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   actionSubtitle: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -709,10 +742,9 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#333',
     lineHeight: 24,
-    textAlign: 'right',
   },
   bottomSpace: {
     height: 100,

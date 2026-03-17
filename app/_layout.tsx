@@ -6,15 +6,20 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, Platform } from 'react-native';
+import { AppState, AppStateStatus, Platform, View, Text, TextInput } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { OfflineModal } from '@/components/ui/OfflineBanner';
+import { MaintenanceGuard } from '@/components/ui/MaintenanceGuard';
+import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
+import { SplashVideoOverlay } from '@/components/ui/SplashVideoOverlay';
+import { useSettings } from '@/contexts/SettingsContext';
 
-// ⚠️ قبل النشر: فك التعليق عن السطرين دول
-// import mobileAds from 'react-native-google-mobile-ads';
-// import { initializeAppOpenAds } from '@/lib/app-open-ad';
+import { initializeAppOpenAds } from '@/lib/app-open-ad';
+import { languageInitPromise, getLanguage } from '@/lib/i18n';
+import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
 
 // Contexts
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -22,11 +27,13 @@ import { QuranProvider } from '@/contexts/QuranContext';
 import { KhatmaProvider } from '@/contexts/KhatmaContext';
 import { WorshipProvider } from '@/contexts/WorshipContext';
 import { SeasonalProvider } from '@/contexts/SeasonalContext';
+import { ThemeConfigProvider } from '@/contexts/ThemeConfigContext';
 import { OnboardingProvider } from '@/contexts/OnboardingContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
 import { AdsProvider } from '@/lib/ads-context';
 import { AppConfigProvider } from '@/lib/app-config-context';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 
 // Firebase Integration
 import { registerUser, updateLastActive } from '@/lib/firebase-user';
@@ -36,10 +43,21 @@ import {
   syncLocalStats 
 } from '@/lib/firebase-analytics';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
+import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
+import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext';
 import { usePathname } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
+import { initTranslationOverrides } from '@/lib/auto-translate';
+import { initRemoteTranslations } from '@/lib/remote-translations';
+import { ScreenshotBranding } from '@/components/ui/ScreenshotBranding';
+import { fontRegular } from '@/lib/fonts';
+import { toWesternDigits } from '@/lib/format-number';
+import { fetchQuranThemes } from '@/lib/admin-data-api';
+import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
+import { Audio } from 'expo-av';
+import { NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES, ADHAN_SOUNDS as ADHAN_SOUND_FILES } from '@/lib/sound-manager';
 
 // Configure notification handler at the top level (before any component renders)
 // Wrapped in try-catch to avoid console error on Expo Go (SDK 53+ removed push notifications from Expo Go)
@@ -59,6 +77,52 @@ try {
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
+// Register TrackPlayer playback service for radio lock screen controls
+// Must be at module scope (not inside a component)
+// Only in native/dev builds — Expo Go doesn't have the native module
+if (Platform.OS !== 'web') {
+  try {
+    const _ExpoConstants = require('expo-constants').default;
+    // 'storeClient' = Expo Go — skip TrackPlayer registration
+    if (_ExpoConstants.executionEnvironment !== 'storeClient') {
+      const _TrackPlayer = require('react-native-track-player').default;
+      const { PlaybackService } = require('@/lib/track-player-service');
+      _TrackPlayer.registerPlaybackService(() => PlaybackService);
+    }
+  } catch {
+    // TrackPlayer native module not available — radio will use expo-av fallback
+  }
+}
+
+// Set global default font and force Western numerals for all Text components
+function westernizeChildren(children: any): any {
+  if (typeof children === 'string') return toWesternDigits(children);
+  if (typeof children === 'number') return children;
+  if (Array.isArray(children)) return children.map(westernizeChildren);
+  return children;
+}
+
+const origTextRender = (Text as any).render;
+if (origTextRender) {
+  (Text as any).render = function(props: any, ref: any) {
+    const style = props.style;
+    const hasFont = style && (
+      (Array.isArray(style) && style.some((s: any) => s && s.fontFamily)) ||
+      (!Array.isArray(style) && style.fontFamily)
+    );
+    const newProps = { ...props };
+    // Convert Eastern Arabic numerals → Western in text children
+    if (newProps.children != null) {
+      newProps.children = westernizeChildren(newProps.children);
+    }
+    if (!hasFont) {
+      // Evaluate fontRegular() at render time so it respects language changes
+      newProps.style = [{ fontFamily: fontRegular() }, style];
+    }
+    return origTextRender.call(this, newProps, ref);
+  };
+}
+
 // Run an async operation with a timeout — never throws, always resolves
 const INIT_TIMEOUT = 10000; // 10 seconds max per operation
 const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = INIT_TIMEOUT) => {
@@ -69,7 +133,7 @@ const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = 
         setTimeout(() => reject(new Error(`${name} timed out after ${timeout}ms`)), timeout)
       ),
     ]);
-    console.log(`✅ ${name} completed`);
+    if (__DEV__) console.log(`✅ ${name} completed`);
   } catch (error) {
     console.warn(`⚠️ ${name} failed:`, error);
     // Don't throw — continue with other initialization
@@ -79,22 +143,63 @@ const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = 
 const hideSplash = async () => {
   try {
     await SplashScreen.hideAsync();
-    console.log('✅ Splash screen hidden');
+    if (__DEV__) console.log('✅ Splash screen hidden');
   } catch (e) {
     // Ignore — might already be hidden
   }
 };
 
+// Delays splash screen hide until BOTH fonts AND settings are loaded
+// Prevents RTL flash for non-Arabic users (settings load is async)
+const SplashGate = ({ fontsReady }: { fontsReady: boolean }) => {
+  const { isLoading } = useSettings();
+  const done = useRef(false);
+
+  useEffect(() => {
+    if (fontsReady && !isLoading && !done.current) {
+      done.current = true;
+      hideSplash();
+    }
+  }, [fontsReady, isLoading]);
+
+  return null;
+};
+
+// Global RTL wrapper component
+// Note: We do NOT set `direction: 'rtl'` here because it conflicts with
+// the manual `flexDirection: isRTL ? 'row-reverse' : 'row'` patterns used
+// throughout the app (200+ components). Setting direction at root level causes
+// double-reversal: Yoga flips row→RTL, then row-reverse flips it back to LTR.
+// Instead, all RTL layout is handled manually via useIsRTL() hook.
+const RTLWrapper = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <View style={{ flex: 1 }}>
+      {children}
+    </View>
+  );
+};
+
 export default function RootLayout() {
   const pathname = usePathname();
   const [appReady, setAppReady] = useState(false);
+  const [languageReady, setLanguageReady] = useState(false);
   const splashHidden = useRef(false);
 
+  // Wait for the eagerly-started language load (started at module scope in i18n.ts)
+  // so that currentLanguage is correct before ANY component calls t()
+  useEffect(() => {
+    languageInitPromise.then(() => setLanguageReady(true));
+  }, []);
+
   const [fontsLoaded, fontError] = useFonts({
-    'Cairo-Regular': require('../assets/fonts/Cairo-Regular.ttf'),
-    'Cairo-Medium': require('../assets/fonts/Cairo-Medium.ttf'),
-    'Cairo-SemiBold': require('../assets/fonts/Cairo-SemiBold.ttf'),
-    'Cairo-Bold': require('../assets/fonts/Cairo-Bold.ttf'),
+    'Rubik-Regular': require('../assets/fonts/Rubik-Regular.ttf'),
+    'Rubik-Medium': require('../assets/fonts/Rubik-Medium.ttf'),
+    'Rubik-SemiBold': require('../assets/fonts/Rubik-SemiBold.ttf'),
+    'Rubik-Bold': require('../assets/fonts/Rubik-Bold.ttf'),
+    'Raleway-Regular': require('../assets/fonts/Raleway-Regular.ttf'),
+    'Raleway-Medium': require('../assets/fonts/Raleway-Medium.ttf'),
+    'Raleway-SemiBold': require('../assets/fonts/Raleway-SemiBold.ttf'),
+    'Raleway-Bold': require('../assets/fonts/Raleway-Bold.ttf'),
     'QCF_Default': require('../assets/fonts/qcf/QCF4_tajweed_001.ttf'),
     'QCFSurahNames': require('../assets/fonts/qcf/surah-names.ttf'),
     'Amiri': require('../assets/fonts/Amiri-Regular.ttf'),
@@ -102,20 +207,24 @@ export default function RootLayout() {
     'KFGQPCUthmanic': require('../assets/fonts/KFGQPC-Uthmanic-Script.ttf'),
     'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
     'Orbitron-Regular': require('../assets/fonts/Orbitron-Regular.ttf'),
+    // Required for VectorIcon in NativeTabs bottom navigation
+    'MaterialCommunityIcons': require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'),
   });
 
-  // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
-  // useEffect(() => {
-  //   const initAds = async () => {
-  //     try {
-  //       await mobileAds().initialize();
-  //       console.log('✅ Google Mobile Ads SDK initialized');
-  //     } catch (error) {
-  //       console.log('❌ Error initializing ads SDK:', error);
-  //     }
-  //   };
-  //   initAds();
-  // }, []);
+  useEffect(() => {
+    const initAds = async () => {
+      try {
+        const { TurboModuleRegistry } = require('react-native');
+        TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsModule');
+        const ads = require('react-native-google-mobile-ads');
+        await ads.default().initialize();
+        if (__DEV__) console.log('✅ Google Mobile Ads SDK initialized');
+      } catch {
+        // Not available (Expo Go / web)
+      }
+    };
+    initAds();
+  }, []);
 
   // Safety timeout: ALWAYS hide splash screen after 12 seconds no matter what
   useEffect(() => {
@@ -132,14 +241,26 @@ export default function RootLayout() {
 
   // Firebase Integration — each step isolated with timeout
   useEffect(() => {
-    console.log('🚀 Starting app initialization...');
+    if (__DEV__) console.log('🚀 Starting app initialization...');
 
     const initFirebase = async () => {
-      console.log('🔥 Initializing Firebase services...');
+      if (__DEV__) console.log('🔥 Initializing Firebase services...');
 
       await initWithTimeout(
         () => checkAndClearCacheOnUpdate().then(() => {}),
         'Cache check',
+        5000
+      );
+
+      await initWithTimeout(
+        () => initTranslationOverrides(),
+        'Translation overrides',
+        5000
+      );
+
+      await initWithTimeout(
+        () => initRemoteTranslations(getLanguage() as any),
+        'Remote translations',
         5000
       );
 
@@ -161,7 +282,16 @@ export default function RootLayout() {
         5000
       );
 
-      console.log('✅ Firebase initialization sequence complete');
+      await initWithTimeout(
+        async () => {
+          const themes = await fetchQuranThemes(QURAN_THEMES);
+          setQuranThemes(themes);
+        },
+        'Quran themes sync',
+        5000
+      );
+
+      if (__DEV__) console.log('✅ Firebase initialization sequence complete');
     };
 
     initFirebase();
@@ -170,6 +300,13 @@ export default function RootLayout() {
     initWithTimeout(
       () => syncWidgetDataToNative(),
       'Widget sync',
+      5000
+    );
+
+    // Sync app icon to match saved language on launch
+    initWithTimeout(
+      () => syncAppIconOnStartup(getLanguage() as any),
+      'App icon sync',
       5000
     );
     
@@ -199,32 +336,106 @@ export default function RootLayout() {
     };
   }, []);
 
-  // ⚠️ قبل النشر: فك التعليق عن الـ useEffect ده
-  // useEffect(() => {
-  //   const cleanupAds = initializeAppOpenAds();
-  //   return () => {
-  //     cleanupAds();
-  //   };
-  // }, []);
+  useEffect(() => {
+    const cleanupAds = initializeAppOpenAds();
+    return () => {
+      cleanupAds();
+    };
+  }, []);
 
-  // Hide splash and mark ready when fonts finish (loaded or errored)
+  // Foreground notification sound player — plays custom sound based on notification data
+  useEffect(() => {
+    let currentSound: Audio.Sound | null = null;
+    
+    const subscription = ExpoNotifications.addNotificationReceivedListener(async (notification) => {
+      const data = notification.request.content.data;
+      const soundType = data?.soundType as string | undefined;
+      if (!soundType || soundType === 'default' || soundType === 'silent') return;
+
+      // Handle ayah audio from URL
+      if (soundType === 'ayah_audio' && data?.ayahAudioUrl) {
+        try {
+          if (currentSound) {
+            try { await currentSound.unloadAsync(); } catch {}
+            currentSound = null;
+          }
+          await Audio.setAudioModeAsync({
+            playsInSilentModeIOS: true,
+            staysActiveInBackground: false,
+            shouldDuckAndroid: true,
+          });
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: data.ayahAudioUrl as string },
+            { shouldPlay: true }
+          );
+          currentSound = sound;
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              sound.unloadAsync();
+              currentSound = null;
+            }
+          });
+        } catch (e) {
+          console.warn('Failed to play ayah audio:', e);
+        }
+        return;
+      }
+
+      // Resolve the sound file (check notification sounds first, then adhan sounds)
+      const soundFile = NOTIFICATION_SOUND_FILES[soundType] || ADHAN_SOUND_FILES[soundType];
+      if (!soundFile) return;
+
+      try {
+        // Clean up previous sound if still playing
+        if (currentSound) {
+          try { await currentSound.unloadAsync(); } catch {}
+          currentSound = null;
+        }
+
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+
+        const { sound } = await Audio.Sound.createAsync(soundFile, { shouldPlay: true });
+        currentSound = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync();
+            currentSound = null;
+          }
+        });
+      } catch (e) {
+        console.warn('Failed to play notification sound:', e);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      if (currentSound) {
+        currentSound.unloadAsync().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Mark app ready when fonts finish (splash hide is handled by SplashGate inside SettingsProvider)
   useEffect(() => {
     if (fontsLoaded || fontError) {
       if (fontError) {
         console.warn('⚠️ Font loading failed, continuing with system fonts:', fontError);
-      } else {
-        console.log('✅ Fonts loaded successfully');
       }
-
       if (!splashHidden.current) {
         splashHidden.current = true;
         setAppReady(true);
-        hideSplash();
       }
     }
   }, [fontsLoaded, fontError]);
 
-  if (!appReady && !fontsLoaded) {
+  // Don't render tree until language is loaded from storage.
+  // This prevents t() calls from returning Arabic on first render
+  // when the user's language is different.
+  if (!languageReady || (!appReady && !fontsLoaded)) {
     return null;
   }
 
@@ -232,16 +443,23 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <SettingsProvider>
+          <SplashGate fontsReady={!!(fontsLoaded || fontError)} />
+          <RTLWrapper>
+          <ThemeConfigProvider>
           <RemoteConfigProvider>
             <AppConfigProvider>
+              <MaintenanceGuard>
+              <SubscriptionProvider>
               <AdsProvider>
                 <NotificationsProvider>
                   <QuranProvider>
+                  <GlobalAudioProvider>
                     <KhatmaProvider>
                       <WorshipProvider>
                         <SeasonalProvider>
                           <OnboardingProvider>
                         <StatusBar style="auto" />
+                        <OfflineModal />
                         <Stack
                           screenOptions={{
                             headerShown: false,
@@ -255,14 +473,15 @@ export default function RootLayout() {
                           <Stack.Screen name="surah/[id]" />
                           <Stack.Screen name="tafsir" />
                           <Stack.Screen name="azkar/[category]" />
-                          <Stack.Screen name="khatma/[id]" />
-                          <Stack.Screen name="settings/[section]" />
-                          <Stack.Screen name="seasonal/[event]" />
+                          <Stack.Screen name="settings/live-activities" options={{ headerShown: false }} />
+                          <Stack.Screen name="settings/photo-backgrounds" options={{ headerShown: false }} />
                           <Stack.Screen name="worship-tracker" />
                           <Stack.Screen name="names" />
                           <Stack.Screen name="ruqya" />
                           <Stack.Screen name="hijri" />
                           <Stack.Screen name="hajj-umrah" />
+                          <Stack.Screen name="hajj" />
+                          <Stack.Screen name="umrah" />
                           <Stack.Screen name="night-reading" />
                           <Stack.Screen name="azkar-search" />
                           <Stack.Screen name="azkar-reminder" />
@@ -274,17 +493,26 @@ export default function RootLayout() {
                           <Stack.Screen name="daily-dua" />
                           <Stack.Screen name="daily-ayah" />
                           <Stack.Screen name="companions" />
+                          <Stack.Screen name="sdui/[screenId]" />
                         </Stack>
-                        {!(pathname && pathname.startsWith('/qibla')) && <AudioPlayerBar global />}
+                        {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
+                        <DynamicSplashOverlay />
+                        <SplashVideoOverlay />
+                        <ScreenshotBranding />
                           </OnboardingProvider>
                         </SeasonalProvider>
                       </WorshipProvider>
                     </KhatmaProvider>
+                  </GlobalAudioProvider>
                   </QuranProvider>
                 </NotificationsProvider>
               </AdsProvider>
+              </SubscriptionProvider>
+              </MaintenanceGuard>
             </AppConfigProvider>
           </RemoteConfigProvider>
+          </ThemeConfigProvider>
+          </RTLWrapper>
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -9,8 +9,8 @@ import {
   Pressable,
   Dimensions,
   Platform,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,6 +28,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getLanguage } from '@/lib/i18n';
 
 const { width, height } = Dimensions.get('window');
 const CIRCLE_SIZE = width * 0.65;
@@ -38,13 +40,13 @@ const DOT_COUNT = 33;
 // ========================================
 
 const ADHKAR = [
-  { id: 1, text: 'سُبْحَانَ اللَّه', target: 33 },
-  { id: 2, text: 'الْحَمْدُ لِلَّه', target: 33 },
-  { id: 3, text: 'اللَّهُ أَكْبَر', target: 34 },
-  { id: 4, text: 'لَا إِلَهَ إِلَّا اللَّه', target: 100 },
-  { id: 5, text: 'أَسْتَغْفِرُ اللَّه', target: 100 },
-  { id: 6, text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', target: 100 },
-  { id: 7, text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّه', target: 100 },
+  { id: 1, text: 'سُبْحَانَ اللَّه', transliteration: 'SubhanAllah', target: 33 },
+  { id: 2, text: 'الْحَمْدُ لِلَّه', transliteration: 'Alhamdulillah', target: 33 },
+  { id: 3, text: 'اللَّهُ أَكْبَر', transliteration: 'Allahu Akbar', target: 34 },
+  { id: 4, text: 'لَا إِلَهَ إِلَّا اللَّه', transliteration: 'La ilaha illallah', target: 100 },
+  { id: 5, text: 'أَسْتَغْفِرُ اللَّه', transliteration: 'Astaghfirullah', target: 100 },
+  { id: 6, text: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ', transliteration: 'SubhanAllahi wa bihamdihi', target: 100 },
+  { id: 7, text: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّه', transliteration: 'La hawla wala quwwata illa billah', target: 100 },
 ];
 
 // ========================================
@@ -90,8 +92,11 @@ const Dot: React.FC<DotProps> = ({ index, total, count, target }) => {
 // ========================================
 
 export default function TasbihScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { isDarkMode, settings } = useSettings();
+  const { isDarkMode, settings, t } = useSettings();
+  const language = getLanguage();
+  const isArabic = language === 'ar';
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [count, setCount] = useState(0);
@@ -222,30 +227,31 @@ export default function TasbihScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
+      opacity={settings.display.backgroundOpacity ?? 1}
       style={styles.container}
     >
       <SafeAreaView style={styles.safeArea}>
         {/* الهيدر */}
-        <View style={styles.header}>
+        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="chevron-right" size={28} color={textColor} />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={28} color={textColor} />
           </Pressable>
-          <Text style={styles.headerTitle}>السبحة الإلكترونية</Text>
+          <Text style={styles.headerTitle}>{t('tabs.tasbih') || 'Tasbih'}</Text>
           <Pressable onPress={handleResetAll} style={styles.resetAllButton}>
             <MaterialCommunityIcons name="refresh" size={24} color={textColor} />
           </Pressable>
         </View>
 
         {/* اختيار الذكر */}
-        <View style={styles.adhkarSelector}>
+        <View style={[styles.adhkarSelector, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Pressable onPress={() => changeAdhkar('prev')} style={styles.arrowButton}>
-            <MaterialCommunityIcons name="chevron-right" size={28} color="#4ade80" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
           </Pressable>
           <View style={styles.adhkarTextContainer}>
-            <Text style={styles.adhkarText}>{currentDhikr.text}</Text>
+            <Text style={styles.adhkarText}>{isArabic ? currentDhikr.text : currentDhikr.transliteration}</Text>
           </View>
           <Pressable onPress={() => changeAdhkar('next')} style={styles.arrowButton}>
-            <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
           </Pressable>
         </View>
 
@@ -282,10 +288,10 @@ export default function TasbihScreen() {
         </View>
 
         {/* الإحصائيات */}
-        <View style={styles.statsContainer}>
+        <View style={[styles.statsContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{rounds}</Text>
-            <Text style={styles.statLabel}>الجولات</Text>
+            <Text style={styles.statLabel}>{t('tasbih.rounds') || 'Rounds'}</Text>
           </View>
           
           <Pressable onPress={handleReset} style={styles.resetButton}>
@@ -294,12 +300,12 @@ export default function TasbihScreen() {
           
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{totalCount}</Text>
-            <Text style={styles.statLabel}>المجموع</Text>
+            <Text style={styles.statLabel}>{t('tasbih.total') || 'Total'}</Text>
           </View>
         </View>
 
         {/* تعليمات */}
-        <Text style={styles.instructions}>اضغط على الدائرة للتسبيح</Text>
+        <Text style={styles.instructions}>{t('tasbih.tapToCount') || 'Tap the circle to count'}</Text>
       </SafeAreaView>
     </BackgroundWrapper>
   );
@@ -329,7 +335,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 20,
     color: '#fff',
   },
@@ -363,7 +369,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   adhkarText: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 22,
     color: '#fff',
     textAlign: 'center',
@@ -424,12 +430,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(74, 222, 128, 0.3)',
   },
   countText: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 72,
     color: '#fff',
   },
   targetText: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontSize: 24,
     color: 'rgba(255,255,255,0.6)',
     marginTop: -10,
@@ -447,12 +453,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 32,
     color: '#fff',
   },
   statLabel: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
     marginTop: 4,
@@ -468,7 +474,7 @@ const styles = StyleSheet.create({
 
   // التعليمات
   instructions: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
     color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',

@@ -55,7 +55,7 @@ class AdminService {
 
   async getAdSettings(): Promise<AdSettings | null> {
     try {
-      const docRef = doc(db, 'config', 'adSettings');
+      const docRef = doc(db, 'config', 'ads-settings');
       const docSnap = await getDoc(docRef);
       return docSnap.exists() ? (docSnap.data() as AdSettings) : null;
     } catch (error) {
@@ -66,7 +66,7 @@ class AdminService {
 
   async updateAdSettings(settings: Partial<AdSettings>): Promise<boolean> {
     try {
-      const docRef = doc(db, 'config', 'adSettings');
+      const docRef = doc(db, 'config', 'ads-settings');
       await setDoc(docRef, settings, { merge: true });
       return true;
     } catch (error) {

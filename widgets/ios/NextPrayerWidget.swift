@@ -29,6 +29,7 @@ struct PrayerWidgetData: Codable {
     var nextPrayerTime: String
     var timeRemaining: String
     var timeRemainingMinutes: Int
+    var timeRemainingLabel: String?
     var allPrayers: [PrayerTime]
     var hijriDate: String
     var hijriDay: Int
@@ -191,6 +192,7 @@ struct PrayerWidgetProvider: IntentTimelineProvider {
             nextPrayerTime: "12:15 م",
             timeRemaining: "2:30",
             timeRemainingMinutes: 150,
+            timeRemainingLabel: "الوقت المتبقي",
             allPrayers: [
                 PrayerTime(name: "Fajr", nameAr: "الفجر", time: "4:30 ص", isPassed: true, isNext: false),
                 PrayerTime(name: "Sunrise", nameAr: "الشروق", time: "5:55 ص", isPassed: true, isNext: false),
@@ -333,7 +335,7 @@ struct MediumPrayerWidgetView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "timer")
                             .font(.system(size: 12))
-                        Text("متبقي \(entry.data?.timeRemaining ?? "2:30")")
+                        Text("\(entry.data?.timeRemainingLabel ?? "متبقي") \(entry.data?.timeRemaining ?? "2:30")")
                             .font(.system(size: 12, weight: .medium))
                     }
                     .foregroundColor(.white.opacity(0.9))
@@ -455,7 +457,7 @@ struct LargePrayerWidgetView: View {
                         
                         HStack(spacing: 4) {
                             Image(systemName: "timer")
-                            Text("متبقي \(entry.data?.timeRemaining ?? "2:30")")
+                            Text("\(entry.data?.timeRemainingLabel ?? "متبقي") \(entry.data?.timeRemaining ?? "2:30")")
                         }
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.9))

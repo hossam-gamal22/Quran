@@ -16,6 +16,8 @@ import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { AppStats, AppSettings, AdSettings } from '../../types/admin';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t } from '@/lib/i18n';
 interface MenuItem {
   id: string;
   title: string;
@@ -31,63 +33,104 @@ export default function AdminDashboard() {
   const [adSettings, setAdSettings] = useState<AdSettings | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const isRTL = useIsRTL();
 
   const menuItems: MenuItem[] = [
     {
       id: 'settings',
-      title: 'إعدادات التطبيق',
+      title: t('admin.appSettings'),
       icon: 'settings',
       route: '/admin/settings',
       color: '#3B82F6',
-      description: 'الصيانة، التحديثات، الإعدادات العامة',
+      description: t('admin.appSettingsDesc'),
     },
     {
       id: 'ads',
-      title: 'الإعلانات',
+      title: t('admin.adsTitle'),
       icon: 'megaphone',
       route: '/admin/ads',
       color: '#F59E0B',
-      description: 'تفعيل/تعطيل الإعلانات وإعداداتها',
+      description: t('admin.adsDesc'),
     },
     {
       id: 'pricing',
-      title: 'الأسعار',
+      title: t('admin.pricingTitle'),
       icon: 'cash',
       route: '/admin/pricing',
       color: '#22C55E',
-      description: 'أسعار الاشتراكات حسب البلد',
+      description: t('admin.pricingDesc'),
     },
     {
       id: 'content',
-      title: 'المحتوى',
+      title: t('admin.contentTitle'),
       icon: 'document-text',
       route: '/admin/content',
       color: '#8B5CF6',
-      description: 'آية اليوم، الإعلانات، النصائح',
+      description: t('admin.contentDesc'),
     },
     {
       id: 'notifications',
-      title: 'الإشعارات',
+      title: t('admin.notificationsTitle'),
       icon: 'notifications',
       route: '/admin/notifications',
       color: '#EC4899',
-      description: 'إرسال إشعارات للمستخدمين',
+      description: t('admin.notificationsDesc'),
     },
     {
       id: 'reciters',
-      title: 'القراء',
+      title: t('admin.recitersTitle'),
       icon: 'mic',
       route: '/admin/reciters',
       color: '#06B6D4',
-      description: 'إدارة قائمة القراء',
+      description: t('admin.recitersDesc'),
     },
     {
       id: 'subscribers',
-      title: 'المشتركين',
+      title: t('admin.subscribersTitle'),
       icon: 'people',
       route: '/admin/subscribers',
       color: '#EF4444',
-      description: 'عرض وإدارة المشتركين',
+      description: t('admin.subscribersDesc'),
+    },
+    {
+      id: 'events',
+      title: 'المناسبات الإسلامية',
+      icon: 'calendar',
+      route: '/admin/events',
+      color: '#10B981',
+      description: 'إدارة المناسبات والأحداث الإسلامية',
+    },
+    {
+      id: 'daily-content',
+      title: 'المحتوى اليومي',
+      icon: 'today',
+      route: '/admin/daily-content',
+      color: '#6366F1',
+      description: 'التحكم في آية اليوم والحديث والدعاء',
+    },
+    {
+      id: 'users',
+      title: 'إدارة المستخدمين',
+      icon: 'person-circle',
+      route: '/admin/users',
+      color: '#14B8A6',
+      description: 'عرض وإدارة المستخدمين والصلاحيات',
+    },
+    {
+      id: 'settings-override',
+      title: 'تجاوز الإعدادات',
+      icon: 'options',
+      route: '/admin/settings-override',
+      color: '#F97316',
+      description: 'التحكم في الميزات وإعدادات التجاوز',
+    },
+    {
+      id: 'app-sections',
+      title: 'أقسام التطبيق',
+      icon: 'layers',
+      route: '/admin/app-sections',
+      color: '#A855F7',
+      description: 'التحكم في ظهور وترتيب أقسام التطبيق',
     },
   ];
 
@@ -108,7 +151,7 @@ export default function AdminDashboard() {
       setAdSettings(adsData);
     } catch (error) {
       console.error('Error loading data:', error);
-      Alert.alert('خطأ', 'فشل في تحميل البيانات');
+      Alert.alert(t('common.error'), t('admin.loadDataFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -131,8 +174,8 @@ export default function AdminDashboard() {
     if (success) {
       setAppSettings({ ...appSettings, maintenanceMode: newValue });
       Alert.alert(
-        'تم',
-        newValue ? 'تم تفعيل وضع الصيانة' : 'تم إلغاء وضع الصيانة'
+        t('common.done'),
+        newValue ? t('admin.maintenanceEnabled') : t('admin.maintenanceDisabled')
       );
     }
   };
@@ -140,16 +183,16 @@ export default function AdminDashboard() {
   const toggleAds = async () => {
     if (!adSettings) return;
     
-    const newValue = !adSettings.adsEnabled;
+    const newValue = !adSettings.enabled;
     const success = await adminService.updateAdSettings({
-      adsEnabled: newValue,
+      enabled: newValue,
     });
     
     if (success) {
-      setAdSettings({ ...adSettings, adsEnabled: newValue });
+      setAdSettings({ ...adSettings, enabled: newValue });
       Alert.alert(
-        'تم',
-        newValue ? 'تم تفعيل الإعلانات' : 'تم تعطيل الإعلانات'
+        t('common.done'),
+        newValue ? t('admin.adsEnabled') : t('admin.adsDisabled')
       );
     }
   };
@@ -164,8 +207,8 @@ export default function AdminDashboard() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>لوحة التحكم</Text>
-          <Text style={styles.headerSubtitle}>رُوح المسلم</Text>
+          <Text style={styles.headerTitle}>{t('admin.dashboard')}</Text>
+          <Text style={styles.headerSubtitle}>{t('common.appName')}</Text>
         </View>
 
         {/* Quick Stats */}
@@ -173,23 +216,23 @@ export default function AdminDashboard() {
           <View style={styles.statCard}>
             <Ionicons name="people" size={24} color={Colors.primary} />
             <Text style={styles.statNumber}>{stats?.premiumUsers || 0}</Text>
-            <Text style={styles.statLabel}>مشترك</Text>
+            <Text style={styles.statLabel}>{t('admin.subscriber')}</Text>
           </View>
           <View style={styles.statCard}>
             <Ionicons name="cash" size={24} color={Colors.success} />
             <Text style={styles.statNumber}>${stats?.totalRevenue || 0}</Text>
-            <Text style={styles.statLabel}>إجمالي الأرباح</Text>
+            <Text style={styles.statLabel}>{t('admin.totalRevenue')}</Text>
           </View>
           <View style={styles.statCard}>
             <Ionicons name="today" size={24} color={Colors.warning} />
             <Text style={styles.statNumber}>${stats?.todayRevenue || 0}</Text>
-            <Text style={styles.statLabel}>أرباح اليوم</Text>
+            <Text style={styles.statLabel}>{t('admin.todayRevenue')}</Text>
           </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>إجراءات سريعة</Text>
+          <Text style={styles.sectionTitle}>{t('admin.quickActions')}</Text>
           <View style={styles.actionsRow}>
             <TouchableOpacity
               style={[
@@ -209,29 +252,29 @@ export default function AdminDashboard() {
                   appSettings?.maintenanceMode && styles.actionBtnTextActive,
                 ]}
               >
-                {appSettings?.maintenanceMode ? 'إلغاء الصيانة' : 'وضع الصيانة'}
+                {appSettings?.maintenanceMode ? t('admin.maintenanceDisable') : t('admin.maintenanceEnable')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
                 styles.actionBtn,
-                !adSettings?.adsEnabled && styles.actionBtnActive,
+                !adSettings?.enabled && styles.actionBtnActive,
               ]}
               onPress={toggleAds}
             >
               <Ionicons
                 name="megaphone"
                 size={24}
-                color={!adSettings?.adsEnabled ? Colors.textLight : Colors.primary}
+                color={!adSettings?.enabled ? Colors.textLight : Colors.primary}
               />
               <Text
                 style={[
                   styles.actionBtnText,
-                  !adSettings?.adsEnabled && styles.actionBtnTextActive,
+                  !adSettings?.enabled && styles.actionBtnTextActive,
                 ]}
               >
-                {adSettings?.adsEnabled ? 'تعطيل الإعلانات' : 'تفعيل الإعلانات'}
+                {adSettings?.enabled ? t('admin.adsDisable') : t('admin.adsEnable')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -239,11 +282,11 @@ export default function AdminDashboard() {
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          <Text style={styles.sectionTitle}>الإدارة</Text>
+          <Text style={styles.sectionTitle}>{t('admin.management')}</Text>
           {menuItems.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.menuItem}
+              style={[styles.menuItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               onPress={() => router.push(item.route as any)}
             >
               <View style={styles.menuIcon}>
@@ -253,7 +296,7 @@ export default function AdminDashboard() {
                 <Text style={styles.menuTitle}>{item.title}</Text>
                 <Text style={styles.menuDescription}>{item.description}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textMuted} />
+              <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           ))}
         </View>
@@ -374,6 +417,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    gap: Spacing.md,
   },
   menuIcon: {
     width: 48,
@@ -384,7 +428,6 @@ const styles = StyleSheet.create({
   },
   menuContent: {
     flex: 1,
-    marginLeft: Spacing.md,
   },
   menuTitle: {
     fontSize: 16,

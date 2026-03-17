@@ -75,8 +75,10 @@ async function pexelsFetch<T = any>(url: string, init: RequestInit = {}) {
   return (await res.json()) as T;
 }
 
-export async function searchPhotos(query: string, page = 1, perPage = 15) {
-  const qs = new URLSearchParams({ query, page: String(page), per_page: String(perPage) });
+export async function searchPhotos(query: string, page = 1, perPage = 15, orientation?: 'portrait' | 'landscape' | 'square') {
+  const params: Record<string, string> = { query, page: String(page), per_page: String(perPage) };
+  if (orientation) params.orientation = orientation;
+  const qs = new URLSearchParams(params);
   return pexelsFetch<PhotoListResponse>(`${PEXELS_V1}/search?${qs.toString()}`);
 }
 

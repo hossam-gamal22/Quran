@@ -16,7 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { CountryPricing } from '../../types/admin';
-
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function PricingScreen() {
   const [pricing, setPricing] = useState<CountryPricing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,32 +70,32 @@ export default function PricingScreen() {
 
   const savePricing = async () => {
     if (!formData.countryCode || !formData.countryName) {
-      Alert.alert('خطأ', 'يرجى ملء جميع الحقول المطلوبة');
+      Alert.alert(t('common.error'), t('admin.fillAllFields'));
       return;
     }
 
     try {
       const success = await adminService.setCountryPricing(formData);
       if (success) {
-        Alert.alert('تم', 'تم حفظ السعر بنجاح');
+        Alert.alert(t('common.done'), t('admin.priceSaved'));
         setShowModal(false);
         loadPricing();
       } else {
-        Alert.alert('خطأ', 'فشل في حفظ السعر');
+        Alert.alert(t('common.error'), t('admin.priceSaveFailed'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.unexpectedError'));
     }
   };
 
   const deletePricing = async (countryCode: string) => {
     Alert.alert(
-      'تأكيد الحذف',
-      'هل أنت متأكد من حذف هذا السعر؟',
+      t('admin.confirmDelete'),
+      t('admin.deleteConfirm'),
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'حذف',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             const success = await adminService.deleteCountryPricing(countryCode);
@@ -121,7 +122,7 @@ export default function PricingScreen() {
         {/* Add Button */}
         <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
           <Ionicons name="add-circle" size={24} color={Colors.textLight} />
-          <Text style={styles.addBtnText}>إضافة سعر جديد</Text>
+          <Text style={styles.addBtnText}>{t('admin.addPrice')}</Text>
         </TouchableOpacity>
 
         {/* Pricing List */}
@@ -150,13 +151,13 @@ export default function PricingScreen() {
               </View>
               <View style={styles.pricesRow}>
                 <View style={styles.priceItem}>
-                  <Text style={styles.priceLabel}>شهري</Text>
+                  <Text style={styles.priceLabel}>{t('common.monthly')}</Text>
                   <Text style={styles.priceValue}>
                     {item.currencySymbol}{item.monthlyPrice}
                   </Text>
                 </View>
                 <View style={styles.priceItem}>
-                  <Text style={styles.priceLabel}>سنوي</Text>
+                  <Text style={styles.priceLabel}>{t('common.yearly')}</Text>
                   <Text style={styles.priceValue}>
                     {item.currencySymbol}{item.yearlyPrice}
                   </Text>
@@ -169,7 +170,7 @@ export default function PricingScreen() {
                     { color: item.isActive ? Colors.success : Colors.error },
                   ]}
                 >
-                  {item.isActive ? 'مفعّل' : 'معطّل'}
+                  {item.isActive ? t('admin.enabled') : t('admin.disabled')}
                 </Text>
               </View>
             </View>
@@ -179,7 +180,7 @@ export default function PricingScreen() {
         {pricing.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="cash-outline" size={64} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>لا توجد أسعار بعد</Text>
+            <Text style={styles.emptyText}>{t('admin.noPrices')}</Text>
           </View>
         )}
       </ScrollView>
@@ -197,16 +198,16 @@ export default function PricingScreen() {
               <Ionicons name="close" size={28} color={Colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingPricing ? 'تعديل السعر' : 'إضافة سعر جديد'}
+              {editingPricing ? t('admin.editPrice') : t('admin.addPrice')}
             </Text>
             <TouchableOpacity onPress={savePricing}>
-              <Text style={styles.saveText}>حفظ</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>رمز البلد (مثال: EG)</Text>
+              <Text style={styles.inputLabel}>{t('admin.countryCodeLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.countryCode}
@@ -221,7 +222,7 @@ export default function PricingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>اسم البلد</Text>
+              <Text style={styles.inputLabel}>{t('admin.countryNameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.countryName}
@@ -234,7 +235,7 @@ export default function PricingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>العملة (مثال: EGP)</Text>
+              <Text style={styles.inputLabel}>{t('admin.currencyLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.currency}
@@ -247,7 +248,7 @@ export default function PricingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>رمز العملة</Text>
+              <Text style={styles.inputLabel}>{t('admin.currencySymbolLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.currencySymbol}
@@ -260,7 +261,7 @@ export default function PricingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>السعر الشهري</Text>
+              <Text style={styles.inputLabel}>{t('admin.monthlyPrice')}</Text>
               <TextInput
                 style={styles.input}
                 value={String(formData.monthlyPrice)}
@@ -274,7 +275,7 @@ export default function PricingScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>السعر السنوي</Text>
+              <Text style={styles.inputLabel}>{t('admin.yearlyPrice')}</Text>
               <TextInput
                 style={styles.input}
                 value={String(formData.yearlyPrice)}

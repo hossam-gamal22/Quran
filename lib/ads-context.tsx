@@ -1,6 +1,7 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { fetchAdsConfig, AdsConfig, AdScreenKey, isBannerEnabledForScreen, getAdUnitId } from './ads-config';
+import { fetchAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen } from './ads-config';
+import { getSubscriptionState } from './subscription-manager';
 
 interface AdsContextType {
   config: AdsConfig | null;
@@ -13,6 +14,13 @@ interface AdsContextType {
   onPageView: () => void;
   recordInterstitialShown: () => void;
   refresh: () => Promise<void>;
+  isPremiumUser: boolean;
+  // Slot-based API
+  getSlotUnitId: (slotKey: string) => string;
+  isSlotEnabled: (slotKey: string) => boolean;
+  getSlotAdType: (slotKey: string) => 'banner' | 'interstitial' | null;
+  // Screen-based dynamic slots
+  getScreenSlots: (screen: string, position?: 'top' | 'bottom') => { key: string; slot: AdSlot }[];
 }
 
 const AdsContext = createContext<AdsContextType | undefined>(undefined);
@@ -20,6 +28,7 @@ const AdsContext = createContext<AdsContextType | undefined>(undefined);
 export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const [config, setConfig] = useState<AdsConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPremiumUser, setIsPremiumUser] = useState(false);
   const [pageViews, setPageViews] = useState(0);
   const [sessionAdsShown, setSessionAdsShown] = useState(0);
   const [lastAdTime, setLastAdTime] = useState<number>(Date.now());
@@ -28,8 +37,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const loadConfig = useCallback(async () => {
     setIsLoading(true);
     try {
-      const adsConfig = await fetchAdsConfig();
+      const [adsConfig, subState] = await Promise.all([
+        fetchAdsConfig(),
+        getSubscriptionState(),
+      ]);
       setConfig(adsConfig);
+      setIsPremiumUser(subState.isPremium);
     } catch (error) {
       console.error('Error loading ads config:', error);
     } finally {
@@ -51,9 +64,10 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
+    if (isPremiumUser) return false;
     if (!config) return false;
     return isBannerEnabledForScreen(config, screen);
-  }, [config]);
+  }, [config, isPremiumUser]);
 
   const getBannerAdUnitId = useCallback((): string => {
     return getAdUnitId('BANNER', config);
@@ -68,6 +82,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   }, [config]);
 
   const canShowInterstitial = useCallback((): boolean => {
+    if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
 
     if (config.delayFirstAd) {
@@ -89,7 +104,29 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       default:
         return false;
     }
-  }, [config, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
+  }, [config, isPremiumUser, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
+
+  // Slot-based API
+  const getSlotUnitId = useCallback((slotKey: string): string => {
+    if (isPremiumUser) return '';
+    return getSlotAdUnitId(config, slotKey);
+  }, [config, isPremiumUser]);
+
+  const isSlotEnabled = useCallback((slotKey: string): boolean => {
+    if (isPremiumUser) return false;
+    if (!config?.enabled) return false;
+    const slot = config.adSlots?.[slotKey];
+    return !!slot?.enabled;
+  }, [config, isPremiumUser]);
+
+  const getSlotAdType = useCallback((slotKey: string): 'banner' | 'interstitial' | null => {
+    return getSlotType(config, slotKey);
+  }, [config]);
+
+  const getScreenSlots = useCallback((screen: string, position?: 'top' | 'bottom') => {
+    if (isPremiumUser) return [];
+    return getSlotsForScreen(config, screen, position);
+  }, [config, isPremiumUser]);
 
   return (
     <AdsContext.Provider value={{
@@ -103,6 +140,11 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       onPageView,
       recordInterstitialShown,
       refresh: loadConfig,
+      isPremiumUser,
+      getSlotUnitId,
+      isSlotEnabled,
+      getSlotAdType,
+      getScreenSlots,
     }}>
       {children}
     </AdsContext.Provider>

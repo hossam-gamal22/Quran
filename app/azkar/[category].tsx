@@ -8,6 +8,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   Animated,
   Share,
@@ -16,13 +17,12 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
-  I18nManager,
   TextInput,
   Alert,
   LayoutAnimation,
   UIManager,
-  Image as RNImage,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -33,11 +33,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
-import ViewShot, { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
-import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
 
 import {
@@ -46,6 +41,7 @@ import {
   AzkarCategoryType,
   Language,
   getAzkarByCategory,
+  getDailySunnahDuas,
   getCategoryById,
   getCategoryName,
   getZikrTranslation,
@@ -56,12 +52,48 @@ import {
   isFavorite,
   getFavorites,
 } from '@/lib/azkar-api';
+import { fetchSelectedDuas, getDailySelectedDuas, duaToZikr } from '@/lib/duas-api';
 import { markAzkarCompleted, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
+import { t } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useGlobalAudio, type AudioTrack } from '@/contexts/GlobalAudioContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { BrandedCapture, BrandedCaptureHandle } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { TranslatedText } from '@/components/ui/TranslatedText';
+import { transliterateReference } from '@/lib/source-transliteration';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Spacing } from '@/constants/theme';
+import { Image as ExpoImage } from 'expo-image';
+import { searchPhotos, type Photo } from '@/lib/api/pexels';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// Search terms per azkar category for background images
+const CATEGORY_PHOTO_TERMS: Record<string, string[]> = {
+  morning: ['beautiful sunrise sky', 'golden morning light nature', 'dawn sky clouds'],
+  evening: ['beautiful sunset sky', 'golden hour landscape', 'dusk sky orange'],
+  sleep: ['starry night sky', 'calm night moon', 'peaceful dark blue sky'],
+  wakeup: ['fresh morning sunrise', 'early morning dew nature', 'dawn light forest'],
+  after_prayer: ['peaceful mosque interior', 'calm nature green', 'serene landscape'],
+  quran_duas: ['beautiful sky clouds', 'peaceful nature light', 'calm ocean horizon'],
+  sunnah_duas: ['serene nature landscape', 'peaceful garden', 'calm river nature'],
+  ruqya: ['peaceful sky light rays', 'calm nature morning', 'green forest light'],
+  eating: ['nature garden flowers', 'peaceful green field', 'beautiful meadow'],
+  mosque: ['beautiful mosque architecture', 'islamic architecture', 'mosque minaret sky'],
+  house: ['peaceful home garden', 'calm interior plants', 'cozy nature'],
+  travel: ['beautiful road landscape', 'mountain path scenic', 'desert horizon'],
+  emotions: ['calm ocean waves', 'peaceful rain nature', 'serene lake reflection'],
+  wudu: ['clear water stream', 'crystal water nature', 'peaceful waterfall'],
+  nature: ['beautiful nature scenery', 'green forest aerial', 'mountain lake scenic'],
+  fasting: ['golden crescent moon', 'peaceful sunset dates', 'calm evening sky'],
+  protection: ['strong mountain landscape', 'peaceful fortress', 'calm sky light'],
+  prayerSupplications: ['beautiful clouds sky', 'peaceful light rays', 'calm nature morning'],
+  salawat: ['beautiful green dome', 'peaceful landscape green', 'serene garden light'],
+  istighfar: ['peaceful rain drops', 'calm misty morning', 'forest light rays'],
+};
 
 // Map azkar category IDs → worship tracker keys
 const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date'>>> = {
@@ -109,6 +141,7 @@ const AFTER_PRAYER_TABS: Record<string, Record<string, string>> = {
 // ===================================
 
 export default function CategoryAzkarScreen() {
+  const isRTL = useIsRTL();
   const { category } = useLocalSearchParams<{ category: AzkarCategoryType }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -124,23 +157,37 @@ export default function CategoryAzkarScreen() {
   const [counts, setCounts] = useState<Record<number, number>>({});
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
   const language = (settings.language || 'ar') as Language;
-  const [showTranslation, setShowTranslation] = useState(settings.display.showTranslation ?? false);
+  const isArabic = language === 'ar';
+  const [showTranslation, setShowTranslation] = useState(!isArabic || (settings.display.showTranslation ?? false));
   const [showTransliteration, setShowTransliteration] = useState(false);
-  const [audioPlaying, setAudioPlaying] = useState(false);
-  const [audioLoading, setAudioLoading] = useState(false);
+
+  // Global audio context — must be before state initializers that reference it
+  const globalAudio = useGlobalAudio();
+
+  const [audioPlaying, setAudioPlaying] = useState(() => {
+    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === `/azkar/${category}` && globalAudio.state.isPlaying;
+  });
+  const [audioLoading, setAudioLoading] = useState(() => {
+    return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === `/azkar/${category}` && globalAudio.state.isLoading;
+  });
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [categoryLocked, setCategoryLocked] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState('general');
   const [loadError, setLoadError] = useState(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
   const isAfterPrayer = category === 'after_prayer';
 
-  // Audio listen-all mode
-  const [listenMode, setListenMode] = useState(false);
-  const [audioQueueIndex, setAudioQueueIndex] = useState(-1);
-  const [audioPaused, setAudioPaused] = useState(false);
-  const [audioPosition, setAudioPosition] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(0);
+  // Audio listen-all mode — restore if audio is already playing for this category
+  const [listenMode, setListenMode] = useState(() => {
+    return globalAudio.state.source === 'azkar' && 
+           globalAudio.state.sourceRoute === `/azkar/${category}` &&
+           (globalAudio.state.isPlaying || globalAudio.state.isLoading);
+  });
+
+  // Listen mode background photos
+  const [listenPhotos, setListenPhotos] = useState<{ url: string; avgColor?: string }[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const listenImageScale = useRef(new Animated.Value(1)).current;
+  const listenImageOpacity = useRef(new Animated.Value(1)).current;
 
   // View mode: card (one-at-a-time) vs list (all at once)
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -156,39 +203,8 @@ export default function CategoryAzkarScreen() {
   const [newDhikrTranslation, setNewDhikrTranslation] = useState('');
 
   // Share options
-  const [showShareSheet, setShowShareSheet] = useState(false);
   const [shareTargetZikr, setShareTargetZikr] = useState<Zikr | CustomDhikr | null>(null);
-  const [shareStep, setShareStep] = useState<'options' | 'colorPicker'>('options');
-  const [selectedShareBg, setSelectedShareBg] = useState<string>('#1a1a2e');
-  const [selectedShareType, setSelectedShareType] = useState<'solid' | 'gradient' | 'custom'>('solid');
-  const [customBgUri, setCustomBgUri] = useState<string | null>(null);
-
-  // ViewShot ref for image export
-  const viewShotRef = useRef<ViewShot>(null);
-
-  const SHARE_BG_COLORS = [
-    { color: '#1a1a2e', label: 'كحلي', textColor: '#FFFFFF' },
-    { color: '#1B5E20', label: 'أخضر', textColor: '#FFFFFF' },
-    { color: '#0D47A1', label: 'أزرق', textColor: '#FFFFFF' },
-    { color: '#000000', label: 'أسود', textColor: '#FFFFFF' },
-    { color: '#004D40', label: 'تيل', textColor: '#FFFFFF' },
-    { color: '#FAFAFA', label: 'أبيض', textColor: '#1F2937' },
-  ];
-
-  const SHARE_BG_GRADIENTS = [
-    { id: 'green', label: 'أخضر', colors: ['#1B5E20', '#4CAF50'] as [string, string], textColor: '#FFFFFF' },
-    { id: 'blue', label: 'أزرق', colors: ['#0D47A1', '#42A5F5'] as [string, string], textColor: '#FFFFFF' },
-    { id: 'purple', label: 'بنفسجي', colors: ['#4A148C', '#AB47BC'] as [string, string], textColor: '#FFFFFF' },
-  ];
-
-  const getShareTextColor = () => {
-    if (selectedShareType === 'custom') return '#FFFFFF';
-    if (selectedShareType === 'gradient') {
-      return SHARE_BG_GRADIENTS.find(g => g.id === selectedShareBg)?.textColor || '#FFFFFF';
-    }
-    const solid = SHARE_BG_COLORS.find(c => c.color === selectedShareBg);
-    return solid?.textColor || '#FFFFFF';
-  };
+  const brandedRef = useRef<BrandedCaptureHandle>(null);
 
   // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -203,9 +219,26 @@ export default function CategoryAzkarScreen() {
     if (!category) return;
 
     try {
-      // 1. تحميل الفئة والأذكار أولاً (بيانات محلية - لا تفشل)
+      // 1. تحميل الفئة والأذكار أولاً
       const catInfo = getCategoryById(category);
-      const categoryAzkar = getAzkarByCategory(category);
+
+      let categoryAzkar: Zikr[];
+      if (category === 'sunnah_duas') {
+        // Try Firestore curated duas first, fallback to local
+        try {
+          const remoteDuas = await fetchSelectedDuas();
+          if (remoteDuas.length > 0) {
+            const daily = getDailySelectedDuas(remoteDuas, 10);
+            categoryAzkar = daily.map(d => duaToZikr(d)) as unknown as Zikr[];
+          } else {
+            categoryAzkar = getDailySunnahDuas(10);
+          }
+        } catch {
+          categoryAzkar = getDailySunnahDuas(10);
+        }
+      } else {
+        categoryAzkar = getAzkarByCategory(category);
+      }
 
       if (!catInfo || categoryAzkar.length === 0) {
         setLoadError(true);
@@ -331,12 +364,12 @@ export default function CategoryAzkarScreen() {
 
   const deleteCustomDhikr = (id: string) => {
     Alert.alert(
-      language === 'ar' ? 'حذف الذكر' : 'Delete Dhikr',
-      language === 'ar' ? 'هل تريد حذف هذا الذكر المخصص؟' : 'Delete this custom dhikr?',
+      t('azkar.deleteCustomDhikr'),
+      t('azkar.deleteCustomDhikrConfirm'),
       [
-        { text: language === 'ar' ? 'إلغاء' : 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: language === 'ar' ? 'حذف' : 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             const updated = customAzkar.filter(d => d.id !== id);
@@ -488,12 +521,6 @@ export default function CategoryAzkarScreen() {
 
   const goToNext = () => {
     if (currentIndex < azkar.length - 1) {
-      // إيقاف الصوت عند التنقل
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-        soundRef.current = null;
-        setAudioPlaying(false);
-      }
       setCurrentIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
@@ -508,12 +535,6 @@ export default function CategoryAzkarScreen() {
 
   const goToPrevious = () => {
     if (currentIndex > 0) {
-      // إيقاف الصوت عند التنقل
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-        soundRef.current = null;
-        setAudioPlaying(false);
-      }
       setCurrentIndex(prev => prev - 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       
@@ -551,10 +572,16 @@ export default function CategoryAzkarScreen() {
 
   const openShareOptions = (zikr: Zikr | CustomDhikr) => {
     setShareTargetZikr(zikr);
-    setShareStep('options');
-    setSelectedShareBg('#1B6B3A');
-    setShowShareSheet(true);
     if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      t('common.share'),
+      '',
+      [
+        { text: t('common.shareText'), onPress: () => shareAsText(zikr) },
+        { text: t('common.shareImage'), onPress: () => setTimeout(() => brandedRef.current?.showSizePicker(), 50) },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
   };
 
   const shareAsText = async (zikr: Zikr | CustomDhikr) => {
@@ -563,60 +590,17 @@ export default function CategoryAzkarScreen() {
       let message = zikr.arabic;
       if (!isCustom) {
         const translation = getZikrTranslation(zikr as Zikr, language);
-        message = `${zikr.arabic}\n\n${translation}\n\n📖 ${(zikr as Zikr).reference}\n\nمن تطبيق روح المسلم`;
+        message = `${zikr.arabic}\n\n${translation}\n\n📖 ${(zikr as Zikr).reference}\n\n${t('azkar.fromApp')}`;
       } else if ((zikr as CustomDhikr).translation) {
-        message = `${zikr.arabic}\n\n${(zikr as CustomDhikr).translation}\n\nمن تطبيق روح المسلم`;
+        message = `${zikr.arabic}\n\n${(zikr as CustomDhikr).translation}\n\n${t('azkar.fromApp')}`;
       } else {
-        message = `${zikr.arabic}\n\nمن تطبيق روح المسلم`;
+        message = `${zikr.arabic}\n\n${t('azkar.fromApp')}`;
       }
       await Share.share({ message });
     } catch (error) {
       console.error('Error sharing:', error);
-    } finally {
-      setShowShareSheet(false);
-      setShareStep('options');
     }
   };
-
-  const shareAsImage = async () => {
-    try {
-      if (!viewShotRef.current) return;
-      const uri = await captureRef(viewShotRef, {
-        format: 'png',
-        quality: 1.0,
-        width: 1080,
-        height: 1350,
-      });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'مشاركة الذكر' });
-      }
-    } catch (error) {
-      console.error('Error sharing image:', error);
-    } finally {
-      setShowShareSheet(false);
-      setShareStep('options');
-    }
-  };
-
-  const pickCustomBackground = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [4, 5],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets[0]) {
-        setCustomBgUri(result.assets[0].uri);
-        setSelectedShareType('custom');
-        setSelectedShareBg('custom');
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-    }
-  };
-  // ===================================
 
   // Build audio queue from azkar that have audio URLs
   const audioQueue = React.useMemo(() => {
@@ -625,118 +609,78 @@ export default function CategoryAzkarScreen() {
       .filter(item => !!item.zikr.audio);
   }, [azkar]);
 
+  // Build GlobalAudioContext-compatible track list
+  const audioTracks: AudioTrack[] = React.useMemo(() => {
+    return audioQueue.map((item, index) => ({
+      id: String(item.zikr.id),
+      title: category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }),
+      subtitle: categoryInfo ? getCategoryName(categoryInfo, language) : '',
+      url: item.zikr.audio!,
+    }));
+  }, [audioQueue, categoryInfo]);
+
   const hasAudio = audioQueue.length > 0;
 
-  const stopAllAudio = useCallback(async () => {
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-    setAudioPlaying(false);
-    setAudioLoading(false);
-    setAudioQueueIndex(-1);
-    setAudioPaused(false);
-    setAudioPosition(0);
-    setAudioDuration(0);
-  }, []);
+  // Derive playback state from global audio context
+  const isGlobalAzkarPlaying = globalAudio.state.source === 'azkar';
+  const audioQueueIndex = isGlobalAzkarPlaying ? globalAudio.state.queueIndex : -1;
+  const audioPaused = isGlobalAzkarPlaying && !globalAudio.state.isPlaying && !globalAudio.state.isLoading;
+  const audioPosition = isGlobalAzkarPlaying ? globalAudio.state.position : 0;
+  const audioDuration = isGlobalAzkarPlaying ? globalAudio.state.duration : 0;
+  const playbackSpeed = globalAudio.playbackSpeed;
 
-  const playAudioAtIndex = useCallback(async (queueIdx: number) => {
-    if (queueIdx < 0 || queueIdx >= audioQueue.length) {
-      // Finished all
-      await stopAllAudio();
-      return;
-    }
-
-    try {
-      // Unload previous sound
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
-      setAudioLoading(true);
-      setAudioQueueIndex(queueIdx);
-      setAudioPaused(false);
-
-      const audioUrl = audioQueue[queueIdx].zikr.audio;
-      if (!audioUrl) {
-        // Skip items without audio
-        playAudioAtIndex(queueIdx + 1);
-        return;
-      }
-
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
-
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (status.isLoaded) {
-            setAudioPosition(status.positionMillis || 0);
-            setAudioDuration(status.durationMillis || 0);
-            if (status.didJustFinish) {
-              // Auto-advance to next
-              playAudioAtIndex(queueIdx + 1);
-            }
-          }
-        }
-      );
-
-      soundRef.current = sound;
-      setAudioPlaying(true);
-    } catch (error) {
-      console.error('Error playing azkar audio:', error);
-      // Try next on error
-      playAudioAtIndex(queueIdx + 1);
-    } finally {
+  // Sync audioPlaying state with global context
+  useEffect(() => {
+    if (isGlobalAzkarPlaying) {
+      setAudioPlaying(globalAudio.state.isPlaying || globalAudio.state.isLoading);
+      setAudioLoading(globalAudio.state.isLoading);
+    } else if (listenMode && audioPlaying) {
+      // Global audio stopped externally — exit listen mode
+      setAudioPlaying(false);
       setAudioLoading(false);
+      setListenMode(false);
     }
-  }, [audioQueue, stopAllAudio]);
+  }, [isGlobalAzkarPlaying, globalAudio.state.isPlaying, globalAudio.state.isLoading]);
 
   const handleListenAll = useCallback(async () => {
     if (audioPlaying) {
-      // Toggle pause/resume
-      if (soundRef.current) {
-        if (audioPaused) {
-          await soundRef.current.playAsync();
-          setAudioPaused(false);
-        } else {
-          await soundRef.current.pauseAsync();
-          setAudioPaused(true);
-        }
-      }
+      // Toggle pause/resume via global context
+      await globalAudio.togglePlayPause();
       return;
     }
     // Start from beginning
     setListenMode(true);
-    playAudioAtIndex(0);
-  }, [audioPlaying, audioPaused, playAudioAtIndex]);
+    setAudioPlaying(true);
+    await globalAudio.playAzkarQueue(audioTracks, 0, `/azkar/${category}`);
+  }, [audioPlaying, audioTracks, globalAudio, category]);
 
   const handleStopListening = useCallback(async () => {
-    await stopAllAudio();
+    await globalAudio.stop();
+    setAudioPlaying(false);
+    setAudioLoading(false);
     setListenMode(false);
-  }, [stopAllAudio]);
+  }, [globalAudio]);
 
   const handleNextTrack = useCallback(async () => {
-    if (audioQueueIndex < audioQueue.length - 1) {
-      playAudioAtIndex(audioQueueIndex + 1);
-    }
-  }, [audioQueueIndex, audioQueue.length, playAudioAtIndex]);
+    await globalAudio.next();
+  }, [globalAudio]);
 
   const handlePrevTrack = useCallback(async () => {
-    if (audioQueueIndex > 0) {
-      playAudioAtIndex(audioQueueIndex - 1);
-    }
-  }, [audioQueueIndex, playAudioAtIndex]);
+    await globalAudio.previous();
+  }, [globalAudio]);
 
   const handleSeek = useCallback(async (value: number) => {
-    if (soundRef.current) {
-      await soundRef.current.setPositionAsync(value);
-    }
-  }, []);
+    await globalAudio.seekTo(value);
+  }, [globalAudio]);
+
+  const cyclePlaybackSpeed = useCallback(async () => {
+    const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+    const currentIdx = SPEED_OPTIONS.indexOf(playbackSpeed);
+    const nextIdx = (currentIdx + 1) % SPEED_OPTIONS.length;
+    const newSpeed = SPEED_OPTIONS[nextIdx];
+    globalAudio.setPlaybackSpeed(newSpeed);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [playbackSpeed, globalAudio]);
 
   const formatTime = (ms: number) => {
     const totalSec = Math.floor(ms / 1000);
@@ -750,14 +694,82 @@ export default function CategoryAzkarScreen() {
     ? audioQueue[audioQueueIndex].zikr.id
     : null;
 
-  // تنظيف الصوت عند الخروج
+  // Audio continues playing when leaving page — GlobalAudioBar handles it
+  // Stop only handled by explicit user action (close button / stop)
+
+  // Fetch background photos for listen mode
   useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
+    if (!listenMode || !category) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const cacheKey = `@azkar_listen_photos_${category}`;
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const oneDay = 24 * 60 * 60 * 1000;
+          if (parsed.ts && Date.now() - parsed.ts < oneDay && parsed.photos?.length > 0) {
+            if (!cancelled) setListenPhotos(parsed.photos);
+            return;
+          }
+        }
+        const terms = CATEGORY_PHOTO_TERMS[category] || CATEGORY_PHOTO_TERMS.morning;
+        const photos: { url: string; avgColor?: string }[] = [];
+        for (const term of terms) {
+          try {
+            const data = await searchPhotos(term, 1, 5, 'portrait');
+            if (data.photos?.length > 0) {
+              for (const p of data.photos) {
+                photos.push({ url: p.src.large || p.src.medium, avgColor: p.avg_color });
+              }
+            }
+          } catch { /* skip */ }
+          if (photos.length >= 8) break;
+        }
+        if (!cancelled && photos.length > 0) {
+          setListenPhotos(photos);
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), photos }));
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [listenMode, category]);
+
+  // Animate listen mode image — subtle slow zoom
+  useEffect(() => {
+    if (!listenMode || listenPhotos.length === 0) return;
+    const animateImage = () => {
+      listenImageScale.setValue(1);
+      Animated.timing(listenImageScale, {
+        toValue: 1.08,
+        duration: 12000,
+        useNativeDriver: true,
+      }).start();
     };
-  }, []);
+    animateImage();
+    const interval = setInterval(animateImage, 12000);
+    return () => clearInterval(interval);
+  }, [listenMode, listenPhotos, currentPhotoIndex]);
+
+  // Change photo on track change
+  useEffect(() => {
+    if (!listenMode || listenPhotos.length === 0) return;
+    const newIndex = audioQueueIndex >= 0 ? audioQueueIndex % listenPhotos.length : 0;
+    if (newIndex !== currentPhotoIndex) {
+      Animated.timing(listenImageOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        setCurrentPhotoIndex(newIndex);
+        Animated.timing(listenImageOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }).start();
+      });
+    }
+  }, [audioQueueIndex, listenMode]);
 
   // ===================================
   // إعادة تعيين العداد
@@ -779,9 +791,9 @@ export default function CategoryAzkarScreen() {
       <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <MaterialCommunityIcons name="alert-circle-outline" size={48} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16 }}>لا توجد بيانات لهذا القسم</Text>
+        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16 }}>{t('azkar.noDataSection')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#2f7659', borderRadius: 20 }}>
-          <Text style={{ color: '#FFF', fontSize: 16 }}>رجوع</Text>
+          <Text style={{ color: '#FFF', fontSize: 16 }}>{t('azkar.goBack')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -792,7 +804,7 @@ export default function CategoryAzkarScreen() {
       <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <ActivityIndicator size="large" color="#2f7659" />
-        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12 }}>جاري التحميل...</Text>
+        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12 }}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -815,22 +827,26 @@ export default function CategoryAzkarScreen() {
       <BackgroundWrapper
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
-        style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}
+        opacity={settings.display.backgroundOpacity ?? 1}
+        style={[styles.container, { backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : (darkMode ? '#111827' : '#F3F4F6') }]}
       >
         {/* Header */}
         <View
           style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(120,120,128,0.15)' }]}
         >
-          <View style={styles.headerTop}>
+          <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <MaterialCommunityIcons name="arrow-left" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+              <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
             </TouchableOpacity>
             
-            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]} numberOfLines={1}>
-              {getCategoryName(categoryInfo, language)}
-            </Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
+              <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {category === 'sunnah_duas' ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language)}
+              </Text>
+              <SectionInfoButton sectionKey="azkar" />
+            </View>
             
-            <View style={styles.headerActions}>
+            <View style={[styles.headerActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
                 style={styles.favoriteButton}
@@ -845,7 +861,7 @@ export default function CategoryAzkarScreen() {
                 <MaterialCommunityIcons name="plus-circle-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push('/all-favorites' as any)} style={styles.favoriteButton}>
-                <MaterialCommunityIcons name="heart-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+                <MaterialCommunityIcons name="bookmark-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => openShareOptions(currentZikr)} style={styles.shareButton}>
                 <MaterialCommunityIcons name="share-variant" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
@@ -854,8 +870,8 @@ export default function CategoryAzkarScreen() {
           </View>
 
           {/* Progress Bar */}
-          <View style={styles.progressBarContainer}>
-            <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.progressBarBg, isRTL && { transform: [{ scaleX: -1 }] }]}>
               <Animated.View
                 style={[
                   styles.progressBarFill,
@@ -874,39 +890,41 @@ export default function CategoryAzkarScreen() {
             </Text>
           </View>
 
-          {/* Read / Listen Mode Toggle */}
-          {hasAudio && (
-            <View style={styles.modeToggleRow}>
+          {/* Read / Listen Mode Toggle — Arabic only (audio is Arabic recordings) */}
+          {hasAudio && language === 'ar' && (
+            <View style={[styles.modeToggleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={() => { handleStopListening(); setListenMode(false); }}
                 style={[
                   styles.modeToggleButton,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
                   !listenMode && { backgroundColor: categoryInfo.color },
                   listenMode && { backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' },
                 ]}
               >
-                <Text style={{ fontSize: 14, marginRight: 4 }}>📖</Text>
+                <MaterialCommunityIcons name="book-open-variant" size={16} color={!listenMode ? '#FFFFFF' : (darkMode ? '#D1D5DB' : '#4B5563')} />
                 <Text style={[
                   styles.modeToggleText,
                   { color: !listenMode ? '#FFFFFF' : (darkMode ? '#D1D5DB' : '#4B5563') },
                 ]}>
-                  {language === 'ar' ? 'القراءة' : 'Read'}
+                  {t('azkar.reading')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => { setListenMode(true); if (!audioPlaying) handleListenAll(); }}
                 style={[
                   styles.modeToggleButton,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
                   listenMode && { backgroundColor: categoryInfo.color },
                   !listenMode && { backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' },
                 ]}
               >
-                <Text style={{ fontSize: 14, marginRight: 4 }}>🎧</Text>
+                <MaterialCommunityIcons name="headphones" size={16} color={listenMode ? '#FFFFFF' : (darkMode ? '#D1D5DB' : '#4B5563')} />
                 <Text style={[
                   styles.modeToggleText,
                   { color: listenMode ? '#FFFFFF' : (darkMode ? '#D1D5DB' : '#4B5563') },
                 ]}>
-                  {language === 'ar' ? 'الاستماع' : 'Listen'}
+                  {t('azkar.listening')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -924,125 +942,292 @@ export default function CategoryAzkarScreen() {
             onSelect={handleSubcategoryChange}
             indicatorColor={categoryInfo?.color}
             scrollable
-            style={{ marginHorizontal: 16, marginBottom: 4 }}
+            style={{ marginHorizontal: 16, marginTop: 10, marginBottom: 4 }}
           />
         )}
 
         {/* المحتوى */}
         {listenMode && hasAudio ? (
-          /* === Listen Mode: Audio-Only Interface === */
-          <View style={styles.listenModeContainer}>
-            <GlassCard intensity={46} style={styles.listenModeCard}>
-              <MaterialCommunityIcons
-                name="headphones"
-                size={80}
-                color={categoryInfo.color}
-                style={{ marginBottom: 24 }}
-              />
-
-              <Text style={[styles.listenModeIndex, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {language === 'ar' ? 'الذكر الحالي' : 'Current'}: {audioQueueIndex >= 0 ? audioQueueIndex + 1 : 0} / {audioQueue.length}
-              </Text>
-
-              <Text
-                style={[styles.listenModeTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
-                numberOfLines={2}
-              >
-                {audioQueueIndex >= 0 && audioQueueIndex < audioQueue.length
-                  ? audioQueue[audioQueueIndex].zikr.arabic.substring(0, 80) + (audioQueue[audioQueueIndex].zikr.arabic.length > 80 ? '...' : '')
-                  : (language === 'ar' ? 'اضغط للتشغيل' : 'Tap to play')}
-              </Text>
-
-              {/* Controls */}
-              <View style={styles.listenModeControls}>
-                <TouchableOpacity
-                  onPress={handlePrevTrack}
-                  disabled={audioQueueIndex <= 0}
-                  style={{ opacity: audioQueueIndex <= 0 ? 0.3 : 1 }}
-                >
-                  <MaterialCommunityIcons
-                    name="skip-previous"
-                    size={40}
-                    color={darkMode ? '#D1D5DB' : '#4B5563'}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={handleListenAll} style={styles.listenModePlayBtn}>
-                  {audioLoading ? (
-                    <ActivityIndicator size="large" color={categoryInfo.color} />
+          /* === Listen Mode: Spotify-style Player === */
+          <View style={{ flex: 1, backgroundColor: darkMode ? '#0a0a0a' : '#f0f0f0' }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Album Art */}
+              <View style={{
+                alignItems: 'center',
+                paddingTop: 16,
+                paddingHorizontal: 32,
+              }}>
+                <View style={{
+                  width: width - 64,
+                  height: width - 64,
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  backgroundColor: darkMode ? '#1a1a1a' : '#e0e0e0',
+                  elevation: 12,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 16,
+                }}>
+                  {listenPhotos.length > 0 ? (
+                    <Animated.View style={{
+                      width: '100%',
+                      height: '100%',
+                      transform: [{ scale: listenImageScale }],
+                      opacity: listenImageOpacity,
+                    }}>
+                      <ExpoImage
+                        source={{ uri: listenPhotos[currentPhotoIndex]?.url }}
+                        style={{ width: '100%', height: '100%' }}
+                        contentFit="cover"
+                        transition={500}
+                      />
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.4)']}
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%' }}
+                      />
+                    </Animated.View>
                   ) : (
-                    <MaterialCommunityIcons
-                      name={audioPlaying && !audioPaused ? 'pause-circle' : 'play-circle'}
-                      size={64}
-                      color={categoryInfo.color}
-                    />
+                    <View style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: categoryInfo.color + '30',
+                    }}>
+                      <MaterialCommunityIcons
+                        name="headphones"
+                        size={80}
+                        color={categoryInfo.color}
+                      />
+                    </View>
                   )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleNextTrack}
-                  disabled={audioQueueIndex >= audioQueue.length - 1}
-                  style={{ opacity: audioQueueIndex >= audioQueue.length - 1 ? 0.3 : 1 }}
-                >
-                  <MaterialCommunityIcons
-                    name="skip-next"
-                    size={40}
-                    color={darkMode ? '#D1D5DB' : '#4B5563'}
-                  />
-                </TouchableOpacity>
+                </View>
               </View>
 
-              {/* Progress Slider */}
-              <View style={styles.listenModeSliderContainer}>
+              {/* Track Info */}
+              <View style={{ paddingHorizontal: 32, paddingTop: 24 }}>
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontFamily: fontBold(),
+                    color: darkMode ? '#F9FAFB' : '#1F2937',
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                    lineHeight: 34,
+                  }}
+                  numberOfLines={2}
+                >
+                  {audioQueueIndex >= 0
+                    ? (category?.includes('duas') ? t('azkar.duaNumber', { num: String(audioQueueIndex + 1) }) : t('azkar.dhikrNumber', { num: String(audioQueueIndex + 1) }))
+                    : getCategoryName(categoryInfo, language)}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontFamily: fontSemiBold(),
+                    color: categoryInfo.color,
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                    marginTop: 4,
+                  }}
+                >
+                  {getCategoryName(categoryInfo, language)}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: fontRegular(),
+                    color: darkMode ? '#9CA3AF' : '#6B7280',
+                    textAlign: isRTL ? 'right' : 'left',
+                    writingDirection: isRTL ? 'rtl' : 'ltr',
+                    marginTop: 2,
+                  }}
+                >
+                  {audioQueueIndex >= 0 ? audioQueueIndex + 1 : 0} / {audioQueue.length}
+                </Text>
+              </View>
+
+              {/* Seek Slider */}
+              <View style={{ paddingHorizontal: 24, paddingTop: 20 }}>
                 <Slider
-                  style={styles.listenModeSlider}
+                  style={{ width: '100%', height: 28 }}
+                  value={audioDuration > 0 ? audioPosition / audioDuration : 0}
                   minimumValue={0}
-                  maximumValue={audioDuration || 1}
-                  value={audioPosition}
-                  onSlidingComplete={handleSeek}
+                  maximumValue={1}
                   minimumTrackTintColor={categoryInfo.color}
-                  maximumTrackTintColor={darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}
+                  maximumTrackTintColor={darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}
                   thumbTintColor={categoryInfo.color}
+                  onSlidingComplete={(val) => handleSeek(val * audioDuration)}
                 />
-                <View style={styles.listenModeTimeRow}>
-                  <Text style={[styles.listenModeTime, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 }}>
+                  <Text style={{ fontSize: 12, fontFamily: fontRegular(), color: darkMode ? '#9CA3AF' : '#6B7280', fontVariant: ['tabular-nums'] }}>
                     {formatTime(audioPosition)}
                   </Text>
-                  <Text style={[styles.listenModeTime, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+                  <Text style={{ fontSize: 12, fontFamily: fontRegular(), color: darkMode ? '#9CA3AF' : '#6B7280', fontVariant: ['tabular-nums'] }}>
                     {formatTime(audioDuration)}
                   </Text>
                 </View>
               </View>
 
-              {/* Track list indicator */}
-              <View style={styles.listenModeTrackDots}>
-                {audioQueue.map((_, i) => (
-                  <View
-                    key={i}
-                    style={[
-                      styles.listenModeTrackDot,
-                      {
-                        backgroundColor: i === audioQueueIndex
-                          ? categoryInfo.color
-                          : (darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'),
-                      },
-                      i === audioQueueIndex && styles.listenModeTrackDotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            </GlassCard>
+              {/* Controls */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: Spacing.lg,
+                paddingTop: 8,
+                paddingHorizontal: 32,
+              }}>
+                {/* Speed */}
+                <TouchableOpacity
+                  onPress={cyclePlaybackSpeed}
+                  style={{
+                    paddingVertical: 4,
+                    paddingHorizontal: 10,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: categoryInfo.color + '40',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: categoryInfo.color, fontVariant: ['tabular-nums'] }}>
+                    {playbackSpeed}x
+                  </Text>
+                </TouchableOpacity>
 
-            {/* Stop button */}
-            <TouchableOpacity
-              onPress={handleStopListening}
-              style={[styles.listenModeStopBtn, { borderColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}
-            >
-              <MaterialCommunityIcons name="close" size={20} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-              <Text style={[styles.listenModeStopText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {language === 'ar' ? 'إيقاف الاستماع' : 'Stop Listening'}
-              </Text>
-            </TouchableOpacity>
+                {/* Previous */}
+                <TouchableOpacity
+                  onPress={handlePrevTrack}
+                  disabled={audioQueueIndex <= 0}
+                  style={{ opacity: audioQueueIndex <= 0 ? 0.3 : 1, padding: 8 }}
+                >
+                  <MaterialCommunityIcons name="skip-previous" size={36} color={darkMode ? '#E5E7EB' : '#374151'} />
+                </TouchableOpacity>
+
+                {/* Play / Pause */}
+                <TouchableOpacity
+                  onPress={handleListenAll}
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: categoryInfo.color,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    elevation: 4,
+                    shadowColor: categoryInfo.color,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                  }}
+                >
+                  {audioLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name={audioPlaying && !audioPaused ? 'pause' : 'play'}
+                      size={32}
+                      color="#fff"
+                    />
+                  )}
+                </TouchableOpacity>
+
+                {/* Next */}
+                <TouchableOpacity
+                  onPress={handleNextTrack}
+                  disabled={audioQueueIndex >= audioQueue.length - 1}
+                  style={{ opacity: audioQueueIndex >= audioQueue.length - 1 ? 0.3 : 1, padding: 8 }}
+                >
+                  <MaterialCommunityIcons name="skip-next" size={36} color={darkMode ? '#E5E7EB' : '#374151'} />
+                </TouchableOpacity>
+
+                {/* Close */}
+                <TouchableOpacity
+                  onPress={handleStopListening}
+                  style={{ padding: 8 }}
+                >
+                  <MaterialCommunityIcons name="close-circle-outline" size={28} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Track list below */}
+              <View style={{ paddingHorizontal: 16, paddingTop: 24, paddingBottom: 16 }}>
+                <Text style={{
+                  fontSize: 16,
+                  fontFamily: fontBold(),
+                  color: darkMode ? '#E5E7EB' : '#374151',
+                  textAlign: isRTL ? 'right' : 'left',
+                  writingDirection: isRTL ? 'rtl' : 'ltr',
+                  marginBottom: 10,
+                  paddingHorizontal: 4,
+                }}>
+                  {t('azkar.playlist')}
+                </Text>
+                {audioQueue.map((item, index) => {
+                  const isCurrentTrack = index === audioQueueIndex;
+                  return (
+                    <TouchableOpacity
+                      key={item.zikr.id}
+                      onPress={async () => {
+                        await globalAudio.playAzkarQueue(audioTracks, index, `/azkar/${category}`);
+                        setAudioPlaying(true);
+                      }}
+                      style={{
+                        flexDirection: 'row-reverse',
+                        alignItems: 'center',
+                        gap: Spacing.md,
+                        paddingVertical: 12,
+                        paddingHorizontal: 12,
+                        borderRadius: 12,
+                        backgroundColor: isCurrentTrack
+                          ? (darkMode ? categoryInfo.color + '20' : categoryInfo.color + '15')
+                          : 'transparent',
+                        marginBottom: 2,
+                      }}
+                    >
+                      <View style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isCurrentTrack ? categoryInfo.color : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                      }}>
+                        {isCurrentTrack && audioPlaying && !audioPaused ? (
+                          <MaterialCommunityIcons name="volume-high" size={14} color="#fff" />
+                        ) : (
+                          <Text style={{
+                            fontSize: 12,
+                            fontFamily: fontBold(),
+                            color: isCurrentTrack ? '#fff' : (darkMode ? '#9CA3AF' : '#6B7280'),
+                          }}>
+                            {index + 1}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            fontFamily: isCurrentTrack ? fontBold() : fontRegular(),
+                            color: isCurrentTrack ? categoryInfo.color : (darkMode ? '#E5E7EB' : '#374151'),
+                            textAlign: isRTL ? 'right' : 'left',
+                            writingDirection: isRTL ? 'rtl' : 'ltr',
+                            lineHeight: 24,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
         ) : viewMode === 'card' ? (
           /* === Card Mode (original one-at-a-time view) === */
@@ -1062,10 +1247,9 @@ export default function CategoryAzkarScreen() {
                   },
                 ]}
               >
-                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
                   <GlassCard intensity={46} style={styles.zikrCardGlass}>
                     {/* أزرار الإجراءات */}
-                    <View style={styles.actionButtons}>
+                    <View style={[styles.actionButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <TouchableOpacity
                         onPress={() => toggleFavorite(currentZikr.id)}
                         style={styles.actionButton}
@@ -1098,14 +1282,25 @@ export default function CategoryAzkarScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    {/* النص العربي */}
-                    <Text style={[
-                      styles.arabicText,
-                      { color: darkMode ? '#F9FAFB' : '#1F2937' },
-                      currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
-                    ]}>
-                      {currentZikr.arabic}
-                    </Text>
+                    {/* النص الرئيسي */}
+                    {/* Main dhikr text: Arabic for Arabic users, translation for others */}
+                    {isArabic ? (
+                      <Text style={[
+                        styles.arabicText,
+                        { color: darkMode ? '#F9FAFB' : '#1F2937' },
+                        currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                      ]}>
+                        {currentZikr.arabic}
+                      </Text>
+                    ) : (
+                      <Text style={[
+                        styles.arabicText,
+                        { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+                        currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                      ]}>
+                        {getZikrTranslation(currentZikr, language)}
+                      </Text>
+                    )}
 
                     {/* النطق */}
                     {showTransliteration && currentZikr.transliteration && (
@@ -1114,14 +1309,14 @@ export default function CategoryAzkarScreen() {
                       </Text>
                     )}
 
-                    {/* الترجمة */}
-                    {showTranslation && (
-                      <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                        {getZikrTranslation(currentZikr, language)}
+                    {/* الترجمة — فقط للعربية مع التبديل */}
+                    {isArabic && showTranslation && (
+                      <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563', writingDirection: 'ltr', textAlign: 'left' }]}>
+                        {getZikrTranslation(currentZikr, 'en' as Language)}
                       </Text>
                     )}
 
-                    {/* الفضل */}
+                    {/* الفضل — benefit text */}
                     {currentZikr.benefit && (
                       <View style={styles.benefitStarWrapper}>
                         <View style={[styles.benefitStarCircle, { backgroundColor: categoryInfo.color + '15' }]}>
@@ -1129,23 +1324,31 @@ export default function CategoryAzkarScreen() {
                         </View>
                         <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}> 
                           <Text style={[styles.benefitText, { color: categoryInfo.color }]}> 
-                            {getZikrBenefit(currentZikr, language)}
+                            {getZikrBenefit(currentZikr, language) || ''}
                           </Text>
                         </View>
                       </View>
                     )}
 
-                    {/* Watermark for image export */}
+                    {/* المرجع — source reference */}
+                    {(currentZikr as Zikr).reference && (
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs, marginTop: 4 }}>
+                        <MaterialCommunityIcons name="book-open-page-variant" size={13} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+                        <Text style={{ color: darkMode ? '#9CA3AF' : '#6B7280', fontSize: 13, lineHeight: 18 }}>
+                          {transliterateReference((currentZikr as Zikr).reference, language)}
+                        </Text>
+                      </View>
+                    )}
+
                     <Text style={styles.watermarkHidden}>روح المسلم</Text>
                   </GlassCard>
-                </ViewShot>
               </Animated.View>
 
               {/* Custom dhikr after main ones (scroll below current card if at end) */}
               {currentIndex === azkar.length - 1 && customAzkar.length > 0 && (
                 <View style={{ marginTop: 16 }}>
                   <Text style={[styles.customSectionTitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                    {language === 'ar' ? 'أذكار مخصصة' : 'Custom Adhkar'}
+                    {t('azkar.customAdhkar')}
                   </Text>
                   {customAzkar.map((cd) => {
                     const cdCount = counts[cd.id as any] || 0;
@@ -1163,11 +1366,19 @@ export default function CategoryAzkarScreen() {
                         activeOpacity={0.8}
                       >
                         <GlassCard intensity={40} style={[styles.zikrCardGlass, { marginBottom: 12 }]}>
-                          <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20 }]}>
-                            {cd.arabic}
-                          </Text>
-                          {cd.translation && (
-                            <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+                          {/* Show Arabic for Arabic users, translation for others */}
+                          {isArabic ? (
+                            <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20 }]}>
+                              {cd.arabic}
+                            </Text>
+                          ) : (
+                            <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                              {cd.translation || cd.arabic}
+                            </Text>
+                          )}
+                          {/* Show translation for Arabic users if enabled */}
+                          {isArabic && showTranslation && cd.translation && (
+                            <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563', writingDirection: 'ltr', textAlign: 'left' }]}>
                               {cd.translation}
                             </Text>
                           )}
@@ -1183,14 +1394,14 @@ export default function CategoryAzkarScreen() {
             </ScrollView>
 
             {/* شريط العداد والتنقل */}
-            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)' }]}>
+            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={goToPrevious}
                 disabled={currentIndex === 0}
                 style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
               >
                 <MaterialCommunityIcons
-                  name="chevron-right"
+                  name={isRTL ? 'chevron-right' : 'chevron-left'}
                   size={28}
                   color={currentIndex === 0 ? '#9CA3AF' : categoryInfo.color}
                 />
@@ -1205,9 +1416,8 @@ export default function CategoryAzkarScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.counterText}>
-                  {isCompleted ? '✓' : currentCount}
+                  {isCompleted ? '✓' : `${currentCount}/${currentZikr.count}`}
                 </Text>
-                <Text style={styles.counterTotal}>/ {currentZikr.count}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1216,7 +1426,7 @@ export default function CategoryAzkarScreen() {
                 style={[styles.navButton, currentIndex === azkar.length - 1 && styles.navButtonDisabled]}
               >
                 <MaterialCommunityIcons
-                  name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+                  name={isRTL ? 'chevron-left' : 'chevron-right'}
                   size={28}
                   color={currentIndex === azkar.length - 1 ? '#9CA3AF' : categoryInfo.color}
                 />
@@ -1254,7 +1464,7 @@ export default function CategoryAzkarScreen() {
                         });
                       }}
                       activeOpacity={0.7}
-                      style={styles.listCollapseHeader}
+                      style={[styles.listCollapseHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     >
                       <View style={[styles.listItemBadge, { backgroundColor: categoryInfo.color + '20', position: 'relative', top: 0, left: 0 }]}>
                         <Text style={[styles.listItemBadgeText, { color: categoryInfo.color }]}>{idx + 1}</Text>
@@ -1262,14 +1472,14 @@ export default function CategoryAzkarScreen() {
                       <Text
                         style={[
                           styles.arabicText,
-                          { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 18, marginBottom: 0, flex: 1, textAlign: 'right' },
+                          { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 18, marginBottom: 0, flex: 1, textAlign: isArabic ? 'right' : (isRTL ? 'right' : 'left'), writingDirection: isArabic ? 'rtl' : (isRTL ? 'rtl' : 'ltr') },
                           currentlyPlayingZikrId === zikr.id && { color: categoryInfo.color },
                         ]}
                         numberOfLines={isExpanded ? undefined : 2}
                       >
-                        {zikr.arabic}
+                        {isArabic ? zikr.arabic : getZikrTranslation(zikr, language)}
                       </Text>
-                      <View style={styles.listCollapseRight}>
+                      <View style={[styles.listCollapseRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={[styles.listMiniCount, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}>
                           <Text style={styles.listMiniCountText}>{zDone ? '✓' : `${zCount}/${zikr.count}`}</Text>
                         </View>
@@ -1285,7 +1495,7 @@ export default function CategoryAzkarScreen() {
                     {isExpanded && (
                       <View style={styles.listExpandedContent}>
                         {/* Action row */}
-                        <View style={[styles.actionButtons, { marginBottom: 8 }]}>
+                        <View style={[styles.actionButtons, { marginBottom: 8, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <TouchableOpacity onPress={() => toggleFavorite(zikr.id)} style={styles.actionButton}>
                             <MaterialCommunityIcons
                               name={favorites[zikr.id] ? 'heart' : 'heart-outline'}
@@ -1298,17 +1508,28 @@ export default function CategoryAzkarScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {showTranslation && (
-                          <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563', fontSize: 14 }]}>
-                            {getZikrTranslation(zikr, language)}
+                        {/* Translation: for Arabic users — toggle English */}
+                        {isArabic && showTranslation && (
+                          <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563', fontSize: 14, writingDirection: 'ltr', textAlign: 'left' }]}>
+                            {getZikrTranslation(zikr, 'en' as Language)}
                           </Text>
                         )}
 
                         {zikr.benefit && (
-                          <View style={[styles.listBenefitBox, { backgroundColor: categoryInfo.color + '12' }]}>
+                          <View style={[styles.listBenefitBox, { backgroundColor: categoryInfo.color + '12', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                             <MaterialCommunityIcons name="star" size={14} color={categoryInfo.color} />
                             <Text style={[styles.benefitText, { color: categoryInfo.color, fontSize: 13 }]}>
-                              {getZikrBenefit(zikr, language)}
+                              {getZikrBenefit(zikr, language) || ''}
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* المرجع — source reference */}
+                        {zikr.reference && (
+                          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs, marginTop: 4 }}>
+                            <MaterialCommunityIcons name="book-open-page-variant" size={12} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+                            <Text style={{ color: darkMode ? '#9CA3AF' : '#6B7280', fontSize: 12, lineHeight: 16 }}>
+                              {transliterateReference(zikr.reference, language)}
                             </Text>
                           </View>
                         )}
@@ -1330,7 +1551,7 @@ export default function CategoryAzkarScreen() {
                           style={[styles.listCounterButton, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.listCounterText}>{zDone ? '✓' : zCount} / {zikr.count}</Text>
+                          <Text style={styles.listCounterText}>{zDone ? '✓' : `${zCount}/${zikr.count}`}</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1343,7 +1564,7 @@ export default function CategoryAzkarScreen() {
             {customAzkar.length > 0 && (
               <View style={{ marginTop: 8 }}>
                 <Text style={[styles.customSectionTitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                  {language === 'ar' ? 'أذكار مخصصة' : 'Custom Adhkar'}
+                  {t('azkar.customAdhkar')}
                 </Text>
                 {customAzkar.map((cd) => {
                   const cdCount = counts[cd.id as any] || 0;
@@ -1362,10 +1583,17 @@ export default function CategoryAzkarScreen() {
                       style={{ marginBottom: 12 }}
                     >
                       <GlassCard intensity={40} style={styles.zikrCardGlass}>
-                        <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20 }]}>
-                          {cd.arabic}
-                        </Text>
-                        {cd.translation && (
+                        {/* Show Arabic for Arabic users, translation for others */}
+                        {isArabic ? (
+                          <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20 }]}>
+                            {cd.arabic}
+                          </Text>
+                        ) : (
+                          <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                            {cd.translation || cd.arabic}
+                          </Text>
+                        )}
+                        {isArabic && showTranslation && cd.translation && (
                           <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
                             {cd.translation}
                           </Text>
@@ -1396,15 +1624,15 @@ export default function CategoryAzkarScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
-            <Text style={styles.modalEmoji}>🎉</Text>
+            <Text style={styles.modalEmoji}></Text>
             <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              مبروك!
+              {t('azkar.congratulations')}
             </Text>
             <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-              تم اكتمال {categoryInfo ? getCategoryName(categoryInfo, language) : 'الأذكار'} بنجاح
+              {t('azkar.completedSuccessfully', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') })}
             </Text>
             <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
-              تقبّل الله منك 🤲
+              {t('azkar.mayAllahAccept')}
             </Text>
             <TouchableOpacity
               style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
@@ -1413,7 +1641,7 @@ export default function CategoryAzkarScreen() {
                 router.back();
               }}
             >
-              <Text style={styles.modalButtonText}>الحمد لله</Text>
+              <Text style={styles.modalButtonText}>{t('azkar.alhamdulillah')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1424,21 +1652,21 @@ export default function CategoryAzkarScreen() {
         <Modal visible={categoryLocked} transparent animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
-              <Text style={styles.modalEmoji}>✅</Text>
+              <Text style={styles.modalEmoji}></Text>
               <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                تم الإكمال
+                {t('azkar.alreadyCompleted')}
               </Text>
               <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                لقد أكملت {categoryInfo ? getCategoryName(categoryInfo, language) : 'هذه الأذكار'} اليوم
+                {t('azkar.completedTodayMessage', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') })}
               </Text>
               <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
-                ستتجدد في موعدها إن شاء الله
+                {t('azkar.willRenewOnTime')}
               </Text>
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
                 onPress={() => router.back()}
               >
-                <Text style={styles.modalButtonText}>حسناً</Text>
+                <Text style={styles.modalButtonText}>{t('common.ok')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1455,7 +1683,7 @@ export default function CategoryAzkarScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', width: '100%' }]}>
             <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', marginBottom: 20 }]}>
-              {language === 'ar' ? 'إضافة ذكر مخصص' : 'Add Custom Dhikr'}
+              {t('azkar.addCustomDhikr')}
             </Text>
 
             <TextInput
@@ -1464,7 +1692,7 @@ export default function CategoryAzkarScreen() {
                 backgroundColor: darkMode ? '#374151' : '#F3F4F6',
                 textAlign: 'right',
               }]}
-              placeholder={language === 'ar' ? 'النص العربي *' : 'Arabic text *'}
+              placeholder={t('azkar.arabicTextRequired')}
               placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
               value={newDhikrArabic}
               onChangeText={setNewDhikrArabic}
@@ -1477,7 +1705,7 @@ export default function CategoryAzkarScreen() {
                 backgroundColor: darkMode ? '#374151' : '#F3F4F6',
                 textAlign: 'center',
               }]}
-              placeholder={language === 'ar' ? 'عدد التكرار' : 'Repeat count'}
+              placeholder={t('azkar.repeatCount')}
               placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
               value={newDhikrCount}
               onChangeText={setNewDhikrCount}
@@ -1488,22 +1716,22 @@ export default function CategoryAzkarScreen() {
               style={[styles.modalInput, {
                 color: darkMode ? '#F9FAFB' : '#1F2937',
                 backgroundColor: darkMode ? '#374151' : '#F3F4F6',
-                textAlign: 'right',
+                textAlign: isRTL ? 'right' : 'left',
               }]}
-              placeholder={language === 'ar' ? 'الترجمة (اختياري)' : 'Translation (optional)'}
+              placeholder={t('azkar.translationOptional')}
               placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
               value={newDhikrTranslation}
               onChangeText={setNewDhikrTranslation}
               multiline
             />
 
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.md, marginTop: 8 }}>
               <TouchableOpacity
                 style={[styles.modalButton, { backgroundColor: darkMode ? '#374151' : '#E5E7EB', flex: 1 }]}
                 onPress={() => setShowAddModal(false)}
               >
                 <Text style={[styles.modalButtonText, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                  {t('common.cancel')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -1511,7 +1739,7 @@ export default function CategoryAzkarScreen() {
                 onPress={addCustomDhikr}
               >
                 <Text style={styles.modalButtonText}>
-                  {language === 'ar' ? 'إضافة' : 'Add'}
+                  {t('common.add')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1519,327 +1747,25 @@ export default function CategoryAzkarScreen() {
         </View>
       </Modal>
 
-      {/* بوب أب خيارات المشاركة */}
-      <Modal
-        visible={showShareSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { setShowShareSheet(false); setShareStep('options'); }}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => { setShowShareSheet(false); setShareStep('options'); }}
-        >
-          <View
-            style={[styles.shareSheet, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}
-            onStartShouldSetResponder={() => true}
-          >
-            <View style={styles.shareSheetHandle} />
-            <Text style={[styles.shareSheetTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {shareStep === 'options'
-                ? (language === 'ar' ? 'مشاركة الذكر' : 'Share Dhikr')
-                : (language === 'ar' ? 'اختر لون الخلفية' : 'Choose Background')}
+      {/* Unified BrandedCapture for image sharing */}
+      <BrandedCapture ref={brandedRef}>
+        <View style={{ alignItems: 'center', padding: 8 }}>
+          <Text style={{
+            fontSize: 18, fontFamily: fontBold(), textAlign: 'center',
+            lineHeight: 34, color: '#FFFFFF',
+          }}>
+            {shareTargetZikr?.arabic || ''}
+          </Text>
+          {'reference' in (shareTargetZikr || {}) && (shareTargetZikr as Zikr)?.reference ? (
+            <Text style={{
+              fontSize: 14, fontFamily: fontSemiBold(), textAlign: 'center',
+              color: 'rgba(255,255,255,0.7)', marginTop: 12,
+            }}>
+              {transliterateReference((shareTargetZikr as Zikr).reference, language)}
             </Text>
-
-            {/* Off-screen ViewShot for image capture (1080×1350 Instagram-ready) */}
-            {shareTargetZikr && (
-              <View style={{ position: 'absolute', left: -9999 }}>
-                <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1, width: 1080, height: 1350 }}>
-                  {(() => {
-                    const txtColor = getShareTextColor();
-                    const refBgColor = txtColor === '#FFFFFF' ? 'rgba(255,255,255,0.12)' : 'rgba(31,41,55,0.08)';
-                    const refBorderColor = txtColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(31,41,55,0.15)';
-
-                    const contentInner = (
-                      <View style={{
-                        flex: 1, width: '100%', alignItems: 'center',
-                        justifyContent: 'center', padding: 60,
-                      }}>
-                        <Text style={{
-                          fontSize: 36, color: txtColor, textAlign: 'center',
-                          lineHeight: 68, fontWeight: '600', paddingHorizontal: 16,
-                        }}>
-                          {shareTargetZikr.arabic}
-                        </Text>
-                        {'reference' in shareTargetZikr && (shareTargetZikr as Zikr).reference ? (
-                          <View style={{
-                            backgroundColor: refBgColor, borderRadius: 24,
-                            paddingHorizontal: 20, paddingVertical: 8, borderWidth: 1,
-                            borderColor: refBorderColor, marginTop: 28,
-                          }}>
-                            <Text style={{ color: txtColor, fontWeight: '800', fontSize: 18, opacity: 0.8 }}>
-                              {(shareTargetZikr as Zikr).reference}
-                            </Text>
-                          </View>
-                        ) : null}
-                        <Text style={{
-                          color: txtColor, opacity: 0.5, fontSize: 16,
-                          marginTop: 32, fontWeight: '600',
-                        }}>
-                          روح المسلم
-                        </Text>
-                      </View>
-                    );
-
-                    if (selectedShareType === 'gradient') {
-                      const grad = SHARE_BG_GRADIENTS.find(g => g.id === selectedShareBg);
-                      return (
-                        <LinearGradient
-                          colors={grad?.colors || ['#1B5E20', '#4CAF50']}
-                          style={{ width: 1080, height: 1350 }}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                        >
-                          {contentInner}
-                        </LinearGradient>
-                      );
-                    }
-
-                    if (selectedShareType === 'custom' && customBgUri) {
-                      return (
-                        <View style={{ width: 1080, height: 1350, overflow: 'hidden' }}>
-                          <RNImage
-                            source={{ uri: customBgUri }}
-                            style={{ position: 'absolute', width: 1080, height: 1350 }}
-                            blurRadius={8}
-                            resizeMode="cover"
-                          />
-                          <View style={{
-                            position: 'absolute', width: 1080, height: 1350,
-                            backgroundColor: 'rgba(0,0,0,0.4)',
-                          }} />
-                          {contentInner}
-                        </View>
-                      );
-                    }
-
-                    return (
-                      <View style={{
-                        width: 1080, height: 1350,
-                        backgroundColor: selectedShareBg,
-                      }}>
-                        {contentInner}
-                      </View>
-                    );
-                  })()}
-                </ViewShot>
-              </View>
-            )}
-
-            {shareStep === 'options' ? (
-              <>
-                <TouchableOpacity
-                  style={[styles.shareOption, { backgroundColor: darkMode ? '#374151' : '#F3F4F6' }]}
-                  onPress={() => shareTargetZikr && shareAsText(shareTargetZikr)}
-                >
-                  <MaterialCommunityIcons name="text" size={24} color={categoryInfo?.color || '#10B981'} />
-                  <Text style={[styles.shareOptionText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                    {language === 'ar' ? 'مشاركة كنص' : 'Share as Text'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.shareOption, { backgroundColor: darkMode ? '#374151' : '#F3F4F6' }]}
-                  onPress={() => setShareStep('colorPicker')}
-                >
-                  <MaterialCommunityIcons name="image" size={24} color={categoryInfo?.color || '#10B981'} />
-                  <Text style={[styles.shareOptionText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                    {language === 'ar' ? 'مشاركة كصورة' : 'Share as Image'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <ScrollView style={{ maxHeight: height * 0.55 }} showsVerticalScrollIndicator={false}>
-                {/* Section: Solid Colors */}
-                <Text style={[styles.bgSectionLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                  {language === 'ar' ? 'ألوان' : 'Colors'}
-                </Text>
-                <View style={styles.colorPickerRow}>
-                  {SHARE_BG_COLORS.map((item) => (
-                    <TouchableOpacity
-                      key={item.color}
-                      onPress={() => {
-                        setSelectedShareType('solid');
-                        setSelectedShareBg(item.color);
-                      }}
-                      style={[
-                        styles.colorPickerItem,
-                        selectedShareType === 'solid' && selectedShareBg === item.color && {
-                          borderColor: categoryInfo?.color || '#10B981',
-                          borderWidth: 3,
-                        },
-                      ]}
-                    >
-                      <View style={[
-                        styles.colorPickerSwatch,
-                        { backgroundColor: item.color },
-                        item.color === '#FAFAFA' && { borderWidth: 1, borderColor: '#D1D5DB' },
-                      ]} />
-                      <Text style={[styles.colorPickerLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Section: Gradients */}
-                <Text style={[styles.bgSectionLabel, { color: darkMode ? '#9CA3AF' : '#6B7280', marginTop: 12 }]}>
-                  {language === 'ar' ? 'تدرجات' : 'Gradients'}
-                </Text>
-                <View style={styles.colorPickerRow}>
-                  {SHARE_BG_GRADIENTS.map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => {
-                        setSelectedShareType('gradient');
-                        setSelectedShareBg(item.id);
-                      }}
-                      style={[
-                        styles.colorPickerItem,
-                        selectedShareType === 'gradient' && selectedShareBg === item.id && {
-                          borderColor: categoryInfo?.color || '#10B981',
-                          borderWidth: 3,
-                        },
-                      ]}
-                    >
-                      <LinearGradient
-                        colors={item.colors}
-                        style={[styles.colorPickerSwatch, { borderRadius: 20 }]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                      />
-                      <Text style={[styles.colorPickerLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  {/* Upload custom background */}
-                  <TouchableOpacity
-                    onPress={pickCustomBackground}
-                    style={[
-                      styles.colorPickerItem,
-                      selectedShareType === 'custom' && {
-                        borderColor: categoryInfo?.color || '#10B981',
-                        borderWidth: 3,
-                      },
-                    ]}
-                  >
-                    {customBgUri ? (
-                      <RNImage source={{ uri: customBgUri }} style={[styles.colorPickerSwatch, { borderRadius: 20 }]} />
-                    ) : (
-                      <View style={[styles.colorPickerSwatch, {
-                        backgroundColor: darkMode ? '#374151' : '#E5E7EB',
-                        alignItems: 'center', justifyContent: 'center',
-                      }]}>
-                        <MaterialCommunityIcons name="image-plus" size={20} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-                      </View>
-                    )}
-                    <Text style={[styles.colorPickerLabel, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                      {language === 'ar' ? 'صورة' : 'Photo'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Preview */}
-                <Text style={[styles.bgSectionLabel, { color: darkMode ? '#9CA3AF' : '#6B7280', marginTop: 12 }]}>
-                  {language === 'ar' ? 'معاينة' : 'Preview'}
-                </Text>
-                <View style={[styles.sharePreviewContainer, {
-                  borderColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                }]}>
-                  {(() => {
-                    const previewTxtColor = getShareTextColor();
-                    const previewContent = (
-                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                        <Text style={{
-                          color: previewTxtColor, fontSize: 14, fontWeight: '600',
-                          textAlign: 'center', lineHeight: 26,
-                        }} numberOfLines={4}>
-                          {shareTargetZikr?.arabic || ''}
-                        </Text>
-                        {'reference' in (shareTargetZikr || {}) && (shareTargetZikr as Zikr)?.reference ? (
-                          <Text style={{ color: previewTxtColor, opacity: 0.7, fontSize: 10, marginTop: 8 }}>
-                            {(shareTargetZikr as Zikr).reference}
-                          </Text>
-                        ) : null}
-                        <Text style={{ color: previewTxtColor, opacity: 0.4, fontSize: 9, marginTop: 6 }}>
-                          روح المسلم
-                        </Text>
-                      </View>
-                    );
-
-                    if (selectedShareType === 'gradient') {
-                      const grad = SHARE_BG_GRADIENTS.find(g => g.id === selectedShareBg);
-                      return (
-                        <LinearGradient
-                          colors={grad?.colors || ['#1B5E20', '#4CAF50']}
-                          style={styles.sharePreviewInner}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                        >
-                          {previewContent}
-                        </LinearGradient>
-                      );
-                    }
-                    if (selectedShareType === 'custom' && customBgUri) {
-                      return (
-                        <View style={styles.sharePreviewInner}>
-                          <RNImage
-                            source={{ uri: customBgUri }}
-                            style={StyleSheet.absoluteFill}
-                            blurRadius={8}
-                            resizeMode="cover"
-                          />
-                          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} />
-                          {previewContent}
-                        </View>
-                      );
-                    }
-                    return (
-                      <View style={[styles.sharePreviewInner, {
-                        backgroundColor: selectedShareBg,
-                      }]}>
-                        {previewContent}
-                      </View>
-                    );
-                  })()}
-                </View>
-
-                {/* Action buttons */}
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                  <TouchableOpacity
-                    style={[styles.shareOption, {
-                      backgroundColor: darkMode ? '#374151' : '#F3F4F6', flex: 1,
-                      justifyContent: 'center',
-                    }]}
-                    onPress={() => setShareStep('options')}
-                  >
-                    <MaterialCommunityIcons name="arrow-right" size={20} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-                    <Text style={[styles.shareOptionText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                      {language === 'ar' ? 'رجوع' : 'Back'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.shareOption, {
-                      backgroundColor: categoryInfo?.color || '#10B981', flex: 2,
-                      justifyContent: 'center',
-                    }]}
-                    onPress={() => shareTargetZikr && shareAsImage()}
-                  >
-                    <MaterialCommunityIcons name="share-variant" size={20} color="#FFFFFF" />
-                    <Text style={[styles.shareOptionText, { color: '#FFFFFF' }]}>
-                      {language === 'ar' ? 'مشاركة' : 'Share'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          ) : null}
+        </View>
+      </BrandedCapture>
     </>
   );
 }
@@ -1885,7 +1811,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Spacing.sm,
   },
   favoriteButton: {
     padding: 8,
@@ -1893,6 +1819,7 @@ const styles = StyleSheet.create({
   progressBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.md,
   },
   progressBarBg: {
     flex: 1,
@@ -1908,9 +1835,7 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 12,
     minWidth: 50,
-    textAlign: 'right',
   },
 
   // Content
@@ -1931,7 +1856,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginBottom: 16,
-    gap: 12,
+    gap: Spacing.md,
   },
   actionButton: {
     padding: 8,
@@ -1941,6 +1866,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 42,
     textAlign: 'center',
+    writingDirection: 'rtl',
     marginBottom: 20,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
@@ -1986,7 +1912,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: Spacing.sm,
   },
   referenceText: {
     fontSize: 13,
@@ -2009,8 +1935,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   counterButton: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
     paddingVertical: 16,
@@ -2018,14 +1943,9 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   counterText: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#FFFFFF',
-  },
-  counterTotal: {
-    fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
-    marginLeft: 4,
   },
 
   // Completion Modal
@@ -2112,12 +2032,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    gap: 10,
+    gap: Spacing.sm,
   },
   listCollapseRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: Spacing.sm,
   },
   listMiniCount: {
     paddingHorizontal: 10,
@@ -2142,7 +2062,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     marginBottom: 10,
-    gap: 6,
+    gap: Spacing.sm,
   },
   listCounterButton: {
     alignSelf: 'center',
@@ -2166,99 +2086,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
 
-  // Share sheet
-  shareSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  shareSheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(120,120,128,0.3)',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  shareSheetTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  shareOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 10,
-    gap: 14,
-  },
-  shareOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  colorPickerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 6,
-  },
-  colorPickerItem: {
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 6,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  colorPickerSwatch: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginBottom: 4,
-  },
-  colorPickerLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  sharePreview: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    minHeight: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sharePreviewContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    marginBottom: 4,
-    aspectRatio: 4 / 5,
-    width: '100%',
-  },
-  sharePreviewInner: {
-    flex: 1,
-    overflow: 'hidden',
-    borderRadius: 12,
-  },
-  bgSectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'right',
-    writingDirection: 'rtl',
-  },
-
   // Mode toggle (Read / Listen)
   modeToggleRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
     marginTop: 10,
   },
   modeToggleButton: {
@@ -2268,103 +2099,83 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     borderRadius: 12,
+    gap: Spacing.sm,
   },
   modeToggleText: {
     fontSize: 14,
     fontWeight: '600',
   },
 
-  // Listen Mode: Audio-Only Interface
-  listenModeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 20,
+  // Compact Player (sticky bottom)
+  compactPlayer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    paddingBottom: 16,
   },
-  listenModeCard: {
-    borderRadius: 24,
-    padding: 32,
-    alignItems: 'center',
+  compactProgressBg: {
+    height: 3,
     width: '100%',
   },
-  listenModeIndex: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 12,
+  compactProgressFill: {
+    height: '100%',
+    borderRadius: 1.5,
   },
-  listenModeTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 34,
-    marginBottom: 32,
-    writingDirection: 'rtl',
-    paddingHorizontal: 8,
+  compactTrackInfo: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
-  listenModeControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 32,
-    marginBottom: 24,
+  compactTrackTitle: {
+    fontSize: 14,
+    fontFamily: fontSemiBold(),
   },
-  listenModePlayBtn: {
-    width: 68,
-    height: 68,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listenModeSliderContainer: {
-    width: '100%',
-    marginBottom: 16,
-  },
-  listenModeSlider: {
-    width: '100%',
-    height: 40,
-  },
-  listenModeTimeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop: -4,
-  },
-  listenModeTime: {
+  compactTrackMeta: {
     fontSize: 12,
-    fontWeight: '500',
-    fontVariant: ['tabular-nums'],
+    fontFamily: fontRegular(),
+    marginTop: 2,
+    fontVariant: ['tabular-nums'] as const,
   },
-  listenModeTrackDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  listenModeTrackDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  listenModeTrackDotActive: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  listenModeStopBtn: {
+  compactControls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    gap: Spacing.md,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+  },
+  compactPlayBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactSpeedBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  listenModeStopText: {
+  compactSpeedText: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'] as const,
+  },
+  speedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  speedButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
   // Watermark (hidden in normal view, visible in image capture)

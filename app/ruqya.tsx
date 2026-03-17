@@ -18,9 +18,9 @@ import {
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { t } from '@/lib/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
 import {
@@ -34,8 +34,15 @@ import {
   isFavorite,
 } from '@/lib/azkar-api';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BackButton } from '@/components/ui';
+import { TranslatedText } from '@/components/ui/TranslatedText';
+import { transliterateReference } from '@/lib/source-transliteration';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Spacing } from '@/constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -44,22 +51,23 @@ const { width, height } = Dimensions.get('window');
 // =====================================
 
 export default function RuqyaScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
   const { isDarkMode, settings } = useSettings();
+  const colors = useColors();
   const darkMode = isDarkMode;
   const language = (settings.language || 'ar') as Language;
+  const isArabic = language === 'ar';
 
   // الحالة
   const [ruqyaList, setRuqyaList] = useState<Zikr[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
+  const [counts, setCounts] = useState<Record<number, number>>({});
   const [showTranslation, setShowTranslation] = useState(true);
   const [showTransliteration, setShowTransliteration] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playingId, setPlayingId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'single' | 'list'>('single');
 
   // الأنيميشن
@@ -108,60 +116,7 @@ export default function RuqyaScreen() {
 
   useEffect(() => {
     loadData();
-    
-    // تنظيف الصوت عند الخروج
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
-      }
-    };
   }, [loadData]);
-
-  // =====================================
-  // تشغيل الصوت
-  // =====================================
-
-  const playAudio = async (audioUrl: string | undefined, id: number, textForTts: string) => {
-    try {
-      // إيقاف الصوت الحالي
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-        soundRef.current = null;
-      }
-
-      if (playingId === id && isPlaying) {
-        // إيقاف نفس الصوت
-        setIsPlaying(false);
-        setPlayingId(null);
-        return;
-      }
-
-      const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ar&q=${encodeURIComponent(textForTts)}`;
-      const resolvedAudioUrl = audioUrl || ttsUrl;
-
-      // تشغيل الصوت الجديد
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: resolvedAudioUrl },
-        { shouldPlay: true }
-      );
-      
-      soundRef.current = sound;
-      setIsPlaying(true);
-      setPlayingId(id);
-
-      // عند انتهاء الصوت
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setIsPlaying(false);
-          setPlayingId(null);
-        }
-      });
-    } catch (error) {
-      console.error('Error playing audio:', error);
-      setIsPlaying(false);
-      setPlayingId(null);
-    }
-  };
 
   // =====================================
   // التنقل
@@ -176,6 +131,24 @@ export default function RuqyaScreen() {
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
+    }
+  };
+
+  const handleCount = (item: Zikr) => {
+    const currentCount = counts[item.id] || 0;
+    if (currentCount >= item.count) {
+      goToNext();
+      return;
+    }
+    const newCount = currentCount + 1;
+    setCounts(prev => ({ ...prev, [item.id]: newCount }));
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(newCount >= item.count ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light);
+    } else {
+      Vibration.vibrate(newCount >= item.count ? 100 : 30);
+    }
+    if (newCount >= item.count) {
+      setTimeout(() => goToNext(), 400);
     }
   };
 
@@ -218,7 +191,7 @@ export default function RuqyaScreen() {
   const shareRuqya = async (item: Zikr) => {
     try {
       const translation = getZikrTranslation(item, language);
-      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 الرقية الشرعية\nمن تطبيق روح المسلم`;
+      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
       
       await Share.share({ message });
     } catch (error) {
@@ -232,15 +205,15 @@ export default function RuqyaScreen() {
 
   const shareAll = async () => {
     try {
-      let message = '🔒 الرقية الشرعية\n\n';
+      let message = `🔒 ${t('azkar.ruqya')}\n\n`;
       
       ruqyaList.forEach((item, index) => {
         message += `${index + 1}. ${item.arabic}\n`;
-        if (item.count > 1) message += `(${item.count} مرات)\n`;
+        if (item.count > 1) message += `(${item.count} ${t('azkar.times')})\n`;
         message += '\n';
       });
       
-      message += '\nمن تطبيق روح المسلم';
+      message += `\n${t('common.fromApp')}`;
       
       await Share.share({ message });
     } catch (error) {
@@ -293,17 +266,6 @@ export default function RuqyaScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => playAudio(item.audio, item.id, item.arabic)}
-                style={styles.actionButton}
-              >
-                <Ionicons
-                  name={playingId === item.id && isPlaying ? 'pause-circle' : 'play-circle'}
-                  size={28}
-                  color="#6366F1"
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 onPress={() => shareRuqya(item)}
                 style={styles.actionButton}
               >
@@ -315,41 +277,44 @@ export default function RuqyaScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* رقم الآية */}
-            <View style={styles.numberBadge}>
-              <Text style={styles.numberText}>{index + 1}</Text>
-            </View>
 
-            {/* النص العربي */}
-            <Text style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {item.arabic}
-            </Text>
+
+            {/* النص الرئيسي — Arabic for Arabic users, translation for others */}
+            {isArabic ? (
+              <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
+                {item.arabic}
+              </Text>
+            ) : (
+              <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {getZikrTranslation(item, language) || item.arabic}
+              </Text>
+            )}
 
             {/* النطق */}
             {showTransliteration && item.transliteration && (
-              <Text style={[styles.transliteration, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              <Text style={[styles.transliteration, { color: colors.textLight }]}>
                 {item.transliteration}
               </Text>
             )}
 
-            {/* الترجمة */}
-            {showTranslation && (
-              <Text style={[styles.translation, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-                {getZikrTranslation(item, language)}
+            {/* Translation — only for Arabic users who want to see English */}
+            {isArabic && showTranslation && (
+              <Text style={[styles.translation, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
+                {getZikrTranslation(item, 'en' as any)}
               </Text>
             )}
 
             {/* عدد التكرار */}
             {item.count > 1 && (
-              <View style={styles.countBadge}>
+              <View style={[styles.countBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons name="repeat" size={16} color="#6366F1" />
                 <Text style={styles.countText}>
-                  {language === 'ar' ? `${item.count} مرات` : `${item.count} times`}
+                  {`${item.count} ${t('azkar.times')}`}
                 </Text>
               </View>
             )}
 
-            {/* الفضل */}
+            {/* الفضل — benefit text */}
             {item.benefit && (
               <View style={styles.benefitStarWrapper}>
                 <View style={[styles.benefitStarCircle, { backgroundColor: '#6366F115' }]}>
@@ -357,17 +322,17 @@ export default function RuqyaScreen() {
                 </View>
                 <View style={[styles.benefitContainer, { backgroundColor: '#6366F115' }]}>
                   <Text style={[styles.benefitText, { color: '#6366F1' }]}>
-                    {getZikrBenefit(item, language)}
+                    {getZikrBenefit(item, language) || ''}
                   </Text>
                 </View>
               </View>
             )}
 
             {/* المرجع */}
-            <View style={styles.referenceContainer}>
+            <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Ionicons name="book-outline" size={14} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-              <Text style={[styles.referenceText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {item.reference}
+              <Text style={[styles.referenceText, { color: colors.textLight }]}>
+                {transliterateReference(item.reference, language)}
               </Text>
             </View>
           </Animated.View>
@@ -385,7 +350,7 @@ export default function RuqyaScreen() {
       <TouchableOpacity
         style={[
           styles.listItem,
-          { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+          { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
         onPress={() => {
           setCurrentIndex(index);
@@ -393,29 +358,29 @@ export default function RuqyaScreen() {
         }}
         activeOpacity={0.7}
       >
-        <View style={styles.listItemNumber}>
+        <View style={[styles.listItemNumber]}>
           <Text style={styles.listItemNumberText}>{index + 1}</Text>
         </View>
         
         <View style={styles.listItemContent}>
           <Text 
-            style={[styles.listItemArabic, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
+            style={[styles.listItemArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}
             numberOfLines={2}
           >
             {item.arabic}
           </Text>
-          <Text style={[styles.listItemReference, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-            {item.reference}
+          <Text style={[styles.listItemReference, { color: colors.textLight }]}>
+            {transliterateReference(item.reference, language)}
           </Text>
         </View>
 
-        <View style={styles.listItemActions}>
+        <View style={[styles.listItemActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {item.count > 1 && (
             <View style={styles.listCountBadge}>
               <Text style={styles.listCountText}>{item.count}×</Text>
             </View>
           )}
-          <Ionicons name="chevron-forward" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+          <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
         </View>
       </TouchableOpacity>
     );
@@ -427,8 +392,8 @@ export default function RuqyaScreen() {
 
   if (ruqyaList.length === 0) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
-        <Text style={{ color: darkMode ? '#FFF' : '#000' }}>جاري التحميل...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor: 'transparent' }]}>
+        <Text style={{ color: colors.text }}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -440,22 +405,24 @@ export default function RuqyaScreen() {
       <BackgroundWrapper
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
-        style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}
+        opacity={settings.display.backgroundOpacity ?? 1}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
       >
         {/* Header */}
         <View
           style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(120,120,128,0.15)' }]}
         >
-          <View style={styles.headerTop}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
-            </TouchableOpacity>
+          <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <BackButton color={darkMode ? '#F9FAFB' : '#1F2937'} />
             
-            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {language === 'ar' ? 'الرقية الشرعية' : 'Ruqyah'}
-            </Text>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
+              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+                {t('azkar.ruqya')}
+              </Text>
+              <SectionInfoButton sectionKey="ruqya" />
+            </View>
             
-            <View style={styles.headerActions}>
+            <View style={[styles.headerActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={toggleViewMode} style={styles.headerButton}>
                 <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
@@ -467,8 +434,8 @@ export default function RuqyaScreen() {
 
           {/* Progress */}
           {viewMode === 'single' && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBarBg}>
+            <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.progressBarBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View
                   style={[
                     styles.progressBarFill,
@@ -476,7 +443,7 @@ export default function RuqyaScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.progressText, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
+              <Text style={[styles.progressText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
                 {currentIndex + 1} / {ruqyaList.length}
               </Text>
             </View>
@@ -493,9 +460,11 @@ export default function RuqyaScreen() {
               keyExtractor={item => item.id.toString()}
               horizontal
               pagingEnabled
+              inverted={isRTL}
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.x / width);
+                const offsetIndex = Math.round(e.nativeEvent.contentOffset.x / width);
+                const index = isRTL ? (ruqyaList.length - 1 - offsetIndex) : offsetIndex;
                 setCurrentIndex(index);
               }}
               initialScrollIndex={currentIndex}
@@ -506,23 +475,32 @@ export default function RuqyaScreen() {
               })}
             />
 
-            {/* أزرار التنقل */}
-            <View style={[styles.navigationBar, { backgroundColor: 'rgba(120,120,128,0.12)' }]}>
+            {/* شريط العداد والتنقل */}
+            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={goToPrevious}
                 disabled={currentIndex === 0}
                 style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
               >
                 <Ionicons
-                  name="chevron-back"
+                  name={isRTL ? 'chevron-forward' : 'chevron-back'}
                   size={28}
                   color={currentIndex === 0 ? '#9CA3AF' : '#6366F1'}
                 />
-                <Text style={[
-                  styles.navButtonText,
-                  { color: currentIndex === 0 ? '#9CA3AF' : '#6366F1' }
-                ]}>
-                  {language === 'ar' ? 'السابق' : 'Previous'}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => ruqyaList[currentIndex] && handleCount(ruqyaList[currentIndex])}
+                style={[
+                  styles.counterButton,
+                  {
+                    backgroundColor: (counts[ruqyaList[currentIndex]?.id] || 0) >= (ruqyaList[currentIndex]?.count || 1) ? '#10B981' : '#6366F1',
+                  },
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.counterText}>
+                  {(counts[ruqyaList[currentIndex]?.id] || 0) >= (ruqyaList[currentIndex]?.count || 1) ? '✓' : `${counts[ruqyaList[currentIndex]?.id] || 0}/${ruqyaList[currentIndex]?.count || 1}`}
                 </Text>
               </TouchableOpacity>
 
@@ -531,14 +509,8 @@ export default function RuqyaScreen() {
                 disabled={currentIndex === ruqyaList.length - 1}
                 style={[styles.navButton, currentIndex === ruqyaList.length - 1 && styles.navButtonDisabled]}
               >
-                <Text style={[
-                  styles.navButtonText,
-                  { color: currentIndex === ruqyaList.length - 1 ? '#9CA3AF' : '#6366F1' }
-                ]}>
-                  {language === 'ar' ? 'التالي' : 'Next'}
-                </Text>
                 <Ionicons
-                  name="chevron-forward"
+                  name={isRTL ? 'chevron-back' : 'chevron-forward'}
                   size={28}
                   color={currentIndex === ruqyaList.length - 1 ? '#9CA3AF' : '#6366F1'}
                 />
@@ -597,7 +569,7 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
   },
   headerButton: {
     padding: 8,
@@ -605,6 +577,7 @@ const styles = StyleSheet.create({
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
   },
   progressBarBg: {
     flex: 1,
@@ -620,9 +593,7 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 12,
     minWidth: 50,
-    textAlign: 'right',
   },
 
   // Single View
@@ -641,10 +612,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: 'row-reverse',
     marginBottom: 16,
-    gap: 12,
+    gap: Spacing.md,
   },
   actionButton: {
     padding: 8,
@@ -690,7 +660,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: Spacing.sm,
     marginBottom: 16,
   },
   countText: {
@@ -718,27 +688,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   benefitText: {
-    flex: 1,
     fontSize: 14,
     lineHeight: 22,
+    textAlign: 'center',
   },
   referenceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: Spacing.sm,
   },
   referenceText: {
     fontSize: 13,
   },
 
-  // Navigation Bar
-  navigationBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  // Bottom Bar
+  bottomBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
@@ -746,22 +713,29 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(0,0,0,0.05)',
   },
   navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
+    padding: 12,
   },
   navButtonDisabled: {
     opacity: 0.5,
   },
-  navButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  counterButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    minWidth: 120,
+  },
+  counterText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
 
   // List View
   listContainer: {
     padding: 16,
-    gap: 12,
+    gap: Spacing.md,
   },
   listItem: {
     flexDirection: 'row',
@@ -771,6 +745,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.12)',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
+    gap: Spacing.md,
   },
   listItemNumber: {
     width: 36,
@@ -779,7 +754,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   listItemNumberText: {
     color: '#FFFFFF',
@@ -794,6 +768,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 4,
     textAlign: 'right',
+    writingDirection: 'rtl',
   },
   listItemReference: {
     fontSize: 12,
@@ -801,7 +776,7 @@ const styles = StyleSheet.create({
   listItemActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   listCountBadge: {
     backgroundColor: '#6366F115',

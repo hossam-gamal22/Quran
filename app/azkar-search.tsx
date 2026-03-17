@@ -20,7 +20,12 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t } from '@/lib/i18n';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BackButton } from '@/components/ui';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { transliterateReference } from '@/lib/source-transliteration';
 import {
   Zikr,
   Language,
@@ -46,6 +51,7 @@ export default function AzkarSearchScreen() {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const { isDarkMode, settings } = useSettings();
+  const isRTL = useIsRTL();
   const darkMode = isDarkMode;
   const language = (settings.language || 'ar') as Language;
   const isBenefitsMode = mode === 'benefits';
@@ -210,7 +216,7 @@ export default function AzkarSearchScreen() {
   const shareZikr = async (zikr: Zikr) => {
     try {
       const translation = getZikrTranslation(zikr, language);
-      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${zikr.reference}\n\nمن تطبيق روح المسلم`;
+      const message = `${zikr.arabic}\n\n${translation}\n\n📖 ${transliterateReference(zikr.reference, language)}\n\n${t('common.fromApp')}`;
       
       await Share.share({ message });
     } catch (error) {
@@ -237,7 +243,7 @@ export default function AzkarSearchScreen() {
           activeOpacity={0.7}
         >
           {/* التصنيف */}
-          <View style={[styles.categoryBadge, { backgroundColor: category?.color + '20' }]}>
+          <View style={[styles.categoryBadge, { backgroundColor: category?.color + '20', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
             <Text style={[styles.categoryBadgeText, { color: category?.color }]}>
               {categoryName}
             </Text>
@@ -260,15 +266,15 @@ export default function AzkarSearchScreen() {
           </Text>
 
           {/* الإجراءات */}
-          <View style={styles.resultActions}>
-            <View style={styles.referenceContainer}>
+          <View style={[styles.resultActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Ionicons name="book-outline" size={12} color={darkMode ? '#6B7280' : '#9CA3AF'} />
               <Text style={[styles.referenceText, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
-                {item.reference}
+                {transliterateReference(item.reference, language)}
               </Text>
             </View>
 
-            <View style={styles.actionButtons}>
+            <View style={[styles.actionButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={() => toggleFavorite(item.id)}
                 style={styles.actionButton}
@@ -316,23 +322,23 @@ export default function AzkarSearchScreen() {
         activeOpacity={0.7}
       >
         {/* التصنيف */}
-        <View style={[styles.categoryBadge, { backgroundColor: (cat?.color || '#10B981') + '20' }]}>
+        <View style={[styles.categoryBadge, { backgroundColor: (cat?.color || '#10B981') + '20', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
           <Text style={[styles.categoryBadgeText, { color: cat?.color || '#10B981' }]}>
             {categoryName}
           </Text>
         </View>
 
-        {/* النص العربي */}
+        {/* النص — translated for non-Arabic */}
         <Text
           style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
           numberOfLines={3}
         >
-          {item.arabic}
+          {getZikrTranslation(item, language)}
         </Text>
 
         {/* الفضل */}
         {benefit ? (
-          <View style={[styles.benefitBox, { backgroundColor: (cat?.color || '#10B981') + '12' }]}>
+          <View style={[styles.benefitBox, { backgroundColor: (cat?.color || '#10B981') + '12', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Ionicons name="star" size={14} color={cat?.color || '#10B981'} />
             <Text style={[styles.benefitText, { color: cat?.color || '#10B981' }]}>
               {benefit}
@@ -341,10 +347,10 @@ export default function AzkarSearchScreen() {
         ) : null}
 
         {/* المرجع */}
-        <View style={styles.referenceContainer}>
+        <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Ionicons name="book-outline" size={12} color={darkMode ? '#6B7280' : '#9CA3AF'} />
           <Text style={[styles.referenceText, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
-            {item.reference}
+            {transliterateReference(item.reference, language)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -360,7 +366,7 @@ export default function AzkarSearchScreen() {
       key={index}
       style={[
         styles.recentItem,
-        { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+        { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', flexDirection: isRTL ? 'row-reverse' : 'row' },
       ]}
       onPress={() => handleSearch(search)}
     >
@@ -379,17 +385,16 @@ export default function AzkarSearchScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       
-      <View style={[styles.container, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+      <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header مع البحث */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-          <View style={styles.headerContent}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
-            </TouchableOpacity>
+          <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <BackButton color={darkMode ? '#F9FAFB' : '#1F2937'} />
 
             {isBenefitsMode ? (
               <Text style={[styles.benefitsHeaderTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                {language === 'ar' ? 'فضل الأذكار' : 'Benefits of Adhkar'}
+                {t('azkarSearch.virtueOfAzkar')}
               </Text>
             ) : (
               <View style={[
@@ -400,7 +405,7 @@ export default function AzkarSearchScreen() {
                 <TextInput
                   ref={inputRef}
                   style={[styles.searchInput, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
-                  placeholder={language === 'ar' ? 'ابحث في الأذكار...' : 'Search adhkar...'}
+                  placeholder={t('azkar.searchPlaceholder')}
                   placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
                   value={query}
                   onChangeText={handleSearch}
@@ -424,7 +429,7 @@ export default function AzkarSearchScreen() {
             sections={benefitSections}
             renderItem={renderBenefitItem}
             renderSectionHeader={({ section }) => (
-              <View style={[styles.sectionHeader, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
+              <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
                 <View style={[styles.sectionHeaderDot, { backgroundColor: (section as any).color }]} />
                 <Text style={[styles.sectionHeaderText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
                   {section.title}
@@ -440,16 +445,14 @@ export default function AzkarSearchScreen() {
             stickySectionHeadersEnabled
             ListHeaderComponent={
               <Text style={[styles.resultsCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {language === 'ar'
-                  ? `${allAzkarWithBenefits.length} ذكر له فضل`
-                  : `${allAzkarWithBenefits.length} adhkar with virtues`}
+                {`${allAzkarWithBenefits.length} ${t('azkarSearch.hasVirtue')}`}
               </Text>
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="star-outline" size={64} color={darkMode ? '#374151' : '#D1D5DB'} />
                 <Text style={[styles.emptyTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                  {language === 'ar' ? 'لا توجد أذكار بفضل' : 'No adhkar with virtues'}
+                  {t('azkarSearch.noAzkarWithVirtue')}
                 </Text>
               </View>
             }
@@ -459,13 +462,13 @@ export default function AzkarSearchScreen() {
           <View style={styles.recentContainer}>
             {recentSearches.length > 0 && (
               <>
-                <View style={styles.recentHeader}>
+                <View style={[styles.recentHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <Text style={[styles.recentTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                    {language === 'ar' ? 'عمليات البحث الأخيرة' : 'Recent Searches'}
+                    {t('azkarSearch.recentSearches')}
                   </Text>
                   <TouchableOpacity onPress={clearRecentSearches}>
                     <Text style={styles.clearText}>
-                      {language === 'ar' ? 'مسح الكل' : 'Clear All'}
+                      {t('azkarSearch.clearAll')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -479,7 +482,7 @@ export default function AzkarSearchScreen() {
             <View style={styles.tipsContainer}>
               <Ionicons name="bulb-outline" size={24} color="#F59E0B" />
               <Text style={[styles.tipsTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                {language === 'ar' ? 'نصائح للبحث' : 'Search Tips'}
+                {t('azkarSearch.searchTips')}
               </Text>
               <Text style={[styles.tipsText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
                 {language === 'ar'
@@ -493,12 +496,10 @@ export default function AzkarSearchScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="search-outline" size={64} color={darkMode ? '#374151' : '#D1D5DB'} />
             <Text style={[styles.emptyTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {language === 'ar' ? 'لا توجد نتائج' : 'No Results'}
+              {t('azkar.noResults')}
             </Text>
             <Text style={[styles.emptyText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-              {language === 'ar'
-                ? `لم نجد أذكار تطابق "${query}"`
-                : `No adhkar found matching "${query}"`}
+              {`${t('azkarSearch.noAzkarMatch')} "${query}"`}
             </Text>
           </View>
         ) : (
@@ -512,14 +513,13 @@ export default function AzkarSearchScreen() {
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <Text style={[styles.resultsCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {language === 'ar'
-                  ? `${results.length} نتيجة`
-                  : `${results.length} results`}
+                {`${results.length} ${t('common.result')}`}
               </Text>
             }
           />
         )}
       </View>
+      </BackgroundWrapper>
     </>
   );
 }
@@ -539,10 +539,10 @@ const styles = StyleSheet.create({
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   backButton: {
     padding: 8,
-    marginRight: 8,
   },
   searchContainer: {
     flex: 1,
@@ -588,6 +588,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 32,
     textAlign: 'right',
+    writingDirection: 'rtl',
     marginBottom: 8,
   },
   translation: {
@@ -603,7 +604,7 @@ const styles = StyleSheet.create({
   referenceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   referenceText: {
     fontSize: 12,
@@ -695,7 +696,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     marginBottom: 10,
-    gap: 6,
+    gap: 8,
   },
   benefitText: {
     flex: 1,

@@ -6,12 +6,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Platform, I18nManager,
+  StyleSheet, Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { ScreenContainer } from '@/components/screen-container';
+import { UniversalHeader } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
 import { FONT_SIZES } from '@/constants/theme';
@@ -26,18 +29,17 @@ import {
   BOOKMARK_COLOR_LABELS,
 } from '@/lib/quran-bookmarks';
 import { getFirstSurahOnPage } from '@/lib/qcf-page-data';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const BOOKMARK_COLOR_ORDER: BookmarkColor[] = ['yellow', 'red', 'green'];
 
-const toArabicNumber = (n: number): string => {
-  const d = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
-  return String(n).split('').map(c => d[parseInt(c)] || c).join('');
-};
+import { localizeNumber as toArabicNumber } from '@/lib/format-number';
 
 export default function QuranBookmarksScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const colors = useColors();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, t } = useSettings();
   const isLightBg = !isDarkMode;
 
   const [bookmarks, setBookmarks] = useState<ColoredBookmark[]>([]);
@@ -73,17 +75,14 @@ export default function QuranBookmarksScreen() {
   return (
     <ScreenContainer>
       {/* Header */}
-      <View style={[s.header, { borderBottomColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
-        <TouchableOpacity hitSlop={12} onPress={() => router.back()}>
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-            size={26}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: colors.text }]}>الفواصل</Text>
-        <View style={{ width: 26 }} />
-      </View>
+      <UniversalHeader
+        style={{ borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }}
+      >
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('quran.bookmarks')}</Text>
+          <SectionInfoButton sectionKey="quran_surahs" />
+        </View>
+      </UniversalHeader>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40, paddingTop: 12 }}>
         {BOOKMARK_COLOR_ORDER.map(color => {
@@ -91,14 +90,14 @@ export default function QuranBookmarksScreen() {
           const expanded = expandedGroups[color];
           return (
             <View key={color} style={[s.bmGroup, { borderColor: BOOKMARK_BORDER_COLORS[color], backgroundColor: BOOKMARK_BG_COLORS[color] }]}>
-              <TouchableOpacity style={s.bmGroupHeader} onPress={() => toggleGroup(color)}>
+              <TouchableOpacity style={[s.bmGroupHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={() => toggleGroup(color)}>
                 <MaterialCommunityIcons name="bookmark" size={24} color={BOOKMARK_COLORS[color]} />
-                <View style={{ flex: 1, marginHorizontal: 10 }}>
-                  <Text style={[s.bmGroupTitle, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>
-                    {BOOKMARK_COLOR_LABELS[color]}
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.bmGroupTitle, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t(BOOKMARK_COLOR_LABELS[color])}
                   </Text>
-                  <Text style={[s.bmGroupCount, { color: isLightBg ? '#666' : '#aaa' }]}>
-                    عدد: {toArabicNumber(items.length)}
+                  <Text style={[s.bmGroupCount, { color: isLightBg ? '#666' : '#aaa', textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t('common.count')} {toArabicNumber(items.length)}
                   </Text>
                 </View>
                 <MaterialCommunityIcons
@@ -111,27 +110,27 @@ export default function QuranBookmarksScreen() {
               {expanded && items.map(bm => (
                 <TouchableOpacity
                   key={bm.id}
-                  style={[s.bmItem, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(40,40,44,0.5)' }]}
+                  style={[s.bmItem, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.6)' : 'rgba(40,40,44,0.5)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => jumpToPage(bm.page)}
                 >
                   <View style={[s.bmItemIcon, { backgroundColor: BOOKMARK_BG_COLORS[color] }]}>
                     <MaterialCommunityIcons name="bookmark" size={18} color={BOOKMARK_COLORS[color]} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.bmItemName, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>{bm.surahName}</Text>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={[s.bmItemName, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left' }]}>{bm.surahName}</Text>
+                    <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 8 }}>
                       <Text style={[s.bmItemMeta, { color: isLightBg ? '#666' : '#aaa' }]}>
-                        آية {toArabicNumber(bm.ayahNumber)}
+                        {t('quran.ayah')} {toArabicNumber(bm.ayahNumber)}
                       </Text>
                       <Text style={[s.bmItemMeta, { color: isLightBg ? '#666' : '#aaa' }]}>
-                        صفحة {toArabicNumber(bm.page)}
+                        {t('quran.page')} {toArabicNumber(bm.page)}
                       </Text>
                     </View>
                   </View>
                   <TouchableOpacity hitSlop={12} onPress={() => handleRemoveBookmark(bm.id)}>
                     <MaterialCommunityIcons name="close" size={16} color={isLightBg ? '#999' : '#666'} />
                   </TouchableOpacity>
-                  <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={18} color={isLightBg ? '#999' : '#666'} />
+                  <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={18} color={isLightBg ? '#999' : '#666'} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -141,9 +140,9 @@ export default function QuranBookmarksScreen() {
         {bookmarks.length === 0 && (
           <View style={s.emptyBm}>
             <MaterialCommunityIcons name="bookmark-outline" size={48} color={isLightBg ? '#ccc' : '#555'} />
-            <Text style={[s.emptyText, { color: isLightBg ? '#999' : '#666' }]}>لا توجد فواصل بعد</Text>
+            <Text style={[s.emptyText, { color: isLightBg ? '#999' : '#666' }]}>{t('quran.noBookmarks')}</Text>
             <Text style={[s.emptyHint, { color: isLightBg ? '#bbb' : '#555' }]}>
-              اضغط مطولاً على أي آية لإضافة فاصل
+              {t('quran.bookmarkHint')}
             </Text>
           </View>
         )}
@@ -153,19 +152,7 @@ export default function QuranBookmarksScreen() {
 }
 
 const s = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontFamily: 'Cairo-Bold',
-    textAlign: 'center',
-  },
+
   bmGroup: {
     marginHorizontal: 16,
     marginBottom: 12,
@@ -178,9 +165,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
+    gap: 10,
   },
-  bmGroupTitle: { fontSize: FONT_SIZES.lg, fontFamily: 'Cairo-Bold' },
-  bmGroupCount: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular' },
+  bmGroupTitle: { fontSize: FONT_SIZES.lg, fontFamily: fontBold() },
+  bmGroupCount: { fontSize: FONT_SIZES.xs, fontFamily: fontRegular() },
   bmItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,13 +183,13 @@ const s = StyleSheet.create({
     width: 36, height: 36, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center',
   },
-  bmItemName: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold' },
+  bmItemName: { fontSize: FONT_SIZES.md, fontFamily: fontSemiBold() },
   bmItemMeta: {
-    fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular',
+    fontSize: FONT_SIZES.xs, fontFamily: fontRegular(),
     backgroundColor: 'rgba(120,120,128,0.08)',
     paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6,
   },
   emptyBm: { alignItems: 'center', paddingVertical: 40, gap: 8 },
-  emptyText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Medium', textAlign: 'center' },
-  emptyHint: { fontSize: FONT_SIZES.sm, fontFamily: 'Cairo-Regular', textAlign: 'center' },
+  emptyText: { fontSize: FONT_SIZES.md, fontFamily: fontMedium(), textAlign: 'center' },
+  emptyHint: { fontSize: FONT_SIZES.sm, fontFamily: fontRegular(), textAlign: 'center' },
 });

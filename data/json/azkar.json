@@ -1602,51 +1602,51 @@
       "transliteration": "La ilaha illallahu wahdahu la sharika lahu, lahul-mulku wa lahul-hamdu yuhyi wa yumitu wa huwa 'ala kulli shay'in qadir (10x)",
       "translations": {
         "ar": {
-          "text": "عشر مرات بعد صلاة المغرب والصبح",
+          "text": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ — عشر مرات بعد صلاة المغرب والصبح",
           "verified": true
         },
         "en": {
-          "text": "Say 10 times after Maghrib and Fajr prayers",
+          "text": "There is no god but Allah alone, with no partner. His is the dominion and His is the praise. He gives life and causes death, and He is capable of all things (10 times after Maghrib and Fajr)",
           "verified": true
         },
         "fr": {
-          "text": "Dire 10 fois après les prières du Maghrib et du Fajr",
+          "text": "Il n'y a de dieu qu'Allah seul, sans associé. À Lui appartient la royauté et la louange. Il donne la vie et cause la mort, et Il est capable de toute chose (10 fois après Maghrib et Fajr)",
           "verified": true
         },
         "de": {
-          "text": "10 mal nach Maghrib und Fajr Gebet sagen",
+          "text": "Es gibt keinen Gott außer Allah allein, ohne Partner. Ihm gehört die Herrschaft und das Lob. Er gibt Leben und verursacht den Tod, und Er hat Macht über alle Dinge (10 Mal nach Maghrib und Fajr)",
           "verified": true
         },
         "tr": {
-          "text": "Akşam ve sabah namazlarından sonra 10 kez söyle",
+          "text": "Allah'tan başka ilah yoktur, O tektir, ortağı yoktur. Mülk O'nundur, hamd O'nadır. O diriltir ve öldürür. O her şeye kadirdir (Akşam ve sabah namazlarından sonra 10 kez)",
           "verified": true
         },
         "ur": {
-          "text": "مغرب اور فجر کے بعد 10 بار کہیں",
+          "text": "اللہ کے سوا کوئی معبود نہیں، وہ اکیلا ہے، اس کا کوئی شریک نہیں۔ بادشاہی اسی کی ہے اور تعریف اسی کی ہے۔ وہ زندہ کرتا اور مارتا ہے اور وہ ہر چیز پر قادر ہے (مغرب اور فجر کے بعد ١٠ بار)",
           "verified": true
         },
         "id": {
-          "text": "Ucapkan 10 kali setelah shalat Maghrib dan Subuh",
+          "text": "Tidak ada tuhan selain Allah semata, tiada sekutu bagi-Nya. Milik-Nya kerajaan dan pujian. Dia menghidupkan dan mematikan, dan Dia Mahakuasa atas segala sesuatu (10 kali setelah Maghrib dan Subuh)",
           "verified": true
         },
         "ms": {
-          "text": "Ucapkan 10 kali selepas solat Maghrib dan Subuh",
+          "text": "Tiada tuhan selain Allah sahaja, tiada sekutu bagi-Nya. Milik-Nya kerajaan dan pujian. Dia menghidupkan dan mematikan, dan Dia Mahakuasa atas segala sesuatu (10 kali selepas Maghrib dan Subuh)",
           "verified": true
         },
         "bn": {
-          "text": "মাগরিব ও ফজরের পর ১০ বার বলুন",
+          "text": "আল্লাহ ছাড়া কোনো ইলাহ নেই, তিনি একক, তাঁর কোনো শরিক নেই। রাজত্ব তাঁরই এবং প্রশংসা তাঁরই। তিনিই জীবন দান করেন এবং মৃত্যু ঘটান, এবং তিনি সবকিছুর উপর ক্ষমতাবান (মাগরিব ও ফজরের পর ১০ বার)",
           "verified": true
         },
         "hi": {
-          "text": "मग़रिब और फज्र के बाद 10 बार कहें",
+          "text": "अल्लाह के सिवा कोई माबूद नहीं, वह अकेला है, उसका कोई शरीक नहीं। बादशाही उसी की है और तारीफ उसी की है। वह ज़िन्दा करता है और मारता है और वह हर चीज़ पर क़ादिर है (मग़रिब और फ़ज्र के बाद १० बार)",
           "verified": true
         },
         "es": {
-          "text": "Decir 10 veces después de Maghrib y Fajr",
+          "text": "No hay dios sino Allah solo, sin socio. Suyo es el dominio y Suya es la alabanza. Él da vida y causa la muerte, y Él tiene poder sobre todas las cosas (10 veces después de Maghrib y Fajr)",
           "verified": true
         },
         "ru": {
-          "text": "Произносить 10 раз после молитв Магриб и Фаджр",
+          "text": "Нет бога, кроме Аллаха, Единого, у Которого нет сотоварища. Ему принадлежит власть и хвала. Он оживляет и умерщвляет, и Он над всем сущим властен (10 раз после Магриба и Фаджра)",
           "verified": true
         }
       },
@@ -6851,18 +6851,18 @@
       "arabic": "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ",
       "transliteration": "Subhan-Allahi wa bihamdihi, 'adada khalqihi, wa rida nafsihi, wa zinata 'arshihi, wa midada kalimatihi",
       "translations": {
-        "ar": "سبحان الله وبحمده عدد خلقه ورضا نفسه وزنة عرشه ومداد كلماته - تقال بعد صلاة الفجر",
-        "en": "Glory be to Allah and praise Him, as many as the number of His creation, as pleases Him, as heavy as His Throne, and as extensive as His Words - said after Fajr",
-        "fr": "Gloire à Allah et louange à Lui, autant que le nombre de Ses créatures - après le Fajr",
-        "de": "Gepriesen sei Allah und Lob sei Ihm, so viele wie Seine Geschöpfe - nach dem Fajr",
-        "tr": "Allah'ı yaratıklarının sayısınca tesbih ederim - sabah namazından sonra",
-        "es": "Gloria a Allah, tantas como el número de Sus criaturas - después del Fajr",
-        "ur": "اللہ کی پاکی بیان کرتا ہوں - فجر کے بعد",
-        "id": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya - setelah Subuh",
-        "ms": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya - selepas Subuh",
-        "hi": "अल्लाह की पाकी है - फज्र के बाद",
-        "bn": "আল্লাহর পবিত্রতা - ফজরের পর",
-        "ru": "Слава Аллаху и хвала Ему - после Фаджр"
+        "ar": "سبحان الله وبحمده عدد خلقه ورضا نفسه وزنة عرشه ومداد كلماته — تقال ثلاث مرات بعد صلاة الفجر",
+        "en": "Glory be to Allah and praise Him, as many as the number of His creation, as pleases Him, as heavy as His Throne, and as extensive as His Words (3 times after Fajr)",
+        "fr": "Gloire à Allah et louange à Lui, autant que le nombre de Ses créatures, autant qu'Il agrée, aussi lourd que Son Trône, aussi abondant que l'encre de Ses Paroles (3 fois après le Fajr)",
+        "de": "Gepriesen sei Allah und Lob sei Ihm, so viele wie Seine Geschöpfe, so viel wie Ihm gefällt, so schwer wie Sein Thron, so umfassend wie Seine Worte (3 Mal nach Fajr)",
+        "tr": "Allah'ı yaratıklarının sayısınca, kendisinin razı olduğu kadar, arşının ağırlığınca ve kelimelerinin mürekkebince tesbih ve hamd ederim (Sabah namazından sonra 3 kez)",
+        "es": "Gloria a Allah y alabanza a Él, tantas como el número de Sus criaturas, tanto como Le plazca, tan pesado como Su Trono, y tan extenso como Sus Palabras (3 veces después del Fajr)",
+        "ur": "اللہ پاک ہے اور اسی کی تعریف ہے، اس کی مخلوق کی تعداد کے برابر، اس کی رضا کے برابر، اس کے عرش کے وزن کے برابر، اور اس کے کلمات کی روشنائی کے برابر (فجر کے بعد ٣ بار)",
+        "id": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya, sepenuh keridhaan-Nya, seberat timbangan Arsy-Nya, dan seluas tinta kalimat-Nya (3 kali setelah Subuh)",
+        "ms": "Maha Suci Allah dan segala puji bagi-Nya, sebanyak makhluk-Nya, sepenuh keredaan-Nya, seberat timbangan Arasy-Nya, dan seluas dakwat kalimat-Nya (3 kali selepas Subuh)",
+        "hi": "अल्लाह पाक है और उसी की तारीफ है, उसकी मख़लूक की गिनती के बराबर, उसकी रज़ा के बराबर, उसके अर्श के वज़न के बराबर, और उसके कलिमात की रोशनाई के बराबर (फ़ज्र के बाद ३ बार)",
+        "bn": "আল্লাহ পবিত্র এবং তাঁরই প্রশংসা, তাঁর সৃষ্টির সংখ্যা পরিমাণ, তাঁর সন্তুষ্টি পরিমাণ, তাঁর আরশের ওজন পরিমাণ এবং তাঁর বাণীসমূহের কালি পরিমাণ (ফজরের পর ৩ বার)",
+        "ru": "Пречист Аллах и хвала Ему столько, сколько Его творений, столько, сколько Ему угодно, столько, сколько весит Его Трон, и столько, сколько чернил для Его Слов (3 раза после Фаджра)"
       },
       "count": 3,
       "reference": "مسلم 2726",

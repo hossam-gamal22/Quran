@@ -10,17 +10,22 @@ import {
   TouchableOpacity,
   StatusBar,
   TextInput,
-  I18nManager,
   Alert,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimated';
-import * as Updates from 'expo-updates';
 
 import { useSettings, Language } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // ========================================
 // الثوابت
@@ -30,34 +35,46 @@ interface LanguageInfo {
   code: Language;
   name: string;
   nativeName: string;
-  flag: string;
+  flagIcon: ImageSourcePropType;
   rtl: boolean;
   region: string;
 }
 
+const FLAG_IMAGES: Record<Language, ImageSourcePropType> = {
+  ar: require('@/assets/images/flags/sa.png'),
+  en: require('@/assets/images/flags/us.png'),
+  fr: require('@/assets/images/flags/fr.png'),
+  de: require('@/assets/images/flags/de.png'),
+  es: require('@/assets/images/flags/es.png'),
+  tr: require('@/assets/images/flags/tr.png'),
+  ur: require('@/assets/images/flags/pk.png'),
+  id: require('@/assets/images/flags/id.png'),
+  ms: require('@/assets/images/flags/my.png'),
+  hi: require('@/assets/images/flags/in.png'),
+  bn: require('@/assets/images/flags/bd.png'),
+  ru: require('@/assets/images/flags/ru.png'),
+};
+
 const LANGUAGES: LanguageInfo[] = [
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true, region: 'middle_east' },
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸', rtl: false, region: 'global' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true, region: 'south_asia' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false, region: 'southeast_asia' },
-  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', rtl: false, region: 'middle_east' },
-  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false, region: 'europe' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false, region: 'europe' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', rtl: false, region: 'south_asia' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', rtl: false, region: 'south_asia' },
-  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾', rtl: false, region: 'southeast_asia' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false, region: 'europe' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false, region: 'europe' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flagIcon: FLAG_IMAGES.ar, rtl: true, region: 'priority' },
+  { code: 'en', name: 'English', nativeName: 'English', flagIcon: FLAG_IMAGES.en, rtl: false, region: 'priority' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flagIcon: FLAG_IMAGES.fr, rtl: false, region: 'priority' },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flagIcon: FLAG_IMAGES.tr, rtl: false, region: 'other' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flagIcon: FLAG_IMAGES.ur, rtl: true, region: 'other' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flagIcon: FLAG_IMAGES.de, rtl: false, region: 'other' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flagIcon: FLAG_IMAGES.es, rtl: false, region: 'other' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flagIcon: FLAG_IMAGES.hi, rtl: false, region: 'other' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flagIcon: FLAG_IMAGES.bn, rtl: false, region: 'other' },
+  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flagIcon: FLAG_IMAGES.id, rtl: false, region: 'other' },
+  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flagIcon: FLAG_IMAGES.ms, rtl: false, region: 'other' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flagIcon: FLAG_IMAGES.ru, rtl: false, region: 'other' },
 ];
 
-const REGION_KEYS = ['middle_east', 'south_asia', 'southeast_asia', 'europe', 'global'];
+const REGION_KEYS = ['priority', 'other'];
 
 const REGION_NAMES: Record<string, Record<string, string>> = {
-  middle_east: { ar: 'الشرق الأوسط', en: 'Middle East', fr: 'Moyen-Orient', de: 'Naher Osten', es: 'Oriente Medio', tr: 'Orta Doğu', ur: 'مشرق وسطیٰ', id: 'Timur Tengah', ms: 'Timur Tengah', hi: 'मध्य पूर्व', bn: 'মধ্যপ্রাচ্য', ru: 'Ближний Восток' },
-  south_asia: { ar: 'جنوب آسيا', en: 'South Asia', fr: 'Asie du Sud', de: 'Südasien', es: 'Asia del Sur', tr: 'Güney Asya', ur: 'جنوبی ایشیا', id: 'Asia Selatan', ms: 'Asia Selatan', hi: 'दक्षिण एशिया', bn: 'দক্ষিণ এশিয়া', ru: 'Южная Азия' },
-  southeast_asia: { ar: 'جنوب شرق آسيا', en: 'Southeast Asia', fr: 'Asie du Sud-Est', de: 'Südostasien', es: 'Sudeste Asiático', tr: 'Güneydoğu Asya', ur: 'جنوب مشرقی ایشیا', id: 'Asia Tenggara', ms: 'Asia Tenggara', hi: 'दक्षिण पूर्व एशिया', bn: 'দক্ষিণ-পূর্ব এশিয়া', ru: 'Юго-Восточная Азия' },
-  europe: { ar: 'أوروبا', en: 'Europe', fr: 'Europe', de: 'Europa', es: 'Europa', tr: 'Avrupa', ur: 'یورپ', id: 'Eropa', ms: 'Eropah', hi: 'यूरोप', bn: 'ইউরোপ', ru: 'Европа' },
-  global: { ar: 'عالمي', en: 'Global', fr: 'Mondial', de: 'Global', es: 'Global', tr: 'Küresel', ur: 'عالمی', id: 'Global', ms: 'Global', hi: 'वैश्विक', bn: 'বৈশ্বিক', ru: 'Глобальный' },
+  priority: { ar: 'اللغات الرئيسية', en: 'Primary Languages', fr: 'Langues principales', de: 'Hauptsprachen', es: 'Idiomas principales', tr: 'Ana Diller', ur: 'بنیادی زبانیں', id: 'Bahasa Utama', ms: 'Bahasa Utama', hi: 'प्राथमिक भाषाएँ', bn: 'প্রাথমিক ভাষা', ru: 'Основные языки' },
+  other: { ar: 'لغات أخرى', en: 'Other Languages', fr: 'Autres langues', de: 'Andere Sprachen', es: 'Otros idiomas', tr: 'Diğer Diller', ur: 'دیگر زبانیں', id: 'Bahasa Lain', ms: 'Bahasa Lain', hi: 'अन्य भाषाएँ', bn: 'অন্যান্য ভাষা', ru: 'Другие языки' },
 };
 
 // ========================================
@@ -70,6 +87,7 @@ interface LanguageItemProps {
   onSelect: () => void;
   index: number;
   isDarkMode: boolean;
+  isRTL: boolean;
 }
 
 const LanguageItem: React.FC<LanguageItemProps> = ({
@@ -78,12 +96,15 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
   onSelect,
   index,
   isDarkMode,
+  isRTL,
 }) => {
+  const colors = useColors();
   return (
     <Animated.View entering={FadeInRight.delay(index * 50).duration(400)}>
       <TouchableOpacity
         style={[
           styles.languageItem,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
           isDarkMode && styles.languageItemDark,
           isSelected && styles.languageItemSelected,
           isSelected && isDarkMode && styles.languageItemSelectedDark,
@@ -94,12 +115,12 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         }}
         activeOpacity={0.7}
       >
-        <Text style={styles.languageFlag}>{language.flag}</Text>
-        <View style={styles.languageInfo}>
+        <Image source={language.flagIcon} style={styles.languageFlag} resizeMode="contain" />
+        <View style={[styles.languageInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
           <Text
             style={[
               styles.languageName,
-              isDarkMode && styles.textLight,
+              { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
               isSelected && styles.languageNameSelected,
             ]}
           >
@@ -108,17 +129,12 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
           <Text
             style={[
               styles.languageEnglish,
-              isDarkMode && styles.textMuted,
+              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {language.name}
           </Text>
         </View>
-        {isSelected && (
-          <View style={styles.checkIcon}>
-            <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
-          </View>
-        )}
         {isSelected && (
           <View style={styles.checkIcon}>
             <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
@@ -136,6 +152,7 @@ interface RegionSectionProps {
   onSelectLanguage: (code: Language) => void;
   isDarkMode: boolean;
   startIndex: number;
+  isRTL: boolean;
 }
 
 const RegionSection: React.FC<RegionSectionProps> = ({
@@ -145,12 +162,14 @@ const RegionSection: React.FC<RegionSectionProps> = ({
   onSelectLanguage,
   isDarkMode,
   startIndex,
+  isRTL,
 }) => {
+  const colors = useColors();
   if (languages.length === 0) return null;
 
   return (
     <View style={styles.regionSection}>
-      <Text style={[styles.regionTitle, isDarkMode && styles.textMuted]}>
+      <Text style={[styles.regionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
         {region}
       </Text>
       {languages.map((lang, idx) => (
@@ -161,6 +180,7 @@ const RegionSection: React.FC<RegionSectionProps> = ({
           onSelect={() => onSelectLanguage(lang.code)}
           index={startIndex + idx}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         />
       ))}
     </View>
@@ -174,9 +194,10 @@ const RegionSection: React.FC<RegionSectionProps> = ({
 export default function LanguageScreen() {
   const router = useRouter();
   const { settings, isDarkMode, updateLanguage, t } = useSettings();
+  const colors = useColors();
   const [searchQuery, setSearchQuery] = useState('');
   const [isChanging, setIsChanging] = useState(false);
-  const isRTL = I18nManager.isRTL;
+  const isRTL = useIsRTL();
 
   const getRegionName = (regionKey: string) => {
     const names = REGION_NAMES[regionKey];
@@ -201,43 +222,29 @@ export default function LanguageScreen() {
       const needsRestart = selectedLang?.rtl !== currentLang?.rtl;
 
       Alert.alert(
-        'تغيير اللغة',
+        t('settings.changeLanguage'),
         needsRestart
-          ? `سيتم تغيير اللغة إلى ${selectedLang?.nativeName}.\n\nنظراً لاختلاف اتجاه الكتابة، سيتم إعادة تشغيل التطبيق.`
-          : `سيتم تغيير اللغة إلى ${selectedLang?.nativeName}.`,
+          ? t('settings.languageChangeRTLWarning')
+          : t('settings.languageChangeConfirm'),
         [
-          { text: 'إلغاء', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'تأكيد',
+            text: t('common.confirm'),
             onPress: async () => {
               setIsChanging(true);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
               try {
+                // updateLanguage handles i18n update, settings save,
+                // and app reload if text direction changes (RTL↔LTR)
                 await updateLanguage(code);
 
-                if (needsRestart) {
-                  // تغيير اتجاه الواجهة
-                  const isRTL = selectedLang?.rtl || false;
-                  I18nManager.allowRTL(isRTL);
-                  I18nManager.forceRTL(isRTL);
-
-                  // إعادة تحميل التطبيق
-                  if (!__DEV__) {
-                    await Updates.reloadAsync();
-                  } else {
-                    Alert.alert(
-                      'وضع التطوير',
-                      'في وضع التطوير، يرجى إعادة تشغيل التطبيق يدوياً لتطبيق التغييرات.',
-                      [{ text: 'حسناً', onPress: () => router.back() }]
-                    );
-                  }
-                } else {
+                if (!needsRestart) {
                   router.back();
                 }
               } catch (error) {
                 console.error('Error changing language:', error);
-                Alert.alert('خطأ', 'حدث خطأ أثناء تغيير اللغة');
+                Alert.alert(t('common.error'), t('settings.languageChangeError'));
               } finally {
                 setIsChanging(false);
               }
@@ -258,8 +265,9 @@ export default function LanguageScreen() {
   });
 
   return (
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       edges={['top']}
     >
       <StatusBar
@@ -268,40 +276,21 @@ export default function LanguageScreen() {
       />
 
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(500)}
-        style={[styles.header, isDarkMode && styles.headerDark]}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <MaterialCommunityIcons
-            name={isRTL ? 'arrow-right' : 'arrow-left'}
-            size={28}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.language')}</Text>
-        <View style={styles.headerPlaceholder} />
-      </Animated.View>
+      <UniversalHeader title={t('settings.language')} />
 
       {/* Search Bar */}
       <Animated.View
         entering={FadeInDown.delay(100).duration(500)}
         style={styles.searchContainer}
       >
-        <View style={[styles.searchBar, isDarkMode && styles.searchBarDark]}>
+        <View style={[styles.searchBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.searchBarDark]}>
           <MaterialCommunityIcons
             name="magnify"
             size={22}
             color={isDarkMode ? '#666' : '#999'}
           />
           <TextInput
-            style={[styles.searchInput, isDarkMode && styles.textLight]}
+            style={[styles.searchInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
             placeholder={t('common.search') + '...'}
             placeholderTextColor={isDarkMode ? '#666' : '#999'}
             value={searchQuery}
@@ -324,9 +313,9 @@ export default function LanguageScreen() {
         entering={FadeInDown.delay(150).duration(500)}
         style={styles.infoCardContainer}
       >
-        <View style={[styles.infoCard, isDarkMode && styles.infoCardDark]}>
+        <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.infoCardDark]}>
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
-          <Text style={[styles.infoText, isDarkMode && styles.textMuted]}>
+          <Text style={[styles.infoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
             {t('settings.language')}:{' '}
             <Text style={styles.infoHighlight}>
               {LANGUAGES.find((l) => l.code === settings.language)?.nativeName}
@@ -353,6 +342,7 @@ export default function LanguageScreen() {
                   onSelect={() => handleSelectLanguage(lang.code)}
                   index={idx}
                   isDarkMode={isDarkMode}
+                  isRTL={isRTL}
                 />
               ))
             ) : (
@@ -362,7 +352,7 @@ export default function LanguageScreen() {
                   size={48}
                   color={isDarkMode ? '#444' : '#ccc'}
                 />
-                <Text style={[styles.emptyText, isDarkMode && styles.textMuted]}>
+                <Text style={[styles.emptyText, { color: colors.textLight }]}>
                   {t('quran.noResults')}
                 </Text>
               </View>
@@ -384,6 +374,7 @@ export default function LanguageScreen() {
                 onSelectLanguage={handleSelectLanguage}
                 isDarkMode={isDarkMode}
                 startIndex={sectionStartIndex}
+                isRTL={isRTL}
               />
             );
           })
@@ -399,10 +390,10 @@ export default function LanguageScreen() {
             size={24}
             color={isDarkMode ? '#444' : '#ddd'}
           />
-          <Text style={[styles.footerText, isDarkMode && styles.textMuted]}>
+          <Text style={[styles.footerText, { color: colors.textLight }]}>
             12 {t('settings.language')}
           </Text>
-          <Text style={[styles.footerSubtext, isDarkMode && styles.textMuted]}>
+          <Text style={[styles.footerSubtext, { color: colors.textLight }]}>
             {t('app.slogan')}
           </Text>
         </Animated.View>
@@ -415,13 +406,14 @@ export default function LanguageScreen() {
         <View style={styles.loadingOverlay}>
           <View style={[styles.loadingCard, isDarkMode && styles.loadingCardDark]}>
             <MaterialCommunityIcons name="loading" size={40} color="#2f7659" />
-            <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>
               {t('common.loading')}
             </Text>
           </View>
         </View>
       )}
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -436,40 +428,6 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerDark: {
-    backgroundColor: '#1a1a2e',
-    borderBottomColor: '#2a2a3e',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -491,9 +449,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 10,
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#333',
-    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoCardContainer: {
     paddingHorizontal: 16,
@@ -513,12 +470,11 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#333',
-    textAlign: I18nManager.isRTL ? 'right' : 'left',
   },
   infoHighlight: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#2f7659',
   },
   scrollView: {
@@ -532,7 +488,7 @@ const styles = StyleSheet.create({
   },
   regionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginBottom: 10,
     marginTop: 5,
@@ -545,6 +501,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 10,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
+    gap: 12,
   },
   languageItemDark: {
     backgroundColor: '#1a1a2e',
@@ -559,16 +516,16 @@ const styles = StyleSheet.create({
     borderColor: '#2f7659',
   },
   languageFlag: {
-    fontSize: 32,
-    marginRight: 16,
+    width: 36,
+    height: 24,
+    borderRadius: 4,
   },
   languageInfo: {
     flex: 1,
-    marginLeft: 0,
   },
   languageName: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   languageNameSelected: {
@@ -576,7 +533,7 @@ const styles = StyleSheet.create({
   },
   languageEnglish: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -585,15 +542,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginLeft: 10,
   },
   rtlBadgeText: {
     fontSize: 10,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
   },
   checkIcon: {
-    marginRight: 5,
   },
   emptyState: {
     alignItems: 'center',
@@ -601,7 +556,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 15,
   },
@@ -612,12 +567,12 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#999',
   },
   footerSubtext: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#ccc',
   },
   bottomSpace: {
@@ -645,7 +600,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
   },
 });

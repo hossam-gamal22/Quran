@@ -131,8 +131,9 @@ class AzkarWidget : AppWidgetProvider() {
                 // تحديث النص
                 views.setTextViewText(R.id.tv_zikr_text, text)
                 
-                // الفئة
-                val categoryName = CATEGORY_NAMES[category] ?: "أذكار"
+                // الفئة - use translated name from shared data, fallback to map
+                val categoryName = randomZikr.optString("categoryName", "") 
+                    .ifEmpty { CATEGORY_NAMES[category] ?: "\u0623\u0630\u0643\u0627\u0631" }
                 views.setTextViewText(R.id.tv_category, categoryName)
                 
                 // لون الخلفية
@@ -145,7 +146,8 @@ class AzkarWidget : AppWidgetProvider() {
                 
                 // العدد
                 if (count > 1) {
-                    views.setTextViewText(R.id.tv_count, "$count مرات")
+                    val timesLabel = randomZikr.optString("timesLabel", "\u0645\u0631\u0627\u062a")
+                    views.setTextViewText(R.id.tv_count, "$count $timesLabel")
                     views.setViewVisibility(R.id.ll_count, View.VISIBLE)
                 } else {
                     views.setViewVisibility(R.id.ll_count, View.GONE)

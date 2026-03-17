@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -19,13 +20,16 @@ import * as Location from 'expo-location';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { isRTL as checkIsRTL } from '@/lib/i18n';
+import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
 
 // ========================================
 // المكون الرئيسي
 // ========================================
 
 export default function LocationScreen() {
-  const { preferences, updatePreferences, goToNextStep, goToPreviousStep } = useOnboarding();
+  const isRTL = checkIsRTL();
+  const { preferences, updatePreferences, goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
   
   const [isLoading, setIsLoading] = useState(false);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -60,14 +64,14 @@ export default function LocationScreen() {
         await fetchLocation();
       } else {
         Alert.alert(
-          'صلاحية الموقع',
-          'نحتاج صلاحية الموقع لعرض أوقات الصلاة بدقة. يمكنك تفعيلها من إعدادات الجهاز.',
-          [{ text: 'حسناً', style: 'default' }]
+          tOnboarding('locationPermission'),
+          tOnboarding('locationPermissionDesc'),
+          [{ text: tOnboarding('ok'), style: 'default' }]
         );
       }
     } catch (error) {
       console.error('Error requesting location:', error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء طلب صلاحية الموقع');
+      Alert.alert(tOnboarding('error'), tOnboarding('locationError'));
     } finally {
       setIsLoading(false);
     }
@@ -92,8 +96,8 @@ export default function LocationScreen() {
       const info = {
         latitude,
         longitude,
-        city: reverseGeocode?.city || reverseGeocode?.subregion || 'غير معروف',
-        country: reverseGeocode?.country || 'غير معروف',
+        city: reverseGeocode?.city || reverseGeocode?.subregion || tOnboarding('unknown'),
+        country: reverseGeocode?.country || tOnboarding('unknown'),
       };
 
       setLocationInfo(info);
@@ -108,7 +112,7 @@ export default function LocationScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Error fetching location:', error);
-      Alert.alert('خطأ', 'تعذر الحصول على موقعك. تأكد من تفعيل GPS.');
+      Alert.alert(tOnboarding('error'), tOnboarding('gpsError'));
     } finally {
       setIsLoading(false);
     }
@@ -137,20 +141,22 @@ export default function LocationScreen() {
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+          <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+              <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.stepText}>الخطوة 2 من 4</Text>
-              <Text style={styles.headerTitle}>الموقع الجغرافي</Text>
+              <Text style={styles.stepText}>{tOnboardingStep(4, 5)}</Text>
+              <Text style={styles.headerTitle}>{tOnboarding('location')}</Text>
             </View>
-            <View style={styles.headerPlaceholder} />
+            <TouchableOpacity style={styles.skipBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); skipOnboarding(); }}>
+              <Text style={styles.skipBtnText}>{tOnboarding('skip')}</Text>
+            </TouchableOpacity>
           </Animated.View>
 
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
-            <View style={styles.progressBg}>
+            <View style={[styles.progressBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Animated.View 
                 entering={FadeInDown.delay(200).duration(600)}
                 style={[styles.progressFill, { width: '50%' }]} 
@@ -175,23 +181,23 @@ export default function LocationScreen() {
 
             {/* العنوان والوصف */}
             <Animated.Text entering={FadeInDown.delay(300).duration(500)} style={styles.title}>
-              {locationGranted ? 'تم تحديد موقعك' : 'تحديد الموقع'}
+              {locationGranted ? tOnboarding('locationDetected') : tOnboarding('detectLocation')}
             </Animated.Text>
 
             <Animated.Text entering={FadeInDown.delay(400).duration(500)} style={styles.description}>
               {locationGranted
-                ? 'سيتم استخدام موقعك لعرض أوقات الصلاة واتجاه القبلة بدقة.'
-                : 'نحتاج موقعك لعرض أوقات الصلاة الدقيقة واتجاه القبلة. لن نشارك موقعك مع أي طرف.'}
+                ? tOnboarding('locationDetectedDesc')
+                : tOnboarding('locationRequestDesc')}
             </Animated.Text>
 
             {/* معلومات الموقع */}
             {locationInfo && (
               <Animated.View entering={FadeIn.delay(500).duration(500)} style={styles.locationCard}>
-                <View style={styles.locationRow}>
+                <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <MaterialCommunityIcons name="city" size={24} color="#2f7659" />
                   <Text style={styles.locationText}>{locationInfo.city}</Text>
                 </View>
-                <View style={styles.locationRow}>
+                <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <MaterialCommunityIcons name="flag" size={24} color="#2f7659" />
                   <Text style={styles.locationText}>{locationInfo.country}</Text>
                 </View>
@@ -212,7 +218,7 @@ export default function LocationScreen() {
                   ) : (
                     <>
                       <MaterialCommunityIcons name="crosshairs-gps" size={24} color="#fff" />
-                      <Text style={styles.enableButtonText}>تفعيل الموقع</Text>
+                      <Text style={styles.enableButtonText}>{tOnboarding('enableLocation')}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -220,10 +226,10 @@ export default function LocationScreen() {
             )}
 
             {/* ملاحظة */}
-            <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.noteContainer}>
+            <Animated.View entering={FadeInDown.delay(600).duration(500)} style={[styles.noteContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="shield-check" size={20} color="#2f7659" />
               <Text style={styles.noteText}>
-                خصوصيتك مهمة لنا. موقعك يُستخدم فقط داخل التطبيق.
+                {tOnboarding('privacyNote')}
               </Text>
             </Animated.View>
           </View>
@@ -233,7 +239,7 @@ export default function LocationScreen() {
             <Animated.View entering={FadeInDown.delay(700).duration(500)}>
               {!locationGranted && (
                 <TouchableOpacity style={styles.skipButton} onPress={handleSkipLocation}>
-                  <Text style={styles.skipButtonText}>تخطي هذه الخطوة</Text>
+                  <Text style={styles.skipButtonText}>{tOnboarding('skipStep')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -243,17 +249,18 @@ export default function LocationScreen() {
                 activeOpacity={0.8}
               >
                 <View
-                  style={[styles.continueButtonGradient, { backgroundColor: locationGranted ? 'rgba(47,118,89,0.85)' : 'rgba(102,102,102,0.85)' }]}
+                  style={[styles.continueButtonGradient, { backgroundColor: locationGranted ? 'rgba(47,118,89,0.85)' : 'rgba(102,102,102,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 >
                   <Text style={styles.continueButtonText}>
-                    {locationGranted ? 'متابعة' : 'متابعة بدون موقع'}
+                    {locationGranted ? tOnboarding('continue') : tOnboarding('continueWithoutLocation')}
                   </Text>
-                  <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+                  <MaterialCommunityIcons name={isRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
                 </View>
               </TouchableOpacity>
 
               {/* مؤشر الصفحات */}
-              <View style={styles.pageIndicator}>
+              <View style={[styles.pageIndicator, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={[styles.dot, styles.dotActive]} />
@@ -299,16 +306,22 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.6)',
   },
   headerTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
-  headerPlaceholder: {
-    width: 44,
+  skipBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  skipBtnText: {
+    fontSize: 15,
+    fontFamily: fontMedium(),
+    color: 'rgba(255,255,255,0.7)',
   },
   progressContainer: {
     paddingHorizontal: 24,
@@ -342,16 +355,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
+    backgroundColor: '#2f7659',
   },
   title: {
     fontSize: 26,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
   },
   description: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 26,
@@ -373,7 +387,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 17,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#fff',
   },
   enableButtonContainer: {
@@ -391,7 +405,7 @@ const styles = StyleSheet.create({
   },
   enableButtonText: {
     fontSize: 17,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   noteContainer: {
@@ -406,7 +420,7 @@ const styles = StyleSheet.create({
   noteText: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
   },
   bottomContainer: {
@@ -420,7 +434,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.6)',
   },
   continueButton: {
@@ -439,7 +453,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   pageIndicator: {

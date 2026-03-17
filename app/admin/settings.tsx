@@ -16,13 +16,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { AppSettings } from '../../types/admin';
-
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function AppSettingsScreen() {
   const [settings, setSettings] = useState<AppSettings>({
     appName: 'رُوح المسلم',
     appVersion: '1.0.0',
     maintenanceMode: false,
-    maintenanceMessage: 'التطبيق تحت الصيانة، سنعود قريباً إن شاء الله',
+    maintenanceMessage: t('admin.defaultMaintenanceMsg'),
     forceUpdate: false,
     minVersion: '1.0.0',
   });
@@ -51,12 +52,12 @@ export default function AppSettingsScreen() {
     try {
       const success = await adminService.updateAppSettings(settings);
       if (success) {
-        Alert.alert('تم', 'تم حفظ الإعدادات بنجاح');
+        Alert.alert(t('common.done'), t('admin.settingsSaved'));
       } else {
-        Alert.alert('خطأ', 'فشل في حفظ الإعدادات');
+        Alert.alert(t('common.error'), t('admin.saveFailed'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.unexpectedError'));
     } finally {
       setIsSaving(false);
     }
@@ -81,10 +82,10 @@ export default function AppSettingsScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* App Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>معلومات التطبيق</Text>
+          <Text style={styles.sectionTitle}>{t('admin.appInfo')}</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>اسم التطبيق</Text>
+            <Text style={styles.inputLabel}>{t('admin.appNameLabel')}</Text>
             <TextInput
               style={styles.input}
               value={settings.appName}
@@ -95,7 +96,7 @@ export default function AppSettingsScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>إصدار التطبيق</Text>
+            <Text style={styles.inputLabel}>{t('admin.appVersionLabel')}</Text>
             <TextInput
               style={styles.input}
               value={settings.appVersion}
@@ -108,7 +109,7 @@ export default function AppSettingsScreen() {
 
         {/* Maintenance Mode */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>وضع الصيانة</Text>
+          <Text style={styles.sectionTitle}>{t('admin.maintenanceMode')}</Text>
 
           <View style={styles.switchRow}>
             <View style={styles.switchInfo}>
@@ -118,9 +119,9 @@ export default function AppSettingsScreen() {
                 color={settings.maintenanceMode ? Colors.warning : Colors.textMuted}
               />
               <View>
-                <Text style={styles.switchLabel}>تفعيل وضع الصيانة</Text>
+                <Text style={styles.switchLabel}>{t('admin.enableMaintenance')}</Text>
                 <Text style={styles.switchHint}>
-                  سيتم منع المستخدمين من استخدام التطبيق
+                  {t('admin.maintenanceHint')}
                 </Text>
               </View>
             </View>
@@ -133,7 +134,7 @@ export default function AppSettingsScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>رسالة الصيانة</Text>
+            <Text style={styles.inputLabel}>{t('admin.maintenanceMessage')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={settings.maintenanceMessage}
@@ -148,7 +149,7 @@ export default function AppSettingsScreen() {
 
         {/* Force Update */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>إجبار التحديث</Text>
+          <Text style={styles.sectionTitle}>{t('admin.forceUpdate')}</Text>
 
           <View style={styles.switchRow}>
             <View style={styles.switchInfo}>
@@ -158,9 +159,9 @@ export default function AppSettingsScreen() {
                 color={settings.forceUpdate ? Colors.error : Colors.textMuted}
               />
               <View>
-                <Text style={styles.switchLabel}>إجبار التحديث</Text>
+                <Text style={styles.switchLabel}>{t('admin.forceUpdate')}</Text>
                 <Text style={styles.switchHint}>
-                  سيُطلب من المستخدمين تحديث التطبيق
+                  {t('admin.forceUpdateHint')}
                 </Text>
               </View>
             </View>
@@ -173,7 +174,7 @@ export default function AppSettingsScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>الحد الأدنى للإصدار المطلوب</Text>
+            <Text style={styles.inputLabel}>{t('admin.minVersionLabel')}</Text>
             <TextInput
               style={styles.input}
               value={settings.minVersion}
@@ -182,7 +183,7 @@ export default function AppSettingsScreen() {
               placeholderTextColor={Colors.textMuted}
             />
             <Text style={styles.inputHint}>
-              المستخدمون بإصدار أقل سيُجبرون على التحديث
+              {t('admin.minVersionHint')}
             </Text>
           </View>
         </View>
@@ -193,10 +194,10 @@ export default function AppSettingsScreen() {
             <Ionicons name="warning" size={24} color={Colors.warning} />
             <Text style={styles.warningText}>
               {settings.maintenanceMode && settings.forceUpdate
-                ? 'وضع الصيانة وإجبار التحديث مفعّلان!'
+                ? t('admin.bothEnabledWarning')
                 : settings.maintenanceMode
-                ? 'وضع الصيانة مفعّل - المستخدمون لن يتمكنوا من استخدام التطبيق'
-                : 'إجبار التحديث مفعّل - المستخدمون سيُطلب منهم التحديث'}
+                ? t('admin.maintenanceWarning')
+                : t('admin.forceUpdateWarning')}
             </Text>
           </View>
         )}
@@ -212,7 +213,7 @@ export default function AppSettingsScreen() {
           ) : (
             <>
               <Ionicons name="save" size={20} color={Colors.textLight} />
-              <Text style={styles.saveBtnText}>حفظ الإعدادات</Text>
+              <Text style={styles.saveBtnText}>{t('admin.saveSettings')}</Text>
             </>
           )}
         </TouchableOpacity>

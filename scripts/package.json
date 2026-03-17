@@ -1,0 +1,12 @@
+{
+  "name": "rooh-almuslim-daily-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated daily Ayah of the Day video generator for روح المسلم",
+  "scripts": {
+    "generate": "node generate-daily-video.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9"
+  }
+}

@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Search,
   X,
+  Download,
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
@@ -31,6 +32,8 @@ interface SoundFile {
   uploadedAt: string;
   fileSize: number;
   duration?: number;
+  isDownloadable?: boolean;
+  downloadDescription?: string;
 }
 
 type SoundCategory = 'adhan' | 'notification' | 'adhkar' | 'effect';
@@ -95,7 +98,7 @@ const DEFAULT_ASSIGNMENTS: SoundAssignments = {
   },
 };
 
-type ActiveTab = 'library' | 'notifications' | 'events';
+type ActiveTab = 'library' | 'notifications' | 'events' | 'downloadable';
 
 // ==================== Component ====================
 
@@ -278,6 +281,26 @@ export default function SoundManager() {
     }
   };
 
+  // ==================== Toggle Downloadable ====================
+
+  const toggleDownloadable = async (soundId: string, currentValue: boolean) => {
+    try {
+      await setDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, soundId), { isDownloadable: !currentValue }, { merge: true });
+      setSounds(prev => prev.map(s => s.id === soundId ? { ...s, isDownloadable: !currentValue } : s));
+    } catch (err) {
+      console.error('Error updating downloadable status:', err);
+    }
+  };
+
+  const updateDownloadDescription = async (soundId: string, description: string) => {
+    try {
+      await setDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, soundId), { downloadDescription: description }, { merge: true });
+      setSounds(prev => prev.map(s => s.id === soundId ? { ...s, downloadDescription: description } : s));
+    } catch (err) {
+      console.error('Error updating download description:', err);
+    }
+  };
+
   // ==================== Save Assignments ====================
 
   const handleSaveAssignments = async () => {
@@ -343,6 +366,7 @@ export default function SoundManager() {
     { key: 'library', label: 'مكتبة الأصوات', icon: <Music className="w-4 h-4" /> },
     { key: 'notifications', label: 'أصوات الإشعارات', icon: <Volume2 className="w-4 h-4" /> },
     { key: 'events', label: 'أصوات الأحداث', icon: <Music className="w-4 h-4" /> },
+    { key: 'downloadable', label: 'أصوات قابلة للتحميل', icon: <Download className="w-4 h-4" /> },
   ];
 
   return (
@@ -438,6 +462,7 @@ export default function SoundManager() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="بحث عن صوت..."
+                aria-label="بحث في الأصوات"
                 className="w-full bg-slate-700 text-white pr-10 pl-4 py-2.5 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
                 dir="rtl"
               />
@@ -445,6 +470,8 @@ export default function SoundManager() {
                 <button
                   onClick={() => setSearchQuery('')}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  aria-label="مسح البحث"
+                  title="مسح البحث"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -456,6 +483,7 @@ export default function SoundManager() {
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as SoundCategory | 'all')}
               className="bg-slate-700 text-white px-4 py-2.5 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+              aria-label="فلتر فئة الأصوات"
             >
               <option value="all">جميع الفئات</option>
               {SOUND_CATEGORIES.map(c => (
@@ -495,16 +523,22 @@ export default function SoundManager() {
                             className="bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-600 text-sm w-full focus:border-emerald-500 focus:outline-none"
                             dir="rtl"
                             autoFocus
+                            aria-label="اسم الصوت"
+                            placeholder="ادخل اسم الصوت"
                           />
                           <button
                             onClick={() => saveEditedName(sound.id)}
                             className="text-emerald-400 hover:text-emerald-300 flex-shrink-0"
+                            aria-label="حفظ الاسم"
+                            title="حفظ الاسم"
                           >
                             <CheckCircle className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => { setEditingNameId(null); setEditingNameValue(''); }}
                             className="text-slate-400 hover:text-white flex-shrink-0"
+                            aria-label="إلغاء التعديل"
+                            title="إلغاء التعديل"
                           >
                             <X className="w-5 h-5" />
                           </button>
@@ -528,6 +562,8 @@ export default function SoundManager() {
                           ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                           : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                       }`}
+                      aria-label={playingId === sound.id ? 'إيقاف الصوت' : 'تشغيل الصوت'}
+                      title={playingId === sound.id ? 'إيقاف' : 'تشغيل'}
                     >
                       {playingId === sound.id ? (
                         <Pause className="w-5 h-5" />
@@ -543,6 +579,7 @@ export default function SoundManager() {
                       value={sound.category}
                       onChange={(e) => updateSoundCategory(sound.id, e.target.value as SoundCategory)}
                       className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+                      aria-label="فئة الصوت"
                     >
                       {SOUND_CATEGORIES.map(c => (
                         <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
@@ -634,6 +671,7 @@ export default function SoundManager() {
                         }))
                       }
                       className="bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none min-w-[200px]"
+                      aria-label={`صوت ${type.label}`}
                     >
                       <option value="">— غير محدد —</option>
                       {sounds.map(s => (
@@ -652,6 +690,8 @@ export default function SoundManager() {
                             ? 'bg-red-500/20 text-red-400'
                             : 'bg-emerald-500/20 text-emerald-400'
                         }`}
+                        aria-label={playingId === selectedSound.id ? 'إيقاف المعاينة' : 'معاينة الصوت'}
+                        title={playingId === selectedSound.id ? 'إيقاف' : 'معاينة'}
                       >
                         {playingId === selectedSound.id ? (
                           <Pause className="w-4 h-4" />
@@ -707,6 +747,7 @@ export default function SoundManager() {
                         }))
                       }
                       className="bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none min-w-[200px]"
+                      aria-label={`صوت ${type.label}`}
                     >
                       <option value="">— غير محدد —</option>
                       {sounds.map(s => (
@@ -724,6 +765,8 @@ export default function SoundManager() {
                             ? 'bg-red-500/20 text-red-400'
                             : 'bg-emerald-500/20 text-emerald-400'
                         }`}
+                        aria-label={playingId === selectedSound.id ? 'إيقاف المعاينة' : 'معاينة الصوت'}
+                        title={playingId === selectedSound.id ? 'إيقاف' : 'معاينة'}
                       >
                         {playingId === selectedSound.id ? (
                           <Pause className="w-4 h-4" />
@@ -736,6 +779,102 @@ export default function SoundManager() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Downloadable Sounds ==================== */}
+      {activeTab === 'downloadable' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+            <p className="text-sm text-slate-400">
+              حدد الأصوات القابلة للتحميل من قبل المستخدمين. سيظهر للمستخدم إعلان قبل تحميل كل صوت.
+            </p>
+          </div>
+
+          {/* All sounds with downloadable toggle */}
+          <div className="space-y-3">
+            {sounds.length === 0 ? (
+              <div className="bg-slate-800 rounded-2xl p-12 border border-slate-700 text-center">
+                <Music className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <p className="text-slate-400 text-lg">لا توجد أصوات</p>
+                <p className="text-slate-500 text-sm mt-1">ارفع أصواتاً من تبويب "مكتبة الأصوات" أولاً</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-slate-400 mb-2">
+                  {sounds.filter(s => s.isDownloadable).length} من {sounds.length} صوت متاح للتحميل
+                </div>
+                {sounds.map(sound => (
+                  <div
+                    key={sound.id}
+                    className={`bg-slate-800 rounded-2xl border p-4 transition-all ${
+                      sound.isDownloadable ? 'border-emerald-500/50' : 'border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Toggle */}
+                      <button
+                        onClick={() => toggleDownloadable(sound.id, !!sound.isDownloadable)}
+                        className={`w-12 h-7 rounded-full flex items-center transition-all flex-shrink-0 ${
+                          sound.isDownloadable ? 'bg-emerald-500 justify-end' : 'bg-slate-600 justify-start'
+                        }`}
+                        title={sound.isDownloadable ? 'إلغاء التحميل' : 'تفعيل التحميل'}
+                        aria-label={sound.isDownloadable ? 'إلغاء التحميل' : 'تفعيل التحميل'}
+                      >
+                        <div className="w-5 h-5 bg-white rounded-full mx-1 shadow-sm" />
+                      </button>
+
+                      {/* Icon */}
+                      <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
+                        {SOUND_CATEGORIES.find(c => c.value === sound.category)?.icon || '🎵'}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{sound.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {SOUND_CATEGORIES.find(c => c.value === sound.category)?.label} — {formatFileSize(sound.fileSize)}
+                        </p>
+                      </div>
+
+                      {/* Preview */}
+                      <button
+                        onClick={() => togglePlay(sound)}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
+                          playingId === sound.id
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'bg-emerald-500/20 text-emerald-400'
+                        }`}
+                        title="تشغيل"
+                        aria-label={playingId === sound.id ? 'إيقاف الصوت' : 'تشغيل الصوت'}
+                      >
+                        {playingId === sound.id ? (
+                          <Pause className="w-4 h-4" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Description field (only when downloadable) */}
+                    {sound.isDownloadable && (
+                      <div className="mt-3 pt-3 border-t border-slate-700">
+                        <input
+                          type="text"
+                          value={sound.downloadDescription || ''}
+                          onChange={(e) => updateDownloadDescription(sound.id, e.target.value)}
+                          placeholder="وصف للمستخدم (مثال: أذان بصوت الشيخ مشاري راشد)"
+                          aria-label="وصف الصوت القابل للتحميل"
+                          className="w-full bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+                          dir="rtl"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Styled } from '../components/Styled';
 
 // ==================== Types ====================
 
@@ -88,7 +89,7 @@ const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
   { id: 'morning_azkar', name: 'أذكار الصباح', icon: '🌅', enabled: true, order: 1, builtIn: true },
   { id: 'evening_azkar', name: 'أذكار المساء', icon: '🌆', enabled: true, order: 2, builtIn: true },
   { id: 'daily_ayah', name: 'آية اليوم', icon: '📖', enabled: true, order: 3, builtIn: true },
-  { id: 'story_of_day', name: 'ستوري اليوم', icon: '▶️', enabled: true, order: 4, builtIn: true },
+  { id: 'story_of_day', name: 'فيديو اليوم', icon: '▶️', enabled: true, order: 4, builtIn: true },
   { id: 'prayer_times', name: 'مواقيت الصلاة', icon: '🕌', enabled: true, order: 5, builtIn: true },
   { id: 'tasbih', name: 'التسبيح', icon: '📿', enabled: true, order: 6, builtIn: true },
   { id: 'qibla', name: 'القبلة', icon: '🧭', enabled: true, order: 7, builtIn: true },
@@ -233,7 +234,7 @@ export default function HomePageManager() {
     return sorted;
   };
 
-  const updateHighlight = (id: string, key: keyof HomeHighlightItem, value: any) => {
+  const updateHighlight = <K extends keyof HomeHighlightItem>(id: string, key: K, value: HomeHighlightItem[K]) => {
     setConfig(prev => ({
       ...prev,
       highlights: {
@@ -249,7 +250,7 @@ export default function HomePageManager() {
     }));
   };
 
-  const updateSection = (id: string, key: keyof HomeSection, value: any) => {
+  const updateSection = <K extends keyof HomeSection>(id: string, key: K, value: HomeSection[K]) => {
     setConfig(prev => ({
       ...prev,
       sections: {
@@ -265,7 +266,7 @@ export default function HomePageManager() {
     }));
   };
 
-  const updateDailyContent = (key: keyof DailyContentConfig, value: any) => {
+  const updateDailyContent = <K extends keyof DailyContentConfig>(key: K, value: DailyContentConfig[K]) => {
     setConfig(prev => ({
       ...prev,
       dailyContent: { ...prev.dailyContent, [key]: value },
@@ -379,6 +380,8 @@ export default function HomePageManager() {
                       onClick={() => moveSection(section.id, 'up')}
                       disabled={index === 0}
                       className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأعلى"
+                      title="تحريك لأعلى"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </button>
@@ -386,6 +389,8 @@ export default function HomePageManager() {
                       onClick={() => moveSection(section.id, 'down')}
                       disabled={index === sortedSections.length - 1}
                       className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأسفل"
+                      title="تحريك لأسفل"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </button>
@@ -410,6 +415,7 @@ export default function HomePageManager() {
                       onChange={(e) => updateSection(section.id, 'titleAr', e.target.value)}
                       className="bg-slate-700 text-white rounded-lg px-3 py-1.5 border border-slate-600 text-sm w-36 focus:border-emerald-500 focus:outline-none"
                       placeholder="العنوان بالعربي"
+                      aria-label="العنوان بالعربي"
                       dir="rtl"
                     />
                     <input
@@ -418,6 +424,7 @@ export default function HomePageManager() {
                       onChange={(e) => updateSection(section.id, 'titleEn', e.target.value)}
                       className="bg-slate-700 text-white rounded-lg px-3 py-1.5 border border-slate-600 text-sm w-36 focus:border-emerald-500 focus:outline-none"
                       placeholder="English title"
+                      aria-label="English title"
                       dir="ltr"
                     />
                   </div>
@@ -426,6 +433,8 @@ export default function HomePageManager() {
                   <button
                     onClick={() => updateSection(section.id, 'enabled', !section.enabled)}
                     className="flex-shrink-0"
+                    aria-label={section.enabled ? 'إخفاء القسم' : 'إظهار القسم'}
+                    title={section.enabled ? 'إخفاء القسم' : 'إظهار القسم'}
                   >
                     {section.enabled ? (
                       <Eye className="w-5 h-5 text-emerald-400" />
@@ -457,14 +466,14 @@ export default function HomePageManager() {
             <div className="bg-slate-900 rounded-2xl p-6">
               <div className="flex gap-5 overflow-x-auto pb-2" dir="rtl">
                 {sortedHighlights.filter(h => h.enabled).map(h => (
-                  <div key={h.id} className="flex flex-col items-center gap-2 flex-shrink-0" style={{ width: 70 }}>
+                  <Styled key={h.id} className="flex flex-col items-center gap-2 flex-shrink-0" css={{ width: 70 }}>
                     <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl border-[3px] border-emerald-600 bg-slate-800">
                       {h.icon}
                     </div>
                     <span className="text-slate-300 text-[11px] text-center leading-tight truncate w-full">
                       {h.name}
                     </span>
-                  </div>
+                  </Styled>
                 ))}
               </div>
             </div>
@@ -486,6 +495,8 @@ export default function HomePageManager() {
                       onClick={() => moveHighlight(item.id, 'up')}
                       disabled={index === 0}
                       className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأعلى"
+                      title="تحريك لأعلى"
                     >
                       <ArrowUp className="w-4 h-4" />
                     </button>
@@ -493,6 +504,8 @@ export default function HomePageManager() {
                       onClick={() => moveHighlight(item.id, 'down')}
                       disabled={index === sortedHighlights.length - 1}
                       className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأسفل"
+                      title="تحريك لأسفل"
                     >
                       <ArrowDown className="w-4 h-4" />
                     </button>
@@ -517,6 +530,8 @@ export default function HomePageManager() {
                     value={item.name}
                     onChange={(e) => updateHighlight(item.id, 'name', e.target.value)}
                     className="bg-slate-700 text-white rounded-lg px-3 py-1.5 border border-slate-600 text-sm w-36 focus:border-emerald-500 focus:outline-none"
+                    placeholder="اسم العنصر"
+                    aria-label="اسم العنصر"
                     dir="rtl"
                   />
 
@@ -524,6 +539,8 @@ export default function HomePageManager() {
                   <button
                     onClick={() => updateHighlight(item.id, 'enabled', !item.enabled)}
                     className="flex-shrink-0"
+                    aria-label={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
+                    title={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
                   >
                     {item.enabled ? (
                       <Eye className="w-5 h-5 text-emerald-400" />
@@ -546,9 +563,9 @@ export default function HomePageManager() {
             <div className="p-5 border-b border-slate-700">
               <h3 className="text-white font-semibold text-lg flex items-center gap-2">
                 <span className="text-xl">▶️</span>
-                ستوري اليوم
+                فيديو اليوم
               </h3>
-              <p className="text-slate-400 text-sm mt-1">تحكم في محتوى ستوري اليوم اليومي</p>
+              <p className="text-slate-400 text-sm mt-1">تحكم في محتوى فيديو اليوم اليومي</p>
             </div>
             <div className="p-5 space-y-4">
               {/* Mode toggle */}
@@ -605,6 +622,7 @@ export default function HomePageManager() {
                         }}
                         className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none"
                         placeholder="1-114"
+                        aria-label="رقم السورة"
                       />
                     </div>
                     <div>
@@ -622,6 +640,7 @@ export default function HomePageManager() {
                         }}
                         className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none"
                         placeholder="رقم الآية"
+                        aria-label="رقم الآية"
                       />
                     </div>
                   </div>
@@ -632,6 +651,7 @@ export default function HomePageManager() {
                       onChange={(e) => updateDailyContent('storyCustomText', e.target.value)}
                       className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none resize-y h-24"
                       placeholder="نص مخصص يظهر في الستوري..."
+                      aria-label="نص مخصص للستوري"
                       dir="rtl"
                     />
                   </div>
@@ -704,6 +724,7 @@ export default function HomePageManager() {
                         }}
                         className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none"
                         placeholder="1-114"
+                        aria-label="رقم السورة"
                       />
                     </div>
                     <div>
@@ -721,6 +742,7 @@ export default function HomePageManager() {
                         }}
                         className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none"
                         placeholder="رقم الآية"
+                        aria-label="رقم الآية"
                       />
                     </div>
                   </div>
@@ -731,6 +753,7 @@ export default function HomePageManager() {
                       onChange={(e) => updateDailyContent('verseCustomText', e.target.value)}
                       className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none resize-y h-24"
                       placeholder="نص الآية المخصص..."
+                      aria-label="نص الآية المخصص"
                       dir="rtl"
                     />
                   </div>
@@ -772,13 +795,15 @@ export default function HomePageManager() {
                     {/* Color presets */}
                     <div className="flex gap-1">
                       {COLOR_PRESETS.slice(0, 6).map(c => (
-                        <button
+                        <Styled
+                          as="button"
                           key={c.value}
                           onClick={() => updateTheme(key, c.value)}
                           className={`w-6 h-6 rounded-full transition-all ${
                             config.theme[key] === c.value ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800' : ''
                           }`}
-                          style={{ backgroundColor: c.value }}
+                          css={{ backgroundColor: c.value }}
+                          aria-label={c.label}
                           title={c.label}
                         />
                       ))}
@@ -788,12 +813,15 @@ export default function HomePageManager() {
                       value={config.theme[key]}
                       onChange={(e) => updateTheme(key, e.target.value)}
                       className="w-8 h-8 rounded-lg border border-slate-600 cursor-pointer"
+                      aria-label={`${label} - اختيار لون`}
                     />
                     <input
                       type="text"
                       value={config.theme[key]}
                       onChange={(e) => updateTheme(key, e.target.value)}
                       className="bg-slate-700 text-white rounded-lg px-3 py-1.5 w-28 border border-slate-600 text-sm font-mono focus:border-emerald-500 focus:outline-none"
+                      aria-label={`${label} - كود اللون`}
+                      placeholder="#000000"
                       dir="ltr"
                     />
                   </div>
@@ -819,6 +847,7 @@ export default function HomePageManager() {
                   onChange={(e) => updateTheme('backgroundImageUrl', e.target.value)}
                   className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
                   placeholder="https://example.com/background.jpg"
+                  aria-label="رابط صورة الخلفية"
                   dir="ltr"
                 />
                 {config.theme.backgroundImageUrl && (
@@ -847,6 +876,7 @@ export default function HomePageManager() {
                   onChange={(e) => updateTheme('appIconUrl', e.target.value)}
                   className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
                   placeholder="https://example.com/icon.png"
+                  aria-label="رابط أيقونة التطبيق"
                   dir="ltr"
                 />
                 {config.theme.appIconUrl && (
@@ -875,52 +905,53 @@ export default function HomePageManager() {
               <h3 className="text-white font-semibold text-lg">معاينة الألوان</h3>
             </div>
             <div className="p-5">
-              <div
+              <Styled
                 className="rounded-2xl p-6 space-y-4"
-                style={{ backgroundColor: config.theme.background }}
+                css={{ backgroundColor: config.theme.background }}
               >
                 {/* Header preview */}
-                <div
+                <Styled
                   className="rounded-xl p-4 flex items-center justify-between"
-                  style={{
+                  css={{
                     background: `linear-gradient(135deg, ${config.theme.headerGradientStart}, ${config.theme.headerGradientEnd})`,
                   }}
                 >
                   <span className="text-white font-bold text-lg">روح المسلم</span>
                   <span className="text-white/80 text-sm">٣ رمضان ١٤٤٧</span>
-                </div>
+                </Styled>
 
                 {/* Card preview */}
-                <div
+                <Styled
                   className="rounded-xl p-4"
-                  style={{ backgroundColor: config.theme.cardBackground }}
+                  css={{ backgroundColor: config.theme.cardBackground }}
                 >
-                  <p style={{ color: config.theme.textPrimary }} className="font-bold">عنوان البطاقة</p>
-                  <p style={{ color: config.theme.textSecondary }} className="text-sm mt-1">نص ثانوي توضيحي</p>
-                  <button
+                  <Styled as="p" css={{ color: config.theme.textPrimary }} className="font-bold">عنوان البطاقة</Styled>
+                  <Styled as="p" css={{ color: config.theme.textSecondary }} className="text-sm mt-1">نص ثانوي توضيحي</Styled>
+                  <Styled
+                    as="button"
                     className="mt-3 px-4 py-2 rounded-lg text-white text-sm"
-                    style={{ backgroundColor: config.theme.accent }}
+                    css={{ backgroundColor: config.theme.accent }}
                   >
                     زر التفاعل
-                  </button>
-                </div>
+                  </Styled>
+                </Styled>
 
                 {/* Accent elements */}
                 <div className="flex gap-3">
-                  <div
+                  <Styled
                     className="flex-1 rounded-xl p-3 text-center text-white text-sm font-medium"
-                    style={{ backgroundColor: config.theme.primary }}
+                    css={{ backgroundColor: config.theme.primary }}
                   >
                     اللون الأساسي
-                  </div>
-                  <div
+                  </Styled>
+                  <Styled
                     className="flex-1 rounded-xl p-3 text-center text-white text-sm font-medium"
-                    style={{ backgroundColor: config.theme.accent }}
+                    css={{ backgroundColor: config.theme.accent }}
                   >
                     لون التأكيد
-                  </div>
+                  </Styled>
                 </div>
-              </div>
+              </Styled>
             </div>
           </div>
         </div>

@@ -14,8 +14,11 @@ import {
   Pressable,
   Platform,
 } from 'react-native';
+import { fontSemiBold } from '@/lib/fonts';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Spacing } from '@/constants/theme';
 
 // ========================================
 // Native Button Props
@@ -109,6 +112,7 @@ export const NativeButton: React.FC<NativeButtonProps> = ({
   ...props
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
+  const isRTL = useIsRTL();
   
   // إذا كان هناك لون مخصص، استخدمه
   const backgroundColor = customColor || colors.primary;
@@ -148,14 +152,13 @@ export const NativeButton: React.FC<NativeButtonProps> = ({
       onPress={handlePress}
       disabled={disabled}
       activeOpacity={0.65}
-      style={buttonStyle}
+      style={[buttonStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       {icon && (
         <MaterialCommunityIcons
           name={icon as any}
           size={20}
           color={textColor}
-          style={label ? styles.iconWithLabel : undefined}
         />
       )}
       {label && (
@@ -193,6 +196,7 @@ export const NativeTintedButton: React.FC<NativeButtonProps> = ({
   ...props
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
+  const isRTL = useIsRTL();
 
   const handlePress = () => {
     if (disabled) return;
@@ -213,6 +217,7 @@ export const NativeTintedButton: React.FC<NativeButtonProps> = ({
         {
           backgroundColor: colors.tinted,
           opacity: disabled ? 0.5 : 1,
+          flexDirection: isRTL ? 'row-reverse' : 'row',
         },
         style,
       ]}
@@ -222,7 +227,6 @@ export const NativeTintedButton: React.FC<NativeButtonProps> = ({
           name={icon as any}
           size={18}
           color={colors.tintedText}
-          style={label ? styles.iconWithLabel : undefined}
         />
       )}
       {label && (
@@ -261,6 +265,7 @@ export const NativeFilledButton: React.FC<NativeButtonProps> = ({
   ...props
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
+  const isRTL = useIsRTL();
 
   const handlePress = () => {
     if (disabled) return;
@@ -281,6 +286,7 @@ export const NativeFilledButton: React.FC<NativeButtonProps> = ({
         {
           backgroundColor: colors.secondary,
           opacity: disabled ? 0.5 : 1,
+          flexDirection: isRTL ? 'row-reverse' : 'row',
         },
         style,
       ]}
@@ -290,7 +296,6 @@ export const NativeFilledButton: React.FC<NativeButtonProps> = ({
           name={icon as any}
           size={18}
           color={colors.secondaryText}
-          style={label ? styles.iconWithLabel : undefined}
         />
       )}
       {label && (
@@ -328,6 +333,7 @@ export const NativeTextButton: React.FC<NativeButtonProps> = ({
   ...props
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
+  const isRTL = useIsRTL();
 
   const handlePress = () => {
     if (disabled) return;
@@ -348,6 +354,7 @@ export const NativeTextButton: React.FC<NativeButtonProps> = ({
         style,
         {
           opacity: disabled ? 0.5 : 1,
+          flexDirection: isRTL ? 'row-reverse' : 'row',
         },
       ]}
     >
@@ -356,7 +363,6 @@ export const NativeTextButton: React.FC<NativeButtonProps> = ({
           name={icon as any}
           size={18}
           color={colors.tinted}
-          style={label ? styles.iconWithLabel : undefined}
         />
       )}
       {label && (
@@ -444,6 +450,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.sm,
     paddingHorizontal: 16,
     paddingVertical: 10,
     minHeight: 44, // iOS recommended minimum touch target
@@ -454,6 +461,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.sm,
     paddingHorizontal: 16,
     paddingVertical: 12,
     minHeight: 48,
@@ -463,11 +471,11 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '500',
   },
   iconWithLabel: {
-    marginRight: 8,
+    // margin handled inline for RTL
   },
   textButtonBase: {
     paddingHorizontal: 12,
@@ -476,10 +484,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    gap: Spacing.sm,
   },
   textButtonText: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
   },
   toggleBase: {

@@ -1,7 +1,7 @@
 // components/ui/ShareableCard.tsx
 // بطاقة قابلة للمشاركة كصورة أو نص
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,19 @@ import {
   Image,
   ImageBackground,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import ViewShot from 'react-native-view-shot';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import { shareText, shareImage, copyText } from '@/lib/share-service';
-import { APP_NAME } from '@/constants/app';
+import { t } from '@/lib/i18n';
+import { getAppName } from '@/constants/app';
 import { CARD_COLORS as THEME_CARD_COLORS } from '@/constants/theme';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 interface ShareableCardProps {
   arabicText: string;
   title?: string;
@@ -33,13 +38,13 @@ interface ShareableCardProps {
 const CARD_COLORS = THEME_CARD_COLORS;
 
 const APP_BACKGROUNDS = [
-  require('@/assets/images/background1.png'),
-  require('@/assets/images/background2.png'),
-  require('@/assets/images/background3.png'),
-  require('@/assets/images/background4.png'),
-  require('@/assets/images/background5.png'),
-  require('@/assets/images/background6.png'),
-  require('@/assets/images/background7.png'),
+  require('@/assets/images/backgrounds/background1.png'),
+  require('@/assets/images/backgrounds/background2.png'),
+  require('@/assets/images/backgrounds/background3.png'),
+  require('@/assets/images/backgrounds/background4.png'),
+  require('@/assets/images/backgrounds/background5.png'),
+  require('@/assets/images/backgrounds/background6.png'),
+  require('@/assets/images/backgrounds/background7.png'),
 ];
 
 export function ShareableCard({
@@ -52,10 +57,31 @@ export function ShareableCard({
   visible,
 }: ShareableCardProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
+  const { logoSource } = useAppIdentity();
   const viewShotRef = useRef<ViewShot>(null);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedBackground, setSelectedBackground] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<'color' | 'image'>('color');
+
+  // Load saved preferences
+  useEffect(() => {
+    AsyncStorage.getItem('@shareable_card_preferences').then(raw => {
+      if (!raw) return;
+      try {
+        const prefs = JSON.parse(raw);
+        if (typeof prefs.colorIndex === 'number' && prefs.colorIndex < CARD_COLORS.length) setSelectedColor(prefs.colorIndex);
+        if (typeof prefs.bgIndex === 'number' && prefs.bgIndex < APP_BACKGROUNDS.length) setSelectedBackground(prefs.bgIndex);
+        if (prefs.mode === 'color' || prefs.mode === 'image') setBackgroundMode(prefs.mode);
+      } catch {}
+    });
+  }, []);
+
+  // Auto-save preferences
+  useEffect(() => {
+    const prefs = { colorIndex: selectedColor, bgIndex: selectedBackground, mode: backgroundMode };
+    AsyncStorage.setItem('@shareable_card_preferences', JSON.stringify(prefs)).catch(() => {});
+  }, [selectedColor, selectedBackground, backgroundMode]);
 
   const handleShareAsText = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,7 +90,7 @@ export function ShareableCard({
     text += arabicText;
     if (translation) text += `\n\n${translation}`;
     if (reference) text += `\n\n📚 ${reference}`;
-    text += `\n\n— ${APP_NAME}`;
+    text += `\n\n— ${getAppName()}`;
     await shareText(text, title);
   };
 
@@ -77,7 +103,7 @@ export function ShareableCard({
       }
     } catch (error) {
       console.error('Error capturing image:', error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء إنشاء الصورة');
+      Alert.alert(t('common.error'), t('common.imageCreationError'));
     }
   };
 
@@ -86,7 +112,7 @@ export function ShareableCard({
     let text = arabicText;
     if (reference) text += `\n\n📚 ${reference}`;
     await copyText(text);
-    Alert.alert('تم النسخ', 'تم نسخ النص بنجاح');
+    Alert.alert(t('common.copied'), t('common.textCopiedSuccess'));
   };
 
   const selectedCardColor = CARD_COLORS[selectedColor] || '#2f7659';
@@ -128,9 +154,9 @@ export function ShareableCard({
           ]}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Text style={[styles.headerTitle, { color: isDarkMode ? '#fff' : '#000' }]}>
-              مشاركة
+              {t('common.share')}
             </Text>
             <TouchableOpacity onPress={onClose}>
               <View style={[styles.closeBtn, {
@@ -153,14 +179,13 @@ export function ShareableCard({
                 {title ? <Text style={styles.cardTitle}>{title}</Text> : null}
                 <Text style={styles.cardArabic}>{arabicText}</Text>
                 {translation ? <Text style={styles.cardTranslation}>{translation}</Text> : null}
-                {reference ? <Text style={styles.cardReference}>📚 {reference}</Text> : null}
+                {reference ? <Text style={styles.cardReference}>{reference}</Text> : null}
                 <View style={styles.logoWatermarkRow}>
                   <Image
-                    source={require('@/assets/images/App-icon.png')}
+                    source={logoSource}
                     style={styles.logoWatermark}
                     resizeMode="contain"
                   />
-                  <Text style={styles.cardWatermark}>{APP_NAME}</Text>
                 </View>
               </ImageBackground>
             ) : (
@@ -169,33 +194,32 @@ export function ShareableCard({
                 {title ? <Text style={styles.cardTitle}>{title}</Text> : null}
                 <Text style={styles.cardArabic}>{arabicText}</Text>
                 {translation ? <Text style={styles.cardTranslation}>{translation}</Text> : null}
-                {reference ? <Text style={styles.cardReference}>📚 {reference}</Text> : null}
+                {reference ? <Text style={styles.cardReference}>{reference}</Text> : null}
                 <View style={styles.logoWatermarkRow}>
                   <Image
-                    source={require('@/assets/images/App-icon.png')}
+                    source={logoSource}
                     style={styles.logoWatermark}
                     resizeMode="contain"
                   />
-                  <Text style={styles.cardWatermark}>{APP_NAME}</Text>
                 </View>
               </View>
             )}
           </ViewShot>
 
           {/* Background Mode */}
-          <View style={styles.modeActions}>
-            <TouchableOpacity style={styles.modeButton} onPress={randomizeBackground}>
+          <View style={[styles.modeActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeBackground}>
               <MaterialCommunityIcons name="image-multiple" size={18} color="#2f7659" />
-              <Text style={styles.modeButtonText}>خلفية عشوائية</Text>
+              <Text style={styles.modeButtonText}>{t('common.randomBackground')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modeButton} onPress={randomizeColor}>
+            <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeColor}>
               <MaterialCommunityIcons name="palette" size={18} color="#2f7659" />
-              <Text style={styles.modeButtonText}>لون عشوائي</Text>
+              <Text style={styles.modeButtonText}>{t('common.randomColor')}</Text>
             </TouchableOpacity>
           </View>
 
           {/* Color Picker (10 colors) */}
-          <View style={styles.colorPicker}>
+          <View style={[styles.colorPicker, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {CARD_COLORS.map((color, index) => (
               <TouchableOpacity
                 key={index}
@@ -214,14 +238,14 @@ export function ShareableCard({
           </View>
 
           {/* Share Actions */}
-          <View style={styles.actions}>
+          <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleCopy}>
               <View style={[styles.actionIcon, {
                 backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)',
               }]}>
                 <MaterialCommunityIcons name="content-copy" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
-              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نسخ</Text>
+              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.copy')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsText}>
@@ -230,14 +254,14 @@ export function ShareableCard({
               }]}>
                 <MaterialCommunityIcons name="text" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
-              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نص</Text>
+              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.text')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsImage}>
               <View style={[styles.actionIcon, { backgroundColor: '#2f7659' }]}>
                 <MaterialCommunityIcons name="image" size={22} color="#fff" />
               </View>
-              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>صورة</Text>
+              <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.image')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -266,7 +290,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   closeBtn: {
     width: 28,
@@ -299,21 +323,21 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: 'rgba(255,255,255,0.7)',
     marginBottom: 16,
     textAlign: 'center',
   },
   cardArabic: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
     lineHeight: 38,
   },
   cardTranslation: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     marginTop: 16,
@@ -321,27 +345,20 @@ const styles = StyleSheet.create({
   },
   cardReference: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.5)',
     marginTop: 16,
     textAlign: 'center',
   },
-  cardWatermark: {
-    fontSize: 11,
-    fontFamily: 'Cairo-Regular',
-    color: 'rgba(255,255,255,0.55)',
-    textAlign: 'center',
-  },
   logoWatermarkRow: {
-    flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 6,
     marginTop: 20,
   },
   logoWatermark: {
-    width: 20,
-    height: 20,
-    opacity: 0.85,
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    opacity: 0.9,
   },
   modeActions: {
     flexDirection: 'row',
@@ -350,9 +367,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   modeButton: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -360,7 +377,7 @@ const styles = StyleSheet.create({
   },
   modeButtonText: {
     fontSize: 12,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#2f7659',
   },
   colorPicker: {
@@ -389,7 +406,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   actionIcon: {
     width: 52,
@@ -400,7 +417,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
 });
 

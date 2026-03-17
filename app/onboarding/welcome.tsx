@@ -11,6 +11,7 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -27,24 +28,20 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { tOnboarding } from '@/constants/onboarding-translations';
+import { t, isRTL as isRTLCheck } from '@/lib/i18n';
 
 const { width, height } = Dimensions.get('window');
 
 // ========================================
-// الثوابت
+// الثوابت (fallback)
 // ========================================
 
-const APP_INFO = {
-  name: 'روح المسلم',
-  tagline: 'رفيقك في رحلة الإيمان',
-  description: 'تطبيق شامل للأذكار والقرآن الكريم وأوقات الصلاة',
-};
-
-const FEATURES = [
-  { icon: 'book-open-variant', label: 'القرآن الكريم', color: '#3a7ca5' },
-  { icon: 'hands-pray', label: 'الأذكار والأدعية', color: '#2f7659' },
-  { icon: 'mosque', label: 'أوقات الصلاة', color: '#c17f59' },
-  { icon: 'compass', label: 'اتجاه القبلة', color: '#5d4e8c' },
+const DEFAULT_FEATURES = [
+  { icon: 'book-open-variant', labelKey: 'featureQuran', color: '#3a7ca5' },
+  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#2f7659' },
+  { icon: 'mosque', labelKey: 'featurePrayer', color: '#c17f59' },
+  { icon: 'compass', labelKey: 'featureQibla', color: '#5d4e8c' },
 ];
 
 // ========================================
@@ -52,7 +49,11 @@ const FEATURES = [
 // ========================================
 
 export default function WelcomeScreen() {
-  const { goToNextStep, skipOnboarding } = useOnboarding();
+  const { goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
+  const isRTL = isRTLCheck();
+  const logoSource = isRTL
+    ? require('@/assets/images/icons/App-icon.png')
+    : require('@/assets/images/icons/App-icon_en.png');
   
   // أنيميشن النجوم
   const starRotation = useSharedValue(0);
@@ -99,10 +100,13 @@ export default function WelcomeScreen() {
       <View
         style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}
       >
-        {/* زر التخطي */}
-        <SafeAreaView edges={['top']} style={styles.topBar}>
+        {/* الهيدر: رجوع + تخطي */}
+        <SafeAreaView edges={['top']} style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goToPreviousStep(); }}>
+            <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipText}>تخطي</Text>
+            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         </SafeAreaView>
 
@@ -120,37 +124,37 @@ export default function WelcomeScreen() {
             <View
               style={[styles.logoGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
             >
-              <MaterialCommunityIcons name="star-crescent" size={60} color="#fff" />
+              <Image source={logoSource} style={{ width: 80, height: 80, borderRadius: 20 }} />
             </View>
           </Animated.View>
 
           {/* اسم التطبيق */}
           <Animated.Text entering={FadeInDown.delay(200).duration(600)} style={styles.appName}>
-            {APP_INFO.name}
+            {t('app.name')}
           </Animated.Text>
 
           {/* الشعار الفرعي */}
           <Animated.Text entering={FadeInDown.delay(400).duration(600)} style={styles.tagline}>
-            {APP_INFO.tagline}
+            {t('onboarding.welcomeTitle')}
           </Animated.Text>
 
           {/* الوصف */}
           <Animated.Text entering={FadeInDown.delay(600).duration(600)} style={styles.description}>
-            {APP_INFO.description}
+            {t('onboarding.welcomeDesc')}
           </Animated.Text>
 
           {/* المميزات */}
           <Animated.View entering={FadeInUp.delay(800).duration(600)} style={styles.featuresContainer}>
-            {FEATURES.map((feature, index) => (
+            {DEFAULT_FEATURES.map((feature, index) => (
               <Animated.View
-                key={feature.label}
+                key={feature.labelKey}
                 entering={FadeInUp.delay(800 + index * 100).duration(400)}
                 style={styles.featureItem}
               >
                 <View style={styles.featureIcon}>
                   <MaterialCommunityIcons name={feature.icon as any} size={24} color={feature.color} />
                 </View>
-                <Text style={styles.featureLabel}>{feature.label}</Text>
+                <Text style={styles.featureLabel}>{tOnboarding(feature.labelKey)}</Text>
               </Animated.View>
             ))}
           </Animated.View>
@@ -165,15 +169,16 @@ export default function WelcomeScreen() {
               activeOpacity={0.8}
             >
               <View
-                style={[styles.primaryButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+                style={[styles.primaryButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
-                <Text style={styles.primaryButtonText}>ابدأ الآن</Text>
-                <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+                <Text style={styles.primaryButtonText}>{t('onboarding.getStarted')}</Text>
+                <MaterialCommunityIcons name={isRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
               </View>
             </TouchableOpacity>
 
             {/* مؤشر الصفحات */}
-            <View style={styles.pageIndicator}>
+            <View style={[styles.pageIndicator, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={styles.dot} />
               <View style={[styles.dot, styles.dotActive]} />
               <View style={styles.dot} />
               <View style={styles.dot} />
@@ -198,9 +203,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
-    alignItems: 'flex-start',
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   skipButton: {
     paddingVertical: 8,
@@ -208,7 +221,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.7)',
   },
   decorationContainer: {
@@ -244,20 +257,20 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 42,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
   },
   tagline: {
     fontSize: 20,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginTop: 8,
   },
   description: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
     marginTop: 12,
@@ -284,7 +297,7 @@ const styles = StyleSheet.create({
   },
   featureLabel: {
     fontSize: 13,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.8)',
   },
   bottomContainer: {
@@ -309,7 +322,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   pageIndicator: {

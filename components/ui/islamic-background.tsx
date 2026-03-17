@@ -17,7 +17,7 @@ export function IslamicBackground({ children }: { children: React.ReactNode }) {
     <View style={styles.container}>
       {/* Gradient Background */}
       <LinearGradient
-        colors={[colors.backgroundGradientStart, colors.backgroundGradientEnd]}
+        colors={[(colors as any).backgroundGradientStart || colors.background, (colors as any).backgroundGradientEnd || colors.surface]}
         style={StyleSheet.absoluteFillObject}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}

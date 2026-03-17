@@ -29,6 +29,9 @@ import {
   getPrayerRecord,
   savePrayerRecord,
   updatePrayerStatus,
+  updatePrayerStatusWithTime,
+  saveDayScheduledTimes,
+  getHistoricalFajrTimes,
   getWeekPrayerRecords,
   getMonthPrayerRecords,
   
@@ -78,12 +81,17 @@ interface WorshipContextType {
   
   // دوال الصلاة
   updatePrayer: (prayer: PrayerName, status: PrayerStatus) => Promise<void>;
+  updatePrayerWithTime: (prayer: PrayerName, status: PrayerStatus, scheduledTime?: string) => Promise<void>;
+  updatePrayerForDate: (date: string, prayer: PrayerName, status: PrayerStatus) => Promise<void>;
+  saveDayTimes: (date: string, times: { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }) => Promise<void>;
+  getHistoricalFajr: (days?: number) => Promise<{ date: string; time: string; status: PrayerStatus }[]>;
   getPrayerForDate: (date: string) => Promise<DailyPrayerRecord | null>;
   getWeekPrayers: (startDate?: Date) => Promise<DailyPrayerRecord[]>;
   getMonthPrayers: (year: number, month: number) => Promise<DailyPrayerRecord[]>;
   
   // دوال الصيام
   toggleTodayFasting: (type?: DailyFastingRecord['type']) => Promise<boolean>;
+  toggleFastingForDate: (date: string, type?: DailyFastingRecord['type']) => Promise<boolean>;
   getFastingForDate: (date: string) => Promise<DailyFastingRecord | null>;
   
   // دوال القرآن
@@ -262,6 +270,50 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     await refreshStats();
   }, [loadWeekPrayers, refreshStats]);
 
+  const updatePrayerWithTime = useCallback(async (prayer: PrayerName, status: PrayerStatus, scheduledTime?: string) => {
+    const today = getTodayDate();
+    await updatePrayerStatusWithTime(today, prayer, status, scheduledTime);
+    
+    setTodayPrayer(prev => {
+      const base = prev || { ...defaultPrayerRecord, date: today };
+      const updated = { ...base, [prayer]: status };
+      if (scheduledTime) {
+        updated.scheduledTimes = { ...updated.scheduledTimes, [prayer]: scheduledTime };
+      }
+      return updated;
+    });
+    
+    await loadWeekPrayers();
+    await refreshStats();
+  }, [loadWeekPrayers, refreshStats]);
+
+  const saveDayTimes = useCallback(async (date: string, times: { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }) => {
+    await saveDayScheduledTimes(date, times);
+    if (date === getTodayDate()) {
+      setTodayPrayer(prev => {
+        if (!prev) return null;
+        return { ...prev, scheduledTimes: { ...prev.scheduledTimes, ...times } };
+      });
+    }
+  }, []);
+
+  const getHistoricalFajr = useCallback(async (days?: number) => {
+    return await getHistoricalFajrTimes(days);
+  }, []);
+
+  const updatePrayerForDate = useCallback(async (date: string, prayer: PrayerName, status: PrayerStatus) => {
+    await updatePrayerStatus(date, prayer, status);
+    await loadWeekPrayers();
+    await refreshStats();
+    // If updating today, also refresh local state
+    if (date === getTodayDate()) {
+      setTodayPrayer(prev => {
+        if (!prev) return { ...defaultPrayerRecord, date, [prayer]: status };
+        return { ...prev, [prayer]: status };
+      });
+    }
+  }, [loadWeekPrayers, refreshStats]);
+
   const getPrayerForDate = useCallback(async (date: string) => {
     return await getPrayerRecord(date);
   }, []);
@@ -289,6 +341,17 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     // تحديث الإحصائيات
     await refreshStats();
     
+    return result;
+  }, [refreshStats]);
+
+  const toggleFastingForDate = useCallback(async (date: string, type?: DailyFastingRecord['type']) => {
+    const result = await toggleFasting(date, type);
+    await refreshStats();
+    // If updating today, refresh local state too
+    if (date === getTodayDate()) {
+      const newRecord = await getFastingRecord(date);
+      setTodayFasting(newRecord);
+    }
     return result;
   }, [refreshStats]);
 
@@ -396,12 +459,17 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // دوال الصلاة
     updatePrayer,
+    updatePrayerWithTime,
+    updatePrayerForDate,
+    saveDayTimes,
+    getHistoricalFajr,
     getPrayerForDate,
     getWeekPrayers,
     getMonthPrayers,
     
     // دوال الصيام
     toggleTodayFasting,
+    toggleFastingForDate,
     getFastingForDate,
     
     // دوال القرآن
@@ -453,6 +521,10 @@ export const usePrayerTracker = () => {
     weekPrayers,
     stats,
     updatePrayer,
+    updatePrayerWithTime,
+    updatePrayerForDate,
+    saveDayTimes,
+    getHistoricalFajr,
     getPrayerForDate,
     getWeekPrayers,
     getMonthPrayers,
@@ -463,6 +535,10 @@ export const usePrayerTracker = () => {
     weekPrayers,
     prayerStats: stats?.prayer,
     updatePrayer,
+    updatePrayerWithTime,
+    updatePrayerForDate,
+    saveDayTimes,
+    getHistoricalFajr,
     getPrayerForDate,
     getWeekPrayers,
     getMonthPrayers,
@@ -477,6 +553,7 @@ export const useFastingTracker = () => {
     todayFasting,
     stats,
     toggleTodayFasting,
+    toggleFastingForDate,
     getFastingForDate,
   } = useWorship();
   
@@ -484,6 +561,7 @@ export const useFastingTracker = () => {
     todayFasting,
     fastingStats: stats?.fasting,
     toggleTodayFasting,
+    toggleFastingForDate,
     getFastingForDate,
     isFastingToday: todayFasting?.fasted ?? false,
   };

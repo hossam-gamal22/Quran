@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Line, G } from 'react-native-svg';
+import { fontRegular } from '@/lib/fonts';
 
 interface CircularAnalogClockProps {
   size?: number;
@@ -48,7 +49,7 @@ const styles = StyleSheet.create({
   timeText: {
     color: '#fff',
     fontSize: 18,
-    fontFamily: 'Cairo-ExtraLight',
+    fontFamily: fontRegular(),
   },
 });
 

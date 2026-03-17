@@ -33,9 +33,9 @@ export const BOOKMARK_BORDER_COLORS: Record<BookmarkColor, string> = {
 };
 
 export const BOOKMARK_COLOR_LABELS: Record<BookmarkColor, string> = {
-  yellow: 'الفواصل الصفراء',
-  red: 'الفواصل الحمراء',
-  green: 'الفواصل الخضراء',
+  yellow: 'quran.yellowGroup',
+  red: 'quran.redGroup',
+  green: 'quran.greenGroup',
 };
 
 export async function getColoredBookmarks(): Promise<ColoredBookmark[]> {

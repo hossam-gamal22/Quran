@@ -1,18 +1,24 @@
+// @ts-ignore
 import { describe, it, expect } from 'vitest';
-import { SURAH_NAMES_AR, RECITERS, TRANSLATION_EDITIONS, getAyahAudioUrl, getSurahAudioUrl } from '../lib/quran-api';
-import { PRAYER_NAMES_AR, getNextPrayer, getTimeUntilPrayer, CALCULATION_METHODS } from '../lib/prayer-api';
+import { SURAH_NAMES_AR, getSurahName, RECITERS, TRANSLATION_EDITIONS, getAyahAudioUrl, getSurahAudioUrl } from '../lib/quran-api';
+import { getNextPrayer, CALCULATION_METHODS } from '../lib/prayer-api';
 
 describe('Quran API Utils', () => {
   it('should have 114 surah names', () => {
-    expect(SURAH_NAMES_AR.length).toBe(114);
+    expect(Object.keys(SURAH_NAMES_AR).length).toBe(114);
   });
 
   it('should have Al-Fatiha as first surah', () => {
-    expect(SURAH_NAMES_AR[0]).toBe('الفاتحة');
+    expect(SURAH_NAMES_AR[1]).toBe('الفاتحة');
   });
 
   it('should have An-Nas as last surah', () => {
-    expect(SURAH_NAMES_AR[113]).toBe('الناس');
+    expect(SURAH_NAMES_AR[114]).toBe('الناس');
+  });
+
+  it('getSurahName should return Arabic name by default', () => {
+    expect(getSurahName(1)).toBe('الفاتحة');
+    expect(getSurahName(114)).toBe('الناس');
   });
 
   it('should have at least 5 reciters', () => {
@@ -24,7 +30,7 @@ describe('Quran API Utils', () => {
   });
 
   it('should generate correct ayah audio URL', () => {
-    const url = getAyahAudioUrl(1, 'ar.alafasy');
+    const url = getAyahAudioUrl(1, 1, 'ar.alafasy');
     expect(url).toBe('https://cdn.islamic.network/quran/audio/128/ar.alafasy/1.mp3');
   });
 
@@ -35,13 +41,6 @@ describe('Quran API Utils', () => {
 });
 
 describe('Prayer API Utils', () => {
-  it('should have Arabic names for all 5 prayers', () => {
-    const prayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-    prayers.forEach(p => {
-      expect(PRAYER_NAMES_AR[p]).toBeDefined();
-    });
-  });
-
   it('should have at least 10 calculation methods', () => {
     expect(CALCULATION_METHODS.length).toBeGreaterThanOrEqual(10);
   });
@@ -63,14 +62,6 @@ describe('Prayer API Utils', () => {
     const result = getNextPrayer(mockTimings);
     expect(result).not.toBeNull();
     expect(result?.name).toBeDefined();
-    expect(result?.arabicName).toBeDefined();
     expect(result?.time).toBeDefined();
-  });
-
-  it('should format time until prayer correctly', () => {
-    const futureTime = '23:59';
-    const result = getTimeUntilPrayer(futureTime);
-    expect(typeof result).toBe('string');
-    expect(result.length).toBeGreaterThan(0);
   });
 });

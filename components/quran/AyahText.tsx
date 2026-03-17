@@ -15,10 +15,9 @@ interface AyahTextProps {
   highlightedAyah?: number;
 }
 
-// تحويل الأرقام إلى أرقام عربية
+// Force Western numerals for verse numbers
 function toArabicNumber(num: number): string {
-  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return num.toString().split('').map(d => arabicNumerals[parseInt(d)]).join('');
+  return String(num);
 }
 
 export function AyahText({
@@ -83,7 +82,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: 'KFGQPC Uthmanic Script HAFS',
-    textAlign: 'justify',
+    textAlign: 'right',
     writingDirection: 'rtl',
   },
   ayahNumber: {

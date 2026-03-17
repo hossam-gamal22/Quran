@@ -3,10 +3,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Search, Save, X, Eye, Upload, Download, Edit2, Globe, Image,
+  Search, Save, X, Eye, Upload, Download, Edit2, Globe, Image, Copy,
   Type, Filter, ChevronDown, CheckCircle, AlertCircle, RefreshCw,
   Smartphone,
 } from 'lucide-react';
+import AutoTranslateField from '../components/AutoTranslateField';
 import { db, storage } from '../firebase';
 import {
   collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
@@ -29,7 +30,7 @@ const SUPPORTED_LANGUAGES = [
   { code: 'de', name: 'Deutsch', flag: '🇩🇪', rtl: false },
   { code: 'es', name: 'Español', flag: '🇪🇸', rtl: false },
   { code: 'ru', name: 'Русский', flag: '🇷🇺', rtl: false },
-  { code: 'fa', name: 'فارسی', flag: '🇮🇷', rtl: true },
+  { code: 'hi', name: 'हिन्दी', flag: '🇮🇳', rtl: false },
   { code: 'ms', name: 'Bahasa Melayu', flag: '🇲🇾', rtl: false },
 ] as const;
 
@@ -218,7 +219,7 @@ const AppContentManager: React.FC = () => {
               <h3 className="text-lg font-bold text-white">تعديل: {localItem.key}</h3>
               <p className="text-sm text-slate-400 mt-1">الشاشة: {localItem.screen} | النوع: {localItem.type}</p>
             </div>
-            <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
+            <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" aria-label="إغلاق" title="إغلاق">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -229,7 +230,21 @@ const AppContentManager: React.FC = () => {
               <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
                 <Globe className="w-4 h-4" /> الترجمات (12 لغة)
               </h4>
-              <div className="space-y-3">
+
+              {/* Auto-translate */}
+              <AutoTranslateField
+                label="ترجمة تلقائية"
+                fieldName="translations"
+                contentType="ui"
+                initialValues={localItem.translations}
+                onSave={(translations) => {
+                  Object.entries(translations).forEach(([code, text]) => {
+                    if (text) updateTranslation(code, text);
+                  });
+                }}
+              />
+
+              <div className="space-y-3 mt-4">
                 {SUPPORTED_LANGUAGES.map(lang => (
                   <div key={lang.code} className="flex items-center gap-3">
                     <span className="text-lg w-8">{lang.flag}</span>
@@ -388,6 +403,7 @@ const AppContentManager: React.FC = () => {
           <input
             type="text"
             placeholder="بحث بالمفتاح أو النص..."
+            aria-label="بحث في المحتوى"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-emerald-500 outline-none"
@@ -396,6 +412,7 @@ const AppContentManager: React.FC = () => {
         <select
           value={filterScreen}
           onChange={(e) => setFilterScreen(e.target.value)}
+          aria-label="فلتر الشاشة"
           className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"
         >
           {screenOptions.map(s => (
@@ -404,7 +421,8 @@ const AppContentManager: React.FC = () => {
         </select>
         <select
           value={filterType}
-          onChange={(e) => setFilterType(e.target.value as any)}
+          onChange={(e) => setFilterType(e.target.value as 'all' | 'text' | 'icon')}
+          aria-label="فلتر النوع"
           className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:border-emerald-500 outline-none"
         >
           <option value="all">الكل</option>
@@ -478,8 +496,17 @@ const AppContentManager: React.FC = () => {
                       <button
                         onClick={() => setEditingItem(item)}
                         className="p-2 hover:bg-slate-600 rounded-lg text-slate-400 hover:text-white transition"
+                        aria-label="تعديل"
+                        title="تعديل"
                       >
                         <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setEditingItem({ ...item, id: `custom_${Date.now()}`, translations: { ...item.translations, ar: (item.translations.ar || '') + ' (نسخة)' } })}
+                        className="p-2 hover:bg-emerald-600/30 rounded-lg text-emerald-400 hover:text-emerald-300 transition"
+                        title="تكرار"
+                      >
+                        <Copy className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>

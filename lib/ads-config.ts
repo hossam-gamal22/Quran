@@ -21,7 +21,14 @@ export type AdScreenKey =
   | 'surah'
   | 'tafsir'
   | 'khatma'
-  | 'worship';
+  | 'worship'
+  | 'seerah'
+  | 'companions'
+  | 'hajj_umrah'
+  | 'daily_ayah'
+  | 'hadith'
+  | 'ayat_universe'
+  | 'hadith_sifat';
 
 // ==================== Test Ad IDs ====================
 
@@ -31,6 +38,17 @@ export const TEST_AD_IDS = {
   INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
 };
 
+// ==================== Ad Slot IDs ====================
+
+export type AdSlotKey =
+  | 'ad_home_banner'
+  | 'ad_home_interstitial'
+  | 'ad_quran_between_surahs'
+  | 'ad_prayer_times_bottom'
+  | 'ad_tasbih_completion'
+  | 'ad_settings_top'
+  | 'ad_section_detail_banner';
+
 // ==================== Types ====================
 
 export interface AdUnitIds {
@@ -38,12 +56,25 @@ export interface AdUnitIds {
   ios: string;
 }
 
+export interface AdSlot {
+  enabled: boolean;
+  adUnitId: AdUnitIds;
+  type: 'banner' | 'interstitial';
+  label: string;
+  /** Target screen(s) — empty/undefined = manual placement only */
+  screens?: string[];
+  /** Position on screen */
+  position?: 'top' | 'bottom';
+}
+
 export interface AdsConfig {
   enabled: boolean;
-  // Ad Unit IDs
+  // Legacy global Ad Unit IDs (fallback)
   bannerAdId: AdUnitIds;
   interstitialAdId: AdUnitIds;
   appOpenAdId: AdUnitIds;
+  // Named ad slots with individual ad unit IDs
+  adSlots?: Record<string, AdSlot>;
   // Per-screen banner visibility
   bannerScreens: Record<string, boolean>;
   // App Open Ad
@@ -64,13 +95,36 @@ export interface AdsConfig {
 
 // ==================== Default Config ====================
 
+// ==================== Production Ad Unit IDs ====================
+
+export const PRODUCTION_AD_IDS = {
+  ios: {
+    banner: 'ca-app-pub-3645278220050673/9534813157',
+    interstitial: 'ca-app-pub-3645278220050673/7064203695',
+    appOpen: 'ca-app-pub-3645278220050673/6908649810',
+    nativeAdvanced: 'ca-app-pub-3645278220050673/8070163603',
+  },
+  android: {
+    banner: 'ca-app-pub-3645278220050673/6453829605',
+    interstitial: 'ca-app-pub-3645278220050673/5882983961',
+    appOpen: 'ca-app-pub-3645278220050673/3627880358',
+    nativeAdvanced: 'ca-app-pub-3645278220050673/5595568144',
+  },
+};
+
 export const DEFAULT_ADS_CONFIG: AdsConfig = {
   enabled: true,
-  bannerAdId: { android: '', ios: '' },
-  interstitialAdId: { android: '', ios: '' },
+  bannerAdId: {
+    android: PRODUCTION_AD_IDS.android.banner,
+    ios: PRODUCTION_AD_IDS.ios.banner,
+  },
+  interstitialAdId: {
+    android: PRODUCTION_AD_IDS.android.interstitial,
+    ios: PRODUCTION_AD_IDS.ios.interstitial,
+  },
   appOpenAdId: {
-    android: 'ca-app-pub-6103597967254377/5798712736',
-    ios: 'ca-app-pub-6103597967254377/3930767722',
+    android: PRODUCTION_AD_IDS.android.appOpen,
+    ios: PRODUCTION_AD_IDS.ios.appOpen,
   },
   bannerScreens: {
     home: true,
@@ -86,6 +140,13 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     tafsir: false,
     khatma: false,
     worship: false,
+    seerah: true,
+    companions: true,
+    hajj_umrah: true,
+    daily_ayah: true,
+    hadith: true,
+    ayat_universe: true,
+    hadith_sifat: true,
   },
   showAdOnAppOpen: false,
   showAdOnQiblaStyleChange: true,
@@ -171,6 +232,9 @@ const normalizeAdminConfig = (data: Record<string, any>): Partial<AdsConfig> => 
   if (data.firstAdDelay !== undefined) normalized.firstAdDelay = data.firstAdDelay;
   if (data.updatedAt) normalized.updatedAt = data.updatedAt;
 
+  // Ad slots
+  if (data.adSlots) normalized.adSlots = data.adSlots;
+
   return normalized;
 };
 
@@ -221,4 +285,55 @@ export const isBannerEnabledForScreen = (config: AdsConfig, screen: AdScreenKey)
 export const isAdsEnabled = async (): Promise<boolean> => {
   const config = await fetchAdsConfig();
   return config.enabled;
+};
+
+/**
+ * الحصول على Ad Unit ID لموضع إعلاني محدد
+ * يرجع string فارغ إذا الموضع غير مفعّل (= لا يُعرض شيء)
+ */
+export const getSlotAdUnitId = (
+  config: AdsConfig | null,
+  slotKey: string,
+  useTestAds: boolean = __DEV__
+): string => {
+  if (!config?.enabled) return '';
+  const slot = config.adSlots?.[slotKey];
+  if (!slot?.enabled) return '';
+
+  const adUnitId = slot.adUnitId;
+  const platformId = Platform.OS === 'ios' ? adUnitId.ios : adUnitId.android;
+  if (!platformId) return '';
+
+  if (useTestAds) {
+    return slot.type === 'interstitial' ? TEST_AD_IDS.INTERSTITIAL : TEST_AD_IDS.BANNER;
+  }
+  return platformId;
+};
+
+/**
+ * الحصول على نوع الإعلان لموضع محدد
+ */
+export const getSlotType = (config: AdsConfig | null, slotKey: string): 'banner' | 'interstitial' | null => {
+  const slot = config?.adSlots?.[slotKey];
+  if (!slot?.enabled) return null;
+  return slot.type;
+};
+
+/**
+ * الحصول على المواضع الإعلانية لشاشة معينة
+ */
+export const getSlotsForScreen = (
+  config: AdsConfig | null,
+  screenKey: string,
+  position?: 'top' | 'bottom'
+): { key: string; slot: AdSlot }[] => {
+  if (!config?.enabled || !config.adSlots) return [];
+  return Object.entries(config.adSlots)
+    .filter(([, slot]) => {
+      if (!slot.enabled) return false;
+      if (!slot.screens?.includes(screenKey)) return false;
+      if (position && slot.position !== position) return false;
+      return true;
+    })
+    .map(([key, slot]) => ({ key, slot }));
 };

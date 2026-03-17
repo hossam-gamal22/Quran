@@ -32,6 +32,8 @@ import {
   Mail,
   MessageSquare,
 } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 // ========================================
 // الأنواع
@@ -80,6 +82,14 @@ interface AppSettings {
   // التحليلات
   analyticsEnabled: boolean;
   crashReportingEnabled: boolean;
+  
+  // مفاتيح الترجمة
+  translationApiKeys: {
+    deepl: string;
+    googleTranslate: string;
+    openai: string;
+    preferredProvider: 'free' | 'deepl' | 'google' | 'openai';
+  };
   
   // التواصل والمشاركة
   contactInfo: {
@@ -136,7 +146,7 @@ const CALCULATION_METHODS = [
 const DEFAULT_SETTINGS: AppSettings = {
   appName: 'روح المسلم',
   appVersion: '1.0.0',
-  bundleId: 'com.roohmuslim.app',
+  bundleId: 'com.rooh.almuslim',
   maintenanceMode: false,
   maintenanceMessage: 'التطبيق تحت الصيانة، سنعود قريباً إن شاء الله',
   adsEnabled: true,
@@ -146,7 +156,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   latestVersion: '1.0.0',
   updateMessage: 'يتوفر تحديث جديد، يرجى التحديث للحصول على أفضل تجربة',
   storeUrlIos: 'https://apps.apple.com/app/rooh-muslim/id123456789',
-  storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.roohmuslim.app',
+  storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   defaultLanguage: 'ar',
   supportedLanguages: ['ar', 'en', 'ur', 'id', 'tr', 'fr'],
   defaultCalculationMethod: 'MWL',
@@ -159,6 +169,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   maxRequestsPerMinute: 60,
   analyticsEnabled: true,
   crashReportingEnabled: true,
+  translationApiKeys: {
+    deepl: '',
+    googleTranslate: '',
+    openai: '',
+    preferredProvider: 'free',
+  },
   contactInfo: {
     email: 'hossamgamal290@gmail.com',
     phone: '+966 50 000 0000',
@@ -166,7 +182,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     facebook: 'https://www.facebook.com/HossamGamal59/',
   },
   shareLinks: {
-    playStore: 'https://play.google.com/store/apps/details?id=com.roohmuslim.app',
+    playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
     appStore: 'https://apps.apple.com/app/rooh-muslim/id123456789',
     shareMessage: 'تحميل تطبيق روح المسلم - تطبيقك الإسلامي الشامل',
   },
@@ -179,7 +195,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
-  const [activeTab, setActiveTab] = useState<'general' | 'updates' | 'notifications' | 'security' | 'contact' | 'api'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'updates' | 'notifications' | 'security' | 'contact' | 'api' | 'translation'>('general');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showFcmKey, setShowFcmKey] = useState(false);
@@ -190,36 +206,37 @@ const SettingsPage: React.FC = () => {
   }, []);
 
   const loadSettings = async () => {
-    // TODO: API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setSettings(DEFAULT_SETTINGS);
-    setApiKeys([
-      {
-        id: '1',
-        name: 'Production API Key',
-        key: 'rk_live_xxxxxxxxxxxxxxxxxxxxx',
-        createdAt: '2026-01-01T00:00:00Z',
-        lastUsed: '2026-03-02T22:00:00Z',
-        isActive: true,
-      },
-      {
-        id: '2',
-        name: 'Development API Key',
-        key: 'rk_test_xxxxxxxxxxxxxxxxxxxxx',
-        createdAt: '2026-01-15T00:00:00Z',
-        lastUsed: '2026-03-01T10:00:00Z',
-        isActive: true,
-      },
-    ]);
+    try {
+      // Read from unified path (config/app-settings)
+      const snap = await getDoc(doc(db, 'config', 'app-settings'));
+      if (snap.exists()) {
+        setSettings(prev => ({ ...prev, ...snap.data() }));
+      } else {
+        // Fallback: try old path for backwards compat
+        const oldSnap = await getDoc(doc(db, 'appConfig', 'appSettings'));
+        if (oldSnap.exists()) {
+          setSettings(prev => ({ ...prev, ...oldSnap.data() }));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
   };
 
   // حفظ الإعدادات
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Write to unified path that the app reads from
+      await setDoc(doc(db, 'config', 'app-settings'), {
+        ...settings,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+    }
     setIsSaving(false);
-    setHasChanges(false);
-    // TODO: API call
   };
 
   // تحديث إعداد
@@ -298,16 +315,17 @@ const SettingsPage: React.FC = () => {
       {/* التبويبات */}
       <div className="flex gap-2 mb-6 border-b border-gray-700 pb-4 overflow-x-auto">
         {[
-          { id: 'general', label: 'عام', icon: Settings },
-          { id: 'updates', label: 'التحديثات', icon: Smartphone },
-          { id: 'notifications', label: 'الإشعارات', icon: Bell },
-          { id: 'contact', label: 'التواصل والمشاركة', icon: MessageSquare },
-          { id: 'security', label: 'الأمان', icon: Shield },
-          { id: 'api', label: 'API Keys', icon: Key },
+          { id: 'general' as const, label: 'عام', icon: Settings },
+          { id: 'updates' as const, label: 'التحديثات', icon: Smartphone },
+          { id: 'notifications' as const, label: 'الإشعارات', icon: Bell },
+          { id: 'contact' as const, label: 'التواصل والمشاركة', icon: MessageSquare },
+          { id: 'security' as const, label: 'الأمان', icon: Shield },
+          { id: 'api' as const, label: 'API Keys', icon: Key },
+          { id: 'translation' as const, label: 'الترجمة', icon: Globe },
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-gray-700 text-white'
@@ -339,6 +357,8 @@ const SettingsPage: React.FC = () => {
                     value={settings.appName}
                     onChange={e => updateSetting('appName', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    placeholder="اسم التطبيق"
+                    aria-label="اسم التطبيق"
                   />
                 </div>
                 <div>
@@ -349,6 +369,8 @@ const SettingsPage: React.FC = () => {
                     onChange={e => updateSetting('appVersion', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
+                    placeholder="1.0.0"
+                    aria-label="الإصدار الحالي"
                   />
                 </div>
                 <div>
@@ -359,6 +381,8 @@ const SettingsPage: React.FC = () => {
                     onChange={e => updateSetting('bundleId', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
+                    placeholder="com.example.app"
+                    aria-label="Bundle ID"
                   />
                 </div>
               </div>
@@ -373,6 +397,8 @@ const SettingsPage: React.FC = () => {
                 </h2>
                 <button
                   onClick={() => updateSetting('maintenanceMode', !settings.maintenanceMode)}
+                  title="تفعيل/تعطيل وضع الصيانة"
+                  aria-label="تفعيل/تعطيل وضع الصيانة"
                   className={`relative w-14 h-7 rounded-full transition-colors ${
                     settings.maintenanceMode ? 'bg-yellow-500' : 'bg-gray-600'
                   }`}
@@ -392,6 +418,8 @@ const SettingsPage: React.FC = () => {
                     onChange={e => updateSetting('maintenanceMessage', e.target.value)}
                     rows={2}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                    placeholder="أدخل رسالة الصيانة"
+                    aria-label="رسالة الصيانة"
                   />
                 </div>
               )}
@@ -406,6 +434,8 @@ const SettingsPage: React.FC = () => {
                 </h2>
                 <button
                   onClick={() => updateSetting('adsEnabled', !settings.adsEnabled)}
+                  title="تفعيل/تعطيل الإعلانات"
+                  aria-label="تفعيل/تعطيل الإعلانات"
                   className={`relative w-14 h-7 rounded-full transition-colors ${
                     settings.adsEnabled ? 'bg-green-500' : 'bg-gray-600'
                   }`}
@@ -427,6 +457,8 @@ const SettingsPage: React.FC = () => {
                   onChange={e => updateSetting('adRemovalPrice', parseFloat(e.target.value) || 0)}
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   dir="ltr"
+                  title="سعر إزالة الإعلانات"
+                  aria-label="سعر إزالة الإعلانات"
                 />
               </div>
             </div>
@@ -441,6 +473,8 @@ const SettingsPage: React.FC = () => {
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">اللغة الافتراضية</label>
                   <select
+                    title="اللغة الافتراضية"
+                    aria-label="اللغة الافتراضية"
                     value={settings.defaultLanguage}
                     onChange={e => updateSetting('defaultLanguage', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
@@ -484,6 +518,8 @@ const SettingsPage: React.FC = () => {
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">طريقة الحساب الافتراضية</label>
                   <select
+                    title="طريقة الحساب الافتراضية"
+                    aria-label="طريقة الحساب الافتراضية"
                     value={settings.defaultCalculationMethod}
                     onChange={e => updateSetting('defaultCalculationMethod', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
@@ -496,6 +532,8 @@ const SettingsPage: React.FC = () => {
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">طريقة حساب العصر</label>
                   <select
+                    title="طريقة حساب العصر"
+                    aria-label="طريقة حساب العصر"
                     value={settings.defaultAsrMethod}
                     onChange={e => updateSetting('defaultAsrMethod', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
@@ -520,6 +558,8 @@ const SettingsPage: React.FC = () => {
                 </h2>
                 <button
                   onClick={() => updateSetting('forceUpdate', !settings.forceUpdate)}
+                  title="تفعيل/تعطيل إجبار التحديث"
+                  aria-label="تفعيل/تعطيل إجبار التحديث"
                   className={`relative w-14 h-7 rounded-full transition-colors ${
                     settings.forceUpdate ? 'bg-red-500' : 'bg-gray-600'
                   }`}
@@ -541,6 +581,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="1.0.0"
+                    aria-label="أقل إصدار مدعوم"
                   />
                 </div>
                 <div>
@@ -552,6 +593,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="1.0.0"
+                    aria-label="آخر إصدار"
                   />
                 </div>
               </div>
@@ -562,6 +604,8 @@ const SettingsPage: React.FC = () => {
                   onChange={e => updateSetting('updateMessage', e.target.value)}
                   rows={2}
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                  placeholder="أدخل رسالة التحديث"
+                  aria-label="رسالة التحديث"
                 />
               </div>
             </div>
@@ -580,6 +624,8 @@ const SettingsPage: React.FC = () => {
                     onChange={e => updateSetting('storeUrlIos', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
+                    placeholder="https://apps.apple.com/..."
+                    aria-label="رابط App Store"
                   />
                 </div>
                 <div>
@@ -590,6 +636,8 @@ const SettingsPage: React.FC = () => {
                     onChange={e => updateSetting('storeUrlAndroid', e.target.value)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
+                    placeholder="https://play.google.com/store/apps/..."
+                    aria-label="رابط Google Play"
                   />
                 </div>
               </div>
@@ -615,9 +663,12 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 pl-12 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="AAAA..."
+                    aria-label="FCM Server Key"
                   />
                   <button
                     onClick={() => setShowFcmKey(!showFcmKey)}
+                    title="إظهار/إخفاء المفتاح"
+                    aria-label="إظهار/إخفاء المفتاح"
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
                   >
                     {showFcmKey ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -639,6 +690,8 @@ const SettingsPage: React.FC = () => {
                   onChange={e => updateSetting('apnsKeyId', e.target.value)}
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   dir="ltr"
+                  placeholder="APNS Key ID"
+                  aria-label="APNS Key ID"
                 />
               </div>
             </div>
@@ -664,6 +717,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="example@email.com"
+                    aria-label="البريد الإلكتروني"
                   />
                 </div>
                 <div>
@@ -675,6 +729,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="+966 50 000 0000"
+                    aria-label="رقم الهاتف"
                   />
                 </div>
                 <div>
@@ -686,6 +741,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="https://example.com"
+                    aria-label="الموقع الإلكتروني"
                   />
                 </div>
 
@@ -698,8 +754,11 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none"
                     dir="ltr"
                     placeholder="https://www.facebook.com/username"
+                    aria-label="رابط Facebook"
                   />
                 </div>
+              </div>
+            </div>
 
             {/* روابط التحميل والمشاركة */}
             <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -717,6 +776,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="https://play.google.com/store/apps/details?id=..."
+                    aria-label="رابط Google Play للمشاركة"
                   />
                 </div>
                 <div>
@@ -728,6 +788,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     dir="ltr"
                     placeholder="https://apps.apple.com/app/..."
+                    aria-label="رابط App Store للمشاركة"
                   />
                 </div>
                 <div>
@@ -738,6 +799,7 @@ const SettingsPage: React.FC = () => {
                     rows={2}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
                     placeholder="تحميل تطبيقنا..."
+                    aria-label="رسالة المشاركة"
                   />
                 </div>
               </div>
@@ -756,6 +818,8 @@ const SettingsPage: React.FC = () => {
                 </h2>
                 <button
                   onClick={() => updateSetting('rateLimitEnabled', !settings.rateLimitEnabled)}
+                  title="تفعيل/تعطيل تحديد معدل الطلبات"
+                  aria-label="تفعيل/تعطيل تحديد معدل الطلبات"
                   className={`relative w-14 h-7 rounded-full transition-colors ${
                     settings.rateLimitEnabled ? 'bg-green-500' : 'bg-gray-600'
                   }`}
@@ -776,6 +840,8 @@ const SettingsPage: React.FC = () => {
                     value={settings.maxRequestsPerMinute}
                     onChange={e => updateSetting('maxRequestsPerMinute', parseInt(e.target.value) || 60)}
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                    title="الحد الأقصى للطلبات"
+                    aria-label="الحد الأقصى للطلبات في الدقيقة"
                   />
                 </div>
               )}
@@ -790,6 +856,8 @@ const SettingsPage: React.FC = () => {
                 <span>تفعيل النسخ الاحتياطي السحابي</span>
                 <button
                   onClick={() => updateSetting('cloudBackupEnabled', !settings.cloudBackupEnabled)}
+                  title="تفعيل/تعطيل النسخ الاحتياطي"
+                  aria-label="تفعيل/تعطيل النسخ الاحتياطي"
                   className={`relative w-14 h-7 rounded-full transition-colors ${
                     settings.cloudBackupEnabled ? 'bg-green-500' : 'bg-gray-600'
                   }`}
@@ -809,6 +877,8 @@ const SettingsPage: React.FC = () => {
                   value={settings.maxBackupSize}
                   onChange={e => updateSetting('maxBackupSize', parseInt(e.target.value) || 50)}
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                  title="الحد الأقصى لحجم النسخة"
+                  aria-label="الحد الأقصى لحجم النسخة بالميغابايت"
                 />
               </div>
             </div>
@@ -823,6 +893,8 @@ const SettingsPage: React.FC = () => {
                   <span>تفعيل التحليلات</span>
                   <button
                     onClick={() => updateSetting('analyticsEnabled', !settings.analyticsEnabled)}
+                    title="تفعيل/تعطيل التحليلات"
+                    aria-label="تفعيل/تعطيل التحليلات"
                     className={`relative w-14 h-7 rounded-full transition-colors ${
                       settings.analyticsEnabled ? 'bg-green-500' : 'bg-gray-600'
                     }`}
@@ -838,6 +910,8 @@ const SettingsPage: React.FC = () => {
                   <span>تفعيل تقارير الأعطال</span>
                   <button
                     onClick={() => updateSetting('crashReportingEnabled', !settings.crashReportingEnabled)}
+                    title="تفعيل/تعطيل تقارير الأعطال"
+                    aria-label="تفعيل/تعطيل تقارير الأعطال"
                     className={`relative w-14 h-7 rounded-full transition-colors ${
                       settings.crashReportingEnabled ? 'bg-green-500' : 'bg-gray-600'
                     }`}
@@ -890,6 +964,7 @@ const SettingsPage: React.FC = () => {
                         onClick={() => copyApiKey(key.key)}
                         className="p-2 hover:bg-gray-600 rounded transition-colors text-gray-400 hover:text-white"
                         title="نسخ"
+                        aria-label="نسخ مفتاح API"
                       >
                         <Copy size={16} />
                       </button>
@@ -897,12 +972,120 @@ const SettingsPage: React.FC = () => {
                         onClick={() => deleteApiKey(key.id)}
                         className="p-2 hover:bg-gray-600 rounded transition-colors text-gray-400 hover:text-red-500"
                         title="حذف"
+                        aria-label="حذف مفتاح API"
                       >
                         <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* تاب الترجمة */}
+        {activeTab === 'translation' && (
+          <>
+            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+                <Globe size={20} className="text-blue-500" />
+                مفاتيح خدمات الترجمة
+              </h2>
+              <p className="text-gray-400 text-sm mb-6">
+                أضف مفاتيح API لخدمات الترجمة لتحسين جودة الترجمة التلقائية. بدون مفاتيح، سيتم استخدام الخدمات المجانية (MyMemory, LibreTranslate, Lingva).
+              </p>
+
+              <div className="space-y-4">
+                {/* المزود المفضل */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">المزود المفضل</label>
+                  <select
+                    title="المزود المفضل للترجمة"
+                    aria-label="المزود المفضل للترجمة"
+                    value={settings.translationApiKeys.preferredProvider}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      translationApiKeys: { ...prev.translationApiKeys, preferredProvider: e.target.value as 'free' | 'deepl' | 'google' | 'openai' }
+                    }))}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="free">مجاني (MyMemory / LibreTranslate / Lingva)</option>
+                    <option value="deepl">DeepL</option>
+                    <option value="google">Google Translate</option>
+                    <option value="openai">OpenAI (GPT)</option>
+                  </select>
+                </div>
+
+                {/* DeepL */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
+                    <Key size={14} className="text-blue-400" />
+                    DeepL API Key
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="أدخل مفتاح DeepL API"
+                    aria-label="مفتاح DeepL API"
+                    value={settings.translationApiKeys.deepl}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      translationApiKeys: { ...prev.translationApiKeys, deepl: e.target.value }
+                    }))}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">احصل على مفتاح من deepl.com/pro — يدعم 500,000 حرف/شهر مجاناً</p>
+                </div>
+
+                {/* Google Translate */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
+                    <Key size={14} className="text-green-400" />
+                    Google Translate API Key
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="أدخل مفتاح Google Cloud Translation API"
+                    aria-label="مفتاح Google Translate API"
+                    value={settings.translationApiKeys.googleTranslate}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      translationApiKeys: { ...prev.translationApiKeys, googleTranslate: e.target.value }
+                    }))}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">من Google Cloud Console — يدعم 500,000 حرف/شهر مجاناً</p>
+                </div>
+
+                {/* OpenAI */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
+                    <Key size={14} className="text-purple-400" />
+                    OpenAI API Key
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="أدخل مفتاح OpenAI API"
+                    aria-label="مفتاح OpenAI API"
+                    value={settings.translationApiKeys.openai}
+                    onChange={(e) => setSettings(prev => ({
+                      ...prev,
+                      translationApiKeys: { ...prev.translationApiKeys, openai: e.target.value }
+                    }))}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="text-gray-500 text-xs mt-1">من platform.openai.com — ترجمة عالية الجودة مع فهم السياق الإسلامي</p>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 bg-gray-700/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Info size={16} className="text-blue-400 mt-0.5 shrink-0" />
+                  <div className="text-sm text-gray-400">
+                    <p className="mb-1"><strong>ترتيب الأولوية:</strong> تعديلات الأدمن → API مدفوع (حسب المزود المفضل) → خدمات مجانية</p>
+                    <p>المفاتيح محفوظة بأمان في Firestore ولا تُشارك مع المستخدمين.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </>

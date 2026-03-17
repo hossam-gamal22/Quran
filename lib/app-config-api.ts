@@ -29,10 +29,32 @@ export interface WelcomeBannerConfig {
   backgroundImage?: string;
 }
 
+export interface MultiLangText {
+  ar: string;
+  en: string;
+  fr?: string;
+  de?: string;
+  es?: string;
+  tr?: string;
+  ur?: string;
+  id?: string;
+  ms?: string;
+  hi?: string;
+  bn?: string;
+  ru?: string;
+}
+
 export interface HighlightItemConfig {
   id: string;
-  enabled: boolean;
-  title: string;
+  enabled: boolean;          // kept for backward compat
+  type?: 'builtin' | 'temp_page';
+  tempPageId?: string;
+  
+  title: string;             // kept for backward compat (Arabic fallback)
+  titles?: MultiLangText;
+  subtitle?: string;
+  subtitles?: MultiLangText;
+  
   icon: string;
   color: string;
   route: string;
@@ -40,6 +62,12 @@ export interface HighlightItemConfig {
   imageUrl?: string;
   htmlContent?: string;
   order: number;
+  
+  isVisible?: boolean;
+  isPinned?: boolean;
+  visibleFrom?: string;
+  visibleUntil?: string;
+  updatedAt?: string;
 }
 
 export type IconMode = 'material' | 'ionicons' | 'sf' | 'png';
@@ -88,6 +116,8 @@ export interface RemoteAppConfig {
     android: string;
     ios: string;
   };
+  storeUrlIos?: string;
+  storeUrlAndroid?: string;
   features: {
     quran: boolean;
     azkar: boolean;
@@ -174,6 +204,8 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
     android: '',
     ios: '',
   },
+  storeUrlIos: '',
+  storeUrlAndroid: '',
   features: {
     quran: true,
     azkar: true,
@@ -229,6 +261,15 @@ export const getAppConfig = async (): Promise<RemoteAppConfig> => {
   return await fetchAppConfig();
 };
 
+// الحصول على روابط المتاجر من الإعدادات (مع fallback)
+export const getStoreUrls = async (): Promise<{ ios: string; android: string }> => {
+  const config = await fetchAppConfig();
+  return {
+    ios: config.storeUrlIos || config.downloadLinks?.ios || '',
+    android: config.storeUrlAndroid || config.downloadLinks?.android || '',
+  };
+};
+
 // اشتراك في التحديثات المباشرة من Firebase
 export const subscribeToAppConfig = (
   onUpdate: (config: RemoteAppConfig) => void,
@@ -259,19 +300,95 @@ export const subscribeToAppConfig = (
   return unsubscribe;
 };
 
+/**
+ * Subscribe to real-time updates for highlights
+ * الاشتراك في تحديثات الأبرز في الوقت الفعلي
+ */
+export const subscribeToHighlights = (
+  onUpdate: (highlights: HighlightItemConfig[]) => void,
+  onError?: (error: Error) => void
+): (() => void) => {
+  const docRef = doc(db, 'config', 'app-settings');
+  
+  const unsubscribe = onSnapshot(
+    docRef,
+    async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const highlights = (data.highlights || []) as HighlightItemConfig[];
+        
+        // Filter: only items that are visible and within date range
+        const now = new Date();
+        const filtered = highlights.filter(h => {
+          // Check isVisible (fallback to enabled for backward compat)
+          const visible = h.isVisible !== undefined ? h.isVisible : h.enabled;
+          if (!visible) return false;
+          
+          // Check date range
+          if (h.visibleFrom && new Date(h.visibleFrom) > now) return false;
+          if (h.visibleUntil && new Date(h.visibleUntil) < now) return false;
+          
+          return true;
+        });
+        
+        // Sort: pinned first, then by order
+        filtered.sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return (a.order || 0) - (b.order || 0);
+        });
+        
+        // Cache
+        await AsyncStorage.setItem('@highlights_cache', JSON.stringify(filtered));
+        
+        console.log('🔄 تم تحديث الأبرز (Real-time):', filtered.length);
+        onUpdate(filtered);
+      }
+    },
+    (error) => {
+      console.error('❌ خطأ في الاشتراك بتحديثات الأبرز:', error);
+      if (onError) onError(error);
+    }
+  );
+  
+  return unsubscribe;
+};
+
+/**
+ * Get localized title from highlight config
+ * الحصول على العنوان المترجم
+ */
+export const getHighlightTitle = (item: HighlightItemConfig, lang: string): string => {
+  if (item.titles) {
+    return (item.titles as any)[lang] || item.titles.ar || item.title;
+  }
+  return item.title;
+};
+
+/**
+ * Get localized subtitle from highlight config  
+ */
+export const getHighlightSubtitle = (item: HighlightItemConfig, lang: string): string | undefined => {
+  if (item.subtitles) {
+    return (item.subtitles as any)[lang] || item.subtitles.ar || item.subtitle;
+  }
+  return item.subtitle;
+};
+
 // ========================================
 // واجهة وAPI الخلفيات الديناميكية
 // ========================================
 
 export interface DynamicBackground {
   id: string;
-  name: string;
+  name_ar: string;
+  name_en: string;
   thumbnailUrl: string;
   fullUrl: string;
-  enabled: boolean;
-  order: number;
+  is_active: boolean;
+  order_index: number;
   textColor?: 'white' | 'black';
-  createdAt?: string;
+  is_premium?: boolean;
 }
 
 // جلب الخلفيات الديناميكية من Firebase
@@ -282,16 +399,16 @@ export const fetchDynamicBackgrounds = async (): Promise<DynamicBackground[]> =>
     const backgroundsRef = collection(db, 'backgrounds');
     const q = query(
       backgroundsRef,
-      where('enabled', '==', true),
-      orderBy('order', 'asc')
+      where('is_active', '==', true),
+      orderBy('order_index', 'asc')
     );
     const querySnapshot = await getDocs(q);
     
     const backgrounds: DynamicBackground[] = [];
-    querySnapshot.forEach((doc) => {
+    querySnapshot.forEach((d) => {
       backgrounds.push({
-        id: doc.id,
-        ...doc.data(),
+        id: d.id,
+        ...d.data(),
       } as DynamicBackground);
     });
     
@@ -630,4 +747,76 @@ export const subscribeToHomePageConfig = (
   );
 
   return unsubscribe;
+};
+
+// ==================== الصفحات المؤقتة ====================
+
+export interface TempPage {
+  id: string;
+  title: string;
+  titleEn?: string;
+  icon: string;
+  color: string;
+  htmlContent: string;
+  htmlContentEn?: string;
+  startDate: string;
+  endDate: string;
+  isPermanent?: boolean;
+  enabled: boolean;
+}
+
+/**
+ * جلب الصفحات المؤقتة النشطة حالياً
+ */
+export const fetchActiveTempPages = async (): Promise<TempPage[]> => {
+  try {
+    const cached = await AsyncStorage.getItem('@temp_pages_cache');
+    const cacheDate = await AsyncStorage.getItem('@temp_pages_cache_date');
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (cached && cacheDate === today) {
+      return JSON.parse(cached) as TempPage[];
+    }
+
+    const snapshot = await getDocs(collection(db, 'tempPages'));
+    const now = new Date();
+    const active: TempPage[] = [];
+
+    snapshot.forEach(doc => {
+      const data = doc.data() as TempPage;
+      if (!data.enabled) return;
+      if (data.isPermanent) {
+        active.push({ ...data, id: doc.id });
+      } else {
+        const start = new Date(data.startDate);
+        const end = new Date(data.endDate);
+        if (now >= start && now <= end) {
+          active.push({ ...data, id: doc.id });
+        }
+      }
+    });
+
+    await AsyncStorage.setItem('@temp_pages_cache', JSON.stringify(active));
+    await AsyncStorage.setItem('@temp_pages_cache_date', today);
+
+    return active;
+  } catch (error) {
+    console.error('Error fetching temp pages:', error);
+    return [];
+  }
+};
+
+/**
+ * جلب صفحة مؤقتة بالمعرف
+ */
+export const fetchTempPageById = async (id: string): Promise<TempPage | null> => {
+  try {
+    const docRef = doc(db, 'tempPages', id);
+    const snap = await getDoc(docRef);
+    if (!snap.exists()) return null;
+    return { ...snap.data(), id: snap.id } as TempPage;
+  } catch (error) {
+    console.error('Error fetching temp page:', error);
+    return null;
+  }
 };

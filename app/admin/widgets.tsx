@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { db } from '../../lib/firebase-config';
 import {
@@ -30,6 +31,11 @@ import {
 } from 'firebase/firestore';
 import WebView from 'react-native-webview';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { useAppIdentity } from '@/hooks/use-app-identity';
+import { t } from '@/lib/i18n';
 // -----------------------------------------------------------
 // Types
 // -----------------------------------------------------------
@@ -58,38 +64,55 @@ interface WidgetTemplate {
 // Constants
 // -----------------------------------------------------------
 
-const WIDGET_TYPES: { key: WidgetType; label: string; icon: string; color: string }[] = [
-  { key: 'ayah', label: 'آية', icon: 'book', color: '#22C55E' },
-  { key: 'azkar', label: 'أذكار', icon: 'moon', color: '#3B82F6' },
-  { key: 'hijri', label: 'تاريخ هجري', icon: 'calendar', color: '#F59E0B' },
-  { key: 'custom', label: 'مخصص', icon: 'construct', color: '#8B5CF6' },
+const WIDGET_TYPES_BASE: { key: WidgetType; icon: string; color: string }[] = [
+  { key: 'ayah', icon: 'book', color: '#22C55E' },
+  { key: 'azkar', icon: 'moon', color: '#3B82F6' },
+  { key: 'hijri', icon: 'calendar', color: '#F59E0B' },
+  { key: 'custom', icon: 'construct', color: '#8B5CF6' },
 ];
 
-const VARIABLE_OPTIONS = [
-  { key: 'hijri_date', label: 'التاريخ الهجري' },
-  { key: 'hijri_day', label: 'اليوم الهجري' },
-  { key: 'hijri_month', label: 'الشهر الهجري' },
-  { key: 'hijri_year', label: 'السنة الهجرية' },
-  { key: 'gregorian_date', label: 'التاريخ الميلادي' },
-  { key: 'random_ayah', label: 'آية عشوائية' },
-  { key: 'random_dua', label: 'دعاء عشوائي' },
-  { key: 'prayer_name', label: 'اسم الصلاة' },
-  { key: 'prayer_time', label: 'وقت الصلاة' },
-  { key: 'app_name', label: 'اسم التطبيق' },
-];
-
-const MOCK_VARIABLES: Record<string, string> = {
-  hijri_date: '15 رمضان 1447',
-  hijri_day: '15',
-  hijri_month: 'رمضان',
-  hijri_year: '1447',
-  gregorian_date: '7 مارس 2026',
-  random_ayah: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-  random_dua: 'اللهم إني أسألك العفو والعافية',
-  prayer_name: 'الفجر',
-  prayer_time: '٤:٣٠ ص',
-  app_name: 'روح المسلم',
+const WIDGET_TYPE_LABELS: Record<WidgetType, string> = {
+  ayah: 'admin.typeAyah',
+  azkar: 'admin.typeAzkar',
+  hijri: 'admin.typeHijri',
+  custom: 'admin.typeCustom',
 };
+
+function getWidgetTypes() {
+  return WIDGET_TYPES_BASE.map((wt) => ({
+    ...wt,
+    label: t(WIDGET_TYPE_LABELS[wt.key]),
+  }));
+}
+
+function getVariableOptions() {
+  return [
+    { key: 'hijri_date', label: t('admin.varHijriDate') },
+    { key: 'hijri_day', label: t('admin.varHijriDay') },
+    { key: 'hijri_month', label: t('admin.varHijriMonth') },
+    { key: 'hijri_year', label: t('admin.varHijriYear') },
+    { key: 'gregorian_date', label: t('admin.varGregorianDate') },
+    { key: 'random_ayah', label: t('admin.varRandomAyah') },
+    { key: 'random_dua', label: t('admin.varRandomDua') },
+    { key: 'prayer_name', label: t('admin.varPrayerName') },
+    { key: 'prayer_time', label: t('admin.varPrayerTime') },
+    { key: 'app_name', label: t('admin.varAppName') },
+  ];
+}
+
+// MOCK_VARIABLES will be defined inside the component to use `appName`
+// const MOCK_VARIABLES: Record<string, string> = {
+//   hijri_date: '15 رمضان 1447',
+//   hijri_day: '15',
+//   hijri_month: 'رمضان',
+//   hijri_year: '1447',
+//   gregorian_date: '7 مارس 2026',
+//   random_ayah: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+//   random_dua: 'اللهم إني أسألك العفو والعافية',
+//   prayer_name: 'الفجر',
+//   prayer_time: '٤:٣٠ ص',
+//   app_name: 'روح المسلم',
+// };
 
 const COLLECTION_NAME = 'widget_templates';
 
@@ -98,14 +121,15 @@ const COLLECTION_NAME = 'widget_templates';
 // -----------------------------------------------------------
 
 function getTypeConfig(type: WidgetType) {
-  return WIDGET_TYPES.find((t) => t.key === type) ?? WIDGET_TYPES[3];
+  const types = getWidgetTypes();
+  return types.find((wt) => wt.key === type) ?? types[3];
 }
 
 /** Replace all {{variable}} placeholders with mock or fallback values */
-function resolveSvg(svgSource: string, mappings: VariableMapping[]): string {
+function resolveSvg(svgSource: string, mappings: VariableMapping[], mockVariables: Record<string, string>): string {
   let resolved = svgSource;
   for (const m of mappings) {
-    const value = MOCK_VARIABLES[m.variable] ?? m.fallback ?? '';
+    const value = mockVariables[m.variable] ?? m.fallback ?? '';
     // Replace placeholder pattern like {{variable_name}}
     const pattern = new RegExp(`\\{\\{${m.variable}\\}\\}`, 'g');
     resolved = resolved.replace(pattern, value);
@@ -113,8 +137,8 @@ function resolveSvg(svgSource: string, mappings: VariableMapping[]): string {
   return resolved;
 }
 
-function buildPreviewHtml(svgSource: string, mappings: VariableMapping[]): string {
-  const resolved = resolveSvg(svgSource, mappings);
+function buildPreviewHtml(svgSource: string, mappings: VariableMapping[], mockVariables: Record<string, string>): string {
+  const resolved = resolveSvg(svgSource, mappings, mockVariables);
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
@@ -135,8 +159,26 @@ function buildPreviewHtml(svgSource: string, mappings: VariableMapping[]): strin
 // -----------------------------------------------------------
 
 export default function WidgetsScreen() {
+  const isRTL = useIsRTL();
+  const { isDarkMode } = useSettings();
+  const colors = useColors();
+  const { appName, logoSource } = useAppIdentity();
+
+  const MOCK_VARIABLES: Record<string, string> = {
+    hijri_date: '15 رمضان 1447',
+    hijri_day: '15',
+    hijri_month: 'رمضان',
+    hijri_year: '1447',
+    gregorian_date: '7 مارس 2026',
+    random_ayah: 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+    random_dua: 'اللهم إني أسألك العفو والعافية',
+    prayer_name: 'الفجر',
+    prayer_time: '٤:٣٠ ص',
+    app_name: appName,
+  };
+
   const [templates, setTemplates] = useState<WidgetTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<WidgetTemplate | null>(null);
 
@@ -152,7 +194,7 @@ export default function WidgetsScreen() {
 
   const loadTemplates = useCallback(async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       const q = query(collection(db, COLLECTION_NAME), orderBy('updatedAt', 'desc'));
       const snap = await getDocs(q);
       const items: WidgetTemplate[] = snap.docs.map((d) => ({
@@ -162,9 +204,9 @@ export default function WidgetsScreen() {
       setTemplates(items);
     } catch (error) {
       console.error('Error loading widget templates:', error);
-      Alert.alert('خطأ', 'فشل تحميل القوالب');
+      Alert.alert(t('common.error'), t('admin.loadFailed'));
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, []);
 
@@ -206,11 +248,11 @@ export default function WidgetsScreen() {
 
   const handleSave = async (publish: boolean) => {
     if (!name.trim()) {
-      Alert.alert('خطأ', 'يجب إدخال اسم القالب');
+      Alert.alert(t('common.error'), t('admin.enterName'));
       return;
     }
     if (!svgSource.trim()) {
-      Alert.alert('خطأ', 'يجب إدخال كود SVG');
+      Alert.alert(t('common.error'), t('admin.enterSvg'));
       return;
     }
 
@@ -243,17 +285,17 @@ export default function WidgetsScreen() {
       loadTemplates();
     } catch (error) {
       console.error('Error saving template:', error);
-      Alert.alert('خطأ', 'فشل حفظ القالب');
+      Alert.alert(t('common.error'), t('admin.saveFailed'));
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDelete = (item: WidgetTemplate) => {
-    Alert.alert('حذف القالب', `هل تريد حذف "${item.name}"؟`, [
-      { text: 'إلغاء', style: 'cancel' },
+    Alert.alert(t('admin.deleteTitle'), t('admin.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'حذف',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -261,7 +303,7 @@ export default function WidgetsScreen() {
             loadTemplates();
           } catch (error) {
             console.error('Error deleting template:', error);
-            Alert.alert('خطأ', 'فشل حذف القالب');
+            Alert.alert(t('common.error'), t('admin.saveFailed'));
           }
         },
       },
@@ -337,16 +379,16 @@ export default function WidgetsScreen() {
                   { color: item.isActive ? '#22C55E' : '#EF4444' },
                 ]}
               >
-                {item.isActive ? 'نشط' : 'مسودة'}
+                {item.isActive ? t('admin.active') : t('admin.draft')}
               </Text>
             </View>
           </View>
           <Text style={styles.cardTitle}>{item.name}</Text>
           {updatedStr ? (
-            <Text style={styles.cardDate}>آخر تحديث: {updatedStr}</Text>
+            <Text style={styles.cardDate}>{t('admin.lastUpdated')}: {updatedStr}</Text>
           ) : null}
           <Text style={styles.cardMappings}>
-            {item.mappings.length} متغير{item.mappings.length !== 1 ? 'ات' : ''}
+            {item.mappings.length} {t('admin.variableUnit')}
           </Text>
         </View>
 
@@ -385,7 +427,7 @@ export default function WidgetsScreen() {
     if (showVariablePicker !== index) return null;
     return (
       <View style={styles.pickerDropdown}>
-        {VARIABLE_OPTIONS.map((opt) => (
+        {getVariableOptions().map((opt) => (
           <TouchableOpacity
             key={opt.key}
             style={styles.pickerOption}
@@ -408,23 +450,23 @@ export default function WidgetsScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>محرك الويدجت الديناميكي</Text>
+        <Text style={styles.headerTitle}>{t('admin.widgetTitle')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>إضافة قالب جديد</Text>
+          <Text style={styles.addButtonText}>{t('admin.addNew')}</Text>
         </TouchableOpacity>
       </View>
 
       {/* List */}
-      {isLoading ? (
+      {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : templates.length === 0 ? (
         <View style={styles.centered}>
           <Ionicons name="cube-outline" size={64} color={Colors.textLight} />
-          <Text style={styles.emptyText}>لا توجد قوالب بعد</Text>
-          <Text style={styles.emptySubtext}>اضغط على "إضافة قالب جديد" للبدء</Text>
+          <Text style={styles.emptyText}>{t('admin.noTemplates')}</Text>
+          <Text style={styles.emptySubtext}>{t('admin.noTemplatesHint')}</Text>
         </View>
       ) : (
         <FlatList
@@ -442,10 +484,10 @@ export default function WidgetsScreen() {
           {/* Modal header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeModal}>
-              <Text style={styles.modalCancel}>إلغاء</Text>
+              <Text style={styles.modalCancel}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingTemplate ? 'تعديل القالب' : 'قالب جديد'}
+              {editingTemplate ? t('admin.editTemplate') : t('admin.newTemplate')}
             </Text>
             <View style={{ width: 50 }} />
           </View>
@@ -456,9 +498,9 @@ export default function WidgetsScreen() {
             keyboardShouldPersistTaps="handled"
           >
             {/* Template name */}
-            <Text style={styles.label}>اسم القالب</Text>
+            <Text style={styles.label}>{t('admin.templateName')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
               value={name}
               onChangeText={setName}
               placeholder="مثال: ويدجت الآية اليومية"
@@ -466,9 +508,9 @@ export default function WidgetsScreen() {
             />
 
             {/* Type selector */}
-            <Text style={styles.label}>نوع القالب</Text>
+            <Text style={styles.label}>{t('admin.templateType')}</Text>
             <View style={styles.typeRow}>
-              {WIDGET_TYPES.map((wt) => (
+              {getWidgetTypes().map((wt) => (
                 <TouchableOpacity
                   key={wt.key}
                   style={[
@@ -495,9 +537,9 @@ export default function WidgetsScreen() {
             </View>
 
             {/* SVG Source */}
-            <Text style={styles.label}>كود SVG</Text>
+            <Text style={styles.label}>{t('admin.svgCode')}</Text>
             <TextInput
-              style={[styles.input, styles.svgInput]}
+              style={[styles.input, styles.svgInput, { textAlign: isRTL ? 'right' : 'left' }]}
               value={svgSource}
               onChangeText={setSvgSource}
               placeholder={'<svg ...>\n  <text id="title">{{random_ayah}}</text>\n</svg>'}
@@ -508,30 +550,30 @@ export default function WidgetsScreen() {
 
             {/* Variable Mappings */}
             <View style={styles.sectionHeader}>
-              <Text style={styles.label}>ربط المتغيرات</Text>
+              <Text style={styles.label}>{t('admin.variableMappings')}</Text>
               <TouchableOpacity style={styles.addMappingBtn} onPress={addMapping}>
                 <Ionicons name="add-circle-outline" size={18} color={Colors.primary} />
-                <Text style={styles.addMappingText}>إضافة متغير</Text>
+                <Text style={styles.addMappingText}>{t('admin.addVariable')}</Text>
               </TouchableOpacity>
             </View>
 
             {mappings.map((m, index) => (
               <View key={index} style={styles.mappingCard}>
                 <View style={styles.mappingRow}>
-                  <Text style={styles.mappingLabel}>المحدد (Selector)</Text>
+                  <Text style={styles.mappingLabel}>{t('admin.nodeSelector')}</Text>
                   <TouchableOpacity onPress={() => removeMapping(index)}>
                     <Ionicons name="close-circle" size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
                 <TextInput
-                  style={styles.mappingInput}
+                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left' }]}
                   value={m.nodeSelector}
                   onChangeText={(v) => updateMapping(index, 'nodeSelector', v)}
                   placeholder='مثال: #title-text'
                   placeholderTextColor={Colors.textLight}
                 />
 
-                <Text style={styles.mappingLabel}>المتغير</Text>
+                <Text style={styles.mappingLabel}>{t('admin.variable')}</Text>
                 <TouchableOpacity
                   style={styles.variableSelector}
                   onPress={() =>
@@ -539,15 +581,15 @@ export default function WidgetsScreen() {
                   }
                 >
                   <Text style={styles.variableSelectorText}>
-                    {VARIABLE_OPTIONS.find((o) => o.key === m.variable)?.label ?? m.variable}
+                    {getVariableOptions().find((o) => o.key === m.variable)?.label ?? m.variable}
                   </Text>
                   <Ionicons name="chevron-down" size={16} color={Colors.textLight} />
                 </TouchableOpacity>
                 {renderVariablePicker(index)}
 
-                <Text style={styles.mappingLabel}>القيمة الافتراضية</Text>
+                <Text style={styles.mappingLabel}>{t('admin.fallbackValue')}</Text>
                 <TextInput
-                  style={styles.mappingInput}
+                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left' }]}
                   value={m.fallback}
                   onChangeText={(v) => updateMapping(index, 'fallback', v)}
                   placeholder="قيمة احتياطية"
@@ -559,11 +601,11 @@ export default function WidgetsScreen() {
             {/* Live Preview */}
             {svgSource.trim() ? (
               <>
-                <Text style={[styles.label, { marginTop: Spacing.lg }]}>معاينة مباشرة</Text>
+                <Text style={[styles.label, { marginTop: Spacing.lg }]}>{t('admin.livePreview')}</Text>
                 <View style={styles.previewFrame}>
                   <WebView
                     originWhitelist={['*']}
-                    source={{ html: buildPreviewHtml(svgSource, mappings) }}
+                    source={{ html: buildPreviewHtml(svgSource, mappings, MOCK_VARIABLES) }}
                     style={styles.previewWebView}
                     scrollEnabled={false}
                     javaScriptEnabled={false}
@@ -585,7 +627,7 @@ export default function WidgetsScreen() {
                   <>
                     <Ionicons name="save-outline" size={18} color={Colors.primary} />
                     <Text style={[styles.saveBtnText, { color: Colors.primary }]}>
-                      حفظ كمسودة
+                      {t('admin.saveDraft')}
                     </Text>
                   </>
                 )}
@@ -601,7 +643,7 @@ export default function WidgetsScreen() {
                 ) : (
                   <>
                     <Ionicons name="rocket-outline" size={18} color="#fff" />
-                    <Text style={[styles.saveBtnText, { color: '#fff' }]}>نشر</Text>
+                    <Text style={[styles.saveBtnText, { color: '#fff' }]}>{t('admin.publish')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -646,7 +688,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.sm,
-    gap: 6,
+    gap: 8,
   },
   addButtonText: {
     color: '#fff',
@@ -687,7 +729,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   cardHeader: {
-    gap: 6,
+    gap: 8,
   },
   cardTitleRow: {
     flexDirection: 'row',
@@ -701,7 +743,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: BorderRadius.xs,
-    gap: 4,
+    gap: 8,
   },
   typeBadgeText: {
     fontSize: 12,
@@ -713,7 +755,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: BorderRadius.xs,
-    gap: 4,
+    gap: 8,
   },
   statusDot: {
     width: 6,
@@ -804,7 +846,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm + 2,
     fontSize: 15,
     color: Colors.text,
-    textAlign: 'right',
   },
   svgInput: {
     height: 160,
@@ -823,7 +864,7 @@ const styles = StyleSheet.create({
   typeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: BorderRadius.sm,
@@ -846,7 +887,7 @@ const styles = StyleSheet.create({
   addMappingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   addMappingText: {
     fontSize: 14,
@@ -882,7 +923,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 14,
     color: Colors.text,
-    textAlign: 'right',
   },
 
   // Variable picker
@@ -955,7 +995,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     paddingVertical: 14,
     borderRadius: BorderRadius.sm,
   },

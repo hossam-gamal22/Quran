@@ -9,6 +9,7 @@ import React, {
   ReactNode,
 } from 'react';
 import * as Notifications from 'expo-notifications';
+import { Audio } from 'expo-av';
 import {
   registerDeviceForPushNotifications,
   getNotificationSettings,
@@ -88,8 +89,8 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [scheduledCount, setScheduledCount] = useState(0);
   
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   // Initialize
   useEffect(() => {
@@ -124,8 +125,25 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
   useEffect(() => {
     // Notification received while app is foregrounded
     notificationListener.current = addNotificationReceivedListener(
-      (notification) => {
+      async (notification) => {
         console.log('Notification received:', notification);
+        const data = notification.request.content.data;
+        // Play ayah audio when custom reminder with ayah content arrives in foreground
+        if (data?.type === 'custom' && data?.contentType === 'ayah' && data?.ayahAudioUrl) {
+          try {
+            const { sound } = await Audio.Sound.createAsync(
+              { uri: String(data.ayahAudioUrl) },
+              { shouldPlay: true }
+            );
+            sound.setOnPlaybackStatusUpdate((status) => {
+              if (status.isLoaded && status.didJustFinish) {
+                sound.unloadAsync();
+              }
+            });
+          } catch (e) {
+            console.warn('Failed to play ayah audio from notification:', e);
+          }
+        }
       }
     );
 
@@ -133,6 +151,16 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
     responseListener.current = addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
       
+      // Handle deep-link URL from admin notifications
+      if (data?.actionUrl && typeof data.actionUrl === 'string') {
+        const url = data.actionUrl;
+        // Only navigate to internal routes (starts with /)
+        if (url.startsWith('/')) {
+          router.push(url as any);
+          return;
+        }
+      }
+
       // Handle navigation based on notification type
       if (data?.type === 'prayer') {
         router.push('/(tabs)/prayer');
@@ -142,6 +170,31 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
         router.push('/(tabs)/quran');
       } else if (data?.type === 'seasonal') {
         router.push('/seasonal');
+      } else if (data?.type === 'custom') {
+        // Navigate to ayah if custom reminder has surah/ayah data
+        if (data?.contentType === 'ayah' && data?.surah && data?.ayah) {
+          router.push(`/surah/${data.surah}?ayah=${data.ayah}` as any);
+          // Play ayah audio after navigation
+          if (data?.ayahAudioUrl) {
+            setTimeout(async () => {
+              try {
+                const { sound } = await Audio.Sound.createAsync(
+                  { uri: String(data.ayahAudioUrl) },
+                  { shouldPlay: true }
+                );
+                sound.setOnPlaybackStatusUpdate((status) => {
+                  if (status.isLoaded && status.didJustFinish) {
+                    sound.unloadAsync();
+                  }
+                });
+              } catch (e) {
+                console.warn('Failed to play ayah audio:', e);
+              }
+            }, 1500);
+          }
+        } else if (data?.contentType === 'surah' && data?.surah) {
+          router.push(`/surah/${data.surah}` as any);
+        }
       }
     });
 

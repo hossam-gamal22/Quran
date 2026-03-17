@@ -9,31 +9,34 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import { t } from '@/lib/i18n';
+import { useColors } from '@/hooks/use-colors';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { TRANSLATION_EDITIONS } from '@/lib/quran-api';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
-const LANGUAGE_NAMES: Record<string, string> = {
-  en: 'الانجليزية',
-  fr: 'الفرنسية',
-  tr: 'التركية',
-  ur: 'الأردية',
-  id: 'الإندونيسية',
-  de: 'الألمانية',
-  es: 'الإسبانية',
-  hi: 'الهندية',
-  bn: 'البنغالية',
-  ms: 'الملايوية',
-  ru: 'الروسية',
-  fa: 'الفارسية',
+const LANGUAGE_NAMES: Record<string, Record<string, string>> = {
+  en: { ar: 'الانجليزية', en: 'English' },
+  fr: { ar: 'الفرنسية', en: 'French' },
+  tr: { ar: 'التركية', en: 'Turkish' },
+  ur: { ar: 'الأردية', en: 'Urdu' },
+  id: { ar: 'الإندونيسية', en: 'Indonesian' },
+  de: { ar: 'الألمانية', en: 'German' },
+  es: { ar: 'الإسبانية', en: 'Spanish' },
+  hi: { ar: 'الهندية', en: 'Hindi' },
+  bn: { ar: 'البنغالية', en: 'Bengali' },
+  ms: { ar: 'الملايوية', en: 'Malay' },
+  ru: { ar: 'الروسية', en: 'Russian' },
+  fa: { ar: 'الفارسية', en: 'Persian' },
 };
 
 const LANGUAGE_FLAGS: Record<string, string> = {
@@ -52,16 +55,17 @@ const LANGUAGE_FLAGS: Record<string, string> = {
 };
 
 export default function TranslationsScreen() {
-  const router = useRouter();
+  const isRTL = useIsRTL();
   const { settings, isDarkMode, updateDisplay } = useSettings();
+  const themeColors = useColors();
 
   const selectedEdition = settings.display.showTranslation
     ? settings.display.translationEdition || 'none'
     : 'none';
 
   const colors = {
-    foreground: isDarkMode ? '#FFFFFF' : '#1C1C1E',
-    muted: isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
+    foreground: themeColors.foreground,
+    muted: themeColors.muted,
     accent: isDarkMode ? '#4ADE80' : '#2f7659',
     divider: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
   };
@@ -87,25 +91,14 @@ export default function TranslationsScreen() {
   return (
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
+      opacity={settings.display.backgroundOpacity ?? 1}
       style={[styles.container, isDarkMode && styles.containerDark]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <MaterialCommunityIcons
-              name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
-              size={28}
-              color={colors.foreground}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
-            ترجمات القرآن
-          </Text>
-          <View style={{ width: 44 }} />
-        </View>
+        <UniversalHeader title={t('settings.quranTranslations')} />
 
         <ScrollView
           style={{ flex: 1 }}
@@ -114,14 +107,14 @@ export default function TranslationsScreen() {
         >
           {/* No Translation */}
           <TouchableOpacity
-            style={[styles.editionRow, { borderBottomColor: colors.divider }]}
+            style={[styles.editionRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => handleSelect('none')}
           >
             <View style={styles.flagContainer}>
               <MaterialCommunityIcons name="translate-off" size={28} color={colors.muted} />
             </View>
             <View style={styles.editionInfo}>
-              <Text style={[styles.editionLang, { color: colors.foreground }]}>بدون ترجمة</Text>
+              <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.noTranslationOption')}</Text>
             </View>
             {selectedEdition === 'none' && (
               <MaterialCommunityIcons name="check" size={22} color={colors.accent} />
@@ -134,17 +127,17 @@ export default function TranslationsScreen() {
               {editions.map((ed) => (
                 <TouchableOpacity
                   key={ed.identifier}
-                  style={[styles.editionRow, { borderBottomColor: colors.divider }]}
+                  style={[styles.editionRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => handleSelect(ed.identifier)}
                 >
                   <View style={styles.flagContainer}>
-                    <Text style={styles.flagEmoji}>{LANGUAGE_FLAGS[lang] || '🌐'}</Text>
+                    <Text style={styles.flagEmoji}>{LANGUAGE_FLAGS[lang] || ''}</Text>
                   </View>
                   <View style={styles.editionInfo}>
-                    <Text style={[styles.editionLang, { color: colors.foreground }]}>
-                      {LANGUAGE_NAMES[lang] || lang}
+                    <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>
+                      {LANGUAGE_NAMES[lang]?.[isRTL ? 'ar' : 'en'] || lang}
                     </Text>
-                    <Text style={[styles.editionName, { color: colors.muted }]}>
+                    <Text style={[styles.editionName, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
                       {ed.name}
                     </Text>
                   </View>
@@ -164,32 +157,13 @@ export default function TranslationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  containerDark: { backgroundColor: '#11151c' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  containerDark: { backgroundColor: 'transparent' },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
   },
   editionRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -201,25 +175,22 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
+    marginHorizontal: 12,
   },
   flagEmoji: {
     fontSize: 28,
   },
   editionInfo: {
     flex: 1,
-    alignItems: 'flex-end',
-    marginRight: 4,
+    marginHorizontal: 4,
   },
   editionLang: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
-    textAlign: 'right',
+    fontFamily: fontSemiBold(),
   },
   editionName: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'right',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
 });

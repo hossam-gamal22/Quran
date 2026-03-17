@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { ReciterConfig } from '../../types/admin';
-
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function RecitersScreen() {
   const [reciters, setReciters] = useState<ReciterConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +80,7 @@ export default function RecitersScreen() {
 
   const saveReciter = async () => {
     if (!formData.nameAr || !formData.audioBaseUrl) {
-      Alert.alert('خطأ', 'يرجى ملء الاسم بالعربية ورابط الصوت');
+      Alert.alert(t('common.error'), t('admin.fillRequiredFields'));
       return;
     }
 
@@ -93,22 +94,22 @@ export default function RecitersScreen() {
       }
 
       if (success) {
-        Alert.alert('تم', 'تم حفظ القارئ بنجاح');
+        Alert.alert(t('common.done'), t('admin.reciterSaved'));
         setShowModal(false);
         loadReciters();
       } else {
-        Alert.alert('خطأ', 'فشل في حفظ القارئ');
+        Alert.alert(t('common.error'), t('admin.reciterSaveFailed'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.unexpectedError'));
     }
   };
 
   const deleteReciter = async (id: string) => {
-    Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا القارئ؟', [
-      { text: 'إلغاء', style: 'cancel' },
+    Alert.alert(t('admin.confirmDelete'), t('admin.reciterDeleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'حذف',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           const success = await adminService.deleteReciter(id);
@@ -154,26 +155,26 @@ export default function RecitersScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{reciters.length}</Text>
-          <Text style={styles.statLabel}>إجمالي القراء</Text>
+          <Text style={styles.statLabel}>{t('admin.totalReciters')}</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
             {reciters.filter((r) => r.isActive).length}
           </Text>
-          <Text style={styles.statLabel}>مفعّلين</Text>
+          <Text style={styles.statLabel}>{t('admin.enabledCount')}</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
             {reciters.filter((r) => r.isPremium).length}
           </Text>
-          <Text style={styles.statLabel}>مميزين</Text>
+          <Text style={styles.statLabel}>{t('admin.premiumCount')}</Text>
         </View>
       </View>
 
       {/* Add Button */}
       <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
         <Ionicons name="add-circle" size={24} color={Colors.textLight} />
-        <Text style={styles.addBtnText}>إضافة قارئ جديد</Text>
+        <Text style={styles.addBtnText}>{t('admin.addReciter')}</Text>
       </TouchableOpacity>
 
       {/* Reciters List */}
@@ -208,13 +209,13 @@ export default function RecitersScreen() {
                           { color: item.isActive ? Colors.success : Colors.error },
                         ]}
                       >
-                        {item.isActive ? 'مفعّل' : 'معطّل'}
+                        {item.isActive ? t('admin.enabled') : t('admin.disabled')}
                       </Text>
                     </View>
                     {item.isPremium && (
                       <View style={[styles.badge, { backgroundColor: Colors.gold + '20' }]}>
                         <Ionicons name="star" size={12} color={Colors.gold} />
-                        <Text style={[styles.badgeText, { color: Colors.gold }]}>مميز</Text>
+                        <Text style={[styles.badgeText, { color: Colors.gold }]}>{t('admin.premium')}</Text>
                       </View>
                     )}
                   </View>
@@ -267,7 +268,7 @@ export default function RecitersScreen() {
         {reciters.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="mic-outline" size={64} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>لا يوجد قراء</Text>
+            <Text style={styles.emptyText}>{t('admin.noReciters')}</Text>
           </View>
         )}
 
@@ -287,16 +288,16 @@ export default function RecitersScreen() {
               <Ionicons name="close" size={28} color={Colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingReciter ? 'تعديل القارئ' : 'إضافة قارئ جديد'}
+              {editingReciter ? t('admin.editReciter') : t('admin.addReciter')}
             </Text>
             <TouchableOpacity onPress={saveReciter}>
-              <Text style={styles.saveText}>حفظ</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>الاسم (عربي) *</Text>
+              <Text style={styles.inputLabel}>{t('admin.nameArabic')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.nameAr}
@@ -307,7 +308,7 @@ export default function RecitersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>الاسم (إنجليزي)</Text>
+              <Text style={styles.inputLabel}>{t('admin.nameEnglish')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.name}
@@ -318,7 +319,7 @@ export default function RecitersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>رابط الصورة</Text>
+              <Text style={styles.inputLabel}>{t('admin.photoUrl')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.photoUrl}
@@ -329,7 +330,7 @@ export default function RecitersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>رابط قاعدة الصوت *</Text>
+              <Text style={styles.inputLabel}>{t('admin.audioBaseUrl')}</Text>
               <TextInput
                 style={styles.input}
                 value={formData.audioBaseUrl}
@@ -338,12 +339,12 @@ export default function RecitersScreen() {
                 placeholderTextColor={Colors.textMuted}
               />
               <Text style={styles.inputHint}>
-                سيتم إضافة رقم السورة تلقائياً (مثال: /001.mp3)
+                {t('admin.audioUrlHint')}
               </Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>ترتيب العرض</Text>
+              <Text style={styles.inputLabel}>{t('admin.sortOrder')}</Text>
               <TextInput
                 style={styles.input}
                 value={String(formData.sortOrder)}
@@ -357,7 +358,7 @@ export default function RecitersScreen() {
             </View>
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>مفعّل</Text>
+              <Text style={styles.switchLabel}>{t('admin.enabled')}</Text>
               <Switch
                 value={formData.isActive}
                 onValueChange={(value) => setFormData({ ...formData, isActive: value })}
@@ -367,7 +368,7 @@ export default function RecitersScreen() {
             </View>
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>مميز (Premium فقط)</Text>
+              <Text style={styles.switchLabel}>{t('admin.premiumLabel')}</Text>
               <Switch
                 value={formData.isPremium}
                 onValueChange={(value) => setFormData({ ...formData, isPremium: value })}
@@ -485,7 +486,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: 8,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,

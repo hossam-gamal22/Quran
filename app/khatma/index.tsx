@@ -14,24 +14,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useKhatma } from '../../contexts/KhatmaContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '../../hooks/use-colors';
 import { getKhatmaStats, getPageSurah, Khatma } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
+import { UniversalHeader } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { fontBold } from '@/lib/fonts';
 import {
   Spacing,
   BorderRadius,
   FONT_SIZES,
 } from '../../constants/theme';
-
-// ===== HELPER =====
-const toArabicNumber = (num: number): string => {
-  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return num.toString().split('').map((d) => arabicNumerals[parseInt(d)]).join('');
-};
+import { localizeNumber as toArabicNumber } from '@/lib/format-number';
 
 export default function KhatmaListScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { settings, t } = useSettings();
+  const isRTL = useIsRTL();
   const {
     khatmas,
     activeKhatma,
@@ -44,12 +47,12 @@ export default function KhatmaListScreen() {
   const handleDelete = useCallback(
     (khatma: Khatma) => {
       Alert.alert(
-        'حذف الختمة',
-        `هل أنت متأكد من حذف "${khatma.name}"؟`,
+        t('khatma.deleteKhatma'),
+        t('khatma.deleteConfirm'),
         [
-          { text: 'إلغاء', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'حذف',
+            text: t('common.delete'),
             style: 'destructive',
             onPress: async () => {
               await deleteKhatma(khatma.id);
@@ -61,18 +64,26 @@ export default function KhatmaListScreen() {
     [deleteKhatma]
   );
 
+  // Handle set active
+  const handleSetActive = useCallback(
+    async (khatma: Khatma) => {
+      await setActiveKhatma(khatma.id);
+    },
+    [setActiveKhatma]
+  );
+
   // Handle options menu for a khatma
   const handleOptions = useCallback(
     (khatma: Khatma) => {
       const isActive = activeKhatma?.id === khatma.id;
       const options = [
-        ...(isActive ? [] : ['تعيين كختمة نشطة']),
-        'تعديل التذكير',
-        'حذف الختمة',
-        'إلغاء',
+        ...(isActive ? [] : [t('khatma.setAsActive')]),
+        t('khatma.editReminder'),
+        t('khatma.deleteKhatma'),
+        t('common.cancel'),
       ];
-      const destructiveIndex = options.indexOf('حذف الختمة');
-      const cancelIndex = options.indexOf('إلغاء');
+      const destructiveIndex = options.indexOf(t('khatma.deleteKhatma'));
+      const cancelIndex = options.indexOf(t('common.cancel'));
 
       if (Platform.OS === 'ios') {
         ActionSheetIOS.showActionSheetWithOptions(
@@ -84,38 +95,30 @@ export default function KhatmaListScreen() {
           },
           (buttonIndex) => {
             const selected = options[buttonIndex];
-            if (selected === 'تعيين كختمة نشطة') handleSetActive(khatma);
-            else if (selected === 'تعديل التذكير') {
+            if (selected === t('khatma.setAsActive')) handleSetActive(khatma);
+            else if (selected === t('khatma.editReminder')) {
               router.push(`/khatma/new?editReminder=${khatma.id}`);
             }
-            else if (selected === 'حذف الختمة') handleDelete(khatma);
+            else if (selected === t('khatma.deleteKhatma')) handleDelete(khatma);
           }
         );
       } else {
         Alert.alert(
           khatma.name,
-          'اختر إجراء',
+          t('khatma.chooseAction'),
           [
-            ...(isActive ? [] : [{ text: 'تعيين كختمة نشطة', onPress: () => handleSetActive(khatma) }]),
+            ...(isActive ? [] : [{ text: t('khatma.setAsActive'), onPress: () => handleSetActive(khatma) }]),
             {
-              text: 'تعديل التذكير',
+              text: t('khatma.editReminder'),
               onPress: () => router.push(`/khatma/new?editReminder=${khatma.id}`),
             },
-            { text: 'حذف الختمة', style: 'destructive' as const, onPress: () => handleDelete(khatma) },
-            { text: 'إلغاء', style: 'cancel' as const },
+            { text: t('khatma.deleteKhatma'), style: 'destructive' as const, onPress: () => handleDelete(khatma) },
+            { text: t('common.cancel'), style: 'cancel' as const },
           ]
         );
       }
     },
     [activeKhatma, handleSetActive, handleDelete, router]
-  );
-
-  // Handle set active
-  const handleSetActive = useCallback(
-    async (khatma: Khatma) => {
-      await setActiveKhatma(khatma.id);
-    },
-    [setActiveKhatma]
   );
 
   // Render khatma card
@@ -139,14 +142,14 @@ export default function KhatmaListScreen() {
             ]}
           >
             {/* Header */}
-            <View style={styles.cardHeader}>
+            <View style={[styles.cardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.cardTitleRow}>
                 <Text style={[styles.khatmaName, { color: colors.text }]}>
                   {item.name}
                 </Text>
                 {isActive && (
                   <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.activeBadgeText}>نشطة</Text>
+                    <Text style={styles.activeBadgeText}>{t('khatma.active')}</Text>
                   </View>
                 )}
               </View>
@@ -160,15 +163,15 @@ export default function KhatmaListScreen() {
             </View>
               
             {item.isCompleted && (
-              <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
+              <View style={[styles.completedBadge, { backgroundColor: colors.success, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                <Text style={styles.completedText}>مكتملة</Text>
+                <Text style={styles.completedText}>{t('khatma.completed')}</Text>
               </View>
             )}
 
             {/* Progress Bar */}
             <View style={styles.progressSection}>
-              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+              <View style={[styles.progressBar, { backgroundColor: colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View
                   style={[
                     styles.progressFill,
@@ -179,20 +182,20 @@ export default function KhatmaListScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+              <Text style={[styles.progressText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
                 {toArabicNumber(stats.progressPercentage)}٪
               </Text>
             </View>
 
             {/* Stats */}
-            <View style={styles.statsRow}>
+            <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
                 <Ionicons name="document-text-outline" size={18} color={colors.primary} />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {toArabicNumber(stats.pagesRead)}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                  صفحة
+                  {t('khatma.pageUnit')}
                 </Text>
               </View>
 
@@ -202,7 +205,7 @@ export default function KhatmaListScreen() {
                   {toArabicNumber(stats.daysRemaining)}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                  يوم متبقي
+                  {t('khatma.daysLeft')}
                 </Text>
               </View>
 
@@ -212,7 +215,7 @@ export default function KhatmaListScreen() {
                   {toArabicNumber(item.pagesPerDay)}
                 </Text>
                 <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                  صفحة/يوم
+                  {t('khatma.pagesPerDayLabel')}
                 </Text>
               </View>
             </View>
@@ -220,16 +223,16 @@ export default function KhatmaListScreen() {
             {/* Current Position */}
             <View style={[styles.currentPosition, { backgroundColor: colors.card }]}>
               <Text style={[styles.positionLabel, { color: colors.textSecondary }]}>
-                الموقع الحالي:
+                {t('khatma.currentPosition')}
               </Text>
               <Text style={[styles.positionValue, { color: colors.text }]}>
-                صفحة {toArabicNumber(item.currentPage)} - {currentSurah}
+                {t('khatma.pageUnit')} {toArabicNumber(item.currentPage)} - {currentSurah}
               </Text>
             </View>
 
             {/* Status Indicator */}
             {!item.isCompleted && (
-              <View style={styles.statusRow}>
+              <View style={[styles.statusRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons
                   name={stats.isOnTrack ? 'checkmark-circle' : 'warning'}
                   size={16}
@@ -241,7 +244,7 @@ export default function KhatmaListScreen() {
                     { color: stats.isOnTrack ? colors.success : colors.warning },
                   ]}
                 >
-                  {stats.isOnTrack ? 'على المسار الصحيح' : 'متأخر عن الجدول'}
+                  {stats.isOnTrack ? t('khatma.onTrack') : t('khatma.behindSchedule')}
                 </Text>
               </View>
             )}
@@ -255,34 +258,40 @@ export default function KhatmaListScreen() {
   // Loading state
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            جاري التحميل...
+            {t('khatma.loading')}
           </Text>
         </View>
       </SafeAreaView>
+      </BackgroundWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: colors.text }]}>ختماتي</Text>
-        
-        <TouchableOpacity
-          onPress={() => router.push('/khatma/new')}
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-        >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
+      <UniversalHeader
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+        rightActions={[{
+          icon: 'plus',
+          onPress: () => router.push('/khatma/new'),
+          color: '#FFFFFF',
+          size: 24,
+          style: { backgroundColor: colors.primary, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+        }]}
+      >
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('khatma.myKhatmas')}</Text>
+          <SectionInfoButton sectionKey="quran_surahs" />
+        </View>
+      </UniversalHeader>
 
       {/* Khatmas List */}
       {khatmas.length > 0 ? (
@@ -298,17 +307,17 @@ export default function KhatmaListScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="book-outline" size={80} color={colors.textSecondary} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            لا توجد ختمات
+            {t('khatma.noKhatmas')}
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            ابدأ ختمة جديدة واقرأ القرآن يومياً
+            {t('khatma.noKhatmasDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.startButtonText}>ابدأ ختمة جديدة</Text>
+            <Text style={styles.startButtonText}>{t('khatma.startNewKhatma')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -316,14 +325,15 @@ export default function KhatmaListScreen() {
       {/* Floating Action Button for Active Khatma */}
       {activeKhatma && !activeKhatma.isCompleted && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
+          style={[styles.fab, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={() => router.push('/khatma/wird')}
         >
           <Ionicons name="book" size={24} color="#FFFFFF" />
-          <Text style={styles.fabText}>الورد اليومي</Text>
+          <Text style={styles.fabText}>{t('khatma.dailyWird')}</Text>
         </TouchableOpacity>
       )}
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -340,30 +350,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: FONT_SIZES.md,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   listContent: {
     padding: Spacing.lg,
     paddingBottom: 120,
@@ -403,7 +390,7 @@ const styles = StyleSheet.create({
   completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -433,7 +420,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     minWidth: 40,
-    textAlign: 'right',
   },
   statsRow: {
     flexDirection: 'row',
@@ -442,7 +428,7 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   statValue: {
     fontSize: FONT_SIZES.lg,

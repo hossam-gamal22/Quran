@@ -5,6 +5,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import azkarData from '@/data/json/azkar.json';
 import categoriesData from '@/data/json/categories.json';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { translateBenefit } from '@/lib/benefit-translations';
 
 // ===================================================
 // الأنواع (Types)
@@ -157,14 +160,16 @@ const resolveTranslationValue = (val: unknown): string | undefined => {
 
 export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
   const t = zikr.translations || zikr.translation;
-  return resolveTranslationValue(t?.[language]) || resolveTranslationValue(t?.[DEFAULT_LANGUAGE]) || zikr.arabic;
+  // Fallback chain: requested lang → en → ar
+  return resolveTranslationValue(t?.[language]) || resolveTranslationValue(t?.en) || resolveTranslationValue(t?.[DEFAULT_LANGUAGE]) || zikr.arabic;
 };
 
 /**
  * الحصول على اسم الفئة مترجم
  */
 export const getCategoryName = (category: AzkarCategory, language: Language): string => {
-  return category.name?.[language] || category.name?.[DEFAULT_LANGUAGE] || '';
+  // Fallback chain: requested lang → en → ar
+  return category.name?.[language] || category.name?.en || category.name?.[DEFAULT_LANGUAGE] || '';
 };
 
 /**
@@ -174,7 +179,8 @@ export const getZikrBenefit = (zikr: Zikr, language: Language): string | undefin
   if (!zikr.benefit) return undefined;
   
   // Handle case where benefit is a plain string (legacy format)
-  if (typeof zikr.benefit === 'string') return zikr.benefit;
+  // Use static translations map for non-Arabic languages
+  if (typeof zikr.benefit === 'string') return translateBenefit(zikr.benefit, language);
   
   // Try requested language, then English, then Arabic fallback
   return zikr.benefit[language] || zikr.benefit.en || zikr.benefit.ar;
@@ -433,9 +439,79 @@ export const getQuranDuas = (): Zikr[] => getAzkarByCategory('quran_duas');
 export const getSunnahDuas = (): Zikr[] => getAzkarByCategory('sunnah_duas');
 export const getRuqya = (): Zikr[] => getAzkarByCategory('ruqya');
 
+/**
+ * أدعية يومية متجددة — 10 أدعية مختلفة كل يوم من مجموعة السنة
+ * يعتمد على يوم السنة لاختيار عشوائي ثابت خلال اليوم
+ */
+export const getDailySunnahDuas = (count: number = 10): Zikr[] => {
+  const all = getSunnahDuas();
+  if (all.length <= count) return all;
+
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+
+  // Seeded shuffle using day of year
+  const indices = all.map((_, i) => i);
+  let seed = dayOfYear * 2654435761; // Knuth multiplicative hash
+  for (let i = indices.length - 1; i > 0; i--) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const j = seed % (i + 1);
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+
+  return indices.slice(0, count).map(i => all[i]);
+};
+
 // ===================================================
 // التصدير الافتراضي
 // ===================================================
+
+// ===================================================
+// Firestore override — admin-managed azkar
+// ===================================================
+
+const FIRESTORE_AZKAR_CACHE_KEY = '@azkar_firestore_cache';
+const FIRESTORE_AZKAR_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+let firestoreAzkarCache: Zikr[] | null = null;
+
+/**
+ * Fetch azkar from Firestore collection `azkar/`.
+ * Caches in memory + AsyncStorage for 24h.
+ * Falls back to local JSON if Firestore is empty or fails.
+ */
+export const fetchAzkarFromFirestore = async (): Promise<Zikr[]> => {
+  // Memory cache
+  if (firestoreAzkarCache) return firestoreAzkarCache;
+
+  // AsyncStorage cache
+  try {
+    const cached = await AsyncStorage.getItem(FIRESTORE_AZKAR_CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < FIRESTORE_AZKAR_CACHE_TTL && data?.length > 0) {
+        firestoreAzkarCache = data;
+        return data;
+      }
+    }
+  } catch { /* continue to Firestore */ }
+
+  // Firestore
+  try {
+    const snap = await getDocs(collection(db, 'azkar'));
+    if (!snap.empty) {
+      const items = snap.docs.map(d => d.data() as Zikr);
+      items.sort((a, b) => a.id - b.id);
+      firestoreAzkarCache = items;
+      await AsyncStorage.setItem(FIRESTORE_AZKAR_CACHE_KEY, JSON.stringify({ data: items, timestamp: Date.now() }));
+      return items;
+    }
+  } catch { /* fallback to local */ }
+
+  // Fallback to local JSON
+  return getAllAzkar();
+};
 
 export default {
   getAllAzkar,
@@ -466,4 +542,5 @@ export default {
   getQuranDuas,
   getSunnahDuas,
   getRuqya,
+  fetchAzkarFromFirestore,
 };

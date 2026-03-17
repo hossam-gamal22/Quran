@@ -27,13 +27,21 @@ export interface DailyPrayerRecord {
   tahajjud?: boolean;
   duha?: boolean;
   spihar?: boolean;
+  // مواقيت الصلاة المجدولة لهذا اليوم (تُخزّن عند تسجيل الصلاة)
+  scheduledTimes?: {
+    fajr?: string;
+    dhuhr?: string;
+    asr?: string;
+    maghrib?: string;
+    isha?: string;
+  };
 }
 
 // سجل صيام يوم واحد
 export interface DailyFastingRecord {
   date: string;
   fasted: boolean;
-  type?: 'ramadan' | 'voluntary' | 'making_up' | 'monday_thursday' | 'white_days';
+  type?: 'ramadan' | 'voluntary' | 'making_up' | 'monday_thursday' | 'white_days' | 'makeup' | 'vow';
   notes?: string;
 }
 
@@ -236,6 +244,103 @@ export const updatePrayerStatus = async (
     await savePrayerRecord(record);
   } catch (error) {
     console.error('Error updating prayer status:', error);
+  }
+};
+
+/**
+ * تحديث حالة صلاة واحدة مع حفظ الوقت المُجدول
+ */
+export const updatePrayerStatusWithTime = async (
+  date: string,
+  prayer: PrayerName,
+  status: PrayerStatus,
+  scheduledTime?: string
+): Promise<void> => {
+  try {
+    let record = await getPrayerRecord(date);
+    
+    if (!record) {
+      record = {
+        date,
+        fajr: 'none',
+        dhuhr: 'none',
+        asr: 'none',
+        maghrib: 'none',
+        isha: 'none',
+      };
+    }
+    
+    record[prayer] = status;
+    
+    if (scheduledTime) {
+      if (!record.scheduledTimes) record.scheduledTimes = {};
+      record.scheduledTimes[prayer] = scheduledTime;
+    }
+    
+    await savePrayerRecord(record);
+  } catch (error) {
+    console.error('Error updating prayer status with time:', error);
+  }
+};
+
+/**
+ * حفظ مواقيت الصلاة المُجدولة ليوم كامل
+ */
+export const saveDayScheduledTimes = async (
+  date: string,
+  times: { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }
+): Promise<void> => {
+  try {
+    let record = await getPrayerRecord(date);
+    
+    if (!record) {
+      record = {
+        date,
+        fajr: 'none',
+        dhuhr: 'none',
+        asr: 'none',
+        maghrib: 'none',
+        isha: 'none',
+      };
+    }
+    
+    record.scheduledTimes = { ...record.scheduledTimes, ...times };
+    await savePrayerRecord(record);
+  } catch (error) {
+    console.error('Error saving scheduled times:', error);
+  }
+};
+
+/**
+ * جلب مواقيت الفجر التاريخية لعدد من الأيام الأخيرة
+ */
+export const getHistoricalFajrTimes = async (
+  days: number = 30
+): Promise<{ date: string; time: string; status: PrayerStatus }[]> => {
+  try {
+    const records = await getAllPrayerRecords();
+    const results: { date: string; time: string; status: PrayerStatus }[] = [];
+    
+    const today = new Date();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = formatDate(d);
+      const record = records[dateStr];
+      
+      if (record?.scheduledTimes?.fajr) {
+        results.push({
+          date: dateStr,
+          time: record.scheduledTimes.fajr,
+          status: record.fajr,
+        });
+      }
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Error getting historical fajr times:', error);
+    return [];
   }
 };
 

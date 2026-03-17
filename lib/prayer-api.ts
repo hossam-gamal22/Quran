@@ -2,6 +2,8 @@
 // API مواقيت الصلاة
 // ============================================
 
+import { t, getLanguage } from '@/lib/i18n';
+
 const ALADHAN_API_BASE = 'https://api.aladhan.com/v1';
 
 // ============================================
@@ -94,16 +96,18 @@ export const CALCULATION_METHODS: CalculationMethod[] = [
 // أسماء الصلوات
 // ============================================
 
-export const PRAYER_NAMES: { [key: string]: { ar: string; en: string } } = {
-  Fajr: { ar: 'الفجر', en: 'Fajr' },
-  Sunrise: { ar: 'الشروق', en: 'Sunrise' },
-  Dhuhr: { ar: 'الظهر', en: 'Dhuhr' },
-  Asr: { ar: 'العصر', en: 'Asr' },
-  Maghrib: { ar: 'المغرب', en: 'Maghrib' },
-  Isha: { ar: 'العشاء', en: 'Isha' },
-  Imsak: { ar: 'الإمساك', en: 'Imsak' },
-  Midnight: { ar: 'منتصف الليل', en: 'Midnight' },
-};
+export function getPrayerNames(): { [key: string]: { ar: string; en: string } } {
+  return {
+    Fajr: { ar: t('prayer.fajr'), en: 'Fajr' },
+    Sunrise: { ar: t('prayer.sunrise'), en: 'Sunrise' },
+    Dhuhr: { ar: t('prayer.dhuhr'), en: 'Dhuhr' },
+    Asr: { ar: t('prayer.asr'), en: 'Asr' },
+    Maghrib: { ar: t('prayer.maghrib'), en: 'Maghrib' },
+    Isha: { ar: t('prayer.isha'), en: 'Isha' },
+    Imsak: { ar: t('prayer.imsak'), en: 'Imsak' },
+    Midnight: { ar: t('prayer.midnight'), en: 'Midnight' },
+  };
+}
 
 // ============================================
 // دوال API
@@ -268,7 +272,23 @@ export function formatTime(time: string, format: '12h' | '24h' = '12h'): string 
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
   }
   
-  const period = hours >= 12 ? 'م' : 'ص';
+  const lang = getLanguage();
+  const amPm: Record<string, [string, string]> = {
+    ar: ['ص', 'م'],
+    ur: ['ص', 'م'],
+    en: ['AM', 'PM'],
+    fr: ['AM', 'PM'],
+    de: ['AM', 'PM'],
+    es: ['AM', 'PM'],
+    tr: ['ÖÖ', 'ÖS'],
+    id: ['AM', 'PM'],
+    ms: ['AM', 'PM'],
+    hi: ['AM', 'PM'],
+    bn: ['AM', 'PM'],
+    ru: ['AM', 'PM'],
+  };
+  const [am, pm] = amPm[lang] || amPm.en;
+  const period = hours >= 12 ? pm : am;
   const hour12 = hours % 12 || 12;
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`;
 }
@@ -295,8 +315,8 @@ export function getNextPrayer(prayerTimes: PrayerTimes): {
         name: prayer,
         time: prayerTimes[prayer],
         remaining: hoursRemaining > 0 
-          ? `${hoursRemaining} ساعة و ${minutesRemaining} دقيقة`
-          : `${minutesRemaining} دقيقة`,
+          ? `${hoursRemaining} ${t('common.hour')} ${minutesRemaining} ${t('common.minute')}`
+          : `${minutesRemaining} ${t('common.minute')}`,
       };
     }
   }

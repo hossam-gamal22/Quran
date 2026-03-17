@@ -1,5 +1,5 @@
 import React from 'react';
-import { Svg, G, Path, Circle } from 'react-native-svg';
+import { Svg, G, Path, Circle, Rect, Defs } from 'react-native-svg';
 
 // The pointer is a minimalist Kaaba-inspired arrow, centered for perfect rotation
 export const QiblaCompassPointer = ({ size = 90, color = '#00FF7A', glow = false }) => {
@@ -17,7 +17,6 @@ export const QiblaCompassPointer = ({ size = 90, color = '#00FF7A', glow = false
             r={radius * 0.7}
             fill={color}
             opacity={0.18}
-            filter="url(#glow)"
           />
         )}
         {/* Pointer body */}
@@ -31,7 +30,6 @@ export const QiblaCompassPointer = ({ size = 90, color = '#00FF7A', glow = false
           stroke="#FFF"
           strokeWidth={2.5}
           opacity={0.98}
-          filter={glow ? 'url(#glow)' : undefined}
         />
         {/* Kaaba base (minimalist square) */}
         <Rect
@@ -45,16 +43,16 @@ export const QiblaCompassPointer = ({ size = 90, color = '#00FF7A', glow = false
           strokeWidth={1.5}
           opacity={0.96}
         />
-        {/* SVG filter for glow */}
-        <Svg.Defs>
-          <Svg.Filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <Svg.FeGaussianBlur stdDeviation={8} result="coloredBlur" />
-            <Svg.FeMerge>
-              <Svg.FeMergeNode in="coloredBlur" />
-              <Svg.FeMergeNode in="SourceGraphic" />
-            </Svg.FeMerge>
-          </Svg.Filter>
-        </Svg.Defs>
+        {/* SVG filter for glow - not supported in RN, using opacity fallback */}
+        {glow && (
+          <Circle
+            cx={radius}
+            cy={radius}
+            r={radius * 0.5}
+            fill={color}
+            opacity={0.12}
+          />
+        )}
       </G>
     </Svg>
   );

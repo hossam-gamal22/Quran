@@ -10,6 +10,7 @@ import {
   Switch,
   Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeInRight,
@@ -22,12 +23,14 @@ import * as Haptics from 'expo-haptics';
 import {
   PrayerTimes,
   PrayerName,
-  formatTime12h,
+  formatPrayerTime,
   getPrayerIcon,
   isPrayerPassed,
   getNextPrayer,
 } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import type { PrayerStatus } from '@/lib/worship-storage';
 
 interface PrayerListProps {
   prayerTimes: PrayerTimes | null;
@@ -37,6 +40,9 @@ interface PrayerListProps {
   onToggleNotification?: (prayer: PrayerName, enabled: boolean) => void;
   showNotificationToggle?: boolean;
   showSunrise?: boolean;
+  show24Hour?: boolean;
+  prayerStatuses?: Record<string, PrayerStatus>;
+  onPrayerStatusToggle?: (prayer: PrayerName) => void;
 }
 
 interface PrayerItemProps {
@@ -48,7 +54,10 @@ interface PrayerItemProps {
   notificationEnabled?: boolean;
   onToggleNotification?: (enabled: boolean) => void;
   showNotificationToggle: boolean;
+  show24Hour?: boolean;
   index: number;
+  prayerStatus?: PrayerStatus;
+  onPrayerStatusToggle?: () => void;
 }
 
 const prayerColors: Record<PrayerName, { light: string; dark: string }> = {
@@ -75,6 +84,9 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   onToggleNotification,
   showNotificationToggle = false,
   showSunrise = true,
+  show24Hour = false,
+  prayerStatuses,
+  onPrayerStatusToggle,
 }) => {
   const { t } = useSettings();
 
@@ -122,7 +134,10 @@ export const PrayerList: React.FC<PrayerListProps> = ({
               : undefined
           }
           showNotificationToggle={showNotificationToggle}
+          show24Hour={show24Hour}
           index={index}
+          prayerStatus={prayerStatuses?.[prayer.name]}
+          onPrayerStatusToggle={onPrayerStatusToggle ? () => onPrayerStatusToggle(prayer.name) : undefined}
         />
       ))}
     </View>
@@ -138,15 +153,20 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   notificationEnabled,
   onToggleNotification,
   showNotificationToggle,
+  show24Hour = false,
   index,
+  prayerStatus,
+  onPrayerStatusToggle,
 }) => {
   const { t } = useSettings();
+  const isRTL = useIsRTL();
   const scale = useSharedValue(1);
   const prayerNameLocalized = t(`prayer.${name}`);
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;
   const activeGreen = '#2f7659';
+  const isPrayed = prayerStatus === 'prayed' || prayerStatus === 'late';
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -157,6 +177,9 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
     scale.value = withSpring(0.95, {}, () => {
       scale.value = withSpring(1);
     });
+    if (onPrayerStatusToggle && name !== 'sunrise') {
+      onPrayerStatusToggle();
+    }
   };
 
   const handleToggle = (value: boolean) => {
@@ -165,10 +188,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   };
 
   return (
-    <Animated.View
-      entering={FadeInRight.delay(index * 100).duration(400)}
-      style={animatedStyle}
-    >
+    <Animated.View entering={FadeInRight.delay(index * 100).duration(400)}>
+    <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={handlePress}
@@ -177,6 +198,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           isDarkMode && styles.prayerItemDark,
           isNext && styles.prayerItemNext,
           isPassed && !isNext && styles.prayerItemPassed,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
         <View
@@ -192,19 +214,21 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           />
         </View>
 
-        <View style={styles.prayerInfo}>
+        {/* Leading: Prayer Name */}
+        <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
           <Text
             style={[
               styles.prayerName,
               isDarkMode && styles.textLight,
               isPassed && !isNext && styles.textPassed,
               isNext && { color: activeGreen },
+              { textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {prayerNameLocalized}
           </Text>
           {isNext && (
-            <View style={[styles.nextBadge, { backgroundColor: activeGreen }]}>
+            <View style={[styles.nextBadge, { backgroundColor: activeGreen, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
               <Text style={styles.nextBadgeText}>
                 {t('prayer.nextPrayer')}
               </Text>
@@ -212,7 +236,26 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           )}
         </View>
 
-        <View style={styles.timeContainer}>
+        {/* Leading: Tracking Circle */}
+        {name !== 'sunrise' && (
+          <TouchableOpacity
+            onPress={() => onPrayerStatusToggle?.()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{}}
+          >
+            <MaterialCommunityIcons
+              name={isPrayed ? 'check-circle' : 'checkbox-blank-circle-outline'}
+              size={22}
+              color={isPrayed ? (isDarkMode ? '#4caf50' : '#2e7d32') : (isDarkMode ? '#555' : '#ccc')}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Spacer */}
+        <View style={{ flex: 1 }} />
+
+        {/* Trailing: Time + Toggle */}
+        <View style={[styles.timeContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Text
             style={[
               styles.prayerTime,
@@ -221,7 +264,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               isNext && { color: activeGreen },
             ]}
           >
-            {formatTime12h(time)}
+            {formatPrayerTime(time, show24Hour ?? false)}
           </Text>
 
           {showNotificationToggle && (
@@ -233,17 +276,9 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               value={notificationEnabled || false}
             />
           )}
-
-          {isPassed && !isNext && (
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={20}
-              color={isDarkMode ? '#4caf50' : '#2e7d32'}
-              style={styles.passedIcon}
-            />
-          )}
         </View>
       </TouchableOpacity>
+    </Animated.View>
     </Animated.View>
   );
 };
@@ -270,7 +305,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     color: '#666',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
   textLight: {
     color: '#fff',
@@ -285,6 +320,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.1)',
     borderWidth: 1,
     borderColor: 'transparent',
+    gap: 8,
   },
   prayerItemDark: {
     backgroundColor: 'rgba(120,120,128,0.2)',
@@ -303,14 +339,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   prayerInfo: {
-    flex: 1,
   },
   prayerName: {
     fontSize: 17,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#333',
   },
   textPassed: {
@@ -326,7 +360,7 @@ const styles = StyleSheet.create({
   nextBadgeText: {
     fontSize: 10,
     color: '#fff',
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
   timeContainer: {
     flexDirection: 'row',
@@ -335,11 +369,10 @@ const styles = StyleSheet.create({
   },
   prayerTime: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   passedIcon: {
-    marginLeft: 4,
   },
 });
 

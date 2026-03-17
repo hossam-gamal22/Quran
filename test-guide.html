@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>روح المسلم — Visual Test Checklist</title>
+<style>
+  :root {
+    --deep-green: #0f987f;
+    --dark-green: #0a6b59;
+    --gold: #d4a853;
+    --light-gold: #f5e6c4;
+    --white: #ffffff;
+    --off-white: #f8f9fa;
+    --light-gray: #e9ecef;
+    --medium-gray: #adb5bd;
+    --dark-text: #1a1a2e;
+    --muted-text: #495057;
+    --pass-green: #28a745;
+    --fail-red: #dc3545;
+    --skip-amber: #ffc107;
+    --card-shadow: 0 2px 12px rgba(15,152,127,0.08);
+    --card-hover: 0 4px 20px rgba(15,152,127,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: linear-gradient(135deg, #f0faf7 0%, #f8f9fa 50%, #fdf8ef 100%);
+    color: var(--dark-text);
+    min-height: 100vh;
+    padding-bottom: 80px;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    background: linear-gradient(135deg, var(--deep-green) 0%, var(--dark-green) 100%);
+    color: var(--white);
+    padding: 40px 24px 32px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '﷽';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+    opacity: 0.4;
+    font-family: 'Traditional Arabic', serif;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-top: 16px;
+    letter-spacing: -0.5px;
+  }
+  .header .subtitle {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-top: 6px;
+  }
+  .header .app-name {
+    font-size: 20px;
+    margin-top: 4px;
+    font-family: 'Traditional Arabic', serif;
+    opacity: 0.9;
+  }
+
+  /* ─── Progress Bar ─── */
+  .progress-section {
+    background: var(--white);
+    margin: -20px 20px 24px;
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    z-index: 2;
+  }
+  .progress-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .progress-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted-text);
+  }
+  .progress-percentage {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--deep-green);
+  }
+  .progress-bar-bg {
+    width: 100%;
+    height: 10px;
+    background: var(--light-gray);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--deep-green), var(--gold));
+    border-radius: 5px;
+    transition: width 0.5s ease;
+    width: 0%;
+  }
+  .progress-counts {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 13px;
+  }
+  .count-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .count-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .count-dot.pass { background: var(--pass-green); }
+  .count-dot.fail { background: var(--fail-red); }
+  .count-dot.skip { background: var(--skip-amber); }
+  .count-dot.pending { background: var(--medium-gray); }
+
+  /* ─── Controls ─── */
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin: 0 20px 20px;
+    flex-wrap: wrap;
+  }
+  .controls button {
+    padding: 8px 16px;
+    border: 1.5px solid var(--deep-green);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--white);
+    color: var(--deep-green);
+  }
+  .controls button:hover {
+    background: var(--deep-green);
+    color: var(--white);
+  }
+  .controls button.active {
+    background: var(--deep-green);
+    color: var(--white);
+  }
+
+  /* ─── Issue Card ─── */
+  .issue-group {
+    margin: 0 20px 16px;
+  }
+  .issue-group-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--deep-green);
+    margin-bottom: 10px;
+    padding-left: 4px;
+  }
+  .issue-card {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 10px;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.2s, transform 0.15s;
+    border-left: 4px solid var(--medium-gray);
+  }
+  .issue-card:hover {
+    box-shadow: var(--card-hover);
+    transform: translateY(-1px);
+  }
+  .issue-card.pass { border-left-color: var(--pass-green); }
+  .issue-card.fail { border-left-color: var(--fail-red); }
+  .issue-card.skip { border-left-color: var(--skip-amber); }
+
+  .issue-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .issue-title-area {
+    flex: 1;
+  }
+  .issue-number {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--deep-green);
+    margin-bottom: 2px;
+  }
+  .issue-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .issue-description {
+    font-size: 13px;
+    color: var(--muted-text);
+    margin-top: 6px;
+    line-height: 1.5;
+  }
+
+  /* Toggle Buttons */
+  .toggle-group {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .toggle-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1.5px solid var(--light-gray);
+    background: var(--off-white);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+  .toggle-btn:hover { transform: scale(1.1); }
+  .toggle-btn.pass-active {
+    background: var(--pass-green);
+    border-color: var(--pass-green);
+    color: white;
+  }
+  .toggle-btn.fail-active {
+    background: var(--fail-red);
+    border-color: var(--fail-red);
+    color: white;
+  }
+  .toggle-btn.skip-active {
+    background: var(--skip-amber);
+    border-color: var(--skip-amber);
+    color: white;
+  }
+
+  /* Sub-checks */
+  .sub-checks {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--light-gray);
+  }
+  .sub-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: var(--muted-text);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .sub-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--deep-green);
+    cursor: pointer;
+  }
+  .sub-check.checked {
+    text-decoration: line-through;
+    opacity: 0.6;
+  }
+
+  /* Notes */
+  .notes-area {
+    margin-top: 10px;
+  }
+  .notes-area textarea {
+    width: 100%;
+    border: 1.5px solid var(--light-gray);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 40px;
+    transition: border-color 0.2s;
+  }
+  .notes-area textarea:focus {
+    outline: none;
+    border-color: var(--deep-green);
+  }
+
+  /* ─── Tags ─── */
+  .tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .tag.ios { background: #e3f2fd; color: #1565c0; }
+  .tag.android { background: #e8f5e9; color: #2e7d32; }
+  .tag.ui { background: #fce4ec; color: #c62828; }
+  .tag.i18n { background: #fff3e0; color: #e65100; }
+  .tag.data { background: #f3e5f5; color: #6a1b9a; }
+  .tag.audio { background: #e0f7fa; color: #00695c; }
+
+  /* ─── Summary Footer ─── */
+  .summary-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border-top: 1px solid var(--light-gray);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+  }
+  .summary-footer .status-text {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .summary-footer .action-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .summary-footer button {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  .btn-export {
+    background: var(--deep-green);
+    color: var(--white);
+  }
+  .btn-export:hover {
+    background: var(--dark-green);
+  }
+  .btn-reset {
+    background: var(--light-gray);
+    color: var(--muted-text);
+  }
+  .btn-reset:hover {
+    background: #dee2e6;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ─── Print ─── */
+  @media print {
+    .controls, .summary-footer, .toggle-group, .notes-area, .btn-export, .btn-reset { display: none; }
+    .issue-card { break-inside: avoid; }
+    body { background: white; }
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 600px) {
+    .header h1 { font-size: 22px; }
+    .progress-section { margin: -16px 12px 16px; }
+    .issue-group { margin: 0 12px 12px; }
+    .controls { margin: 0 12px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="app-name">روح المسلم — Ruh Al-Muslim</div>
+  <h1>Visual Test Checklist</h1>
+  <div class="subtitle">29 Issues &bull; All Platforms &bull; 12 Languages</div>
+</div>
+
+<div class="progress-section" id="progressSection">
+  <div class="progress-stats">
+    <span class="progress-label">Overall Progress</span>
+    <span class="progress-percentage" id="progressPct">0%</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progressBar"></div>
+  </div>
+  <div class="progress-counts">
+    <span class="count-badge"><span class="count-dot pass"></span> <span id="passCount">0</span> Pass</span>
+    <span class="count-badge"><span class="count-dot fail"></span> <span id="failCount">0</span> Fail</span>
+    <span class="count-badge"><span class="count-dot skip"></span> <span id="skipCount">0</span> Skip</span>
+    <span class="count-badge"><span class="count-dot pending"></span> <span id="pendingCount">29</span> Pending</span>
+  </div>
+</div>
+
+<div class="controls">
+  <button onclick="filterCards('all')" class="active" id="filterAll">All (29)</button>
+  <button onclick="filterCards('pass')" id="filterPass">✅ Pass</button>
+  <button onclick="filterCards('fail')" id="filterFail">❌ Fail</button>
+  <button onclick="filterCards('skip')" id="filterSkip">⏭ Skip</button>
+  <button onclick="filterCards('pending')" id="filterPending">⬜ Pending</button>
+  <button onclick="expandAll()">Expand All</button>
+  <button onclick="collapseAll()">Collapse All</button>
+</div>
+
+<div id="issueContainer"></div>
+
+<div class="summary-footer">
+  <span class="status-text" id="statusText">Ready to test</span>
+  <div class="action-buttons">
+    <button class="btn-reset" onclick="resetAll()">Reset All</button>
+    <button class="btn-export" onclick="exportResults()">Export JSON</button>
+  </div>
+</div>
+
+<script>
+const ISSUES = [
+  // ── Group: Core UI & Theming ──
+  {
+    id: 1, group: 'Core UI & Theming',
+    title: 'Fix Dark Mode Contrast Issues',
+    description: 'Text must be readable on dark backgrounds. All text colors derived from useColors() or contrast helpers. No hardcoded #333 or #fff.',
+    tags: ['ui'],
+    checks: [
+      'Prayer tab text visible in dark mode',
+      'Azkar cards readable in dark mode',
+      'Settings page all text visible',
+      'Home page elements properly contrasted',
+      'Modal overlays have readable text'
+    ]
+  },
+  {
+    id: 2, group: 'Core UI & Theming',
+    title: 'Fix Glassmorphism Consistency',
+    description: 'All cards use GlassCard / BlurView with correct opacity: Light rgba(255,255,255,0.4), Dark rgba(30,30,32,0.55).',
+    tags: ['ui'],
+    checks: [
+      'GlassCard renders correctly on iOS',
+      'GlassCard renders correctly on Android',
+      'Tab bar has glass effect',
+      'Bottom sheets have blur background'
+    ]
+  },
+  {
+    id: 3, group: 'Core UI & Theming',
+    title: 'Fix Spring Animation Performance',
+    description: 'Reanimated spring animations use config: damping 18, stiffness 240. No jank on low-end devices.',
+    tags: ['ui'],
+    checks: [
+      'Collapsible sections animate smoothly',
+      'Tab transitions are fluid',
+      'No frame drops during animations'
+    ]
+  },
+  {
+    id: 4, group: 'Core UI & Theming',
+    title: 'Fix Icon Alignment and Centering',
+    description: 'All icons perfectly centered with flexbox. Minimum 44×44 touch targets. Icons never touch text.',
+    tags: ['ui'],
+    checks: [
+      'Home page icons centered',
+      'Quick access icons aligned',
+      'Navigation bar icons centered',
+      'Settings list icons aligned'
+    ]
+  },
+
+  // ── Group: RTL & Internationalization ──
+  {
+    id: 5, group: 'RTL & Internationalization',
+    title: 'Fix RTL Layout Mirroring',
+    description: 'All layouts dynamically mirror via useIsRTL() hook and manual flexDirection. No I18nManager.forceRTL().',
+    tags: ['i18n'],
+    checks: [
+      'Arabic: all rows are right-to-left',
+      'English: all rows are left-to-right',
+      'Navigation arrows correct in RTL',
+      'Horizontal scroll views mirror correctly',
+      'Quick access grid mirrors in RTL'
+    ]
+  },
+  {
+    id: 6, group: 'RTL & Internationalization',
+    title: 'Fix Translation Coverage',
+    description: 'All 12 languages have complete translations. No missing keys cause blank text or keys displayed as-is.',
+    tags: ['i18n'],
+    checks: [
+      'Switch to each of 12 languages — no blank text',
+      'Settings page fully translated',
+      'Prayer times labels translated',
+      'Azkar category names translated',
+      'Tab bar labels translated'
+    ]
+  },
+  {
+    id: 7, group: 'RTL & Internationalization',
+    title: 'Fix Western Numerals for Non-Arabic',
+    description: 'Non-Arabic modes show Western numerals (0-9). Arabic mode shows Eastern numerals (٠-٩).',
+    tags: ['i18n'],
+    checks: [
+      'Prayer times show Western numerals in English',
+      'Countdown uses Western numerals in English',
+      'Tasbih counter shows Western numerals in English',
+      'Arabic mode shows Eastern numerals correctly'
+    ]
+  },
+  {
+    id: 8, group: 'RTL & Internationalization',
+    title: 'Fix Localized Font Application',
+    description: 'Cairo font for Arabic, system fonts for other languages. QCF fonts for Mushaf rendering.',
+    tags: ['i18n', 'ui'],
+    checks: [
+      'Arabic text uses Cairo font',
+      'English text uses system font',
+      'Mushaf pages render with QCF fonts',
+      'Orbitron font loads for digital clock'
+    ]
+  },
+
+  // ── Group: Navigation & Routing ──
+  {
+    id: 9, group: 'Navigation & Routing',
+    title: 'Fix Tab Navigation Routes',
+    description: 'Tab destinations use router.navigate(), stack routes use router.push(). Correct bottom nav icons and labels.',
+    tags: ['ui'],
+    checks: [
+      'All 5 tabs navigate correctly',
+      'Tab labels show in active language',
+      'Active tab highlighted green (#22C55E)',
+      'No duplicate screens in stack'
+    ]
+  },
+  {
+    id: 10, group: 'Navigation & Routing',
+    title: 'Fix Surah Navigation to Mushaf',
+    description: 'All surah links navigate to /surah/{number}. No separate surah pages. Ayat Al-Kursi → /surah/2?ayah=255.',
+    tags: ['ui'],
+    checks: [
+      'Surah Al-Kahf opens Mushaf at surah 18',
+      'Surah Yasin opens Mushaf at surah 36',
+      'Surah Al-Mulk opens Mushaf at surah 67',
+      'Ayat Al-Kursi scrolls to 2:255'
+    ]
+  },
+
+  // ── Group: Prayer & Worship ──
+  {
+    id: 11, group: 'Prayer & Worship',
+    title: 'Fix Prayer Times Display',
+    description: 'Three clock styles (widget/analog/digital). Correct prayer names via t() keys. PrayerList with notification toggles.',
+    tags: ['ui', 'data'],
+    checks: [
+      'Widget clock style renders correctly',
+      'Analog clock shows Arabic numerals and green marker',
+      'Digital clock uses Orbitron font',
+      'Clock style selector works (no text labels)',
+      'All 5 prayers listed with correct names'
+    ]
+  },
+  {
+    id: 12, group: 'Prayer & Worship',
+    title: 'Fix Qibla Compass',
+    description: 'Qibla compass shows correct direction. Smooth rotation animation.',
+    tags: ['ui'],
+    checks: [
+      'Compass points toward Qibla',
+      'Rotation animation is smooth',
+      'Permission dialog for location works'
+    ]
+  },
+  {
+    id: 13, group: 'Prayer & Worship',
+    title: 'Fix Tasbih Counter',
+    description: 'Daily reset at midnight. Dynamic font sizing. No tashkeel on Arabic text. Worship tracking integration.',
+    tags: ['ui', 'data'],
+    checks: [
+      'Counter increments on tap with haptic feedback',
+      'Ring animation shows progress',
+      'Counter resets at midnight with toast',
+      'Previous day stats saved to history',
+      'Font size adjusts: 72px (1-2 digits), 52px (3), 36px (4+)'
+    ]
+  },
+
+  // ── Group: Azkar & Duas ──
+  {
+    id: 14, group: 'Azkar & Duas',
+    title: 'Fix Azkar Category Display',
+    description: 'Card view and list view both functional. Benefits shown with multi-language support. Repeat counts displayed.',
+    tags: ['data', 'i18n'],
+    checks: [
+      'Morning azkar display all items',
+      'Evening azkar display all items',
+      'Sleep azkar display correctly',
+      'After prayer azkar with subcategory tabs',
+      'Benefits text appears below each dhikr'
+    ]
+  },
+  {
+    id: 15, group: 'Azkar & Duas',
+    title: 'Fix Azkar Audio System',
+    description: 'Listen All mode with sequential playback. Sticky audio player. No individual per-item audio buttons.',
+    tags: ['audio'],
+    checks: [
+      'Read/Listen mode toggle works',
+      'Sequential playback advances to next track',
+      'Play/Pause button works',
+      'Progress bar shows elapsed time',
+      'Track counter shows current position'
+    ]
+  },
+  {
+    id: 16, group: 'Azkar & Duas',
+    title: 'Fix Daily Dua Display',
+    description: '126 curated duas. Deterministic + random refresh. Share as text or image with color options.',
+    tags: ['data', 'ui'],
+    checks: [
+      'Daily dua loads on screen open',
+      'Dua text displayed correctly',
+      'Share as text works',
+      'Share as image with color background works',
+      'Refresh shows different dua'
+    ]
+  },
+
+  // ── Group: Quran Features ──
+  {
+    id: 17, group: 'Quran Features',
+    title: 'Fix Mushaf Reader Rendering',
+    description: 'QCF fonts render correctly. 17 reading themes. Header icons: tafsir, play, heart, share (NO bookmark).',
+    tags: ['ui', 'data'],
+    checks: [
+      'QCF fonts render on all pages',
+      'Theme selector shows 17 themes',
+      'Header has correct 4 icons',
+      'Long-press on verse enables bookmarking',
+      'Page turns are smooth'
+    ]
+  },
+  {
+    id: 18, group: 'Quran Features',
+    title: 'Fix Quran Audio Recitation',
+    description: 'AudioPlayerManager singleton. CDN streaming. Subscription-based state updates.',
+    tags: ['audio'],
+    checks: [
+      'Play button starts recitation',
+      'Pause/resume works',
+      'Track advances to next ayah',
+      'Background audio continues',
+      'Reciter selection works'
+    ]
+  },
+  {
+    id: 19, group: 'Quran Features',
+    title: 'Fix Verse of the Day',
+    description: 'Deterministic daily verse. Mushaf-style with KFGQPCUthmanic font. Ornamental brackets ﴿١٢٣﴾.',
+    tags: ['ui', 'data'],
+    checks: [
+      'Verse loads on home page',
+      'Arabic text uses Uthmanic font',
+      'Verse number in ornamental brackets',
+      'Surah reference shown below',
+      'Share functionality works'
+    ]
+  },
+
+  // ── Group: Notifications ──
+  {
+    id: 20, group: 'Notifications',
+    title: 'Fix Unified Notification System',
+    description: 'All notification types in one page. Expandable dropdowns. Test button for each type. Android channels configured.',
+    tags: ['ios', 'android'],
+    checks: [
+      'Prayer notifications fire at correct times',
+      'Azkar reminders trigger correctly',
+      'Notification sound plays set sound',
+      'Each notification type expandable',
+      'Test notification button works'
+    ]
+  },
+
+  // ── Group: Multi-Language Identity ──
+  {
+    id: 21, group: 'Multi-Language Identity',
+    title: 'Fix useAppIdentity Hook',
+    description: 'Central hook returns language-aware appName, logoSource, splashLogoSource, iconSource, isArabic across all branding.',
+    tags: ['i18n'],
+    checks: [
+      'Arabic: returns Arabic logo and name',
+      'English: returns English logo and name',
+      'All 12 languages return correct identity',
+      'Hook used in prayer widgets',
+      'Hook used in about page'
+    ]
+  },
+  {
+    id: 22, group: 'Multi-Language Identity',
+    title: 'Fix Prayer Widget Logo',
+    description: 'RectangleWidgetView, GlassWidgetPreview, LargeWidgetVariants, CircularPrayerClock all accept and display iconSource from useAppIdentity().',
+    tags: ['ui', 'i18n'],
+    checks: [
+      'RectangleWidgetView shows correct logo',
+      'GlassWidgetPreview shows correct logo',
+      'LargeWidgetVariants shows correct logo',
+      'CircularPrayerClock shows correct logo',
+      'Logo changes when language switches'
+    ]
+  },
+  {
+    id: 23, group: 'Multi-Language Identity',
+    title: 'Fix About Page Logo',
+    description: 'About page uses actual app logo from useAppIdentity() instead of MaterialCommunityIcons star-crescent.',
+    tags: ['ui', 'i18n'],
+    checks: [
+      'About page shows app logo image',
+      'Logo matches active language',
+      'No star-crescent icon visible'
+    ]
+  },
+  {
+    id: 24, group: 'Multi-Language Identity',
+    title: 'Fix Onboarding Welcome Logo',
+    description: 'Onboarding welcome screen uses app logo Image from useAppIdentity() instead of generic icon.',
+    tags: ['ui', 'i18n'],
+    checks: [
+      'Welcome screen shows app logo',
+      'Logo matches active language',
+      'No generic star-crescent icon visible'
+    ]
+  },
+  {
+    id: 25, group: 'Multi-Language Identity',
+    title: 'Fix Dynamic In-App Logo',
+    description: 'All in-app logo references use useAppIdentity() for language-aware logo. Covers prayer, about, onboarding.',
+    tags: ['i18n', 'ui'],
+    checks: [
+      'Switch to Arabic — all logos are Arabic version',
+      'Switch to English — all logos are English version',
+      'Switch to French — English logo used',
+      'No hardcoded require() for logo images'
+    ]
+  },
+
+  // ── Group: Platform & Build ──
+  {
+    id: 26, group: 'Platform & Build',
+    title: 'Fix Dynamic App Icon on Device Home Screen',
+    description: 'iOS: Alternate App Icons API. Android: Activity Alias. Arabic → Arabic icon, Non-Arabic → English icon. Share image branding matches.',
+    tags: ['ios', 'android'],
+    checks: [
+      'Language change triggers icon switch (EAS build)',
+      'iOS: no crash on icon change',
+      'Android: toast shown about icon delay',
+      'Share watermark uses correct language logo',
+      'Guarded code doesn\'t crash Expo Go'
+    ]
+  },
+  {
+    id: 27, group: 'RTL & Internationalization',
+    title: 'Eliminate ALL Arabic Text in Non-Arabic Modes',
+    description: 'Zero Arabic text in English mode except Quran text, Arabic dhikr/dua, and decorative calligraphy. AM/PM, dates, companions all translated.',
+    tags: ['i18n'],
+    checks: [
+      'AM/PM uses locale formatter, not ص/م',
+      'Date bar fully translated (Gregorian + Hijri)',
+      'Companion categories use translation keys',
+      'Companion names show transliteration in English',
+      'Hijri calendar Friday check is index-based',
+      'No hardcoded Arabic strings visible in English mode'
+    ]
+  },
+  {
+    id: 28, group: 'Core UI & Theming',
+    title: 'Fix UniversalHeader Component',
+    description: 'Consistent header across all pages with RTL support, back button, and glass morphism styling.',
+    tags: ['ui'],
+    checks: [
+      'Header renders on all sub-pages',
+      'Back button navigates correctly',
+      'Title centered properly',
+      'RTL layout mirrors header'
+    ]
+  },
+  {
+    id: 29, group: 'Azkar & Duas',
+    title: 'Translate Hadith Evidence in Dhikr/Dua Cards',
+    description: 'Arabic dua text stays Arabic. Hadith evidence/proof translated to user language via benefit-translations.ts (87 entries × 12 languages).',
+    tags: ['i18n', 'data'],
+    checks: [
+      'Arabic dhikr text remains in Arabic',
+      'Benefit/evidence text translated in English',
+      'Benefit text translated in French',
+      'Benefit text translated in Turkish',
+      'Ruqya page shows translated benefits',
+      'Daily dhikr page shows translated benefits',
+      'Azkar category page shows translated benefits',
+      'Original Arabic shown for Arabic users'
+    ]
+  }
+];
+
+// ── State ──
+let state = {};
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem('ruh_test_state');
+    state = saved ? JSON.parse(saved) : {};
+  } catch { state = {}; }
+}
+
+function saveState() {
+  localStorage.setItem('ruh_test_state', JSON.stringify(state));
+}
+
+function getIssueState(id) {
+  return state[id] || { status: 'pending', checks: {}, notes: '' };
+}
+
+function setIssueStatus(id, status) {
+  if (!state[id]) state[id] = { status: 'pending', checks: {}, notes: '' };
+  state[id].status = state[id].status === status ? 'pending' : status;
+  saveState();
+  renderAll();
+}
+
+function toggleCheck(issueId, checkIdx) {
+  if (!state[issueId]) state[issueId] = { status: 'pending', checks: {}, notes: '' };
+  state[issueId].checks[checkIdx] = !state[issueId].checks[checkIdx];
+  saveState();
+  renderAll();
+}
+
+function updateNotes(issueId, text) {
+  if (!state[issueId]) state[issueId] = { status: 'pending', checks: {}, notes: '' };
+  state[issueId].notes = text;
+  saveState();
+}
+
+// ── Rendering ──
+let currentFilter = 'all';
+
+function renderAll() {
+  renderCards();
+  updateProgress();
+}
+
+function renderCards() {
+  const container = document.getElementById('issueContainer');
+  container.innerHTML = '';
+
+  const groups = {};
+  ISSUES.forEach(issue => {
+    if (!groups[issue.group]) groups[issue.group] = [];
+    groups[issue.group].push(issue);
+  });
+
+  for (const [groupName, issues] of Object.entries(groups)) {
+    const filteredIssues = issues.filter(i => {
+      const s = getIssueState(i.id);
+      return currentFilter === 'all' || s.status === currentFilter;
+    });
+    if (filteredIssues.length === 0) continue;
+
+    const groupDiv = document.createElement('div');
+    groupDiv.className = 'issue-group';
+    groupDiv.innerHTML = `<div class="issue-group-title">${groupName}</div>`;
+
+    filteredIssues.forEach(issue => {
+      const s = getIssueState(issue.id);
+      const card = document.createElement('div');
+      card.className = `issue-card ${s.status !== 'pending' ? s.status : ''}`;
+      card.dataset.issueId = issue.id;
+
+      const tagsHtml = issue.tags.map(t => `<span class="tag ${t}">${t.toUpperCase()}</span>`).join('');
+
+      const checksHtml = issue.checks.map((check, idx) => {
+        const checked = s.checks[idx] ? 'checked' : '';
+        const checkedClass = s.checks[idx] ? 'checked' : '';
+        return `<label class="sub-check ${checkedClass}">
+          <input type="checkbox" ${checked} onchange="toggleCheck(${issue.id}, ${idx})">
+          ${check}
+        </label>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="issue-header">
+          <div class="issue-title-area">
+            <div class="issue-number">#${issue.id}</div>
+            <div class="issue-title">${issue.title}</div>
+            <div class="tags">${tagsHtml}</div>
+          </div>
+          <div class="toggle-group">
+            <button class="toggle-btn ${s.status === 'pass' ? 'pass-active' : ''}" onclick="setIssueStatus(${issue.id}, 'pass')" title="Pass">✅</button>
+            <button class="toggle-btn ${s.status === 'fail' ? 'fail-active' : ''}" onclick="setIssueStatus(${issue.id}, 'fail')" title="Fail">❌</button>
+            <button class="toggle-btn ${s.status === 'skip' ? 'skip-active' : ''}" onclick="setIssueStatus(${issue.id}, 'skip')" title="Skip">⏭</button>
+          </div>
+        </div>
+        <div class="issue-description">${issue.description}</div>
+        <div class="sub-checks">${checksHtml}</div>
+        <div class="notes-area">
+          <textarea placeholder="Notes..." oninput="updateNotes(${issue.id}, this.value)">${s.notes || ''}</textarea>
+        </div>
+      `;
+
+      groupDiv.appendChild(card);
+    });
+
+    container.appendChild(groupDiv);
+  }
+}
+
+function updateProgress() {
+  let pass = 0, fail = 0, skip = 0, pending = 0;
+  ISSUES.forEach(i => {
+    const s = getIssueState(i.id).status;
+    if (s === 'pass') pass++;
+    else if (s === 'fail') fail++;
+    else if (s === 'skip') skip++;
+    else pending++;
+  });
+
+  const total = ISSUES.length;
+  const tested = pass + fail + skip;
+  const pct = Math.round((tested / total) * 100);
+
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('passCount').textContent = pass;
+  document.getElementById('failCount').textContent = fail;
+  document.getElementById('skipCount').textContent = skip;
+  document.getElementById('pendingCount').textContent = pending;
+
+  // Status text
+  const statusEl = document.getElementById('statusText');
+  if (pending === 0 && fail === 0) {
+    statusEl.textContent = '🎉 All tests passed!';
+    statusEl.style.color = 'var(--pass-green)';
+  } else if (fail > 0) {
+    statusEl.textContent = `⚠️ ${fail} issue(s) failing`;
+    statusEl.style.color = 'var(--fail-red)';
+  } else if (tested > 0) {
+    statusEl.textContent = `Testing in progress... ${pending} remaining`;
+    statusEl.style.color = 'var(--deep-green)';
+  } else {
+    statusEl.textContent = 'Ready to test';
+    statusEl.style.color = 'var(--muted-text)';
+  }
+
+  // Update filter button counts
+  document.getElementById('filterAll').textContent = `All (${total})`;
+  document.getElementById('filterPass').textContent = `✅ Pass (${pass})`;
+  document.getElementById('filterFail').textContent = `❌ Fail (${fail})`;
+  document.getElementById('filterSkip').textContent = `⏭ Skip (${skip})`;
+  document.getElementById('filterPending').textContent = `⬜ Pending (${pending})`;
+}
+
+function filterCards(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+  const id = 'filter' + filter.charAt(0).toUpperCase() + filter.slice(1);
+  document.getElementById(id).classList.add('active');
+  renderAll();
+}
+
+function expandAll() {
+  document.querySelectorAll('.sub-checks, .notes-area').forEach(el => el.classList.remove('hidden'));
+}
+
+function collapseAll() {
+  document.querySelectorAll('.sub-checks, .notes-area').forEach(el => el.classList.add('hidden'));
+}
+
+function resetAll() {
+  if (!confirm('Reset all test results? This cannot be undone.')) return;
+  state = {};
+  saveState();
+  renderAll();
+}
+
+function exportResults() {
+  const results = ISSUES.map(i => {
+    const s = getIssueState(i.id);
+    const checkedCount = Object.values(s.checks).filter(Boolean).length;
+    return {
+      id: i.id,
+      title: i.title,
+      group: i.group,
+      status: s.status,
+      checksCompleted: `${checkedCount}/${i.checks.length}`,
+      notes: s.notes || ''
+    };
+  });
+
+  const summary = {
+    app: 'Ruh Al-Muslim (روح المسلم)',
+    exportDate: new Date().toISOString(),
+    totalIssues: ISSUES.length,
+    pass: results.filter(r => r.status === 'pass').length,
+    fail: results.filter(r => r.status === 'fail').length,
+    skip: results.filter(r => r.status === 'skip').length,
+    pending: results.filter(r => r.status === 'pending').length,
+    issues: results
+  };
+
+  const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ruh-almuslim-test-results-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Init ──
+loadState();
+renderAll();
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import BackgroundWrapper from "@/components/ui/BackgroundWrapper";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useColors } from "@/hooks/use-colors";
+import { DynamicScreenAds } from "@/components/ads/DynamicScreenAds";
 
 export interface ScreenContainerProps extends ViewProps {
   edges?: Edge[];
@@ -11,6 +12,8 @@ export interface ScreenContainerProps extends ViewProps {
   containerClassName?: string;
   safeAreaClassName?: string;
   useAppBackground?: boolean;
+  /** When set, auto-renders admin-configured ads for this screen */
+  screenKey?: string;
 }
 
 /**
@@ -25,12 +28,13 @@ export function ScreenContainer({
   safeAreaClassName,
   style,
   useAppBackground = true,
+  screenKey,
   ...props
 }: ScreenContainerProps) {
   const { settings, isDarkMode } = useSettings();
   const colors = useColors();
   const bgKey = settings.display.appBackground;
-  const hasBg = useAppBackground && bgKey !== 'none';
+  const hasBg = useAppBackground;
 
   const content = (
     <SafeAreaView
@@ -38,9 +42,11 @@ export function ScreenContainer({
       className={cn("flex-1", safeAreaClassName)}
       style={styles.safeArea}
     >
+      {screenKey && <DynamicScreenAds screen={screenKey} position="top" />}
       <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
         {children}
       </View>
+      {screenKey && <DynamicScreenAds screen={screenKey} position="bottom" />}
     </SafeAreaView>
   );
 
@@ -48,6 +54,11 @@ export function ScreenContainer({
     return (
       <BackgroundWrapper
         backgroundKey={bgKey}
+        backgroundUrl={settings.display.appBackgroundUrl}
+        opacity={settings.display.backgroundOpacity ?? 1}
+        blurEnabled={settings.display.blurEnabled}
+        blurIntensity={settings.display.blurIntensity}
+        dimEnabled={settings.display.dimEnabled}
         style={[styles.container, { backgroundColor: 'transparent' }]}
         {...props}
       >

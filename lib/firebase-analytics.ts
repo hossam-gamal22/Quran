@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { getUserId } from './firebase-user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateMonthlyScore } from './rewards-manager';
 
 // ==================== الثوابت ====================
 
@@ -129,6 +130,9 @@ export const trackAppOpen = async (): Promise<void> => {
       timestamp: serverTimestamp(),
     });
     
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'app_open').catch(() => {});
+    
     console.log('📊 App open tracked');
   } catch (error) {
     console.log('Could not track app open');
@@ -166,6 +170,9 @@ export const trackAzkarRead = async (
       language,
       timestamp: serverTimestamp(),
     });
+    
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'azkar').catch(() => {});
     
     console.log('📿 Azkar read tracked:', azkarId);
   } catch (error) {
@@ -205,6 +212,9 @@ export const trackQuranPage = async (
       timestamp: serverTimestamp(),
     });
     
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'quran').catch(() => {});
+    
     console.log('📖 Quran page tracked:', surahName);
   } catch (error) {
     console.log('Could not track quran page');
@@ -239,6 +249,9 @@ export const trackPrayer = async (
       onTime,
       timestamp: serverTimestamp(),
     });
+    
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'prayer').catch(() => {});
     
     console.log('🕌 Prayer tracked:', prayerName);
   } catch (error) {
@@ -278,6 +291,9 @@ export const trackTasbih = async (
       timestamp: serverTimestamp(),
     });
     
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'tasbih', totalRounds).catch(() => {});
+    
     console.log('📿 Tasbih tracked:', count);
   } catch (error) {
     console.log('Could not track tasbih');
@@ -306,6 +322,9 @@ export const trackKhatmaProgress = async (
       progressPercent,
       timestamp: serverTimestamp(),
     });
+    
+    // Update monthly engagement score
+    updateMonthlyScore(userId, 'khatma').catch(() => {});
     
     console.log('📚 Khatma progress tracked:', progressPercent + '%');
   } catch (error) {

@@ -11,35 +11,37 @@ import {
   StatusBar,
   Linking,
   Image,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import Animated, { FadeInDown, FadeIn, useAnimatedStyle, useSharedValue, withSpring, withSequence } from 'react-native-reanimated';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { useAppIdentity } from '@/hooks/use-app-identity';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // ========================================
 // الثوابت
 // ========================================
 
 const APP_INFO = {
-  name: 'روح المسلم',
-  tagline: 'رفيقك الروحي اليومي',
-  description: 'تطبيق إسلامي شامل يهدف إلى مساعدة المسلمين في أداء عباداتهم اليومية والتقرب إلى الله.',
   email: 'hossamgamal290@gmail.com',
 };
 
 const FEATURES = [
-  { icon: 'book-open-variant', title: 'القرآن الكريم', desc: 'قراءة واستماع مع التفسير' },
-  { icon: 'hands-pray', title: 'الأذكار والأدعية', desc: 'أذكار الصباح والمساء والمناسبات' },
-  { icon: 'mosque', title: 'مواقيت الصلاة', desc: 'تنبيهات دقيقة حسب موقعك' },
-  { icon: 'calendar-check', title: 'متتبع العبادات', desc: 'تتبع صلاتك وصيامك وأذكارك' },
-  { icon: 'bookmark-multiple', title: 'نظام الختمات', desc: 'إنشاء وإدارة ختمات القرآن' },
-  { icon: 'widgets', title: 'ويدجت', desc: 'ويدجت للشاشة الرئيسية' },
+  { icon: 'book-open-variant', titleKey: 'aboutApp.holyQuran', descKey: 'aboutApp.holyQuranDesc' },
+  { icon: 'hands-pray', titleKey: 'aboutApp.adhkarAndDuas', descKey: 'aboutApp.adhkarAndDuasDesc' },
+  { icon: 'mosque', titleKey: 'aboutApp.prayerTimesFeature', descKey: 'aboutApp.prayerTimesFeatureDesc' },
+  { icon: 'calendar-check', titleKey: 'aboutApp.worshipTrackerFeature', descKey: 'aboutApp.worshipTrackerFeatureDesc' },
+  { icon: 'bookmark-multiple', titleKey: 'aboutApp.khatmaSystem', descKey: 'aboutApp.khatmaSystemDesc' },
+  { icon: 'widgets', titleKey: 'aboutApp.widgetFeature', descKey: 'aboutApp.widgetFeatureDesc' },
 ];
 
 
@@ -65,9 +67,11 @@ const LinkItem: React.FC<LinkItemProps> = ({
   onPress,
   isDarkMode,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <TouchableOpacity
-      style={[styles.linkItem, isDarkMode && styles.linkItemDark]}
+      style={[styles.linkItem, isDarkMode && styles.linkItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -77,13 +81,13 @@ const LinkItem: React.FC<LinkItemProps> = ({
       <View style={styles.linkIconBg}>
         <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
       </View>
-      <View style={styles.linkContent}>
-        <Text style={[styles.linkTitle, isDarkMode && styles.textLight]}>{title}</Text>
+      <View style={[styles.linkContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <Text style={[styles.linkTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
         {subtitle && (
-          <Text style={[styles.linkSubtitle, isDarkMode && styles.textMuted]}>{subtitle}</Text>
+          <Text style={[styles.linkSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subtitle}</Text>
         )}
       </View>
-      <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={isDarkMode ? '#666' : '#ccc'} />
+      <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={isDarkMode ? '#666' : '#ccc'} />
     </TouchableOpacity>
   );
 };
@@ -97,17 +101,19 @@ interface FeatureItemProps {
 }
 
 const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isDarkMode }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 80).duration(400)}
-      style={[styles.featureItem, isDarkMode && styles.featureItemDark]}
+      style={[styles.featureItem, isDarkMode && styles.featureItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       <View style={styles.featureIcon}>
         <MaterialCommunityIcons name={icon} size={24} color="#2f7659" />
       </View>
-      <View style={styles.featureContent}>
-        <Text style={[styles.featureTitle, isDarkMode && styles.textLight]}>{title}</Text>
-        <Text style={[styles.featureDesc, isDarkMode && styles.textMuted]}>{desc}</Text>
+      <View style={[styles.featureContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <Text style={[styles.featureTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
+        <Text style={[styles.featureDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{desc}</Text>
       </View>
     </Animated.View>
   );
@@ -118,8 +124,10 @@ const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isD
 // ========================================
 
 export default function AboutScreen() {
-  const router = useRouter();
-  const { isDarkMode, t } = useSettings();
+  const isRTL = useIsRTL();
+  const { isDarkMode, t, settings } = useSettings();
+  const colors = useColors();
+  const { logoSource } = useAppIdentity();
   const [tapCount, setTapCount] = useState(0);
   const logoScale = useSharedValue(1);
 
@@ -142,33 +150,19 @@ export default function AboutScreen() {
   }));
 
   const openEmail = () => {
-    Linking.openURL(`mailto:${APP_INFO.email}?subject=تطبيق روح المسلم`);
+    Linking.openURL(`mailto:${APP_INFO.email}?subject=${encodeURIComponent(t('aboutApp.emailSubject'))}`);
   };
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(500)}
-        style={[styles.header, isDarkMode && styles.headerDark]}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.about')}</Text>
-        <View style={styles.headerPlaceholder} />
-      </Animated.View>
+      <UniversalHeader title={t('settings.about')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -182,14 +176,14 @@ export default function AboutScreen() {
           >
             <TouchableOpacity onPress={handleLogoTap} activeOpacity={0.9}>
               <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-                <MaterialCommunityIcons name="moon-waning-crescent" size={50} color="#fff" />
+                <Image source={logoSource} style={{ width: 70, height: 70, borderRadius: 16 }} />
               </Animated.View>
             </TouchableOpacity>
             <Text style={styles.appName}>{t('common.appName')}</Text>
-            <Text style={styles.appTagline}>{APP_INFO.tagline}</Text>
+            <Text style={styles.appTagline}>{t('aboutApp.subtitle')}</Text>
             <View style={styles.versionBadge}>
               <Text style={styles.versionText}>
-                الإصدار {Application.nativeApplicationVersion || '1.0.0'}
+                {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.0.0'}
               </Text>
             </View>
           </View>
@@ -198,22 +192,22 @@ export default function AboutScreen() {
         {/* Description */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <View style={[styles.descCard, isDarkMode && styles.descCardDark]}>
-            <Text style={[styles.descText, isDarkMode && styles.textLight]}>
-              {APP_INFO.description}
+            <Text style={[styles.descText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('aboutApp.description')}
             </Text>
           </View>
         </Animated.View>
 
         {/* Features */}
         <Animated.View entering={FadeIn.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.about')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('aboutApp.features')}</Text>
           <View style={[styles.featuresGrid, isDarkMode && styles.featuresGridDark]}>
             {FEATURES.map((feature, index) => (
               <FeatureItem
-                key={feature.title}
+                key={feature.titleKey}
                 icon={feature.icon as any}
-                title={feature.title}
-                desc={feature.desc}
+                title={t(feature.titleKey)}
+                desc={t(feature.descKey)}
                 index={index}
                 isDarkMode={isDarkMode}
               />
@@ -223,28 +217,28 @@ export default function AboutScreen() {
 
         {/* Stats */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.about')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('aboutApp.stats')}</Text>
           <View style={[styles.statsContainer, isDarkMode && styles.statsContainerDark]}>
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>12</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('settings.language')}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>12</Text>
+              <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('settings.language')}</Text>
             </View>
             <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>114</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('quran.surah')}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>114</Text>
+              <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('quran.surah')}</Text>
             </View>
             <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statNumber, isDarkMode && styles.textLight]}>100+</Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>{t('home.azkarSection')}</Text>
+              <Text style={[styles.statNumber, { color: colors.text }]}>100+</Text>
+              <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('home.azkarSection')}</Text>
             </View>
           </View>
         </Animated.View>
 
         {/* Links */}
         <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>{t('settings.support')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.support')}</Text>
           <View style={[styles.linksCard, isDarkMode && styles.linksCardDark]}>
             <LinkItem
               icon="email"
@@ -261,26 +255,12 @@ export default function AboutScreen() {
               onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/')}
               isDarkMode={isDarkMode}
             />
-            <LinkItem
-              icon="shield-check"
-              iconColor="#5d4e8c"
-              title={t('settings.privacyPolicy')}
-              onPress={() => router.push('/settings/privacy-policy' as any)}
-              isDarkMode={isDarkMode}
-            />
-            <LinkItem
-              icon="file-document"
-              iconColor="#c17f59"
-              title={t('settings.termsOfService')}
-              onPress={() => router.push('/settings/terms-of-use' as any)}
-              isDarkMode={isDarkMode}
-            />
           </View>
         </Animated.View>
 
         {/* Footer */}
         <Animated.View entering={FadeInDown.delay(350).duration(500)} style={styles.footer}>
-          <Text style={[styles.copyright, isDarkMode && styles.textMuted]}>
+          <Text style={[styles.copyright, { color: colors.textLight }]}>
             © {new Date().getFullYear()} {t('common.appName')}
           </Text>
         </Animated.View>
@@ -288,6 +268,7 @@ export default function AboutScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -302,40 +283,6 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerDark: {
-    backgroundColor: '#1a1a2e',
-    borderBottomColor: '#2a2a3e',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   scrollView: {
     flex: 1,
@@ -360,13 +307,13 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginBottom: 5,
   },
   appTagline: {
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.9)',
     marginBottom: 15,
   },
@@ -378,7 +325,7 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#fff',
   },
   descCard: {
@@ -392,14 +339,14 @@ const styles = StyleSheet.create({
   },
   descText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#333',
     lineHeight: 26,
     textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginTop: 20,
     marginBottom: 12,
@@ -436,12 +383,12 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   featureDesc: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -461,12 +408,12 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#2f7659',
   },
   statLabel: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 4,
   },
@@ -509,12 +456,12 @@ const styles = StyleSheet.create({
   },
   linkTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#333',
   },
   linkSubtitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -564,12 +511,12 @@ const styles = StyleSheet.create({
   },
   creditName: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   creditRole: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -580,19 +527,19 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginBottom: 8,
   },
   copyright: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginBottom: 4,
   },
   buildInfo: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#ccc',
   },
   bottomSpace: {

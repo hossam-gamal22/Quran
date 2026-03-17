@@ -11,8 +11,8 @@ import {
   StatusBar,
   RefreshControl,
   Dimensions,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,8 +21,18 @@ import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimat
 
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SeasonInfo, SeasonType, getSeasonProgress } from '@/lib/seasonal-content';
 import GlassCard from '@/components/ui/GlassCard';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getLanguage } from '@/lib/i18n';
+import TranslatedText from '@/components/ui/TranslatedText';
+import { UniversalHeader } from '@/components/ui';
+
+const getSeasonName = (season: { nameAr: string; nameEn: string }) => {
+  return getLanguage() === 'ar' ? season.nameAr : season.nameEn;
+};
 
 const { width } = Dimensions.get('window');
 
@@ -43,6 +53,7 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
   onPress,
   isDarkMode,
 }) => {
+  const isRTL = useIsRTL();
   const progress = getSeasonProgress(season);
 
   return (
@@ -63,32 +74,32 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
 
           {/* المحتوى */}
           <View style={styles.activeSeasonContent}>
-            <View style={styles.seasonBadge}>
+            <View style={[styles.seasonBadge, { alignSelf: isRTL ? 'flex-end' : 'flex-start', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name={season.icon as any} size={24} color="#fff" />
-              <Text style={styles.seasonBadgeText}>موسم نشط</Text>
+              <Text style={styles.seasonBadgeText}>{t('seasonal.activeSeason')}</Text>
             </View>
 
-            <Text style={styles.activeSeasonName}>{season.nameAr}</Text>
+            <Text style={styles.activeSeasonName}>{getSeasonName(season)}</Text>
             
             {greeting && (
               <Text style={styles.activeSeasonGreeting}>{greeting}</Text>
             )}
 
             {/* معلومات اليوم */}
-            <View style={styles.dayInfoContainer}>
+            <View style={[styles.dayInfoContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.dayInfoItem}>
                 <Text style={styles.dayInfoValue}>{season.currentDay}</Text>
-                <Text style={styles.dayInfoLabel}>اليوم الحالي</Text>
+                <Text style={styles.dayInfoLabel}>{t('seasonal.currentDay')}</Text>
               </View>
               <View style={styles.dayInfoDivider} />
               <View style={styles.dayInfoItem}>
                 <Text style={styles.dayInfoValue}>{season.daysRemaining}</Text>
-                <Text style={styles.dayInfoLabel}>يوم متبقي</Text>
+                <Text style={styles.dayInfoLabel}>{t('seasonal.daysRemaining')}</Text>
               </View>
               <View style={styles.dayInfoDivider} />
               <View style={styles.dayInfoItem}>
                 <Text style={styles.dayInfoValue}>{Math.round(progress)}%</Text>
-                <Text style={styles.dayInfoLabel}>التقدم</Text>
+                <Text style={styles.dayInfoLabel}>{t('seasonal.progress')}</Text>
               </View>
             </View>
 
@@ -102,9 +113,9 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
             </View>
 
             {/* زر الدخول */}
-            <View style={styles.enterButtonContainer}>
-              <Text style={styles.enterButtonText}>ادخل للموسم</Text>
-              <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+            <View style={[styles.enterButtonContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={styles.enterButtonText}>{t('seasonal.enterSeason')}</Text>
+              <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={20} color="#fff" />
             </View>
           </View>
         </View>
@@ -119,26 +130,28 @@ interface UpcomingSeasonCardProps {
 }
 
 const UpcomingSeasonCard: React.FC<UpcomingSeasonCardProps> = ({ season, isDarkMode }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-      <View style={[styles.upcomingCard, isDarkMode && styles.upcomingCardDark]}>
+      <View style={[styles.upcomingCard, isDarkMode && styles.upcomingCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.upcomingIconContainer}>
           <MaterialCommunityIcons name={season.icon as any} size={28} color={season.color} />
         </View>
         <View style={styles.upcomingContent}>
-          <Text style={[styles.upcomingLabel, isDarkMode && styles.textMuted]}>
-            الموسم القادم
+          <Text style={[styles.upcomingLabel, { color: colors.textLight }]}>
+            {t('seasonal.nextSeason')}
           </Text>
-          <Text style={[styles.upcomingName, isDarkMode && styles.textLight]}>
-            {season.nameAr}
+          <Text style={[styles.upcomingName, { color: colors.text }]}>
+            {getSeasonName(season)}
           </Text>
         </View>
         <View style={styles.upcomingDays}>
           <Text style={[styles.upcomingDaysValue, { color: season.color }]}>
             {season.daysUntil}
           </Text>
-          <Text style={[styles.upcomingDaysLabel, isDarkMode && styles.textMuted]}>
-            يوم
+          <Text style={[styles.upcomingDaysLabel, { color: colors.textLight }]}>
+            {t('seasonal.day')}
           </Text>
         </View>
       </View>
@@ -150,6 +163,7 @@ interface SpecialDayCardProps {
   day: {
     day: number;
     nameAr: string;
+    nameEn?: string;
     description: string;
     virtues: string[];
     recommendedActions: string[];
@@ -159,6 +173,8 @@ interface SpecialDayCardProps {
 }
 
 const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDarkMode }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeIn.duration(500)}>
       <View style={styles.starAboveCardWrapper}>
@@ -168,22 +184,22 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
         <View
           style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
         >
-          <View style={styles.specialDayHeader}>
-            <Text style={[styles.specialDayTitle, isDarkMode && styles.textLight]}>
-              يوم مميز: {day.nameAr}
+          <View style={[styles.specialDayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.specialDayTitle, { color: colors.text }]}>
+              {t('seasonal.specialDay')}: {getLanguage() === 'ar' ? day.nameAr : day.nameEn}
             </Text>
           </View>
-        <Text style={[styles.specialDayDesc, isDarkMode && styles.textMuted]}>
+        <Text style={[styles.specialDayDesc, { color: colors.textLight }]}>
           {day.description}
         </Text>
         
         {day.virtues.length > 0 && (
           <View style={styles.virtuesContainer}>
-            <Text style={[styles.virtuesTitle, isDarkMode && styles.textLight]}>الفضائل:</Text>
+            <Text style={[styles.virtuesTitle, { color: colors.text }]}>{t('seasonal.ashura.virtues')}:</Text>
             {day.virtues.map((virtue, index) => (
-              <View key={index} style={styles.virtueItem}>
+              <View key={index} style={[styles.virtueItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="check-circle" size={16} color={seasonColor} />
-                <Text style={[styles.virtueText, isDarkMode && styles.textMuted]}>{virtue}</Text>
+                <Text style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</Text>
               </View>
             ))}
           </View>
@@ -191,11 +207,11 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
 
         {day.recommendedActions.length > 0 && (
           <View style={styles.actionsContainer}>
-            <Text style={[styles.actionsTitle, isDarkMode && styles.textLight]}>الأعمال المستحبة:</Text>
+            <Text style={[styles.actionsTitle, { color: colors.text }]}>{t('seasonal.ashura.recommendedActions')}:</Text>
             {day.recommendedActions.map((action, index) => (
-              <View key={index} style={styles.actionItem}>
+              <View key={index} style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#2f7659" />
-                <Text style={[styles.actionText, isDarkMode && styles.textMuted]}>{action}</Text>
+                <Text style={[styles.actionText, { color: colors.textLight }]}>{action}</Text>
               </View>
             ))}
           </View>
@@ -214,6 +230,8 @@ interface SeasonGridItemProps {
 }
 
 const SeasonGridItem: React.FC<SeasonGridItemProps> = ({ season, onPress, index, isDarkMode }) => {
+  const isRTL = useIsRTL();
+  const colors = useColors();
   return (
     <Animated.View
       entering={FadeInRight.delay(index * 80).duration(400)}
@@ -230,11 +248,11 @@ const SeasonGridItem: React.FC<SeasonGridItemProps> = ({ season, onPress, index,
         <View style={styles.gridIconBg}>
           <MaterialCommunityIcons name={season.icon as any} size={28} color={season.color} />
         </View>
-        <Text style={[styles.gridItemName, isDarkMode && styles.textLight]} numberOfLines={1}>
-          {season.nameAr}
+        <Text style={[styles.gridItemName, { color: colors.text }]} numberOfLines={1}>
+          {getSeasonName(season)}
         </Text>
         {season.isActive && (
-          <View style={[styles.activeDot, { backgroundColor: season.color }]} />
+          <View style={[styles.activeDot, { backgroundColor: season.color }, isRTL ? { left: 8, right: undefined } : null]} />
         )}
       </TouchableOpacity>
     </Animated.View>
@@ -247,6 +265,7 @@ interface NoSeasonCardProps {
 }
 
 const NoSeasonCard: React.FC<NoSeasonCardProps> = ({ upcomingSeason, isDarkMode }) => {
+  const colors = useColors();
   return (
     <Animated.View entering={FadeInDown.duration(500)}>
       <View style={[styles.noSeasonCard, isDarkMode && styles.noSeasonCardDark]}>
@@ -255,16 +274,22 @@ const NoSeasonCard: React.FC<NoSeasonCardProps> = ({ upcomingSeason, isDarkMode 
           size={60}
           color={isDarkMode ? '#444' : '#ddd'}
         />
-        <Text style={[styles.noSeasonTitle, isDarkMode && styles.textLight]}>
-          لا يوجد موسم نشط حالياً
+        <Text style={[styles.noSeasonTitle, { color: colors.text }]}>
+          {t('seasonal.noActiveSeason')}
         </Text>
-        <Text style={[styles.noSeasonSubtitle, isDarkMode && styles.textMuted]}>
-          استمر في عباداتك اليومية وانتظر المواسم القادمة
-        </Text>
+        {getLanguage() === 'ar' ? (
+          <Text style={[styles.noSeasonSubtitle, { color: colors.textLight }]}>
+            استمر في عباداتك اليومية وانتظر المواسم القادمة
+          </Text>
+        ) : (
+          <TranslatedText style={[styles.noSeasonSubtitle, { color: colors.textLight }]}>
+            استمر في عباداتك اليومية وانتظر المواسم القادمة
+          </TranslatedText>
+        )}
         {upcomingSeason && (
           <View style={styles.noSeasonUpcoming}>
-            <Text style={[styles.noSeasonUpcomingText, isDarkMode && styles.textMuted]}>
-              الموسم القادم: {upcomingSeason.nameAr} بعد {upcomingSeason.daysUntil} يوم
+            <Text style={[styles.noSeasonUpcomingText, { color: colors.textLight }]}>
+              {t('seasonal.nextSeason')}: {getSeasonName(upcomingSeason)} - {upcomingSeason.daysUntil} {t('seasonal.day')}
             </Text>
           </View>
         )}
@@ -278,8 +303,9 @@ const NoSeasonCard: React.FC<NoSeasonCardProps> = ({ upcomingSeason, isDarkMode 
 // ========================================
 
 export default function SeasonalIndexScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
   const {
     isLoading,
     currentSeason,
@@ -289,6 +315,7 @@ export default function SeasonalIndexScreen() {
     allSeasons,
     refreshSeasonalData,
   } = useSeasonal();
+  const colors = useColors();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -301,7 +328,7 @@ export default function SeasonalIndexScreen() {
 
   const navigateToSeason = (seasonType: SeasonType) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(`/seasonal/${seasonType}`);
+    router.push(`/seasonal/${seasonType}` as any);
   };
 
   const handleActiveSeasonPress = () => {
@@ -318,33 +345,18 @@ export default function SeasonalIndexScreen() {
   });
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
       {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(500)}
-        style={[styles.header, isDarkMode && styles.headerDark]}
-      >
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-            size={28}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>المواسم الإسلامية</Text>
-        <View style={styles.headerPlaceholder} />
-      </Animated.View>
+      <UniversalHeader
+        title={t('seasonal.islamicSeasons')}
+        titleColor={colors.text}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -395,8 +407,8 @@ export default function SeasonalIndexScreen() {
 
         {/* جميع المواسم */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-            جميع المواسم
+          <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+            {t('seasonal.allSeasons')}
           </Text>
           <View style={styles.seasonsGrid}>
             {sortedSeasons.map((season, index) => (
@@ -414,12 +426,12 @@ export default function SeasonalIndexScreen() {
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.tipCard}>
           <View
-            style={[styles.tipGradient, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)' }]}
+            style={[styles.tipGradient, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           >
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#2f7659" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>نصيحة</Text>
-              <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
+              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>{t('seasonal.hajj.tipTitle')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight }]}>
                 استغل المواسم الإسلامية في مضاعفة الأجر والتقرب إلى الله بالطاعات
               </Text>
             </View>
@@ -429,6 +441,7 @@ export default function SeasonalIndexScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -456,34 +469,6 @@ const styles = StyleSheet.create({
   },
   containerDark: {
     backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerDark: {
-    backgroundColor: '#1a1a2e',
-    borderBottomColor: '#2a2a3e',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  headerPlaceholder: {
-    width: 40,
   },
   textLight: {
     color: '#fff',
@@ -524,22 +509,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   seasonBadgeText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#fff',
   },
   activeSeasonName: {
     fontSize: 32,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginTop: 15,
   },
   activeSeasonGreeting: {
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.9)',
     marginTop: 5,
   },
@@ -556,12 +541,12 @@ const styles = StyleSheet.create({
   },
   dayInfoValue: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   dayInfoLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   dayInfoDivider: {
@@ -591,7 +576,7 @@ const styles = StyleSheet.create({
   },
   enterButtonText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
 
@@ -622,12 +607,12 @@ const styles = StyleSheet.create({
   },
   upcomingLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
   },
   upcomingName: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   upcomingDays: {
@@ -635,11 +620,11 @@ const styles = StyleSheet.create({
   },
   upcomingDaysValue: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   upcomingDaysLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
   },
 
@@ -674,12 +659,12 @@ const styles = StyleSheet.create({
   },
   specialDayTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   specialDayDesc: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginBottom: 12,
   },
@@ -688,7 +673,7 @@ const styles = StyleSheet.create({
   },
   virtuesTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 8,
   },
@@ -700,14 +685,14 @@ const styles = StyleSheet.create({
   },
   virtueText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     flex: 1,
   },
   actionsContainer: {},
   actionsTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 8,
   },
@@ -719,7 +704,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     flex: 1,
   },
@@ -736,13 +721,13 @@ const styles = StyleSheet.create({
   },
   noSeasonTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginTop: 15,
   },
   noSeasonSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     textAlign: 'center',
     marginTop: 8,
@@ -755,14 +740,14 @@ const styles = StyleSheet.create({
   },
   noSeasonUpcomingText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
   },
 
   // شبكة المواسم
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginTop: 24,
     marginBottom: 12,
@@ -796,7 +781,7 @@ const styles = StyleSheet.create({
   },
   gridItemName: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
     textAlign: 'center',
   },
@@ -825,13 +810,13 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#2f7659',
     marginBottom: 4,
   },
   tipText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
   },

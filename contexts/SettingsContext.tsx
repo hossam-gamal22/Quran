@@ -11,7 +11,7 @@ import React, {
   ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName, I18nManager, Alert } from 'react-native';
+import { Appearance, ColorSchemeName, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { scheduleNotificationsFromSettings } from '@/lib/notifications-manager';
@@ -25,6 +25,9 @@ import {
   supportedLanguages,
 } from '@/lib/i18n';
 import { translations, Language, TranslationKeys } from '@/constants/translations';
+import { blendWithDimOverlay, getContrastTextColor } from '@/lib/contrast-helper';
+import { updateSharedData } from '@/lib/widget-data';
+import { switchAppIcon } from '@/lib/app-icon-manager';
 
 // ========================================
 // الأنواع
@@ -35,9 +38,11 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 99;
 
-export type NotificationSoundType = 'default' | 'asbahna' | 'amsayna' | 'subhanallah' | 'alhamdulillah' | 'allahuakbar' | 'silent';
+export type NotificationSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'general_reminder' | 'silent';
 
-export type AdhanSoundType = 'default' | 'makkah' | 'madinah' | 'alaqsa' | 'mishary' | 'abdulbasit' | 'silent';
+export type ReminderSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'general_reminder' | 'silent';
+
+export type AdhanSoundType = 'default' | 'makkah' | 'madinah' | 'alaqsa' | 'mishary' | 'abdulbasit' | 'sudais' | 'egypt' | 'dosari' | 'ajman' | 'ali_mulla' | 'naqshbandi' | 'sharif' | 'mansoor_zahrani' | 'haramain' | 'silent';
 
 export interface NotificationSettings {
   enabled: boolean;
@@ -90,6 +95,29 @@ export interface NotificationSettings {
   wakeupAzkar: boolean;
   wakeupAzkarTime: string;
   afterPrayerAzkar: boolean;
+  // Per-category sound selection
+  salawatSoundType?: ReminderSoundType;
+  tasbihSoundType?: ReminderSoundType;
+  istighfarSoundType?: ReminderSoundType;
+  azkarSoundType?: ReminderSoundType;
+  dailyVerseSoundType?: ReminderSoundType;
+  // Custom reminder
+  customReminder?: boolean;
+  customReminderTime?: string;
+  customReminderTitle?: string;
+  customReminderSoundType?: ReminderSoundType;
+  // Custom reminder content
+  customReminderContentType?: 'text' | 'ayah' | 'surah' | 'azkar' | 'dua';
+  customReminderSurah?: number;
+  customReminderAyah?: number;
+  customReminderReciter?: string;
+  // Per-category day-of-week selection (1=Sun, 2=Mon, ... 7=Sat — expo-notifications weekday)
+  salawatDays?: number[];
+  tasbihDays?: number[];
+  istighfarDays?: number[];
+  azkarDays?: number[];
+  dailyVerseDays?: number[];
+  customReminderDays?: number[];
 }
 
 export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7' | 'dynamic';
@@ -109,6 +137,10 @@ export interface DisplaySettings {
   appBackground: AppBackgroundKey;
   appBackgroundUrl?: string; // For dynamic/remote backgrounds
   appBackgroundTextColor?: 'white' | 'black'; // Text color for dynamic backgrounds
+  /** Average color of dynamic photo background for smart contrast */
+  dynamicBgColor?: string;
+  /** Background image opacity (0.1–0.5, default 0.2) */
+  backgroundOpacity: number;
   quranBackground: QuranBackgroundKey;
   quranThemeIndex: number;
   homeLayout: HomeLayout;
@@ -120,6 +152,20 @@ export interface DisplaySettings {
   showTafsir: boolean;
   /** Focus mode - hide UI elements while reading Quran */
   focusMode: boolean;
+  /** Show translation in Dua/Hadith/Quote pages */
+  duaShowTranslation: boolean;
+  /** Auto-change interval for daily content (in hours, 0 = manual only) */
+  dailyContentChangeInterval: number;
+  /** Enable blur overlay on background image */
+  blurEnabled: boolean;
+  /** Blur intensity (1–100, default 15) */
+  blurIntensity: number;
+  /** Enable dim overlay on background image */
+  dimEnabled: boolean;
+  /** Dim overlay opacity (0.3–0.7, default 0.5) */
+  dimOpacity: number;
+  /** Show section info (ⓘ) buttons across the app */
+  showSectionInfo: boolean;
 }
 
 export interface PrayerSettings {
@@ -135,6 +181,8 @@ export interface PrayerSettings {
   };
   showSunrise: boolean;
   show24Hour: boolean;
+  showDate: boolean;
+  showLocation: boolean;
   layout?: 'list' | 'widget';
 }
 
@@ -165,6 +213,7 @@ interface SettingsContextType {
   
   // دوال عامة
   resetSettings: () => Promise<void>;
+  reloadSettings: () => Promise<void>;
   exportSettings: () => Promise<string>;
   importSettings: (data: string) => Promise<boolean>;
   
@@ -238,7 +287,8 @@ const defaultDisplay: DisplaySettings = {
   showTransliteration: false,
   translationEdition: 'en.sahih',
   highlightTajweed: true,
-  appBackground: 'none',
+  appBackground: 'background1',
+  backgroundOpacity: 1,
   quranBackground: 'quranbg1',
   quranFontSizeAdjust: 0,
   quranThemeIndex: 0,
@@ -246,6 +296,13 @@ const defaultDisplay: DisplaySettings = {
   homeLayout: 'grid',
   showTafsir: false,
   focusMode: false,
+  duaShowTranslation: true,
+  dailyContentChangeInterval: 24, // Change daily content every 24 hours
+  blurEnabled: false,
+  blurIntensity: 15,
+  dimEnabled: false,
+  dimOpacity: 0.55,
+  showSectionInfo: true,
 };
 
 const defaultPrayer: PrayerSettings = {
@@ -261,6 +318,8 @@ const defaultPrayer: PrayerSettings = {
   },
   showSunrise: true,
   show24Hour: false,
+  showDate: true,
+  showLocation: true,
   layout: 'list',
 };
 
@@ -296,20 +355,48 @@ interface SettingsProviderProps {
 }
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  // Use lazy initializer so the FIRST render already has the correct language.
+  // By the time SettingsProvider mounts, _layout.tsx's languageReady gate has
+  // ensured languageInitPromise resolved, so getLanguage() is the saved value.
+  // This eliminates the "Arabic flash" for non-Arabic users.
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const initialLang = getLanguage() as Language;
+    if (__DEV__) console.log(`📱 SettingsProvider initial language: ${initialLang}`);
+    return {
+      ...defaultSettings,
+      language: initialLang,
+    };
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [systemTheme, setSystemTheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
 
   // حساب الوضع الداكن
-  const isDarkMode = settings.theme === 'system' 
+  // When a background that requires white text is active, force dark mode
+  // since dark backgrounds need light text for readability
+  const appBgKey = settings.display.appBackground;
+  const hasActiveBg = appBgKey && appBgKey !== 'none';
+  const hasDynamicPhotoBg = appBgKey === 'dynamic' && settings.display.dimEnabled;
+  const hasBuiltInBg = hasActiveBg && appBgKey !== 'dynamic';
+
+  // Smart contrast: determine if white text is needed based on effective bg color
+  let needsWhiteText = settings.display.appBackgroundTextColor !== 'black';
+  if (hasDynamicPhotoBg && settings.display.dynamicBgColor) {
+    // Blend photo color with dim overlay to get effective perceived color
+    const dimOpacity = settings.display.dimOpacity ?? 0.55;
+    const effectiveColor = blendWithDimOverlay(settings.display.dynamicBgColor, dimOpacity);
+    needsWhiteText = getContrastTextColor(effectiveColor) === '#FFFFFF';
+  }
+
+  const forceDarkMode = (hasDynamicPhotoBg || hasBuiltInBg) && needsWhiteText;
+  const isDarkMode = forceDarkMode ? true : (settings.theme === 'system' 
     ? systemTheme === 'dark' 
-    : settings.theme === 'dark';
+    : settings.theme === 'dark');
 
   // حساب اتجاه اللغة
   const isRTLMode = isRTL(settings.language);
 
   // الترجمات الحالية
-  const currentTranslations = translations[settings.language] || translations['ar'];
+  const currentTranslations = translations[settings.language] || translations['en'];
 
   // ========================================
   // تحميل الإعدادات
@@ -330,20 +417,34 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     try {
       // تحميل الإعدادات المحفوظة
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      
+      // Check if language was set directly (e.g. during onboarding) via @app_language
+      const i18nLang = await loadSavedLanguage();
+      
       if (stored) {
         const parsed = JSON.parse(stored);
-        const loadedSettings = { ...defaultSettings, ...parsed };
+        // Deep merge nested objects to preserve new defaults for fields added after initial save
+        const loadedSettings = {
+          ...defaultSettings,
+          ...parsed,
+          notifications: { ...defaultNotifications, ...(parsed.notifications || {}) },
+          display: { ...defaultDisplay, ...(parsed.display || {}) },
+          prayer: { ...defaultPrayer, ...(parsed.prayer || {}) },
+        };
+        
+        // Prefer i18n-saved language if it differs (handles onboarding sync)
+        if (i18nLang && i18nLang !== loadedSettings.language) {
+          loadedSettings.language = i18nLang;
+        }
+        
         setSettings(loadedSettings);
         
         // تحديث اللغة في نظام الترجمة
         await setI18nLanguage(loadedSettings.language);
         
-        // تحديث اتجاه النص
-        const shouldBeRTL = isRTL(loadedSettings.language);
-        if (I18nManager.isRTL !== shouldBeRTL) {
-          I18nManager.allowRTL(shouldBeRTL);
-          I18nManager.forceRTL(shouldBeRTL);
-        }
+        // RTL is handled manually via useIsRTL() hook throughout the app.
+        // We do NOT call I18nManager.forceRTL() because it conflicts with
+        // the manual flexDirection: 'row-reverse' patterns (causes double-reversal).
 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
@@ -365,6 +466,41 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             dailyVerse: n.dailyVerse,
             dailyVerseTime: n.dailyVerseTime,
             sound: n.sound,
+            vibration: n.vibration !== false,
+            azkarSoundType: n.azkarSoundType,
+            dailyVerseSoundType: n.dailyVerseSoundType,
+            salawatReminder: n.salawatReminder,
+            salawatReminderTime: n.salawatReminderTime,
+            salawatSoundType: n.salawatSoundType,
+            tasbihReminder: n.tasbihReminder,
+            tasbihReminderTime: n.tasbihReminderTime,
+            tasbihSoundType: n.tasbihSoundType,
+            istighfarReminder: n.istighfarReminder,
+            istighfarReminderTime: n.istighfarReminderTime,
+            istighfarSoundType: n.istighfarSoundType,
+            customReminder: n.customReminder,
+            customReminderTime: n.customReminderTime,
+            customReminderTitle: n.customReminderTitle,
+            customReminderSoundType: n.customReminderSoundType,
+            customReminderContentType: n.customReminderContentType,
+            customReminderSurah: n.customReminderSurah,
+            customReminderAyah: n.customReminderAyah,
+            customReminderReciter: n.customReminderReciter,
+            salawatDays: n.salawatDays,
+            tasbihDays: n.tasbihDays,
+            istighfarDays: n.istighfarDays,
+            azkarDays: n.azkarDays,
+            dailyVerseDays: n.dailyVerseDays,
+            customReminderDays: n.customReminderDays,
+            quranReadingReminder: n.quranReadingReminder,
+            quranReadingReminderTime: n.quranReadingReminderTime,
+            quranReminderDays: n.quranReminderDays,
+            quranReminderSoundType: n.quranReminderSoundType,
+            worshipPrayerLogging: n.worshipPrayerLogging,
+            worshipDailySummary: n.worshipDailySummary,
+            worshipDailySummaryTime: n.worshipDailySummaryTime,
+            worshipStreakAlerts: n.worshipStreakAlerts,
+            worshipWeeklyReport: n.worshipWeeklyReport,
           }).catch((e) => console.log('Init notification scheduling error (non-blocking):', e));
         }
       } else {
@@ -377,6 +513,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       setIsLoading(false);
     }
   };
+
+  const reloadSettings = useCallback(async () => {
+    await loadSettings();
+  }, []);
 
   // ========================================
   // حفظ الإعدادات
@@ -399,30 +539,26 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     // تحديث نظام الترجمة
     await setI18nLanguage(language);
     
-    // تحديث اتجاه النص
-    const shouldBeRTL = isRTL(language);
-    const needsRestart = I18nManager.isRTL !== shouldBeRTL;
-    
-    if (needsRestart) {
-      I18nManager.allowRTL(shouldBeRTL);
-      I18nManager.forceRTL(shouldBeRTL);
-    }
+    // RTL is handled manually via useIsRTL() hook throughout the app.
+    // We do NOT call I18nManager.forceRTL() to avoid double-reversal.
     
     // حفظ الإعدادات
     const newSettings = { ...settings, language };
     await saveSettings(newSettings);
     
-    // إعادة تحميل التطبيق إذا تغير الاتجاه
-    if (needsRestart) {
-      try {
-        await Updates.reloadAsync();
-      } catch (e) {
-        Alert.alert(
-          'يلزم إعادة التشغيل',
-          'يرجى إعادة تشغيل التطبيق لتطبيق اتجاه النص الجديد.',
-          [{ text: 'حسناً' }]
-        );
-      }
+    // تحديث بيانات الويدجت باللغة الجديدة
+    try { await updateSharedData(); } catch (e) { console.log('Widget data update failed:', e); }
+
+    // تحديث أيقونة التطبيق على الشاشة الرئيسية
+    try { await switchAppIcon(language); } catch (e) { console.log('App icon switch failed:', e); }
+
+    // إعادة تحميل التطبيق دائماً عند تغيير اللغة
+    // لضمان تحديث جميع الشاشات والمكونات فوراً
+    try {
+      await Updates.reloadAsync();
+    } catch (e) {
+      // Updates.reloadAsync may fail in dev — state update still applied via saveSettings
+      console.log('Updates.reloadAsync unavailable, using state update only');
     }
   }, [settings]);
 
@@ -457,6 +593,41 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       dailyVerse: n.dailyVerse,
       dailyVerseTime: n.dailyVerseTime,
       sound: n.sound,
+      vibration: n.vibration !== false,
+      azkarSoundType: n.azkarSoundType,
+      dailyVerseSoundType: n.dailyVerseSoundType,
+      salawatReminder: n.salawatReminder,
+      salawatReminderTime: n.salawatReminderTime,
+      salawatSoundType: n.salawatSoundType,
+      tasbihReminder: n.tasbihReminder,
+      tasbihReminderTime: n.tasbihReminderTime,
+      tasbihSoundType: n.tasbihSoundType,
+      istighfarReminder: n.istighfarReminder,
+      istighfarReminderTime: n.istighfarReminderTime,
+      istighfarSoundType: n.istighfarSoundType,
+      customReminder: n.customReminder,
+      customReminderTime: n.customReminderTime,
+      customReminderTitle: n.customReminderTitle,
+      customReminderSoundType: n.customReminderSoundType,
+      customReminderContentType: n.customReminderContentType,
+      customReminderSurah: n.customReminderSurah,
+      customReminderAyah: n.customReminderAyah,
+      customReminderReciter: n.customReminderReciter,
+      salawatDays: n.salawatDays,
+      tasbihDays: n.tasbihDays,
+      istighfarDays: n.istighfarDays,
+      azkarDays: n.azkarDays,
+      dailyVerseDays: n.dailyVerseDays,
+      customReminderDays: n.customReminderDays,
+      quranReadingReminder: n.quranReadingReminder,
+      quranReadingReminderTime: n.quranReadingReminderTime,
+      quranReminderDays: n.quranReminderDays,
+      quranReminderSoundType: n.quranReminderSoundType,
+      worshipPrayerLogging: n.worshipPrayerLogging,
+      worshipDailySummary: n.worshipDailySummary,
+      worshipDailySummaryTime: n.worshipDailySummaryTime,
+      worshipStreakAlerts: n.worshipStreakAlerts,
+      worshipWeeklyReport: n.worshipWeeklyReport,
     });
   }, [settings]);
 
@@ -526,6 +697,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     updateDisplay,
     updatePrayer,
     resetSettings,
+    reloadSettings,
     exportSettings,
     importSettings,
     t,

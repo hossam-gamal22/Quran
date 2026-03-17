@@ -16,7 +16,7 @@
         "ru": "Утренние азкары",
         "es": "Súplicas matutinas"
       },
-      "icon": "sunrise",
+      "icon": "weather-sunset-up",
       "color": "#F59E0B",
       "order": 1
     },
@@ -36,7 +36,7 @@
         "ru": "Вечерние азкары",
         "es": "Súplicas vespertinas"
       },
-      "icon": "sunset",
+      "icon": "weather-sunset-down",
       "color": "#8B5CF6",
       "order": 2
     },
@@ -56,7 +56,7 @@
         "ru": "Азкары перед сном",
         "es": "Súplicas antes de dormir"
       },
-      "icon": "moon",
+      "icon": "weather-night",
       "color": "#3B82F6",
       "order": 3
     },
@@ -76,7 +76,7 @@
         "ru": "Азкары при пробуждении",
         "es": "Súplicas al despertar"
       },
-      "icon": "sun",
+      "icon": "white-balance-sunny",
       "color": "#10B981",
       "order": 4
     },
@@ -96,7 +96,7 @@
         "ru": "Азкары после молитвы",
         "es": "Súplicas después del rezo"
       },
-      "icon": "hands-praying",
+      "icon": "hands-pray",
       "color": "#EC4899",
       "order": 5
     },

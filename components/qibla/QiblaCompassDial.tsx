@@ -1,5 +1,5 @@
 import React from 'react';
-import { Svg, Circle, G, Text } from 'react-native-svg';
+import { Svg, Circle, G, Text, Line } from 'react-native-svg';
 import { useColorScheme } from 'react-native';
 
 // Amiri font must be loaded in the app for this to work
@@ -69,7 +69,7 @@ export const QiblaCompassDial = ({ size = 260 }) => {
           const x2 = radius + outer * Math.cos(angle);
           const y2 = radius + outer * Math.sin(angle);
           return (
-            <Svg.Line
+            <Line
               key={i}
               x1={x1}
               y1={y1}

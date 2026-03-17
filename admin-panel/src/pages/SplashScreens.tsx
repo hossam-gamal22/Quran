@@ -2,6 +2,9 @@
 // إدارة شاشات البداية الديناميكية - لوحة تحكم روح المسلم
 
 import React, { useState, useEffect } from 'react';
+import type { LucideIcon } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import {
   Plus,
   Edit2,
@@ -26,6 +29,7 @@ import {
   Gift,
   Sparkles,
 } from 'lucide-react';
+import { Styled } from '../components/Styled';
 
 // ========================================
 // الأنواع
@@ -88,7 +92,7 @@ interface SplashScreen {
 // البيانات الافتراضية
 // ========================================
 
-const SPLASH_TYPES: { value: SplashType; label: string; icon: any }[] = [
+const SPLASH_TYPES: { value: SplashType; label: string; icon: LucideIcon }[] = [
   { value: 'azkar', label: 'ذكر', icon: Star },
   { value: 'ayah', label: 'آية قرآنية', icon: BookOpen },
   { value: 'hadith', label: 'حديث شريف', icon: BookOpen },
@@ -188,61 +192,17 @@ const SplashScreensPage: React.FC = () => {
   }, []);
 
   const loadSplashScreens = async () => {
-    // TODO: استبدال بـ API call
-    const mockData: SplashScreen[] = [
-      {
-        id: '1',
-        type: 'azkar',
-        isActive: true,
-        priority: 1,
-        titleAr: 'ذكر اليوم',
-        contentAr: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ',
-        subtitleAr: 'كلمتان خفيفتان على اللسان، ثقيلتان في الميزان',
-        sourceAr: 'رواه البخاري',
-        backgroundColor: '#11151c',
-        backgroundGradient: ['#2f7659', '#1d5a3a'],
-        textColor: '#ffffff',
-        accentColor: '#2f7659',
-        iconName: 'star',
-        showIcon: true,
-        actionType: 'navigate',
-        actionLabel: 'ابدأ التسبيح',
-        actionTarget: '/tasbih',
-        displayFrequency: 'daily',
-        showDuration: 5,
-        viewCount: 1250,
-        clickCount: 320,
-        dismissCount: 930,
-        createdAt: '2026-02-01T00:00:00Z',
-        updatedAt: '2026-03-01T00:00:00Z',
-      },
-      {
-        id: '2',
-        type: 'feature',
-        isActive: true,
-        priority: 2,
-        titleAr: 'خاصية جديدة! 🎉',
-        contentAr: 'تتبع عباداتك اليومية واحصل على إحصائيات مفصلة',
-        subtitleAr: 'الصلاة • الصيام • قراءة القرآن',
-        backgroundColor: '#1a1a2e',
-        backgroundGradient: ['#5d4e8c', '#3a3a5c'],
-        textColor: '#ffffff',
-        accentColor: '#9b59b6',
-        iconName: 'chart-line',
-        showIcon: true,
-        actionType: 'navigate',
-        actionLabel: 'جرّب الآن',
-        actionTarget: '/worship-tracker',
-        displayFrequency: 'once',
-        showDuration: 7,
-        viewCount: 500,
-        clickCount: 180,
-        dismissCount: 320,
-        createdAt: '2026-02-15T00:00:00Z',
-        updatedAt: '2026-02-28T00:00:00Z',
-      },
-    ];
-    setSplashScreens(mockData);
+    try {
+      const snap = await getDocs(collection(db, 'splashScreens'));
+      if (!snap.empty) {
+        setSplashScreens(snap.docs.map(d => ({ ...d.data(), id: d.id } as SplashScreen)));
+        return;
+      }
+    } catch (err) {
+      console.error('Error loading splash screens:', err);
+    }
+    // Empty state — no mock data
+    setSplashScreens([]);
   };
 
   // فتح نافذة الإضافة
@@ -265,32 +225,49 @@ const SplashScreensPage: React.FC = () => {
   const handleSave = async () => {
     const updatedScreen = { ...formData, updatedAt: new Date().toISOString() };
     
-    if (editingScreen) {
-      setSplashScreens(prev =>
-        prev.map(s => (s.id === editingScreen.id ? updatedScreen : s))
-      );
-    } else {
-      setSplashScreens(prev => [...prev, updatedScreen]);
+    try {
+      const { id, ...data } = updatedScreen;
+      await setDoc(doc(db, 'splashScreens', id), data);
+      if (editingScreen) {
+        setSplashScreens(prev =>
+          prev.map(s => (s.id === editingScreen.id ? updatedScreen : s))
+        );
+      } else {
+        setSplashScreens(prev => [...prev, updatedScreen]);
+      }
+    } catch (err) {
+      console.error('Error saving splash screen:', err);
     }
     
     setIsModalOpen(false);
-    // TODO: API call to save
   };
 
   // حذف
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذه الشاشة؟')) {
-      setSplashScreens(prev => prev.filter(s => s.id !== id));
-      // TODO: API call to delete
+      try {
+        await deleteDoc(doc(db, 'splashScreens', id));
+        setSplashScreens(prev => prev.filter(s => s.id !== id));
+      } catch (err) {
+        console.error('Error deleting splash screen:', err);
+      }
     }
   };
 
   // تفعيل/تعطيل
   const handleToggleActive = async (id: string) => {
-    setSplashScreens(prev =>
-      prev.map(s => (s.id === id ? { ...s, isActive: !s.isActive } : s))
-    );
-    // TODO: API call to update
+    const screen = splashScreens.find(s => s.id === id);
+    if (screen) {
+      try {
+        const { id: _, ...data } = screen;
+        await setDoc(doc(db, 'splashScreens', id), { ...data, isActive: !screen.isActive });
+        setSplashScreens(prev =>
+          prev.map(s => (s.id === id ? { ...s, isActive: !s.isActive } : s))
+        );
+      } catch (err) {
+        console.error('Error toggling splash screen:', err);
+      }
+    }
   };
 
   // حساب نسبة التفاعل
@@ -359,9 +336,9 @@ const SplashScreensPage: React.FC = () => {
             }`}
           >
             {/* معاينة مصغرة */}
-            <div
+            <Styled
               className="h-40 p-4 flex flex-col justify-center items-center relative"
-              style={{
+              css={{
                 background: screen.backgroundGradient
                   ? `linear-gradient(135deg, ${screen.backgroundGradient.join(', ')})`
                   : screen.backgroundColor,
@@ -372,22 +349,23 @@ const SplashScreensPage: React.FC = () => {
                   معطّل
                 </div>
               )}
-              <div className="text-center" style={{ color: screen.textColor }}>
+              <Styled className="text-center" css={{ color: screen.textColor }}>
                 <div className="text-lg font-bold mb-1">{screen.titleAr}</div>
                 <div className="text-sm opacity-80 line-clamp-2">{screen.contentAr}</div>
-              </div>
-            </div>
+              </Styled>
+            </Styled>
 
             {/* المعلومات */}
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span
+                  <Styled
+                    as="span"
                     className="px-2 py-1 rounded text-xs"
-                    style={{ backgroundColor: `${screen.accentColor}30`, color: screen.accentColor }}
+                    css={{ backgroundColor: `${screen.accentColor}30`, color: screen.accentColor }}
                   >
                     {SPLASH_TYPES.find(t => t.value === screen.type)?.label}
-                  </span>
+                  </Styled>
                   <span className="text-gray-400 text-xs">
                     {DISPLAY_FREQUENCIES.find(f => f.value === screen.displayFrequency)?.label}
                   </span>
@@ -431,6 +409,8 @@ const SplashScreensPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => handleToggleActive(screen.id)}
+                  aria-label={screen.isActive ? 'تعطيل الشاشة' : 'تفعيل الشاشة'}
+                  title={screen.isActive ? 'تعطيل الشاشة' : 'تفعيل الشاشة'}
                   className={`flex items-center justify-center gap-1 px-3 py-2 rounded transition-colors ${
                     screen.isActive
                       ? 'bg-red-600/20 text-red-500 hover:bg-red-600/30'
@@ -441,6 +421,8 @@ const SplashScreensPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => handleDelete(screen.id)}
+                  aria-label="حذف الشاشة"
+                  title="حذف الشاشة"
                   className="flex items-center justify-center px-3 py-2 bg-red-600/20 text-red-500 hover:bg-red-600/30 rounded transition-colors"
                 >
                   <Trash2 size={16} />
@@ -471,6 +453,8 @@ const SplashScreensPage: React.FC = () => {
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
+                aria-label="إغلاق النافذة"
+                title="إغلاق النافذة"
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -487,7 +471,7 @@ const SplashScreensPage: React.FC = () => {
               ].map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab(tab.id as 'content' | 'design' | 'action' | 'schedule')}
                   className={`flex items-center gap-2 px-6 py-3 transition-colors ${
                     activeTab === tab.id
                       ? 'bg-gray-700 text-white border-b-2 border-green-500'
@@ -534,6 +518,7 @@ const SplashScreensPage: React.FC = () => {
                         type="text"
                         value={formData.titleAr}
                         onChange={e => setFormData({ ...formData, titleAr: e.target.value })}
+                        aria-label="العنوان بالعربية"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                         placeholder="ذكر اليوم"
                       />
@@ -544,6 +529,7 @@ const SplashScreensPage: React.FC = () => {
                         type="text"
                         value={formData.titleEn || ''}
                         onChange={e => setFormData({ ...formData, titleEn: e.target.value })}
+                        aria-label="العنوان بالإنجليزية"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                         placeholder="Daily Dhikr"
                       />
@@ -557,6 +543,7 @@ const SplashScreensPage: React.FC = () => {
                       value={formData.contentAr}
                       onChange={e => setFormData({ ...formData, contentAr: e.target.value })}
                       rows={4}
+                      aria-label="المحتوى الرئيسي بالعربية"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
                       placeholder="سُبْحَانَ اللَّهِ وَبِحَمْدِهِ..."
                     />
@@ -568,8 +555,7 @@ const SplashScreensPage: React.FC = () => {
                     <input
                       type="text"
                       value={formData.subtitleAr || ''}
-                      onChange={e => setFormData({ ...formData, subtitleAr: e.target.value })}
-                      className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                      onChange={e => setFormData({ ...formData, subtitleAr: e.target.value })}                        aria-label="العنوان الفرعي"                      className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       placeholder="فضل هذا الذكر..."
                     />
                   </div>
@@ -580,8 +566,7 @@ const SplashScreensPage: React.FC = () => {
                     <input
                       type="text"
                       value={formData.sourceAr || ''}
-                      onChange={e => setFormData({ ...formData, sourceAr: e.target.value })}
-                      className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                      onChange={e => setFormData({ ...formData, sourceAr: e.target.value })}                        aria-label="المصدر"                      className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       placeholder="رواه البخاري"
                     />
                   </div>
@@ -604,13 +589,16 @@ const SplashScreensPage: React.FC = () => {
                               ? 'border-white scale-110'
                               : 'border-transparent'
                           }`}
-                          style={{ backgroundColor: color }}
+                          css={{ backgroundColor: color }}
+                          aria-label={`اختيار اللون ${color}`}
+                          title={color}
                         />
                       ))}
                       <input
                         type="color"
                         value={formData.backgroundColor}
                         onChange={e => setFormData({ ...formData, backgroundColor: e.target.value, backgroundGradient: undefined })}
+                        aria-label="اختيار لون الخلفية"
                         className="w-10 h-10 rounded-lg cursor-pointer"
                       />
                     </div>
@@ -629,7 +617,9 @@ const SplashScreensPage: React.FC = () => {
                               ? 'border-white scale-110'
                               : 'border-transparent'
                           }`}
-                          style={{ background: `linear-gradient(135deg, ${gradient.join(', ')})` }}
+                          css={{ background: `linear-gradient(135deg, ${gradient.join(', ')})` }}
+                          aria-label={`اختيار تدرج ${gradient[0]} إلى ${gradient[1]}`}
+                          title={`${gradient[0]} → ${gradient[1]}`}
                         />
                       ))}
                       <button
@@ -650,12 +640,15 @@ const SplashScreensPage: React.FC = () => {
                           type="color"
                           value={formData.textColor}
                           onChange={e => setFormData({ ...formData, textColor: e.target.value })}
+                          aria-label="اختيار لون النص"
                           className="w-10 h-10 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={formData.textColor}
                           onChange={e => setFormData({ ...formData, textColor: e.target.value })}
+                          aria-label="كود لون النص"
+                          placeholder="#ffffff"
                           className="flex-1 bg-gray-700 rounded-lg px-3 py-2"
                         />
                       </div>
@@ -667,12 +660,15 @@ const SplashScreensPage: React.FC = () => {
                           type="color"
                           value={formData.accentColor}
                           onChange={e => setFormData({ ...formData, accentColor: e.target.value })}
+                          aria-label="اختيار اللون المميز"
                           className="w-10 h-10 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={formData.accentColor}
                           onChange={e => setFormData({ ...formData, accentColor: e.target.value })}
+                          aria-label="كود اللون المميز"
+                          placeholder="#2f7659"
                           className="flex-1 bg-gray-700 rounded-lg px-3 py-2"
                         />
                       </div>
@@ -686,6 +682,7 @@ const SplashScreensPage: React.FC = () => {
                         type="checkbox"
                         checked={formData.showIcon}
                         onChange={e => setFormData({ ...formData, showIcon: e.target.checked })}
+                        aria-label="إظهار أيقونة"
                         className="rounded"
                       />
                       إظهار أيقونة
@@ -699,6 +696,7 @@ const SplashScreensPage: React.FC = () => {
                       type="url"
                       value={formData.backgroundImage || ''}
                       onChange={e => setFormData({ ...formData, backgroundImage: e.target.value })}
+                      aria-label="رابط صورة الخلفية"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       placeholder="https://example.com/image.jpg"
                     />
@@ -715,6 +713,7 @@ const SplashScreensPage: React.FC = () => {
                     <select
                       value={formData.actionType}
                       onChange={e => setFormData({ ...formData, actionType: e.target.value as ActionType })}
+                      aria-label="نوع الإجراء"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     >
                       {ACTION_TYPES.map(type => (
@@ -733,8 +732,7 @@ const SplashScreensPage: React.FC = () => {
                         <input
                           type="text"
                           value={formData.actionLabel || ''}
-                          onChange={e => setFormData({ ...formData, actionLabel: e.target.value })}
-                          className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
+                          onChange={e => setFormData({ ...formData, actionLabel: e.target.value })}                          aria-label="نص الزر"                          className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                           placeholder="ابدأ الآن"
                         />
                       </div>
@@ -746,6 +744,7 @@ const SplashScreensPage: React.FC = () => {
                           <select
                             value={formData.actionTarget || ''}
                             onChange={e => setFormData({ ...formData, actionTarget: e.target.value })}
+                            aria-label="الصفحة المستهدفة"
                             className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                           >
                             <option value="">اختر صفحة</option>
@@ -763,6 +762,7 @@ const SplashScreensPage: React.FC = () => {
                             type="url"
                             value={formData.actionTarget || ''}
                             onChange={e => setFormData({ ...formData, actionTarget: e.target.value })}
+                            aria-label="الرابط"
                             className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                             placeholder="https://..."
                           />
@@ -782,6 +782,7 @@ const SplashScreensPage: React.FC = () => {
                     <select
                       value={formData.displayFrequency}
                       onChange={e => setFormData({ ...formData, displayFrequency: e.target.value as DisplayFrequency })}
+                      aria-label="تكرار العرض"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     >
                       {DISPLAY_FREQUENCIES.map(freq => (
@@ -803,6 +804,7 @@ const SplashScreensPage: React.FC = () => {
                       max="15"
                       value={formData.showDuration}
                       onChange={e => setFormData({ ...formData, showDuration: parseInt(e.target.value) })}
+                      aria-label="مدة العرض بالثواني"
                       className="w-full"
                     />
                   </div>
@@ -816,6 +818,8 @@ const SplashScreensPage: React.FC = () => {
                       max="100"
                       value={formData.priority}
                       onChange={e => setFormData({ ...formData, priority: parseInt(e.target.value) || 1 })}
+                      aria-label="الأولوية"
+                      placeholder="1"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     />
                   </div>
@@ -828,6 +832,7 @@ const SplashScreensPage: React.FC = () => {
                         type="date"
                         value={formData.startDate ? formData.startDate.split('T')[0] : ''}
                         onChange={e => setFormData({ ...formData, startDate: e.target.value ? `${e.target.value}T00:00:00Z` : undefined })}
+                        aria-label="تاريخ البدء"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       />
                     </div>
@@ -837,6 +842,7 @@ const SplashScreensPage: React.FC = () => {
                         type="date"
                         value={formData.endDate ? formData.endDate.split('T')[0] : ''}
                         onChange={e => setFormData({ ...formData, endDate: e.target.value ? `${e.target.value}T23:59:59Z` : undefined })}
+                        aria-label="تاريخ الانتهاء"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       />
                     </div>
@@ -849,6 +855,7 @@ const SplashScreensPage: React.FC = () => {
                       id="isActive"
                       checked={formData.isActive}
                       onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
+                      aria-label="تفعيل الشاشة فوراً بعد الحفظ"
                       className="w-5 h-5 rounded"
                     />
                     <label htmlFor="isActive" className="text-sm">
@@ -903,9 +910,9 @@ const SplashScreensPage: React.FC = () => {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-black rounded-b-3xl z-10" />
             
             {/* الشاشة */}
-            <div
+            <Styled
               className="w-full h-full flex flex-col items-center justify-center p-8 text-center"
-              style={{
+              css={{
                 background: previewScreen.backgroundGradient
                   ? `linear-gradient(180deg, ${previewScreen.backgroundGradient.join(', ')})`
                   : previewScreen.backgroundColor,
@@ -918,76 +925,84 @@ const SplashScreensPage: React.FC = () => {
             >
               {/* الأيقونة */}
               {previewScreen.showIcon && (
-                <div
+                <Styled
                   className="w-20 h-20 rounded-full flex items-center justify-center mb-6"
-                  style={{ backgroundColor: `${previewScreen.accentColor}30` }}
+                  css={{ backgroundColor: `${previewScreen.accentColor}30` }}
                 >
                   <Star size={40} style={{ color: previewScreen.accentColor }} />
-                </div>
+                </Styled>
               )}
 
               {/* العنوان */}
-              <h1
+              <Styled
+                as="h1"
                 className="text-2xl font-bold mb-4"
-                style={{ color: previewScreen.textColor }}
+                css={{ color: previewScreen.textColor }}
               >
                 {previewScreen.titleAr}
-              </h1>
+              </Styled>
 
               {/* المحتوى */}
-              <p
+              <Styled
+                as="p"
                 className="text-xl leading-relaxed mb-4"
-                style={{ color: previewScreen.textColor }}
+                css={{ color: previewScreen.textColor }}
               >
                 {previewScreen.contentAr}
-              </p>
+              </Styled>
 
               {/* العنوان الفرعي */}
               {previewScreen.subtitleAr && (
-                <p
+                <Styled
+                  as="p"
                   className="text-sm opacity-80 mb-4"
-                  style={{ color: previewScreen.textColor }}
+                  css={{ color: previewScreen.textColor }}
                 >
                   {previewScreen.subtitleAr}
-                </p>
+                </Styled>
               )}
 
               {/* المصدر */}
               {previewScreen.sourceAr && (
-                <p
+                <Styled
+                  as="p"
                   className="text-xs opacity-60 mb-8"
-                  style={{ color: previewScreen.textColor }}
+                  css={{ color: previewScreen.textColor }}
                 >
                   [{previewScreen.sourceAr}]
-                </p>
+                </Styled>
               )}
 
               {/* زر الإجراء */}
               {previewScreen.actionType !== 'none' && previewScreen.actionLabel && (
-                <button
+                <Styled
+                  as="button"
                   className="px-8 py-3 rounded-full font-bold"
-                  style={{
+                  css={{
                     backgroundColor: previewScreen.accentColor,
                     color: '#fff',
                   }}
                 >
                   {previewScreen.actionLabel}
-                </button>
+                </Styled>
               )}
 
               {/* زر التخطي */}
-              <button
+              <Styled
+                as="button"
                 className="absolute bottom-12 text-sm opacity-60"
-                style={{ color: previewScreen.textColor }}
+                css={{ color: previewScreen.textColor }}
               >
                 تخطي
-              </button>
-            </div>
+              </Styled>
+            </Styled>
           </div>
 
           {/* زر الإغلاق */}
           <button
             onClick={() => setPreviewScreen(null)}
+            aria-label="إغلاق المعاينة"
+            title="إغلاق المعاينة"
             className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white"
           >
             <X size={24} />

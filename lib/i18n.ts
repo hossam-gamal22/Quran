@@ -1,9 +1,10 @@
 // lib/i18n.ts
 // نظام الترجمة - روح المسلم
-// آخر تحديث: 2026-03-04
+// آخر تحديث: 2026-03-12
 
 import { translations, Language, TranslationKeys } from '@/constants/translations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getRemoteTranslation } from '@/lib/remote-translations';
 
 // ==================== المتغيرات ====================
 
@@ -23,6 +24,12 @@ export const loadSavedLanguage = async (): Promise<Language> => {
   }
   return currentLanguage;
 };
+
+// Start loading saved language immediately at module scope.
+// This ensures currentLanguage is set from AsyncStorage BEFORE
+// any React component renders and calls t(), preventing the
+// "Arabic flash" when the app language is non-Arabic.
+export const languageInitPromise: Promise<Language> = loadSavedLanguage();
 
 // ==================== حفظ اللغة ====================
 
@@ -64,6 +71,18 @@ export const getLanguage = (): Language => {
  * @param params - متغيرات للاستبدال (مثل: {count: 5})
  */
 export const t = (key: string, params?: Record<string, string | number>): string => {
+  // Check remote translations first (admin overrides)
+  const remoteValue = getRemoteTranslation(key, currentLanguage);
+  if (remoteValue) {
+    let result = remoteValue;
+    if (params) {
+      Object.keys(params).forEach(param => {
+        result = result.replace(new RegExp(`{${param}}`, 'g'), String(params[param]));
+      });
+    }
+    return result;
+  }
+
   const keys = key.split('.');
   let value: any = translations[currentLanguage];
   
@@ -85,14 +104,29 @@ export const t = (key: string, params?: Record<string, string | number>): string
       if (value && typeof value === 'object' && k in value) {
         value = value[k];
       } else {
-        return key; // إرجاع المفتاح إذا لم يوجد
+        if (__DEV__) {
+          console.warn(`[i18n] Missing translation key: "${key}" (lang: ${currentLanguage})`);
+        }
+        // Humanize the last segment instead of returning raw "word.word" key
+        const lastSegment = keys[keys.length - 1];
+        return lastSegment
+          .replace(/([a-z])([A-Z])/g, '$1 $2')
+          .replace(/[_-]/g, ' ')
+          .replace(/^\w/, c => c.toUpperCase());
       }
     }
   }
   
   // التأكد من أن القيمة نص
   if (typeof value !== 'string') {
-    return key;
+    if (__DEV__) {
+      console.warn(`[i18n] Translation key "${key}" resolved to non-string value (lang: ${currentLanguage})`);
+    }
+    const lastSegment = keys[keys.length - 1];
+    return lastSegment
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/[_-]/g, ' ')
+      .replace(/^\w/, c => c.toUpperCase());
   }
   
   // استبدال المتغيرات
@@ -106,6 +140,38 @@ export const t = (key: string, params?: Record<string, string | number>): string
 };
 
 /**
+ * الحصول على ترجمة من نوع مصفوفة (مثل أسماء الأشهر)
+ * @param key - مفتاح الترجمة (مثل: 'calendar.months')
+ */
+export const tArray = (key: string): string[] => {
+  const keys = key.split('.');
+  let value: any = translations[currentLanguage];
+
+  for (const k of keys) {
+    if (value && typeof value === 'object' && k in value) {
+      value = value[k];
+    } else {
+      value = null;
+      break;
+    }
+  }
+
+  // fallback to English
+  if (!Array.isArray(value)) {
+    value = translations['en'];
+    for (const k of keys) {
+      if (value && typeof value === 'object' && k in value) {
+        value = value[k];
+      } else {
+        return [];
+      }
+    }
+  }
+
+  return Array.isArray(value) ? value : [];
+};
+
+/**
  * الحصول على كل الترجمات للغة معينة
  */
 export const getTranslations = (lang?: Language): TranslationKeys => {
@@ -114,6 +180,7 @@ export const getTranslations = (lang?: Language): TranslationKeys => {
 
 /**
  * الحصول على اتجاه اللغة
+ * @param lang - اللغة للتحقق منها (إذا لم تُحدد، تستخدم اللغة الحالية)
  */
 export const isRTL = (lang?: Language): boolean => {
   const checkLang = lang || currentLanguage;
@@ -154,7 +221,7 @@ export const getLanguageName = (lang: Language): string => {
 export const getLanguageFlag = (lang: Language): string => {
   const flags: Record<Language, string> = {
     ar: '🇸🇦',
-    en: '🇬🇧',
+    en: '�🇸',
     fr: '🇫🇷',
     de: '🇩🇪',
     es: '🇪🇸',
@@ -180,7 +247,7 @@ export const supportedLanguages: {
   rtl: boolean;
 }[] = [
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true },
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', rtl: false },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸', rtl: false },
   { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false },
   { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false },
   { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false },
@@ -193,11 +260,38 @@ export const supportedLanguages: {
   { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false },
 ];
 
+// ==================== Date Locale ====================
+
+/**
+ * Maps app language to proper date locale for toLocaleDateString / toLocaleTimeString.
+ * Returns BCP 47 locale tag.
+ */
+const DATE_LOCALE_MAP: Record<Language, string> = {
+  ar: 'ar-u-nu-latn',
+  en: 'en-US',
+  fr: 'fr-FR',
+  de: 'de-DE',
+  es: 'es-ES',
+  tr: 'tr-TR',
+  ur: 'ur-u-nu-latn',
+  id: 'id-ID',
+  ms: 'ms-MY',
+  hi: 'hi-u-nu-latn',
+  bn: 'bn-u-nu-latn',
+  ru: 'ru-RU',
+};
+
+export const getDateLocale = (lang?: Language): string => {
+  const l = lang || currentLanguage;
+  return DATE_LOCALE_MAP[l] || l;
+};
+
 // ==================== تصدير افتراضي ====================
 
-export default { 
-  t, 
-  setLanguage, 
+export default {
+  t,
+  tArray,
+  setLanguage,
   getLanguage, 
   isRTL,
   getTextDirection,
@@ -207,4 +301,5 @@ export default {
   saveLanguage,
   getTranslations,
   supportedLanguages,
+  getDateLocale,
 };

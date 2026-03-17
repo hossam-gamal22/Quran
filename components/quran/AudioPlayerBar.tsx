@@ -8,9 +8,12 @@ import Slider from '@react-native-community/slider';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useRouter, usePathname } from 'expo-router';
 import { useQuran } from '@/contexts/QuranContext';
+import { getSurahName } from '@/lib/quran-api';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { fontRegular, fontSemiBold } from '@/lib/fonts';
 function formatTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const min = Math.floor(totalSec / 60);
@@ -24,7 +27,8 @@ interface AudioPlayerBarProps {
 }
 
 export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, t } = useSettings();
+  const isRTL = useIsRTL();
   const router = useRouter();
   const pathname = usePathname();
   const {
@@ -76,7 +80,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
     return null;
   }
 
-  const surahName = surahs.find(s => s.number === currentSurah)?.name || '';
+  const surahName = currentSurah > 0 ? getSurahName(currentSurah) : '';
   const primaryColor = '#2f7659';
   const textColor = isDarkMode ? '#fff' : '#1C1C1E';
   const textSecondary = isDarkMode ? '#8E8E93' : '#3A3A3C';
@@ -120,6 +124,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
             style={[
               styles.miniPill,
               {
+                flexDirection: isRTL ? 'row-reverse' : 'row',
                 backgroundColor: isDarkMode
                   ? 'rgba(28,28,30,0.55)'
                   : 'rgba(255,255,255,0.6)',
@@ -152,8 +157,8 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
               )}
             </Pressable>
 
-            <Text style={[styles.miniText, { color: textColor }]} numberOfLines={1}>
-              {surahName} - آية {currentAyah}
+            <Text style={[styles.miniText, { color: textColor, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+              {surahName} - {t('quran.ayah')} {currentAyah}
             </Text>
 
             <Pressable
@@ -199,19 +204,19 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
           </Pressable>
 
           {/* Top row: info + controls */}
-          <View style={styles.topRow}>
+          <View style={[styles.topRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {/* معلومات التشغيل */}
-            <View style={styles.info}>
-              <Text style={[styles.surahName, { color: textColor }]} numberOfLines={1}>
+            <View style={[styles.info]}>
+              <Text style={[styles.surahName, { color: textColor, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                 {surahName}
               </Text>
-              <Text style={[styles.ayahNumber, { color: textSecondary }]}>
-                الآية {currentAyah}
+              <Text style={[styles.ayahNumber, { color: textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+                {t('quran.ayah')} {currentAyah}
               </Text>
             </View>
 
             {/* أزرار التحكم */}
-            <View style={styles.controls}>
+            <View style={[styles.controls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Pressable onPress={toggleMinimize} style={styles.controlButton}>
                 <MaterialCommunityIcons name="chevron-down" size={22} color={textColor} />
               </Pressable>
@@ -243,7 +248,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
 
           {/* Progress bar / scrubber */}
           {duration > 0 && (
-            <View style={styles.progressRow}>
+            <View style={[styles.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.timeText, { color: textSecondary }]}>
                 {formatTime(position)}
               </Text>
@@ -295,21 +300,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.md,
   },
   info: {
     flex: 1,
-    marginRight: Spacing.md,
   },
   surahName: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
-    textAlign: 'right',
   },
   ayahNumber: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'right',
+    fontFamily: fontRegular(),
   },
   controls: {
     flexDirection: 'row',
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
-    gap: 4,
+    gap: 8,
   },
   slider: {
     flex: 1,
@@ -338,7 +341,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     minWidth: 32,
     textAlign: 'center',
   },
@@ -362,9 +365,8 @@ const styles = StyleSheet.create({
   miniText: {
     flex: 1,
     fontSize: FONT_SIZES.sm,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
-    textAlign: 'right',
   },
   absoluteClose: {
     position: 'absolute',

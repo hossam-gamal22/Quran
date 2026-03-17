@@ -1,0 +1,2555 @@
+{
+  "missingAssets": [
+    "backgrounds/background1.png",
+    "backgrounds/background2.png",
+    "backgrounds/background3.png",
+    "backgrounds/background4.png",
+    "backgrounds/background5.png",
+    "backgrounds/background6.png",
+    "backgrounds/background7.png",
+    "flags/bd.png",
+    "flags/de.png",
+    "flags/es.png",
+    "flags/fr.png",
+    "flags/id.png",
+    "flags/in.png",
+    "flags/my.png",
+    "flags/pk.png",
+    "flags/ru.png",
+    "flags/sa.png",
+    "flags/tr.png",
+    "flags/us.png",
+    "icons/android-icon-background.png",
+    "icons/android-icon-monochrome.png",
+    "icons/notification-icon.png",
+    "quran/basmala.png",
+    "quran/quranbg1.png",
+    "quran/quranbg2.png",
+    "quran/quranbg3.png",
+    "quran/quranbg4.png",
+    "quran/surah-ornament.png",
+    "widgets/widget-icon.png"
+  ],
+  "allLeaks": [
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 302,
+      "content": "<Text style={s.title}>🌙 التقويم الهجري</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 331,
+      "content": "<Text key={d} style={[s.weekDay, d === 'جمعة' && { color: colors.primary }]}>{d}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 360,
+      "content": "<Text style={s.convTitle}>📅 محوّل التواريخ — اليوم</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 362,
+      "content": "<Text style={s.convLabel}>ميلادي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 366,
+      "content": "<Text style={s.convLabel}>هجري</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 367,
+      "content": "<Text style={[s.convValue, { color: colors.primary }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} هـ</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 370,
+      "content": "<Text style={s.convLabel}>اليوم المختار</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 371,
+      "content": "<Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} هـ</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 374,
+      "content": "<Text style={s.convLabel}>يوافقه ميلادياً</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 383,
+      "content": "<Text style={s.sectionTitle}>📅 المناسبات القادمة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/hijri-calendar.tsx",
+      "line": 387,
+      "content": "<Text style={s.upcomingDiffText}>{ev.diff === 0 ? 'اليوم!' : `${ev.diff}د`}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/khatm.tsx",
+      "line": 268,
+      "content": "<Text style={s.emptyText}>{t('khatma.khatmaCreatedMsg').replace('ابدأ القراءة الآن!', '')}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/khatm.tsx",
+      "line": 308,
+      "content": "placeholder={`ختمة ${new Date().toLocaleDateString('ar-EG')}`}"
+    },
+    {
+      "file": "/app/(tabs)/khatm.tsx",
+      "line": 367,
+      "content": "<Text style={{ fontSize: 24, marginTop: 12 }}>بارك الله فيك 🌟</Text>"
+    },
+    {
+      "file": "/app/(tabs)/prayer.tsx",
+      "line": 558,
+      "content": "<Text style={styles.thumbWidgetPrayerLabel}>صلاة الظهر</Text>"
+    },
+    {
+      "file": "/app/(tabs)/prayer.tsx",
+      "line": 594,
+      "content": "<Text style={[styles.thumbDigitalLabel, { color: colors.textLight }]}>الفجر</Text>"
+    },
+    {
+      "file": "/app/(tabs)/qibla.tsx",
+      "line": 394,
+      "content": "<Text style={styles.retryText}>إعادة المحاولة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/qibla.tsx",
+      "line": 406,
+      "content": "<Text style={styles.loadingText}>جاري تحديد اتجاه القبلة...</Text>"
+    },
+    {
+      "file": "/app/(tabs)/qibla.tsx",
+      "line": 565,
+      "content": "<Text style={styles.titleText}>اتجاه القبلة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 395,
+      "content": "<Text style={s.juzText}>ج{item.juz}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 419,
+      "content": "<Text style={s.resultActionText}>التفسير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 454,
+      "content": "<Text style={s.headerTitle}>البحث في القرآن</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 472,
+      "content": "placeholder={searchLang === 'ar' ? 'ابحث بالعربية...' : 'Search in English...'}"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 485,
+      "content": ": <Text style={s.searchBtnText}>بحث</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 497,
+      "content": "<Text style={[s.controlChipText, searchLang === 'ar' && s.controlChipTextActive]}>🇸🇦 عربي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 523,
+      "content": "<Text style={[s.controlChipText, showStats && s.controlChipTextActive]}>📊 إحصاء</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 549,
+      "content": "<Text style={s.statLabel}> نتيجة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 553,
+      "content": "<Text style={s.statLabel}> سورة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 557,
+      "content": "<Text style={s.statLabel}> جزء</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 582,
+      "content": "<Text style={{ color: colors.textLight, marginTop: 12, fontSize: 14 }}>جاري البحث...</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 599,
+      "content": "<Text style={{ fontSize: 12, color: colors.textLight }}>مسح</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 601,
+      "content": "<Text style={s.historyTitle}>🕐 عمليات البحث الأخيرة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 617,
+      "content": "<Text style={[s.historyTitle, { marginTop: 20 }]}>💡 جرّب البحث عن</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 627,
+      "content": "<Text style={s.emptyTitle}>ابحث في القرآن الكريم</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 628,
+      "content": "<Text style={s.emptyText}>ابحث بالكلمة أو العبارة بالعربية أو الإنجليزية</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 634,
+      "content": "<Text style={s.emptyTitle}>لا توجد نتائج</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 635,
+      "content": "<Text style={s.emptyText}>جرّب كلمات مختلفة أو غيّر لغة البحث</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 654,
+      "content": "<Text style={s.modalTitle}>التفسير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 696,
+      "content": "<Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 714,
+      "content": "<Text style={[s.modalTitle, { flex: 1 }]}>اختر السورة للفلترة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/quran-search.tsx",
+      "line": 720,
+      "content": "<Text style={[s.surahItemName, surahFilter === null && { color: colors.primary }]}>كل السور</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 373,
+      "content": "<Text style={s.title}>🎙️ التلاوات الكاملة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 379,
+      "content": "<Text style={s.changeBtnText}>تغيير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 382,
+      "content": "<Text style={s.reciterLabel}>القارئ المختار</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 396,
+      "content": "<Text style={[s.toggleBtnText, view === 'surahs' && s.toggleBtnTextActive]}>📖 السور (114)</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 399,
+      "content": "<Text style={[s.toggleBtnText, view === 'juz' && s.toggleBtnTextActive]}>📚 الأجزاء (30)</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 409,
+      "content": "placeholder=\"ابحث عن سورة...\""
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 424,
+      "content": "<Text style={s.sectionTitle}>⭐ المفضلة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/recitations.tsx",
+      "line": 486,
+      "content": "<Text style={s.modalTitle}>اختر القارئ</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 118,
+      "content": "<Text style={[s.juzBadgeText, { color: colors.muted }]}>ج {item.juz}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 129,
+      "content": "<Text style={s.tafsirBtnText}>التفسير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 231,
+      "content": "<Text style={[s.title, { marginBottom: 0, flex: 1 }]}>البحث في التفسير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 245,
+      "content": "placeholder=\"ابحث في القرآن...\""
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 255,
+      "content": "<Text style={s.searchBtnText}>بحث</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 273,
+      "content": "<Text style={s.editionLabel}>عرض التفسير بـ:</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 307,
+      "content": "<Text style={s.emptyTitle}>لا توجد نتائج</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 308,
+      "content": "<Text style={s.emptyText}>جرّب البحث بكلمات مختلفة أو غيّر لغة البحث</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 313,
+      "content": "<Text style={s.emptyTitle}>ابحث في القرآن</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 314,
+      "content": "<Text style={s.emptyText}>ابحث بالكلمة أو العبارة لإيجاد الآيات وقراءة تفسيرها</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 335,
+      "content": "<Text style={s.modalTitle}>التفسير</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tafsir-search.tsx",
+      "line": 374,
+      "content": "<Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 658,
+      "content": "<Text style={[s.headerTitle, { color: C.text }, colors.textShadowStyle]}>التسبيح</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 840,
+      "content": "<Text style={[s.chipText, { color: C.textSec }]}>{rounds} جولات</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 844,
+      "content": "<Text style={[s.chipText, { color: C.textSec }]}>{totalCount} إجمالي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 862,
+      "content": "<Text style={[s.resetBtnText, { color: count > 0 ? GREEN : C.textSec }]}>إعادة العداد</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 879,
+      "content": "<Text style={s.toastText}>تم حفظ تسبيحات الأمس وإعادة تعيين العداد</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 889,
+      "content": "<Text style={[s.modalTitle, { color: C.text }]}>اختر التسبيح</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 896,
+      "content": "<Text style={[s.sectionLabel, { color: C.textSec }]}>التسبيحات المعتمدة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 917,
+      "content": "<Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تسبيحاتي المخصصة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 942,
+      "content": "<Text style={s.addBtnText}>إضافة تسبيح مخصص</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 958,
+      "content": "<Text style={[s.modalTitle, { color: C.text }]}>إضافة تسبيح مخصص</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 963,
+      "content": "<Text style={[s.inputLabel, { color: C.text }]}>نص التسبيح</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 968,
+      "content": "placeholder=\"أدخل نص التسبيح...\""
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 973,
+      "content": "<Text style={[s.inputLabel, { color: C.text }]}>العدد</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 998,
+      "content": "<Text style={s.saveBtnText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1009,
+      "content": "<Text style={[s.modalTitle, { color: C.text }]}>الإعدادات</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1014,
+      "content": "<GlassToggle label=\"الاهتزاز\" icon=\"cellphone\" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1015,
+      "content": "<GlassToggle label=\"إظهار الفضل\" icon=\"star-outline\" enabled={showVirtue} onToggle={setShowVirtue} />"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1016,
+      "content": "<GlassToggle label=\"الانتقال التلقائي\" icon=\"arrow-right-circle-outline\" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle=\"الانتقال للتسبيح التالي عند الإكمال\" />"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1018,
+      "content": "<GlassToggle label=\"إظهار الترجمة\" icon=\"translate\" enabled={showTranslation} onToggle={setShowTranslation} />"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1021,
+      "content": "<Text style={s.saveBtnText}>إعادة تعيين كل شيء</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1032,
+      "content": "<Text style={[s.modalTitle, { color: C.text }]}>إحصائياتي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1043,
+      "content": "<Text style={[s.statLabel, { color: C.textSec }]}>تسبيحات اليوم</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1048,
+      "content": "<Text style={[s.statLabel, { color: C.textSec }]}>جولات مكتملة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1055,
+      "content": "<Text style={[s.statLabel, { color: C.textSec }]}>الإجمالي الكلي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1060,
+      "content": "<Text style={[s.statLabel, { color: C.textSec }]}>متوسط يومي</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1067,
+      "content": "<Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تفصيل اليوم</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1078,
+      "content": "<Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>آخر ٧ أيام</Text>"
+    },
+    {
+      "file": "/app/(tabs)/tasbih.tsx",
+      "line": 1084,
+      "content": "<Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>"
+    },
+    {
+      "file": "/app/(tabs)/wird.tsx",
+      "line": 235,
+      "content": "<Text style={styles.headerTitle}>السبحة الإلكترونية</Text>"
+    },
+    {
+      "file": "/app/(tabs)/wird.tsx",
+      "line": 290,
+      "content": "<Text style={styles.statLabel}>الجولات</Text>"
+    },
+    {
+      "file": "/app/(tabs)/wird.tsx",
+      "line": 299,
+      "content": "<Text style={styles.statLabel}>المجموع</Text>"
+    },
+    {
+      "file": "/app/(tabs)/wird.tsx",
+      "line": 304,
+      "content": "<Text style={styles.instructions}>اضغط على الدائرة للتسبيح</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 93,
+      "content": "<Text style={styles.toggleTitle}>الإعلانات</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 109,
+      "content": "<Text style={styles.sectionTitle}>معرّفات الإعلانات</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 147,
+      "content": "<Text style={styles.sectionTitle}>مواضع Banner</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 150,
+      "content": "<Text style={styles.switchLabel}>الصفحة الرئيسية</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 160,
+      "content": "<Text style={styles.switchLabel}>شاشة القرآن</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 170,
+      "content": "<Text style={styles.switchLabel}>شاشة الأذكار</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 180,
+      "content": "<Text style={styles.switchLabel}>شاشة الصلوات</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 192,
+      "content": "<Text style={styles.sectionTitle}>إعدادات Interstitial</Text>"
+    },
+    {
+      "file": "/app/admin/ads.tsx",
+      "line": 222,
+      "content": "<Text style={styles.saveBtnText}>حفظ الإعدادات</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 217,
+      "content": "<Text style={styles.addBtnText}>إضافة محتوى جديد</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 288,
+      "content": "<Text style={styles.priorityText}>الأولوية: {item.priority}</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 298,
+      "content": "<Text style={styles.emptyText}>لا يوجد محتوى</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 322,
+      "content": "<Text style={styles.saveText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 329,
+      "content": "<Text style={styles.inputLabel}>نوع المحتوى</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 364,
+      "content": "<Text style={styles.inputLabel}>العنوان (عربي) *</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 369,
+      "content": "placeholder=\"عنوان المحتوى\""
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 375,
+      "content": "<Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 386,
+      "content": "<Text style={styles.inputLabel}>المحتوى (عربي) *</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 391,
+      "content": "placeholder=\"نص المحتوى...\""
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 399,
+      "content": "<Text style={styles.inputLabel}>المحتوى (إنجليزي)</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 412,
+      "content": "<Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 423,
+      "content": "<Text style={styles.inputLabel}>رابط خارجي (اختياري)</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 434,
+      "content": "<Text style={styles.inputLabel}>الأولوية (1-10)</Text>"
+    },
+    {
+      "file": "/app/admin/content.tsx",
+      "line": 448,
+      "content": "<Text style={styles.switchLabel}>مفعّل</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 168,
+      "content": "<Text style={styles.headerTitle}>لوحة التحكم</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 169,
+      "content": "<Text style={styles.headerSubtitle}>رُوح المسلم</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 177,
+      "content": "<Text style={styles.statLabel}>مشترك</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 182,
+      "content": "<Text style={styles.statLabel}>إجمالي الأرباح</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 187,
+      "content": "<Text style={styles.statLabel}>أرباح اليوم</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 193,
+      "content": "<Text style={styles.sectionTitle}>إجراءات سريعة</Text>"
+    },
+    {
+      "file": "/app/admin/index.tsx",
+      "line": 243,
+      "content": "<Text style={styles.sectionTitle}>الإدارة</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 187,
+      "content": "<Text style={styles.addBtnText}>إضافة إشعار جديد</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 213,
+      "content": "<Text style={styles.sendBtnText}>إرسال الآن</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 246,
+      "content": "<Text style={styles.metaText}>أُرسل {item.sentCount} مرة</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 256,
+      "content": "<Text style={styles.emptyText}>لا توجد إشعارات</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 279,
+      "content": "<Text style={styles.saveText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 285,
+      "content": "<Text style={styles.inputLabel}>العنوان (عربي) *</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 290,
+      "content": "placeholder=\"عنوان الإشعار\""
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 296,
+      "content": "<Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 307,
+      "content": "<Text style={styles.inputLabel}>النص (عربي) *</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 312,
+      "content": "placeholder=\"نص الإشعار...\""
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 320,
+      "content": "<Text style={styles.inputLabel}>النص (إنجليزي)</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 333,
+      "content": "<Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 345,
+      "content": "<Text style={styles.inputLabel}>التكرار</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 371,
+      "content": "<Text style={styles.inputLabel}>الجمهور المستهدف</Text>"
+    },
+    {
+      "file": "/app/admin/notifications.tsx",
+      "line": 396,
+      "content": "<Text style={styles.switchLabel}>مفعّل</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 125,
+      "content": "<Text style={styles.addBtnText}>إضافة سعر جديد</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 154,
+      "content": "<Text style={styles.priceLabel}>شهري</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 160,
+      "content": "<Text style={styles.priceLabel}>سنوي</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 183,
+      "content": "<Text style={styles.emptyText}>لا توجد أسعار بعد</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 204,
+      "content": "<Text style={styles.saveText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 210,
+      "content": "<Text style={styles.inputLabel}>رمز البلد (مثال: EG)</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 225,
+      "content": "<Text style={styles.inputLabel}>اسم البلد</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 232,
+      "content": "placeholder=\"مصر\""
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 238,
+      "content": "<Text style={styles.inputLabel}>العملة (مثال: EGP)</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 251,
+      "content": "<Text style={styles.inputLabel}>رمز العملة</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 258,
+      "content": "placeholder=\"ج.م\""
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 264,
+      "content": "<Text style={styles.inputLabel}>السعر الشهري</Text>"
+    },
+    {
+      "file": "/app/admin/pricing.tsx",
+      "line": 278,
+      "content": "<Text style={styles.inputLabel}>السعر السنوي</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 158,
+      "content": "<Text style={styles.statLabel}>إجمالي القراء</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 164,
+      "content": "<Text style={styles.statLabel}>مفعّلين</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 170,
+      "content": "<Text style={styles.statLabel}>مميزين</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 177,
+      "content": "<Text style={styles.addBtnText}>إضافة قارئ جديد</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 218,
+      "content": "<Text style={[styles.badgeText, { color: Colors.gold }]}>مميز</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 271,
+      "content": "<Text style={styles.emptyText}>لا يوجد قراء</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 294,
+      "content": "<Text style={styles.saveText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 300,
+      "content": "<Text style={styles.inputLabel}>الاسم (عربي) *</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 305,
+      "content": "placeholder=\"عبدالرحمن السديس\""
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 311,
+      "content": "<Text style={styles.inputLabel}>الاسم (إنجليزي)</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 322,
+      "content": "<Text style={styles.inputLabel}>رابط الصورة</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 333,
+      "content": "<Text style={styles.inputLabel}>رابط قاعدة الصوت *</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 347,
+      "content": "<Text style={styles.inputLabel}>ترتيب العرض</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 361,
+      "content": "<Text style={styles.switchLabel}>مفعّل</Text>"
+    },
+    {
+      "file": "/app/admin/reciters.tsx",
+      "line": 371,
+      "content": "<Text style={styles.switchLabel}>مميز (Premium فقط)</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 85,
+      "content": "<Text style={styles.sectionTitle}>معلومات التطبيق</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 88,
+      "content": "<Text style={styles.inputLabel}>اسم التطبيق</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 93,
+      "content": "placeholder=\"رُوح المسلم\""
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 99,
+      "content": "<Text style={styles.inputLabel}>إصدار التطبيق</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 112,
+      "content": "<Text style={styles.sectionTitle}>وضع الصيانة</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 122,
+      "content": "<Text style={styles.switchLabel}>تفعيل وضع الصيانة</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 137,
+      "content": "<Text style={styles.inputLabel}>رسالة الصيانة</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 142,
+      "content": "placeholder=\"التطبيق تحت الصيانة...\""
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 152,
+      "content": "<Text style={styles.sectionTitle}>إجبار التحديث</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 162,
+      "content": "<Text style={styles.switchLabel}>إجبار التحديث</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 177,
+      "content": "<Text style={styles.inputLabel}>الحد الأدنى للإصدار المطلوب</Text>"
+    },
+    {
+      "file": "/app/admin/settings.tsx",
+      "line": 216,
+      "content": "<Text style={styles.saveBtnText}>حفظ الإعدادات</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 91,
+      "content": "<Text style={styles.statLabel}>إجمالي المشتركين</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 96,
+      "content": "<Text style={styles.statLabel}>إجمالي الأرباح</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 101,
+      "content": "<Text style={styles.statLabel}>أرباح اليوم</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 108,
+      "content": "<Text style={styles.sectionTitle}>أعلى الدول</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 175,
+      "content": "<Text style={styles.email}>{sub.email || 'بدون بريد'}</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 215,
+      "content": "<Text style={styles.detailLabel}>نوع الاشتراك</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 221,
+      "content": "<Text style={styles.detailLabel}>المبلغ</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 229,
+      "content": "<Text style={styles.detailLabel}>تاريخ البدء</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 233,
+      "content": "<Text style={styles.detailLabel}>تاريخ الانتهاء</Text>"
+    },
+    {
+      "file": "/app/admin/subscribers.tsx",
+      "line": 252,
+      "content": "<Text style={styles.emptyText}>لا يوجد مشتركين</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 369,
+      "content": "<Text style={styles.cardDate}>آخر تحديث: {updatedStr}</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 434,
+      "content": "<Text style={styles.headerTitle}>محرك الويدجت الديناميكي</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 437,
+      "content": "<Text style={styles.addButtonText}>إضافة قالب جديد</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 449,
+      "content": "<Text style={styles.emptyText}>لا توجد قوالب بعد</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 450,
+      "content": "<Text style={styles.emptySubtext}>اضغط على \"إضافة قالب جديد\" للبدء</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 468,
+      "content": "<Text style={styles.modalCancel}>إلغاء</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 482,
+      "content": "<Text style={styles.label}>اسم القالب</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 487,
+      "content": "placeholder=\"مثال: ويدجت الآية اليومية\""
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 492,
+      "content": "<Text style={styles.label}>نوع القالب</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 521,
+      "content": "<Text style={styles.label}>كود SVG</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 534,
+      "content": "<Text style={styles.label}>ربط المتغيرات</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 537,
+      "content": "<Text style={styles.addMappingText}>إضافة متغير</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 544,
+      "content": "<Text style={styles.mappingLabel}>المحدد (Selector)</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 553,
+      "content": "placeholder='مثال: #title-text'"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 557,
+      "content": "<Text style={styles.mappingLabel}>المتغير</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 571,
+      "content": "<Text style={styles.mappingLabel}>القيمة الافتراضية</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 576,
+      "content": "placeholder=\"قيمة احتياطية\""
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 585,
+      "content": "<Text style={[styles.label, { marginTop: Spacing.lg }]}>معاينة مباشرة</Text>"
+    },
+    {
+      "file": "/app/admin/widgets.tsx",
+      "line": 627,
+      "content": "<Text style={[styles.saveBtnText, { color: '#fff' }]}>نشر</Text>"
+    },
+    {
+      "file": "/app/ayat-universe.tsx",
+      "line": 62,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>آيات عظمة الله</Text>"
+    },
+    {
+      "file": "/app/ayat-universe.tsx",
+      "line": 75,
+      "content": "<Text style={styles.introTitle}>تأمل في آيات الله الكونية</Text>"
+    },
+    {
+      "file": "/app/ayat-universe.tsx",
+      "line": 76,
+      "content": "<Text style={styles.introSubtitle}>آيات من القرآن الكريم تدل على عظمة الخالق وقدرته</Text>"
+    },
+    {
+      "file": "/app/ayat-universe.tsx",
+      "line": 135,
+      "content": "<Text style={[styles.actionBtnText, { color: themeInfo?.color || '#3a7ca5' }]}>قراءة في المصحف</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 788,
+      "content": "<Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16 }}>لا توجد بيانات لهذا القسم</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 790,
+      "content": "<Text style={{ color: '#FFF', fontSize: 16 }}>رجوع</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 801,
+      "content": "<Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12 }}>جاري التحميل...</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1323,
+      "content": "<Text style={styles.watermarkHidden}>روح المسلم</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1611,
+      "content": "<Text style={styles.modalButtonText}>الحمد لله</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1636,
+      "content": "<Text style={styles.modalButtonText}>حسناً</Text>"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1662,
+      "content": "placeholder={language === 'ar' ? 'النص العربي *' : 'Arabic text *'}"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1675,
+      "content": "placeholder={language === 'ar' ? 'عدد التكرار' : 'Repeat count'}"
+    },
+    {
+      "file": "/app/azkar/[category].tsx",
+      "line": 1688,
+      "content": "placeholder={language === 'ar' ? 'الترجمة (اختياري)' : 'Translation (optional)'}"
+    },
+    {
+      "file": "/app/azkar-search.tsx",
+      "line": 406,
+      "content": "placeholder={language === 'ar' ? 'ابحث في الأذكار...' : 'Search adhkar...'}"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 373,
+      "content": "<Text style={s.title}>✨ آية اليوم</Text>"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 376,
+      "content": "<Text style={s.subtitle}>شارك كلام الله مع أحبائك</Text>"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 387,
+      "content": "<Text style={s.sectionLabel}>🖼️ {t('quran.imageBackground') || 'خلفية الصورة'}</Text>"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 430,
+      "content": "<Text style={s.sectionLabel}>📖 {t('quran.chooseVerse') || 'اختر الآية'}</Text>"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 446,
+      "content": "<Text style={s.sectionLabel}>🎨 {t('quran.cardStyle') || 'نمط البطاقة'}</Text>"
+    },
+    {
+      "file": "/app/daily-ayah.tsx",
+      "line": 473,
+      "content": "<Text style={[s.chipText, showTafsir && s.chipTextActive]}>📖 {t('quran.tafsir') || 'تفسير'}</Text>"
+    },
+    {
+      "file": "/app/daily-dhikr.tsx",
+      "line": 192,
+      "content": "<BrandedCapture ref={brandedRef} title=\"أذكار يومية\">"
+    },
+    {
+      "file": "/app/daily-dhikr.tsx",
+      "line": 218,
+      "content": "<Text style={[styles.benefitLabel, { color: ACCENT }]}>فضل الذكر</Text>"
+    },
+    {
+      "file": "/app/daily-dhikr.tsx",
+      "line": 240,
+      "content": "<Text style={[styles.refreshButtonText, { color: ACCENT }]}>ذكر آخر</Text>"
+    },
+    {
+      "file": "/app/hadith-of-day.tsx",
+      "line": 170,
+      "content": "<BrandedCapture ref={brandedRef} title={t('home.hadithOfDay') || 'حديث اليوم'}>"
+    },
+    {
+      "file": "/app/hadith-of-day.tsx",
+      "line": 253,
+      "content": "<Text style={[styles.refreshButtonText, { color: ACCENT }]}>{t('home.anotherHadith') || 'حديث آخر'}</Text>"
+    },
+    {
+      "file": "/app/hadith-sifat.tsx",
+      "line": 73,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>أحاديث صفات الله</Text>"
+    },
+    {
+      "file": "/app/hadith-sifat.tsx",
+      "line": 86,
+      "content": "<Text style={styles.introTitle}>أحاديث عن صفات الله</Text>"
+    },
+    {
+      "file": "/app/hadith-sifat.tsx",
+      "line": 87,
+      "content": "<Text style={styles.introSubtitle}>أحاديث نبوية صحيحة عن صفات الله وعظمته وقربه من عباده</Text>"
+    },
+    {
+      "file": "/app/hadith-sifat.tsx",
+      "line": 150,
+      "content": "<Text style={[styles.actionBtnText, { color: colors.text }]}>حفظ</Text>"
+    },
+    {
+      "file": "/app/hadith-sifat.tsx",
+      "line": 160,
+      "content": "<Text style={[styles.actionBtnText, { color: colors.text }]}>مشاركة</Text>"
+    },
+    {
+      "file": "/app/hajj-umrah.tsx",
+      "line": 729,
+      "content": "<Text style={[s.stepsLabelText, { color: ACCENT }]}>الخطوات</Text>"
+    },
+    {
+      "file": "/app/hajj-umrah.tsx",
+      "line": 747,
+      "content": "<Text style={[s.duasHeaderText, { color: ACCENT }]}>الأدعية</Text>"
+    },
+    {
+      "file": "/app/hajj.tsx",
+      "line": 169,
+      "content": "<Text style={[s.footerText, { color: colors.text }]}>اللَّهُمَّ تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ</Text>"
+    },
+    {
+      "file": "/app/hajj.tsx",
+      "line": 170,
+      "content": "<Text style={[s.footerNote, { color: colors.textLight }]}>نسأل الله أن يتقبل منكم ويرزقكم حجاً مبروراً</Text>"
+    },
+    {
+      "file": "/app/hijri.tsx",
+      "line": 370,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>التقويم الهجري</Text>"
+    },
+    {
+      "file": "/app/hijri.tsx",
+      "line": 474,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>مناسبات هذا الشهر</Text>"
+    },
+    {
+      "file": "/app/hijri.tsx",
+      "line": 535,
+      "content": "<Text style={styles.modalTitle}>تعديل التاريخ الهجري</Text>"
+    },
+    {
+      "file": "/app/honor-board.tsx",
+      "line": 95,
+      "content": "<Text style={[styles.title, { color: colors.text }]}>لوحة الشرف</Text>"
+    },
+    {
+      "file": "/app/honor-board.tsx",
+      "line": 113,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>نقاطك هذا الشهر</Text>"
+    },
+    {
+      "file": "/app/honor-board.tsx",
+      "line": 115,
+      "content": "<Text style={[styles.scoreLabel, { color: colors.muted }]}>نقطة</Text>"
+    },
+    {
+      "file": "/app/honor-board.tsx",
+      "line": 137,
+      "content": "<Text style={styles.premiumBadgeText}>بريميوم</Text>"
+    },
+    {
+      "file": "/app/honor-board.tsx",
+      "line": 147,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>كيف يعمل النظام؟</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 134,
+      "content": "<Text style={styles.startButtonText}>ابدأ ختمة جديدة</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 160,
+      "content": "<Text style={styles.startButtonText}>ابدأ ختمة جديدة</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 175,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>الورد اليومي</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 254,
+      "content": "<Text style={styles.completedBadgeText}>مكتمل</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 264,
+      "content": "<Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>من</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 274,
+      "content": "<Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>إلى</Text>"
+    },
+    {
+      "file": "/app/khatma/wird.tsx",
+      "line": 344,
+      "content": "<Text style={styles.completeButtonText}>أكملت ورد اليوم</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1062,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>أسماء الله الحسنى</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1153,
+      "content": "<Text style={styles.sectionTitle}>المعنى</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1164,
+      "content": "<Text style={styles.sectionTitle}>الشرح</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1176,
+      "content": "<Text style={styles.sectionTitle}>الدليل</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1189,
+      "content": "<Text style={styles.actionBtnText}>مشاركة</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1197,
+      "content": "<Text style={styles.actionBtnText}>نسخ</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1207,
+      "content": "<Text style={styles.navBtnText}>السابق</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1211,
+      "content": "<Text style={styles.navBtnText}>التالي</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1233,
+      "content": "<Text style={styles.shareModalTitle}>مشاركة</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1254,
+      "content": "<Text style={styles.shareOptionText}>مشاركة</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1264,
+      "content": "<Text style={styles.shareOptionText}>نسخ</Text>"
+    },
+    {
+      "file": "/app/names.tsx",
+      "line": 1286,
+      "content": "<Text style={styles.shareOptionText}>واتساب</Text>"
+    },
+    {
+      "file": "/app/quote-of-day.tsx",
+      "line": 176,
+      "content": "<Text style={styles.refreshText}>حكمة أخرى</Text>"
+    },
+    {
+      "file": "/app/quran-bookmarks.tsx",
+      "line": 86,
+      "content": "<Text style={[s.headerTitle, { color: colors.text }]}>الفواصل</Text>"
+    },
+    {
+      "file": "/app/quran-bookmarks.tsx",
+      "line": 146,
+      "content": "<Text style={[s.emptyText, { color: isLightBg ? '#999' : '#666' }]}>لا توجد فواصل بعد</Text>"
+    },
+    {
+      "file": "/app/ruqya.tsx",
+      "line": 376,
+      "content": "<Text style={{ color: colors.text }}>جاري التحميل...</Text>"
+    },
+    {
+      "file": "/app/sdui/[screenId].tsx",
+      "line": 49,
+      "content": "<Text style={styles.backButtonText}>العودة</Text>"
+    },
+    {
+      "file": "/app/seasonal/ashura.tsx",
+      "line": 166,
+      "content": "<Text style={styles.recommendedText}>مستحب</Text>"
+    },
+    {
+      "file": "/app/seasonal/ashura.tsx",
+      "line": 353,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>أيام الصيام</Text>"
+    },
+    {
+      "file": "/app/seasonal/ashura.tsx",
+      "line": 366,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>فضائل عاشوراء</Text>"
+    },
+    {
+      "file": "/app/seasonal/ashura.tsx",
+      "line": 374,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>الأعمال المستحبة</Text>"
+    },
+    {
+      "file": "/app/seasonal/ashura.tsx",
+      "line": 392,
+      "content": "<Text style={[styles.tipTitle, { color: colors.text }]}>نصيحة</Text>"
+    },
+    {
+      "file": "/app/seasonal/hajj.tsx",
+      "line": 232,
+      "content": "<Text style={styles.dayNumberLabel}>ذو الحجة</Text>"
+    },
+    {
+      "file": "/app/seasonal/hajj.tsx",
+      "line": 408,
+      "content": "<Text style={styles.ritualModalDayLabel}>ذو الحجة</Text>"
+    },
+    {
+      "file": "/app/seasonal/hajj.tsx",
+      "line": 549,
+      "content": "<Text style={styles.headerTitle}>موسم الحج</Text>"
+    },
+    {
+      "file": "/app/seasonal/hajj.tsx",
+      "line": 622,
+      "content": "<Text style={[styles.tipTitle, { color: colors.text }]}>لغير الحاج</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 70,
+      "content": "<Text style={styles.seasonBadgeText}>موسم نشط</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 83,
+      "content": "<Text style={styles.dayInfoLabel}>اليوم الحالي</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 88,
+      "content": "<Text style={styles.dayInfoLabel}>يوم متبقي</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 93,
+      "content": "<Text style={styles.dayInfoLabel}>التقدم</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 108,
+      "content": "<Text style={styles.enterButtonText}>ادخل للموسم</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 186,
+      "content": "<Text style={[styles.virtuesTitle, { color: colors.text }]}>الفضائل:</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 198,
+      "content": "<Text style={[styles.actionsTitle, { color: colors.text }]}>الأعمال المستحبة:</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 354,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>المواسم الإسلامية</Text>"
+    },
+    {
+      "file": "/app/seasonal/index.tsx",
+      "line": 430,
+      "content": "<Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>نصيحة</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 224,
+      "content": "<Text style={styles.headerTitle}>ذكرى المولد النبوي</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 291,
+      "content": "<Text style={styles.counterButtonText}>اضغط للصلاة على النبي</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 298,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>من أسماء النبي ﷺ</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 306,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>من صفاته ﷺ</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 328,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>في هذا اليوم</Text>"
+    },
+    {
+      "file": "/app/seasonal/mawlid.tsx",
+      "line": 349,
+      "content": "<Text style={[styles.tipTitle, { color: colors.text }]}>تذكير</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 102,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>ذِكر مخصص</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 104,
+      "content": "<Text style={styles.saveText}>حفظ</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 111,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>الأيقونة</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 134,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>اسم الذِكر</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 138,
+      "content": "placeholder=\"مثال: تسبيح بعد الصلاة\""
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 149,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>نص الذِكر</Text>"
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 153,
+      "content": "placeholder=\"اكتب نص الذِكر هنا...\""
+    },
+    {
+      "file": "/app/settings/custom-dhikr.tsx",
+      "line": 167,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight }]}>عدد التكرار</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 79,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>الأنشطة الحالية</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 108,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>شكل النشاط</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 145,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', marginTop: 16 }]}>معاينة</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 150,
+      "content": "<Text style={[styles.previewAppName, { color: colors.text }]}>روح المسلم</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 152,
+      "content": "<Text style={[styles.previewPrayer, { color: colors.text }]}>الصلاة القادمة: المغرب</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 153,
+      "content": "<Text style={[styles.previewTime, { color: '#22C55E' }]}>٠٢:٣٠:١٥</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 155,
+      "content": "<Text style={[styles.previewExtra, { color: colors.muted }]}>الشروق: ٠٥:٤٥</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 158,
+      "content": "<Text style={[styles.previewExtra, { color: colors.muted }]}>اللهم اجعلني من المتقين</Text>"
+    },
+    {
+      "file": "/app/settings/live-activities.tsx",
+      "line": 161,
+      "content": "<Text style={[styles.previewExtra, { color: colors.muted }]}>﴿إِنَّ الصَّلَاةَ كَانَتْ عَلَى الْمُؤْمِنِينَ كِتَابًا مَّوْقُوتًا﴾</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 213,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>خلفيات الصور</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 248,
+      "content": "<Text style={[styles.emptyText, { color: colors.textLight }]}>لا توجد خلفيات محفوظة</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 253,
+      "content": "<Text style={styles.emptyBtnText}>تصفح الخلفيات</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 378,
+      "content": "<Text style={[styles.dimLabel, { color: colors.text }]}>شدة التعتيم</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 414,
+      "content": "<Text style={styles.previewSampleText}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 415,
+      "content": "<Text style={styles.previewSampleSub}>معاينة الخلفية</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 429,
+      "content": "<Text style={styles.setBtnText}>حفظ وتعيين كخلفية</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 437,
+      "content": "<Text style={styles.cancelPreviewText}>إلغاء</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 465,
+      "content": "<Text style={styles.previewSampleText}>بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 466,
+      "content": "<Text style={styles.previewSampleSub}>معاينة الخلفية</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 474,
+      "content": "<Text style={styles.setBtnText}>تعيين كخلفية</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 481,
+      "content": "<Text style={styles.deleteBtnText}>حذف</Text>"
+    },
+    {
+      "file": "/app/settings/photo-backgrounds.tsx",
+      "line": 487,
+      "content": "<Text style={styles.cancelPreviewText}>إلغاء</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-adjustments.tsx",
+      "line": 72,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>تعديل المواقيت</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-adjustments.tsx",
+      "line": 74,
+      "content": "<Text style={styles.resetText}>إعادة</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-layout.tsx",
+      "line": 43,
+      "content": "<Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>شكل عرض مواقيت الصلاة</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-layout.tsx",
+      "line": 54,
+      "content": "<Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>قائمة</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-layout.tsx",
+      "line": 55,
+      "content": "<Text style={[styles.optionSub, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>عرض القائمة الاعتيادية لمواقيت الصلاة</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-layout.tsx",
+      "line": 67,
+      "content": "<Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>لوحة تفاعلية</Text>"
+    },
+    {
+      "file": "/app/settings/prayer-layout.tsx",
+      "line": 68,
+      "content": "<Text style={[styles.optionSub, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>عرض لوحة/مكوّن دائري تفاعلي (الواجة المصغرة)</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 59,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>مقدمة</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 64,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>البيانات التي نجمعها</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 66,
+      "content": "• <Text style={styles.bold}>بيانات الموقع:</Text> نستخدم موقعك الجغرافي فقط لتحديد أوقات الصلاة واتجاه القبلة. لا يتم إرسال هذه البيانات لأي جهة خارجية."
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 69,
+      "content": "• <Text style={styles.bold}>إعدادات التطبيق:</Text> يتم حفظ تفضيلاتك (اللغة، المظهر، الإشعارات) محلياً على جهازك فقط."
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 72,
+      "content": "• <Text style={styles.bold}>تقدّم العبادات:</Text> بيانات التسبيح والختمة والأذكار تُخزّن محلياً على جهازك."
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 75,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>كيف نستخدم بياناتك</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 83,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>الإعلانات</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 88,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>أمان البيانات</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 93,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>حقوقك</Text>"
+    },
+    {
+      "file": "/app/settings/privacy-policy.tsx",
+      "line": 100,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>التواصل معنا</Text>"
+    },
+    {
+      "file": "/app/settings/quran.tsx",
+      "line": 147,
+      "content": "<Text style={[styles.subLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>حجم الخط</Text>"
+    },
+    {
+      "file": "/app/settings/quran.tsx",
+      "line": 249,
+      "content": "<Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>الساعة</Text>"
+    },
+    {
+      "file": "/app/settings/quran.tsx",
+      "line": 274,
+      "content": "<Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>الدقيقة</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 59,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>القبول بالشروط</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 64,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>الغرض من التطبيق</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 76,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>المحتوى الإسلامي</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 81,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>مسؤوليات المستخدم</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 88,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>الملكية الفكرية</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 93,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>إخلاء المسؤولية</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 100,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>التحديثات</Text>"
+    },
+    {
+      "file": "/app/settings/terms-of-use.tsx",
+      "line": 105,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.text }]}>التواصل</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 248,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>إعدادات المتتبع</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 259,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>تذكيرات تسجيل الصلاة</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 264,
+      "content": "title=\"تذكير تسجيل الصلاة\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 265,
+      "content": "subtitle=\"تنبيه لتسجيل صلاتك إذا لم تسجل بعد\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 275,
+      "content": "title=\"تنبيهات وقت الصلاة\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 276,
+      "content": "subtitle=\"إشعار عند دخول وقت كل صلاة\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 288,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>الملخص اليومي</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 293,
+      "content": "title=\"ملخص يومي\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 294,
+      "content": "subtitle=\"إشعار بملخص إنجاز الصلاة في نهاية اليوم\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 304,
+      "content": "title=\"وقت الملخص اليومي\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 316,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>السلسلة والتقارير</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 321,
+      "content": "title=\"تنبيهات السلسلة\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 322,
+      "content": "subtitle=\"تشجيع عند استمرار السلسلة أو تحذير عند وشك انقطاعها\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 332,
+      "content": "title=\"تقرير أسبوعي\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 333,
+      "content": "subtitle=\"ملخص أسبوعي لنسبة الالتزام بالصلاة\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 345,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>وقت الهدوء</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 350,
+      "content": "title=\"تفعيل وقت الهدوء\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 351,
+      "content": "subtitle=\"إيقاف الإشعارات خلال فترة معينة (مثل وقت النوم)\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 361,
+      "content": "title=\"بداية وقت الهدوء\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 371,
+      "content": "title=\"نهاية وقت الهدوء\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 383,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>الصوت</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 388,
+      "content": "title=\"صوت الإشعارات\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 389,
+      "content": "subtitle=\"تشغيل صوت عند وصول إشعارات المتتبع\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 399,
+      "content": "title=\"الاهتزاز\""
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 411,
+      "content": "<Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>إدارة البيانات</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 425,
+      "content": "<Text style={[styles.settingTitle, { color: colors.text }]}>تصدير البيانات</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 426,
+      "content": "<Text style={[styles.settingSubtitle, { color: colors.textLight }]}>عرض ملخص بيانات المتتبع</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 443,
+      "content": "<Text style={[styles.settingTitle, { color: '#ef5350' }]}>مسح جميع البيانات</Text>"
+    },
+    {
+      "file": "/app/settings/worship-tracking.tsx",
+      "line": 444,
+      "content": "<Text style={[styles.settingSubtitle, { color: colors.textLight }]}>حذف كل سجلات وإحصائيات المتتبع</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 568,
+      "content": "<Text style={[styles.headerTitle, { color: colors.text }]}>فيديو اليوم</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 678,
+      "content": "<Text style={styles.primaryBtnText}>معاينة الفيديو</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 709,
+      "content": "<Text style={styles.primaryBtnText}>حفظ فيديو مع صوت القارئ</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 728,
+      "content": "<Text style={styles.primaryBtnText}>جاري المشاركة...</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 733,
+      "content": "<Text style={styles.primaryBtnText}>مشاركة</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 851,
+      "content": "<Text style={styles.previewTitle}>معاينة الفيديو</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 880,
+      "content": "<Text style={[styles.infoModalTitle, { color: colors.text }]}>فيديو اليوم</Text>"
+    },
+    {
+      "file": "/app/story-of-day.tsx",
+      "line": 895,
+      "content": "<Text style={styles.infoModalBtnText}>حسنًا</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 319,
+      "content": "<Text style={{ color: textColor, marginBottom: 12 }}>تعذر تحميل خط الصفحة</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 327,
+      "content": "<Text style={{ color: '#fff' }}>إعادة المحاولة</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1317,
+      "content": "<Text style={[s.menuLabel, { color: isLightBg ? '#333' : '#ccc' }]}>إضافة فاصل</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1340,
+      "content": "<Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>التفسير</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1345,
+      "content": "<Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>نسخ الآية</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1350,
+      "content": "<Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>مشاركة بالعلامة</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1355,
+      "content": "<Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>تشغيل الآية</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1372,
+      "content": "<Text style={[s.menuActionText, { color: '#FF6B6B' }]}>إزالة الفاصل</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1395,
+      "content": "<Text style={[s.tafsirTitle, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>التفسير</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1397,
+      "content": "<Text style={[s.tafsirSource, { color: goldenColor }]}>تفسير الميسّر</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1430,
+      "content": "<Text style={{ color: goldenColor, fontSize: 13, fontWeight: '600', marginTop: 12, marginBottom: 6 }}>الترجمة</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1467,
+      "content": "<Text style={[s.settingsTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>الإعدادات</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1479,
+      "content": "<Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>حجم الخط</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1535,
+      "content": "<Text style={[stg.resetText, { color: goldenColor }]}>إعادة تعيين</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1544,
+      "content": "<Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>خلفية المصحف</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1577,
+      "content": "<Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>القارئ</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1614,
+      "content": "<Text style={[stg.toggleLabel, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>إظهار التفسير</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1615,
+      "content": "<Text style={[stg.toggleHint, { color: settingsIsLight ? '#888' : '#777' }]}>عرض تفسير الآيات أسفل المصحف</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1634,
+      "content": "<Text style={[stg.toggleLabel, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>وضع التركيز</Text>"
+    },
+    {
+      "file": "/app/surah/[id].tsx",
+      "line": 1635,
+      "content": "<Text style={[stg.toggleHint, { color: settingsIsLight ? '#888' : '#777' }]}>اضغط على الصفحة لإخفاء أو إظهار الشريط العلوي</Text>"
+    },
+    {
+      "file": "/app/tafsir/[surah]/[ayah].tsx",
+      "line": 113,
+      "content": "<Text style={s.title}>التفسير</Text>"
+    },
+    {
+      "file": "/app/tafsir/[surah]/[ayah].tsx",
+      "line": 150,
+      "content": "<Text style={s.tafsirText}>{tafsirText || 'لا يتوفر تفسير لهذه الآية'}</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 101,
+      "content": "<Text style={[s.headerTitle, { color: C.text }]}>سجل التسبيح</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 127,
+      "content": "<Text style={[s.statLabel, { color: C.textLight }]}>تسبيحات اليوم</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 137,
+      "content": "<Text style={[s.statLabel, { color: C.textLight }]}>جولات مكتملة</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 150,
+      "content": "<Text style={[s.statLabel, { color: C.textLight }]}>الإجمالي الكلي</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 160,
+      "content": "<Text style={[s.statLabel, { color: C.textLight }]}>متوسط يومي</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 196,
+      "content": "<Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16 }]}>آخر ٧ أيام</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 200,
+      "content": "<Text style={[s.emptyText, { color: C.textLight }]}>لا توجد بيانات بعد</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 201,
+      "content": "<Text style={[s.emptySubtext, { color: C.textLight }]}>ابدأ التسبيح لتتبع إحصائياتك</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 230,
+      "content": "<Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>"
+    },
+    {
+      "file": "/app/tasbih-stats.tsx",
+      "line": 283,
+      "content": "<Text style={s.goButtonText}>فتح المسبحة</Text>"
+    },
+    {
+      "file": "/app/umrah.tsx",
+      "line": 169,
+      "content": "<Text style={[s.footerText, { color: colors.text }]}>اللَّهُمَّ تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ</Text>"
+    },
+    {
+      "file": "/app/umrah.tsx",
+      "line": 170,
+      "content": "<Text style={[s.footerNote, { color: colors.textLight }]}>نسأل الله أن يتقبل عمرتكم ومناسككم</Text>"
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 425,
+      "content": "<Text style={styles.previewTitle}>معاينة الويدجت</Text>"
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 435,
+      "content": "title=\"الإعدادات العامة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 442,
+      "content": "label=\"تفعيل الويدجت\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 453,
+      "content": "title=\"ويدجت مواقيت الصلاة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 460,
+      "content": "label=\"تفعيل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 467,
+      "content": "label=\"عرض جميع الصلوات\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 475,
+      "content": "label=\"عرض التاريخ الهجري\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 482,
+      "content": "label=\"عرض الموقع\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 489,
+      "content": "label=\"تسجيل إكمال الصلاة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 511,
+      "content": "title=\"ويدجت الأذكار\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 518,
+      "content": "label=\"تفعيل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 525,
+      "content": "label=\"عرض الترجمة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 548,
+      "content": "title=\"ويدجت التاريخ الهجري\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 555,
+      "content": "label=\"تفعيل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 562,
+      "content": "label=\"عرض التاريخ الميلادي\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 573,
+      "content": "title=\"ويدجت آية اليوم\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 580,
+      "content": "label=\"تفعيل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 587,
+      "content": "label=\"عرض الترجمة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 598,
+      "content": "title=\"ويدجت ذكر اليوم\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 605,
+      "content": "label=\"تفعيل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 612,
+      "content": "label=\"عرض الترجمة\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 620,
+      "content": "label=\"عرض الفضل\""
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 639,
+      "content": "<Text style={styles.refreshButtonText}>تحديث الويدجت الآن</Text>"
+    },
+    {
+      "file": "/app/widget-settings.tsx",
+      "line": 682,
+      "content": "<Text style={styles.saveButtonText}>حفظ التغييرات</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 152,
+      "content": "<Text style={styles.previewLabel}>آية اليوم</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 206,
+      "content": "<Text style={styles.previewLabel}>الصلاة القادمة</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 227,
+      "content": "<Text style={styles.previewLabel}>مواقيت الصلاة</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 275,
+      "content": "<Text style={styles.previewLabel}>ذكر اليوم</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 321,
+      "content": "<Text style={styles.previewLabel}>أذكار</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 365,
+      "content": "<Text style={styles.previewLabel}>التاريخ الهجري</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 445,
+      "content": "<Text style={styles.headerTitle}>معرض الويدجت</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 540,
+      "content": "<Text style={styles.addButtonText}>إضافة للشاشة الرئيسية</Text>"
+    },
+    {
+      "file": "/app/widgets-gallery.tsx",
+      "line": 556,
+      "content": "<Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left' }]}>إعدادات الويدجت</Text>"
+    },
+    {
+      "file": "/components/hajj/shared.tsx",
+      "line": 232,
+      "content": "<Text style={[s.stepsLabelText, { color: ACCENT }]}>الخطوات</Text>"
+    },
+    {
+      "file": "/components/hajj/shared.tsx",
+      "line": 248,
+      "content": "<Text style={[s.duasHeaderText, { color: ACCENT }]}>الأدعية</Text>"
+    },
+    {
+      "file": "/components/ui/BrandedCapture.tsx",
+      "line": 393,
+      "content": "<Text style={[styles.fontBtnLg, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>أ+</Text>"
+    },
+    {
+      "file": "/components/ui/BrandedCapture.tsx",
+      "line": 403,
+      "content": "<Text style={[styles.fontBtnSm, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>أ-</Text>"
+    },
+    {
+      "file": "/components/ui/ErrorBoundary.tsx",
+      "line": 111,
+      "content": "<Text style={styles.title}>حدث خطأ غير متوقع</Text>"
+    },
+    {
+      "file": "/components/ui/ErrorBoundary.tsx",
+      "line": 121,
+      "content": "<Text style={styles.errorTitle}>تفاصيل الخطأ:</Text>"
+    },
+    {
+      "file": "/components/ui/ErrorBoundary.tsx",
+      "line": 146,
+      "content": "<Text style={styles.buttonText}>إعادة تشغيل التطبيق</Text>"
+    },
+    {
+      "file": "/components/ui/ErrorBoundary.tsx",
+      "line": 156,
+      "content": "<Text style={styles.secondaryButtonText}>المحاولة مرة أخرى</Text>"
+    },
+    {
+      "file": "/components/ui/MaintenanceGuard.tsx",
+      "line": 28,
+      "content": "<Text style={styles.title}>صيانة مؤقتة</Text>"
+    },
+    {
+      "file": "/components/ui/MaintenanceGuard.tsx",
+      "line": 43,
+      "content": "<Text style={styles.title}>تحديث مطلوب</Text>"
+    },
+    {
+      "file": "/components/ui/OfflineBanner.tsx",
+      "line": 36,
+      "content": "<Text style={styles.text}>لا يوجد اتصال بالإنترنت</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 176,
+      "content": "<Text style={previewStyles.headerTitle}>مناسك الحج</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 182,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: p.sectionTitle1 }]}>١. الإحرام</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 189,
+      "content": "<Text style={[previewStyles.duaText, { color: p.duaText }]}>﴿ ربنا تقبل منا ﴾</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 195,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: p.sectionTitle2 }]}>٢. الطواف</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 209,
+      "content": "<Text style={previewStyles.headerTitle}>مناسك الحج</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 213,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: ct.sectionTitleColor }]}>١. الإحرام</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 219,
+      "content": "<Text style={[previewStyles.duaText, { color: ct.duaTextColor }]}>﴿ ربنا تقبل منا ﴾</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 223,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: ct.sectionAltTitleColor }]}>٢. الطواف</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 252,
+      "content": "<Text style={previewStyles.headerTitle}>مناسك الحج</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 256,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: 'rgba(255,255,255,0.9)' }]}>١. الإحرام</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 262,
+      "content": "<Text style={[previewStyles.duaText, { color: 'rgba(255,255,255,0.9)' }]}>﴿ ربنا تقبل منا ﴾</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 266,
+      "content": "<Text style={[previewStyles.sectionTitle, { color: 'rgba(255,255,255,0.85)' }]}>٢. الطواف</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 431,
+      "content": "<Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600', marginTop: 6 }}>اختر خلفية</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 435,
+      "content": "<Text style={[styles.cardTitle, { color: colors.text }]}>تخصيص</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 436,
+      "content": "<Text style={[styles.cardDesc, { color: colors.textLight }]}>خلفية من التطبيق</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 449,
+      "content": "<Text style={[styles.bgPickerTitle, { color: colors.textLight }]}>اختر خلفية التصدير</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 486,
+      "content": "<Text style={[styles.uploadsTitle, { color: colors.textLight }]}>أو حمّل نسخة جاهزة</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 511,
+      "content": "<Text style={[styles.uploadsTitle, { color: '#22C55E' }]}>نسخة جاهزة لهذا النمط</Text>"
+    },
+    {
+      "file": "/components/ui/PdfTemplatePicker.tsx",
+      "line": 554,
+      "content": "<Text style={styles.confirmText}>{linkedPdf ? 'تحميل PDF جاهز' : 'تصدير PDF'}</Text>"
+    },
+    {
+      "file": "/components/ui/PremiumGate.tsx",
+      "line": 35,
+      "content": "<Text style={[styles.lockText, { color: colors.text }]}>ميزة بريميوم</Text>"
+    },
+    {
+      "file": "/components/ui/PremiumGate.tsx",
+      "line": 48,
+      "content": "<Text style={styles.upgradeText}>ترقية</Text>"
+    },
+    {
+      "file": "/components/ui/ShareableCard.tsx",
+      "line": 209,
+      "content": "<Text style={styles.modeButtonText}>خلفية عشوائية</Text>"
+    },
+    {
+      "file": "/components/ui/ShareableCard.tsx",
+      "line": 213,
+      "content": "<Text style={styles.modeButtonText}>لون عشوائي</Text>"
+    },
+    {
+      "file": "/components/ui/ShareableCard.tsx",
+      "line": 244,
+      "content": "<Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نسخ</Text>"
+    },
+    {
+      "file": "/components/ui/ShareableCard.tsx",
+      "line": 253,
+      "content": "<Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نص</Text>"
+    },
+    {
+      "file": "/components/ui/ShareableCard.tsx",
+      "line": 260,
+      "content": "<Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>صورة</Text>"
+    },
+    {
+      "file": "/components/ui/prayer/CountdownTimer.tsx",
+      "line": 240,
+      "content": "<Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>باقي على الأذان</Text>"
+    },
+    {
+      "file": "/components/ui/prayer/CountdownTimer.tsx",
+      "line": 264,
+      "content": "<TimeDigit value={timeRemaining.hours} label=\"س\" isDarkMode={isDarkMode} />"
+    },
+    {
+      "file": "/components/ui/prayer/CountdownTimer.tsx",
+      "line": 266,
+      "content": "<TimeDigit value={timeRemaining.minutes} label=\"د\" isDarkMode={isDarkMode} />"
+    },
+    {
+      "file": "/components/ui/prayer/CountdownTimer.tsx",
+      "line": 268,
+      "content": "<TimeDigit value={timeRemaining.seconds} label=\"ث\" isDarkMode={isDarkMode} />"
+    },
+    {
+      "file": "/components/ui/prayer/PrayerCard.tsx",
+      "line": 177,
+      "content": "<CountdownDigit value={timeRemaining.hours} label=\"س\" />"
+    },
+    {
+      "file": "/components/ui/prayer/PrayerCard.tsx",
+      "line": 179,
+      "content": "<CountdownDigit value={timeRemaining.minutes} label=\"د\" />"
+    },
+    {
+      "file": "/components/ui/prayer/PrayerCard.tsx",
+      "line": 181,
+      "content": "<CountdownDigit value={timeRemaining.seconds} label=\"ث\" />"
+    }
+  ]
+}

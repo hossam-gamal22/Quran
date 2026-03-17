@@ -1,6 +1,7 @@
 // app/admin/_layout.tsx
 import { Stack } from 'expo-router';
 import { Colors } from '../../constants/theme';
+import { t } from '@/lib/i18n';
 
 export default function AdminLayout() {
   return (
@@ -18,55 +19,85 @@ export default function AdminLayout() {
       <Stack.Screen
         name="index"
         options={{
-          title: 'لوحة التحكم',
+          title: t('admin.dashboard'),
         }}
       />
       <Stack.Screen
         name="settings"
         options={{
-          title: 'إعدادات التطبيق',
+          title: t('admin.appSettings'),
         }}
       />
       <Stack.Screen
         name="ads"
         options={{
-          title: 'إعدادات الإعلانات',
+          title: t('admin.adsTitle'),
         }}
       />
       <Stack.Screen
         name="pricing"
         options={{
-          title: 'أسعار الاشتراكات',
+          title: t('admin.pricingTitle'),
         }}
       />
       <Stack.Screen
         name="content"
         options={{
-          title: 'المحتوى',
+          title: t('admin.contentTitle'),
         }}
       />
       <Stack.Screen
         name="notifications"
         options={{
-          title: 'الإشعارات',
+          title: t('admin.notificationsTitle'),
         }}
       />
       <Stack.Screen
         name="reciters"
         options={{
-          title: 'القراء',
+          title: t('admin.recitersTitle'),
         }}
       />
       <Stack.Screen
         name="subscribers"
         options={{
-          title: 'المشتركين',
+          title: t('admin.subscribersTitle'),
         }}
       />
       <Stack.Screen
         name="widgets"
         options={{
-          title: 'محرك الويدجت',
+          title: t('admin.widgetEngine'),
+        }}
+      />
+      <Stack.Screen
+        name="events"
+        options={{
+          title: 'المناسبات الإسلامية',
+        }}
+      />
+      <Stack.Screen
+        name="daily-content"
+        options={{
+          title: 'المحتوى اليومي',
+        }}
+      />
+      <Stack.Screen
+        name="users"
+        options={{
+          title: 'إدارة المستخدمين',
+        }}
+      />
+      <Stack.Screen
+        name="settings-override"
+        options={{
+          title: 'تجاوز الإعدادات',
+        }}
+      />
+      <Stack.Screen
+        name="app-sections"
+        options={{
+          title: 'أقسام التطبيق',
         }}
       />
     </Stack>

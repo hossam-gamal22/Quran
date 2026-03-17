@@ -6,6 +6,7 @@ import {
   getValue,
   RemoteConfig
 } from 'firebase/remote-config';
+import { t } from '@/lib/i18n';
 
 // Firebase Config
 const firebaseConfig = {
@@ -205,7 +206,7 @@ export const checkAppVersion = (currentVersion: string): {
   return {
     needsUpdate,
     forceUpdate: needsUpdate && forceUpdate,
-    message: needsUpdate ? 'يتوفر تحديث جديد للتطبيق' : undefined,
+    message: needsUpdate ? t('settings.updateAvailable') : undefined,
   };
 };
 

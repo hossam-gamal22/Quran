@@ -11,6 +11,7 @@ const PRESERVED_KEYS = [
   '@user_settings',
   '@user_token',
   '@onboarding_completed',
+  'onboarding_complete',
   '@notification_settings',
   '@prayer_notification_settings',
   '@prayer_location',

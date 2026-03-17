@@ -1,7 +1,7 @@
 // app/daily-dua.tsx
 // صفحة دعاء اليوم - مع زر تغيير لعرض أدعية مختلفة
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,26 +10,87 @@ import {
   TouchableOpacity,
   Share,
   Platform,
+  Alert,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { t, getLanguage } from '@/lib/i18n';
+import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { GlassCard } from '@/components/ui/GlassCard';
+import { BrandedCapture, type BrandedCaptureHandle } from '@/components/ui/BrandedCapture';
 import { getDuaOfTheDay, getRandomDua, type DailyDua } from '@/data/daily-duas';
+import { getDailyDuaOverride } from '@/lib/daily-content-override';
+import { useFavorite } from '@/hooks/use-favorite';
+import { getFavorites } from '@/lib/favorites-manager';
+import { transliterateReference } from '@/lib/source-transliteration';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Spacing } from '@/constants/theme';
 const ACCENT = '#7c3aed';
 
 export default function DailyDuaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDarkMode, settings } = useSettings();
+  const isRTL = useIsRTL();
+  const colors = useColors();
 
+  const params = useLocalSearchParams<{ favId?: string }>();
   const [dua, setDua] = useState<DailyDua>(() => getDuaOfTheDay());
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined);
+  const language = getLanguage();
+  const isArabic = language === 'ar';
+  const isEnglish = language === 'en';
+  const translatedDua = useAutoTranslate(dua.translation || dua.arabic, isArabic ? 'ar' : 'en', 'section');
+  const translatedReference = useAutoTranslate(dua.reference || '', 'ar', 'section');
+  const [showTranslation, setShowTranslation] = useState(!isArabic);
+  const brandedRef = useRef<BrandedCaptureHandle>(null);
+
+  const { saved: isFav, toggle: toggleFav } = useFavorite(
+    `dua_${dua.reference}`,
+    'dua',
+    () => ({
+      id: `dua_${dua.reference}`,
+      type: 'dua',
+      title: dua.reference,
+      arabic: dua.arabic,
+      translation: dua.translation,
+      reference: dua.reference,
+      route: `/daily-dua?favId=dua_${encodeURIComponent(dua.reference)}`,
+      meta: { duaArabic: dua.arabic, duaTranslation: dua.translation || '', duaReference: dua.reference },
+    }),
+  );
+
+  // Load saved dua from favorites if opened with favId, otherwise check admin override
+  useEffect(() => {
+    if (params.favId) {
+      getFavorites('dua').then(favs => {
+        const fav = favs.find(f => f.id === params.favId);
+        if (fav?.meta?.duaArabic) {
+          setDua({ arabic: String(fav.meta.duaArabic), translation: String(fav.meta.duaTranslation || ''), reference: String(fav.meta.duaReference || fav.reference || '') });
+          return;
+        }
+        loadDefault();
+      }).catch(() => loadDefault());
+    } else {
+      loadDefault();
+    }
+    function loadDefault() {
+      getDailyDuaOverride().then(({ data, isOverride }) => {
+        if (isOverride && data) {
+          setDua({ arabic: data.arabic, translation: data.translation, reference: data.reference });
+        }
+      }).catch(() => {});
+    }
+  }, [params.favId]);
 
   const handleRefresh = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -38,13 +99,41 @@ export default function DailyDuaScreen() {
     setCurrentIndex(index);
   }, [currentIndex]);
 
-  const shareDua = async () => {
+  const shareAsText = async () => {
     try {
-      await Share.share({
-        message: `${dua.arabic}\n\n${dua.translation}\n\n📖 ${dua.reference}\n\nمن تطبيق روح المسلم`,
-      });
+      const parts: string[] = [];
+      if (isArabic) {
+        parts.push(dua.arabic);
+        if (showTranslation && dua.translation) parts.push(dua.translation);
+      } else {
+        if (dua.translation) parts.push(dua.translation);
+        else parts.push(dua.arabic);
+      }
+      parts.push(`📖 ${dua.reference}`, `\n${t('common.fromApp')}`);
+      await Share.share({ message: parts.join('\n\n') });
     } catch { /* ignore */ }
   };
+
+  const shareAsImage = async () => {
+    try {
+      if (!brandedRef.current) return;
+      brandedRef.current.showSizePicker();
+    } catch { /* ignore */ }
+  };
+
+  const handleShare = () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      t('common.share'),
+      '',
+      [
+        { text: t('common.shareText'), onPress: shareAsText },
+        { text: t('common.shareImage'), onPress: shareAsImage },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
+  };
+
 
   return (
     <>
@@ -52,20 +141,25 @@ export default function DailyDuaScreen() {
       <BackgroundWrapper
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
-        style={[styles.container, { backgroundColor: isDarkMode ? '#111827' : '#F3F4F6' }]}
+        opacity={settings.display.backgroundOpacity ?? 1}
+        style={[styles.container, { backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : (isDarkMode ? '#111827' : '#F3F4F6') }]}
       >
         {/* Header */}
-        <View style={[styles.header, { paddingTop: insets.top }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={isDarkMode ? '#F9FAFB' : '#1F2937'} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: isDarkMode ? '#F9FAFB' : '#1F2937' }]}>
-            دعاء اليوم
-          </Text>
-          <TouchableOpacity onPress={shareDua} style={styles.shareButton}>
-            <MaterialCommunityIcons name="share-variant" size={22} color={isDarkMode ? '#F9FAFB' : '#1F2937'} />
-          </TouchableOpacity>
-        </View>
+        <UniversalHeader
+          backColor={isDarkMode ? '#F9FAFB' : '#1F2937'}
+          style={{ paddingTop: insets.top }}
+          rightActions={[
+            { icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : (isDarkMode ? '#F9FAFB' : '#1F2937') },
+            { icon: 'share-variant', onPress: handleShare, color: isDarkMode ? '#F9FAFB' : '#1F2937' },
+          ]}
+        >
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              {t('azkar.duaOfDay')}
+            </Text>
+            <SectionInfoButton sectionKey="duas_hadith" />
+          </View>
+        </UniversalHeader>
 
         <ScrollView
           style={styles.content}
@@ -79,54 +173,69 @@ export default function DailyDuaScreen() {
             </View>
           </View>
 
-          {/* Arabic Text */}
+          {/* Branded image capture */}
+          <BrandedCapture ref={brandedRef} title={t('azkar.duaOfDay')}>
+            <View style={styles.duaCardInner}>
+              {isArabic ? (
+                <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
+                  {dua.arabic}
+                </Text>
+              ) : (
+                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {isEnglish ? (dua.translation || dua.arabic) : translatedDua}
+                </Text>
+              )}
+              <Text style={[styles.referenceCaptureText, { color: ACCENT }]}>
+                📖 {transliterateReference(dua.reference, language)}
+              </Text>
+            </View>
+          </BrandedCapture>
+
+          {/* Visible dua card */}
           <GlassCard intensity={46} style={styles.duaCard}>
-            <Text style={[styles.arabicText, { color: isDarkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {dua.arabic}
-            </Text>
+            {isArabic ? (
+              <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
+                {dua.arabic}
+              </Text>
+            ) : (
+              <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {isEnglish ? (dua.translation || dua.arabic) : translatedDua}
+              </Text>
+            )}
           </GlassCard>
 
-          {/* Translation */}
-          <GlassCard intensity={46} style={styles.translationCard}>
-            <Text style={[styles.translationLabel, { color: ACCENT }]}>Translation</Text>
-            <Text style={[styles.translationText, { color: isDarkMode ? '#D1D5DB' : '#4B5563' }]}>
-              {dua.translation}
-            </Text>
-          </GlassCard>
+          {/* Translation — only shown for Arabic users who want to see English */}
+          {isArabic && showTranslation && dua.translation && (
+            <GlassCard intensity={46} style={styles.translationCard}>
+              <Text style={[styles.translationLabel, { color: ACCENT }]}>{t('azkar.translation')}</Text>
+              <Text style={[styles.translationText, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
+                {dua.translation}
+              </Text>
+            </GlassCard>
+          )}
 
           {/* Reference */}
-          <View style={styles.referenceRow}>
+          <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="book-open-page-variant" size={18} color={ACCENT} />
-            <Text style={[styles.referenceText, { color: isDarkMode ? '#9CA3AF' : '#6B7280' }]}>
-              {dua.reference}
+            <Text style={[styles.referenceText, { color: colors.textLight }]}>
+              {transliterateReference(dua.reference, language)}
             </Text>
           </View>
 
           {/* Refresh Button */}
           <TouchableOpacity
-            style={[styles.refreshButton, { borderColor: ACCENT + '40' }]}
+            style={[styles.refreshButton, { borderColor: ACCENT + '40', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleRefresh}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="refresh" size={20} color={ACCENT} />
-            <Text style={[styles.refreshButtonText, { color: ACCENT }]}>دعاء آخر</Text>
+            <Text style={[styles.refreshButtonText, { color: ACCENT }]}>{t('azkar.anotherDua')}</Text>
           </TouchableOpacity>
 
-          {/* Share Button */}
-          <TouchableOpacity
-            style={[styles.shareButtonLarge, { backgroundColor: ACCENT }]}
-            onPress={() => {
-              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              shareDua();
-            }}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
-            <Text style={styles.shareButtonText}>مشاركة الدعاء</Text>
-          </TouchableOpacity>
 
-          <Text style={[styles.footerText, { color: isDarkMode ? '#6B7280' : '#9CA3AF' }]}>
-            اضغط "دعاء آخر" لعرض دعاء جديد
+
+          <Text style={[styles.footerText, { color: colors.textLight }]}>
+            {t('azkar.tapForNewDua')}
           </Text>
         </ScrollView>
 
@@ -138,20 +247,11 @@ export default function DailyDuaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  backButton: { padding: 8 },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
   },
-  shareButton: { padding: 8 },
   content: { flex: 1 },
   contentContainer: {
     padding: 20,
@@ -201,7 +301,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: Spacing.sm,
     marginBottom: 24,
   },
   referenceText: {
@@ -212,7 +312,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: Spacing.sm,
     paddingVertical: 12,
     borderRadius: 30,
     borderWidth: 1.5,
@@ -222,22 +322,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  shareButtonLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 30,
-    marginBottom: 16,
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+
   footerText: {
     textAlign: 'center',
     fontSize: 13,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    marginBottom: 16,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(128,128,128,0.2)',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  duaCardInner: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  translationTextCapture: {
+    fontSize: 15,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  referenceCaptureText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 16,
+    textAlign: 'center',
   },
 });

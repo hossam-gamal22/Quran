@@ -12,10 +12,11 @@ import {
   TextStyle,
   TouchableOpacityProps,
 } from 'react-native';
+import { fontMedium } from '@/lib/fonts';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+import { useIsRTL } from '@/hooks/use-is-rtl';
 // ========================================
 // أنماط وأنواع الأزرار
 // ========================================
@@ -100,6 +101,7 @@ export const IOSButton: React.FC<IOSButtonProps> = ({
 }) => {
   const sizeConfig = SIZE_MAP[size];
   const accentColor = customColor || getColorValue(color);
+  const isRTL = useIsRTL();
 
   const handlePress = () => {
     if (haptic) {
@@ -149,6 +151,7 @@ export const IOSButton: React.FC<IOSButtonProps> = ({
           height: sizeConfig.height,
           borderRadius: sizeConfig.borderRadius,
           backgroundColor: getBackgroundColor(),
+          flexDirection: isRTL ? 'row-reverse' : 'row',
         },
         style,
       ]}
@@ -158,7 +161,6 @@ export const IOSButton: React.FC<IOSButtonProps> = ({
           name={icon as any}
           size={sizeConfig.fontSize + 6}
           color={getTextColor()}
-          style={label ? { marginRight: 4 } : undefined}
         />
       )}
       {label && (
@@ -313,9 +315,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 4,
   },
   buttonText: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontWeight: '600',
   },
   glassContainer: {

@@ -1,7 +1,7 @@
 // app/worship-tracker/fasting.tsx
 // صفحة متتبع الصيام - روح المسلم
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,9 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
-  I18nManager,
+  Alert,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,8 +31,13 @@ import Animated, {
 import { useFastingTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { DailyFastingRecord } from '@/lib/worship-storage';
-import { getHijriDateObject } from '@/lib/hijri-date';
+import { getHijriDateObject, gregorianToHijri } from '@/lib/hijri-date';
 import GlassCard from '@/components/ui/GlassCard';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getTranslations } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -39,26 +45,23 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const FASTING_TYPES: { key: DailyFastingRecord['type']; name: string; description: string; color: string }[] = [
-  { key: 'voluntary', name: 'تطوع', description: 'صيام نافلة', color: '#5d4e8c' },
-  { key: 'ramadan', name: 'رمضان', description: 'صيام فريضة', color: '#2f7659' },
-  { key: 'makeup', name: 'قضاء', description: 'قضاء أيام', color: '#c17f59' },
-  { key: 'vow', name: 'نذر', description: 'صيام نذر', color: '#3a7ca5' },
+const FASTING_TYPES: { key: DailyFastingRecord['type']; nameKey: string; descKey: string; color: string }[] = [
+  { key: 'voluntary', nameKey: 'worship.voluntary', descKey: 'worship.voluntaryDesc', color: '#5d4e8c' },
+  { key: 'ramadan', nameKey: 'worship.ramadan', descKey: 'worship.ramadanDesc', color: '#2f7659' },
+  { key: 'makeup', nameKey: 'worship.makeup', descKey: 'worship.makeupDesc', color: '#c17f59' },
+  { key: 'vow', nameKey: 'worship.vow', descKey: 'worship.vowDesc', color: '#3a7ca5' },
 ];
 
-const SUNNAH_DAYS = [
-  { name: 'الإثنين والخميس', description: 'صيام يومي الإثنين والخميس من كل أسبوع', icon: 'calendar-week' },
-  { name: 'الأيام البيض', description: '13، 14، 15 من كل شهر هجري', icon: 'moon-full' },
-  { name: 'يوم عرفة', description: '9 ذو الحجة لغير الحاج', icon: 'mosque' },
-  { name: 'يوم عاشوراء', description: '10 محرم ويوم قبله أو بعده', icon: 'star-crescent' },
-  { name: 'ست من شوال', description: '6 أيام من شهر شوال', icon: 'numeric-6-circle' },
-  { name: 'صيام داود', description: 'صيام يوم وإفطار يوم', icon: 'swap-horizontal' },
+const SUNNAH_DAYS_KEYS = [
+  { nameKey: 'worship.mondayThursday', descKey: 'worship.mondayThursdayDesc', icon: 'calendar-week' },
+  { nameKey: 'worship.whiteDays', descKey: 'worship.whiteDaysDesc', icon: 'moon-full' },
+  { nameKey: 'worship.dayOfArafat', descKey: 'worship.dayOfArafatDesc', icon: 'mosque' },
+  { nameKey: 'worship.dayOfAshura', descKey: 'worship.dayOfAshuraDesc', icon: 'star-crescent' },
+  { nameKey: 'worship.sixShawwal', descKey: 'worship.sixShawwalDesc', icon: 'numeric-6-circle' },
+  { nameKey: 'worship.davidFasting', descKey: 'worship.davidFastingDesc', icon: 'swap-horizontal' },
 ];
 
-const MONTHS_AR = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-];
+// Month names are resolved via getTranslations().calendar.months at render time
 
 // ========================================
 // مكونات فرعية
@@ -118,10 +121,10 @@ const FastingButton: React.FC<FastingButtonProps> = ({
               color="#fff"
             />
             <Text style={styles.fastingButtonText}>
-              {isFasting ? 'أنت صائم اليوم' : 'سجل صيامك'}
+              {isFasting ? t('worship.youAreFasting') : t('worship.recordFasting')}
             </Text>
             <Text style={styles.fastingButtonSubtext}>
-              {isFasting ? 'اضغط لإلغاء التسجيل' : 'اضغط للتسجيل'}
+              {isFasting ? t('worship.tapToCancel') : t('worship.tapToRecord')}
             </Text>
           </View>
         </View>
@@ -141,6 +144,8 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
   onSelect,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <View style={styles.typeSelector}>
       {FASTING_TYPES.map((type, index) => (
@@ -152,10 +157,11 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
             style={[
               styles.typeItem,
               isDarkMode && styles.typeItemDark,
-              selectedType === type.key && { 
+              selectedType === type.key && {
                 borderColor: type.color,
                 backgroundColor: `${type.color}15`,
               },
+              { flexDirection: isRTL ? 'row-reverse' : 'row' },
             ]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -167,13 +173,13 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
             <View style={styles.typeInfo}>
               <Text style={[
                 styles.typeName,
-                isDarkMode && styles.textLight,
+                { color: colors.text },
                 selectedType === type.key && { color: type.color },
               ]}>
-                {type.name}
+                {t(type.nameKey)}
               </Text>
-              <Text style={[styles.typeDescription, isDarkMode && styles.textMuted]}>
-                {type.description}
+              <Text style={[styles.typeDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                {t(type.descKey)}
               </Text>
             </View>
             {selectedType === type.key && (
@@ -190,6 +196,7 @@ interface CalendarDayProps {
   day: number;
   isFasted: boolean;
   isToday: boolean;
+  isRamadan?: boolean;
   onPress?: () => void;
   isDarkMode?: boolean;
 }
@@ -198,9 +205,11 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   day,
   isFasted,
   isToday,
+  isRamadan,
   onPress,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
   if (day === 0) {
     return <View style={styles.calendarDayEmpty} />;
   }
@@ -210,6 +219,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       style={[
         styles.calendarDay,
         isDarkMode && styles.calendarDayDark,
+        isRamadan && !isFasted && !isToday && styles.calendarDayRamadan,
         isToday && styles.calendarDayToday,
         isFasted && styles.calendarDayFasted,
       ]}
@@ -219,7 +229,8 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     >
       <Text style={[
         styles.calendarDayText,
-        isDarkMode && styles.textLight,
+        { color: colors.text },
+        isRamadan && !isFasted && !isToday && { color: '#2f7659' },
         isToday && styles.calendarDayTextToday,
         isFasted && styles.calendarDayTextFasted,
       ]}>
@@ -228,12 +239,15 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       {isFasted && (
         <View style={styles.fastingDot} />
       )}
+      {isRamadan && !isFasted && (
+        <View style={[styles.fastingDot, { backgroundColor: 'rgba(47,118,89,0.4)' }]} />
+      )}
     </TouchableOpacity>
   );
 };
 
 interface SunnahCardProps {
-  item: typeof SUNNAH_DAYS[0];
+  item: typeof SUNNAH_DAYS_KEYS[0];
   index: number;
   isDarkMode?: boolean;
 }
@@ -243,9 +257,11 @@ const SunnahCard: React.FC<SunnahCardProps> = ({
   index,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInDown.delay(index * 80).duration(400)}>
-      <View style={[styles.sunnahCard, isDarkMode && styles.sunnahCardDark]}>
+      <View style={[styles.sunnahCard, isDarkMode && styles.sunnahCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.sunnahIconBg}>
           <MaterialCommunityIcons
             name={item.icon as any}
@@ -253,12 +269,12 @@ const SunnahCard: React.FC<SunnahCardProps> = ({
             color="#5d4e8c"
           />
         </View>
-        <View style={styles.sunnahInfo}>
-          <Text style={[styles.sunnahName, isDarkMode && styles.textLight]}>
-            {item.name}
+        <View style={[styles.sunnahInfo]}>
+          <Text style={[styles.sunnahName, { color: colors.text }]}>
+            {t(item.nameKey)}
           </Text>
-          <Text style={[styles.sunnahDescription, isDarkMode && styles.textMuted]}>
-            {item.description}
+          <Text style={[styles.sunnahDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t(item.descKey)}
           </Text>
         </View>
       </View>
@@ -271,11 +287,13 @@ const SunnahCard: React.FC<SunnahCardProps> = ({
 // ========================================
 
 export default function FastingTrackerScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const {
     todayFasting,
     fastingStats,
     toggleTodayFasting,
+    toggleFastingForDate,
     getFastingForDate,
     isFastingToday,
   } = useFastingTracker();
@@ -288,7 +306,52 @@ export default function FastingTrackerScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [monthFastingDays, setMonthFastingDays] = useState<number[]>([]);
   
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const colors = useColors();
+
+  // حساب أيام رمضان في الشهر الميلادي المعروض
+  const ramadanDaysInMonth = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const ramadanDays: number[] = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      try {
+        const hijri = gregorianToHijri(new Date(year, month, day));
+        if (hijri.month === 9) {
+          ramadanDays.push(day);
+        }
+      } catch {}
+    }
+    return ramadanDays;
+  }, [currentMonth]);
+
+  // تحميل بيانات الصيام للشهر المعروض
+  const loadMonthFastingData = useCallback(async () => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const fastedDays: number[] = [];
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const record = await getFastingForDate(dateStr);
+      if (record?.fasted) {
+        fastedDays.push(day);
+      }
+    }
+    setMonthFastingDays(fastedDays);
+  }, [currentMonth, getFastingForDate]);
+
+  useEffect(() => {
+    loadMonthFastingData();
+  }, [loadMonthFastingData]);
+
+  // إعادة تحميل عند تغير بيانات اليوم
+  useEffect(() => {
+    loadMonthFastingData();
+  }, [todayFasting]);
 
   // حساب أيام الشهر
   const calendarData = useMemo(() => {
@@ -334,16 +397,100 @@ export default function FastingTrackerScreen() {
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // تحميل بيانات الصيام للشهر
+    await loadMonthFastingData();
     setIsRefreshing(false);
-  }, []);
+  }, [loadMonthFastingData]);
 
-  // تسجيل الصيام
+  // تسجيل الصيام لليوم
   const handleToggleFasting = async () => {
     await toggleTodayFasting(selectedType);
   };
 
+  // تسجيل/إلغاء الصيام ليوم معين من التقويم
+  const handleToggleCalendarDay = async (day: number) => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    
+    // لا نسمح بتسجيل أيام مستقبلية
+    const dayDate = new Date(year, month, day);
+    if (dayDate > new Date()) return;
+
+    // تحقق إذا كان اليوم مسجل بالفعل — إلغاء بدون سؤال
+    const existingRecord = await getFastingForDate(dateStr);
+    if (existingRecord?.fasted) {
+      const isToday_ = isToday(day);
+      if (isToday_) {
+        await toggleTodayFasting(selectedType);
+      } else {
+        await toggleFastingForDate(dateStr, selectedType);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await loadMonthFastingData();
+      return;
+    }
+
+    // تحويل التاريخ لهجري لمعرفة إذا كان في رمضان
+    const hijriDate = gregorianToHijri(dayDate);
+    const isRamadanDay = hijriDate.month === 9;
+
+    if (isRamadanDay) {
+      // يوم رمضان — تسجيل تلقائي كصيام رمضان
+      const isToday_ = isToday(day);
+      if (isToday_) {
+        await toggleTodayFasting('ramadan');
+      } else {
+        await toggleFastingForDate(dateStr, 'ramadan');
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await loadMonthFastingData();
+    } else {
+      // يوم خارج رمضان — نسأل المستخدم عن نوع الصيام
+      Alert.alert(
+        t('worship.fastingType'),
+        t('worship.whatTypeOfFasting'),
+        [
+          {
+            text: t('worship.voluntary'),
+            onPress: async () => {
+              const isToday_ = isToday(day);
+              if (isToday_) await toggleTodayFasting('voluntary');
+              else await toggleFastingForDate(dateStr, 'voluntary');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await loadMonthFastingData();
+            },
+          },
+          {
+            text: t('worship.makeup'),
+            onPress: async () => {
+              const isToday_ = isToday(day);
+              if (isToday_) await toggleTodayFasting('making_up');
+              else await toggleFastingForDate(dateStr, 'making_up');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await loadMonthFastingData();
+            },
+          },
+          {
+            text: t('worship.vow'),
+            onPress: async () => {
+              const isToday_ = isToday(day);
+              if (isToday_) await toggleTodayFasting('voluntary');
+              else await toggleFastingForDate(dateStr, 'voluntary');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await loadMonthFastingData();
+            },
+          },
+          {
+            text: t('common.cancel'),
+            style: 'cancel',
+          },
+        ]
+      );
+    }
+  };
+
   return (
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
@@ -352,22 +499,12 @@ export default function FastingTrackerScreen() {
       />
       
       {/* الهيدر */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-          متتبع الصيام
-        </Text>
-        <View style={styles.headerSpacer} />
-      </Animated.View>
+      <UniversalHeader
+        title={t('worship.fastingTracker')}
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -394,8 +531,8 @@ export default function FastingTrackerScreen() {
         {/* نوع الصيام */}
         {!isFastingToday && (
           <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-              نوع الصيام
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.fastingType')}
             </Text>
             <TypeSelector
               selectedType={selectedType}
@@ -408,52 +545,52 @@ export default function FastingTrackerScreen() {
         {/* الإحصائيات */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
           <GlassCard style={styles.statsCard}>
-            <Text style={[styles.statsTitle, isDarkMode && styles.textLight]}>
-              إحصائياتك
+            <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('worship.yourStats')}
             </Text>
-            <View style={styles.statsGrid}>
+            <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="calendar-check" size={24} color="#2f7659" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.totalDays ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  إجمالي الأيام
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.totalDays')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="star-crescent" size={24} color="#5d4e8c" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.ramadanDays ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  رمضان
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.ramadan')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="heart" size={24} color="#c17f59" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.voluntaryDays ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  تطوع
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.voluntary')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="fire" size={24} color="#ff6b35" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.currentStreak ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  سلسلة حالية
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.currentStreak')}
                 </Text>
               </View>
             </View>
@@ -463,58 +600,73 @@ export default function FastingTrackerScreen() {
         {/* التقويم */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <View style={[styles.calendarCard, isDarkMode && styles.calendarCardDark]}>
-            <View style={styles.calendarHeader}>
+            <View style={[styles.calendarHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={goToPrevMonth} style={styles.calendarNav}>
-                <MaterialCommunityIcons name="chevron-right" size={28} color={isDarkMode ? '#fff' : '#333'} />
+                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
               </TouchableOpacity>
-              <Text style={[styles.calendarTitle, isDarkMode && styles.textLight]}>
-                {MONTHS_AR[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+              <Text style={[styles.calendarTitle, { color: colors.text }]}>
+                {getTranslations().calendar.months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </Text>
               <TouchableOpacity onPress={goToNextMonth} style={styles.calendarNav}>
-                <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={28} color={isDarkMode ? '#fff' : '#333'} />
+                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color={isDarkMode ? '#fff' : '#333'} />
               </TouchableOpacity>
             </View>
             
             <View style={styles.calendarWeekHeader}>
-              {['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'].map((day, i) => (
-                <Text key={i} style={[styles.calendarWeekDay, isDarkMode && styles.textMuted]}>
+              {getTranslations().calendar.weekDaysShort.map((day: string, i: number) => (
+                <Text key={i} style={[styles.calendarWeekDay, { color: colors.textLight }]}>
                   {day}
                 </Text>
               ))}
             </View>
             
             <View style={styles.calendarGrid}>
-              {calendarData.map((day, index) => (
-                <CalendarDay
-                  key={index}
-                  day={day}
-                  isFasted={monthFastingDays.includes(day)}
-                  isToday={isToday(day)}
-                  isDarkMode={isDarkMode}
-                />
-              ))}
+              {calendarData.map((day, index) => {
+                const isFutureDay = day > 0 && new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day) > new Date();
+                return (
+                  <CalendarDay
+                    key={index}
+                    day={day}
+                    isFasted={monthFastingDays.includes(day)}
+                    isToday={isToday(day)}
+                    isRamadan={ramadanDaysInMonth.includes(day)}
+                    isDarkMode={isDarkMode}
+                    onPress={day > 0 && !isFutureDay ? () => handleToggleCalendarDay(day) : undefined}
+                  />
+                );
+              })}
             </View>
             
-            <View style={styles.calendarLegend}>
-              <View style={styles.legendItem}>
+            <Text style={[styles.calendarHint, { color: colors.textLight }]}>
+              {t('worship.tapToRecordFasting')}
+            </Text>
+            
+            <View style={[styles.calendarLegend, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={[styles.legendDot, { backgroundColor: '#5d4e8c' }]} />
-                <Text style={[styles.legendText, isDarkMode && styles.textMuted]}>يوم صيام</Text>
+                <Text style={[styles.legendText, { color: colors.textLight }]}>{t('worship.fastingDay')}</Text>
               </View>
-              <View style={styles.legendItem}>
+              <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={[styles.legendDot, { backgroundColor: '#2f7659' }]} />
-                <Text style={[styles.legendText, isDarkMode && styles.textMuted]}>اليوم</Text>
+                <Text style={[styles.legendText, { color: colors.textLight }]}>{t('calendar.today')}</Text>
               </View>
+              {ramadanDaysInMonth.length > 0 && (
+                <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.legendDot, { backgroundColor: 'rgba(47,118,89,0.4)', borderWidth: 1, borderColor: 'rgba(47,118,89,0.6)' }]} />
+                  <Text style={[styles.legendText, { color: colors.textLight }]}>{t('worship.ramadan')}</Text>
+                </View>
+              )}
             </View>
           </View>
         </Animated.View>
 
         {/* أيام السنة المستحبة */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            أيام الصيام المستحبة
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.recommendedFastingDays')}
           </Text>
           <View style={styles.sunnahList}>
-            {SUNNAH_DAYS.map((item, index) => (
+            {SUNNAH_DAYS_KEYS.map((item, index) => (
               <SunnahCard
                 key={index}
                 item={item}
@@ -528,6 +680,7 @@ export default function FastingTrackerScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -538,35 +691,12 @@ export default function FastingTrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
     backgroundColor: 'transparent',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  containerDark: {
+    backgroundColor: 'transparent',
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
+
   textLight: {
     color: '#fff',
   },
@@ -581,7 +711,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
@@ -599,13 +729,13 @@ const styles = StyleSheet.create({
   },
   fastingButtonText: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginTop: 15,
   },
   fastingButtonSubtext: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 5,
   },
@@ -622,6 +752,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 2,
     borderColor: 'transparent',
+    gap: 12,
   },
   typeItemDark: {
     backgroundColor: '#1a1a2e',
@@ -630,21 +761,21 @@ const styles = StyleSheet.create({
     width: 4,
     height: 40,
     borderRadius: 2,
-    marginLeft: 12,
   },
   typeInfo: {
     flex: 1,
   },
   typeName: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   typeDescription: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 2,
+    textAlign: 'right',
   },
   // الإحصائيات
   statsCard: {
@@ -654,7 +785,7 @@ const styles = StyleSheet.create({
   },
   statsTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 15,
   },
@@ -675,12 +806,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   statLabel: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
   // التقويم
@@ -710,7 +841,7 @@ const styles = StyleSheet.create({
   },
   calendarTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   calendarWeekHeader: {
@@ -722,7 +853,7 @@ const styles = StyleSheet.create({
     width: 40,
     textAlign: 'center',
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
   },
   calendarGrid: {
@@ -750,9 +881,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#5d4e8c20',
     borderRadius: 12,
   },
+  calendarDayRamadan: {
+    backgroundColor: 'rgba(47,118,89,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(47,118,89,0.2)',
+  },
   calendarDayText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
   },
   calendarDayTextToday: {
@@ -781,7 +918,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   legendDot: {
     width: 10,
@@ -790,8 +927,15 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
+  },
+  calendarHint: {
+    fontSize: 11,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+    marginTop: 10,
+    opacity: 0.7,
   },
   // أيام السنة
   sunnahList: {
@@ -804,6 +948,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
+    gap: 15,
   },
   sunnahCardDark: {
     backgroundColor: '#1a1a2e',
@@ -818,18 +963,18 @@ const styles = StyleSheet.create({
   },
   sunnahInfo: {
     flex: 1,
-    marginLeft: 15,
   },
   sunnahName: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   sunnahDescription: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 2,
+    textAlign: 'right',
   },
   bottomSpace: {
     height: 100,

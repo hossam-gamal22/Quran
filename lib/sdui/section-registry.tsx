@@ -3,6 +3,7 @@
 
 import React, { ComponentType, lazy, Suspense } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { t } from '@/lib/i18n';
 import type {
   SDUISectionType,
   BaseSectionConfig,
@@ -22,6 +23,7 @@ import type {
   AnnouncementSection,
   SpacerSection,
 } from './types';
+import { fontRegular } from '@/lib/fonts';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Section Props Type Helper
@@ -64,7 +66,7 @@ function SectionErrorFallback({ sectionType }: { sectionType: string }) {
   return (
     <View style={styles.errorContainer}>
       <Text style={styles.errorText}>
-        خطأ في تحميل القسم: {sectionType}
+        {t('common.sectionLoadError')}: {sectionType}
       </Text>
     </View>
   );
@@ -78,7 +80,7 @@ function PlaceholderSection({ config }: SectionProps) {
   return (
     <View style={styles.placeholder}>
       <Text style={styles.placeholderText}>
-        قسم غير متاح: {config.type}
+        {t('common.sectionUnavailable')}: {config.type}
       </Text>
     </View>
   );
@@ -250,7 +252,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#EF4444',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
     textAlign: 'center',
   },
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: '#A1A1AA',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
     textAlign: 'center',
   },

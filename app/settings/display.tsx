@@ -1,7 +1,7 @@
 // app/settings/display.tsx
 // إعدادات العرض - حجم الخط ونوعه وطريقة العرض والخلفية
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,13 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  I18nManager,
   Image,
+  Dimensions,
+  Switch,
+  Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,63 +23,83 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useSettings, FontSize, HomeLayout, AppBackgroundKey } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { APP_BACKGROUNDS } from '@/lib/backgrounds';
+import { fetchDynamicBackgrounds, type DynamicBackground } from '@/lib/app-config-api';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Spacing } from '@/constants/theme';
 
-const FONT_SIZES: { value: FontSize; label: string; sample: number }[] = [
-  { value: 'small', label: 'صغير', sample: 14 },
-  { value: 'medium', label: 'متوسط', sample: 18 },
-  { value: 'large', label: 'كبير', sample: 22 },
-  { value: 'xlarge', label: 'كبير جداً', sample: 26 },
+const FONT_SIZES: { value: FontSize; labelKey: string; sample: number }[] = [
+  { value: 'small', labelKey: 'settings.small', sample: 14 },
+  { value: 'medium', labelKey: 'settings.medium', sample: 18 },
+  { value: 'large', labelKey: 'settings.large', sample: 22 },
+  { value: 'xlarge', labelKey: 'settings.xlarge', sample: 26 },
 ];
 
-const BACKGROUND_OPTIONS: { key: AppBackgroundKey; source: any }[] = [
-  { key: 'none', source: null },
-  { key: 'background1', source: require('@/assets/images/background1.png') },
-  { key: 'background2', source: require('@/assets/images/background2.png') },
-  { key: 'background3', source: require('@/assets/images/background3.png') },
-  { key: 'background4', source: require('@/assets/images/background4.png') },
-  { key: 'background5', source: require('@/assets/images/background5.png') },
-  { key: 'background6', source: require('@/assets/images/background6.png') },
-  { key: 'background7', source: require('@/assets/images/background7.png') },
-];
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const GRID_PADDING = 16;
+const GRID_GAP = 10;
+const GRID_COLUMNS = 4;
+const THUMB_SIZE = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1) - 32) / GRID_COLUMNS;
 
 export default function DisplaySettingsScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const { settings, isDarkMode, updateDisplay, t } = useSettings();
+  const colors = useColors();
+  const [adminBackgrounds, setAdminBackgrounds] = useState<DynamicBackground[]>([]);
+
+  useEffect(() => {
+    fetchDynamicBackgrounds().then(setAdminBackgrounds);
+  }, []);
 
   const handleFontSize = (size: FontSize) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateDisplay({ fontSize: size, arabicFontSize: size });
+    const sampleSize = FONT_SIZES.find(f => f.value === size)?.sample ?? 18;
+    updateDisplay({ fontSize: size, arabicFontSize: sampleSize });
+  };
+
+  const handleSelectBackground = (key: AppBackgroundKey) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateDisplay({
+      appBackground: key,
+      appBackgroundUrl: undefined,
+      appBackgroundTextColor: undefined,
+      dynamicBgColor: undefined,
+      blurEnabled: false,
+      dimEnabled: false,
+    } as any);
+  };
+
+  const handleSelectAdminBackground = (bg: DynamicBackground) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateDisplay({
+      appBackground: 'dynamic' as AppBackgroundKey,
+      appBackgroundUrl: bg.fullUrl,
+      appBackgroundTextColor: bg.textColor || 'white',
+      blurEnabled: false,
+      dimEnabled: true,
+    });
   };
 
   return (
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <MaterialCommunityIcons
-              name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-              size={28}
-              color={isDarkMode ? '#fff' : '#333'}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-            {t('settings.displaySettings')}
-          </Text>
-          <View style={{ width: 28 }} />
-        </View>
+        <UniversalHeader title={t('settings.displaySettings')} />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* حجم الخط */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-              حجم الخط
+            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('settings.fontSize')}
             </Text>
             <View style={[styles.section, isDarkMode && styles.sectionDark]}>
               {FONT_SIZES.map((fs) => (
@@ -83,12 +107,13 @@ export default function DisplaySettingsScreen() {
                   key={fs.value}
                   style={[
                     styles.option,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     settings.display.fontSize === fs.value && styles.optionSelected,
                   ]}
                   onPress={() => handleFontSize(fs.value)}
                 >
-                  <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { fontSize: fs.sample }]}>
-                    {fs.label}
+                  <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { fontSize: fs.sample, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t(fs.labelKey)}
                   </Text>
                   {settings.display.fontSize === fs.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
@@ -100,8 +125,8 @@ export default function DisplaySettingsScreen() {
 
           {/* معاينة */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-              معاينة
+            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('settings.preview')}
             </Text>
             <View style={[styles.section, isDarkMode && styles.sectionDark, styles.preview]}>
               <Text
@@ -111,7 +136,9 @@ export default function DisplaySettingsScreen() {
                   { fontSize: FONT_SIZES.find(f => f.value === settings.display.fontSize)?.sample || 18 },
                 ]}
               >
-                بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+                {settings.language === 'ar'
+                  ? 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ'
+                  : 'In the name of All\u0101h, the Entirely Merciful, the Especially Merciful.'}
               </Text>
               <Text
                 style={[
@@ -120,25 +147,28 @@ export default function DisplaySettingsScreen() {
                   { fontSize: (FONT_SIZES.find(f => f.value === settings.display.fontSize)?.sample || 18) - 4 },
                 ]}
               >
-                الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ
+                {settings.language === 'ar'
+                  ? 'الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ'
+                  : '[All] praise is [due] to Allāh, Lord of the worlds.'}
               </Text>
             </View>
           </Animated.View>
 
           {/* شكل الصفحة الرئيسية */}
           <Animated.View entering={FadeInDown.delay(250).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-              شكل الصفحة الرئيسية
+            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('settings.homeLayout')}
             </Text>
             <View style={[styles.section, isDarkMode && styles.sectionDark]}>
               {([
-                { value: 'grid' as HomeLayout, label: 'شبكة', icon: 'view-grid' as const },
-                { value: 'list' as HomeLayout, label: 'قائمة', icon: 'view-list' as const },
+                { value: 'grid' as HomeLayout, labelKey: 'settings.grid', icon: 'view-grid' as const },
+                { value: 'list' as HomeLayout, labelKey: 'settings.list', icon: 'view-list' as const },
               ]).map((layout) => (
                 <TouchableOpacity
                   key={layout.value}
                   style={[
                     styles.option,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     (settings.display.homeLayout || 'grid') === layout.value && styles.optionSelected,
                   ]}
                   onPress={() => {
@@ -146,14 +176,14 @@ export default function DisplaySettingsScreen() {
                     updateDisplay({ homeLayout: layout.value });
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
                     <MaterialCommunityIcons
                       name={layout.icon}
                       size={24}
                       color={(settings.display.homeLayout || 'grid') === layout.value ? '#2f7659' : (isDarkMode ? '#999' : '#666')}
                     />
-                    <Text style={[styles.optionLabel, isDarkMode && styles.textLight]}>
-                      {layout.label}
+                    <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
+                      {t(layout.labelKey)}
                     </Text>
                   </View>
                   {(settings.display.homeLayout || 'grid') === layout.value && (
@@ -164,34 +194,62 @@ export default function DisplaySettingsScreen() {
             </View>
           </Animated.View>
 
-          {/* خلفية التطبيق */}
+          {/* إظهار زر معلومات القسم ⓘ */}
+          <Animated.View entering={FadeInDown.delay(275).duration(400)}>
+            <View style={[styles.section, isDarkMode && styles.sectionDark, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 }]}>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
+                <MaterialCommunityIcons name="information-outline" size={24} color="#2f7659" />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t('settings.showSectionInfo')}
+                  </Text>
+                  <Text style={[{ fontSize: 12, fontFamily: fontRegular(), color: isDarkMode ? '#999' : '#888', textAlign: isRTL ? 'right' : 'left', marginTop: 2 }]}>
+                    {t('settings.showSectionInfoDesc')}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={settings.display.showSectionInfo !== false}
+                onValueChange={(val) => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  updateDisplay({ showSectionInfo: val });
+                }}
+                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+              />
+            </View>
+          </Animated.View>
+
+          {/* خلفيات الألوان */}
           <Animated.View entering={FadeInDown.delay(300).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-              خلفية التطبيق
-            </Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark, { padding: 16 }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                {BACKGROUND_OPTIONS.map((bg) => {
-                  const isSelected = (settings.display.appBackground || 'none') === bg.key;
+            <View style={[styles.bgSectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <MaterialCommunityIcons name="palette" size={20} color={isDarkMode ? '#999' : '#666'} />
+              <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted, { marginTop: 0, marginBottom: 0, textAlign: isRTL ? 'right' : 'left' }]}>
+                {t('settings.colorBackgrounds')}
+              </Text>
+            </View>
+            <View style={styles.bgSeparator} />
+            <View style={[styles.section, isDarkMode && styles.sectionDark, { padding: GRID_PADDING }]}>
+              {/* Grid of backgrounds */}
+              <View style={styles.bgGrid}>
+                {/* Built-in background images */}
+                {APP_BACKGROUNDS.map((bg) => {
+                  const isSelected = settings.display.appBackground === bg.id;
                   return (
                     <TouchableOpacity
-                      key={bg.key}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        updateDisplay({ appBackground: bg.key });
-                      }}
+                      key={bg.id}
+                      onPress={() => handleSelectBackground(bg.id)}
                       style={[
-                        styles.bgThumb,
+                        styles.bgGridThumb,
+                        { width: THUMB_SIZE, height: THUMB_SIZE * 1.4 },
                         isSelected && styles.bgThumbSelected,
                       ]}
                     >
-                      {bg.source ? (
-                        <Image source={bg.source} style={styles.bgThumbImage} />
-                      ) : (
-                        <View style={[styles.bgThumbImage, { backgroundColor: isDarkMode ? '#1a1a2e' : '#f0f0f0', alignItems: 'center', justifyContent: 'center' }]}>
-                          <MaterialCommunityIcons name="cancel" size={24} color={isDarkMode ? '#666' : '#999'} />
-                        </View>
-                      )}
+                      <Image
+                        source={bg.source}
+                        style={[styles.bgGridImage, { width: THUMB_SIZE - 4, height: THUMB_SIZE * 1.4 - 4 }]}
+                      />
                       {isSelected && (
                         <View style={styles.bgCheck}>
                           <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
@@ -200,8 +258,53 @@ export default function DisplaySettingsScreen() {
                     </TouchableOpacity>
                   );
                 })}
-              </ScrollView>
+                {/* Admin-added backgrounds from Firestore */}
+                {adminBackgrounds.map((bg) => {
+                  const isSelected = settings.display.appBackground === 'dynamic' && settings.display.appBackgroundUrl === bg.fullUrl;
+                  return (
+                    <TouchableOpacity
+                      key={bg.id}
+                      onPress={() => handleSelectAdminBackground(bg)}
+                      style={[
+                        styles.bgGridThumb,
+                        { width: THUMB_SIZE, height: THUMB_SIZE * 1.4 },
+                        isSelected && styles.bgThumbSelected,
+                      ]}
+                    >
+                      <ExpoImage
+                        source={{ uri: bg.thumbnailUrl }}
+                        style={[styles.bgGridImage, { width: THUMB_SIZE - 4, height: THUMB_SIZE * 1.4 - 4 }]}
+                        contentFit="cover"
+                        transition={200}
+                      />
+                      {isSelected && (
+                        <View style={styles.bgCheck}>
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
+          </Animated.View>
+
+          {/* خلفيات الصور */}
+          <Animated.View entering={FadeInDown.delay(350).duration(400)}>
+            <TouchableOpacity
+              style={[styles.section, isDarkMode && styles.sectionDark, styles.photoLink, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/settings/photo-backgrounds');
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <MaterialCommunityIcons name="image-multiple" size={22} color="#0f987f" />
+                <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.photoBackgrounds')}</Text>
+              </View>
+              <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={22} color={isDarkMode ? '#999' : '#666'} />
+            </TouchableOpacity>
           </Animated.View>
 
           <View style={{ height: 100 }} />
@@ -214,26 +317,13 @@ export default function DisplaySettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   containerDark: { backgroundColor: '#11151c' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
   textLight: { color: '#fff' },
   textMuted: { color: '#999' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 10 },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginTop: 20,
     marginBottom: 10,
@@ -248,7 +338,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.18)',
   },
   option: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
@@ -259,25 +348,44 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(47,118,89,0.08)',
   },
   optionLabel: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
   },
   preview: {
     padding: 20,
     alignItems: 'center',
-    gap: 12,
+    gap: Spacing.sm,
   },
   previewText: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     textAlign: 'center',
   },
   previewSub: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
   },
-  bgThumb: {
+  // Background grid
+  bgSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: 24,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  bgSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(120,120,128,0.3)',
+    marginBottom: 12,
+  },
+  bgGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+  bgGridThumb: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 2,
@@ -286,9 +394,7 @@ const styles = StyleSheet.create({
   bgThumbSelected: {
     borderColor: '#2f7659',
   },
-  bgThumbImage: {
-    width: 72,
-    height: 110,
+  bgGridImage: {
     borderRadius: 10,
   },
   bgCheck: {
@@ -297,5 +403,11 @@ const styles = StyleSheet.create({
     right: 4,
     backgroundColor: '#fff',
     borderRadius: 10,
+  },
+  photoLink: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    marginTop: 16,
   },
 });

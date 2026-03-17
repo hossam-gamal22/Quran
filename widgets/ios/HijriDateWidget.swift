@@ -9,6 +9,21 @@ import SwiftUI
 // نموذج البيانات
 // ========================================
 
+/// تحويل الأرقام الإنجليزية إلى أرقام عربية
+private func toArabicNumerals(_ input: String) -> String {
+    let arabicDigits: [Character] = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"]
+    return String(input.map { ch in
+        if let digit = ch.wholeNumberValue, digit >= 0, digit <= 9 {
+            return arabicDigits[digit]
+        }
+        return ch
+    })
+}
+
+private func arabicNumber(_ number: Int) -> String {
+    toArabicNumerals(String(number))
+}
+
 struct HijriDateData: Codable {
     var hijriDay: Int
     var hijriMonth: String
@@ -28,6 +43,31 @@ struct HijriDateWidgetEntry: TimelineEntry {
     let date: Date
     let data: HijriDateData?
     let showGregorian: Bool
+    let language: String
+
+    var isArabic: Bool { language == "ar" || language == "ur" || language == "fa" }
+
+    func displayDay() -> String {
+        if isArabic { return data?.dayName ?? "الأحد" }
+        return data?.dayNameEn ?? "Sunday"
+    }
+
+    func displayMonth() -> String {
+        if isArabic { return data?.hijriMonth ?? "رمضان" }
+        return data?.hijriMonthEn ?? "Ramadan"
+    }
+
+    func displayYear() -> String {
+        let year = data?.hijriYear ?? 1446
+        let suffix = isArabic ? "هـ" : "AH"
+        let yearStr = isArabic ? arabicNumber(year) : String(year)
+        return "\(yearStr) \(suffix)"
+    }
+
+    func displayHijriDay() -> String {
+        let day = data?.hijriDay ?? 15
+        return isArabic ? arabicNumber(day) : String(day)
+    }
 }
 
 struct HijriDateWidgetProvider: TimelineProvider {
@@ -39,23 +79,26 @@ struct HijriDateWidgetProvider: TimelineProvider {
         HijriDateWidgetEntry(
             date: Date(),
             data: sampleData,
-            showGregorian: true
+            showGregorian: true,
+            language: "ar"
         )
     }
-    
+
     func getSnapshot(in context: Context, completion: @escaping (HijriDateWidgetEntry) -> Void) {
         let entry = HijriDateWidgetEntry(
             date: Date(),
             data: loadData() ?? sampleData,
-            showGregorian: loadShowGregorian()
+            showGregorian: loadShowGregorian(),
+            language: loadLanguage()
         )
         completion(entry)
     }
-    
+
     func getTimeline(in context: Context, completion: @escaping (Timeline<HijriDateWidgetEntry>) -> Void) {
         let currentDate = Date()
         let data = loadData() ?? sampleData
         let showGregorian = loadShowGregorian()
+        let language = loadLanguage()
         
         // تحديث عند منتصف الليل
         let calendar = Calendar.current
@@ -64,7 +107,8 @@ struct HijriDateWidgetProvider: TimelineProvider {
         let entry = HijriDateWidgetEntry(
             date: currentDate,
             data: data,
-            showGregorian: showGregorian
+            showGregorian: showGregorian,
+            language: language
         )
         
         let timeline = Timeline(entries: [entry], policy: .after(tomorrow))
@@ -111,7 +155,23 @@ struct HijriDateWidgetProvider: TimelineProvider {
         
         return jsonData.settings.hijriWidget?.showGregorian ?? true
     }
-    
+
+    private func loadLanguage() -> String {
+        guard let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupId
+        ) else { return "ar" }
+
+        let fileURL = containerURL.appendingPathComponent("widget_data.json")
+
+        guard let data = try? Data(contentsOf: fileURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let lang = json["language"] as? String else {
+            return "ar"
+        }
+
+        return lang
+    }
+
     private func getDayNameAr() -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ar")
@@ -178,25 +238,25 @@ struct SmallHijriDateWidgetView: View {
             
             VStack(spacing: 6) {
                 // اسم اليوم
-                Text(entry.data?.dayName ?? "الأحد")
-                    .font(.system(size: 12, weight: .medium))
+                Text(entry.displayDay())
+                    .font(.custom("Amiri", size: 12))
                     .foregroundColor(.white.opacity(0.9))
-                
+
                 // اليوم الهجري
-                Text("\(entry.data?.hijriDay ?? 15)")
-                    .font(.system(size: 44, weight: .bold, design: .rounded))
+                Text(entry.displayHijriDay())
+                    .font(.custom("Amiri-Bold", size: 44))
                     .foregroundColor(.white)
-                
+
                 // الشهر الهجري
-                Text(entry.data?.hijriMonth ?? "رمضان")
-                    .font(.system(size: 16, weight: .semibold))
+                Text(entry.displayMonth())
+                    .font(.custom("Amiri-Bold", size: 16))
                     .foregroundColor(.white)
-                
+
                 // السنة الهجرية
-                Text("\(entry.data?.hijriYear ?? 1446) هـ")
-                    .font(.system(size: 11))
+                Text(entry.displayYear())
+                    .font(.custom("Amiri", size: 11))
                     .foregroundColor(.white.opacity(0.8))
-                
+
                 // التاريخ الميلادي
                 if entry.showGregorian {
                     Text(entry.data?.gregorianDate ?? "2 مارس")
@@ -232,32 +292,32 @@ struct MediumHijriDateWidgetView: View {
             HStack(spacing: 20) {
                 // الجانب الأيسر - اليوم
                 VStack(spacing: 4) {
-                    Text(entry.data?.dayName ?? "الأحد")
-                        .font(.system(size: 14, weight: .medium))
+                    Text(entry.displayDay())
+                        .font(.custom("Amiri", size: 14))
                         .foregroundColor(.white.opacity(0.9))
-                    
-                    Text("\(entry.data?.hijriDay ?? 15)")
-                        .font(.system(size: 56, weight: .bold, design: .rounded))
+
+                    Text(entry.displayHijriDay())
+                        .font(.custom("Amiri-Bold", size: 56))
                         .foregroundColor(.white)
                 }
                 .frame(width: 100)
-                
+
                 // الفاصل
                 Rectangle()
                     .fill(Color.white.opacity(0.3))
                     .frame(width: 1)
                     .padding(.vertical, 10)
-                
+
                 // الجانب الأيمن - التفاصيل
                 VStack(alignment: .trailing, spacing: 8) {
                     // الشهر الهجري
-                    Text(entry.data?.hijriMonth ?? "رمضان")
-                        .font(.system(size: 22, weight: .bold))
+                    Text(entry.displayMonth())
+                        .font(.custom("Amiri-Bold", size: 22))
                         .foregroundColor(.white)
-                    
+
                     // السنة الهجرية
-                    Text("\(entry.data?.hijriYear ?? 1446) هـ")
-                        .font(.system(size: 16, weight: .medium))
+                    Text(entry.displayYear())
+                        .font(.custom("Amiri", size: 16))
                         .foregroundColor(.white.opacity(0.9))
                     
                     Spacer()
@@ -337,7 +397,7 @@ struct LargeHijriDateWidgetView: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
                     
-                    Text("\(entry.data?.hijriDay ?? 15)")
+                    Text(arabicNumber(entry.data?.hijriDay ?? 15))
                         .font(.system(size: 72, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                     

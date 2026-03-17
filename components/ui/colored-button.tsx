@@ -12,9 +12,11 @@ import {
   TextStyle,
   TouchableOpacityProps,
 } from 'react-native';
+import { fontBold } from '@/lib/fonts';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 interface ColoredButtonProps extends Omit<TouchableOpacityProps, 'style'> {
   label: string;
   icon?: string;
@@ -46,6 +48,7 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
   ...props
 }) => {
   const sizeConfig = SIZE_MAP[size];
+  const isRTL = useIsRTL();
 
   const handlePress = () => {
     if (disabled) return;
@@ -66,6 +69,7 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
         {
           backgroundColor,
           opacity: disabled ? 0.6 : 1,
+          flexDirection: isRTL ? 'row-reverse' : 'row',
         },
         style,
       ]}
@@ -139,7 +143,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   text: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontWeight: '700',
     flex: 1,
   },

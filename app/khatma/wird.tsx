@@ -13,24 +13,25 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKhatma } from '../../contexts/KhatmaContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '../../hooks/use-colors';
 import { getPageSurah, getKhatmaStats } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
+import { UniversalHeader } from '@/components/ui';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { localizeNumber as toArabicNumber } from '@/lib/format-number';
 import {
   Spacing,
   BorderRadius,
   FONT_SIZES,
 } from '../../constants/theme';
 
-// ===== HELPER =====
-const toArabicNumber = (num: number): string => {
-  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return num.toString().split('').map((d) => arabicNumerals[parseInt(d)]).join('');
-};
-
 export default function WirdScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { settings, t } = useSettings();
+  const isRTL = useIsRTL();
   const {
     activeKhatma,
     getTodayWirdInfo,
@@ -68,12 +69,12 @@ export default function WirdScreen() {
   // Handle complete wird
   const handleCompleteWird = useCallback(async () => {
     Alert.alert(
-      'إتمام الورد',
-      'هل أكملت قراءة ورد اليوم؟',
+      t('khatma.completeWird'),
+      t('khatma.confirmCompleteWird'),
       [
-        { text: 'لا', style: 'cancel' },
+        { text: t('common.no'), style: 'cancel' },
         {
-          text: 'نعم، أكملته',
+          text: t('khatma.yesCompleted'),
           onPress: async () => {
             setIsCompleting(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -82,9 +83,9 @@ export default function WirdScreen() {
             
             if (success) {
               Alert.alert(
-                'بارك الله فيك! 🎉',
-                'تم تسجيل إتمام ورد اليوم. استمر على هذا النهج!',
-                [{ text: 'حسناً' }]
+                t('khatma.congratulations'),
+                t('khatma.wirdCompletedMsg'),
+                [{ text: t('common.ok') }]
               );
             }
             setIsCompleting(false);
@@ -110,68 +111,71 @@ export default function WirdScreen() {
   // No active khatma
   if (!activeKhatma) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.emptyContainer}>
           <Ionicons name="book-outline" size={80} color={colors.textSecondary} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            لا توجد ختمة نشطة
+            {t('khatma.noActiveKhatma')}
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            ابدأ ختمة جديدة لتحديد وردك اليومي
+            {t('khatma.noActiveKhatmaDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.startButtonText}>ابدأ ختمة جديدة</Text>
+            <Text style={styles.startButtonText}>{t('khatma.startNewKhatma')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </BackgroundWrapper>
     );
   }
 
   // Khatma completed
   if (activeKhatma.isCompleted) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.emptyContainer}>
           <Ionicons name="trophy" size={80} color={colors.success} />
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            مبارك! أتممت الختمة 🎉
+            {t('khatma.khatmaCompleted')} 🎉
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-            بارك الله فيك وجعله في ميزان حسناتك
+            {t('khatma.khatmaCompletedMsg')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.startButtonText}>ابدأ ختمة جديدة</Text>
+            <Text style={styles.startButtonText}>{t('khatma.startNewKhatma')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
+      </BackgroundWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: colors.text }]}>الورد اليومي</Text>
-        
-        <TouchableOpacity
-          onPress={() => router.push('/khatma')}
-          style={styles.khatmasButton}
-        >
-          <Ionicons name="list" size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      <UniversalHeader
+        title={t('khatma.dailyWird')}
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+        rightActions={[{
+          icon: 'format-list-bulleted',
+          onPress: () => router.push('/khatma'),
+          color: colors.text,
+          size: 24,
+        }]}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -186,7 +190,7 @@ export default function WirdScreen() {
           
           {/* Progress Bar */}
           <View style={styles.progressSection}>
-            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+            <View style={[styles.progressBar, { backgroundColor: colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View
                 style={[
                   styles.progressFill,
@@ -197,19 +201,19 @@ export default function WirdScreen() {
                 ]}
               />
             </View>
-            <Text style={[styles.progressText, { color: colors.text }]}>
+            <Text style={[styles.progressText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {toArabicNumber(stats?.progressPercentage || 0)}٪
             </Text>
           </View>
 
           {/* Stats Row */}
-          <View style={styles.statsRow}>
+          <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: colors.primary }]}>
                 {toArabicNumber(stats?.pagesRead || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                صفحة مقروءة
+                {t('khatma.pagesRead')}
               </Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -218,7 +222,7 @@ export default function WirdScreen() {
                 {toArabicNumber(stats?.pagesRemaining || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                صفحة متبقية
+                {t('khatma.pagesRemaining')}
               </Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -227,7 +231,7 @@ export default function WirdScreen() {
                 {toArabicNumber(stats?.daysRemaining || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                يوم متبقي
+                {t('khatma.daysLeft')}
               </Text>
             </View>
           </View>
@@ -235,26 +239,26 @@ export default function WirdScreen() {
 
         {/* Today's Wird */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              ورد اليوم
+              {t('khatma.todayWird')}
             </Text>
             {wirdInfo?.isCompleted && (
-              <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
+              <View style={[styles.completedBadge, { backgroundColor: colors.success, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                <Text style={styles.completedBadgeText}>مكتمل</Text>
+                <Text style={styles.completedBadgeText}>{t('khatma.completedBadge')}</Text>
               </View>
             )}
           </View>
 
           {/* Wird Summary */}
           <GlassCard style={styles.wirdSummary}>
-            <View style={styles.wirdRow}>
+            <View style={[styles.wirdRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.wirdItem}>
                 <Ionicons name="flag-outline" size={24} color={colors.primary} />
-                <Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>من</Text>
+                <Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>{t('khatma.fromLabel')}</Text>
                 <Text style={[styles.wirdValue, { color: colors.text }]}>
-                  صفحة {toArabicNumber(wirdInfo?.startPage || 1)}
+                  {t('khatma.pageUnit')} {toArabicNumber(wirdInfo?.startPage || 1)}
                 </Text>
               </View>
               
@@ -262,32 +266,32 @@ export default function WirdScreen() {
               
               <View style={styles.wirdItem}>
                 <Ionicons name="flag" size={24} color={colors.success} />
-                <Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>إلى</Text>
+                <Text style={[styles.wirdLabel, { color: colors.textSecondary }]}>{t('khatma.toLabel')}</Text>
                 <Text style={[styles.wirdValue, { color: colors.text }]}>
-                  صفحة {toArabicNumber(wirdInfo?.endPage || 1)}
+                  {t('khatma.pageUnit')} {toArabicNumber(wirdInfo?.endPage || 1)}
                 </Text>
               </View>
             </View>
             
-            <View style={[styles.wirdTotal, { backgroundColor: colors.card }]}>
+            <View style={[styles.wirdTotal, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.wirdTotalLabel, { color: colors.textSecondary }]}>
-                إجمالي الورد:
+                {t('khatma.totalWird')}
               </Text>
               <Text style={[styles.wirdTotalValue, { color: colors.primary }]}>
-                {toArabicNumber(activeKhatma.pagesPerDay)} صفحة
+                {toArabicNumber(activeKhatma.pagesPerDay)} {t('khatma.pageUnit')}
               </Text>
             </View>
           </GlassCard>
 
           {/* Pages List */}
           <Text style={[styles.pagesTitle, { color: colors.text }]}>
-            الصفحات
+            {t('khatma.pagesTitle')}
           </Text>
           <View style={styles.pagesList}>
             {pagesList.map((page) => (
               <TouchableOpacity
                 key={page.number}
-                style={[styles.pageItem, { backgroundColor: colors.card }]}
+                style={[styles.pageItem, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 onPress={() => handleOpenPage(page.number)}
               >
                 <View style={[styles.pageNumber, { backgroundColor: colors.primary + '15' }]}>
@@ -295,10 +299,10 @@ export default function WirdScreen() {
                     {toArabicNumber(page.number)}
                   </Text>
                 </View>
-                <Text style={[styles.pageSurah, { color: colors.text }]}>
+                <Text style={[styles.pageSurah, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                   {page.surah}
                 </Text>
-                <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+                <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             ))}
           </View>
@@ -308,10 +312,10 @@ export default function WirdScreen() {
         <GlassCard style={styles.quoteCard}>
           <Ionicons name="heart" size={24} color={colors.error} />
           <Text style={[styles.quoteText, { color: colors.text }]}>
-            "خيركم من تعلم القرآن وعلمه"
+            {t('khatma.quranHadith')}
           </Text>
           <Text style={[styles.quoteSource, { color: colors.textSecondary }]}>
-            رواه البخاري
+            {t('khatma.quranHadithSource')}
           </Text>
         </GlassCard>
 
@@ -323,7 +327,7 @@ export default function WirdScreen() {
       {!wirdInfo?.isCompleted && (
         <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
           <TouchableOpacity
-            style={[styles.completeButton, { backgroundColor: colors.primary }]}
+            style={[styles.completeButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleCompleteWird}
             disabled={isCompleting}
           >
@@ -332,13 +336,14 @@ export default function WirdScreen() {
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
-                <Text style={styles.completeButtonText}>أكملت ورد اليوم</Text>
+                <Text style={styles.completeButtonText}>{t('khatma.completeWirdBtn')}</Text>
               </>
             )}
           </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -346,29 +351,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-  },
-  khatmasButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   scrollView: {
     flex: 1,
   },
@@ -436,7 +419,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
     minWidth: 50,
-    textAlign: 'right',
   },
   statsRow: {
     flexDirection: 'row',
@@ -474,7 +456,7 @@ const styles = StyleSheet.create({
   completedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -532,6 +514,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
+    gap: Spacing.md,
   },
   pageNumber: {
     width: 36,
@@ -539,7 +522,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: Spacing.md,
   },
   pageNumberText: {
     fontSize: FONT_SIZES.sm,
@@ -549,7 +531,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: FONT_SIZES.md,
     fontWeight: '500',
-    textAlign: 'right',
   },
   quoteCard: {
     padding: Spacing.lg,

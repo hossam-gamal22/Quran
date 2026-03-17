@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getDateLocale, t } from '@/lib/i18n';
 
 const KEY = '@quran_khatm';
 
@@ -45,7 +46,7 @@ export async function startNewKhatm(name: string): Promise<KhatmRecord> {
   const records = await getAllKhatm();
   const newKhatm: KhatmRecord = {
     id: Date.now().toString(),
-    name: name.trim() || `ختمة ${new Date().toLocaleDateString('ar-EG')}`,
+    name: name.trim() || `${t('khatma.defaultName')} ${new Date().toLocaleDateString(getDateLocale())}`,
     startDate: Date.now(),
     completedSurahs: [],
     totalAyahsRead: 0,
@@ -130,8 +131,8 @@ export function getDurationText(startDate: number, endDate?: number): string {
   const end = endDate || Date.now();
   const diffMs = end - startDate;
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (days === 0) return 'اليوم';
-  if (days === 1) return 'يوم واحد';
-  if (days < 10) return `${days} أيام`;
-  return `${days} يوماً`;
+  if (days === 0) return t('common.today');
+  if (days === 1) return t('common.oneDay');
+  if (days < 10) return `${days} ${t('common.days')}`;
+  return `${days} ${t('common.daysCount')}`;
 }

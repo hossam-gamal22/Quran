@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 
 type Props = {
   size?: number;
@@ -10,6 +13,7 @@ type Props = {
   prayerLabel?: string; // Arabic label like 'الوقت المتبقي على صلاة الفجر'
   useBlur?: boolean;
   onPress?: () => void;
+  iconSource?: any;
 };
 
 function formatHMS(secInput: number) {
@@ -24,10 +28,12 @@ export default function CircularPrayerClock({
   size = 200,
   totalSeconds,
   remainingSeconds,
-  prayerLabel = 'الوقت المتبقي على صلاة الفجر',
+  prayerLabel = t('prayer.timeRemaining'),
   useBlur = false,
   onPress,
+  iconSource,
 }: Props) {
+  const isRTL = useIsRTL();
   // Circle radius matching mockup proportions (r=76 in 200x200 viewBox)
   const circleRadius = size * 0.38;
   const strokeWidth = 3;
@@ -60,17 +66,17 @@ export default function CircularPrayerClock({
       <View style={styles.contentContainer} pointerEvents="none">
         {/* Logo */}
         <Image
-          source={require('@/assets/images/icon.png')}
+          source={iconSource || require('@/assets/images/widgets/widget-icon.png')}
           style={[styles.logo, { width: size * 0.18, height: size * 0.18, borderRadius: size * 0.04 }]}
         />
 
         {/* Countdown timer */}
-        <Text style={[styles.timeText, { fontSize: Math.max(18, size * 0.11) }]}>
+        <Text style={[styles.timeText, { fontSize: Math.max(18, size * 0.11), writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {formatHMS(remainingSeconds)}
         </Text>
 
         {/* Prayer label */}
-        <Text style={[styles.labelText, { fontSize: Math.max(8, size * 0.044) }]}>
+        <Text style={[styles.labelText, { fontSize: Math.max(8, size * 0.044), writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {prayerLabel}
         </Text>
       </View>
@@ -105,22 +111,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '70%',
-    gap: 4,
+    gap: 8,
   },
   logo: {
     marginBottom: 4,
   },
   timeText: {
     color: '#081827',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textAlign: 'center',
-    writingDirection: 'rtl',
   },
   labelText: {
     color: '#081827',
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center',
-    writingDirection: 'rtl',
     opacity: 0.6,
   },
 });

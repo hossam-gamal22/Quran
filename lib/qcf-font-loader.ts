@@ -11,7 +11,7 @@
 import * as Font from 'expo-font';
 import * as FileSystem from 'expo-file-system/legacy';
 import pako from 'pako';
-import { patchCpalTableAllPalettes, DARK_UNIFIED_COLOR, LIGHT_UNIFIED_COLOR } from './ttf-cpal-patcher';
+import { stripColrTable } from './ttf-cpal-patcher';
 
 const CDN_BASE =
   'https://cdn.jsdelivr.net/gh/alheekmahlib/quran_library@main/assets/fonts/quran_fonts_qfc4';
@@ -24,14 +24,18 @@ let cacheDirReady = false;
 /** Total pages in the Quran Mushaf */
 export const TOTAL_QURAN_PAGES = 604;
 
-/** Font family for a given page (1-based) */
-export function getPageFontFamily(page: number): string {
+/** Font family for a given page (1-based). Use darkMode param for mode-specific names. */
+export function getPageFontFamily(page: number, darkMode?: boolean): string {
+  if (darkMode === true) return `QCF4p${page}d`;
+  if (darkMode === false) return `QCF4p${page}l`;
   return `QCF4_page${page}`;
 }
 
-/** Whether the font for this page is already loaded in memory */
-export function isPageFontLoaded(page: number): boolean {
-  return loadedPages.has(page);
+/** Whether the font for this page is already loaded in memory (optionally for a specific mode) */
+export function isPageFontLoaded(page: number, darkMode?: boolean): boolean {
+  if (!loadedPages.has(page)) return false;
+  if (darkMode === undefined) return true;
+  return loadedPages.get(page) === darkMode;
 }
 
 /** Validate page number */
@@ -69,9 +73,8 @@ export async function loadPageFont(
   const promise = (async () => {
     try {
       await ensureCacheDir();
-      const familyName = getPageFontFamily(page);
-      const patchColor = darkMode ? DARK_UNIFIED_COLOR : LIGHT_UNIFIED_COLOR;
-      const cacheKey = darkMode ? '_dark' : '_light';
+      const familyName = getPageFontFamily(page, darkMode);
+      const cacheKey = darkMode ? '_dark_v7' : '_light_v7';
       const cachedPath = CACHE_DIR + `page${page}${cacheKey}.ttf`;
 
         // Check if CPAL-patched version is already cached on disk
@@ -91,10 +94,11 @@ export async function loadPageFont(
 
         // Decompress gzip → raw TTF bytes
         const gzBuffer = await response.arrayBuffer();
-        let ttfBytes = pako.ungzip(new Uint8Array(gzBuffer));
+        let ttfBytes: Uint8Array = pako.ungzip(new Uint8Array(gzBuffer as ArrayBuffer));
 
-        // Patch CPAL to uniform color (black for light, cream for dark)
-        ttfBytes = patchCpalTableAllPalettes(ttfBytes, patchColor);
+        // Strip COLR table so font renders as monochrome
+        // Text color is controlled by the React Native Text component's color prop
+        ttfBytes = stripColrTable(ttfBytes);
 
         // Convert to base64 and write to cache
         const base64 = uint8ArrayToBase64(ttfBytes);

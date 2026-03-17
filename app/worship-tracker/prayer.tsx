@@ -13,8 +13,8 @@ import {
   StatusBar,
   Modal,
   Pressable,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,11 +32,16 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { PrayerStatus, PrayerName, DailyPrayerRecord } from '@/lib/worship-storage';
 import {
   getCachedPrayerTimes,
-  formatTime12h,
+  formatPrayerTime,
   timeStringToDate,
   PrayerTimes,
 } from '@/lib/prayer-times';
 import GlassCard from '@/components/ui/GlassCard';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getTranslations, getDateLocale } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -44,36 +49,36 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const PRAYERS: { key: PrayerName; name: string; icon: string }[] = [
-  { key: 'fajr', name: 'الفجر', icon: 'weather-sunset-up' },
-  { key: 'dhuhr', name: 'الظهر', icon: 'weather-sunny' },
-  { key: 'asr', name: 'العصر', icon: 'weather-sunny-alert' },
-  { key: 'maghrib', name: 'المغرب', icon: 'weather-sunset-down' },
-  { key: 'isha', name: 'العشاء', icon: 'weather-night' },
+const PRAYER_KEYS: { key: PrayerName; nameKey: string; icon: string }[] = [
+  { key: 'fajr', nameKey: 'prayer.fajr', icon: 'weather-sunset-up' },
+  { key: 'dhuhr', nameKey: 'prayer.dhuhr', icon: 'weather-sunny' },
+  { key: 'asr', nameKey: 'prayer.asr', icon: 'weather-sunny-alert' },
+  { key: 'maghrib', nameKey: 'prayer.maghrib', icon: 'weather-sunset-down' },
+  { key: 'isha', nameKey: 'prayer.isha', icon: 'weather-night' },
 ];
 
-const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; label: string }[] = [
-  { value: 'prayed', color: '#2f7659', icon: 'check-circle', label: 'في الوقت' },
-  { value: 'late', color: '#f5a623', icon: 'clock-alert', label: 'متأخر' },
-  { value: 'missed', color: '#ef5350', icon: 'close-circle', label: 'فائتة' },
-  { value: 'none', color: '#999', icon: 'circle-outline', label: 'لم تسجل' },
+const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; labelKey: string }[] = [
+  { value: 'prayed', color: '#2f7659', icon: 'check-circle', labelKey: 'worship.onTime' },
+  { value: 'late', color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
+  { value: 'missed', color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
+  { value: 'none', color: '#999', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 ];
 
-const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; label: string }> = {
-  prayed: { color: '#2f7659', icon: 'check-circle', label: 'في الوقت' },
-  late: { color: '#f5a623', icon: 'clock-alert', label: 'متأخر' },
-  missed: { color: '#ef5350', icon: 'close-circle', label: 'فائتة' },
-  none: { color: '#ccc', icon: 'circle-outline', label: 'لم تسجل' },
+const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; labelKey: string }> = {
+  prayed: { color: '#2f7659', icon: 'check-circle', labelKey: 'worship.onTime' },
+  late: { color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
+  missed: { color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
+  none: { color: '#ccc', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 };
 
-const DAYS_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+// Day names are resolved via t('calendar.weekDays') at render time
 
 // ========================================
 // مكونات فرعية
 // ========================================
 
 interface PrayerItemProps {
-  prayer: typeof PRAYERS[0];
+  prayer: typeof PRAYER_KEYS[0];
   status: PrayerStatus;
   onStatusChange: (status: PrayerStatus) => void;
   index: number;
@@ -91,6 +96,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   timeString,
   isAvailable,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   const [menuOpen, setMenuOpen] = useState(false);
   const scale = useSharedValue(1);
   const config = STATUS_CONFIG[status];
@@ -121,21 +128,19 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   };
 
   return (
-    <Animated.View
-      entering={FadeInRight.delay(index * 80).duration(400)}
-      style={animatedStyle}
-    >
+    <Animated.View entering={FadeInRight.delay(index * 80).duration(400)}>
+    <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={handlePress}
         style={[
           styles.prayerItem,
           isDarkMode && styles.prayerItemDark,
-          { borderLeftColor: isAvailable ? config.color : '#555', borderLeftWidth: 4 },
+          { borderLeftColor: isRTL ? undefined : (isAvailable ? config.color : '#555'), borderLeftWidth: isRTL ? 0 : 4, borderRightColor: isRTL ? (isAvailable ? config.color : '#555') : undefined, borderRightWidth: isRTL ? 4 : 0, flexDirection: isRTL ? 'row-reverse' : 'row' },
           !isAvailable && { opacity: 0.5 },
         ]}
       >
-        <View style={styles.prayerLeft}>
+        <View style={[styles.prayerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={styles.prayerIconBg}>
             <MaterialCommunityIcons
               name={prayer.icon as any}
@@ -144,24 +149,24 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             />
           </View>
           <View style={styles.prayerInfo}>
-            <Text style={[styles.prayerName, isDarkMode && styles.textLight]}>
-              {prayer.name}
+            <Text style={[styles.prayerName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t(prayer.nameKey)}
             </Text>
-            <Text style={[styles.prayerTime, isDarkMode && styles.textMuted]}>
+            <Text style={[styles.prayerTime, { color: colors.textLight }]}>
               {timeString || '--:--'}
             </Text>
           </View>
         </View>
         
         <View style={styles.prayerRight}>
-          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : '#999'}20` }]}>
+          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : '#999'}20`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons
               name={isAvailable ? config.icon as any : 'lock-clock'}
               size={18}
               color={isAvailable ? config.color : '#999'}
             />
             <Text style={[styles.statusText, { color: isAvailable ? config.color : '#999' }]}>
-              {isAvailable ? config.label : 'لم يحِن'}
+              {isAvailable ? t(config.labelKey) : t('worship.notYetAvailable')}
             </Text>
             {isAvailable && (
               <MaterialCommunityIcons
@@ -183,6 +188,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
               style={[
                 styles.dropdownItem,
                 status === opt.value && { backgroundColor: `${opt.color}15` },
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
               ]}
               onPress={() => selectStatus(opt.value)}
               activeOpacity={0.7}
@@ -192,16 +198,17 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
                 size={20}
                 color={opt.color}
               />
-              <Text style={[styles.dropdownLabel, { color: isDarkMode ? '#eee' : '#333' }]}>
-                {opt.label}
+              <Text style={[styles.dropdownLabel, { color: colors.text, flex: 1 }]}>
+                {t(opt.labelKey)}
               </Text>
               {status === opt.value && (
-                <MaterialCommunityIcons name="check" size={18} color={opt.color} style={{ marginRight: 'auto' }} />
+                <MaterialCommunityIcons name="check" size={18} color={opt.color} />
               )}
             </TouchableOpacity>
           ))}
         </View>
       )}
+    </Animated.View>
     </Animated.View>
   );
 };
@@ -210,6 +217,7 @@ interface WeekDayProps {
   date: Date;
   record?: DailyPrayerRecord;
   isToday: boolean;
+  isSelected: boolean;
   onPress: () => void;
   isDarkMode?: boolean;
 }
@@ -218,10 +226,13 @@ const WeekDay: React.FC<WeekDayProps> = ({
   date,
   record,
   isToday,
+  isSelected,
   onPress,
   isDarkMode = false,
 }) => {
-  const dayName = DAYS_AR[date.getDay()];
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const dayName = getTranslations().calendar.weekDaysShort[date.getDay()];
   const dayNumber = date.getDate();
 
   const getPrayedCount = () => {
@@ -239,25 +250,26 @@ const WeekDay: React.FC<WeekDayProps> = ({
         styles.weekDay,
         isDarkMode && styles.weekDayDark,
         isToday && styles.weekDayToday,
+        isSelected && !isToday && styles.weekDaySelected,
       ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <Text style={[
         styles.weekDayName,
-        isDarkMode && styles.textMuted,
-        isToday && styles.weekDayTextToday,
+        { color: colors.textLight },
+        (isToday || isSelected) && styles.weekDayTextToday,
       ]}>
         {dayName}
       </Text>
       <Text style={[
         styles.weekDayNumber,
-        isDarkMode && styles.textLight,
-        isToday && styles.weekDayTextToday,
+        { color: colors.text },
+        (isToday || isSelected) && styles.weekDayTextToday,
       ]}>
         {dayNumber}
       </Text>
-      <View style={styles.weekDayProgress}>
+      <View style={[styles.weekDayProgress, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View
           style={[
             styles.weekDayProgressFill,
@@ -268,8 +280,8 @@ const WeekDay: React.FC<WeekDayProps> = ({
       </View>
       <Text style={[
         styles.weekDayCount,
-        isDarkMode && styles.textMuted,
-        isToday && styles.weekDayTextToday,
+        { color: colors.textLight },
+        (isToday || isSelected) && styles.weekDayTextToday,
       ]}>
         {prayedCount}/5
       </Text>
@@ -282,46 +294,79 @@ const WeekDay: React.FC<WeekDayProps> = ({
 // ========================================
 
 export default function PrayerTrackerScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const {
     todayPrayer,
     weekPrayers,
     prayerStats,
     updatePrayer,
+    updatePrayerWithTime,
+    updatePrayerForDate,
+    getPrayerForDate,
     getWeekPrayers,
+    getHistoricalFajr,
   } = usePrayerTracker();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDayRecord, setSelectedDayRecord] = useState<DailyPrayerRecord | null>(null);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
+  const [historicalFajr, setHistoricalFajr] = useState<{ date: string; time: string; status: PrayerStatus }[]>([]);
   
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const colors = useColors();
 
-  // جلب مواقيت الصلاة الحقيقية من الكاش
+  const isSelectedToday = useMemo(() => {
+    return selectedDate.toDateString() === new Date().toDateString();
+  }, [selectedDate]);
+
+  const selectedDateStr = useMemo(() => {
+    return selectedDate.toISOString().split('T')[0];
+  }, [selectedDate]);
+
+  // جلب مواقيت الصلاة الحقيقية من الكاش + سجل الفجر التاريخي
   useEffect(() => {
     const loadTimes = async () => {
       const today = new Date().toISOString().split('T')[0];
       const cached = await getCachedPrayerTimes(today);
       if (cached) setPrayerTimes(cached);
+      
+      const fajrHistory = await getHistoricalFajr(30);
+      setHistoricalFajr(fajrHistory);
     };
     loadTimes();
-  }, []);
+  }, [getHistoricalFajr]);
 
-  // تحديد هل الصلاة حان وقتها (أو فات)
+  // تحميل سجل اليوم المحدد
+  useEffect(() => {
+    if (isSelectedToday) {
+      setSelectedDayRecord(todayPrayer);
+    } else {
+      const loadRecord = async () => {
+        const record = await getPrayerForDate(selectedDateStr);
+        setSelectedDayRecord(record);
+      };
+      loadRecord();
+    }
+  }, [selectedDateStr, isSelectedToday, todayPrayer, getPrayerForDate]);
+
+  // تحديد هل الصلاة حان وقتها (أو فات) — فقط لليوم الحالي
   const isPrayerAvailable = useCallback((prayerKey: PrayerName): boolean => {
-    if (!prayerTimes) return true; // لو مفيش مواقيت، نسمح بالكل
+    if (!isSelectedToday) return true; // الأيام السابقة كلها متاحة
+    if (!prayerTimes) return true;
     const timeStr = prayerTimes[prayerKey as keyof PrayerTimes];
     if (!timeStr) return true;
     const prayerDate = timeStringToDate(timeStr);
     return new Date() >= prayerDate;
-  }, [prayerTimes]);
+  }, [prayerTimes, isSelectedToday]);
 
   // جلب وقت الصلاة المنسق
   const getPrayerTimeDisplay = useCallback((prayerKey: PrayerName): string | undefined => {
     if (!prayerTimes) return undefined;
     const timeStr = prayerTimes[prayerKey as keyof PrayerTimes];
     if (!timeStr) return undefined;
-    return formatTime12h(timeStr);
+    return formatPrayerTime(timeStr, settings.prayer.show24Hour);
   }, [prayerTimes]);
 
   // حساب أيام الأسبوع
@@ -336,19 +381,19 @@ export default function PrayerTrackerScreen() {
     return dates;
   }, []);
 
-  // حساب الإحصائيات
-  const todayProgress = useMemo(() => {
-    if (!todayPrayer) return 0;
+  // حساب الإحصائيات — بناءً على اليوم المحدد
+  const selectedProgress = useMemo(() => {
+    if (!selectedDayRecord) return 0;
     const prayers: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    const prayed = prayers.filter(p => todayPrayer[p] === 'prayed' || todayPrayer[p] === 'late').length;
+    const prayed = prayers.filter(p => selectedDayRecord[p] === 'prayed' || selectedDayRecord[p] === 'late').length;
     return (prayed / 5) * 100;
-  }, [todayPrayer]);
+  }, [selectedDayRecord]);
 
-  const todayPrayedCount = useMemo(() => {
-    if (!todayPrayer) return 0;
+  const selectedPrayedCount = useMemo(() => {
+    if (!selectedDayRecord) return 0;
     const prayers: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-    return prayers.filter(p => todayPrayer[p] === 'prayed' || todayPrayer[p] === 'late').length;
-  }, [todayPrayer]);
+    return prayers.filter(p => selectedDayRecord[p] === 'prayed' || selectedDayRecord[p] === 'late').length;
+  }, [selectedDayRecord]);
 
   // تحديث
   const onRefresh = useCallback(async () => {
@@ -358,9 +403,20 @@ export default function PrayerTrackerScreen() {
     setIsRefreshing(false);
   }, [getWeekPrayers]);
 
-  // تغيير حالة الصلاة
+  // تغيير حالة الصلاة — يدعم اليوم الحالي والأيام السابقة
   const handleStatusChange = async (prayer: PrayerName, status: PrayerStatus) => {
-    await updatePrayer(prayer, status);
+    if (isSelectedToday) {
+      // حفظ الحالة مع وقت الصلاة المُجدول
+      const scheduledTime = prayerTimes ? prayerTimes[prayer as keyof PrayerTimes] : undefined;
+      await updatePrayerWithTime(prayer, status, scheduledTime);
+    } else {
+      await updatePrayerForDate(selectedDateStr, prayer, status);
+      // تحديث السجل المحلي مباشرة
+      setSelectedDayRecord(prev => {
+        if (!prev) return { date: selectedDateStr, fajr: 'none', dhuhr: 'none', asr: 'none', maghrib: 'none', isha: 'none', [prayer]: status } as DailyPrayerRecord;
+        return { ...prev, [prayer]: status };
+      });
+    }
   };
 
   // البحث عن سجل يوم معين
@@ -375,6 +431,7 @@ export default function PrayerTrackerScreen() {
   };
 
   return (
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
@@ -383,22 +440,12 @@ export default function PrayerTrackerScreen() {
       />
       
       {/* الهيدر */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-          متتبع الصلاة
-        </Text>
-        <View style={styles.headerSpacer} />
-      </Animated.View>
+      <UniversalHeader
+        title={t('worship.prayerTracker')}
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -418,36 +465,36 @@ export default function PrayerTrackerScreen() {
           <View
             style={[styles.progressCard, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
           >
-            <View style={styles.progressHeader}>
+            <View style={[styles.progressHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View>
-                <Text style={styles.progressTitle}>تقدم اليوم</Text>
+                <Text style={styles.progressTitle}>{isSelectedToday ? t('worship.todayProgress') : t('worship.selectedDayProgress')}</Text>
                 <Text style={styles.progressDate}>
-                  {new Date().toLocaleDateString('ar-SA', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {selectedDate.toLocaleDateString(getDateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}
                 </Text>
               </View>
               <View style={styles.progressCircle}>
-                <Text style={styles.progressPercent}>{Math.round(todayProgress)}%</Text>
+                <Text style={styles.progressPercent}>{Math.round(selectedProgress)}%</Text>
               </View>
             </View>
             
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${todayProgress}%` }]} />
+            <View style={[styles.progressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.progressFill, { width: `${selectedProgress}%` }]} />
             </View>
             
-            <View style={styles.progressStats}>
+            <View style={[styles.progressStats, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.progressStat}>
-                <Text style={styles.progressStatValue}>{todayPrayedCount}</Text>
-                <Text style={styles.progressStatLabel}>صلوات اليوم</Text>
+                <Text style={styles.progressStatValue}>{selectedPrayedCount}</Text>
+                <Text style={styles.progressStatLabel}>{t('prayer.title')}</Text>
               </View>
               <View style={styles.progressDivider} />
               <View style={styles.progressStat}>
                 <Text style={styles.progressStatValue}>{prayerStats?.streak ?? 0}</Text>
-                <Text style={styles.progressStatLabel}>أيام متتالية</Text>
+                <Text style={styles.progressStatLabel}>{t('worship.consecutiveDays')}</Text>
               </View>
               <View style={styles.progressDivider} />
               <View style={styles.progressStat}>
                 <Text style={styles.progressStatValue}>{prayerStats?.percentage ?? 0}%</Text>
-                <Text style={styles.progressStatLabel}>نسبة الالتزام</Text>
+                <Text style={styles.progressStatLabel}>{t('worship.bestStreak')}</Text>
               </View>
             </View>
           </View>
@@ -455,13 +502,13 @@ export default function PrayerTrackerScreen() {
 
         {/* أيام الأسبوع */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            هذا الأسبوع
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.thisWeek')}
           </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.weekContainer}
+            contentContainerStyle={[styles.weekContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           >
             {weekDates.map((date, index) => (
               <WeekDay
@@ -469,6 +516,7 @@ export default function PrayerTrackerScreen() {
                 date={date}
                 record={getRecordForDate(date)}
                 isToday={isToday(date)}
+                isSelected={date.toDateString() === selectedDate.toDateString()}
                 onPress={() => setSelectedDate(date)}
                 isDarkMode={isDarkMode}
               />
@@ -478,22 +526,29 @@ export default function PrayerTrackerScreen() {
 
         {/* صلوات اليوم */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            صلوات اليوم
-          </Text>
-          <Text style={[styles.sectionSubtitle, isDarkMode && styles.textMuted]}>
-            اضغط لاختيار حالة الصلاة
+          <View style={[styles.prayerSectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {isSelectedToday ? t('worship.todaysPrayers') : `${t('prayer.title')} ${getTranslations().calendar.weekDays[selectedDate.getDay()]} ${selectedDate.getDate()}`}
+            </Text>
+            {!isSelectedToday && (
+              <TouchableOpacity onPress={() => setSelectedDate(new Date())} style={styles.returnTodayBtn}>
+                <Text style={styles.returnTodayText}>{t('calendar.today')}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={[styles.sectionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.tapToSelectStatus')}
           </Text>
           <View style={styles.prayersContainer}>
-            {PRAYERS.map((prayer, index) => (
+            {PRAYER_KEYS.map((prayer, index) => (
               <PrayerItem
                 key={prayer.key}
                 prayer={prayer}
-                status={todayPrayer?.[prayer.key] ?? 'none'}
+                status={selectedDayRecord?.[prayer.key] ?? 'none'}
                 onStatusChange={(status) => handleStatusChange(prayer.key, status)}
                 index={index}
                 isDarkMode={isDarkMode}
-                timeString={getPrayerTimeDisplay(prayer.key)}
+                timeString={isSelectedToday ? getPrayerTimeDisplay(prayer.key) : undefined}
                 isAvailable={isPrayerAvailable(prayer.key)}
               />
             ))}
@@ -503,53 +558,110 @@ export default function PrayerTrackerScreen() {
         {/* إحصائيات */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
           <GlassCard style={styles.statsCard}>
-            <Text style={[styles.statsTitle, isDarkMode && styles.textLight]}>
-              إحصائياتك
+            <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.yourStats')}
             </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="check-all" size={24} color="#2f7659" />
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.prayedOnTime ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  في الوقت
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.onTime')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="clock-alert" size={24} color="#f5a623" />
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.prayedLate ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  متأخرة
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.late')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="close-circle" size={24} color="#ef5350" />
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.missed ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  فائتة
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.missed')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <MaterialCommunityIcons name="fire" size={24} color="#ff6b35" />
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.bestStreak ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  أفضل سلسلة
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.bestStreak')}
                 </Text>
               </View>
             </View>
           </GlassCard>
         </Animated.View>
 
+        {/* مواقيت الفجر التاريخية */}
+        {historicalFajr.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(500).duration(500)}>
+            <GlassCard style={styles.statsCard}>
+              <View style={[styles.fajrHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name="weather-sunset-up" size={22} color="#2f7659" />
+                <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, flex: 1 }]}>
+                  {t('worship.historicalFajrTimes')}
+                </Text>
+              </View>
+              <Text style={[styles.fajrSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {t('worship.last30Days')}
+              </Text>
+              <View style={styles.fajrList}>
+                {historicalFajr.slice(0, 14).map((item, index) => {
+                  const dateObj = new Date(item.date + 'T00:00:00');
+                  const statusConfig = STATUS_CONFIG[item.status];
+                  return (
+                    <View
+                      key={item.date}
+                      style={[
+                        styles.fajrRow,
+                        isDarkMode && styles.fajrRowDark,
+                        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                        index < historicalFajr.slice(0, 14).length - 1 && styles.fajrRowBorder,
+                      ]}
+                    >
+                      <View style={[styles.fajrDateCol, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <Text style={[styles.fajrDayName, { color: colors.textLight }]}>
+                          {getTranslations().calendar.weekDaysShort[dateObj.getDay()]}
+                        </Text>
+                        <Text style={[styles.fajrDate, { color: colors.text }]}>
+                          {dateObj.getDate()}/{dateObj.getMonth() + 1}
+                        </Text>
+                      </View>
+                      <Text style={[styles.fajrTime, { color: colors.text }]}>
+                        {formatPrayerTime(item.time, settings.prayer.show24Hour)}
+                      </Text>
+                      <View style={[styles.fajrStatusBadge, { backgroundColor: `${statusConfig.color}20`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <MaterialCommunityIcons
+                          name={statusConfig.icon as any}
+                          size={14}
+                          color={statusConfig.color}
+                        />
+                        <Text style={[styles.fajrStatusText, { color: statusConfig.color }]}>
+                          {t(statusConfig.labelKey)}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </GlassCard>
+          </Animated.View>
+        )}
+
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -560,35 +672,12 @@ export default function PrayerTrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
     backgroundColor: 'transparent',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  containerDark: {
+    backgroundColor: 'transparent',
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
+
   textLight: {
     color: '#fff',
   },
@@ -615,12 +704,12 @@ const styles = StyleSheet.create({
   },
   progressTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   progressDate: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
   },
@@ -634,7 +723,7 @@ const styles = StyleSheet.create({
   },
   progressPercent: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   progressBar: {
@@ -658,12 +747,12 @@ const styles = StyleSheet.create({
   },
   progressStatValue: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   progressStatLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
@@ -675,15 +764,32 @@ const styles = StyleSheet.create({
   // أيام الأسبوع
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
     marginBottom: 12,
   },
+  prayerSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  returnTodayBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#2f765920',
+  },
+  returnTodayText: {
+    fontSize: 12,
+    fontFamily: fontSemiBold(),
+    color: '#2f7659',
+  },
   sectionSubtitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     paddingHorizontal: 20,
     marginTop: -8,
@@ -707,14 +813,19 @@ const styles = StyleSheet.create({
   weekDayToday: {
     backgroundColor: '#2f7659',
   },
+  weekDaySelected: {
+    backgroundColor: '#2f765940',
+    borderColor: '#2f7659',
+    borderWidth: 1.5,
+  },
   weekDayName: {
     fontSize: 10,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
   },
   weekDayNumber: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginVertical: 4,
   },
@@ -739,7 +850,7 @@ const styles = StyleSheet.create({
   },
   weekDayCount: {
     fontSize: 10,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginTop: 6,
   },
@@ -775,12 +886,12 @@ const styles = StyleSheet.create({
   prayerInfo: {},
   prayerName: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   prayerTime: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 2,
   },
@@ -788,14 +899,14 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
   },
   statusText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
   // dropdown
   dropdownMenu: {
@@ -822,7 +933,7 @@ const styles = StyleSheet.create({
   },
   dropdownLabel: {
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
   // إحصائيات
   statsCard: {
@@ -832,7 +943,7 @@ const styles = StyleSheet.create({
   },
   statsTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 15,
   },
@@ -842,17 +953,71 @@ const styles = StyleSheet.create({
   },
   statItem: {
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   statValue: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   statLabel: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
+  },
+  fajrHeader: {
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  fajrSubtitle: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    marginBottom: 12,
+  },
+  fajrList: {
+    gap: 0,
+  },
+  fajrRow: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  fajrRowDark: {},
+  fajrRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
+  fajrDateCol: {
+    width: 80,
+    alignItems: 'center',
+    gap: 6,
+  },
+  fajrDayName: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+  },
+  fajrDate: {
+    fontSize: 13,
+    fontFamily: fontMedium(),
+  },
+  fajrTime: {
+    fontSize: 15,
+    fontFamily: fontSemiBold(),
+    flex: 1,
+    textAlign: 'center',
+  },
+  fajrStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  fajrStatusText: {
+    fontSize: 11,
+    fontFamily: fontMedium(),
   },
   bottomSpace: {
     height: 100,

@@ -10,8 +10,8 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -20,22 +20,37 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import type { NotificationSoundType } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BackButton } from '@/components/ui';
 
-const DAY_NAMES = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t } from '@/lib/i18n';
 
-const SOUND_OPTIONS: { key: NotificationSoundType; label: string }[] = [
-  { key: 'default', label: 'الافتراضي' },
-  { key: 'asbahna', label: 'أصبحنا وأصبح الملك لله' },
-  { key: 'amsayna', label: 'أمسينا وأمسى الملك لله' },
-  { key: 'subhanallah', label: 'سبحان الله' },
-  { key: 'alhamdulillah', label: 'الحمد لله' },
-  { key: 'allahuakbar', label: 'الله أكبر' },
-  { key: 'silent', label: 'صامت' },
+const DAY_NAMES = [
+  { nameKey: 'quranReminder.saturday' as const },
+  { nameKey: 'quranReminder.sunday' as const },
+  { nameKey: 'quranReminder.monday' as const },
+  { nameKey: 'quranReminder.tuesday' as const },
+  { nameKey: 'quranReminder.wednesday' as const },
+  { nameKey: 'quranReminder.thursday' as const },
+  { nameKey: 'quranReminder.friday' as const },
+];
+
+const SOUND_OPTIONS: { key: NotificationSoundType; nameKey: string }[] = [
+  { key: 'default', nameKey: 'quranReminder.defaultSound' },
+  { key: 'salawat', nameKey: 'quranReminder.salawatProphet' },
+  { key: 'tasbih', nameKey: 'quranReminder.subhanallahBihamdi' },
+  { key: 'subhanallah', nameKey: 'quranReminder.subhanallah' },
+  { key: 'alhamdulillah', nameKey: 'quranReminder.alhamdulillah' },
+  { key: 'istighfar', nameKey: 'quranReminder.astaghfirullah' },
+  { key: 'general_reminder', nameKey: 'quranReminder.reminderTone' },
+  { key: 'silent', nameKey: 'quranReminder.silent' },
 ];
 
 export default function QuranReminderScreen() {
   const router = useRouter();
   const { settings, isDarkMode, updateNotifications } = useSettings();
+  const isRTL = useIsRTL();
 
   const reminderEnabled = settings.notifications.quranReadingReminder ?? false;
   const reminderTime = settings.notifications.quranReadingReminderTime ?? '20:00';
@@ -79,10 +94,10 @@ export default function QuranReminderScreen() {
 
   const allDaysSelected = reminderDays.length === 7;
   const daysLabel = allDaysSelected
-    ? 'كل يوم'
+    ? t('quranReminder.everyDay')
     : reminderDays.length === 0
-      ? 'لم يتم اختيار أيام'
-      : reminderDays.map(d => DAY_NAMES[d]).join('، ');
+      ? t('quranReminder.noDaysSelected')
+      : reminderDays.map(d => t(DAY_NAMES[d].nameKey)).join(isRTL ? '، ' : ', ');
 
   const colors = {
     bg: isDarkMode ? '#11151c' : '#f5f5f5',
@@ -94,23 +109,18 @@ export default function QuranReminderScreen() {
   };
 
   return (
-    <View style={[s.container, { backgroundColor: colors.bg }]}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <View style={[s.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={s.headerBtn}>
-            <Ionicons
-              name="chevron-forward"
-              size={28}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={[s.headerTitle, { color: colors.text }]}>التذكير</Text>
+        <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
+          <BackButton />
+          <Text style={[s.headerTitle, { color: colors.text }]}>{t('quranReminder.title')}</Text>
           <TouchableOpacity
             onPress={() => router.back()}
             style={[s.saveBtn, { backgroundColor: colors.accent }]}
           >
-            <Text style={s.saveBtnText}>حفظ</Text>
+            <Text style={s.saveBtnText}>{t('common.save')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -121,13 +131,13 @@ export default function QuranReminderScreen() {
         >
           {/* Title Card */}
           <View style={[s.card, { backgroundColor: colors.card }]}>
-            <Text style={[s.cardTitle, { color: colors.text }]}>تذكير</Text>
+            <Text style={[s.cardTitle, { color: colors.text }]}>{t('quranReminder.reminder')}</Text>
           </View>
 
           {/* Message Card */}
           <View style={[s.card, { backgroundColor: colors.card }]}>
             <Text style={[s.cardMessage, { color: colors.muted }]}>
-              لاتنسى قراءة القرآن
+              {t('quranReminder.dontForgetQuran')}
             </Text>
           </View>
 
@@ -139,14 +149,14 @@ export default function QuranReminderScreen() {
               trackColor={{ false: '#767577', true: colors.accent + '80' }}
               thumbColor={reminderEnabled ? colors.accent : '#f4f3f4'}
             />
-            <Text style={[s.toggleLabel, { color: colors.text }]}>تفعيل التذكير</Text>
+            <Text style={[s.toggleLabel, { color: colors.text }]}>{t('quranReminder.enableReminder')}</Text>
           </View>
 
           {reminderEnabled && (
             <>
               {/* Time Picker Section */}
               <Text style={[s.sectionLabel, { color: colors.muted }]}>
-                تحديد وقت إرسال التذكير
+                {t('quranReminder.setReminderTime')}
               </Text>
               <View style={[s.card, s.timePickerCard, { backgroundColor: colors.card }]}>
                 <DateTimePicker
@@ -155,7 +165,7 @@ export default function QuranReminderScreen() {
                   display="spinner"
                   onChange={handleTimeChange}
                   textColor={colors.text}
-                  locale="ar"
+                  locale={isRTL ? 'ar' : 'en'}
                   style={{ height: 150, width: '100%' }}
                   themeVariant={isDarkMode ? 'dark' : 'light'}
                 />
@@ -163,19 +173,19 @@ export default function QuranReminderScreen() {
 
               {/* Day Selection */}
               <Text style={[s.sectionLabel, { color: colors.muted }]}>
-                قم بتحديد في أي يوم يتم أرسال التذكير اليك
+                {t('quranReminder.selectDays')}
               </Text>
               <TouchableOpacity
                 style={[s.card, s.dayRow, { backgroundColor: colors.card }]}
                 onPress={() => setShowDaySelector(!showDaySelector)}
               >
                 <Ionicons
-                  name="chevron-back"
+                  name={isRTL ? 'chevron-forward' : 'chevron-back'}
                   size={20}
                   color={colors.muted}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.dayRowText, { color: colors.text }]}>
+                  <Text style={[s.dayRowText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
                     {daysLabel}
                   </Text>
                 </View>
@@ -197,11 +207,11 @@ export default function QuranReminderScreen() {
                     }}
                   >
                     <Text style={[s.dayChipText, { color: allDaysSelected ? '#fff' : colors.text }]}>
-                      {allDaysSelected ? 'إلغاء تحديد الكل' : 'تحديد كل الأيام'}
+                      {allDaysSelected ? t('quranReminder.deselectAll') : t('quranReminder.selectAllDays')}
                     </Text>
                   </TouchableOpacity>
                   <View style={s.daysGrid}>
-                    {DAY_NAMES.map((name, index) => {
+                    {DAY_NAMES.map((item, index) => {
                       const isSelected = reminderDays.includes(index);
                       return (
                         <TouchableOpacity
@@ -217,7 +227,7 @@ export default function QuranReminderScreen() {
                           onPress={() => handleDayToggle(index)}
                         >
                           <Text style={[s.dayChipText, { color: isSelected ? '#fff' : colors.text }]}>
-                            {name}
+                            {t(item.nameKey)}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -228,7 +238,7 @@ export default function QuranReminderScreen() {
 
               {/* Notification Sound */}
               <Text style={[s.sectionLabel, { color: colors.muted }]}>
-                قم بتحديد صوت التذكير
+                {t('quranReminder.selectSound')}
               </Text>
               <TouchableOpacity
                 style={[s.card, s.dayRow, { backgroundColor: colors.card }]}
@@ -236,13 +246,13 @@ export default function QuranReminderScreen() {
                 onPress={() => setShowSoundSelector(!showSoundSelector)}
               >
                 <Ionicons
-                  name="chevron-back"
+                  name={isRTL ? 'chevron-forward' : 'chevron-back'}
                   size={20}
                   color={colors.muted}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.dayRowText, { color: colors.text }]}>
-                    {SOUND_OPTIONS.find(o => o.key === reminderSound)?.label ?? 'الافتراضي'}
+                  <Text style={[s.dayRowText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {t(SOUND_OPTIONS.find(o => o.key === reminderSound)?.nameKey ?? 'quranReminder.defaultSound')}
                   </Text>
                 </View>
                 <MaterialCommunityIcons
@@ -283,10 +293,10 @@ export default function QuranReminderScreen() {
                         <Text
                           style={[
                             s.soundOptionText,
-                            { color: isSelected ? colors.accent : colors.text },
+                            { color: isSelected ? colors.accent : colors.text, textAlign: isRTL ? 'right' : 'left' },
                           ]}
                         >
-                          {option.label}
+                          {t(option.nameKey)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -300,6 +310,7 @@ export default function QuranReminderScreen() {
         </ScrollView>
       </SafeAreaView>
     </View>
+    </BackgroundWrapper>
   );
 }
 
@@ -321,7 +332,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textAlign: 'center',
   },
   saveBtn: {
@@ -331,7 +342,7 @@ const s = StyleSheet.create({
   },
   saveBtnText: {
     color: '#fff',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 14,
   },
   scrollContent: {
@@ -345,12 +356,12 @@ const s = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textAlign: 'center',
   },
   cardMessage: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center',
   },
   toggleCard: {
@@ -361,11 +372,11 @@ const s = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
   sectionLabel: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 10,
@@ -382,8 +393,7 @@ const s = StyleSheet.create({
   },
   dayRowText: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
-    textAlign: 'right',
+    fontFamily: fontSemiBold(),
   },
   daysGrid: {
     flexDirection: 'row',
@@ -398,7 +408,7 @@ const s = StyleSheet.create({
   },
   dayChipText: {
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
   soundOption: {
     flexDirection: 'row',
@@ -412,8 +422,7 @@ const s = StyleSheet.create({
   },
   soundOptionText: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     flex: 1,
-    textAlign: 'right',
   },
 });

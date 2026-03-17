@@ -2,13 +2,13 @@
 // مشاركة البيانات مع الويدجت - روح المسلم
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 
 import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
-import { getHijriDate, getHijriDateObject } from './hijri-date';
+import { getLocalizedHijriDate } from './hijri-date';
 import { getAllAzkar } from '@/lib/azkar-api';
-import { t } from '@/lib/i18n';
+import { t, getDateLocale, getLanguage } from '@/lib/i18n';
 import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
 
 // ========================================
@@ -43,6 +43,7 @@ export interface WidgetPrayerData {
   nextPrayerTime: string;
   timeRemaining: string;
   timeRemainingMinutes: number;
+  timeRemainingLabel: string;
   allPrayers: {
     name: string;
     nameAr: string;
@@ -53,6 +54,7 @@ export interface WidgetPrayerData {
   hijriDate: string;
   hijriDay: number;
   hijriMonth: string;
+  hijriMonthEn: string;
   hijriYear: number;
   gregorianDate: string;
   location: string;
@@ -65,7 +67,9 @@ export interface WidgetAzkarData {
     text: string;
     translation?: string;
     count: number;
+    timesLabel?: string;
     category: string;
+    categoryName?: string;
     benefit?: string;
   };
   morningCompleted: boolean;
@@ -88,6 +92,7 @@ export interface DhikrWidgetData {
   arabic: string;
   translation?: string;
   count: number;
+  timesLabel?: string;
   category: string;
   categoryName: string;
   benefit?: string;
@@ -148,6 +153,7 @@ export interface SharedWidgetData {
   dhikr: DhikrWidgetData;
   prayerCompletion: PrayerCompletionData;
   settings: WidgetSettings;
+  language?: string;
 }
 
 // ========================================
@@ -234,7 +240,7 @@ export const preparePrayerWidgetData = async (
   language: string = 'ar'
 ): Promise<WidgetPrayerData> => {
   const now = new Date();
-  const hijri = getHijriDateObject();
+  const hijri = getLocalizedHijriDate();
   
   // الصلاة القادمة
   const nextPrayerResult = prayerTimes ? getNextPrayer(prayerTimes) : null;
@@ -244,12 +250,12 @@ export const preparePrayerWidgetData = async (
   
   // أسماء الصلوات
   const prayerNames: Record<string, { en: string; ar: string }> = {
-    fajr: { en: 'Fajr', ar: 'الفجر' },
-    sunrise: { en: 'Sunrise', ar: 'الشروق' },
-    dhuhr: { en: 'Dhuhr', ar: 'الظهر' },
-    asr: { en: 'Asr', ar: 'العصر' },
-    maghrib: { en: 'Maghrib', ar: 'المغرب' },
-    isha: { en: 'Isha', ar: 'العشاء' },
+    fajr: { en: 'Fajr', ar: t('prayer.fajr') },
+    sunrise: { en: 'Sunrise', ar: t('prayer.sunrise') },
+    dhuhr: { en: 'Dhuhr', ar: t('prayer.dhuhr') },
+    asr: { en: 'Asr', ar: t('prayer.asr') },
+    maghrib: { en: 'Maghrib', ar: t('prayer.maghrib') },
+    isha: { en: 'Isha', ar: t('prayer.isha') },
   };
 
   // تحضير قائمة الصلوات
@@ -280,12 +286,14 @@ export const preparePrayerWidgetData = async (
     timeRemainingMinutes: timeRemaining 
       ? timeRemaining.hours * 60 + timeRemaining.minutes 
       : 0,
+    timeRemainingLabel: t('prayer.timeRemaining'),
     allPrayers,
-    hijriDate: hijri ? `${hijri.day} ${hijri.monthAr} ${hijri.year}` : '',
+    hijriDate: hijri ? `${hijri.day} ${hijri.monthName} ${hijri.year}` : '',
     hijriDay: hijri?.day || 1,
-    hijriMonth: hijri?.monthAr || '',
+    hijriMonth: hijri?.monthName || '',
+    hijriMonthEn: hijri?.monthName || '',
     hijriYear: hijri?.year || 1446,
-    gregorianDate: now.toLocaleDateString('ar-SA', { 
+    gregorianDate: now.toLocaleDateString(getDateLocale(), { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long' 
@@ -316,7 +324,7 @@ export const prepareAzkarWidgetData = async (
   const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
   const text = language === 'ar' ? randomZikr.arabic : (randomZikr.translations?.[lang] || randomZikr.arabic);
   const translation = language !== 'ar' ? randomZikr.translations?.['en'] : undefined;
-  const benefit = randomZikr.benefit?.[lang as 'ar' | 'en' | 'fr'] || undefined;
+  const benefit = typeof randomZikr.benefit === 'object' && randomZikr.benefit ? (randomZikr.benefit as Record<string, string>)[lang] : undefined;
 
   // حالة إكمال الأذكار (من التخزين)
   let morningCompleted = false;
@@ -336,11 +344,13 @@ export const prepareAzkarWidgetData = async (
 
   return {
     randomZikr: {
-      id: randomZikr.id,
+      id: String(randomZikr.id),
       text,
       translation,
       count: randomZikr.count,
+      timesLabel: t('azkar.times'),
       category: randomZikr.category,
+      categoryName: getDhikrCategoryName(randomZikr.category),
       benefit,
     },
     morningCompleted,
@@ -376,18 +386,21 @@ function getDailyDhikrIndex(totalAzkar: number): number {
   return ((dayOfYear + 137) % totalAzkar);
 }
 
-const DHIKR_CATEGORY_NAMES_AR: Record<string, string> = {
-  morning: 'أذكار الصباح',
-  evening: 'أذكار المساء',
-  sleep: 'أذكار النوم',
-  wakeup: 'أذكار الاستيقاظ',
-  after_prayer: 'بعد الصلاة',
-  quran_duas: 'أدعية قرآنية',
-  sunnah_duas: 'أدعية نبوية',
-  ruqya: 'رقية شرعية',
-  protection: 'أذكار الحماية',
-  misc: 'أذكار متنوعة',
-};
+function getDhikrCategoryName(category: string): string {
+  const names: Record<string, () => string> = {
+    morning: () => t('azkar.morning'),
+    evening: () => t('azkar.evening'),
+    sleep: () => t('azkar.sleep'),
+    wakeup: () => t('azkar.wakeup'),
+    after_prayer: () => t('prayer.afterPrayer'),
+    quran_duas: () => t('azkar.quranDuas'),
+    sunnah_duas: () => t('azkar.sunnahDuas'),
+    ruqya: () => t('azkar.ruqya'),
+    protection: () => t('azkar.protectionAdhkar'),
+    misc: () => t('widget.miscAzkar'),
+  };
+  return names[category]?.() || category;
+}
 
 /**
  * تحضير بيانات آية اليوم للويدجت
@@ -451,8 +464,9 @@ export const prepareDhikrWidgetData = async (
     return {
       arabic: 'سُبْحَانَ اللهِ وَبِحَمْدِهِ، سُبْحَانَ اللهِ الْعَظِيمِ',
       count: 3,
+      timesLabel: t('azkar.times'),
       category: 'misc',
-      categoryName: 'أذكار متنوعة',
+      categoryName: t('widget.miscAzkar'),
       date: todayDate,
       lastUpdated: new Date().toISOString(),
     };
@@ -472,8 +486,9 @@ export const prepareDhikrWidgetData = async (
     arabic: zikr.arabic,
     translation,
     count: zikr.count,
+    timesLabel: t('azkar.times'),
     category: zikr.category,
-    categoryName: DHIKR_CATEGORY_NAMES_AR[zikr.category] || 'أذكار',
+    categoryName: getDhikrCategoryName(zikr.category),
     benefit,
     date: todayDate,
     lastUpdated: new Date().toISOString(),
@@ -561,9 +576,10 @@ export const updateSharedData = async (
     const settings = await getWidgetSettings();
     
     const prayerData = await preparePrayerWidgetData(prayerTimes || null, location);
-    const azkarData = await prepareAzkarWidgetData('ar', settings.azkarWidget.categories);
-    const verseData = await prepareVerseWidgetData('ar');
-    const dhikrData = await prepareDhikrWidgetData('ar');
+    const lang = getLanguage();
+    const azkarData = await prepareAzkarWidgetData(lang, settings.azkarWidget.categories);
+    const verseData = await prepareVerseWidgetData(lang);
+    const dhikrData = await prepareDhikrWidgetData(lang);
     const prayerCompletion = await getPrayerCompletion();
     
     const sharedData: SharedWidgetData = {
@@ -573,6 +589,7 @@ export const updateSharedData = async (
       dhikr: dhikrData,
       prayerCompletion,
       settings,
+      language: lang,
     };
     
     // حفظ في AsyncStorage

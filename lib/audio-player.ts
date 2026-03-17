@@ -1,6 +1,6 @@
 // lib/audio-player.ts
-import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
+import { Audio } from 'expo-av';
 import { getAyahAudioUrl, saveLastPlayback, getLastPlayback, getCachedSurah } from './quran-cache';
 
 export interface PlaybackState {
@@ -33,7 +33,7 @@ class AudioPlayerManager {
   private surahAyahsCount: number = 0;
   private playingFullSurah: boolean = false;
   private surahOffsets: Map<string, number[]> = new Map();
-  private offsetPoller: number | null = null; // setInterval returns number in RN
+  private offsetPoller: number | null = null;
 
   constructor() {
     this.initAudio();
@@ -87,15 +87,25 @@ class AudioPlayerManager {
       let audioUrl: string;
       if (this.playingFullSurah) {
         const { getSurahAudioUrl } = await import('./quran-cache');
-        // Fetch timestamps + matching audio URL from QuranCDN (single request, no per-ayah loading)
+        // Check for locally downloaded file first
+        let localUri: string | null = null;
         try {
-          const { offsets, audioUrl: cdnUrl } = await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
-          // Use the CDN audio file whose timestamps we just fetched so they stay in sync
-          audioUrl = cdnUrl || getSurahAudioUrl(reciterIdentifier, surahNumber);
-          console.log('[audio-player] full surah', reciterIdentifier, surahNumber, 'offsets:', offsets.length, 'url=', audioUrl);
-        } catch (e) {
-          console.warn('[audio-player] Failed to fetch surah timestamps, falling back:', e);
-          audioUrl = getSurahAudioUrl(reciterIdentifier, surahNumber);
+          const { getLocalUri } = await import('./audio-download-manager');
+          localUri = await getLocalUri(surahNumber, reciterIdentifier);
+        } catch {}
+
+        if (localUri) {
+          audioUrl = localUri;
+          console.log('[audio-player] using offline file:', audioUrl);
+        } else {
+          try {
+            const { offsets, audioUrl: cdnUrl } = await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
+            audioUrl = cdnUrl || getSurahAudioUrl(reciterIdentifier, surahNumber);
+            console.log('[audio-player] full surah', reciterIdentifier, surahNumber, 'offsets:', offsets.length, 'url=', audioUrl);
+          } catch (e) {
+            console.warn('[audio-player] Failed to fetch surah timestamps, falling back:', e);
+            audioUrl = getSurahAudioUrl(reciterIdentifier, surahNumber);
+          }
         }
       } else {
         // compute global ayah number for single-ayah files
@@ -173,6 +183,34 @@ class AudioPlayerManager {
     }
   }
 
+  async togglePlayPause(): Promise<void> {
+    if (!this.sound) return;
+    if (this.state.isPlaying) {
+      await this.sound.pauseAsync();
+    } else {
+      await this.sound.playAsync();
+    }
+  }
+
+  async stop(): Promise<void> {
+    if (this.sound) {
+      await this.sound.stopAsync();
+      await this.sound.unloadAsync();
+      this.sound = null;
+    }
+    this.playingFullSurah = false;
+    this.stopOffsetPoller();
+    this.updateState({
+      isPlaying: false,
+      isLoading: false,
+      duration: 0,
+      position: 0,
+      currentSurah: 0,
+      currentAyah: 0,
+      playingFullSurah: false,
+    });
+  }
+
   async playNextAyah(suppressLoading: boolean = false): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
 
@@ -206,32 +244,10 @@ class AudioPlayerManager {
     }
   }
 
-  async togglePlayPause(): Promise<void> {
-    if (!this.sound) return;
-    if (this.state.isPlaying) {
-      await this.sound.pauseAsync();
-    } else {
-      await this.sound.playAsync();
-    }
-  }
-
-  async stop(): Promise<void> {
+  async seekTo(positionMillis: number): Promise<void> {
     if (this.sound) {
-      await this.sound.stopAsync();
-      await this.sound.unloadAsync();
-      this.sound = null;
+      await this.sound.setPositionAsync(positionMillis);
     }
-    this.playingFullSurah = false;
-    this.stopOffsetPoller();
-    this.updateState({
-      isPlaying: false,
-      isLoading: false,
-      duration: 0,
-      position: 0,
-      currentSurah: 0,
-      currentAyah: 0,
-      playingFullSurah: false,
-    });
   }
 
   async resumeLastPlayback(continuous: boolean = true): Promise<boolean> {
@@ -245,12 +261,6 @@ class AudioPlayerManager {
 
   getState(): PlaybackState {
     return this.state;
-  }
-
-  async seekTo(positionMillis: number): Promise<void> {
-    if (this.sound) {
-      await this.sound.setPositionAsync(positionMillis);
-    }
   }
 
   setContinuousPlay(enabled: boolean) {

@@ -18,17 +18,21 @@ import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { DynamicContent } from '../../types/admin';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t } from '@/lib/i18n';
 type ContentType = 'ayah' | 'hadith' | 'tip' | 'announcement' | 'banner';
 
-const contentTypes: { key: ContentType; label: string; icon: string; color: string }[] = [
-  { key: 'ayah', label: 'آية', icon: 'book', color: '#22C55E' },
-  { key: 'hadith', label: 'حديث', icon: 'document-text', color: '#3B82F6' },
-  { key: 'tip', label: 'نصيحة', icon: 'bulb', color: '#F59E0B' },
-  { key: 'announcement', label: 'إعلان', icon: 'megaphone', color: '#EC4899' },
-  { key: 'banner', label: 'بانر', icon: 'image', color: '#8B5CF6' },
+const getContentTypes = (): { key: ContentType; label: string; icon: string; color: string }[] => [
+  { key: 'ayah', label: t('admin.typeAyah'), icon: 'book', color: '#22C55E' },
+  { key: 'hadith', label: t('admin.typeHadith'), icon: 'document-text', color: '#3B82F6' },
+  { key: 'tip', label: t('admin.typeTip'), icon: 'bulb', color: '#F59E0B' },
+  { key: 'announcement', label: t('admin.typeAnnouncement'), icon: 'megaphone', color: '#EC4899' },
+  { key: 'banner', label: t('admin.typeBanner'), icon: 'image', color: '#8B5CF6' },
 ];
 
 export default function ContentScreen() {
+  const isRTL = useIsRTL();
+  const contentTypes = getContentTypes();
   const [content, setContent] = useState<DynamicContent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -107,7 +111,7 @@ export default function ContentScreen() {
 
   const saveContent = async () => {
     if (!formData.titleAr || !formData.contentAr) {
-      Alert.alert('خطأ', 'يرجى ملء العنوان والمحتوى بالعربية');
+      Alert.alert(t('common.error'), t('admin.contentFillRequired'));
       return;
     }
 
@@ -121,22 +125,22 @@ export default function ContentScreen() {
       }
 
       if (success) {
-        Alert.alert('تم', 'تم حفظ المحتوى بنجاح');
+        Alert.alert(t('common.done'), t('admin.contentSaved'));
         setShowModal(false);
         loadContent();
       } else {
-        Alert.alert('خطأ', 'فشل في حفظ المحتوى');
+        Alert.alert(t('common.error'), t('admin.contentSaveFailed'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.unexpectedError'));
     }
   };
 
   const deleteContent = async (id: string) => {
-    Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا المحتوى؟', [
-      { text: 'إلغاء', style: 'cancel' },
+    Alert.alert(t('admin.confirmDelete'), t('admin.contentDeleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'حذف',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           const success = await adminService.deleteDynamicContent(id);
@@ -213,7 +217,7 @@ export default function ContentScreen() {
       {/* Add Button */}
       <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
         <Ionicons name="add-circle" size={24} color={Colors.textLight} />
-        <Text style={styles.addBtnText}>إضافة محتوى جديد</Text>
+        <Text style={styles.addBtnText}>{t('admin.addContent')}</Text>
       </TouchableOpacity>
 
       {/* Content List */}
@@ -278,8 +282,8 @@ export default function ContentScreen() {
                     </View>
                   </View>
 
-                  <Text style={styles.cardTitle}>{item.titleAr}</Text>
-                  <Text style={styles.cardContent} numberOfLines={2}>
+                  <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{item.titleAr}</Text>
+                  <Text style={[styles.cardContent, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
                     {item.contentAr}
                   </Text>
 
@@ -315,10 +319,10 @@ export default function ContentScreen() {
               <Ionicons name="close" size={28} color={Colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingContent ? 'تعديل المحتوى' : 'إضافة محتوى جديد'}
+              {editingContent ? t('common.edit') : t('admin.addContent')}
             </Text>
             <TouchableOpacity onPress={saveContent}>
-              <Text style={styles.saveText}>حفظ</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -362,7 +366,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (عربي) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.titleAr}
                 onChangeText={(value) => setFormData({ ...formData, titleAr: value })}
                 placeholder="عنوان المحتوى"
@@ -373,7 +377,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.title}
                 onChangeText={(value) => setFormData({ ...formData, title: value })}
                 placeholder="Content Title"
@@ -384,7 +388,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>المحتوى (عربي) *</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.contentAr}
                 onChangeText={(value) => setFormData({ ...formData, contentAr: value })}
                 placeholder="نص المحتوى..."
@@ -397,7 +401,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>المحتوى (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.content}
                 onChangeText={(value) => setFormData({ ...formData, content: value })}
                 placeholder="Content text..."
@@ -410,7 +414,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.imageUrl}
                 onChangeText={(value) => setFormData({ ...formData, imageUrl: value })}
                 placeholder="https://..."
@@ -421,7 +425,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط خارجي (اختياري)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.linkUrl}
                 onChangeText={(value) => setFormData({ ...formData, linkUrl: value })}
                 placeholder="https://..."
@@ -432,7 +436,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>الأولوية (1-10)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={String(formData.priority)}
                 onChangeText={(value) =>
                   setFormData({ ...formData, priority: parseInt(value) || 1 })
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
@@ -569,13 +573,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
-    textAlign: 'right',
     marginBottom: Spacing.xs,
   },
   cardContent: {
     fontSize: 14,
     color: Colors.textMuted,
-    textAlign: 'right',
     lineHeight: 20,
   },
   cardFooter: {
@@ -638,7 +640,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.border,
-    textAlign: 'right',
   },
   textArea: {
     minHeight: 100,

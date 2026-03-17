@@ -3,6 +3,7 @@
 // URL Scheme: rooh-almuslim://
 
 import { Platform } from 'react-native';
+import { t } from '@/lib/i18n';
 
 // ========================================
 // Constants
@@ -98,17 +99,17 @@ export function parseDeepLink(url: string): string | null {
 export function getAddWidgetInstructions(): string {
   if (Platform.OS === 'ios') {
     return [
-      '١. اضغط مطولاً على الشاشة الرئيسية',
-      '٢. اضغط على زر (+) في الزاوية العليا',
-      '٣. ابحث عن "روح المسلم"',
-      '٤. اختر حجم الويدجت المطلوب',
-      '٥. اضغط "إضافة ويدجت"',
+      t('widgets.widgetStep1'),
+      t('widgets.widgetStep2Ios'),
+      t('widgets.widgetStep3'),
+      t('widgets.widgetStep4Ios'),
+      t('widgets.widgetStep5Ios'),
     ].join('\n');
   }
   return [
-    '١. اضغط مطولاً على الشاشة الرئيسية',
-    '٢. اختر "Widgets" أو "الأدوات"',
-    '٣. ابحث عن "روح المسلم"',
-    '٤. اسحب الويدجت إلى الشاشة',
+    t('widgets.widgetStep1'),
+    t('widgets.widgetStep2Android'),
+    t('widgets.widgetStep3'),
+    t('widgets.widgetStep4Android'),
   ].join('\n');
 }

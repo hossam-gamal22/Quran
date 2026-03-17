@@ -5,8 +5,9 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import { fetchPrayerTimesByCoords, PRAYER_NAMES_AR } from './prayer-api';
+import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
+import { t } from '@/lib/i18n';
 import { 
   NotificationSettings, 
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -30,14 +31,17 @@ const PRAYER_EMOJIS: Record<PrayerKey, string> = {
   isha: '✨',
 };
 
-const PRAYER_MESSAGES: Record<PrayerKey, string> = {
-  fajr: 'حان وقت صلاة الفجر — استيقظ على ذكر الله',
-  sunrise: 'شروق الشمس — لا تنسَ الأذكار',
-  dhuhr: 'حان وقت صلاة الظهر — أقم الصلاة لذكر الله',
-  asr: 'حان وقت صلاة العصر — حافظ على الصلوات',
-  maghrib: 'حان وقت صلاة المغرب — الصلاة خير من النوم',
-  isha: 'حان وقت صلاة العشاء — ختم يومك بالصلاة',
-};
+function getPrayerMessage(key: PrayerKey): string {
+  const messages: Record<PrayerKey, string> = {
+    fajr: t('notifications.fajrBody'),
+    sunrise: t('notifications.sunriseBody'),
+    dhuhr: t('notifications.dhuhrBody'),
+    asr: t('notifications.asrBody'),
+    maghrib: t('notifications.maghribBody'),
+    isha: t('notifications.ishaBody'),
+  };
+  return messages[key];
+}
 
 // ─── تحويل بين أسماء الصلوات والـ API ───────────────────────────────────────
 const PRAYER_KEY_TO_API: Record<PrayerKey, string> = {
@@ -47,6 +51,15 @@ const PRAYER_KEY_TO_API: Record<PrayerKey, string> = {
   asr: 'Asr',
   maghrib: 'Maghrib',
   isha: 'Isha',
+};
+
+const PRAYER_NAMES_AR: Record<PrayerKey, string> = {
+  fajr: 'الفجر',
+  sunrise: 'الشروق',
+  dhuhr: 'الظهر',
+  asr: 'العصر',
+  maghrib: 'المغرب',
+  isha: 'العشاء',
 };
 
 // مدة التنبيه المسبق بالدقائق
@@ -66,8 +79,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('prayer-times', {
-      name: 'مواقيت الصلاة',
-      description: 'إشعارات بمواقيت الصلوات الخمس',
+      name: t('notifications.prayerChannel'),
+      description: t('notifications.prayerChannelDesc'),
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#1B6B3A',
@@ -144,15 +157,15 @@ export async function schedulePrayerNotifications(
       if (!notifSettings.prayers[prayerKey]) continue;
 
       const apiKey = PRAYER_KEY_TO_API[prayerKey];
-      const timeStr = prayerData.timings[apiKey];
+      const timeStr = prayerData.timings[apiKey as keyof typeof prayerData.timings];
       if (!timeStr) continue;
 
       const triggerDate = prayerTimeToDate(timeStr, notifSettings.advanceMinutes);
       const arabicName = PRAYER_NAMES_AR[prayerKey] || prayerKey;
       const emoji = PRAYER_EMOJIS[prayerKey];
       const message = notifSettings.advanceMinutes > 0
-        ? `باقي ${notifSettings.advanceMinutes} دقيقة على ${arabicName} (${timeStr})`
-        : PRAYER_MESSAGES[prayerKey];
+        ? `${t('notificationSounds.minutesBefore').replace('{count}', String(notifSettings.advanceMinutes))} ${t(`prayer.${prayerKey}`)} (${timeStr})`
+        : getPrayerMessage(prayerKey);
 
       try {
         const id = await Notifications.scheduleNotificationAsync({

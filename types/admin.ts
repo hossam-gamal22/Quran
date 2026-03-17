@@ -11,16 +11,26 @@ export interface AppSettings {
 }
 
 // إعدادات الإعلانات
+export interface AdUnitIds {
+  android: string;
+  ios: string;
+}
+
 export interface AdSettings {
-  adsEnabled: boolean;
-  bannerAdId: string;
-  interstitialAdId: string;
-  rewardedAdId: string;
-  showBannerOnHome: boolean;
-  showBannerOnQuran: boolean;
-  showBannerOnAzkar: boolean;
-  showBannerOnPrayers: boolean;
+  enabled: boolean;
+  bannerAdId: AdUnitIds;
+  interstitialAdId: AdUnitIds;
+  appOpenAdId: AdUnitIds;
+  bannerScreens: Record<string, boolean>;
+  showAdOnAppOpen: boolean;
+  showAdOnQiblaStyleChange: boolean;
+  interstitialMode: 'pages' | 'time' | 'session';
   interstitialFrequency: number;
+  interstitialTimeInterval: number;
+  interstitialSessionLimit: number;
+  delayFirstAd: boolean;
+  firstAdDelay: number;
+  updatedAt?: string;
 }
 
 // أسعار الاشتراكات حسب البلد

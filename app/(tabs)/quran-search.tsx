@@ -17,13 +17,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/SettingsContext';
 import QuranBackgroundWrapper from '@/components/ui/QuranBackgroundWrapper';
 import {
-  SURAH_NAMES_AR, TAFSIR_EDITIONS,
+  getSurahName, TAFSIR_EDITIONS,
   fetchTafsir, searchQuran, TRANSLATION_EDITIONS,
 } from '@/lib/quran-api';
 import { addBookmark, isBookmarked } from '@/lib/storage';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SearchResult {
   number: number;
@@ -75,7 +76,8 @@ const HISTORY_KEY = '@quran_search_history';
 export default function QuranSearchScreen() {
   const router = useRouter();
   const colors = useColors();
-  const { settings, isDarkMode } = useSettings();
+  const { settings, isDarkMode, t } = useSettings();
+  const isRTL = useIsRTL();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -158,7 +160,7 @@ export default function QuranSearchScreen() {
       const { arabicText, tafsirText } = await fetchTafsir(surahNum, ayahNum, selectedEdition);
       setTafsirDetail({ surahNum, ayahNum, arabicText, tafsirText, edition: selectedEdition });
     } catch {
-      setTafsirDetail(prev => prev ? { ...prev, tafsirText: 'تعذر تحميل التفسير' } : null);
+      setTafsirDetail(prev => prev ? { ...prev, tafsirText: t('quranSearch.loadTafsirFailed') } : null);
     } finally {
       setLoadingTafsir(false);
     }
@@ -170,7 +172,7 @@ export default function QuranSearchScreen() {
     await addBookmark({
       surahNumber: result.surah.number,
       ayahNumber: result.numberInSurah,
-      surahName: SURAH_NAMES_AR[result.surah.number - 1] || result.surah.name,
+      surahName: getSurahName(result.surah.number),
       ayahText: result.text,
     });
     setBookmarkedMap(prev => ({ ...prev, [key]: true }));
@@ -184,7 +186,7 @@ export default function QuranSearchScreen() {
       const counts: Record<number, number> = {};
       results.forEach(r => { counts[r.surah.number] = (counts[r.surah.number] || 0) + 1; });
       const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-      return top ? { name: SURAH_NAMES_AR[Number(top[0]) - 1], count: top[1] } : null;
+      return top ? { name: getSurahName(Number(top[0])), count: top[1] } : null;
     })(),
   } : null;
 
@@ -217,15 +219,15 @@ export default function QuranSearchScreen() {
       color: colors.text,
       textAlign: 'center',
     },
-    title: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: 'right', marginBottom: 12 },
+    title: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 12 },
     // Search row
     searchRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
     inputWrap: {
-      flex: 1, flexDirection: 'row', alignItems: 'center',
+      flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4,
       backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1.5,
       borderColor: hasSearched ? colors.primary : colors.border, paddingHorizontal: 12,
     },
-    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: 'right' },
+    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left' },
     clearBtn: { padding: 4 },
     searchBtn: {
       backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 16,
@@ -237,7 +239,7 @@ export default function QuranSearchScreen() {
     controlChip: {
       paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
       backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-      flexDirection: 'row', alignItems: 'center', gap: 4,
+      flexDirection: 'row', alignItems: 'center', gap: 8,
     },
     controlChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     controlChipText: { fontSize: 12, fontWeight: '700', color: colors.textLight },
@@ -265,7 +267,7 @@ export default function QuranSearchScreen() {
     statLabel: { fontSize: 11, color: colors.textLight },
     // Result count
     resultCount: {
-      fontSize: 13, color: colors.textLight, textAlign: 'right',
+      fontSize: 13, color: colors.textLight, textAlign: isRTL ? 'right' : 'left',
       paddingHorizontal: 16, paddingVertical: 6,
     },
     // Result card
@@ -294,7 +296,7 @@ export default function QuranSearchScreen() {
       fontSize: searchLang === 'ar' ? 18 : 14,
       paddingHorizontal: 14, paddingBottom: 10,
       lineHeight: searchLang === 'ar' ? 34 : 22,
-      textAlign: 'right',
+      textAlign: isRTL ? 'right' : 'left',
     },
     // Actions
     resultActions: {
@@ -302,13 +304,13 @@ export default function QuranSearchScreen() {
     },
     resultActionBtn: {
       flex: 1, paddingVertical: 9, alignItems: 'center',
-      flexDirection: 'row', justifyContent: 'center', gap: 5,
+      flexDirection: 'row', justifyContent: 'center', gap: 8,
     },
     resultActionText: { fontSize: 12, fontWeight: '600', color: colors.primary },
     actionDivider: { width: 0.5, backgroundColor: colors.border },
     // History
     historyWrap: { paddingHorizontal: 16, paddingTop: 12 },
-    historyTitle: { fontSize: 14, fontWeight: '700', color: colors.textLight, textAlign: 'right', marginBottom: 8 },
+    historyTitle: { fontSize: 14, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', marginBottom: 8 },
     historyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     historyChip: {
       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
@@ -328,13 +330,13 @@ export default function QuranSearchScreen() {
     },
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.text },
     closeBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface },
-    modalContent: { padding: 20 },
-    ayahRef: { fontSize: 14, color: colors.primary, textAlign: 'right', fontWeight: '700', marginBottom: 10 },
+    modalContent: { padding: 20, paddingBottom: 60 },
+    ayahRef: { fontSize: 14, color: colors.primary, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
       backgroundColor: colors.surface, borderRadius: 14, padding: 16,
       borderWidth: 1, borderColor: colors.border, marginBottom: 16,
     },
-    arabicTextLarge: { fontSize: 22, color: colors.text, textAlign: 'right', lineHeight: 42 },
+    arabicTextLarge: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
@@ -343,8 +345,8 @@ export default function QuranSearchScreen() {
     editionTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     editionTabText: { fontSize: 12, fontWeight: '700', color: colors.textLight },
     editionTabTextActive: { color: '#fff' },
-    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: 'right', marginBottom: 10 },
-    tafsirText: { fontSize: 16, color: colors.text, textAlign: 'right', lineHeight: 32 },
+    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
+    tafsirText: { fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
     // Surah filter modal
     surahModalWrap: { flex: 1, backgroundColor: colors.background },
     surahModalHeader: {
@@ -353,18 +355,18 @@ export default function QuranSearchScreen() {
     },
     surahItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-      borderBottomWidth: 0.5, borderBottomColor: colors.border,
+      borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 8,
     },
     surahNum: {
       width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15',
-      justifyContent: 'center', alignItems: 'center', marginLeft: 12,
+      justifyContent: 'center', alignItems: 'center',
     },
     surahNumText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-    surahItemName: { flex: 1, fontSize: 16, color: colors.text, textAlign: 'right', fontWeight: '600' },
+    surahItemName: { flex: 1, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' },
   });
 
   const renderResult = useCallback(({ item, index }: { item: SearchResult; index: number }) => {
-    const surahName = SURAH_NAMES_AR[item.surah.number] || item.surah.name;
+    const surahName = getSurahName(item.surah.number);
     const key = `${item.surah.number}_${item.numberInSurah}`;
     const isBookmarkedItem = bookmarkedMap[key];
 
@@ -390,7 +392,7 @@ export default function QuranSearchScreen() {
           </TouchableOpacity>
           <View style={s.flex1} />
           <View style={s.juzBadge}>
-            <Text style={s.juzText}>ج{item.juz}</Text>
+            <Text style={s.juzText}>{t('quranSearch.juzLabel')}{item.juz}</Text>
           </View>
           <View style={s.surahBadge}>
             <Text style={s.surahBadgeText}>{surahName} ({item.surah.number}:{item.numberInSurah})</Text>
@@ -414,7 +416,7 @@ export default function QuranSearchScreen() {
             onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
           >
             <IconSymbol name="book" size={14} color={colors.primary} />
-            <Text style={s.resultActionText}>التفسير</Text>
+            <Text style={s.resultActionText}>{t('quranSearch.tafsir')}</Text>
           </TouchableOpacity>
           <View style={s.actionDivider} />
           <TouchableOpacity
@@ -428,7 +430,7 @@ export default function QuranSearchScreen() {
               color={isBookmarkedItem ? '#F59E0B' : colors.primary}
             />
             <Text style={[s.resultActionText, isBookmarkedItem && { color: '#F59E0B' }]}>
-              {isBookmarkedItem ? 'محفوظة' : 'حفظ'}
+              {isBookmarkedItem ? t('quranSearch.saved') : t('quranSearch.saveBtn')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -444,12 +446,12 @@ export default function QuranSearchScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>
-          <View style={s.headerTopBar}>
+          <View style={[s.headerTopBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={s.headerTopBtn} onPress={() => router.back()}>
               <IconSymbol name="chevron.right" size={17} color={colors.text} />
             </TouchableOpacity>
 
-            <Text style={s.headerTitle}>البحث في القرآن</Text>
+            <Text style={s.headerTitle}>{t('quranSearch.title')}</Text>
 
             <TouchableOpacity style={s.headerTopBtn} onPress={() => setShowStats((v) => !v)}>
               <IconSymbol name="chart.bar" size={17} color={colors.text} />
@@ -457,7 +459,7 @@ export default function QuranSearchScreen() {
           </View>
 
           {/* Search Row */}
-          <View style={s.searchRow}>
+          <View style={[s.searchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.inputWrap}>
               {query.length > 0 && (
                 <TouchableOpacity style={s.clearBtn} onPress={() => { setQuery(''); setResults([]); setHasSearched(false); }}>
@@ -467,7 +469,7 @@ export default function QuranSearchScreen() {
               <TextInput
                 ref={inputRef}
                 style={s.input}
-                placeholder={searchLang === 'ar' ? 'ابحث بالعربية...' : 'Search in English...'}
+                placeholder={searchLang === 'ar' ? t('quranSearch.placeholder') : t('quranSearch.englishPlaceholder')}
                 placeholderTextColor={colors.textLight}
                 value={query}
                 onChangeText={setQuery}
@@ -475,12 +477,12 @@ export default function QuranSearchScreen() {
                 onSubmitEditing={() => handleSearch()}
                 autoCorrect={false}
               />
-              <IconSymbol name="magnifyingglass" size={16} color={colors.textLight} style={{ marginRight: 4 }} />
+              <IconSymbol name="magnifyingglass" size={16} color={colors.textLight} />
             </View>
             <TouchableOpacity style={s.searchBtn} onPress={() => handleSearch()} disabled={loading}>
               {loading
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={s.searchBtnText}>بحث</Text>
+                : <Text style={s.searchBtnText}>{t('quranSearch.searchBtn')}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -492,13 +494,13 @@ export default function QuranSearchScreen() {
               style={[s.controlChip, searchLang === 'ar' && s.controlChipActive]}
               onPress={() => setSearchLang('ar')}
             >
-              <Text style={[s.controlChipText, searchLang === 'ar' && s.controlChipTextActive]}>🇸🇦 عربي</Text>
+              <Text style={[s.controlChipText, searchLang === 'ar' && s.controlChipTextActive]}>{t('quranSearch.arabicLang')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.controlChip, searchLang === 'en' && s.controlChipActive]}
               onPress={() => setSearchLang('en')}
             >
-              <Text style={[s.controlChipText, searchLang === 'en' && s.controlChipTextActive]}>🇬🇧 English</Text>
+              <Text style={[s.controlChipText, searchLang === 'en' && s.controlChipTextActive]}>English</Text>
             </TouchableOpacity>
 
             {/* Surah filter */}
@@ -508,7 +510,7 @@ export default function QuranSearchScreen() {
             >
               <IconSymbol name="line.3.horizontal.decrease" size={12} color={surahFilter !== null ? '#fff' : colors.textLight} />
               <Text style={[s.controlChipText, surahFilter !== null && s.controlChipTextActive]}>
-                {surahFilter ? SURAH_NAMES_AR[surahFilter] : 'كل السور'}
+                {surahFilter ? getSurahName(surahFilter) : t('quranSearch.allSurahs')}
               </Text>
             </TouchableOpacity>
 
@@ -518,7 +520,7 @@ export default function QuranSearchScreen() {
                 style={[s.controlChip, showStats && s.controlChipActive]}
                 onPress={() => setShowStats(v => !v)}
               >
-                <Text style={[s.controlChipText, showStats && s.controlChipTextActive]}>📊 إحصاء</Text>
+                <Text style={[s.controlChipText, showStats && s.controlChipTextActive]}>{t('quranSearch.stats')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -530,11 +532,11 @@ export default function QuranSearchScreen() {
             <TouchableOpacity style={s.filterClearBtn} onPress={() => setSurahFilter(null)}>
               <IconSymbol name="xmark.circle.fill" size={16} color={colors.textLight} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 12, color: colors.textLight, flex: 1, textAlign: 'right' }}>
-              فلتر نشط:
+            <Text style={{ fontSize: 12, color: colors.textLight, flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+              {t('quranSearch.activeFilter')}
             </Text>
             <View style={s.filterChip}>
-              <Text style={s.filterChipText}>📖 {SURAH_NAMES_AR[surahFilter]}</Text>
+              <Text style={s.filterChipText}>{getSurahName(surahFilter)}</Text>
             </View>
           </View>
         )}
@@ -544,15 +546,15 @@ export default function QuranSearchScreen() {
           <View style={s.statsBar}>
             <View style={s.statItem}>
               <Text style={s.statNum}>{resultCount}</Text>
-              <Text style={s.statLabel}> نتيجة</Text>
+              <Text style={s.statLabel}> {t('quranSearch.resultLabel')}</Text>
             </View>
             <View style={s.statItem}>
               <Text style={s.statNum}>{statsData.uniqueSurahs}</Text>
-              <Text style={s.statLabel}> سورة</Text>
+              <Text style={s.statLabel}> {t('quranSearch.surahLabel')}</Text>
             </View>
             <View style={s.statItem}>
               <Text style={s.statNum}>{statsData.uniqueJuz}</Text>
-              <Text style={s.statLabel}> جزء</Text>
+              <Text style={s.statLabel}> {t('quranSearch.juzStatLabel')}</Text>
             </View>
             {statsData.topSurah && (
               <View style={s.statItem}>
@@ -567,8 +569,8 @@ export default function QuranSearchScreen() {
         {hasSearched && !loading && (
           <Text style={s.resultCount}>
             {resultCount > 0
-              ? `${resultCount} نتيجة ${surahFilter ? `في ${SURAH_NAMES_AR[surahFilter]}` : 'في القرآن الكريم'}`
-              : 'لا توجد نتائج — جرّب كلمات مختلفة'
+              ? `${resultCount} ${t('quranSearch.resultLabel')} ${t('quranSearch.inQuran')}`
+              : t('quranSearch.noResultsMsg')
             }
           </Text>
         )}
@@ -577,7 +579,7 @@ export default function QuranSearchScreen() {
         {loading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ color: colors.textLight, marginTop: 12, fontSize: 14 }}>جاري البحث...</Text>
+            <Text style={{ color: colors.textLight, marginTop: 12, fontSize: 14 }}>{t('quranSearch.searching')}</Text>
           </View>
         ) : (
           <FlatList
@@ -592,11 +594,11 @@ export default function QuranSearchScreen() {
                   {/* Search History */}
                   {searchHistory.length > 0 && (
                     <>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <TouchableOpacity onPress={clearHistory}>
-                          <Text style={{ fontSize: 12, color: colors.textLight }}>مسح</Text>
+                          <Text style={{ fontSize: 12, color: colors.textLight }}>{t('quranSearch.clearHistory')}</Text>
                         </TouchableOpacity>
-                        <Text style={s.historyTitle}>🕐 عمليات البحث الأخيرة</Text>
+                        <Text style={s.historyTitle}>{t('quranSearch.recentSearches')}</Text>
                       </View>
                       <View style={s.historyRow}>
                         {searchHistory.map((h, i) => (
@@ -612,25 +614,25 @@ export default function QuranSearchScreen() {
                     </>
                   )}
                   {/* Suggestions */}
-                  <Text style={[s.historyTitle, { marginTop: 20 }]}>💡 جرّب البحث عن</Text>
+                  <Text style={[s.historyTitle, { marginTop: 20 }]}>{t('quranSearch.searchSuggestions')}</Text>
                   <View style={s.historyRow}>
-                    {['الصبر', 'الرحمة', 'التوبة', 'mercy', 'paradise', 'prayer'].map((s_) => (
+                    {(isRTL ? ['الصبر', 'الرحمة', 'التوبة', 'mercy', 'paradise', 'prayer'] : ['patience', 'mercy', 'repentance', 'paradise', 'prayer', 'forgiveness']).map((s_) => (
                       <TouchableOpacity key={s_} style={s.historyChip} onPress={() => { setQuery(s_); setSearchLang(s_.match(/[a-z]/i) ? 'en' : 'ar'); handleSearch(s_); }}>
                         <Text style={s.historyChipText}>{s_}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                   <View style={[s.emptyWrap, { paddingTop: 40 }]}>
-                    <Text style={s.emptyEmoji}>🔍</Text>
-                    <Text style={s.emptyTitle}>ابحث في القرآن الكريم</Text>
-                    <Text style={s.emptyText}>ابحث بالكلمة أو العبارة بالعربية أو الإنجليزية</Text>
+                    <Text style={s.emptyEmoji}></Text>
+                    <Text style={s.emptyTitle}>{t('quranSearch.emptyTitle')}</Text>
+                    <Text style={s.emptyText}>{t('quranSearch.emptyHint')}</Text>
                   </View>
                 </View>
               ) : (
                 <View style={s.emptyWrap}>
-                  <Text style={s.emptyEmoji}>🤔</Text>
-                  <Text style={s.emptyTitle}>لا توجد نتائج</Text>
-                  <Text style={s.emptyText}>جرّب كلمات مختلفة أو غيّر لغة البحث</Text>
+                  <Text style={s.emptyEmoji}></Text>
+                  <Text style={s.emptyTitle}>{t('quranSearch.noResultsTitle')}</Text>
+                  <Text style={s.emptyText}>{t('quranSearch.noResultsHint')}</Text>
                 </View>
               )
             }
@@ -645,11 +647,11 @@ export default function QuranSearchScreen() {
         onRequestClose={() => setTafsirDetail(null)}
       >
         <View style={s.modalWrap}>
-          <View style={s.modalHeader}>
+          <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={s.closeBtn} onPress={() => setTafsirDetail(null)}>
               <IconSymbol name="xmark" size={18} color={colors.text} />
             </TouchableOpacity>
-            <Text style={s.modalTitle}>التفسير</Text>
+            <Text style={s.modalTitle}>{t('quranSearch.tafsir')}</Text>
             <View style={{ width: 36 }} />
           </View>
 
@@ -658,7 +660,7 @@ export default function QuranSearchScreen() {
           ) : tafsirDetail && (
             <ScrollView style={s.modalContent} showsVerticalScrollIndicator={false}>
               <Text style={s.ayahRef}>
-                {SURAH_NAMES_AR[tafsirDetail.surahNum - 1]} • آية {tafsirDetail.ayahNum}
+                {getSurahName(tafsirDetail.surahNum)} • {t('quran.ayah')} {tafsirDetail.ayahNum}
               </Text>
 
               {tafsirDetail.arabicText ? (
@@ -690,8 +692,8 @@ export default function QuranSearchScreen() {
                 ))}
               </View>
 
-              <Text style={s.tafsirTitle}>📖 {tafsirEditionName}</Text>
-              <Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>
+              <Text style={s.tafsirTitle}>{tafsirEditionName}</Text>
+              <Text style={s.tafsirText}>{tafsirDetail.tafsirText || t('quranSearch.noTafsirAvailable')}</Text>
               <View style={{ height: 60 }} />
             </ScrollView>
           )}
@@ -705,17 +707,17 @@ export default function QuranSearchScreen() {
         onRequestClose={() => setShowSurahFilter(false)}
       >
         <View style={s.surahModalWrap}>
-          <View style={s.surahModalHeader}>
+          <View style={[s.surahModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity onPress={() => setShowSurahFilter(false)}>
               <IconSymbol name="xmark" size={20} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[s.modalTitle, { flex: 1 }]}>اختر السورة للفلترة</Text>
+            <Text style={[s.modalTitle, { flex: 1 }]}>{t('quranSearch.chooseSurahFilter')}</Text>
           </View>
           <TouchableOpacity
-            style={[s.surahItem, { backgroundColor: surahFilter === null ? colors.primary + '12' : 'transparent' }]}
+            style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === null && { backgroundColor: colors.primary + '12' }]}
             onPress={() => { setSurahFilter(null); setShowSurahFilter(false); }}
           >
-            <Text style={[s.surahItemName, surahFilter === null && { color: colors.primary }]}>كل السور</Text>
+            <Text style={[s.surahItemName, surahFilter === null && { color: colors.primary }]}>{t('quranSearch.allSurahs')}</Text>
             {surahFilter === null && <IconSymbol name="checkmark" size={16} color={colors.primary} />}
           </TouchableOpacity>
           <FlatList
@@ -723,12 +725,12 @@ export default function QuranSearchScreen() {
             keyExtractor={n => n.toString()}
             renderItem={({ item: n }) => (
               <TouchableOpacity
-                style={[s.surahItem, surahFilter === n && { backgroundColor: colors.primary + '12' }]}
+                style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === n && { backgroundColor: colors.primary + '12' }]}
                 onPress={() => { setSurahFilter(n); setShowSurahFilter(false); }}
               >
-                {surahFilter === n && <IconSymbol name="checkmark" size={16} color={colors.primary} style={{ marginLeft: 8 }} />}
+                {surahFilter === n && <IconSymbol name="checkmark" size={16} color={colors.primary} />}
                 <Text style={[s.surahItemName, surahFilter === n && { color: colors.primary }]}>
-                  {SURAH_NAMES_AR[n - 1]}
+                  {getSurahName(n)}
                 </Text>
                 <View style={s.surahNum}><Text style={s.surahNumText}>{n}</Text></View>
               </TouchableOpacity>

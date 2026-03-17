@@ -2,7 +2,7 @@
 // Centralized sound file management — handles bundled, cached, and remote sounds
 
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
@@ -22,25 +22,51 @@ export const SOUND_CATEGORIES = {
 } as const;
 
 // ─── Bundled Sound Mappings ──────────────────────────────────────────────────
-// Uncomment entries as actual .mp3 files are added to the corresponding folders
 
 export const NOTIFICATION_SOUNDS: Record<string, number> = {
-  // salawat: require('@/assets/sounds/notifications/salawat.mp3'),
-  // istighfar: require('@/assets/sounds/notifications/istighfar.mp3'),
-  // subhanallah: require('@/assets/sounds/notifications/subhanallah.mp3'),
+  salawat: require('@/assets/sounds/notifications/salawat.mp3'),
+  istighfar: require('@/assets/sounds/notifications/istighfar.mp3'),
+  tasbih: require('@/assets/sounds/notifications/tasbih.mp3'),
+  alhamdulillah: require('@/assets/sounds/notifications/alhamdulillah.mp3'),
+  subhanallah: require('@/assets/sounds/notifications/subhanallah.mp3'),
+  morning_adhkar: require('@/assets/sounds/notifications/morning_adhkar.mp3'),
+  evening_adhkar: require('@/assets/sounds/notifications/evening_adhkar.mp3'),
+  general_reminder: require('@/assets/sounds/notifications/general_reminder.mp3'),
 };
 
 export const ADHAN_SOUNDS: Record<string, number> = {
-  // makkah: require('@/assets/sounds/adhan/makkah.mp3'),
-  // madinah: require('@/assets/sounds/adhan/madinah.mp3'),
-  // alaqsa: require('@/assets/sounds/adhan/alaqsa.mp3'),
-  // mishary: require('@/assets/sounds/adhan/mishary.mp3'),
-  // abdulBasit: require('@/assets/sounds/adhan/abdul-basit.mp3'),
+  makkah: require('@/assets/sounds/adhan/makkah.mp3'),
+  madinah: require('@/assets/sounds/adhan/madinah.mp3'),
+  alaqsa: require('@/assets/sounds/adhan/alaqsa.mp3'),
+  mishary: require('@/assets/sounds/adhan/mishary.mp3'),
+  abdulbasit: require('@/assets/sounds/adhan/abdulbasit.mp3'),
+  sudais: require('@/assets/sounds/adhan/sudais.mp3'),
+  egypt: require('@/assets/sounds/adhan/egypt.mp3'),
+  dosari: require('@/assets/sounds/adhan/dosari.mp3'),
+  ajman: require('@/assets/sounds/adhan/ajman.mp3'),
+  ali_mulla: require('@/assets/sounds/adhan/ali_mulla.mp3'),
+  naqshbandi: require('@/assets/sounds/adhan/naqshbandi.mp3'),
+  sharif: require('@/assets/sounds/adhan/sharif.mp3'),
+  mansoor_zahrani: require('@/assets/sounds/adhan/mansoor_zahrani.mp3'),
+  haramain: require('@/assets/sounds/adhan/haramain.mp3'),
+  silent: require('@/assets/sounds/adhan/silent.mp3'),
 };
 
 export const EFFECT_SOUNDS: Record<string, number> = {
-  // tap: require('@/assets/sounds/effects/tap.mp3'),
-  // complete: require('@/assets/sounds/effects/complete.mp3'),
+  button_click: require('@/assets/sounds/effects/button_click.mp3'),
+  success: require('@/assets/sounds/effects/success.mp3'),
+  page_turn: require('@/assets/sounds/effects/page_turn.mp3'),
+  tasbih_click: require('@/assets/sounds/effects/tasbih_click.mp3'),
+  prayer_complete: require('@/assets/sounds/effects/prayer_complete.mp3'),
+  quran_open: require('@/assets/sounds/effects/quran_open.mp3'),
+};
+
+export const ADHKAR_SOUNDS: Record<string, number> = {
+  morning_full: require('@/assets/sounds/adhkar/morning_full.mp3'),
+  evening_full: require('@/assets/sounds/adhkar/evening_full.mp3'),
+  sleep_full: require('@/assets/sounds/adhkar/sleep_full.mp3'),
+  wakeup_full: require('@/assets/sounds/adhkar/wakeup_full.mp3'),
+  after_prayer_full: require('@/assets/sounds/adhkar/after_prayer_full.mp3'),
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────

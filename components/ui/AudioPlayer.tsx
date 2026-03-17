@@ -11,6 +11,8 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 interface AudioPlayerProps {
   audioUrl?: string;
@@ -22,9 +24,10 @@ interface AudioPlayerProps {
 const AudioPlayer: React.FC<AudioPlayerProps> = ({
   audioUrl,
   title,
-  reciterName = 'الشيخ',
+  reciterName = t('quran.reciterLabel'),
   onError,
 }) => {
+  const isRTL = useIsRTL();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -42,7 +45,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   const loadAudio = async () => {
     if (!audioUrl) {
-      onError?.('لا توجد ملف صوتي');
+      onError?.(t('common.noAudioFile'));
       return;
     }
 
@@ -124,9 +127,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <MaterialCommunityIcons name="music" size={20} color={Colors.primary} />
-        <View style={styles.headerText}>
+        <View style={[styles.headerText]}>
           <Text style={styles.title} numberOfLines={1}>
             {title}
           </Text>
@@ -148,7 +151,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         />
       </View>
 
-      <View style={styles.controls}>
+      <View style={[styles.controls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <Text style={styles.time}>{formatTime(position)}</Text>
 
         <TouchableOpacity
@@ -184,10 +187,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.md,
+    gap: 12,
   },
   headerText: {
     flex: 1,
-    marginLeft: Spacing.md,
   },
   title: {
     fontSize: 14,

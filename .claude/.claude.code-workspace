@@ -1,0 +1,193 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../.expo"
+		},
+		{
+			"path": "../.vscode"
+		},
+		{
+			"path": "agents"
+		},
+		{
+			"path": "../admin-panel"
+		},
+		{
+			"path": "../admin-panel/node_modules"
+		},
+		{
+			"path": "../admin-panel/public"
+		},
+		{
+			"path": "../admin-panel/src"
+		},
+		{
+			"path": "../admin-panel/src/assets"
+		},
+		{
+			"path": "../admin-panel/src/components"
+		},
+		{
+			"path": "../admin-panel/src/pages"
+		},
+		{
+			"path": "../admin-panel/src/services"
+		},
+		{
+			"path": "../admin-panel/src/types"
+		},
+		{
+			"path": "../android"
+		},
+		{
+			"path": "../app/(tabs)"
+		},
+		{
+			"path": "../app/admin"
+		},
+		{
+			"path": "../app/azkar"
+		},
+		{
+			"path": "../app"
+		},
+		{
+			"path": "../app/dev"
+		},
+		{
+			"path": "../app/khatma"
+		},
+		{
+			"path": "../app/oauth"
+		},
+		{
+			"path": "../app/onboarding"
+		},
+		{
+			"path": "../app/seasonal"
+		},
+		{
+			"path": "../app/settings"
+		},
+		{
+			"path": "../app/surah"
+		},
+		{
+			"path": "../app/tafsir"
+		},
+		{
+			"path": "../app/worship-tracker"
+		},
+		{
+			"path": "../assets"
+		},
+		{
+			"path": "../assets/design"
+		},
+		{
+			"path": "../assets/fonts"
+		},
+		{
+			"path": "../assets/images"
+		},
+		{
+			"path": "../assets/sounds"
+		},
+		{
+			"path": "../assets/stories"
+		},
+		{
+			"path": "../components"
+		},
+		{
+			"path": "../components/ads"
+		},
+		{
+			"path": "../components/prayer-clock"
+		},
+		{
+			"path": "../components/qibla"
+		},
+		{
+			"path": "../components/quran"
+		},
+		{
+			"path": "../components/ui"
+		},
+		{
+			"path": "../components/ui/prayer"
+		},
+		{
+			"path": "../config"
+		},
+		{
+			"path": "../constants"
+		},
+		{
+			"path": "../contexts"
+		},
+		{
+			"path": "../data"
+		},
+		{
+			"path": "../data/json"
+		},
+		{
+			"path": "../design/mockups/prayer-clock"
+		},
+		{
+			"path": "../dist"
+		},
+		{
+			"path": "../drizzle"
+		},
+		{
+			"path": "../hooks"
+		},
+		{
+			"path": "../ios"
+		},
+		{
+			"path": "../lib"
+		},
+		{
+			"path": "../lib/_core"
+		},
+		{
+			"path": "../lib/api"
+		},
+		{
+			"path": "../lib/sdui"
+		},
+		{
+			"path": "../node_modules"
+		},
+		{
+			"path": "../res"
+		},
+		{
+			"path": "../scripts"
+		},
+		{
+			"path": "../server"
+		},
+		{
+			"path": "../services"
+		},
+		{
+			"path": "../shared"
+		},
+		{
+			"path": "../tests"
+		},
+		{
+			"path": "../types"
+		},
+		{
+			"path": "../widgets"
+		}
+	]
+}

@@ -15,6 +15,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -29,11 +30,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useQuran } from '../../contexts/QuranContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useAppConfig } from '@/lib/app-config-context';
 import { useColors } from '../../hooks/use-colors';
 import { getLastRead } from '../../lib/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import SegmentedControl from '@react-native-segmented-control/segmented-control';
+
 import { NativeTabs } from '../../components/ui/NativeTabs';
 import {
   GlassCard,
@@ -42,13 +44,20 @@ import {
 import { getColoredBookmarks } from '../../lib/quran-bookmarks';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { getFirstSurahOnPage } from '../../lib/qcf-page-data';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import {
+  downloadSurah,
+  isDownloading,
+  getDownloadedForReciter,
+  deleteDownload,
+} from '@/lib/audio-download-manager';
 
 // Background images
 const QURAN_BG_IMAGES: Record<string, any> = {
-  quranbg1: require('@/assets/images/quranbg1.png'),
-  quranbg2: require('@/assets/images/quranbg2.png'),
-  quranbg3: require('@/assets/images/quranbg3.png'),
-  quranbg4: require('@/assets/images/quranbg4.png'),
+  quranbg1: require('@/assets/images/quran/quranbg1.png'),
+  quranbg2: require('@/assets/images/quran/quranbg2.png'),
+  quranbg3: require('@/assets/images/quran/quranbg3.png'),
+  quranbg4: require('@/assets/images/quran/quranbg4.png'),
 };
 import {
   Spacing,
@@ -103,19 +112,15 @@ const JUZ_DATA: JuzInfo[] = JUZ_PAGE_STARTS.map((startPage, i) => ({
   endPage: i < 29 ? JUZ_PAGE_STARTS[i + 1] - 1 : 604,
 }));
 
-// تحويل الأرقام للعربية
-const toArabicNumber = (num: number | undefined | null): string => {
+// تحويل الأرقام حسب اللغة
+const toLocalizedNumber = (num: number | undefined | null, _isArabicLang: boolean): string => {
   if (num == null) return '';
-  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return String(num)
-    .split('')
-    .map((d) => arabicNumerals[parseInt(d)] || d)
-    .join('');
+  return String(num);
 };
 
 // أنواع السور
-const getRevelationType = (type: string): string => {
-  return type === 'Meccan' ? 'مكية' : 'مدنية';
+const getRevelationType = (type: string, t: (key: string) => string): string => {
+  return type === 'Meccan' ? t('quran.meccan') : t('quran.medinan');
 };
 
 interface Surah {
@@ -220,9 +225,11 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
 export default function QuranScreen() {
   const router = useRouter();
 
-  const { isDarkMode, settings, updateDisplay, updateNotifications, isRTL } = useSettings();
+  const { isDarkMode, settings, updateDisplay, updateNotifications, t } = useSettings();
   const { config } = useAppConfig();
   const colors = useColors();
+  const isRTL = useIsRTL();
+  const isArabic = settings.language === 'ar';
   const isLightBg = !isDarkMode;
 
   const {
@@ -246,16 +253,24 @@ export default function QuranScreen() {
 
   const [activeTab, setActiveTab] = useState<'surahs' | 'juz' | 'listen'>('surahs');
 
+  // Download state for listen tab
+  const [downloadedSet, setDownloadedSet] = useState<Set<number>>(new Set());
+  const [downloadingSet, setDownloadingSet] = useState<Set<number>>(new Set());
+  const [failedSet, setFailedSet] = useState<Set<number>>(new Set());
+  const [progressMap, setProgressMap] = useState<Map<number, number>>(new Map());
+
   const quranSegments = useMemo(() => {
     const defaults = {
-      surahs: { label: 'السور', icon: 'book-open-variant' },
-      juz: { label: 'الأجزاء', icon: 'bookshelf' },
-      listen: { label: 'استماع', icon: 'headphones' },
+      surahs: { label: t('quran.surahs'), icon: 'book-open-variant' },
+      juz: { label: t('quran.juz'), icon: 'bookshelf' },
+      listen: { label: t('quran.listen'), icon: 'headphones' },
     };
 
     const byKey = new Map((config.uiCustomization?.quranSegments || []).map((item) => [item.key, item]));
 
-    return (['listen', 'juz', 'surahs'] as const).map((key) => {
+    return (['surahs', 'juz', 'listen'] as const)
+      .filter((key) => key !== 'listen' || settings.language === 'ar')
+      .map((key) => {
       const item = byKey.get(key);
       const label = settings.language === 'ar'
         ? (item?.labelAr || defaults[key].label)
@@ -281,6 +296,13 @@ export default function QuranScreen() {
   const quranSegmentKeys = useMemo(() => quranSegments.map((segment) => segment.key as 'surahs' | 'juz' | 'listen'), [quranSegments]);
   const quranSegmentLabels = useMemo(() => quranSegments.map((segment) => segment.label), [quranSegments]);
   const quranSelectedIndex = Math.max(0, quranSegmentKeys.indexOf(activeTab));
+
+  // Reset to surahs if current tab is no longer available (e.g. listen tab hidden for non-Arabic)
+  React.useEffect(() => {
+    if (!quranSegmentKeys.includes(activeTab)) {
+      setActiveTab('surahs');
+    }
+  }, [quranSegmentKeys, activeTab]);
 
   useFocusEffect(useCallback(() => {
     let mounted = true;
@@ -314,6 +336,67 @@ export default function QuranScreen() {
     };
   }, []));
 
+  // Load downloaded surahs for current reciter
+  useFocusEffect(useCallback(() => {
+    if (activeTab !== 'listen') return;
+    let mounted = true;
+    const loadDownloaded = async () => {
+      try {
+        const downloaded = await getDownloadedForReciter(currentReciter);
+        if (mounted) {
+          setDownloadedSet(new Set(downloaded.map(d => d.surahNumber)));
+        }
+      } catch {}
+    };
+    loadDownloaded();
+    return () => { mounted = false; };
+  }, [activeTab, currentReciter]));
+
+  // Download handler
+  const handleDownloadSurah = useCallback(async (surahNumber: number) => {
+    if (downloadingSet.has(surahNumber) || downloadedSet.has(surahNumber)) return;
+    // Clear previous failure
+    setFailedSet(prev => {
+      const next = new Set(prev);
+      next.delete(surahNumber);
+      return next;
+    });
+    setProgressMap(prev => { const m = new Map(prev); m.set(surahNumber, 0); return m; });
+    setDownloadingSet(prev => new Set(prev).add(surahNumber));
+    try {
+      await downloadSurah(surahNumber, currentReciter, (pct) => {
+        setProgressMap(prev => { const m = new Map(prev); m.set(surahNumber, pct); return m; });
+      });
+      setDownloadedSet(prev => new Set(prev).add(surahNumber));
+    } catch (e: any) {
+      setFailedSet(prev => new Set(prev).add(surahNumber));
+    } finally {
+      setDownloadingSet(prev => {
+        const next = new Set(prev);
+        next.delete(surahNumber);
+        return next;
+      });
+      setProgressMap(prev => { const m = new Map(prev); m.delete(surahNumber); return m; });
+    }
+  }, [currentReciter, downloadingSet, downloadedSet]);
+
+  // Delete download handler
+  const handleDeleteDownload = useCallback(async (surahNumber: number) => {
+    Alert.alert(t('quran.deleteDownload'), t('quran.confirmDeleteDownload'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'), style: 'destructive', onPress: async () => {
+          await deleteDownload(surahNumber, currentReciter);
+          setDownloadedSet(prev => {
+            const next = new Set(prev);
+            next.delete(surahNumber);
+            return next;
+          });
+        }
+      },
+    ]);
+  }, [currentReciter]);
+
   // فلترة السور حسب البحث
   const filteredSurahs = useMemo(() => {
     if (!searchQuery.trim()) return surahs;
@@ -331,8 +414,9 @@ export default function QuranScreen() {
     const reciter = reciters.find(
       (r: Reciter) => r.identifier === currentReciter
     );
-    return reciter?.name || 'اختر قارئ';
-  }, [reciters, currentReciter]);
+    if (!reciter) return t('quran.selectReciter');
+    return isArabic ? reciter.name : (reciter.englishName || reciter.name);
+  }, [reciters, currentReciter, isArabic]);
 
   // فلترة الأجزاء حسب البحث
   const filteredJuz = useMemo(() => {
@@ -378,11 +462,11 @@ export default function QuranScreen() {
     }
 
     Alert.alert(
-      'لا يوجد فاصل محفوظ',
-      'احفظ فاصلًا أولًا من شاشة المصحف عبر الضغط المطول على الآية، أو افتح المفضلة.',
+      t('quran.noBookmarkFound'),
+      t('quran.bookmarkGuide'),
       [
-        { text: 'إلغاء', style: 'cancel' },
-        { text: 'فتح المفضلة', onPress: () => router.push('/all-favorites' as any) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('quran.openFavorites'), onPress: () => router.push('/all-favorites' as any) },
       ]
     );
   }, [firstBookmarkPage, router]);
@@ -426,6 +510,7 @@ export default function QuranScreen() {
               style={[
                 styles.surahItem,
                 {
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
                   backgroundColor: isLightBg
                     ? 'rgba(255,255,255,0.35)'
                     : 'rgba(28,30,36,0.35)',
@@ -447,24 +532,64 @@ export default function QuranScreen() {
                 ]}
               >
                 <Text style={[styles.surahNumberText, { color: colors.primary }]}>
-                  {toArabicNumber(item.number)}
+                  {toLocalizedNumber(item.number, isArabic)}
                 </Text>
               </View>
 
               {/* معلومات السورة */}
               <View style={styles.surahInfo}>
                 <Text style={[styles.surahName, { color: colors.text }]}>
-                  {item.name}
+                  {isArabic ? item.name : item.englishName}
                 </Text>
                 <Text style={[styles.surahDetails, { color: colors.textSecondary }]}>
-                  {getRevelationType(item.revelationType)} • {toArabicNumber(item.numberOfAyahs)} آية • صفحة {toArabicNumber(SURAH_PAGES[item.number] || 1)}
+                  {getRevelationType(item.revelationType, t)} • {toLocalizedNumber(item.numberOfAyahs, isArabic)} {t('quran.ayah')} • {t('quran.page')} {toLocalizedNumber(SURAH_PAGES[item.number] || 1, isArabic)}
                 </Text>
               </View>
 
               {/* الأكشن */}
-              <View style={styles.pageInfo}>
+              <View style={[styles.pageInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 {activeTab === 'listen' ? (
-                  <View style={styles.listenActions}>
+                  <View style={[styles.listenActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    {/* زر التحميل */}
+                    <TouchableOpacity
+                      style={styles.listenActionBtn}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        if (downloadedSet.has(item.number)) {
+                          handleDeleteDownload(item.number);
+                        } else {
+                          handleDownloadSurah(item.number);
+                        }
+                      }}
+                      hitSlop={8}
+                    >
+                      {downloadingSet.has(item.number) ? (
+                        <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                          <ActivityIndicator size={14} color="#F59E0B" />
+                          <Text style={styles.progressText}>
+                            {Math.round((progressMap.get(item.number) || 0) * 100)}%
+                          </Text>
+                        </View>
+                      ) : (
+                        <MaterialCommunityIcons
+                          name={
+                            downloadedSet.has(item.number)
+                              ? 'check-circle'
+                              : failedSet.has(item.number)
+                                ? 'alert-circle'
+                                : 'download'
+                          }
+                          size={22}
+                          color={
+                            downloadedSet.has(item.number)
+                              ? '#22C55E'
+                              : failedSet.has(item.number)
+                                ? '#EF4444'
+                                : '#9CA3AF'
+                          }
+                        />
+                      )}
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.listenActionBtn}
                       onPress={(event) => {
@@ -505,7 +630,7 @@ export default function QuranScreen() {
         </View>
       );
     },
-    [activeTab, colors, isLightBg, onSurahPress, openSurah, playbackState.currentSurah, playbackState.isPlaying]
+    [activeTab, colors, isLightBg, onSurahPress, openSurah, playbackState.currentSurah, playbackState.isPlaying, downloadedSet, downloadingSet, failedSet, progressMap, handleDownloadSurah, handleDeleteDownload]
   );
 
   // عرض عنصر القارئ
@@ -520,6 +645,7 @@ export default function QuranScreen() {
               borderBottomColor: isLightBg
                 ? 'rgba(0,0,0,0.06)'
                 : 'rgba(255,255,255,0.06)',
+              flexDirection: isRTL ? 'row-reverse' : 'row',
             },
             isSelected && {
               backgroundColor: colors.primary + '12',
@@ -528,7 +654,7 @@ export default function QuranScreen() {
           onPress={() => selectReciter(item.identifier)}
           activeOpacity={0.7}
         >
-          <View style={styles.reciterInfo}>
+          <View style={[styles.reciterInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View
               style={[
                 styles.reciterAvatar,
@@ -577,6 +703,7 @@ export default function QuranScreen() {
         style={[
           styles.surahItem,
           {
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             backgroundColor: isLightBg
               ? 'rgba(255,255,255,0.55)'
               : 'rgba(28,30,36,0.55)',
@@ -599,15 +726,15 @@ export default function QuranScreen() {
           ]}
         >
           <Text style={[styles.surahNumberText, { color: colors.primary }]}>
-            {toArabicNumber(item.number)}
+            {toLocalizedNumber(item.number, isArabic)}
           </Text>
         </View>
         <View style={styles.surahInfo}>
           <Text style={[styles.surahName, { color: colors.text }]}>
-            الجزء {item.name}
+            {`${t('quran.juz')} ${isArabic ? item.name : item.number}`}
           </Text>
           <Text style={[styles.surahDetails, { color: colors.textSecondary }]}>
-            صفحة {toArabicNumber(item.startPage)} - {toArabicNumber(item.endPage)}
+            {t('quran.page')} {toLocalizedNumber(item.startPage, isArabic)} - {toLocalizedNumber(item.endPage, isArabic)}
           </Text>
         </View>
         <MaterialCommunityIcons
@@ -630,7 +757,7 @@ export default function QuranScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            جاري تحميل القرآن الكريم...
+            {t('quran.loadingQuran')}
           </Text>
         </View>
       </SafeAreaView>
@@ -656,7 +783,7 @@ export default function QuranScreen() {
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={() => router.replace('/quran')}
           >
-            <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -664,7 +791,13 @@ export default function QuranScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <BackgroundWrapper
+      backgroundKey={settings.display.appBackground}
+      backgroundUrl={settings.display.appBackgroundUrl}
+      opacity={settings.display.backgroundOpacity ?? 1}
+      style={{ flex: 1 }}
+    >
+    <View style={[styles.container, { backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : colors.background }]}>
       <SafeAreaView
         style={[styles.container, { backgroundColor: 'transparent' }]}
         edges={['top']}
@@ -674,59 +807,50 @@ export default function QuranScreen() {
           backgroundColor={colors.background}
         />
 
-        {/* الهيدر - Glassmorphism */}
-        <View style={styles.headerWrapper}>
-          <BlurView
-            intensity={Platform.OS === 'ios' ? 60 : 40}
-            tint={isLightBg ? 'light' : 'dark'}
-            style={styles.headerBlur}
-          >
-            <View style={[
-              styles.header,
-              {
-                backgroundColor: isLightBg
-                  ? 'rgba(255,255,255,0.15)'
-                  : 'rgba(20,20,22,0.15)',
-              },
-            ]}>
-              {/* Left: worship tracker + favorites */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <TouchableOpacity
-                  style={styles.headerBtn}
-                  onPress={() => router.push('/worship-tracker?context=quran' as any)}
-                >
-                  <MaterialCommunityIcons name="chart-bar" size={20} color={colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.headerBtn}
-                  onPress={() => router.push('/all-favorites' as any)}
-                >
-                  <MaterialCommunityIcons name="bookmark-outline" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
+        {/* الهيدر */}
+        <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {/* Right side in RTL: worship tracker + favorites + radio */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => router.push('/radio' as any)}
+            >
+              <MaterialCommunityIcons name="radio" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => router.push('/worship-tracker/quran' as any)}
+            >
+              <MaterialCommunityIcons name="chart-bar" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => router.push('/all-favorites' as any)}
+            >
+              <MaterialCommunityIcons name="bookmark-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
 
-              {/* Center: title — absolutely centered regardless of icon widths */}
-              <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>
-                  القرآن الكريم
-                </Text>
-              </View>
+          {/* Center: title */}
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>
+              {t('quran.title')}
+            </Text>
+          </View>
 
-              {/* Right: settings */}
-              <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                <TouchableOpacity
-                  style={styles.headerBtn}
-                  onPress={() => setShowSettings(true)}
-                >
-                  <MaterialCommunityIcons name="cog-outline" size={20} color={colors.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </BlurView>
+          {/* Left side in RTL: settings */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={() => setShowSettings(true)}
+            >
+              <MaterialCommunityIcons name="cog-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* التبويبات - Native Tabs */}
-        <View style={{ marginHorizontal: Spacing.lg, marginBottom: Spacing.md }}>
+        <View style={{ marginHorizontal: Spacing.lg, marginTop: 10, marginBottom: Spacing.md }}>
           <NativeTabs
             tabs={quranSegments.map(s => ({ key: s.key, label: s.label }))}
             selected={activeTab}
@@ -752,6 +876,7 @@ export default function QuranScreen() {
                     borderColor: isLightBg
                       ? 'rgba(255,255,255,0.7)'
                       : 'rgba(255,255,255,0.06)',
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                   },
                 ]}
               >
@@ -764,7 +889,7 @@ export default function QuranScreen() {
                 </View>
                 <View style={styles.reciterSelectorInfo}>
                   <Text style={[styles.reciterSelectorLabel, { color: colors.textSecondary }]}>
-                    القارئ
+                    {t('quran.reciterLabel')}
                   </Text>
                   <Text style={[styles.reciterSelectorName, { color: colors.text }]}>
                     {currentReciterName}
@@ -786,6 +911,7 @@ export default function QuranScreen() {
             style={[
               styles.searchContainer,
               {
+                flexDirection: isRTL ? 'row-reverse' : 'row',
                 backgroundColor: isLightBg
                   ? 'rgba(255,255,255,0.45)'
                   : 'rgba(120,120,128,0.12)',
@@ -802,11 +928,11 @@ export default function QuranScreen() {
             />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder={activeTab === 'juz' ? 'ابحث برقم الجزء' : 'ابحث باسم السورة أو رقمها'}
+              placeholder={activeTab === 'juz' ? t('quran.searchByJuz') : t('quran.searchBySurah')}
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              textAlign="right"
+              textAlign={isRTL ? 'right' : 'left'}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -823,10 +949,10 @@ export default function QuranScreen() {
         {/* أزرار سريعة - 2x2 Grid Glass Widgets (فقط في تاب السور) */}
         {activeTab === 'surahs' && (
           <View style={styles.quickActionsGrid}>
-            <View style={styles.quickActionsRow}>
+            <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassActionButton
                 icon="book-search-outline"
-                label="التفسير"
+                label={t('quran.tafsir')}
                 onPress={() => router.push('/browse-tafsir' as any)}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
@@ -834,17 +960,17 @@ export default function QuranScreen() {
               />
               <GlassActionButton
                 icon="book-open-page-variant"
-                label="آخر صفحة"
+                label={t('quran.lastPage')}
                 onPress={openLastReadSurah}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
                 accentColor="#16A34A"
               />
             </View>
-            <View style={styles.quickActionsRow}>
+            <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassActionButton
                 icon="bookmark-outline"
-                label="الفاصل"
+                label={t('quran.bookmark')}
                 onPress={() => router.push('/all-favorites' as any)}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
@@ -852,7 +978,7 @@ export default function QuranScreen() {
               />
               <GlassActionButton
                 icon="book-check"
-                label="الختمة"
+                label={t('quran.khatma')}
                 onPress={() => router.push('/khatma')}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
@@ -878,7 +1004,7 @@ export default function QuranScreen() {
                   color={colors.textSecondary}
                 />
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  لا توجد نتائج للبحث
+                  {t('quran.noResults')}
                 </Text>
               </View>
             }
@@ -901,7 +1027,7 @@ export default function QuranScreen() {
                   color={colors.textSecondary}
                 />
                 <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  لا توجد نتائج للبحث
+                  {t('quran.noResults')}
                 </Text>
               </View>
             }
@@ -955,9 +1081,9 @@ export default function QuranScreen() {
                   </View>
 
                   {/* Header */}
-                  <View style={styles.modalHeader}>
+                  <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <Text style={[styles.modalTitle, { color: colors.text }]}>
-                      اختر القارئ
+                      {t('quran.selectReciter')}
                     </Text>
                     <TouchableOpacity
                       onPress={() => setShowReciterModal(false)}
@@ -1022,8 +1148,8 @@ export default function QuranScreen() {
               />
               <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.4)' : 'rgba(30,30,32,0.55)', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 0.5, borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)' }]} />
               <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
-              <View style={styles.settingsHeader}>
-                <Text style={[styles.settingsTitle, { color: colors.text }]}>إعدادات القرآن</Text>
+              <View style={[styles.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text style={[styles.settingsTitle, { color: colors.text }]}>{t('quran.quranSettings')}</Text>
                 <TouchableOpacity
                   onPress={() => setShowSettings(false)}
                   style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isLightBg ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.24)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
@@ -1035,10 +1161,13 @@ export default function QuranScreen() {
               <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
                 {/* ─── 1. إعدادات الخط (Font Settings) ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="format-size" size={14} /> إعدادات الخط
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 8 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="format-size" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.fontSettings')}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 8 }}>
                     <TouchableOpacity
                       style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
                       onPress={() => {
@@ -1049,8 +1178,8 @@ export default function QuranScreen() {
                     >
                       <MaterialCommunityIcons name="minus" size={22} color={isLightBg ? '#333' : '#ddd'} />
                     </TouchableOpacity>
-                    <Text style={{ color: colors.primary, fontSize: 16, fontFamily: 'Cairo-SemiBold' }}>
-                      {(settings.display.quranFontSizeAdjust ?? 0) === 0 ? 'افتراضي' : (settings.display.quranFontSizeAdjust ?? 0) > 0 ? `+${settings.display.quranFontSizeAdjust}` : String(settings.display.quranFontSizeAdjust)}
+                    <Text style={{ color: colors.primary, fontSize: 16, fontFamily: fontSemiBold() }}>
+                      {(settings.display.quranFontSizeAdjust ?? 0) === 0 ? t('quran.defaultSize') : (settings.display.quranFontSizeAdjust ?? 0) > 0 ? `+${settings.display.quranFontSizeAdjust}` : String(settings.display.quranFontSizeAdjust)}
                     </Text>
                     <TouchableOpacity
                       style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
@@ -1067,30 +1196,36 @@ export default function QuranScreen() {
 
                 {/* ─── 2. إعدادات التذكير بقراءة القرآن ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="bell-ring-outline" size={14} /> التذكير بقراءة القرآن
-                  </Text>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="bell-ring-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.quranReminder')}
+                    </Text>
+                  </View>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, backgroundColor: isLightBg ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.06)' }}
+                    style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, backgroundColor: isLightBg ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.06)', gap: Spacing.sm }}
                     onPress={() => { setShowSettings(false); router.push('/quran-reminder'); }}
                   >
-                    <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+                    <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.textSecondary} />
                     <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: colors.text }}>إعدادات التذكير</Text>
-                      <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
-                        {(settings.notifications.quranReadingReminder ?? false) ? `مفعّل · ${settings.notifications.quranReadingReminderTime ?? '20:00'}` : 'غير مفعّل'}
+                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 15, color: colors.text }}>{t('quran.reminderSettings')}</Text>
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                        {(settings.notifications.quranReadingReminder ?? false) ? `${t('quran.enabled')} · ${settings.notifications.quranReadingReminderTime ?? '20:00'}` : t('quran.notEnabled')}
                       </Text>
                     </View>
-                    <MaterialCommunityIcons name="bell-ring-outline" size={22} color={colors.primary} style={{ marginStart: 10 }} />
+                    <MaterialCommunityIcons name="bell-ring-outline" size={22} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
 
                 {/* ─── 3. خلفية المصحف ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="image-outline" size={14} /> خلفية المصحف
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="image-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.mushafBackground')}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm, marginTop: 8 }}>
                     {(['quranbg1', 'quranbg2', 'quranbg3', 'quranbg4'] as const).map(key => {
                       const isSelected = (settings.display.quranBackground ?? 'quranbg1') === key;
                       return (
@@ -1122,42 +1257,46 @@ export default function QuranScreen() {
 
                 {/* ─── 4. الترجمة للغات أخرى ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="translate" size={14} /> الترجمة للغات أخرى
-                  </Text>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="translate" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.translationToOtherLanguages')}
+                    </Text>
+                  </View>
                   {(() => {
                     const LANG_FLAGS: Record<string, string> = { en: '🇺🇸', fr: '🇫🇷', tr: '🇹🇷', ur: '🇵🇰', id: '🇮🇩', de: '🇩🇪', es: '🇪🇸', hi: '🇮🇳', bn: '🇧🇩', ms: '🇲🇾', ru: '🇷🇺', fa: '🇮🇷' };
-                    const LANG_NAMES: Record<string, string> = { en: 'الانجليزية', fr: 'الفرنسية', tr: 'التركية', ur: 'الأردية', id: 'الإندونيسية', de: 'الألمانية', es: 'الإسبانية', hi: 'الهندية', bn: 'البنغالية', ms: 'الملايوية', ru: 'الروسية', fa: 'الفارسية' };
+                    const LANG_NAMES: Record<string, string> = { en: 'English', fr: 'Français', tr: 'Türkçe', ur: 'اردو', id: 'Indonesia', de: 'Deutsch', es: 'Español', hi: 'हिन्दी', bn: 'বাংলা', ms: 'Melayu', ru: 'Русский', fa: 'فارسی' };
                     const selEdition = settings.display.showTranslation ? (settings.display.translationEdition || '') : '';
                     const selLang = selEdition ? selEdition.split('.')[0] : '';
                     const flag = LANG_FLAGS[selLang] || '🌐';
-                    const langName = LANG_NAMES[selLang] || 'بدون ترجمة';
+                    const langName = LANG_NAMES[selLang] || t('quran.noTranslation');
                     return (
                       <TouchableOpacity
                         style={{
-                          flexDirection: 'row',
+                          flexDirection: isRTL ? 'row-reverse' : 'row',
                           alignItems: 'center',
                           paddingVertical: 12,
                           paddingHorizontal: 12,
                           borderRadius: 12,
                           marginTop: 8,
                           backgroundColor: isLightBg ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+                          gap: Spacing.sm,
                         }}
                         onPress={() => {
                           setShowSettings(false);
                           router.push('/settings/translations' as any);
                         }}
                       >
-                        <Text style={{ fontSize: 26, marginEnd: 2 }}>{flag}</Text>
-                        <View style={{ flex: 1, marginHorizontal: 10 }}>
-                          <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: colors.text }}>
-                            اختيار لغة الترجمة
+                        <Text style={{ fontSize: 26 }}>{flag}</Text>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text }}>
+                            {t('quran.chooseTranslationLanguage')}
                           </Text>
-                          <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
-                            {selLang ? `${langName} ${flag}` : 'اختر الترجمة المفضلة لعرضها مع الآيات'}
+                          <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                            {selLang ? `${langName} ${flag}` : t('quran.chooseTranslationDesc')}
                           </Text>
                         </View>
-                        <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                        <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.textSecondary} />
                       </TouchableOpacity>
                     );
                   })()}
@@ -1165,12 +1304,15 @@ export default function QuranScreen() {
 
                 {/* ─── 5. اختيار القارئ (Reciter Selection) ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="account-music-outline" size={14} /> اختيار القارئ
-                  </Text>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="account-music-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.chooseReciter')}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     style={{
-                      flexDirection: 'row',
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
                       alignItems: 'center',
                       paddingVertical: 12,
                       paddingHorizontal: 12,
@@ -1185,29 +1327,78 @@ export default function QuranScreen() {
                   >
                     <MaterialCommunityIcons name="account-music" size={20} color={colors.primary} />
                     <View style={{ flex: 1, marginHorizontal: 10 }}>
-                      <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: colors.text }}>
+                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text }}>
                         {currentReciterName}
                       </Text>
-                      <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.textSecondary }}>
-                        اختر القارئ المفضل للاستماع
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                        {t('quran.selectReciterDesc')}
                       </Text>
                     </View>
-                    <MaterialCommunityIcons name="chevron-left" size={20} color={colors.textSecondary} />
+                    <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
 
                 {/* ─── 6. عرض التفسير (Tafsir Split Screen Toggle) ─── */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary }]}>
-                    <MaterialCommunityIcons name="book-open-page-variant-outline" size={14} /> عرض التفسير
-                  </Text>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="book-open-page-variant-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.showTafsir')}
+                    </Text>
+                  </View>
                   <GlassToggle
-                    label="تفسير تلقائي"
-                    subtitle="عرض التفسير الميسر أسفل صفحة المصحف"
+                    label={t('quran.autoTafsir')}
+                    subtitle={t('quran.autoTafsirDesc')}
                     icon="book-open-variant"
                     enabled={settings.display.showTafsir ?? false}
                     onToggle={(v) => {
                       updateDisplay({ showTafsir: v } as any);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  />
+                </View>
+
+                {/* ─── 7. وضع التركيز (Focus Mode) ─── */}
+                <View style={{ marginBottom: 16 }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
+                    <MaterialCommunityIcons name="eye-outline" size={14} color={colors.textSecondary} />
+                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
+                      {t('quran.focusMode')}
+                    </Text>
+                  </View>
+                  <GlassToggle
+                    label={t('quran.focusMode')}
+                    subtitle={t('quran.focusModeDesc')}
+                    icon="eye-off-outline"
+                    enabled={settings.display.focusMode ?? false}
+                    onToggle={async (v) => {
+                      if (v) {
+                        const seen = await AsyncStorage.getItem('@focus_mode_intro_seen');
+                        if (seen !== 'true') {
+                          Alert.alert(
+                            t('quran.focusModeAlertTitle'),
+                            t('quran.focusModeAlertMessage'),
+                            [
+                              {
+                                text: t('quran.dontShowAgain'),
+                                onPress: async () => {
+                                  await AsyncStorage.setItem('@focus_mode_intro_seen', 'true');
+                                  updateDisplay({ focusMode: true });
+                                },
+                              },
+                              {
+                                text: t('quran.ok'),
+                                onPress: () => {
+                                  updateDisplay({ focusMode: true });
+                                },
+                              },
+                            ]
+                          );
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          return;
+                        }
+                      }
+                      updateDisplay({ focusMode: v });
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
                   />
@@ -1219,6 +1410,7 @@ export default function QuranScreen() {
         </Modal>
       </SafeAreaView>
     </View>
+    </BackgroundWrapper>
   );
 }
 
@@ -1238,7 +1430,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontWeight: '500',
   },
   errorContainer: {
@@ -1250,7 +1442,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     textAlign: 'center',
   },
   retryButton: {
@@ -1262,38 +1454,26 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#FFFFFF',
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
   },
 
-  // Header - Glassmorphism
-  headerWrapper: {
-    overflow: 'hidden',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    marginBottom: Spacing.sm,
-  },
-  headerBlur: {
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    overflow: 'hidden',
-  },
+  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
   headerTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontFamily: 'Cairo-Bold',
-    fontWeight: '700',
+    fontSize: 20,
+    fontFamily: fontBold(),
   },
   headerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1311,8 +1491,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'right',
+    fontFamily: fontRegular(),
     paddingVertical: Platform.OS === 'ios' ? 2 : 0,
   },
 
@@ -1335,7 +1514,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 8,
     borderRadius: 18,
     minHeight: 60,
     paddingVertical: 8,
@@ -1351,7 +1530,7 @@ const styles = StyleSheet.create({
   },
   glassQuickActionText: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
   },
 
@@ -1368,6 +1547,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md + 2,
     paddingVertical: 14,
     borderWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.md,
   },
   surahNumber: {
     width: 42,
@@ -1375,11 +1555,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: Spacing.md,
   },
   surahNumberText: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontWeight: '700',
   },
   surahInfo: {
@@ -1394,7 +1573,7 @@ const styles = StyleSheet.create({
   },
   surahDetails: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
   pageInfo: {
@@ -1405,14 +1584,24 @@ const styles = StyleSheet.create({
   listenActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   listenActionBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressText: {
+    fontSize: 10,
+    fontFamily: fontBold(),
+    color: '#F59E0B',
   },
   playIconCircle: {
     width: 32,
@@ -1423,7 +1612,7 @@ const styles = StyleSheet.create({
   },
   pageNumber: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
 
   // Reciter Selector - Glass
@@ -1449,11 +1638,11 @@ const styles = StyleSheet.create({
   },
   reciterSelectorLabel: {
     fontSize: FONT_SIZES.xs,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
   reciterSelectorName: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     fontWeight: '600',
   },
 
@@ -1467,7 +1656,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
 
   // Modal - Glass
@@ -1511,7 +1700,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: FONT_SIZES.xl,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontWeight: '700',
   },
   modalCloseBtnBlur: {
@@ -1551,7 +1740,7 @@ const styles = StyleSheet.create({
   },
   reciterName: {
     fontSize: FONT_SIZES.md,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontWeight: '500',
   },
   // Quran Settings Modal
@@ -1572,12 +1761,12 @@ const styles = StyleSheet.create({
   },
   settingsTitle: {
     fontSize: FONT_SIZES.xl,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontWeight: '700',
   },
   settingsSectionLabel: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontWeight: '500',
     marginBottom: Spacing.sm,
   },

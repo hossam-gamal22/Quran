@@ -13,28 +13,33 @@ import Animated, {
   Easing,
   FadeIn,
 } from 'react-native-reanimated';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 
 import {
   PrayerTimes,
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
-  formatTime12h,
+  formatPrayerTime,
   getPrayerIcon,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 interface DigitalTypographyViewProps {
   prayerTimes: PrayerTimes | null;
   language?: string;
   isDarkMode?: boolean;
+  show24Hour?: boolean;
 }
 
 const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   prayerTimes,
   language = 'ar',
   isDarkMode = false,
+  show24Hour = false,
 }) => {
+  const isRTL = useIsRTL();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -92,9 +97,9 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   return (
     <View style={styles.wrapper}>
       {/* Header: icon + next prayer label */}
-      <Animated.View entering={FadeIn.duration(500)} style={styles.headerRow}>
+      <Animated.View entering={FadeIn.duration(500)} style={[styles.headerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <MaterialCommunityIcons name={prayerIcon as any} size={20} color={accentColor} />
-        <Text style={[styles.prayerLabel, { color: mutedColor }]}>الصلاة القادمة</Text>
+        <Text style={[styles.prayerLabel, { color: mutedColor }]}>{t('prayer.nextPrayerLabel')}</Text>
       </Animated.View>
 
       {/* Prayer name */}
@@ -114,10 +119,10 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
       </View>
 
       {/* Adhan time */}
-      <View style={styles.adhanRow}>
+      <View style={[styles.adhanRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <MaterialCommunityIcons name="mosque" size={16} color={accentColor} />
         <Text style={[styles.adhanText, { color: mutedColor }]}>
-          الأذان {formatTime12h(nextPrayer.time)}
+          {t('prayer.athan')} {formatPrayerTime(nextPrayer.time, show24Hour ?? false)}
         </Text>
       </View>
     </View>
@@ -138,16 +143,16 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     marginBottom: 4,
   },
   prayerLabel: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
   prayerName: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     marginBottom: 20,
   },
   digitalRow: {
@@ -172,11 +177,11 @@ const styles = StyleSheet.create({
   adhanRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   adhanText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
 });
 

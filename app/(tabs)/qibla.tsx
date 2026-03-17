@@ -17,6 +17,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
@@ -32,6 +33,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from '@/lib/qiblaAssets';
 import { useInterstitialAd } from '@/components/ads/InterstitialAdManager';
 import { useAds } from '@/lib/ads-context';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -160,9 +165,11 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 // ---------------------------------------------------------------------------
 const QiblaScreen = () => {
   const insets = useSafeAreaInsets();
+  const { settings, t } = useSettings();
+  const colors = useColors();
+  const isRTL = useIsRTL();
   const [qiblaBearing, setQiblaBearing] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isOffline, setIsOffline] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [guidance, setGuidance] = useState('');
   const [currentStyleId, setCurrentStyleId] = useState('style1');
@@ -209,23 +216,16 @@ const QiblaScreen = () => {
 
     (async () => {
       try {
-        // 0. Check internet connectivity
-        const online = await checkConnectivity();
-        if (!online) {
-          if (mounted) setIsOffline(true);
-          return;
-        }
-
         // 1. Request location permission
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          if (mounted) setErrorMsg('يرجى السماح بإذن الموقع لتحديد اتجاه القبلة');
+          if (mounted) setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
           if (mounted)
             setErrorMsg(
-              'خدمات الموقع معطلة من إعدادات الجهاز. يرجى تفعيلها ثم إعادة المحاولة.',
+              t('qibla.servicesDisabled') || 'Location services disabled. Please enable them and try again.'
             );
           return;
         }
@@ -239,7 +239,7 @@ const QiblaScreen = () => {
         } catch {
           if (mounted)
             setErrorMsg(
-              'تعذر تحديد الموقع. يرجى تفعيل خدمات الموقع من إعدادات الجهاز.',
+              t('qibla.locationFailed') || 'Could not determine location. Please enable location services.'
             );
           return;
         }
@@ -249,9 +249,13 @@ const QiblaScreen = () => {
 
         if (mounted) setUserCoords({ lat, lng });
 
-        // 3. Get Qibla bearing: UmmahAPI → AlAdhan → local calculation
-        let bearing = await fetchQiblaDirection(lat, lng);
-        if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
+        // 3. Get Qibla bearing: try APIs first, fall back to local calculation
+        let bearing: number | null = null;
+        const online = await checkConnectivity();
+        if (online) {
+          bearing = await fetchQiblaDirection(lat, lng);
+          if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
+        }
         if (mounted) {
           setQiblaBearing(bearing ?? calculateQiblaBearingLocal(lat, lng));
         }
@@ -281,7 +285,7 @@ const QiblaScreen = () => {
         });
       } catch (err) {
         console.warn('Qibla init error:', err);
-        if (mounted) setErrorMsg('فشل في تهيئة أجهزة الاستشعار.');
+        if (mounted) setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
       }
     })();
 
@@ -328,6 +332,11 @@ const QiblaScreen = () => {
     };
   });
 
+  // Pre-compute translated guidance strings outside the worklet
+  const guidanceAligned = t('qibla.aligned') || 'You are facing Qibla ✓';
+  const guidanceTurnRight = t('qibla.turnRight') || 'Turn Right';
+  const guidanceTurnLeft = t('qibla.turnLeft') || 'Turn Left';
+
   // POINTER: rotates to point toward Qibla
   const pointerAnimatedStyle = useAnimatedStyle(() => {
     const safeBearing =
@@ -342,11 +351,11 @@ const QiblaScreen = () => {
     let text: string;
     let aligned = false;
     if (delta > 5) {
-      text = 'أدر الهاتف لليمين';
+      text = guidanceTurnRight;
     } else if (delta < -5) {
-      text = 'أدر الهاتف لليسار';
+      text = guidanceTurnLeft;
     } else {
-      text = 'أنت تواجه القبلة ✓';
+      text = guidanceAligned;
       aligned = true;
     }
     runOnJS(onGuidanceUpdate)(text, aligned);
@@ -354,56 +363,54 @@ const QiblaScreen = () => {
     return {
       transform: [{ rotate: `${rotation}deg` }],
     };
-  }, [qiblaBearing]);
+  }, [qiblaBearing, guidanceAligned, guidanceTurnRight, guidanceTurnLeft]);
 
   // ------ Loading / Error / Offline ------
-  if (isOffline) {
-    return (
-      <View style={styles.centeredLoading}>
-        <MaterialCommunityIcons name="wifi-off" size={56} color="#FF6B6B" />
-        <Text style={[styles.loadingText, { color: '#FF6B6B', marginTop: 16 }]}>
-          يتطلب اتصال بالإنترنت
-        </Text>
-        <Text style={[styles.loadingText, { color: '#aaa', fontSize: 14, marginTop: 6 }]}>
-          يرجى الاتصال بالإنترنت لتحديد اتجاه القبلة
-        </Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            setIsOffline(false);
-            setQiblaBearing(null);
-            setErrorMsg(null);
-            setRetryKey((k) => k + 1);
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
-          <Text style={styles.retryText}>إعادة المحاولة</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const bgProps = {
+    backgroundKey: settings.display.appBackground,
+    backgroundUrl: settings.display.appBackgroundUrl,
+    opacity: settings.display.backgroundOpacity ?? 1,
+    style: { flex: 1 } as const,
+  };
 
   if (!qiblaBearing && !errorMsg) {
     return (
+      <BackgroundWrapper {...bgProps}>
       <View style={styles.centeredLoading}>
         <ActivityIndicator size="large" color="#2f7659" />
-        <Text style={styles.loadingText}>جاري تحديد اتجاه القبلة...</Text>
+        <Text style={[styles.loadingText, { color: colors.text }]}>{t('qibla.findingDirection') || 'Finding Qibla Direction...'}</Text>
       </View>
+      </BackgroundWrapper>
     );
   }
 
   if (errorMsg) {
     return (
+      <BackgroundWrapper {...bgProps}>
       <View style={styles.centeredLoading}>
-        <Text style={[styles.loadingText, { color: '#FF6B6B' }]}>{errorMsg}</Text>
+        <MaterialCommunityIcons name="alert-circle-outline" size={56} color="#FF6B6B" />
+        <Text style={[styles.loadingText, { color: '#FF6B6B', marginTop: 16 }]}>{errorMsg}</Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          onPress={() => {
+            setErrorMsg(null);
+            setQiblaBearing(null);
+            setRetryKey((k) => k + 1);
+          }}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+          <Text style={styles.retryText}>{t('common.retry') || 'Retry'}</Text>
+        </TouchableOpacity>
       </View>
+      </BackgroundWrapper>
     );
   }
 
-  const isAligned = guidance.includes('القبلة');
+  const isAligned = guidance === guidanceAligned;
 
   return (
+    <BackgroundWrapper {...bgProps}>
     <ScrollView
       style={styles.root}
       contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 }]}
@@ -431,7 +438,7 @@ const QiblaScreen = () => {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.styleSwitcherScroll}
+            contentContainerStyle={[styles.styleSwitcherScroll, { flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, justifyContent: 'flex-start' }]}
           >
             {AVAILABLE_STYLES.map((styleId) => {
               const isActive = currentStyleId === styleId;
@@ -543,15 +550,16 @@ const QiblaScreen = () => {
 
       {/* 4. Title + degree + coordinates at the bottom */}
       <View style={styles.header}>
-        <Text style={styles.titleText}>اتجاه القبلة</Text>
-        <Text style={styles.subtitleText}>{Math.round(qiblaBearing!)}°</Text>
+        <Text style={[styles.titleText, { color: colors.text }]}>{t('tabs.qibla') || 'Qibla Direction'}</Text>
+        <Text style={[styles.subtitleText, { color: colors.muted }]}>{Math.round(qiblaBearing!)}°</Text>
         {userCoords && (
-          <Text style={styles.coordsText}>
+          <Text style={[styles.coordsText, { color: colors.muted }]}>
             {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
           </Text>
         )}
       </View>
     </ScrollView>
+    </BackgroundWrapper>
   );
 };
 
@@ -574,18 +582,18 @@ const styles = StyleSheet.create({
   titleText: {
     color: '#fff',
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   subtitleText: {
     color: '#aaa',
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
   coordsText: {
     color: '#777',
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
   compassArea: {
@@ -632,7 +640,7 @@ const styles = StyleSheet.create({
   guidanceText: {
     color: '#fff',
     fontSize: 18,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center',
   },
   guidanceTextActive: {
@@ -691,7 +699,7 @@ const styles = StyleSheet.create({
   loadingText: {
     color: '#FFFFFF',
     marginTop: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 16,
     textAlign: 'center',
   },
@@ -708,7 +716,7 @@ const styles = StyleSheet.create({
   retryText: {
     color: '#fff',
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
 });
 

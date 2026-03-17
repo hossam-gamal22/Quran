@@ -15,6 +15,7 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
+import { fontBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,8 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
-import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
+import { useColors } from '@/hooks/use-colors';
 
 import AzkarAPI, {
   AzkarCategory,
@@ -34,6 +36,7 @@ import AzkarAPI, {
   getCategoryCompletionPercentage,
   getAllCategories,
 } from '@/lib/azkar-api';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const { width } = Dimensions.get('window');
 
@@ -45,8 +48,8 @@ const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons'
   morning: { name: 'sunny', type: 'ionicons' },
   evening: { name: 'moon', type: 'ionicons' },
   sleep: { name: 'bed', type: 'fontawesome' },
-  wakeup: { name: 'sunrise', type: 'material' },
-  after_prayer: { name: 'hands-praying', type: 'fontawesome' },
+  wakeup: { name: 'weather-sunrise', type: 'material' },
+  after_prayer: { name: 'praying-hands', type: 'fontawesome' },
   quran_duas: { name: 'book-open', type: 'fontawesome' },
   sunnah_duas: { name: 'sparkles', type: 'ionicons' },
   ruqya: { name: 'shield-checkmark', type: 'ionicons' },
@@ -59,7 +62,7 @@ const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons'
   nature: { name: 'leaf', type: 'ionicons' },
   fasting: { name: 'moon', type: 'ionicons' },
   protection: { name: 'shield', type: 'ionicons' },
-  prayerSupplications: { name: 'hands-praying', type: 'fontawesome' },
+  prayerSupplications: { name: 'praying-hands', type: 'fontawesome' },
   salawat: { name: 'star', type: 'ionicons' },
   istighfar: { name: 'refresh', type: 'ionicons' },
   ayat_kursi: { name: 'book', type: 'ionicons' },
@@ -70,10 +73,12 @@ const CATEGORY_ICONS: Record<AzkarCategoryType, { name: string; type: 'ionicons'
 // =========================================
 
 export default function AzkarScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
+  const colors = useColors();
   const language = (settings.language || 'ar') as Language;
   
   // الحالة
@@ -154,7 +159,7 @@ export default function AzkarScreen() {
       const azkarCount = getAzkarByCategory(category.id).length;
       
       await Share.share({
-        message: `${categoryName}\n${azkarCount} أذكار\n\nحمّل تطبيق روح المسلم`,
+        message: `${categoryName}\n${azkarCount} ${t('tabs.azkar')}\n\n${t('common.fromApp')}`,
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -228,7 +233,7 @@ export default function AzkarScreen() {
             <Text
               style={[
                 styles.categoryName,
-                { color: darkMode ? '#F9FAFB' : '#1F2937' },
+                { color: colors.text },
               ]}
               numberOfLines={2}
             >
@@ -236,13 +241,13 @@ export default function AzkarScreen() {
             </Text>
 
             {/* العدد */}
-            <Text style={[styles.azkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+            <Text style={[styles.azkarCount, { color: colors.textLight }]}>
               {azkarCount} {t('azkar.count')}
             </Text>
 
             {/* شريط التقدم */}
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressBar, { backgroundColor: darkMode ? '#374151' : '#E5E7EB' }]}>
+            <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.progressBar, { backgroundColor: darkMode ? '#374151' : '#E5E7EB', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View
                   style={[
                     styles.progressFill,
@@ -253,7 +258,7 @@ export default function AzkarScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.progressText, { color: category.color }]}>
+              <Text style={[styles.progressText, { color: category.color, textAlign: isRTL ? 'right' : 'left' }]}>
                 {categoryProgress}%
               </Text>
             </View>
@@ -294,7 +299,7 @@ export default function AzkarScreen() {
           onLongPress={() => shareCategory(category)}
           activeOpacity={0.7}
         >
-          <GlassCard intensity={40} style={styles.listCardGlass}>
+          <GlassCard intensity={40} style={{ ...styles.listCardGlass, flexDirection: isRTL ? 'row-reverse' : 'row' }}>
             {/* الأيقونة */}
             <View style={styles.listIconContainer}> 
               {renderIcon(category.id, 24, category.color)}
@@ -305,23 +310,23 @@ export default function AzkarScreen() {
               <Text
                 style={[
                   styles.listCategoryName,
-                  { color: darkMode ? '#F9FAFB' : '#1F2937' },
+                  { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
                 ]}
                 numberOfLines={1}
               >
                 {categoryName}
               </Text>
-              <Text style={[styles.listAzkarCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              <Text style={[styles.listAzkarCount, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
                 {azkarCount} {t('azkar.count')}
               </Text>
             </View>
 
             {/* التقدم */}
-            <View style={styles.listProgressContainer}>
+            <View style={[styles.listProgressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.listProgressText, { color: category.color }]}>
                 {categoryProgress}%
               </Text>
-              <Ionicons name="chevron-forward" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+              <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
             </View>
           </GlassCard>
         </TouchableOpacity>
@@ -344,10 +349,10 @@ export default function AzkarScreen() {
 
     return (
       <View style={styles.quickLinksContainer}>
-        <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
           {t('home.quickAccess')}
         </Text>
-        <View style={styles.quickLinksRow}>
+        <View style={[styles.quickLinksRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {quickLinks.map(link => (
             <TouchableOpacity
               key={link.id}
@@ -357,7 +362,7 @@ export default function AzkarScreen() {
             >
               <GlassCard intensity={38} style={styles.quickLinkGlass}>
                 <Ionicons name={link.icon as any} size={24} color={link.color} />
-                <Text style={[styles.quickLinkLabel, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                <Text style={[styles.quickLinkLabel, { color: colors.text }]}>
                   {link.label}
                 </Text>
               </GlassCard>
@@ -376,17 +381,18 @@ export default function AzkarScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
+      opacity={settings.display.backgroundOpacity ?? 1}
       style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (darkMode ? '#111827' : '#F3F4F6') : 'transparent' }]}
     >
       {/* Header */}
       <View
         style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: 'rgba(120,120,128,0.15)' }]}
       >
-        <View style={styles.headerContent}>
+        <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Left: worship tracker + favorites */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity
-              onPress={() => router.push('/worship-tracker?context=azkar' as any)}
+              onPress={() => router.push('/worship-tracker/azkar' as any)}
               style={styles.viewToggle}
             >
               <MaterialCommunityIcons name="chart-bar" size={22} color={darkMode ? '#fff' : '#333'} />
@@ -401,18 +407,18 @@ export default function AzkarScreen() {
 
           {/* Center: title — absolutely centered */}
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-            <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 20, fontFamily: 'Cairo-Bold' }]}>
+            <Text style={[styles.headerTitle, { color: colors.text, fontSize: 20, fontFamily: fontBold() }]}>
               {t('azkar.title')}
             </Text>
           </View>
 
           {/* Right: view toggle */}
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+          <View style={{ flex: 1, alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
             <View style={{ width: 110 }}>
               <NativeTabs
                 tabs={[
-                  { key: 'grid', label: 'شبكة' },
-                  { key: 'list', label: 'قائمة' },
+                  { key: 'grid', label: t('azkar.grid') },
+                  { key: 'list', label: t('azkar.list') },
                 ]}
                 selected={viewMode}
                 onSelect={async (key) => {
@@ -437,12 +443,12 @@ export default function AzkarScreen() {
         }
       >
         {/* الفئات */}
-        <Text style={[styles.sectionTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+        <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
           {t('azkar.categories')}
         </Text>
 
         {viewMode === 'grid' ? (
-          <View style={styles.gridContainer}>
+          <View style={[styles.gridContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {categories.map((category, index) => renderGridCard(category, index))}
           </View>
         ) : (
@@ -554,13 +560,13 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   progressBar: {
     flex: 1,
     height: 6,
     borderRadius: 3,
     overflow: 'hidden',
-    marginRight: 8,
   },
   progressFill: {
     height: '100%',
@@ -570,7 +576,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     width: 35,
-    textAlign: 'right',
   },
 
   // List View
@@ -588,6 +593,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
+    gap: 12,
   },
   listIconContainer: {
     width: 48,
@@ -595,7 +601,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   listContent: {
     flex: 1,
@@ -611,11 +616,11 @@ const styles = StyleSheet.create({
   listProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   listProgressText: {
     fontSize: 14,
     fontWeight: '600',
-    marginRight: 8,
   },
 
   // Quick Links

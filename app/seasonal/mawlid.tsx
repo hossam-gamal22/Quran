@@ -1,7 +1,7 @@
 // app/seasonal/mawlid.tsx
 // صفحة ذكرى المولد النبوي - روح المسلم
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,20 @@ import {
   StatusBar,
   RefreshControl,
   Share,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
-import { useSettings } from '@/contexts/SettingsContext';
+import { useSettings, useTranslation } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getLanguage } from '@/lib/i18n';
+import TranslatedText from '@/components/ui/TranslatedText';
 
 // ========================================
 // الثوابت
@@ -93,13 +98,23 @@ interface ProphetNameCardProps {
 }
 
 const ProphetNameCard: React.FC<ProphetNameCardProps> = ({ item, index, isDarkMode }) => {
+  const colors = useColors();
+  const isArabic = getLanguage() === 'ar';
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 80).duration(400)}
       style={[styles.nameCard, isDarkMode && styles.nameCardDark]}
     >
-      <Text style={[styles.nameText, isDarkMode && styles.textLight]}>{item.name}</Text>
-      <Text style={[styles.meaningText, isDarkMode && styles.textMuted]}>{item.meaning}</Text>
+      {isArabic ? (
+        <Text style={[styles.nameText, isDarkMode && styles.textLight]}>{item.name}</Text>
+      ) : (
+        <TranslatedText style={[styles.nameText, isDarkMode && styles.textLight]}>{item.name}</TranslatedText>
+      )}
+      {isArabic ? (
+        <Text style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</Text>
+      ) : (
+        <TranslatedText style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</TranslatedText>
+      )}
     </Animated.View>
   );
 };
@@ -111,6 +126,8 @@ interface QualityCardProps {
 }
 
 const QualityCard: React.FC<QualityCardProps> = ({ quality, index, isDarkMode }) => {
+  const colors = useColors();
+  const isArabic = getLanguage() === 'ar';
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 60).duration(400)}
@@ -120,8 +137,16 @@ const QualityCard: React.FC<QualityCardProps> = ({ quality, index, isDarkMode })
         <View style={styles.qualityIcon}>
           <MaterialCommunityIcons name={quality.icon as any} size={28} color={MAWLID_COLOR} />
         </View>
-        <Text style={[styles.qualityTitle, isDarkMode && styles.textLight]}>{quality.title}</Text>
-        <Text style={[styles.qualityDesc, isDarkMode && styles.textMuted]}>{quality.description}</Text>
+        {isArabic ? (
+          <Text style={[styles.qualityTitle, { color: colors.text }]}>{quality.title}</Text>
+        ) : (
+          <TranslatedText style={[styles.qualityTitle, { color: colors.text }]}>{quality.title}</TranslatedText>
+        )}
+        {isArabic ? (
+          <Text style={[styles.qualityDesc, { color: colors.textLight }]}>{quality.description}</Text>
+        ) : (
+          <TranslatedText style={[styles.qualityDesc, { color: colors.textLight }]}>{quality.description}</TranslatedText>
+        )}
       </View>
     </Animated.View>
   );
@@ -135,11 +160,18 @@ interface SalawatCardProps {
 }
 
 const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode, index }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
       <View style={[styles.salawatCard, isDarkMode && styles.salawatCardDark]}>
-        <View style={styles.salawatHeader}>
-          <Text style={[styles.salawatTitle, isDarkMode && styles.textLight]}>{salawat.title}</Text>
+        <View style={[styles.salawatHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {isArabicLang ? (
+            <Text style={[styles.salawatTitle, { color: colors.text }]}>{salawat.title}</Text>
+          ) : (
+            <TranslatedText style={[styles.salawatTitle, { color: colors.text }]}>{salawat.title}</TranslatedText>
+          )}
           <TouchableOpacity
             style={styles.shareButton}
             onPress={() => {
@@ -150,13 +182,21 @@ const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode,
             <MaterialCommunityIcons name="share-variant" size={20} color={MAWLID_COLOR} />
           </TouchableOpacity>
         </View>
-        <Text style={[styles.salawatArabic, isDarkMode && styles.textLight]}>{salawat.arabic}</Text>
+        {isArabicLang ? (
+          <Text style={[styles.salawatArabic, { color: colors.text, writingDirection: 'rtl' }]}>{salawat.arabic}</Text>
+        ) : (
+          <TranslatedText style={[styles.salawatArabic, { color: colors.text }]}>{salawat.arabic}</TranslatedText>
+        )}
         <View style={styles.salawatVirtueWrapper}>
           <View style={styles.salawatVirtueStarCircle}>
             <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
           </View>
           <View style={styles.salawatVirtue}>
-            <Text style={[styles.salawatVirtueText, isDarkMode && styles.textMuted]}>{salawat.virtue}</Text>
+            {isArabicLang ? (
+              <Text style={[styles.salawatVirtueText, { color: colors.textLight }]}>{salawat.virtue}</Text>
+            ) : (
+              <TranslatedText style={[styles.salawatVirtueText, { color: colors.textLight }]}>{salawat.virtue}</TranslatedText>
+            )}
           </View>
         </View>
       </View>
@@ -169,10 +209,60 @@ const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode,
 // ========================================
 
 export default function MawlidScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const { t } = useTranslation();
+  const colors = useColors();
+  const isArabicLang = getLanguage() === 'ar';
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [salawatCount, setSalawatCount] = useState(0);
+
+  const prophetNames = useMemo(() => [
+    { name: t('seasonal.mawlid.nameMuhammad'), meaning: t('seasonal.mawlid.nameMuhammadMeaning') },
+    { name: t('seasonal.mawlid.nameAhmad'), meaning: t('seasonal.mawlid.nameAhmadMeaning') },
+    { name: t('seasonal.mawlid.nameAlMahi'), meaning: t('seasonal.mawlid.nameAlMahiMeaning') },
+    { name: t('seasonal.mawlid.nameAlHashir'), meaning: t('seasonal.mawlid.nameAlHashirMeaning') },
+    { name: t('seasonal.mawlid.nameAlAqib'), meaning: t('seasonal.mawlid.nameAlAqibMeaning') },
+    { name: t('seasonal.mawlid.nameAlMuqaffi'), meaning: t('seasonal.mawlid.nameAlMuqaffiMeaning') },
+  ], [t]);
+
+  const prophetQualities = useMemo(() => [
+    { icon: 'account-heart', title: t('seasonal.mawlid.qualityMercy'), description: t('seasonal.mawlid.qualityMercyDesc') },
+    { icon: 'shield-check', title: t('seasonal.mawlid.qualityHonesty'), description: t('seasonal.mawlid.qualityHonestyDesc') },
+    { icon: 'hand-heart', title: t('seasonal.mawlid.qualityGenerosity'), description: t('seasonal.mawlid.qualityGenerosityDesc') },
+    { icon: 'meditation', title: t('seasonal.mawlid.qualityHumility'), description: t('seasonal.mawlid.qualityHumilityDesc') },
+    { icon: 'emoticon-happy', title: t('seasonal.mawlid.qualityCheerfulness'), description: t('seasonal.mawlid.qualityCheerfulnessDesc') },
+    { icon: 'arm-flex', title: t('seasonal.mawlid.qualityBravery'), description: t('seasonal.mawlid.qualityBraveryDesc') },
+  ], [t]);
+
+  const salawatList = useMemo(() => [
+    {
+      id: 'ibrahimiyah',
+      title: t('seasonal.mawlid.salawatIbrahimiyah'),
+      arabic: 'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ، اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ، كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ، إِنَّكَ حَمِيدٌ مَجِيدٌ',
+      virtue: t('seasonal.mawlid.salawatIbrahimiyahVirtue'),
+    },
+    {
+      id: 'short',
+      title: t('seasonal.mawlid.salawatShort'),
+      arabic: 'اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ',
+      virtue: t('seasonal.mawlid.salawatShortVirtue'),
+    },
+    {
+      id: 'salam',
+      title: t('seasonal.mawlid.salawatSalam'),
+      arabic: 'السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ',
+      virtue: t('seasonal.mawlid.salawatSalamVirtue'),
+    },
+  ], [t]);
+
+  const recommendedActions = useMemo(() => [
+    { id: 'salawat', icon: 'heart', title: t('seasonal.mawlid.actionSalawat'), color: '#e91e63' },
+    { id: 'seerah', icon: 'book-open-variant', title: t('seasonal.mawlid.actionSeerah'), color: '#3a7ca5' },
+    { id: 'sunnah', icon: 'star', title: t('seasonal.mawlid.actionSunnah'), color: '#f5a623' },
+    { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#2f7659' },
+  ], [t]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -197,11 +287,12 @@ export default function MawlidScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={MAWLID_COLOR} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -209,11 +300,11 @@ export default function MawlidScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>ذكرى المولد النبوي</Text>
-          <Text style={styles.headerSubtitle}>{PROPHET_INFO.birthDate}</Text>
+          <Text style={styles.headerTitle}>{t('seasonal.mawlid.title')}</Text>
+          <Text style={styles.headerSubtitle}>{t('seasonal.mawlid.birthDate')}</Text>
         </View>
         <View style={styles.headerPlaceholder} />
 
@@ -222,7 +313,7 @@ export default function MawlidScreen() {
           name="star-four-points"
           size={80}
           color="rgba(255,255,255,0.15)"
-          style={styles.headerDecoration}
+          style={[styles.headerDecoration, isRTL ? null : { right: 20, left: undefined }]}
         />
       </View>
 
@@ -247,23 +338,23 @@ export default function MawlidScreen() {
             <View style={styles.prophetIconContainer}>
               <MaterialCommunityIcons name="star-crescent" size={40} color={MAWLID_COLOR} />
             </View>
-            <Text style={[styles.prophetName, isDarkMode && styles.textLight]}>
-              {PROPHET_INFO.name}
+            <Text style={[styles.prophetName, { color: colors.text }]}>
+              {t('seasonal.mawlid.prophetName')}
             </Text>
-            <Text style={[styles.prophetFullName, isDarkMode && styles.textMuted]}>
-              {PROPHET_INFO.fullName}
+            <Text style={[styles.prophetFullName, { color: colors.textLight }]}>
+              {t('seasonal.mawlid.prophetFullName')}
             </Text>
-            <View style={styles.prophetInfo}>
-              <View style={styles.prophetInfoItem}>
+            <View style={[styles.prophetInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.prophetInfoItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="map-marker" size={16} color={MAWLID_COLOR} />
-                <Text style={[styles.prophetInfoText, isDarkMode && styles.textMuted]}>
-                  {PROPHET_INFO.birthPlace}
+                <Text style={[styles.prophetInfoText, { color: colors.textLight }]}>
+                  {t('seasonal.mawlid.birthPlace')}
                 </Text>
               </View>
-              <View style={styles.prophetInfoItem}>
+              <View style={[styles.prophetInfoItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="calendar" size={16} color={MAWLID_COLOR} />
-                <Text style={[styles.prophetInfoText, isDarkMode && styles.textMuted]}>
-                  {PROPHET_INFO.birthYear}
+                <Text style={[styles.prophetInfoText, { color: colors.textLight }]}>
+                  {t('seasonal.mawlid.birthYear')}
                 </Text>
               </View>
             </View>
@@ -273,39 +364,39 @@ export default function MawlidScreen() {
         {/* عداد الصلاة على النبي */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <View style={[styles.counterCard, isDarkMode && styles.counterCardDark]}>
-            <Text style={[styles.counterLabel, isDarkMode && styles.textMuted]}>
-              صلِّ على النبي ﷺ
+            <Text style={[styles.counterLabel, { color: colors.textLight }]}>
+              {t('seasonal.mawlid.counterLabel')}
             </Text>
             <TouchableOpacity style={styles.counterButton} onPress={handleSalawat} activeOpacity={0.8}>
               <View style={[styles.counterButtonGradient, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
                 <Text style={styles.counterValue}>{salawatCount}</Text>
-                <Text style={styles.counterButtonText}>اضغط للصلاة على النبي</Text>
+                <Text style={styles.counterButtonText}>{t('seasonal.mawlid.counterButton')}</Text>
               </View>
             </TouchableOpacity>
           </View>
         </Animated.View>
 
         {/* أسماء النبي ﷺ */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>من أسماء النبي ﷺ</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.namesSection')}</Text>
         <View style={styles.namesGrid}>
-          {PROPHET_NAMES.map((item, index) => (
+          {prophetNames.map((item, index) => (
             <ProphetNameCard key={item.name} item={item} index={index} isDarkMode={isDarkMode} />
           ))}
         </View>
 
         {/* صفات النبي ﷺ */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>من صفاته ﷺ</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.qualitiesSection')}</Text>
         <View style={styles.qualitiesGrid}>
-          {PROPHET_QUALITIES.map((quality, index) => (
+          {prophetQualities.map((quality, index) => (
             <QualityCard key={quality.title} quality={quality} index={index} isDarkMode={isDarkMode} />
           ))}
         </View>
 
         {/* صيغ الصلاة على النبي */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-          صيغ الصلاة على النبي ﷺ
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+          {t('seasonal.mawlid.salawatSection')}
         </Text>
-        {SALAWAT.map((salawat, index) => (
+        {salawatList.map((salawat, index) => (
           <SalawatCard
             key={salawat.id}
             salawat={salawat}
@@ -316,31 +407,34 @@ export default function MawlidScreen() {
         ))}
 
         {/* الأعمال المستحبة */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>في هذا اليوم</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.todaySection')}</Text>
         <View style={[styles.actionsCard, isDarkMode && styles.actionsCardDark]}>
-          {RECOMMENDED_ACTIONS.map((action, index) => (
+          {recommendedActions.map((action, index) => (
             <Animated.View
               key={action.id}
               entering={FadeInDown.delay(index * 80).duration(400)}
-              style={styles.actionItem}
+              style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             >
               <View style={styles.actionIcon}>
                 <MaterialCommunityIcons name={action.icon as any} size={22} color={action.color} />
               </View>
-              <Text style={[styles.actionTitle, isDarkMode && styles.textLight]}>{action.title}</Text>
+              {isArabicLang ? (
+                <Text style={[styles.actionTitle, { color: colors.text }]}>{action.title}</Text>
+              ) : (
+                <TranslatedText style={[styles.actionTitle, { color: colors.text }]}>{action.title}</TranslatedText>
+              )}
             </Animated.View>
           ))}
         </View>
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark]}>
+          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#f5a623" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>تذكير</Text>
-              <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
-                أفضل طريقة لإحياء ذكرى المولد هي اتباع سنته ﷺ والتخلق بأخلاقه الكريمة، 
-                والإكثار من الصلاة والسلام عليه.
+              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.mawlid.reminder')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight }]}>
+                {t('seasonal.mawlid.reminderText')}
               </Text>
             </View>
           </View>
@@ -349,6 +443,7 @@ export default function MawlidScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -384,12 +479,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   headerPlaceholder: {
@@ -430,12 +525,12 @@ const styles = StyleSheet.create({
   },
   prophetName: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   prophetFullName: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 4,
   },
@@ -447,11 +542,11 @@ const styles = StyleSheet.create({
   prophetInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   prophetInfoText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
 
@@ -468,7 +563,7 @@ const styles = StyleSheet.create({
   },
   counterLabel: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginBottom: 12,
   },
@@ -483,12 +578,12 @@ const styles = StyleSheet.create({
   },
   counterValue: {
     fontSize: 48,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   counterButtonText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.9)',
     marginTop: 4,
   },
@@ -496,7 +591,7 @@ const styles = StyleSheet.create({
   // العناوين
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginTop: 24,
     marginBottom: 12,
@@ -515,13 +610,13 @@ const styles = StyleSheet.create({
   nameCardDark: {},
   nameText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: MAWLID_COLOR,
     textAlign: 'center',
   },
   meaningText: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
     marginTop: 2,
@@ -557,12 +652,12 @@ const styles = StyleSheet.create({
   },
   qualityTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   qualityDesc: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
     marginTop: 4,
@@ -586,7 +681,7 @@ const styles = StyleSheet.create({
   },
   salawatTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   shareButton: {
@@ -599,9 +694,10 @@ const styles = StyleSheet.create({
   },
   salawatArabic: {
     fontSize: 18,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
     textAlign: 'center',
+    writingDirection: 'rtl',
     lineHeight: 32,
     marginBottom: 12,
   },
@@ -629,7 +725,7 @@ const styles = StyleSheet.create({
   },
   salawatVirtueText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
 
@@ -657,7 +753,7 @@ const styles = StyleSheet.create({
   },
   actionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
     flex: 1,
   },
@@ -679,12 +775,12 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   tipText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
     marginTop: 4,

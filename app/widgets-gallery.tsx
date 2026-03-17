@@ -10,9 +10,9 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
-  I18nManager,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +20,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getLanguage } from '@/lib/i18n';
+import { UniversalHeader } from '@/components/ui';
+import { toWesternNumerals, getSurahEnglishName } from '@/lib/quran-evidence';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -38,48 +44,50 @@ interface WidgetCategory {
 
 // -- Constants --
 
-const CATEGORIES: WidgetCategory[] = [
+function getCategories(): WidgetCategory[] {
+  return [
   {
     id: 'prayer',
-    title: 'مواقيت الصلاة',
+    title: t('widgets.prayerTimesTitle'),
     icon: 'mosque',
     gradient: ['#2f7659', '#1d4a3a'],
     deepLink: 'rooh-almuslim://prayer',
-    description: 'يعرض جميع مواقيت الصلاة مع تحديد القادمة وإمكانية تسجيل الإكمال',
+    description: t('widgets.prayerTimesDesc'),
   },
   {
     id: 'ayah',
-    title: 'آية اليوم',
+    title: t('widgets.dailyAyahTitle'),
     icon: 'book-open-page-variant',
     gradient: ['#1e3a5f', '#2f7659'],
     deepLink: 'rooh-almuslim://daily-ayah',
-    description: 'يعرض آية يومية متجددة مع اسم السورة ورقم الآية',
+    description: t('widgets.dailyAyahDesc'),
   },
   {
     id: 'dhikr',
-    title: 'ذكر اليوم',
+    title: t('widgets.dailyDhikrTitle'),
     icon: 'hand-heart',
     gradient: ['#5d4e8c', '#7c3aed'],
     deepLink: 'rooh-almuslim://azkar',
-    description: 'يعرض ذكراً يومياً متجدداً مع فضله وعدد التكرار',
+    description: t('widgets.dailyDhikrDesc'),
   },
   {
     id: 'azkar',
-    title: 'أدعية وأذكار',
+    title: t('widgets.azkarTitle'),
     icon: 'star-crescent',
     gradient: ['#4c1d95', '#5b21b6'],
     deepLink: 'rooh-almuslim://azkar/morning',
-    description: 'يعرض أذكار وأدعية متنوعة تتجدد تلقائياً',
+    description: t('widgets.azkarDesc'),
   },
   {
     id: 'hijri',
-    title: 'التاريخ الهجري',
+    title: t('widgets.hijriTitle'),
     icon: 'calendar-month',
     gradient: ['#92400e', '#b45309'],
     deepLink: 'rooh-almuslim://hijri',
-    description: 'يعرض التاريخ الهجري مع التاريخ الميلادي',
+    description: t('widgets.hijriDesc'),
   },
 ];
+}
 
 const WIDGET_PREVIEW_SIZE = {
   small: { width: 160, height: 160 },
@@ -93,13 +101,13 @@ function handleAddWidget() {
 
   if (Platform.OS === 'ios') {
     Alert.alert(
-      'إضافة ويدجت',
-      'اضغط مطولاً على الشاشة الرئيسية ← (+) ← ابحث عن روح المسلم',
-      [{ text: 'حسناً', style: 'default' }],
+      t('widgets.addWidget'),
+      t('widgets.addWidgetIosInstructions'),
+      [{ text: t('common.ok'), style: 'default' }],
     );
   } else {
-    Alert.alert('إضافة ويدجت', 'تم طلب إضافة الويدجت', [
-      { text: 'حسناً', style: 'default' },
+    Alert.alert(t('widgets.addWidget'), t('widgets.addWidgetRequested'), [
+      { text: t('common.ok'), style: 'default' },
     ]);
   }
 }
@@ -133,6 +141,9 @@ function AyahPreview({ size }: { size: WidgetSize }) {
 }
 
 function AyahPreviewText({ size }: { size: WidgetSize }) {
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
+  const surahRef = isAr ? 'الفاتحة - آية ١' : `${getSurahEnglishName(1)} - ${t('quran.verseOfDay')} 1`;
   return (
     <>
       <MaterialCommunityIcons
@@ -141,13 +152,18 @@ function AyahPreviewText({ size }: { size: WidgetSize }) {
         color="rgba(255,255,255,0.5)"
         style={styles.previewIcon}
       />
-      <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
-        بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
+      <Text
+        style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall, !isAr && { fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 16 : 18 }]}
+        numberOfLines={size === 'small' ? 3 : 4}
+      >
+        {isAr
+          ? 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ'
+          : 'In the name of Allāh, the Entirely Merciful, the Especially Merciful.'}
       </Text>
-      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        الفاتحة - آية ١
+      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall, !isAr && { fontSize: size === 'small' ? 9 : 11, lineHeight: size === 'small' ? 14 : 16 }]}>
+        {surahRef}
       </Text>
-      <Text style={styles.previewLabel}>آية اليوم</Text>
+      <Text style={styles.previewLabel}>{t('widgets.dailyAyahTitle')}</Text>
     </>
   );
 }
@@ -179,10 +195,13 @@ function PrayerPreview({ size }: { size: WidgetSize }) {
 }
 
 function PrayerPreviewText({ size }: { size: WidgetSize }) {
+  const isRTL = useIsRTL();
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
   const prayers = [
-    { name: 'الفجر', time: '٤:٣٠', done: true },
-    { name: 'الظهر', time: '١٢:١٥', done: false, isNext: true },
-    { name: 'العصر', time: '٣:٤٥', done: false },
+    { name: t('prayer.fajr'), time: isAr ? '٤:٣٠' : '4:30', done: true },
+    { name: t('prayer.dhuhr'), time: isAr ? '١٢:١٥' : '12:15', done: false, isNext: true },
+    { name: t('prayer.asr'), time: isAr ? '٣:٤٥' : '3:45', done: false },
   ];
   return (
     <>
@@ -195,33 +214,33 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
       {size === 'small' ? (
         <>
           <Text style={[styles.previewArabic, styles.previewArabicSmall]}>
-            الظهر
+            {t('prayer.dhuhr')}
           </Text>
-          <Text style={{ fontFamily: 'Cairo-Bold', fontSize: 20, color: '#fff' }}>
-            ١٢:١٥ م
+          <Text style={{ fontFamily: fontBold(), fontSize: 20, color: '#fff' }}>
+            {isAr ? '١٢:١٥ م' : '12:15 PM'}
           </Text>
-          <Text style={styles.previewLabel}>الصلاة القادمة</Text>
+          <Text style={styles.previewLabel}>{t('widgets.nextPrayer')}</Text>
         </>
       ) : (
         <View style={{ width: '100%', gap: 4 }}>
           {prayers.map((p) => (
-            <View key={p.name} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View key={p.name} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                 <MaterialCommunityIcons
                   name={p.done ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
                   size={14}
                   color={p.done ? '#4CAF50' : p.isNext ? '#FFD700' : 'rgba(255,255,255,0.5)'}
                 />
-                <Text style={{ fontFamily: 'Cairo-Medium', fontSize: 13, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+                <Text style={{ fontFamily: fontMedium(), fontSize: 13, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
                   {p.name}
                 </Text>
               </View>
-              <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+              <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
                 {p.time}
               </Text>
             </View>
           ))}
-          <Text style={styles.previewLabel}>مواقيت الصلاة</Text>
+          <Text style={styles.previewLabel}>{t('widgets.prayerTimesTitle')}</Text>
         </View>
       )}
     </>
@@ -255,6 +274,8 @@ function DhikrPreview({ size }: { size: WidgetSize }) {
 }
 
 function DhikrPreviewText({ size }: { size: WidgetSize }) {
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
   return (
     <>
       <MaterialCommunityIcons
@@ -264,12 +285,12 @@ function DhikrPreviewText({ size }: { size: WidgetSize }) {
         style={styles.previewIcon}
       />
       <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
-        سبحان الله وبحمده
+        {isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi'}
       </Text>
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        ٣ مرات
+        {isAr ? '٣ مرات' : `3 ${t('azkar.times')}`}
       </Text>
-      <Text style={styles.previewLabel}>ذكر اليوم</Text>
+      <Text style={styles.previewLabel}>{t('widgets.dailyDhikrTitle')}</Text>
     </>
   );
 }
@@ -301,6 +322,8 @@ function AzkarPreview({ size }: { size: WidgetSize }) {
 }
 
 function AzkarPreviewText({ size }: { size: WidgetSize }) {
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
   return (
     <>
       <MaterialCommunityIcons
@@ -310,12 +333,12 @@ function AzkarPreviewText({ size }: { size: WidgetSize }) {
         style={styles.previewIcon}
       />
       <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
-        سبحان الله وبحمده
+        {isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi'}
       </Text>
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        سبحان الله العظيم
+        {isAr ? 'سبحان الله العظيم' : 'SubhanAllah al-Azeem'}
       </Text>
-      <Text style={styles.previewLabel}>أذكار</Text>
+      <Text style={styles.previewLabel}>{t('widgets.azkarTitle')}</Text>
     </>
   );
 }
@@ -347,6 +370,8 @@ function HijriPreview({ size }: { size: WidgetSize }) {
 }
 
 function HijriPreviewText({ size }: { size: WidgetSize }) {
+  const lang = getLanguage();
+  const isAr = lang === 'ar';
   return (
     <>
       <MaterialCommunityIcons
@@ -357,9 +382,9 @@ function HijriPreviewText({ size }: { size: WidgetSize }) {
       />
       <Text style={[styles.hijriDay, size === 'small' && styles.hijriDaySmall]}>15</Text>
       <Text style={[styles.hijriMonth, size === 'small' && styles.hijriMonthSmall]}>
-        رمضان 1447
+        {isAr ? 'رمضان ١٤٤٧' : 'Ramadan 1447'}
       </Text>
-      <Text style={styles.previewLabel}>التاريخ الهجري</Text>
+      <Text style={styles.previewLabel}>{t('widgets.hijriTitle')}</Text>
     </>
   );
 }
@@ -403,11 +428,14 @@ function WidgetThumbnail({
 // -- Main Screen --
 
 export default function WidgetsGalleryScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
+  const { settings } = useSettings();
+  const categories = getCategories();
   const [activeTab, setActiveTab] = useState('ayah');
   const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
 
-  const activeCategory = CATEGORIES.find((c) => c.id === activeTab) ?? CATEGORIES[0];
+  const activeCategory = categories.find((c) => c.id === activeTab) ?? categories[0];
 
   const onTabPress = useCallback((id: string) => {
     Haptics.selectionAsync();
@@ -422,23 +450,14 @@ export default function WidgetsGalleryScreen() {
   const PreviewComponent = PREVIEW_MAP[activeCategory.id];
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top', 'bottom']}>
       {/* Header */}
-      <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
-            size={28}
-            color="#fff"
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>معرض الويدجت</Text>
-        <View style={{ width: 40 }} />
-      </Animated.View>
+      <UniversalHeader
+        title={t('widgets.galleryTitle')}
+        titleColor="#fff"
+        backColor="#fff"
+      />
 
       {/* Horizontal widget thumbnails */}
       <Animated.View entering={FadeInRight.duration(500).delay(100)}>
@@ -446,14 +465,16 @@ export default function WidgetsGalleryScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.thumbnailsContainer}
+          style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
         >
-          {CATEGORIES.map((cat) => (
-            <WidgetThumbnail
-              key={cat.id}
-              category={cat}
-              isSelected={activeTab === cat.id}
-              onPress={() => onTabPress(cat.id)}
-            />
+          {categories.map((cat) => (
+            <View key={cat.id} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
+              <WidgetThumbnail
+                category={cat}
+                isSelected={activeTab === cat.id}
+                onPress={() => onTabPress(cat.id)}
+              />
+            </View>
           ))}
         </ScrollView>
       </Animated.View>
@@ -475,14 +496,14 @@ export default function WidgetsGalleryScreen() {
 
         {/* Info */}
         <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.detailInfo}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardTitleRow}>
+          <View style={[styles.cardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.cardTitleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons
                 name={activeCategory.icon as any}
                 size={22}
                 color="#3d9970"
               />
-              <Text style={styles.cardTitle}>{activeCategory.title}</Text>
+              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{activeCategory.title}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -496,16 +517,16 @@ export default function WidgetsGalleryScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.cardDescription}>{activeCategory.description}</Text>
+          <Text style={[styles.cardDescription, { textAlign: isRTL ? 'right' : 'left' }]}>{activeCategory.description}</Text>
 
           {/* Size pills */}
-          <View style={styles.sizePills}>
+          <View style={[styles.sizePills, { flexDirection: 'row' }]}>
             <TouchableOpacity
               onPress={() => onSizeChange('small')}
               style={[styles.pill, selectedSize === 'small' && styles.pillActive]}
             >
               <Text style={[styles.pillText, selectedSize === 'small' && styles.pillTextActive]}>
-                صغير
+                {t('widgets.sizeSmall')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -513,7 +534,7 @@ export default function WidgetsGalleryScreen() {
               style={[styles.pill, selectedSize === 'medium' && styles.pillActive]}
             >
               <Text style={[styles.pillText, selectedSize === 'medium' && styles.pillTextActive]}>
-                متوسط
+                {t('widgets.sizeMedium')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -528,10 +549,10 @@ export default function WidgetsGalleryScreen() {
               colors={['#2f7659', '#3d9970']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.addButtonGradient}
+              style={[styles.addButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             >
               <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>إضافة للشاشة الرئيسية</Text>
+              <Text style={styles.addButtonText}>{t('widgets.addToHomeScreen')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -543,13 +564,13 @@ export default function WidgetsGalleryScreen() {
               Haptics.selectionAsync();
               router.push('/widget-settings');
             }}
-            style={styles.bottomLink}
+            style={[styles.bottomLink, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="cog-outline" size={18} color="#3d9970" />
-            <Text style={styles.bottomLinkText}>إعدادات الويدجت</Text>
+            <Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.widgetSettings')}</Text>
             <MaterialCommunityIcons
-              name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+              name={isRTL ? 'chevron-left' : 'chevron-right'}
               size={18}
               color="rgba(255,255,255,0.3)"
             />
@@ -557,6 +578,7 @@ export default function WidgetsGalleryScreen() {
         </Animated.View>
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -567,27 +589,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0a0a',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 20,
-    color: '#fff',
-    textAlign: 'center',
-  },
+
 
   // Tabs – replaced by thumbnail strip
   thumbnailsContainer: {
@@ -664,6 +666,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#fff',
     textAlign: 'center',
+    writingDirection: 'rtl',
     lineHeight: 30,
   },
   previewArabicSmall: {
@@ -675,6 +678,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
+    writingDirection: 'rtl',
     marginTop: 4,
     lineHeight: 26,
   },
@@ -683,7 +687,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   previewLabel: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
     position: 'absolute',
@@ -727,7 +731,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 18,
     color: '#fff',
   },
@@ -740,7 +744,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardDescription: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
     lineHeight: 22,
@@ -766,7 +770,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(61,153,112,0.5)',
   },
   pillText: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
   },
@@ -788,7 +792,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   addButtonText: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 15,
     color: '#fff',
   },
@@ -803,7 +807,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bottomLinkText: {
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
   },

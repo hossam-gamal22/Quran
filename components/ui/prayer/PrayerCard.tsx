@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -24,10 +25,11 @@ import {
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
-  formatTime12h,
+  formatPrayerTime,
   getPrayerIcon,
 } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const { width } = Dimensions.get('window');
 
@@ -37,6 +39,7 @@ interface PrayerCardProps {
   location?: string;
   language?: string;
   isDarkMode?: boolean;
+  show24Hour?: boolean;
 }
 
 export const PrayerCard: React.FC<PrayerCardProps> = ({
@@ -45,8 +48,10 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
   location,
   language = 'ar',
   isDarkMode = false,
+  show24Hour = false,
 }) => {
   const { t } = useSettings();
+  const isRTL = useIsRTL();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -142,7 +147,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
         <View style={styles.content}>
           <View style={styles.mainContent}>
             {hijriDate && (
-              <View style={styles.dateContainer}>
+              <View style={[styles.dateContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="moon-waning-crescent" size={16} color="#fff" />
                 <Text style={styles.dateText}>{hijriDate}</Text>
               </View>
@@ -152,7 +157,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
               {t('prayer.nextPrayer')}
             </Text>
 
-            <View style={styles.prayerInfo}>
+            <View style={[styles.prayerInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons
                 name={prayerIcon as any}
                 size={50}
@@ -161,7 +166,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
               <View style={styles.prayerDetails}>
                 <Text style={styles.prayerName}>{prayerNameLocalized}</Text>
                 <Text style={styles.prayerTime}>
-                  {formatTime12h(nextPrayer.time)}
+                  {formatPrayerTime(nextPrayer.time, show24Hour)}
                 </Text>
               </View>
             </View>
@@ -172,11 +177,11 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
                   {t('prayer.timeRemaining')}
                 </Text>
                 <Animated.View style={[styles.countdown, pulseAnimatedStyle]}>
-                  <CountdownDigit value={timeRemaining.hours} label="س" />
+                  <CountdownDigit value={timeRemaining.hours} label={t('countdown.hourLabel')} />
                   <Text style={styles.countdownSeparator}>:</Text>
-                  <CountdownDigit value={timeRemaining.minutes} label="د" />
+                  <CountdownDigit value={timeRemaining.minutes} label={t('countdown.minuteLabel')} />
                   <Text style={styles.countdownSeparator}>:</Text>
-                  <CountdownDigit value={timeRemaining.seconds} label="ث" />
+                  <CountdownDigit value={timeRemaining.seconds} label={t('countdown.secondLabel')} />
                 </Animated.View>
               </View>
             )}
@@ -232,7 +237,7 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#333',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
   textLight: {
     color: '#fff',
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -255,7 +260,7 @@ const styles = StyleSheet.create({
   dateText: {
     color: '#fff',
     fontSize: 13,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
   mainContent: {
     alignItems: 'center',
@@ -263,7 +268,7 @@ const styles = StyleSheet.create({
   nextLabel: {
     fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginBottom: 10,
   },
   prayerInfo: {
@@ -278,12 +283,12 @@ const styles = StyleSheet.create({
   prayerName: {
     fontSize: 28,
     color: '#fff',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   prayerTime: {
     fontSize: 20,
     color: 'rgba(255,255,255,0.9)',
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
   countdownContainer: {
     alignItems: 'center',
@@ -296,7 +301,7 @@ const styles = StyleSheet.create({
   remainingLabel: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginBottom: 8,
   },
   countdown: {
@@ -307,7 +312,7 @@ const styles = StyleSheet.create({
   countdownSeparator: {
     fontSize: 32,
     color: '#fff',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     marginHorizontal: 5,
   },
   digitContainer: {
@@ -317,12 +322,12 @@ const styles = StyleSheet.create({
   digitValue: {
     fontSize: 36,
     color: '#fff',
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   digitLabel: {
     fontSize: 10,
     color: 'rgba(255,255,255,0.7)',
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     marginTop: -5,
   },
 });

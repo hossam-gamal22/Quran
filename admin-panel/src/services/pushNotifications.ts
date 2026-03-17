@@ -303,6 +303,7 @@ export const sendPushNotification = async (
         body: translation.body,
         sound: 'default',
         priority: 'high',
+        channelId: 'general',
         data: {
           actionType: payload.actionType,
           actionUrl: payload.actionUrl,
@@ -446,5 +447,205 @@ export const getUserStats = async (): Promise<UserStats> => {
     };
   } catch (error) {
     return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0, byLanguage: {} };
+  }
+};
+
+// ==================== إعادة التفاعل ====================
+
+/**
+ * عدد المستخدمين غير النشطين حسب عتبة الأيام
+ */
+export const getInactiveUserCount = async (inactiveDays: number): Promise<number> => {
+  try {
+    const threshold = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+    const snapshot = await getDocs(collection(db, 'users'));
+    let count = 0;
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
+      if (!data.lastActive) { count++; return; }
+      if (data.lastActive.toDate() <= threshold) count++;
+    });
+    return count;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * إرسال إشعار إعادة تفاعل للمستخدمين غير النشطين
+ */
+export const sendReengagementNotification = async (params: {
+  translations: NotificationTranslations;
+  inactiveDays: number;
+  actionUrl?: string;
+}): Promise<SendResult> => {
+  const { translations, inactiveDays, actionUrl } = params;
+  const errors: string[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
+  const perLanguage: { [lang: string]: number } = {};
+
+  try {
+    // Fetch inactive users with configurable threshold
+    const threshold = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+    const snapshot = await getDocs(collection(db, 'users'));
+    const users: UserToken[] = [];
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
+      const isInactive = !data.lastActive || data.lastActive.toDate() <= threshold;
+      if (isInactive) {
+        users.push({
+          id: doc.id,
+          fcmToken: data.fcmToken,
+          platform: data.platform || 'unknown',
+          language: data.language || 'ar',
+          country: data.country || 'SA',
+          lastActive: data.lastActive,
+        });
+      }
+    });
+
+    if (users.length === 0) {
+      return { success: false, sentCount: 0, failedCount: 0, errors: ['لا يوجد مستخدمين غير نشطين'], perLanguage: {} };
+    }
+
+    const messages: ExpoPushMessage[] = users.map(user => {
+      const translation = getTranslationForUser(translations, user.language);
+      perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+      return {
+        to: user.fcmToken,
+        title: translation.title,
+        body: translation.body,
+        sound: 'default',
+        priority: 'high' as const,
+        channelId: 'general',
+        data: { actionType: 'screen', actionUrl: actionUrl || '/', type: 'reengagement' },
+      };
+    });
+
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch);
+      sentCount += result.successCount;
+      failedCount += result.failureCount;
+      errors.push(...result.errors);
+      if (i + BATCH_SIZE < messages.length) await new Promise(r => setTimeout(r, 100));
+    }
+
+    await addDoc(collection(db, 'notifications'), {
+      translations,
+      targetAudience: 'inactive',
+      actionType: 'screen',
+      actionUrl: actionUrl || '/',
+      status: 'sent',
+      type: 'reengagement',
+      inactiveDays,
+      sentCount,
+      failedCount,
+      perLanguage,
+      sentAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };
+  } catch (error) {
+    return { success: false, sentCount, failedCount, errors: [(error as Error).message], perLanguage };
+  }
+};
+
+/**
+ * ترجمات إشعار الفوز بالجائزة الشهرية
+ */
+const PRIZE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
+  ar: { title: 'مبارك! 🎉', body: 'أنت من أكثر ٣ مستخدمين نشاطاً هذا الشهر. تم تفعيل جميع المميزات المجانية لمدة شهر!' },
+  en: { title: 'Congratulations! 🎉', body: 'You are one of the top 3 most active users this month. All premium features have been activated for free for a month!' },
+  fr: { title: 'Félicitations ! 🎉', body: "Vous êtes l'un des 3 utilisateurs les plus actifs ce mois-ci. Toutes les fonctionnalités premium ont été activées gratuitement pendant un mois !" },
+  de: { title: 'Herzlichen Glückwunsch! 🎉', body: 'Sie gehören zu den 3 aktivsten Nutzern diesen Monat. Alle Premium-Funktionen wurden für einen Monat kostenlos aktiviert!' },
+  es: { title: '¡Felicidades! 🎉', body: '¡Eres uno de los 3 usuarios más activos este mes. Todas las funciones premium se han activado gratis por un mes!' },
+  tr: { title: 'Tebrikler! 🎉', body: 'Bu ay en aktif 3 kullanıcıdan birisiniz. Tüm premium özellikler bir ay boyunca ücretsiz etkinleştirildi!' },
+  ur: { title: 'مبارک ہو! 🎉', body: 'آپ اس مہینے سب سے زیادہ فعال ۳ صارفین میں سے ایک ہیں۔ تمام پریمیم سہولیات ایک ماہ کے لیے مفت فعال کر دی گئی ہیں!' },
+  id: { title: 'Selamat! 🎉', body: 'Anda salah satu dari 3 pengguna paling aktif bulan ini. Semua fitur premium telah diaktifkan gratis selama sebulan!' },
+  ms: { title: 'Tahniah! 🎉', body: 'Anda antara 3 pengguna paling aktif bulan ini. Semua ciri premium telah diaktifkan secara percuma selama sebulan!' },
+  hi: { title: 'बधाई हो! 🎉', body: 'आप इस महीने के शीर्ष 3 सबसे सक्रिय उपयोगकर्ताओं में से एक हैं। सभी प्रीमियम सुविधाएं एक महीने के लिए मुफ्त सक्रिय कर दी गई हैं!' },
+  bn: { title: 'অভিনন্দন! 🎉', body: 'আপনি এই মাসের সবচেয়ে সক্রিয় ৩ জন ব্যবহারকারীর একজন। সমস্ত প্রিমিয়াম বৈশিষ্ট্য এক মাসের জন্য বিনামূল্যে সক্রিয় করা হয়েছে!' },
+  ru: { title: 'Поздравляем! 🎉', body: 'Вы один из 3 самых активных пользователей в этом месяце. Все премиум-функции активированы бесплатно на месяц!' },
+};
+
+/**
+ * إرسال إشعار للفائزين بالجائزة الشهرية
+ */
+export const sendPrizeNotification = async (
+  winnerUserIds: string[]
+): Promise<SendResult> => {
+  const errors: string[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
+  const perLanguage: { [lang: string]: number } = {};
+
+  try {
+    const snapshot = await getDocs(collection(db, 'users'));
+    const winners: UserToken[] = [];
+
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (!winnerUserIds.includes(docSnap.id)) return;
+      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
+      winners.push({
+        id: docSnap.id,
+        fcmToken: data.fcmToken,
+        platform: data.platform || 'unknown',
+        language: data.language || 'ar',
+        country: data.country || 'SA',
+        lastActive: data.lastActive,
+      });
+    });
+
+    if (winners.length === 0) {
+      return { success: false, sentCount: 0, failedCount: 0, errors: ['لا يوجد توكنات للفائزين'], perLanguage: {} };
+    }
+
+    const messages: ExpoPushMessage[] = winners.map(user => {
+      const translation = getTranslationForUser(PRIZE_NOTIFICATION_TRANSLATIONS, user.language);
+      perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+      return {
+        to: user.fcmToken,
+        title: translation.title,
+        body: translation.body,
+        sound: 'default',
+        priority: 'high' as const,
+        channelId: 'general',
+        data: { actionType: 'screen', actionUrl: '/honor-board', type: 'prize' },
+      };
+    });
+
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch);
+      sentCount += result.successCount;
+      failedCount += result.failureCount;
+      errors.push(...result.errors);
+    }
+
+    await addDoc(collection(db, 'notifications'), {
+      translations: PRIZE_NOTIFICATION_TRANSLATIONS,
+      targetAudience: 'custom',
+      actionType: 'screen',
+      actionUrl: '/honor-board',
+      status: 'sent',
+      type: 'prize',
+      winnerUserIds,
+      sentCount,
+      failedCount,
+      perLanguage,
+      sentAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };
+  } catch (error) {
+    return { success: false, sentCount, failedCount, errors: [(error as Error).message], perLanguage };
   }
 };

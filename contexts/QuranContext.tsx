@@ -8,6 +8,7 @@ import {
   fetchAndCacheSurahsList,
 } from '@/lib/quran-cache';
 import { audioPlayer, PlaybackState } from '@/lib/audio-player';
+import { t } from '@/lib/i18n';
 
 interface QuranContextType {
   // البيانات
@@ -55,7 +56,7 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
         setReciters(reciters);
         console.log('✅ Quran data loaded successfully');
       } catch (err) {
-        setError('فشل في تحميل بيانات القرآن');
+        setError(t('common.loadFailed'));
         console.error('❌ Error loading Quran data:', err);
       } finally {
         setIsLoading(false);

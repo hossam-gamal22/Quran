@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { BlurView } from 'expo-blur';
 import RenderHtml, {
   HTMLSource,
@@ -19,6 +20,8 @@ import RenderHtml, {
   HTMLContentModel,
 } from 'react-native-render-html';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -61,9 +64,9 @@ const SYSTEM_FONTS = [
   ...defaultSystemFonts,
   'Amiri-Regular',
   'Amiri-Bold',
-  'Cairo-Regular',
-  'Cairo-SemiBold',
-  'Cairo-Bold',
+  fontRegular(),
+  fontSemiBold(),
+  fontBold(),
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -86,6 +89,7 @@ export function GlassHTML({
   onError,
 }: GlassHTMLProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = windowWidth - 32 - (padding * 2);
 
@@ -138,57 +142,57 @@ export function GlassHTML({
 
     return {
       body: {
-        fontFamily: 'Cairo-Regular',
+        fontFamily: fontRegular(),
         fontSize: 16,
         lineHeight: 28,
         color: colors.text,
-        textAlign: 'right',
-        direction: 'rtl',
+        textAlign: isRTL ? 'right' : 'left',
+        direction: isRTL ? 'rtl' : 'ltr',
       },
       p: {
-        fontFamily: 'Cairo-Regular',
+        fontFamily: fontRegular(),
         fontSize: 16,
         lineHeight: 28,
         color: colors.text,
         marginVertical: 8,
       },
       h1: {
-        fontFamily: 'Cairo-Bold',
+        fontFamily: fontBold(),
         fontSize: 28,
         lineHeight: 40,
         color: colors.text,
         marginVertical: 12,
       },
       h2: {
-        fontFamily: 'Cairo-Bold',
+        fontFamily: fontBold(),
         fontSize: 24,
         lineHeight: 36,
         color: colors.text,
         marginVertical: 10,
       },
       h3: {
-        fontFamily: 'Cairo-SemiBold',
+        fontFamily: fontSemiBold(),
         fontSize: 20,
         lineHeight: 32,
         color: colors.text,
         marginVertical: 8,
       },
       h4: {
-        fontFamily: 'Cairo-SemiBold',
+        fontFamily: fontSemiBold(),
         fontSize: 18,
         lineHeight: 28,
         color: colors.text,
         marginVertical: 6,
       },
       h5: {
-        fontFamily: 'Cairo-SemiBold',
+        fontFamily: fontSemiBold(),
         fontSize: 16,
         lineHeight: 24,
         color: colors.text,
         marginVertical: 4,
       },
       h6: {
-        fontFamily: 'Cairo-SemiBold',
+        fontFamily: fontSemiBold(),
         fontSize: 14,
         lineHeight: 22,
         color: colors.textSecondary,
@@ -196,15 +200,15 @@ export function GlassHTML({
       },
       a: {
         color: colors.link,
-        fontFamily: 'Cairo-SemiBold',
+        fontFamily: fontSemiBold(),
         textDecorationLine: 'none',
       },
       strong: {
-        fontFamily: 'Cairo-Bold',
+        fontFamily: fontBold(),
         fontWeight: '700',
       },
       b: {
-        fontFamily: 'Cairo-Bold',
+        fontFamily: fontBold(),
         fontWeight: '700',
       },
       em: {
@@ -234,13 +238,15 @@ export function GlassHTML({
         fontSize: 20,
         lineHeight: 40,
         color: colors.text,
-        textAlign: 'right',
+        textAlign: isRTL ? 'right' : 'left',
       },
       blockquote: {
-        borderLeftWidth: 3,
-        borderLeftColor: colors.blockquoteBorder,
-        paddingLeft: 16,
-        paddingRight: 0,
+        borderLeftWidth: isRTL ? 0 : 3,
+        borderLeftColor: isRTL ? undefined : colors.blockquoteBorder,
+        borderRightWidth: isRTL ? 3 : 0,
+        borderRightColor: isRTL ? colors.blockquoteBorder : undefined,
+        paddingLeft: isRTL ? 0 : 16,
+        paddingRight: isRTL ? 16 : 0,
         marginVertical: 12,
         fontStyle: 'italic',
         color: colors.textSecondary,
@@ -263,14 +269,16 @@ export function GlassHTML({
       },
       ul: {
         marginVertical: 8,
-        paddingRight: 20,
+        paddingLeft: isRTL ? 0 : 20,
+        paddingRight: isRTL ? 20 : 0,
       },
       ol: {
         marginVertical: 8,
-        paddingRight: 20,
+        paddingLeft: isRTL ? 0 : 20,
+        paddingRight: isRTL ? 20 : 0,
       },
       li: {
-        fontFamily: 'Cairo-Regular',
+        fontFamily: fontRegular(),
         fontSize: 16,
         lineHeight: 28,
         color: colors.text,
@@ -288,18 +296,18 @@ export function GlassHTML({
         overflow: 'hidden',
       },
       th: {
-        fontFamily: 'Cairo-Bold',
+        fontFamily: fontBold(),
         backgroundColor: colors.codeBackground,
         padding: 8,
       },
       td: {
-        fontFamily: 'Cairo-Regular',
+        fontFamily: fontRegular(),
         padding: 8,
         borderTopWidth: 1,
         borderTopColor: colors.border,
       },
     };
-  }, [useAppTypography, colors]);
+  }, [useAppTypography, colors, isRTL]);
 
   // Merge custom styles with defaults
   const mergedTagsStyles = useMemo(() => ({
@@ -309,7 +317,7 @@ export function GlassHTML({
 
   // Base styles for the HTML container
   const mergedBaseStyles: MixedStyleDeclaration = useMemo(() => ({
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 16,
     color: colors.text,
     ...baseStyles,
@@ -329,7 +337,7 @@ export function GlassHTML({
     return errorComponent || (
       <View style={[styles.errorContainer, { padding }]}>
         <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-          فشل تحميل المحتوى
+          {t('common.loadFailed')}
         </Text>
       </View>
     );
@@ -418,7 +426,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
   errorText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
   },
 });

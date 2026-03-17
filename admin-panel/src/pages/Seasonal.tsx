@@ -29,6 +29,10 @@ import {
   Zap,
   Award
 } from 'lucide-react';
+import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
+import { db } from '../firebase';
+import AutoTranslateField from '../components/AutoTranslateField';
+import { Styled } from '../components/Styled';
 
 // ==================== الأنواع ====================
 
@@ -64,6 +68,7 @@ interface SeasonalContent {
     textEn: string;
     action: string;
   };
+  translations?: Record<string, string>;
   stats: {
     views: number;
     interactions: number;
@@ -171,8 +176,18 @@ const Seasonal: React.FC = () => {
 
   const loadData = async () => {
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setContents(INITIAL_CONTENT);
+    try {
+      const q = query(collection(db, 'seasonalContent'), orderBy('priority', 'asc'));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        setContents(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SeasonalContent)));
+      } else {
+        setContents(INITIAL_CONTENT);
+      }
+    } catch (error) {
+      console.error('Error loading seasonal content:', error);
+      setContents(INITIAL_CONTENT);
+    }
     setIsLoading(false);
   };
 
@@ -182,9 +197,17 @@ const Seasonal: React.FC = () => {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      for (const content of contents) {
+        await setDoc(doc(db, 'seasonalContent', content.id), {
+          ...content,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error('Error saving seasonal content:', error);
+    }
     setIsSaving(false);
-    alert('تم حفظ التغييرات بنجاح!');
   };
 
   const handleAddContent = () => {
@@ -220,6 +243,7 @@ const Seasonal: React.FC = () => {
   const handleDeleteContent = (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا المحتوى؟')) {
       setContents(prev => prev.filter(c => c.id !== id));
+      deleteDoc(doc(db, 'seasonalContent', id)).catch(console.error);
     }
   };
 
@@ -232,13 +256,18 @@ const Seasonal: React.FC = () => {
   const handleSaveContent = () => {
     if (!editingContent) return;
     
+    const id = editingContent.id || Date.now().toString();
+    const entry = { ...editingContent, id, updatedAt: new Date().toISOString() };
+    
     if (editingContent.id) {
       setContents(prev => prev.map(c => 
-        c.id === editingContent.id ? { ...editingContent, updatedAt: new Date().toISOString() } : c
+        c.id === editingContent.id ? entry : c
       ));
     } else {
-      setContents(prev => [...prev, { ...editingContent, id: Date.now().toString() }]);
+      setContents(prev => [...prev, entry]);
     }
+    
+    setDoc(doc(db, 'seasonalContent', id), entry).catch(console.error);
     setShowModal(false);
     setEditingContent(null);
   };
@@ -364,6 +393,7 @@ const Seasonal: React.FC = () => {
             <select
               value={selectedSeason}
               onChange={(e) => setSelectedSeason(e.target.value as SeasonType | 'all')}
+              aria-label="فلترة حسب الموسم"
               className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
             >
               <option value="all">جميع المواسم</option>
@@ -393,13 +423,13 @@ const Seasonal: React.FC = () => {
                 >
                   <div className="flex">
                     {/* Preview */}
-                    <div
+                    <Styled
                       className="w-48 p-4 flex flex-col items-center justify-center text-center"
-                      style={{ backgroundColor: content.backgroundColor, color: content.textColor }}
+                      css={{ backgroundColor: content.backgroundColor, color: content.textColor }}
                     >
                       <span className="text-4xl mb-2">{content.icon}</span>
-                      <p className="text-sm font-bold">{content.titleAr}</p>
-                    </div>
+                      <Styled as="p" className="text-sm font-bold" css={{ color: content.textColor }}>{content.titleAr}</Styled>
+                    </Styled>
                     
                     {/* Details */}
                     <div className="flex-1 p-4">
@@ -424,18 +454,32 @@ const Seasonal: React.FC = () => {
                           <button
                             onClick={() => handleEditContent(content)}
                             className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"
+                            aria-label="تعديل"
+                            title="تعديل"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleEditContent({ ...content, id: `sc_${Date.now()}`, titleAr: content.titleAr + ' (نسخة)' })}
+                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg"
+                            aria-label="تكرار"
+                            title="تكرار"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleToggleActive(content.id)}
                             className={`p-2 rounded-lg ${content.isActive ? 'text-amber-500 hover:bg-amber-50' : 'text-green-500 hover:bg-green-50'}`}
+                            aria-label={content.isActive ? 'إخفاء' : 'تفعيل'}
+                            title={content.isActive ? 'إخفاء' : 'تفعيل'}
                           >
                             {content.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                           <button
                             onClick={() => handleDeleteContent(content.id)}
                             className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                            aria-label="حذف"
+                            title="حذف"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -511,6 +555,8 @@ const Seasonal: React.FC = () => {
               <button
                 onClick={() => { setShowModal(false); setEditingContent(null); }}
                 className="p-2 hover:bg-gray-100 rounded-lg"
+                aria-label="إغلاق"
+                title="إغلاق"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -545,6 +591,7 @@ const Seasonal: React.FC = () => {
                       <select
                         value={editingContent.seasonType}
                         onChange={(e) => setEditingContent({ ...editingContent, seasonType: e.target.value as SeasonType })}
+                        aria-label="الموسم"
                         className="w-full px-3 py-2 border rounded-lg"
                       >
                         {SEASON_TYPES.map(s => (
@@ -557,6 +604,7 @@ const Seasonal: React.FC = () => {
                       <select
                         value={editingContent.contentType}
                         onChange={(e) => setEditingContent({ ...editingContent, contentType: e.target.value as ContentType })}
+                        aria-label="نوع المحتوى"
                         className="w-full px-3 py-2 border rounded-lg"
                       >
                         {CONTENT_TYPES.map(c => (
@@ -572,6 +620,7 @@ const Seasonal: React.FC = () => {
                       type="text"
                       value={editingContent.titleAr}
                       onChange={(e) => setEditingContent({ ...editingContent, titleAr: e.target.value })}
+                      aria-label="العنوان بالعربي"
                       className="w-full px-3 py-2 border rounded-lg"
                       placeholder="أدخل العنوان"
                     />
@@ -583,7 +632,9 @@ const Seasonal: React.FC = () => {
                       type="text"
                       value={editingContent.titleEn}
                       onChange={(e) => setEditingContent({ ...editingContent, titleEn: e.target.value })}
+                      aria-label="العنوان بالإنجليزي"
                       className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Enter title"
                       dir="ltr"
                     />
                   </div>
@@ -594,7 +645,9 @@ const Seasonal: React.FC = () => {
                       value={editingContent.contentAr}
                       onChange={(e) => setEditingContent({ ...editingContent, contentAr: e.target.value })}
                       rows={3}
+                      aria-label="المحتوى بالعربي"
                       className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="أدخل المحتوى بالعربي..."
                     />
                   </div>
                   
@@ -604,10 +657,28 @@ const Seasonal: React.FC = () => {
                       value={editingContent.contentEn}
                       onChange={(e) => setEditingContent({ ...editingContent, contentEn: e.target.value })}
                       rows={3}
+                      aria-label="المحتوى بالإنجليزي"
                       className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Enter content..."
                       dir="ltr"
                     />
                   </div>
+
+                  {/* Auto-translate seasonal content */}
+                  <AutoTranslateField
+                    label="ترجمة تلقائية للمحتوى"
+                    fieldName="translations"
+                    contentType="ui"
+                    arabicText={editingContent.contentAr}
+                    initialValues={{ ar: editingContent.contentAr, en: editingContent.contentEn }}
+                    onSave={(translations: Record<string, string>) => {
+                      setEditingContent({
+                        ...editingContent,
+                        contentEn: translations.en || editingContent.contentEn,
+                        translations,
+                      });
+                    }}
+                  />
                 </div>
               )}
 
@@ -620,7 +691,9 @@ const Seasonal: React.FC = () => {
                       type="text"
                       value={editingContent.icon}
                       onChange={(e) => setEditingContent({ ...editingContent, icon: e.target.value })}
+                      aria-label="الأيقونة"
                       className="w-full px-3 py-2 border rounded-lg text-2xl text-center"
+                      placeholder="🌙"
                     />
                   </div>
                   
@@ -631,6 +704,7 @@ const Seasonal: React.FC = () => {
                         type="color"
                         value={editingContent.backgroundColor}
                         onChange={(e) => setEditingContent({ ...editingContent, backgroundColor: e.target.value })}
+                        aria-label="لون الخلفية"
                         className="w-full h-10 rounded cursor-pointer"
                       />
                     </div>
@@ -640,6 +714,7 @@ const Seasonal: React.FC = () => {
                         type="color"
                         value={editingContent.textColor}
                         onChange={(e) => setEditingContent({ ...editingContent, textColor: e.target.value })}
+                        aria-label="لون النص"
                         className="w-full h-10 rounded cursor-pointer"
                       />
                     </div>
@@ -649,6 +724,7 @@ const Seasonal: React.FC = () => {
                         type="color"
                         value={editingContent.accentColor}
                         onChange={(e) => setEditingContent({ ...editingContent, accentColor: e.target.value })}
+                        aria-label="اللون المميز"
                         className="w-full h-10 rounded cursor-pointer"
                       />
                     </div>
@@ -657,14 +733,14 @@ const Seasonal: React.FC = () => {
                   {/* Preview */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">معاينة</label>
-                    <div
+                    <Styled
                       className="p-6 rounded-xl text-center"
-                      style={{ backgroundColor: editingContent.backgroundColor, color: editingContent.textColor }}
+                      css={{ backgroundColor: editingContent.backgroundColor, color: editingContent.textColor }}
                     >
                       <span className="text-5xl mb-3 block">{editingContent.icon}</span>
                       <h3 className="text-xl font-bold mb-2">{editingContent.titleAr || 'العنوان'}</h3>
                       <p className="opacity-90">{editingContent.contentAr || 'المحتوى...'}</p>
-                    </div>
+                    </Styled>
                   </div>
                 </div>
               )}
@@ -691,6 +767,7 @@ const Seasonal: React.FC = () => {
                         type="text"
                         value={editingContent.startDate}
                         onChange={(e) => setEditingContent({ ...editingContent, startDate: e.target.value })}
+                        aria-label="تاريخ البداية"
                         className="w-full px-3 py-2 border rounded-lg"
                         placeholder="9-1 أو friday"
                       />
@@ -701,6 +778,7 @@ const Seasonal: React.FC = () => {
                         type="text"
                         value={editingContent.endDate}
                         onChange={(e) => setEditingContent({ ...editingContent, endDate: e.target.value })}
+                        aria-label="تاريخ النهاية"
                         className="w-full px-3 py-2 border rounded-lg"
                         placeholder="9-30 أو friday"
                       />
@@ -715,6 +793,7 @@ const Seasonal: React.FC = () => {
                       onChange={(e) => setEditingContent({ ...editingContent, priority: parseInt(e.target.value) })}
                       min={1}
                       max={100}
+                      aria-label="الأولوية"
                       className="w-full px-3 py-2 border rounded-lg"
                     />
                   </div>
@@ -724,6 +803,7 @@ const Seasonal: React.FC = () => {
                       type="checkbox"
                       checked={editingContent.isActive}
                       onChange={(e) => setEditingContent({ ...editingContent, isActive: e.target.checked })}
+                      aria-label="نشط"
                       className="w-5 h-5 text-emerald-600 rounded"
                     />
                     <span>نشط</span>

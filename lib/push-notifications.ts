@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { initializeApp, getApps } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { t } from '@/lib/i18n';
 
 // ==================== Firebase Config ====================
 
@@ -88,8 +89,8 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 const setupAndroidChannels = async (): Promise<void> => {
   // Prayer Times Channel
   await Notifications.setNotificationChannelAsync('prayer-times', {
-    name: 'مواقيت الصلاة',
-    description: 'إشعارات أوقات الصلاة',
+    name: t('notifications.prayerTimesChannel'),
+    description: t('notifications.prayerTimesDesc'),
     importance: Notifications.AndroidImportance.HIGH,
     sound: 'default',
     vibrationPattern: [0, 250, 250, 250],
@@ -98,30 +99,30 @@ const setupAndroidChannels = async (): Promise<void> => {
 
   // Azkar Channel
   await Notifications.setNotificationChannelAsync('azkar', {
-    name: 'الأذكار',
-    description: 'تذكيرات الأذكار',
+    name: t('notifications.azkarChannel'),
+    description: t('notifications.azkarDesc'),
     importance: Notifications.AndroidImportance.DEFAULT,
     sound: 'default',
   });
 
   // Daily Ayah Channel
   await Notifications.setNotificationChannelAsync('daily-ayah', {
-    name: 'آية اليوم',
-    description: 'آية قرآنية يومية',
+    name: t('notifications.dailyVerseChannel'),
+    description: t('notifications.dailyVerseDesc'),
     importance: Notifications.AndroidImportance.DEFAULT,
   });
 
   // General Updates Channel
   await Notifications.setNotificationChannelAsync('general', {
-    name: 'تحديثات عامة',
-    description: 'إشعارات وتحديثات عامة',
+    name: t('notifications.generalChannel'),
+    description: t('notifications.generalDesc'),
     importance: Notifications.AndroidImportance.LOW,
   });
 
   // Seasonal Content Channel
   await Notifications.setNotificationChannelAsync('seasonal', {
-    name: 'المحتوى الموسمي',
-    description: 'محتوى المناسبات الإسلامية',
+    name: t('notifications.seasonalChannel'),
+    description: t('notifications.seasonalChannelDesc'),
     importance: Notifications.AndroidImportance.DEFAULT,
   });
 };
@@ -246,14 +247,28 @@ export const saveNotificationSettings = async (
 
 export const scheduleLocalNotification = async (
   notification: PushNotificationData,
-  trigger: Notifications.NotificationTriggerInput
+  trigger: Notifications.NotificationTriggerInput,
+  options?: { sound?: boolean; vibration?: boolean }
 ): Promise<string> => {
+  // Extract channelId from trigger (if present) and move it to content
+  let channelId: string | undefined;
+  if (trigger && typeof trigger === 'object' && 'channelId' in trigger) {
+    channelId = (trigger as any).channelId;
+    const { channelId: _, ...triggerWithoutChannel } = trigger as any;
+    trigger = triggerWithoutChannel;
+  }
+
+  const soundEnabled = options?.sound !== false;
+  const vibrationEnabled = options?.vibration !== false;
+
   const id = await Notifications.scheduleNotificationAsync({
     content: {
       title: notification.title,
       body: notification.body,
       data: notification.data,
-      sound: 'default',
+      sound: soundEnabled ? 'default' : undefined,
+      ...(Platform.OS === 'android' && channelId && { channelId }),
+      ...(Platform.OS === 'android' && !vibrationEnabled && { vibrate: [0] }),
     },
     trigger,
   });
@@ -273,11 +288,11 @@ export const schedulePrayerNotification = async (
 
   const notification: PushNotificationData = {
     title: minutesBefore > 0 
-      ? `⏰ ${prayerName} بعد ${minutesBefore} دقيقة`
-      : `🕌 حان وقت ${prayerName}`,
+      ? `⏰ ${prayerName} ${t('notifications.afterMinutes').replace('{0}', String(minutesBefore))}`
+      : `🕌 ${t('notifications.prayerTimeArrived')} ${prayerName}`,
     body: minutesBefore > 0
-      ? `استعد لصلاة ${prayerName}`
-      : `أقم صلاتك الآن`,
+      ? `${t('notifications.prepareForPrayer')} ${prayerName}`
+      : t('notifications.prayNow'),
     data: { type: 'prayer', prayer: prayerName },
   };
 
@@ -296,14 +311,14 @@ export const scheduleAzkarReminder = async (
   if (time <= new Date()) return '';
 
   const titles = {
-    morning: '☀️ أذكار الصباح',
-    evening: '🌅 أذكار المساء',
-    sleep: '🌙 أذكار النوم',
+    morning: '☀️ ' + t('home.morningAzkar'),
+    evening: '🌅 ' + t('home.eveningAzkar'),
+    sleep: '🌙 ' + t('home.sleepAzkar'),
   };
 
   const notification: PushNotificationData = {
     title: titles[azkarType],
-    body: 'حان وقت قراءة الأذكار',
+    body: t('notifications.timeForAzkar'),
     data: { type: 'azkar', category: azkarType },
   };
 

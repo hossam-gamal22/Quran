@@ -12,21 +12,30 @@ import {
   Dimensions,
   Alert,
   ScrollView,
+  Linking,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Shadows } from '../constants/theme';
-import { APP_CONFIG, APP_NAME } from '../constants/app';
+import { APP_CONFIG } from '../constants/app';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
 import { useTranslation } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BackButton } from '@/components/ui';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { GlassSegmentedControl } from '@/components/ui/GlassCard';
+
 import { NativeTabs } from '@/components/ui/NativeTabs';
+import { TranslatedText } from '@/components/ui/TranslatedText';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { copyToClipboard, shareText } from '../lib/clipboard';
 import namesTranslations from '@/data/json/names-of-allah-translations.json';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useQuranEvidence } from '@/lib/quran-evidence';
+import { getLanguage } from '@/lib/i18n';
 
 // ===============================
 // الثوابت
@@ -38,7 +47,7 @@ const ITEM_WIDTH = (SCREEN_WIDTH - Spacing.md * 4) / GRID_COLUMNS;
 // ===============================
 // أسماء الله الحسنى مع الشرح
 // ===============================
-interface AllahName {
+export interface AllahName {
   id: number;
   name: string;
   transliteration: string;
@@ -47,7 +56,7 @@ interface AllahName {
   evidence?: string; // الدليل من القرآن أو السنة
 }
 
-const ALLAH_NAMES: AllahName[] = [
+export const ALLAH_NAMES: AllahName[] = [
   {
     id: 1,
     name: 'الله',
@@ -869,12 +878,28 @@ function getNameMeaning(name: AllahName, language: string): string {
 }
 
 // ===============================
+// المكون الفرعي للدليل
+// ===============================
+function EvidenceText({ evidence, style }: { evidence: string; style: any }) {
+  const translated = useQuranEvidence(evidence);
+  const language = getLanguage();
+  const isRTL = language === 'ar' || language === 'ur';
+  return (
+    <Text style={[style, !isRTL && { writingDirection: 'ltr', textAlign: 'left' }]}>
+      {translated}
+    </Text>
+  );
+}
+
+// ===============================
 // المكون الرئيسي
 // ===============================
 export default function AllahNamesScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const { isDarkMode, settings } = useSettings();
-  const { language } = useTranslation();
+  const colors = useColors();
+  const { t, language } = useTranslation();
   const currentLang = settings.language || 'ar';
   
   // الحالة
@@ -939,7 +964,7 @@ export default function AllahNamesScreen() {
     
     const success = await copyToClipboard(text);
     if (success) {
-      Alert.alert('تم النسخ', 'تم نسخ الاسم إلى الحافظة ✓');
+      Alert.alert(t('common.copied'), t('names.nameCopied'));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setShowShareModal(false);
@@ -989,11 +1014,11 @@ export default function AllahNamesScreen() {
         <Text style={styles.gridItemNumberText}>{item.id}</Text>
       </View>
       
-      <Text style={styles.gridItemName}>{item.name}</Text>
+      <Text style={[styles.gridItemName, { color: colors.text }]}>{currentLang === 'ar' ? item.name : item.transliteration}</Text>
       
       {favorites.includes(item.id) && (
-        <View style={styles.favoriteIndicator}>
-          <Ionicons name="heart" size={12} color={Colors.error} />
+        <View style={[styles.favoriteIndicator, isRTL ? { right: 8, left: undefined } : null]}>
+          <Ionicons name="heart" size={12} color={colors.error || Colors.error} />
         </View>
       )}
     </TouchableOpacity>
@@ -1002,28 +1027,28 @@ export default function AllahNamesScreen() {
   // عرض عنصر القائمة
   const renderListItem = ({ item }: { item: AllahName }) => (
     <TouchableOpacity
-      style={styles.listItem}
+      style={[styles.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
       onPress={() => openNameDetails(item)}
       onLongPress={() => openShareModal(item)}
       activeOpacity={0.7}
     >
-      <View style={styles.listItemLeft}>
+      <View style={[styles.listItemLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.listItemNumber}>
           <Text style={styles.listItemNumberText}>{item.id}</Text>
         </View>
         
         <View style={styles.listItemContent}>
-          <Text style={styles.listItemName}>{item.name}</Text>
-          <Text style={styles.listItemMeaning}>{getNameMeaning(item, currentLang)}</Text>
+          <Text style={[styles.listItemName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{currentLang === 'ar' ? item.name : item.transliteration}</Text>
+          <Text style={[styles.listItemMeaning, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{getNameMeaning(item, currentLang)}</Text>
         </View>
       </View>
       
-      <View style={styles.listItemActions}>
+      <View style={[styles.listItemActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={styles.listItemAction}
           onPress={() => openShareModal(item)}
         >
-          <Ionicons name="share-outline" size={20} color={Colors.primary} />
+          <Ionicons name="share-outline" size={20} color={colors.primary || Colors.primary} />
         </TouchableOpacity>
         
         <TouchableOpacity
@@ -1033,7 +1058,7 @@ export default function AllahNamesScreen() {
           <Ionicons
             name={favorites.includes(item.id) ? 'heart' : 'heart-outline'}
             size={20}
-            color={favorites.includes(item.id) ? Colors.error : Colors.textMuted}
+            color={favorites.includes(item.id) ? (colors.error || Colors.error) : colors.textLight}
           />
         </TouchableOpacity>
       </View>
@@ -1044,22 +1069,24 @@ export default function AllahNamesScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
-      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }]}
+      opacity={settings.display.backgroundOpacity ?? 1}
+      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]}
     >
     <SafeAreaView style={{ flex: 1 }}>
       {/* الرأس */}
-      <View style={[styles.header, { backgroundColor: 'transparent' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={[styles.headerBtn, { backgroundColor: 'rgba(120,120,128,0.18)' }]}>
-          <Ionicons name="arrow-forward" size={24} color={isDarkMode ? '#fff' : Colors.text} />
-        </TouchableOpacity>
+      <View style={[styles.header, { backgroundColor: 'transparent', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <BackButton color={isDarkMode ? '#fff' : Colors.text} style={[styles.headerBtn, { backgroundColor: 'rgba(120,120,128,0.18)' }]} />
         
-        <Text style={[styles.headerTitle, isDarkMode && { color: '#fff' }]}>أسماء الله الحسنى</Text>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('names.title')}</Text>
+          <SectionInfoButton sectionKey="names" />
+        </View>
         
-        <View style={{ width: 110 }}>
+        <View style={{ width: 130 }}>
           <NativeTabs
             tabs={[
-              { key: 'grid', label: 'شبكة' },
-              { key: 'list', label: 'قائمة' },
+              { key: 'grid', label: t('names.gridView') },
+              { key: 'list', label: t('names.listView') },
             ]}
             selected={viewMode}
             onSelect={(key) => setViewMode(key as 'grid' | 'list')}
@@ -1069,10 +1096,10 @@ export default function AllahNamesScreen() {
       </View>
       
       {/* بطاقة المعلومات */}
-      <View style={styles.infoCard}>
-        <Ionicons name="information-circle" size={24} color={Colors.primary} />
-        <Text style={styles.infoText}>
-          قال رسول الله ﷺ: «إن لله تسعة وتسعين اسماً، مائة إلا واحداً، من أحصاها دخل الجنة»
+      <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Ionicons name="information-circle" size={24} color={colors.primary || Colors.primary} />
+        <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          {t('names.introHadith')}
         </Text>
       </View>
       
@@ -1085,6 +1112,7 @@ export default function AllahNamesScreen() {
         key={viewMode}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        columnWrapperStyle={viewMode === 'grid' ? { flexDirection: isRTL ? 'row-reverse' : 'row' } : undefined}
       />
 
       <BannerAdComponent screen="names" />
@@ -1099,19 +1127,19 @@ export default function AllahNamesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.detailsModal}>
             {/* الرأس */}
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.textMuted} />
+                <Ionicons name="close" size={24} color="#8E8E93" />
               </TouchableOpacity>
               
               <Text style={styles.modalTitle}>
                 {selectedName?.id} / 99
               </Text>
               
-              <View style={styles.modalHeaderActions}>
+              <View style={[styles.modalHeaderActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
                   style={styles.modalHeaderBtn}
-                  onPress={() => selectedName && openShareModal(selectedName)}
+                  onPress={() => selectedName && handleShareName(selectedName)}
                 >
                   <Ionicons name="share-outline" size={22} color={Colors.primary} />
                 </TouchableOpacity>
@@ -1123,7 +1151,7 @@ export default function AllahNamesScreen() {
                   <Ionicons
                     name={selectedName && favorites.includes(selectedName.id) ? 'heart' : 'heart-outline'}
                     size={22}
-                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : Colors.textMuted}
+                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : '#8E8E93'}
                   />
                 </TouchableOpacity>
               </View>
@@ -1133,70 +1161,64 @@ export default function AllahNamesScreen() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 {/* الاسم */}
                 <View style={styles.nameSection}>
-                  <Text style={styles.bigName}>{selectedName.name}</Text>
-                  <Text style={styles.transliteration}>{selectedName.transliteration}</Text>
+                  <Text style={styles.bigName}>{currentLang === 'ar' ? selectedName.name : selectedName.transliteration}</Text>
                 </View>
                 
                 {/* المعنى */}
                 <View style={styles.meaningSection}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="bulb" size={20} color={Colors.gold} />
-                    <Text style={styles.sectionTitle}>المعنى</Text>
+                  <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.gold + '25', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="bulb" size={18} color={Colors.gold} />
+                    </View>
+                    <Text style={styles.sectionTitle}>{t('names.meaning')}</Text>
                   </View>
-                  <Text style={styles.meaningText}>{getNameMeaning(selectedName, currentLang)}</Text>
+                  <Text style={[styles.meaningText, { writingDirection: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }]}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 {/* الشرح */}
                 <View style={styles.descriptionSection}>
-                  <View style={styles.sectionHeader}>
-                    <Ionicons name="document-text" size={20} color={Colors.primary} />
-                    <Text style={styles.sectionTitle}>الشرح</Text>
+                  <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary + '25', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="document-text" size={18} color={Colors.primary} />
+                    </View>
+                    <Text style={styles.sectionTitle}>{t('names.explanation')}</Text>
                   </View>
-                  <Text style={styles.descriptionText}>{selectedName.description}</Text>
+                  <TranslatedText from="ar" type="section" style={styles.descriptionText}>{selectedName.description}</TranslatedText>
                 </View>
                 
                 {/* الدليل */}
                 {selectedName.evidence && (
                   <View style={styles.evidenceSection}>
-                    <View style={styles.sectionHeader}>
-                      <Ionicons name="book" size={20} color={Colors.secondary} />
-                      <Text style={styles.sectionTitle}>الدليل</Text>
+                    <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.secondary + '25', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="book" size={18} color={Colors.secondary} />
+                      </View>
+                      <Text style={styles.sectionTitle}>{t('names.evidence')}</Text>
                     </View>
-                    <Text style={styles.evidenceText}>{selectedName.evidence}</Text>
+                    <EvidenceText evidence={selectedName.evidence} style={styles.evidenceText} />
                   </View>
                 )}
-                
-                {/* أزرار الإجراءات */}
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: Colors.primary }]}
-                    onPress={() => handleShareName(selectedName)}
-                  >
-                    <Ionicons name="share-social" size={20} color="#FFF" />
-                    <Text style={styles.actionBtnText}>مشاركة</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: Colors.secondary }]}
-                    onPress={() => handleCopyName(selectedName)}
-                  >
-                    <Ionicons name="copy" size={20} color="#FFF" />
-                    <Text style={styles.actionBtnText}>نسخ</Text>
-                  </TouchableOpacity>
-                </View>
+
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: Colors.secondary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  onPress={() => handleCopyName(selectedName)}
+                >
+                  <Ionicons name="copy" size={20} color="#FFF" />
+                  <Text style={styles.actionBtnText}>{t('common.copy')}</Text>
+                </TouchableOpacity>
               </ScrollView>
             )}
             
             {/* أزرار التنقل */}
-            <View style={styles.navigationRow}>
-              <TouchableOpacity style={styles.navBtn} onPress={goToPreviousName}>
-                <Ionicons name="chevron-forward" size={24} color={Colors.primary} />
-                <Text style={styles.navBtnText}>السابق</Text>
+            <View style={[styles.navigationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <TouchableOpacity style={[styles.navBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={goToPreviousName}>
+                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={Colors.primary} />
+                <Text style={styles.navBtnText}>{t('common.previous')}</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.navBtn} onPress={goToNextName}>
-                <Text style={styles.navBtnText}>التالي</Text>
-                <Ionicons name="chevron-back" size={24} color={Colors.primary} />
+
+              <TouchableOpacity style={[styles.navBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={goToNextName}>
+                <Text style={styles.navBtnText}>{t('common.next')}</Text>
+                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={Colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1216,10 +1238,10 @@ export default function AllahNamesScreen() {
           onPress={() => setShowShareModal(false)}
         >
           <View style={styles.shareModalContent}>
-            <View style={styles.shareModalHeader}>
-              <Text style={styles.shareModalTitle}>مشاركة</Text>
+            <View style={[styles.shareModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={styles.shareModalTitle}>{t('names.shareHeader')}</Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.textMuted} />
+                <Ionicons name="close" size={24} color="#8E8E93" />
               </TouchableOpacity>
             </View>
             
@@ -1230,7 +1252,7 @@ export default function AllahNamesScreen() {
                   <Text style={styles.sharePreviewMeaning}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
-                <View style={styles.shareOptions}>
+                <View style={[styles.shareOptions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <TouchableOpacity
                     style={styles.shareOption}
                     onPress={() => handleShareName(selectedName)}
@@ -1238,7 +1260,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="share-social" size={24} color={Colors.primary} />
                     </View>
-                    <Text style={styles.shareOptionText}>مشاركة</Text>
+                    <Text style={styles.shareOptionText}>{t('common.share')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1248,19 +1270,29 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="copy" size={24} color={Colors.secondary} />
                     </View>
-                    <Text style={styles.shareOptionText}>نسخ</Text>
+                    <Text style={styles.shareOptionText}>{t('common.copy')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
                     style={styles.shareOption}
-                    onPress={() => {
-                      handleShareName(selectedName);
+                    onPress={async () => {
+                      if (!selectedName) return;
+                      const localizedMeaning = getNameMeaning(selectedName, currentLang);
+                      const text = `✨ من أسماء الله الحسنى ✨\n\n🌟 ${selectedName.name}\n\n💎 المعنى: ${localizedMeaning}\n\n📝 الشرح:\n${selectedName.description}${selectedName.evidence ? `\n\n📖 الدليل:\n${selectedName.evidence}` : ''}\n\n${APP_CONFIG.getShareSignature()}`;
+                      const url = `whatsapp://send?text=${encodeURIComponent(text)}`;
+                      const supported = await Linking.canOpenURL(url);
+                      if (supported) {
+                        await Linking.openURL(url);
+                      } else {
+                        handleShareName(selectedName);
+                      }
+                      setShowShareModal(false);
                     }}
                   >
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                     </View>
-                    <Text style={styles.shareOptionText}>واتساب</Text>
+                    <Text style={styles.shareOptionText}>{t('names.whatsapp')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1278,7 +1310,7 @@ export default function AllahNamesScreen() {
                       />
                     </View>
                     <Text style={styles.shareOptionText}>
-                      {favorites.includes(selectedName.id) ? 'إزالة' : 'مفضلة'}
+                      {favorites.includes(selectedName.id) ? t('common.removeFromFavorites') : t('common.addToFavorites')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1319,7 +1351,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: Colors.text,
   },
   
@@ -1336,7 +1368,7 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: Colors.text,
     lineHeight: 22,
   },
@@ -1356,6 +1388,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: Spacing.sm,
   },
   gridItemNumber: {
     position: 'absolute',
@@ -1371,13 +1404,14 @@ const styles = StyleSheet.create({
   gridItemNumberText: {
     color: '#FFF',
     fontSize: 10,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   gridItemName: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: 'Amiri-Bold',
     color: Colors.text,
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
   favoriteIndicator: {
     position: 'absolute',
@@ -1399,6 +1433,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: Spacing.md,
   },
   listItemNumber: {
     width: 36,
@@ -1407,12 +1442,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: Spacing.md,
   },
   listItemNumberText: {
     color: '#FFF',
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   listItemContent: {
     flex: 1,
@@ -1424,18 +1458,18 @@ const styles = StyleSheet.create({
   },
   listItemMeaning: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    color: Colors.textMuted,
+    fontFamily: fontRegular(),
+    color: '#8E8E93',
   },
   listItemActions: {
     flexDirection: 'row',
     gap: Spacing.xs,
   },
   listItemAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.glass,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(120,120,128,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1463,8 +1497,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-    color: Colors.textMuted,
+    fontFamily: fontBold(),
+    color: '#8E8E93',
   },
   modalHeaderActions: {
     flexDirection: 'row',
@@ -1492,8 +1526,8 @@ const styles = StyleSheet.create({
   },
   transliteration: {
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
-    color: Colors.textMuted,
+    fontFamily: fontRegular(),
+    color: '#8E8E93',
     marginTop: Spacing.xs,
   },
   
@@ -1506,7 +1540,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#FFFFFF',
   },
   
@@ -1517,7 +1551,7 @@ const styles = StyleSheet.create({
   },
   meaningText: {
     fontSize: 18,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#FFFFFF',
     textAlign: 'center',
   },
@@ -1529,10 +1563,11 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#E0E0E0',
     lineHeight: 26,
-    textAlign: 'justify',
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   
   evidenceSection: {
@@ -1569,7 +1604,7 @@ const styles = StyleSheet.create({
   actionBtnText: {
     color: '#FFF',
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
   
   // أزرار التنقل
@@ -1588,7 +1623,7 @@ const styles = StyleSheet.create({
   },
   navBtnText: {
     fontSize: 14,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: Colors.primary,
   },
   
@@ -1613,8 +1648,8 @@ const styles = StyleSheet.create({
   },
   shareModalTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
-    color: Colors.text,
+    fontFamily: fontBold(),
+    color: '#FFFFFF',
   },
   sharePreview: {
     alignItems: 'center',
@@ -1630,8 +1665,8 @@ const styles = StyleSheet.create({
   },
   sharePreviewMeaning: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
-    color: Colors.textMuted,
+    fontFamily: fontRegular(),
+    color: '#8E8E93',
     marginTop: Spacing.xs,
   },
   shareOptions: {
@@ -1651,7 +1686,7 @@ const styles = StyleSheet.create({
   },
   shareOptionText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    color: Colors.text,
+    fontFamily: fontRegular(),
+    color: '#FFFFFF',
   },
 });

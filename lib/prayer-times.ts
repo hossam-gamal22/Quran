@@ -3,6 +3,7 @@
 // يستخدم AlAdhan API
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
 
 // ========================================
 // الأنواع والواجهات
@@ -298,7 +299,23 @@ export const timeStringToDate = (timeString: string, baseDate: Date = new Date()
  */
 export const formatTime12h = (timeString: string): string => {
   const [hours, minutes] = timeString.split(':').map(Number);
-  const period = hours >= 12 ? 'م' : 'ص';
+  const lang = getLanguage();
+  const amPm: Record<string, [string, string]> = {
+    ar: ['ص', 'م'],
+    ur: ['ص', 'م'],
+    en: ['AM', 'PM'],
+    fr: ['AM', 'PM'],
+    de: ['AM', 'PM'],
+    es: ['AM', 'PM'],
+    tr: ['ÖÖ', 'ÖS'],
+    id: ['AM', 'PM'],
+    ms: ['AM', 'PM'],
+    hi: ['AM', 'PM'],
+    bn: ['AM', 'PM'],
+    ru: ['AM', 'PM'],
+  };
+  const [am, pm] = amPm[lang] || amPm.en;
+  const period = hours >= 12 ? pm : am;
   const displayHours = hours % 12 || 12;
   return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
 };
@@ -308,6 +325,13 @@ export const formatTime12h = (timeString: string): string => {
  */
 export const formatTime24h = (timeString: string): string => {
   return timeString;
+};
+
+/**
+ * تنسيق الوقت حسب إعداد المستخدم (12 أو 24 ساعة)
+ */
+export const formatPrayerTime = (timeString: string, use24Hour: boolean): string => {
+  return use24Hour ? formatTime24h(timeString) : formatTime12h(timeString);
 };
 
 // ========================================
@@ -615,6 +639,7 @@ export default {
   formatTimeRemaining,
   formatTime12h,
   formatTime24h,
+  formatPrayerTime,
   savePrayerSettings,
   getPrayerSettings,
   saveLocation,

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { Styled } from '../components/Styled';
 
 // ✅ استخدام jsDelivr CDN بدل raw.githubusercontent (يحل مشكلة CORS)
 const AZKAR_JSON_URL = 'https://cdn.jsdelivr.net/gh/hossam-gamal22/Quran@main/data/json/azkar.json';
@@ -232,6 +233,8 @@ const Dashboard: React.FC = () => {
           <button
             onClick={loadAllData}
             disabled={isLoading}
+            aria-label="تحديث البيانات"
+            title="تحديث البيانات"
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -358,9 +361,9 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
               <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-                <div 
+                <Styled 
                   className="h-full bg-blue-500 rounded-full transition-all" 
-                  style={{ width: `${stats.totalUsers > 0 ? (stats.iosUsers / stats.totalUsers) * 100 : 0}%` }} 
+                  css={{ width: `${stats.totalUsers > 0 ? (stats.iosUsers / stats.totalUsers) * 100 : 0}%` }} 
                 />
               </div>
             </div>
@@ -372,9 +375,9 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
               <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
-                <div 
+                <Styled 
                   className="h-full bg-emerald-500 rounded-full transition-all" 
-                  style={{ width: `${stats.totalUsers > 0 ? (stats.androidUsers / stats.totalUsers) * 100 : 0}%` }} 
+                  css={{ width: `${stats.totalUsers > 0 ? (stats.androidUsers / stats.totalUsers) * 100 : 0}%` }} 
                 />
               </div>
             </div>

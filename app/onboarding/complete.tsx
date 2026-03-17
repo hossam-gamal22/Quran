@@ -10,6 +10,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -27,7 +28,8 @@ import Animated, {
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
-
+import { tOnboarding } from '@/constants/onboarding-translations';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width, height } = Dimensions.get('window');
 
 // ========================================
@@ -36,6 +38,7 @@ const { width, height } = Dimensions.get('window');
 
 export default function CompleteScreen() {
   const { completeOnboarding, preferences } = useOnboarding();
+  const isRTL = useIsRTL();
   
   // أنيميشن النجمة
   const starScale = useSharedValue(0);
@@ -111,28 +114,28 @@ export default function CompleteScreen() {
 
             {/* العنوان */}
             <Animated.Text entering={FadeInDown.delay(400).duration(600)} style={styles.title}>
-              تم الإعداد بنجاح!
+              {tOnboarding('setupComplete')}
             </Animated.Text>
 
             <Animated.Text entering={FadeInDown.delay(600).duration(600)} style={styles.subtitle}>
-              أنت الآن جاهز لبدء رحلتك الإيمانية
+              {tOnboarding('readyToStart')}
             </Animated.Text>
 
             {/* ملخص الإعدادات */}
             <Animated.View entering={FadeInUp.delay(800).duration(600)} style={styles.summaryContainer}>
-              <Text style={styles.summaryTitle}>ملخص إعداداتك</Text>
+              <Text style={styles.summaryTitle}>{tOnboarding('settingsSummary')}</Text>
               
-              <View style={styles.summaryItem}>
+              <View style={[styles.summaryItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={styles.summaryIcon}>
                   <MaterialCommunityIcons name="translate" size={20} color="#3a7ca5" />
                 </View>
-                <Text style={styles.summaryLabel}>اللغة:</Text>
+                <Text style={styles.summaryLabel}>{tOnboarding('languageLabel')}</Text>
                 <Text style={styles.summaryValue}>
-                  {preferences.language === 'ar' ? 'العربية' : preferences.language}
+                  {preferences.language === 'ar' ? tOnboarding('arabic') : preferences.language}
                 </Text>
               </View>
 
-              <View style={styles.summaryItem}>
+              <View style={[styles.summaryItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={styles.summaryIcon}>
                   <MaterialCommunityIcons
                     name={preferences.locationEnabled ? 'map-marker-check' : 'map-marker-off'}
@@ -140,13 +143,13 @@ export default function CompleteScreen() {
                     color={preferences.locationEnabled ? '#2f7659' : '#999'}
                   />
                 </View>
-                <Text style={styles.summaryLabel}>الموقع:</Text>
+                <Text style={styles.summaryLabel}>{tOnboarding('locationLabel')}</Text>
                 <Text style={styles.summaryValue}>
-                  {preferences.locationEnabled ? `${preferences.city || 'مفعّل'}` : 'غير مفعّل'}
+                  {preferences.locationEnabled ? `${preferences.city || tOnboarding('enabled')}` : tOnboarding('notEnabled')}
                 </Text>
               </View>
 
-              <View style={styles.summaryItem}>
+              <View style={[styles.summaryItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={styles.summaryIcon}>
                   <MaterialCommunityIcons
                     name={preferences.notificationsEnabled ? 'bell-check' : 'bell-off'}
@@ -154,18 +157,18 @@ export default function CompleteScreen() {
                     color={preferences.notificationsEnabled ? '#f5a623' : '#999'}
                   />
                 </View>
-                <Text style={styles.summaryLabel}>الإشعارات:</Text>
+                <Text style={styles.summaryLabel}>{tOnboarding('notificationsLabel')}</Text>
                 <Text style={styles.summaryValue}>
-                  {preferences.notificationsEnabled ? 'مفعّلة' : 'غير مفعّلة'}
+                  {preferences.notificationsEnabled ? tOnboarding('enabledF') : tOnboarding('notEnabledF')}
                 </Text>
               </View>
             </Animated.View>
 
             {/* نصيحة */}
-            <Animated.View entering={FadeInUp.delay(1000).duration(600)} style={styles.tipContainer}>
+            <Animated.View entering={FadeInUp.delay(1000).duration(600)} style={[styles.tipContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="lightbulb-on" size={20} color="#f5a623" />
               <Text style={styles.tipText}>
-                يمكنك تعديل هذه الإعدادات في أي وقت من صفحة الإعدادات
+                {tOnboarding('canChangeSettings')}
               </Text>
             </Animated.View>
           </View>
@@ -178,15 +181,15 @@ export default function CompleteScreen() {
               activeOpacity={0.8}
             >
               <View
-                style={[styles.startButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+                style={[styles.startButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
-                <Text style={styles.startButtonText}>ابدأ الآن</Text>
+                <Text style={styles.startButtonText}>{tOnboarding('startNow')}</Text>
                 <MaterialCommunityIcons name="rocket-launch" size={26} color="#fff" />
               </View>
             </TouchableOpacity>
 
             <Text style={styles.footerText}>
-              بسم الله الرحمن الرحيم
+              {tOnboarding('bismillah')}
             </Text>
           </Animated.View>
         </SafeAreaView>
@@ -228,16 +231,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 15,
+    backgroundColor: '#2f7659',
   },
   title: {
     fontSize: 32,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 17,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     marginTop: 10,
@@ -251,17 +255,17 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     marginBottom: 16,
   },
   summaryItem: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+    gap: 12,
   },
   summaryIcon: {
     width: 36,
@@ -274,17 +278,15 @@ const styles = StyleSheet.create({
   summaryLabel: {
     flex: 1,
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.7)',
-    marginLeft: 12,
   },
   summaryValue: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   tipContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(245,166,35,0.15)',
     borderRadius: 12,
@@ -295,7 +297,7 @@ const styles = StyleSheet.create({
   tipText: {
     flex: 1,
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   bottomContainer: {
@@ -310,7 +312,6 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   startButtonGradient: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 20,
@@ -318,12 +319,12 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   footerText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.5)',
     marginTop: 20,
   },

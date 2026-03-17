@@ -8,7 +8,10 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { schedulePrayerNotifications } from './prayer-notifications';
+import { fetchTafsir, getSurahName } from './quran-api';
+import { getAyahAudioUrl } from './quran-cache';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
+import { t } from './i18n';
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
 const KEYS = {
@@ -127,10 +130,11 @@ export async function scheduleWirdNotifications(
   await Notifications.scheduleNotificationAsync({
     identifier: 'wird_morning',
     content: {
-      title: '🌅 الورد الصباحي',
-      body: 'حان وقت أذكار الصباح — ابدأ يومك بذكر الله',
+      title: t('settings.morningWirdTitle'),
+      body: t('settings.morningWirdBody'),
       sound: 'default',
       data: { type: 'wird', period: 'morning' },
+      ...(Platform.OS === 'android' && { channelId: 'azkar' }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -143,10 +147,11 @@ export async function scheduleWirdNotifications(
   await Notifications.scheduleNotificationAsync({
     identifier: 'wird_evening',
     content: {
-      title: '🌇 الورد المسائي',
-      body: 'حان وقت أذكار المساء — اختم يومك بحمد الله',
+      title: t('settings.eveningWirdTitle'),
+      body: t('settings.eveningWirdBody'),
       sound: 'default',
       data: { type: 'wird', period: 'evening' },
+      ...(Platform.OS === 'android' && { channelId: 'azkar' }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -175,10 +180,11 @@ export async function scheduleKahfNotification(
   await Notifications.scheduleNotificationAsync({
     identifier: 'kahf_friday',
     content: {
-      title: '📖 سورة الكهف',
-      body: 'يوم الجمعة المبارك — اقرأ سورة الكهف وأكثر من الصلاة على النبي ﷺ',
+      title: t('settings.kahfTitle'),
+      body: t('settings.kahfBody'),
       sound: 'default',
       data: { type: 'kahf' },
+      ...(Platform.OS === 'android' && { channelId: 'general' }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
@@ -191,13 +197,13 @@ export async function scheduleKahfNotification(
 
 // ─── Schedule Daily Ayah ──────────────────────────────────────────────────────
 const DAILY_AYAHS = [
-  'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ﴿الشرح: ٥﴾',
-  'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ ﴿الطلاق: ٣﴾',
-  'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ ﴿البقرة: ١٥٣﴾',
-  'وَبَشِّرِ الصَّابِرِينَ ﴿البقرة: ١٥٥﴾',
-  'فَاذْكُرُونِي أَذْكُرْكُمْ ﴿البقرة: ١٥٢﴾',
-  'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ ﴿الحديد: ٤﴾',
-  'إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ ﴿التوبة: ١٢٠﴾',
+  { text: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ﴿الشرح: ٥﴾', surah: 94, ayah: 5 },
+  { text: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ ﴿الطلاق: ٣﴾', surah: 65, ayah: 3 },
+  { text: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ ﴿البقرة: ١٥٣﴾', surah: 2, ayah: 153 },
+  { text: 'وَبَشِّرِ الصَّابِرِينَ ﴿البقرة: ١٥٥﴾', surah: 2, ayah: 155 },
+  { text: 'فَاذْكُرُونِي أَذْكُرْكُمْ ﴿البقرة: ١٥٢﴾', surah: 2, ayah: 152 },
+  { text: 'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ ﴿الحديد: ٤﴾', surah: 57, ayah: 4 },
+  { text: 'إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ ﴿التوبة: ١٢٠﴾', surah: 9, ayah: 120 },
 ];
 
 export async function scheduleDailyAyahNotification(
@@ -213,15 +219,16 @@ export async function scheduleDailyAyahNotification(
 
   const { hour, minute } = parseTime(settings.dailyAyahTime);
   const dayIndex = new Date().getDay();
-  const ayah = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
+  const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
 
   await Notifications.scheduleNotificationAsync({
     identifier: 'daily_ayah',
     content: {
-      title: '✨ آية اليوم',
-      body: ayah,
+      title: t('settings.dailyAyahTitle'),
+      body: ayahData.text,
       sound: 'default',
       data: { type: 'daily_ayah' },
+      ...(Platform.OS === 'android' && { channelId: 'daily-ayah' }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -276,6 +283,45 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   dailyVerse: boolean;
   dailyVerseTime: string;
   sound: boolean;
+  vibration: boolean;
+  // Per-category sound types for foreground playback
+  azkarSoundType?: string;
+  dailyVerseSoundType?: string;
+  salawatReminder?: boolean;
+  salawatReminderTime?: string;
+  salawatSoundType?: string;
+  tasbihReminder?: boolean;
+  tasbihReminderTime?: string;
+  tasbihSoundType?: string;
+  istighfarReminder?: boolean;
+  istighfarReminderTime?: string;
+  istighfarSoundType?: string;
+  customReminder?: boolean;
+  customReminderTime?: string;
+  customReminderTitle?: string;
+  customReminderSoundType?: string;
+  customReminderContentType?: 'text' | 'ayah' | 'surah' | 'azkar' | 'dua';
+  customReminderSurah?: number;
+  customReminderAyah?: number;
+  customReminderReciter?: string;
+  // Per-category day-of-week (1=Sun...7=Sat, empty/undefined = every day)
+  salawatDays?: number[];
+  tasbihDays?: number[];
+  istighfarDays?: number[];
+  azkarDays?: number[];
+  dailyVerseDays?: number[];
+  customReminderDays?: number[];
+  // Quran reading reminder
+  quranReadingReminder?: boolean;
+  quranReadingReminderTime?: string;
+  quranReminderDays?: number[];
+  quranReminderSoundType?: string;
+  // Worship tracking notifications
+  worshipPrayerLogging?: boolean;
+  worshipDailySummary?: boolean;
+  worshipDailySummaryTime?: string;
+  worshipStreakAlerts?: boolean;
+  worshipWeeklyReport?: boolean;
 }): Promise<void> {
   try {
     if (!notifSettings.enabled) {
@@ -285,6 +331,64 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     const hasPermission = await requestNotifPermission();
     if (!hasPermission) return;
+
+    // Helper: schedule DAILY or per-day WEEKLY based on selected days
+    const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7]; // Sun-Sat
+    const scheduleWithDays = async (
+      baseId: string,
+      content: Notifications.NotificationContentInput,
+      hour: number,
+      minute: number,
+      days?: number[],
+      channelId: string = 'general',
+    ) => {
+      // Cancel existing (base + per-day variants)
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`${baseId}_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync(baseId); } catch {}
+
+      // channelId must be in content (not trigger) for Android
+      const contentWithChannel: Notifications.NotificationContentInput = {
+        ...content,
+        ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
+      };
+
+      const selectedDays = days && days.length > 0 && days.length < 7 ? days : null;
+
+      try {
+        if (!selectedDays) {
+          // Every day — use single DAILY trigger
+          await Notifications.scheduleNotificationAsync({
+            identifier: baseId,
+            content: contentWithChannel,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DAILY,
+              hour,
+              minute,
+            },
+          });
+        } else {
+          // Specific days — use WEEKLY triggers
+          for (const weekday of selectedDays) {
+            await Notifications.scheduleNotificationAsync({
+              identifier: `${baseId}_d${weekday}`,
+              content: contentWithChannel,
+              trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+                weekday,
+                hour,
+                minute,
+              },
+            });
+          }
+        }
+        console.log(`🔔 Scheduled ${baseId} at ${hour}:${String(minute).padStart(2,'0')} (channel: ${channelId})`);
+      } catch (err) {
+        console.error(`❌ Failed to schedule ${baseId}:`, err);
+      }
+    };
 
     // 1) Schedule prayer time notifications
     const prayerSettings: PrayerNotifSettings = {
@@ -303,15 +407,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     await schedulePrayerNotifications(prayerSettings);
 
     // 2) Schedule morning azkar
-    const wirdSettings: AllNotificationSettings = {
-      ...DEFAULT_ALL_NOTIF,
-      wirdEnabled: notifSettings.morningAzkar || notifSettings.eveningAzkar,
-      wirdMorningTime: notifSettings.morningAzkarTime || '06:00',
-      wirdEveningTime: notifSettings.eveningAzkarTime || '18:00',
-      dailyAyahEnabled: notifSettings.dailyVerse,
-      dailyAyahTime: notifSettings.dailyVerseTime || '08:00',
-    };
-
     // Cancel existing wird notifications before re-scheduling selectively
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const n of scheduled) {
@@ -322,85 +417,322 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule morning wird if enabled
     if (notifSettings.morningAzkar) {
-      const morning = parseTime(wirdSettings.wirdMorningTime);
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'wird_morning',
-        content: {
-          title: '🌅 الورد الصباحي',
-          body: 'حان وقت أذكار الصباح — ابدأ يومك بذكر الله',
+      const morning = parseTime(notifSettings.morningAzkarTime || '06:00');
+      await scheduleWithDays(
+        'wird_morning',
+        {
+          title: t('settings.morningWirdTitle'),
+          body: t('settings.morningWirdBody'),
           sound: notifSettings.sound ? 'default' : undefined,
-          data: { type: 'wird', period: 'morning' },
+          data: { type: 'wird', period: 'morning', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: morning.hour,
-          minute: morning.minute,
-        },
-      });
+        morning.hour,
+        morning.minute,
+        notifSettings.azkarDays,
+        'azkar',
+      );
     }
 
     // Schedule evening wird if enabled
     if (notifSettings.eveningAzkar) {
-      const evening = parseTime(wirdSettings.wirdEveningTime);
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'wird_evening',
-        content: {
-          title: '🌇 الورد المسائي',
-          body: 'حان وقت أذكار المساء — اختم يومك بحمد الله',
+      const evening = parseTime(notifSettings.eveningAzkarTime || '18:00');
+      await scheduleWithDays(
+        'wird_evening',
+        {
+          title: t('settings.eveningWirdTitle'),
+          body: t('settings.eveningWirdBody'),
           sound: notifSettings.sound ? 'default' : undefined,
-          data: { type: 'wird', period: 'evening' },
+          data: { type: 'wird', period: 'evening', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: evening.hour,
-          minute: evening.minute,
-        },
-      });
+        evening.hour,
+        evening.minute,
+        notifSettings.azkarDays,
+        'azkar',
+      );
     }
 
     // Schedule sleep azkar if enabled
     if (notifSettings.sleepAzkar) {
       const sleep = parseTime(notifSettings.sleepAzkarTime || '22:00');
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'wird_sleep',
-        content: {
-          title: '🌙 أذكار النوم',
-          body: 'حان وقت أذكار النوم — نم على ذكر الله',
+      await scheduleWithDays(
+        'wird_sleep',
+        {
+          title: t('settings.sleepAzkarTitle'),
+          body: t('settings.sleepAzkarBody'),
           sound: notifSettings.sound ? 'default' : undefined,
-          data: { type: 'wird', period: 'sleep' },
+          data: { type: 'wird', period: 'sleep', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: sleep.hour,
-          minute: sleep.minute,
-        },
-      });
+        sleep.hour,
+        sleep.minute,
+        notifSettings.azkarDays,
+        'azkar',
+      );
     }
 
     // Schedule wakeup azkar if enabled
     if (notifSettings.wakeupAzkar) {
       const wakeup = parseTime(notifSettings.wakeupAzkarTime || '05:30');
-      await Notifications.scheduleNotificationAsync({
-        identifier: 'wird_wakeup',
-        content: {
-          title: '🌤️ أذكار الاستيقاظ',
-          body: 'الحمد لله الذي أحيانا بعد ما أماتنا وإليه النشور',
+      await scheduleWithDays(
+        'wird_wakeup',
+        {
+          title: t('settings.wakeupAzkarTitle'),
+          body: t('settings.wakeupAzkarBody'),
           sound: notifSettings.sound ? 'default' : undefined,
-          data: { type: 'wird', period: 'wakeup' },
+          data: { type: 'wird', period: 'wakeup', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: wakeup.hour,
-          minute: wakeup.minute,
-        },
-      });
+        wakeup.hour,
+        wakeup.minute,
+        notifSettings.azkarDays,
+        'azkar',
+      );
     }
 
     // Note: afterPrayerAzkar notifications are tied to prayer times
     // They are handled by the azkar_reminders system in AsyncStorage
 
     // 3) Schedule daily ayah
-    await scheduleDailyAyahNotification(wirdSettings);
+    if (notifSettings.dailyVerse) {
+      const dailyTime = parseTime(notifSettings.dailyVerseTime || '08:00');
+      const dayIndex = new Date().getDay();
+      const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
+      
+      // Try to fetch tafsir for richer notification
+      let notifBody = ayahData.text;
+      try {
+        const tafsirResult = await fetchTafsir(ayahData.surah, ayahData.ayah, 'ar.muyassar');
+        if (tafsirResult.tafsirText && tafsirResult.tafsirText !== 'تعذر تحميل التفسير') {
+          const shortTafsir = tafsirResult.tafsirText.length > 120
+            ? tafsirResult.tafsirText.slice(0, 120) + '...'
+            : tafsirResult.tafsirText;
+          notifBody = `${ayahData.text}\n\n📖 ${shortTafsir}`;
+        }
+      } catch {}
+
+      await scheduleWithDays(
+        'daily_ayah',
+        {
+          title: t('settings.dailyAyahTitle'),
+          body: notifBody,
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'daily_ayah', soundType: notifSettings.dailyVerseSoundType || 'general_reminder' },
+        },
+        dailyTime.hour,
+        dailyTime.minute,
+        notifSettings.dailyVerseDays,
+        'daily-ayah',
+      );
+    } else {
+      // Cancel all daily_ayah variants
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`daily_ayah_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('daily_ayah'); } catch {}
+    }
+
+    // 4) Schedule salawat reminder
+    if (notifSettings.salawatReminder) {
+      const salawatTime = parseTime(notifSettings.salawatReminderTime || '09:00');
+      await scheduleWithDays(
+        'salawat_reminder',
+        {
+          title: t('settings.salawatTitle'),
+          body: t('settings.salawatBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'salawat', soundType: notifSettings.salawatSoundType || 'salawat' },
+        },
+        salawatTime.hour,
+        salawatTime.minute,
+        notifSettings.salawatDays,
+        'general',
+      );
+    } else {
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`salawat_reminder_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('salawat_reminder'); } catch {}
+    }
+
+    // 5) Schedule tasbih reminder
+    if (notifSettings.tasbihReminder) {
+      const tasbihTime = parseTime(notifSettings.tasbihReminderTime || '15:00');
+      await scheduleWithDays(
+        'tasbih_reminder',
+        {
+          title: t('settings.tasbihReminderTitle'),
+          body: t('settings.tasbihReminderBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'tasbih', soundType: notifSettings.tasbihSoundType || 'tasbih' },
+        },
+        tasbihTime.hour,
+        tasbihTime.minute,
+        notifSettings.tasbihDays,
+        'general',
+      );
+    } else {
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`tasbih_reminder_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('tasbih_reminder'); } catch {}
+    }
+
+    // 6) Schedule istighfar reminder
+    if (notifSettings.istighfarReminder) {
+      const istighfarTime = parseTime(notifSettings.istighfarReminderTime || '12:00');
+      await scheduleWithDays(
+        'istighfar_reminder',
+        {
+          title: t('settings.istighfarTitle'),
+          body: t('settings.istighfarBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'istighfar', soundType: notifSettings.istighfarSoundType || 'istighfar' },
+        },
+        istighfarTime.hour,
+        istighfarTime.minute,
+        notifSettings.istighfarDays,
+        'general',
+      );
+    } else {
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`istighfar_reminder_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('istighfar_reminder'); } catch {}
+    }
+
+    // 7) Schedule custom reminder
+    if (notifSettings.customReminder) {
+      const customTime = parseTime(notifSettings.customReminderTime || '08:00');
+      
+      let title = t('settings.alertTitle');
+      let body = notifSettings.customReminderTitle || t('settings.customReminderDefault');
+      let soundType = notifSettings.customReminderSoundType || 'default';
+      let ayahAudioUrl: string | undefined;
+      
+      // Build content based on type
+      if (notifSettings.customReminderContentType === 'ayah' && notifSettings.customReminderSurah && notifSettings.customReminderAyah) {
+        const reciter = notifSettings.customReminderReciter || 'ar.alafasy';
+        // حساب رقم الآية الكلي
+        const ayahCounts = [7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,45,33,27,57,29,19,18,12,11,82,8,11,98,5,8,8,19,5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6,4,4];
+        let totalAyahs = 0;
+        for (let i = 0; i < notifSettings.customReminderSurah - 1; i++) {
+          totalAyahs += ayahCounts[i];
+        }
+        const globalAyah = totalAyahs + notifSettings.customReminderAyah;
+        ayahAudioUrl = getAyahAudioUrl(reciter, globalAyah);
+        title = t('settings.verseReminder');
+        const surahName = getSurahName(notifSettings.customReminderSurah);
+        if (!notifSettings.customReminderTitle) {
+          body = `${surahName} - ${t('quran.ayah')} ${notifSettings.customReminderAyah}`;
+        }
+        soundType = 'ayah_audio';
+      } else if (notifSettings.customReminderContentType === 'surah' && notifSettings.customReminderSurah) {
+        title = t('settings.surahReminder');
+        if (!notifSettings.customReminderTitle) {
+          body = `${t('settings.surahReadingTime')} ${notifSettings.customReminderSurah}`;
+        }
+      }
+
+      await scheduleWithDays(
+        'custom_reminder',
+        {
+          title,
+          body,
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { 
+            type: 'custom', 
+            soundType,
+            ...(ayahAudioUrl && { ayahAudioUrl }),
+            ...(notifSettings.customReminderSurah && { surah: notifSettings.customReminderSurah }),
+            ...(notifSettings.customReminderAyah && { ayah: notifSettings.customReminderAyah }),
+            contentType: notifSettings.customReminderContentType || 'text',
+          },
+        },
+        customTime.hour,
+        customTime.minute,
+        notifSettings.customReminderDays,
+        'general',
+      );
+    } else {
+      for (const d of ALL_DAYS) {
+        try { await Notifications.cancelScheduledNotificationAsync(`custom_reminder_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('custom_reminder'); } catch {}
+    }
+
+    // 8) Schedule Quran reading reminder
+    if (notifSettings.quranReadingReminder) {
+      const quranTime = parseTime(notifSettings.quranReadingReminderTime || '20:00');
+      // quranReminderDays uses 0=Sat..6=Fri, convert to 1=Sun..7=Sat
+      const qDays = notifSettings.quranReminderDays;
+      const convertedDays = qDays && qDays.length > 0 && qDays.length < 7
+        ? qDays.map(d => {
+            // 0=Sat→7, 1=Sun→1, 2=Mon→2, 3=Tue→3, 4=Wed→4, 5=Thu→5, 6=Fri→6
+            return d === 0 ? 7 : d;
+          })
+        : undefined;
+      await scheduleWithDays(
+        'quran_reading_reminder',
+        {
+          title: t('settings.quranReadingNotifTitle'),
+          body: t('settings.quranReadingNotifBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'quran_reading', soundType: notifSettings.quranReminderSoundType || 'general_reminder' },
+        },
+        quranTime.hour,
+        quranTime.minute,
+        convertedDays,
+        'general',
+      );
+    } else {
+      for (const d of [1, 2, 3, 4, 5, 6, 7]) {
+        try { await Notifications.cancelScheduledNotificationAsync(`quran_reading_reminder_d${d}`); } catch {}
+      }
+      try { await Notifications.cancelScheduledNotificationAsync('quran_reading_reminder'); } catch {}
+    }
+
+    // 9) Schedule worship tracking notifications
+    // Daily summary
+    if (notifSettings.worshipDailySummary) {
+      const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
+      await scheduleWithDays(
+        'worship_daily_summary',
+        {
+          title: t('settings.worshipDailySummaryTitle'),
+          body: t('settings.worshipDailySummaryBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'worship_summary' },
+        },
+        summaryTime.hour,
+        summaryTime.minute,
+        undefined,
+        'general',
+      );
+    } else {
+      try { await Notifications.cancelScheduledNotificationAsync('worship_daily_summary'); } catch {}
+    }
+
+    // Weekly report (every Friday at the daily summary time)
+    if (notifSettings.worshipWeeklyReport) {
+      const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
+      try { await Notifications.cancelScheduledNotificationAsync('worship_weekly_report'); } catch {}
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'worship_weekly_report',
+        content: {
+          title: t('settings.worshipWeeklyReportTitle'),
+          body: t('settings.worshipWeeklyReportBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: { type: 'worship_weekly' },
+          ...(Platform.OS === 'android' && { channelId: 'general' }),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: 6, // Friday
+          hour: weeklyTime.hour,
+          minute: weeklyTime.minute,
+        },
+      });
+    } else {
+      try { await Notifications.cancelScheduledNotificationAsync('worship_weekly_report'); } catch {}
+    }
 
     console.log('✅ All notifications scheduled from settings');
   } catch (error) {

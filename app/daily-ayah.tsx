@@ -9,35 +9,41 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
   ScrollView, Alert, Platform, Animated, Share, Dimensions,
 } from 'react-native';
+import { fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
+import { UniversalHeader } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
 import { useRouter, Stack } from 'expo-router';
+import { fetchTafsir, getDefaultTranslationForLanguage } from '@/lib/quran-api';
+import { getVerseQcfData } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
+import { getDailyAyahOverride } from '@/lib/daily-content-override';
+import { useFavorite } from '@/hooks/use-favorite';
+import { transliterateReference } from '@/lib/source-transliteration';
+import { localizeNumber } from '@/lib/format-number';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useAutoTranslate } from '@/hooks/use-auto-translate';
+import { Spacing } from '@/constants/theme';
+import { useAppIdentity } from '@/hooks/use-app-identity';
+import { DAILY_AYAHS } from '@/data/daily-ayahs';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ─── Daily Ayahs (7 آيات تتناوب) ────────────────────────────────────────────
-const DAILY_AYAHS = [
-  { arabic: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا', ref: 'الشرح ٥', trans: 'For indeed, with hardship will be ease.', surah: 94, ayah: 5 },
-  { arabic: 'وَمَن يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ', ref: 'الطلاق ٣', trans: 'And whoever relies upon Allah - then He is sufficient for him.', surah: 65, ayah: 3 },
-  { arabic: 'إِنَّ اللَّهَ مَعَ الصَّابِرِينَ', ref: 'البقرة ١٥٣', trans: 'Indeed, Allah is with the patient.', surah: 2, ayah: 153 },
-  { arabic: 'وَهُوَ مَعَكُمْ أَيْنَ مَا كُنتُمْ', ref: 'الحديد ٤', trans: 'And He is with you wherever you are.', surah: 57, ayah: 4 },
-  { arabic: 'فَاذْكُرُونِي أَذْكُرْكُمْ', ref: 'البقرة ١٥٢', trans: 'So remember Me; I will remember you.', surah: 2, ayah: 152 },
-  { arabic: 'وَاللَّهُ يُحِبُّ الْمُحْسِنِينَ', ref: 'آل عمران ١٣٤', trans: 'And Allah loves the doers of good.', surah: 3, ayah: 134 },
-  { arabic: 'إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ', ref: 'التوبة ١٢٠', trans: 'Indeed, Allah does not allow to be lost the reward of the doers of good.', surah: 9, ayah: 120 },
-];
 
 // ─── Background image categories from Unsplash ───────────────────────────────
 // Images are sourced from Unsplash (free, no API key required for direct access)
 const BG_CATEGORIES = [
   {
     id: 'ocean',
-    label: '🌊 بحر',
+    label: 'محيط',
     images: [
       'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80',
       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
@@ -46,7 +52,7 @@ const BG_CATEGORIES = [
   },
   {
     id: 'sky',
-    label: '🌅 سماء',
+    label: 'سماء',
     images: [
       'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80',
       'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=800&q=80',
@@ -55,7 +61,7 @@ const BG_CATEGORIES = [
   },
   {
     id: 'nature',
-    label: '🌿 طبيعة',
+    label: 'طبيعة',
     images: [
       'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80',
       'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
@@ -64,7 +70,7 @@ const BG_CATEGORIES = [
   },
   {
     id: 'desert',
-    label: '🏜️ صحراء',
+    label: 'صحراء',
     images: [
       'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80',
       'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=800&q=80',
@@ -73,7 +79,7 @@ const BG_CATEGORIES = [
   },
   {
     id: 'mosque',
-    label: '🕌 مسجد',
+    label: 'مسجد',
     images: [
       'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80',
       'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?w=800&q=80',
@@ -82,8 +88,17 @@ const BG_CATEGORIES = [
   },
   {
     id: 'solid',
-    label: '🎨 ألوان',
-    images: ['#1a1a2e', '#1B5E20', '#0D47A1'],
+    label: 'ألوان',
+    images: [
+      '#1a1a2e', '#1B5E20', '#0D47A1',
+      '#2C3E50', '#1A237E', '#311B92',
+      '#4A148C', '#880E4F', '#B71C1C',
+      '#E65100', '#F57F17', '#33691E',
+      '#004D40', '#006064', '#01579B',
+      '#263238', '#3E2723', '#212121',
+      '#0D7377', '#1B4332', '#2D3436',
+      '#6C3483', '#1C2833', '#1E3A5F',
+    ],
   },
 ];
 
@@ -100,15 +115,30 @@ const CARD_STYLES = [
 const UTHMANI_FONT = 'KFGQPCUthmanic';
 const UTHMANI_FALLBACK = 'Amiri';
 
+/** Small wrapper to auto-translate daily ayah English translation */
+function TranslatedAyahTrans({ trans, isEnglish, textLight }: { trans: string; isEnglish: boolean; textLight: string }) {
+  const translated = useAutoTranslate(trans || '', 'en', 'quran');
+  return (
+    <Text style={{ fontSize: 14, color: textLight, textAlign: 'left', writingDirection: 'ltr' as const, fontStyle: 'italic', lineHeight: 22 }}>
+      {isEnglish ? trans : translated}
+    </Text>
+  );
+}
+
 interface AyahCardProps {
   ayah: typeof DAILY_AYAHS[0];
   bgUrl: string;
   cardStyle: typeof CARD_STYLES[0];
   cardRef: React.RefObject<ViewShot>;
   showTranslation: boolean;
+  qcfGlyphs?: string[] | null;
+  qcfFontFamily?: string | null;
+  isArabic?: boolean;
+  verseTranslation?: string | null;
+  language?: string;
 }
 
-const toArabicNumeral = (n: number) => n.toString().replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+const toArabicNumeral = (n: number) => localizeNumber(n);
 
 const TEXT_SHADOW = {
   textShadowColor: 'rgba(0,0,0,0.5)',
@@ -116,8 +146,9 @@ const TEXT_SHADOW = {
   textShadowRadius: 3,
 };
 
-function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: AyahCardProps) {
+function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar' }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
+  const { logoSource } = useAppIdentity();
   const isSolidBg = bgUrl.startsWith('#');
   const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
 
@@ -137,18 +168,32 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
 
         {/* Content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-          {/* Arabic verse with ornamental brackets */}
-          <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
-            ﴿ {ayah.arabic} ﴾
-          </Text>
+          {/* Verse text — Arabic with QCF for Arabic users, translation for others */}
+          {isArabicCard ? (
+            qcfGlyphs && qcfFontFamily ? (
+              <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
+                {qcfGlyphs.join('')}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
+                ﴿ {ayah.arabic} ﴾
+              </Text>
+            )
+          ) : (
+            <Text style={{ fontSize: 18, color: '#FFFFFF', textAlign: 'center', lineHeight: 30, fontFamily: fontRegular(), marginBottom: 14, ...TEXT_SHADOW }}>
+              {cardTranslation || ayah.trans || ayah.arabic}
+            </Text>
+          )}
 
-          {/* Ref badge — single instance */}
+          {/* Ref badge */}
           <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>
-            <Text style={{ color: '#FFFFFF', fontFamily: UTHMANI_FALLBACK, fontSize: 13, ...TEXT_SHADOW }}>{ayah.ref.split(' ')[0]}: {toArabicNumeral(ayah.ayah)}</Text>
+            <Text style={{ color: '#FFFFFF', fontFamily: isArabicCard ? UTHMANI_FALLBACK : undefined, fontSize: 13, ...TEXT_SHADOW }}>
+              {isArabicCard ? `${ayah.ref.split(' ')[0]}: ${toArabicNumeral(ayah.ayah)}` : transliterateReference(ayah.ref, cardLang)}
+            </Text>
           </View>
 
-          {/* Translation */}
-          {showTranslation && (
+          {/* Translation — only for non-Arabic users with toggle ON */}
+          {!isArabicCard && showTranslation && (
             <Text style={{ color: '#FFFFFF', opacity: 0.85, fontSize: 12, textAlign: 'center', fontStyle: 'italic', paddingHorizontal: 10, direction: 'ltr', writingDirection: 'ltr', ...TEXT_SHADOW }}>
               {ayah.trans}
             </Text>
@@ -156,11 +201,8 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
         </View>
 
         {/* Branding watermark */}
-        <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <RNImage source={require('@/assets/images/App-icon.png')} style={{ width: 20, height: 20, borderRadius: 5 }} />
-          <Text style={{ color: '#FFFFFF', opacity: 0.6, fontSize: 11, fontWeight: '600', ...TEXT_SHADOW }}>
-            روح المسلم
-          </Text>
+        <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <RNImage source={logoSource} style={{ width: 56, height: 56, borderRadius: 14, opacity: 0.85 }} />
         </View>
       </View>
     </ViewShot>
@@ -171,8 +213,20 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation }: Aya
 export default function DailyAyahVideoScreen() {
   const colors = useColors();
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const cardRef = useRef<ViewShot>(null);
+  const cardRef = useRef<ViewShot>(null!);
+  const language = getLanguage();
+  const isArabic = language === 'ar';
+
+  const bgLabelMap: Record<string, string> = {
+    ocean: t('home.bgOcean'),
+    sky: t('home.bgSky'),
+    nature: t('home.bgNature'),
+    desert: t('home.bgDesert'),
+    mosque: t('home.bgMosque'),
+    solid: t('home.bgColors'),
+  };
 
   const today = new Date();
   const dayIndex = today.getDay();
@@ -182,16 +236,110 @@ export default function DailyAyahVideoScreen() {
   const [selectedCat, setSelectedCat] = useState(BG_CATEGORIES[dayIndex % BG_CATEGORIES.length]);
   const [selectedBgIdx, setSelectedBgIdx] = useState(weekIndex % 3);
   const [selectedCardStyle, setSelectedCardStyle] = useState(CARD_STYLES[dayIndex % CARD_STYLES.length]);
-  const [showTranslation, setShowTranslation] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(!isArabic);
+  const isEnglish = language === 'en';
+  const [showTafsir, setShowTafsir] = useState(false);
+  const [tafsirText, setTafsirText] = useState<string | null>(null);
+  const [tafsirLoading, setTafsirLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [bgLoaded, setBgLoaded] = useState(false);
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
+  const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
+  const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
+  const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
+  const currentAyah = overrideAyah || DAILY_AYAHS[selectedAyahIdx];
 
+  const { saved: isFav, toggle: toggleFav } = useFavorite(
+    `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
+    'ayah',
+    () => ({
+      id: `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
+      type: 'ayah',
+      title: currentAyah.ref,
+      arabic: currentAyah.arabic,
+      translation: currentAyah.trans,
+      reference: currentAyah.ref,
+      route: `/surah/${currentAyah.surah}?ayah=${currentAyah.ayah}`,
+      meta: { surah: currentAyah.surah, ayah: currentAyah.ayah },
+    }),
+  );
 
-  const currentAyah = DAILY_AYAHS[selectedAyahIdx];
+  // Check for admin override
+  useEffect(() => {
+    getDailyAyahOverride().then(({ data }) => {
+      if (data) {
+        setOverrideAyah({
+          arabic: data.text,
+          ref: data.surahName || '',
+          trans: '',
+          surah: data.surah,
+          ayah: data.ayah,
+        });
+      }
+    });
+  }, []);
   const currentBg = selectedCat.images[selectedBgIdx];
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Fetch verse translation for non-Arabic users
+  useEffect(() => {
+    if (isArabic) { setVerseTranslation(null); return; }
+    let cancelled = false;
+    const edition = getDefaultTranslationForLanguage(language);
+    const cacheKey = `@verse_trans_${currentAyah.surah}_${currentAyah.ayah}_${edition}`;
+
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached && !cancelled) { setVerseTranslation(cached); return; }
+      } catch {}
+
+      try {
+        const res = await fetch(`https://api.alquran.cloud/v1/ayah/${currentAyah.surah}:${currentAyah.ayah}/${edition}`);
+        const data = await res.json();
+        if (!cancelled && data.code === 200 && data.data?.text) {
+          setVerseTranslation(data.data.text);
+          AsyncStorage.setItem(cacheKey, data.data.text).catch(() => {});
+        } else if (!cancelled) {
+          // Fallback to English translation
+          setVerseTranslation(currentAyah.trans);
+        }
+      } catch {
+        if (!cancelled) setVerseTranslation(currentAyah.trans);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentAyah.surah, currentAyah.ayah, language, isArabic]);
+
+  // Load QCF font when ayah changes
+  useEffect(() => {
+    let cancelled = false;
+    const data = getVerseQcfData(currentAyah.surah, currentAyah.ayah);
+    if (!data) {
+      setQcfGlyphs(null);
+      setQcfFontFamily(null);
+      return;
+    }
+    loadPageFont(data.page, isDarkMode).then(() => {
+      if (cancelled) return;
+      setQcfGlyphs(data.glyphs);
+      setQcfFontFamily(getPageFontFamily(data.page, isDarkMode));
+    });
+    return () => { cancelled = true; };
+  }, [currentAyah.surah, currentAyah.ayah, isDarkMode]);
+
+  // Fetch tafsir when ayah changes or tafsir is shown
+  useEffect(() => {
+    if (!showTafsir) return;
+    setTafsirLoading(true);
+    setTafsirText(null);
+    fetchTafsir(currentAyah.surah, currentAyah.ayah, 'ar.muyassar')
+      .then(result => setTafsirText(result.tafsirText))
+      .catch(() => setTafsirText(t('quranSearch.loadTafsirFailed')))
+      .finally(() => setTafsirLoading(false));
+  }, [showTafsir, currentAyah.surah, currentAyah.ayah]);
 
 
 
@@ -220,12 +368,12 @@ export default function DailyAyahVideoScreen() {
       if (status === 'granted') {
         await MediaLibrary.saveToLibraryAsync(uri);
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('✅ تم الحفظ', 'تم حفظ الصورة في معرض الصور بنجاح');
+        Alert.alert('✅ ' + t('common.savedSuccess'), t('common.imageSavedSuccess'));
       } else {
-        Alert.alert('تنبيه', 'يلزم إذن الوصول لمعرض الصور');
+        Alert.alert(t('common.error'), t('common.photoPermissionRequired'));
       }
     } catch {
-      Alert.alert('خطأ', 'تعذر حفظ الصورة. تأكد من الأذونات وحاول مرة أخرى.');
+      Alert.alert(t('common.error'), t('common.imageSaveError'));
     } finally {
       setExporting(false);
     }
@@ -237,110 +385,125 @@ export default function DailyAyahVideoScreen() {
     try {
       if (Platform.OS === 'web') {
         await Share.share({
-          message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— القرآن الكريم`,
+          message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— ${t('common.appName')}`,
         });
         return;
       }
       const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `آية: ${currentAyah.ref}` });
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `${t('shareService.ayahRef')}: ${currentAyah.ref}` });
       } else {
         await Share.share({ message: `${currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾` });
       }
     } catch {
-      Alert.alert('خطأ', 'تعذر المشاركة');
+      Alert.alert(t('common.error'), t('common.shareError'));
     }
   }, [currentAyah]);
 
   const s = StyleSheet.create({
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },
     subtitle: { fontSize: 13, color: colors.textLight },
-    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: 'right', marginBottom: 8, marginTop: 4 },
-    hScroll: { paddingHorizontal: 16 },
-    chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border, marginLeft: 8 },
+    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', marginBottom: 8, marginTop: 4 },
+    hScroll: { paddingHorizontal: 16, gap: Spacing.sm },
+    chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border },
     chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     chipText: { fontSize: 13, fontWeight: '700', color: colors.textLight },
     chipTextActive: { color: '#fff' },
     cardWrap: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 },
     previewCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
-    actionsRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 16 },
-    actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
+    actionsRow: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: 16, marginBottom: 16 },
+    actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, justifyContent: 'center', gap: Spacing.sm },
     actionBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-    styleRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 12 },
+    styleRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: 16, marginBottom: 12 },
     styleCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
-    toggleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
+    toggleRow: { flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   });
 
   return (
     <>
     <Stack.Screen options={{ headerShown: false }} />
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Text style={s.title}>✨ آية اليوم</Text>
-          <Text style={s.subtitle}>شارك كلام الله مع أحبائك</Text>
+      <UniversalHeader
+        style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
+        rightActions={[{ icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : colors.text }]}
+      >
+        <View style={{ alignItems: 'center' }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Text style={s.title}>{t('quran.verseOfDay')}</Text>
+            <SectionInfoButton sectionKey="quran_surahs" />
+          </View>
+          <Text style={s.subtitle}>{t('quran.shareWordsOfAllah')}</Text>
         </View>
-        <View style={{ width: 32 }} />
-      </View>
+      </UniversalHeader>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 
         {/* Background category selector */}
         <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-          <Text style={s.sectionLabel}>🖼️ خلفية الصورة</Text>
+          <Text style={s.sectionLabel}>{t('quran.imageBackground')}</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
           {BG_CATEGORIES.map(cat => (
             <TouchableOpacity
               key={cat.id}
-              style={[s.chip, selectedCat.id === cat.id && s.chipActive]}
+              style={[s.chip, selectedCat.id === cat.id && s.chipActive, isRTL && { transform: [{ scaleX: -1 }] }]}
               onPress={() => { setSelectedCat(cat); setSelectedBgIdx(0); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
             >
-              <Text style={[s.chipText, selectedCat.id === cat.id && s.chipTextActive]}>{cat.label}</Text>
+              <Text style={[s.chipText, selectedCat.id === cat.id && s.chipTextActive]}>{bgLabelMap[cat.id] || cat.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
         {/* BG image variant picker */}
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 10 }}>
-          {selectedCat.images.map((_, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[s.chip, { paddingHorizontal: 10 }, selectedBgIdx === i && s.chipActive]}
-              onPress={() => { setSelectedBgIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-            >
-              <Text style={[s.chipText, selectedBgIdx === i && s.chipTextActive]}>#{i + 1}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {selectedCat.id === 'solid' ? (
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingHorizontal: 16, marginTop: 10 }}>
+            {selectedCat.images.map((color, i) => (
+              <TouchableOpacity
+                key={i}
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: color, borderWidth: selectedBgIdx === i ? 2.5 : 1, borderColor: selectedBgIdx === i ? colors.primary : 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => { setSelectedBgIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+              >
+                {selectedBgIdx === i && <MaterialCommunityIcons name="check" size={18} color="#fff" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        ) : (
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm, paddingHorizontal: 16, marginTop: 10 }}>
+            {selectedCat.images.map((_, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[s.chip, { paddingHorizontal: 10 }, selectedBgIdx === i && s.chipActive]}
+                onPress={() => { setSelectedBgIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+              >
+                <Text style={[s.chipText, selectedBgIdx === i && s.chipTextActive]}>#{i + 1}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Ayah selector */}
         <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <Text style={s.sectionLabel}>📖 اختر الآية</Text>
+          <Text style={s.sectionLabel}>{t('quran.chooseVerse')}</Text>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
           {DAILY_AYAHS.map((a, i) => (
             <TouchableOpacity
               key={i}
-              style={[s.chip, selectedAyahIdx === i && s.chipActive, { maxWidth: 160 }]}
+              style={[s.chip, selectedAyahIdx === i && s.chipActive, { maxWidth: 160 }, isRTL && { transform: [{ scaleX: -1 }] }]}
               onPress={() => { setSelectedAyahIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
             >
-              <Text style={[s.chipText, selectedAyahIdx === i && s.chipTextActive]} numberOfLines={1}>{a.ref}</Text>
+              <Text style={[s.chipText, selectedAyahIdx === i && s.chipTextActive]} numberOfLines={1}>{isArabic ? a.ref : transliterateReference(a.ref, language)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
         {/* Card style */}
         <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <Text style={s.sectionLabel}>🎨 نمط البطاقة</Text>
+          <Text style={s.sectionLabel}>{t('quran.cardStyle')}</Text>
         </View>
-        <View style={s.styleRow}>
+        <View style={[s.styleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {CARD_STYLES.map((cs, i) => (
             <TouchableOpacity
               key={cs.id}
@@ -351,12 +514,21 @@ export default function DailyAyahVideoScreen() {
             </TouchableOpacity>
           ))}
           <View style={{ flex: 1 }} />
-          {/* Translation toggle */}
+          {/* Translation toggle — only for non-Arabic users */}
+          {!isArabic && (
+            <TouchableOpacity
+              style={[s.chip, showTranslation && s.chipActive]}
+              onPress={() => setShowTranslation(v => !v)}
+            >
+              <Text style={[s.chipText, showTranslation && s.chipTextActive]}>{t('azkar.translation')}</Text>
+            </TouchableOpacity>
+          )}
+          {/* Tafsir toggle */}
           <TouchableOpacity
-            style={[s.chip, showTranslation && s.chipActive]}
-            onPress={() => setShowTranslation(v => !v)}
+            style={[s.chip, showTafsir && s.chipActive]}
+            onPress={() => { setShowTafsir(v => !v); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
           >
-            <Text style={[s.chipText, showTranslation && s.chipTextActive]}>🌐 ترجمة</Text>
+              <Text style={[s.chipText, showTafsir && s.chipTextActive]}>{t('quran.tafsir')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -374,12 +546,17 @@ export default function DailyAyahVideoScreen() {
               cardStyle={selectedCardStyle}
               cardRef={cardRef}
               showTranslation={showTranslation}
+              qcfGlyphs={qcfGlyphs}
+              qcfFontFamily={qcfFontFamily}
+              isArabic={isArabic}
+              verseTranslation={verseTranslation}
+              language={language}
             />
           </TouchableOpacity>
         </Animated.View>
 
         {/* Action buttons */}
-        <View style={s.actionsRow}>
+        <View style={[s.actionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
             style={[s.actionBtn, { backgroundColor: '#1B6B3A' }]}
             onPress={handleSaveImage}
@@ -389,7 +566,7 @@ export default function DailyAyahVideoScreen() {
               ? <ActivityIndicator color="#fff" size="small" />
               : <>
                   <MaterialCommunityIcons name="download" size={18} color="#fff" />
-                  <Text style={s.actionBtnText}>تنزيل</Text>
+                  <Text style={s.actionBtnText}>{t('common.download')}</Text>
                 </>
             }
           </TouchableOpacity>
@@ -399,7 +576,7 @@ export default function DailyAyahVideoScreen() {
             disabled={exporting}
           >
             <MaterialCommunityIcons name="share-variant" size={18} color="#fff" />
-            <Text style={s.actionBtnText}>مشاركة</Text>
+            <Text style={s.actionBtnText}>{t('common.share')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -417,26 +594,52 @@ export default function DailyAyahVideoScreen() {
             borderColor: isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)',
           }}
         >
-          {/* Verse text with ornamental brackets */}
-          <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
-            ﴿ {currentAyah.arabic} ﴾
-          </Text>
+          {/* Verse text — Arabic for Arabic users, translation for others */}
+          {isArabic ? (
+            qcfGlyphs && qcfFontFamily ? (
+              <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 12, writingDirection: 'rtl' }}>
+                {qcfGlyphs.join('')}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
+                ﴿ {currentAyah.arabic} ﴾
+              </Text>
+            )
+          ) : (
+            <Text style={{ fontSize: 20, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 34, fontFamily: fontRegular(), marginBottom: 12, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+              {verseTranslation || currentAyah.trans || currentAyah.arabic}
+            </Text>
+          )}
 
-          {/* Surah reference — single instance */}
-          <Text style={{ fontSize: 15, color: colors.primary, textAlign: 'center', fontFamily: UTHMANI_FALLBACK }}>
-            {currentAyah.ref.split(' ')[0]}: {toArabicNumeral(currentAyah.ayah)}
+          {/* Surah reference — transliterated for non-Arabic */}
+          <Text style={{ fontSize: 15, color: colors.primary, textAlign: 'center', fontFamily: isArabic ? UTHMANI_FALLBACK : undefined }}>
+            {isArabic ? `${currentAyah.ref.split(' ')[0]}: ${toArabicNumeral(currentAyah.ayah)}` : transliterateReference(currentAyah.ref, language)}
           </Text>
 
           <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 8, opacity: 0.6 }}>
-            اضغط مطولاً للذهاب للآية في المصحف
+            {t('quran.longPressToGoToVerse')}
           </Text>
 
-          {/* Translation with proper direction */}
-          {showTranslation && (
+          {/* Translation with proper direction — only for non-Arabic users */}
+          {!isArabic && showTranslation && (
             <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border, direction: 'ltr' }}>
-              <Text style={{ fontSize: 14, color: colors.textLight, textAlign: 'left', writingDirection: 'ltr', fontStyle: 'italic', lineHeight: 22 }}>
-                {currentAyah.trans}
+              <TranslatedAyahTrans trans={currentAyah.trans} isEnglish={isEnglish} textLight={colors.textLight} />
+            </View>
+          )}
+
+          {/* Tafsir section */}
+          {showTafsir && (
+            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border }}>
+              <Text style={{ fontSize: 14, fontFamily: fontSemiBold(), color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 6, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+                {t('home.tafsirMuyassar')}
               </Text>
+              {tafsirLoading ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+              ) : (
+                <Text style={{ fontSize: 15, fontFamily: fontRegular(), color: colors.text, textAlign: 'right', writingDirection: 'rtl', lineHeight: 26 }}>
+                  {tafsirText || t('common.loading')}
+                </Text>
+              )}
             </View>
           )}
         </TouchableOpacity>

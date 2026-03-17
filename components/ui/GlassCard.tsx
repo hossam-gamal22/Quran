@@ -3,14 +3,16 @@
 // Inspired by iOS Control Center, Widgets, and Dynamic Island
 
 import React from 'react';
-import { View, StyleSheet, ViewStyle, Platform, TouchableOpacity, Text, Switch, LayoutChangeEvent, Image } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp, Platform, TouchableOpacity, Text, Switch, LayoutChangeEvent, Image } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { BorderRadius, Shadows } from '@/constants/theme';
+import { BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { useSettings } from '@/contexts/SettingsContext';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming, interpolateColor, type SharedValue } from 'react-native-reanimated';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 const PRESS_SPRING = { damping: 18, stiffness: 240, mass: 0.7 };
 
 // ========================================
@@ -19,7 +21,7 @@ const PRESS_SPRING = { damping: 18, stiffness: 240, mass: 0.7 };
 
 interface GlassCardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   intensity?: number;
   borderRadius?: number;
   noBorder?: boolean;
@@ -35,6 +37,7 @@ export function GlassCard({
   noShadow = false,
 }: GlassCardProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
 
   if (Platform.OS === 'web') {
     return (
@@ -50,10 +53,10 @@ export function GlassCard({
             borderColor: isDarkMode
               ? 'rgba(255,255,255,0.12)'
               : 'rgba(0,0,0,0.06)',
-            // @ts-ignore
+            // @ts-ignore — web-only CSS props
             backdropFilter: 'blur(40px)',
             WebkitBackdropFilter: 'blur(40px)',
-          },
+          } as any,
           !noShadow && (isDarkMode ? styles.shadowDark : styles.shadowLight),
           style,
         ]}
@@ -74,7 +77,7 @@ export function GlassCard({
     >
       <BlurView
         intensity={intensity}
-        tint={isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
         style={[StyleSheet.absoluteFill, { borderRadius }]}
       />
       <View
@@ -123,6 +126,7 @@ export function GlassButton({
   fullWidth = false,
 }: GlassButtonProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
   const pressScale = useSharedValue(1);
 
   const sizeMap = {
@@ -176,10 +180,10 @@ export function GlassButton({
         }}
         style={[
           {
-            flexDirection: 'row',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
+            gap: Spacing.sm,
             backgroundColor: v.bg,
             paddingVertical: s.paddingV,
             paddingHorizontal: s.paddingH,
@@ -201,7 +205,7 @@ export function GlassButton({
         <Text
           style={{
             fontSize: s.fontSize,
-            fontFamily: 'Cairo-SemiBold',
+            fontFamily: fontSemiBold(),
             color: v.text,
             textAlign: 'center',
           }}
@@ -237,9 +241,10 @@ export function GlassToggle({
   disabled = false,
 }: GlassToggleProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
 
   const toggleContent = (
-    <View style={[styles.toggleRow, { padding: 14, position: 'relative', zIndex: 1 }]}>
+    <View style={[styles.toggleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { padding: 14, position: 'relative', zIndex: 1 }]}>
       {icon && (
         <View style={styles.toggleIcon}>
           <MaterialCommunityIcons name={icon as any} size={20} color={iconColor} />
@@ -250,7 +255,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleLabel,
-              { color: isDarkMode ? '#fff' : '#000' },
+              { color: isDarkMode ? '#fff' : '#000', textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {label}
@@ -260,7 +265,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleSubtitle,
-              { color: isDarkMode ? '#8e8e93' : '#6c6c70' },
+              { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {subtitle}
@@ -298,10 +303,10 @@ export function GlassToggle({
           borderColor: isDarkMode
             ? 'rgba(255,255,255,0.12)'
             : 'rgba(0,0,0,0.06)',
-          // @ts-ignore
+          // @ts-ignore — web-only CSS props
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-        }]}
+        } as any]}
       >
         {toggleContent}
       </View>
@@ -312,7 +317,7 @@ export function GlassToggle({
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8 }}>
       <BlurView
         intensity={30}
-        tint={isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
         style={StyleSheet.absoluteFill}
       />
       <View
@@ -361,6 +366,7 @@ export function GlassListItem({
   rightElement,
 }: GlassListItemProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
   const pressScale = useSharedValue(1);
 
   const pressStyle = useAnimatedStyle(() => ({
@@ -385,7 +391,7 @@ export function GlassListItem({
           }
         }}
         disabled={!onPress}
-        style={[styles.listItem, { position: 'relative', zIndex: 1 }]}
+        style={[styles.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', position: 'relative', zIndex: 1 }]}
       >
         {icon && (
           <View style={styles.listItemIcon}> 
@@ -393,11 +399,11 @@ export function GlassListItem({
           </View>
         )}
         <View style={styles.listItemContent}>
-          <Text style={[styles.listItemTitle, { color: isDarkMode ? '#fff' : '#000' }]}> 
+          <Text style={[styles.listItemTitle, { color: isDarkMode ? '#fff' : '#000', textAlign: isRTL ? 'right' : 'left' }]}> 
             {title}
           </Text>
           {subtitle && (
-            <Text style={[styles.listItemSubtitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70' }]}> 
+            <Text style={[styles.listItemSubtitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}> 
               {subtitle}
             </Text>
           )}
@@ -410,7 +416,7 @@ export function GlassListItem({
         {rightElement}
         {showArrow && onPress && (
           <MaterialCommunityIcons
-            name="chevron-left"
+            name={isRTL ? 'chevron-left' : 'chevron-right'}
             size={22}
             color={isDarkMode ? '#48484a' : '#c7c7cc'}
           />
@@ -433,10 +439,10 @@ export function GlassListItem({
           borderColor: isDarkMode
             ? 'rgba(255,255,255,0.12)'
             : 'rgba(0,0,0,0.06)',
-          // @ts-ignore
+          // @ts-ignore — web-only CSS props
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-        }]}
+        } as any]}
       >
         {itemContent}
       </View>
@@ -447,7 +453,7 @@ export function GlassListItem({
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 4 }}>
       <BlurView
         intensity={30}
-        tint={isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
         style={StyleSheet.absoluteFill}
       />
       <View
@@ -482,11 +488,12 @@ interface GlassSectionProps {
 
 export function GlassSection({ title, children, style }: GlassSectionProps) {
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
 
   return (
     <View style={[styles.section, style]}>
       {title && (
-        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70' }]}>
+        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}>
           {title}
         </Text>
       )}
@@ -545,13 +552,12 @@ const SegmentItem: React.FC<{
   isDarkMode: boolean;
   onPress: () => void;
   onLayoutCb: (x: number, width: number) => void;
-}> = React.memo(({ seg, activeProgress, isDarkMode, onPress, onLayoutCb }) => {
-  const activeColor = isDarkMode ? '#fff' : '#000';
+}> = React.memo(({ seg, activeProgress, isDarkMode, onPress, onLayoutCb }) => {  const isRTL = useIsRTL();  const activeColor = isDarkMode ? '#fff' : '#000';
   const inactiveColor = isDarkMode ? '#8e8e93' : '#6c6c70';
 
   const animatedLabelStyle = useAnimatedStyle(() => ({
     color: interpolateColor(activeProgress.value, [0, 1], [inactiveColor, activeColor]),
-    fontFamily: activeProgress.value > 0.5 ? 'Cairo-Bold' : 'Cairo-Medium',
+    fontFamily: activeProgress.value > 0.5 ? fontBold() : fontMedium(),
   }));
 
   // Bridge icon color to JS for MaterialCommunityIcons
@@ -572,7 +578,7 @@ const SegmentItem: React.FC<{
         const { x, width } = e.nativeEvent.layout;
         onLayoutCb(x, width);
       }}
-      style={styles.segment}
+      style={[styles.segment, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       {seg.icon && (
         <View style={styles.segmentIconWrap}>
@@ -789,6 +795,7 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.md,
   },
   toggleIcon: {
     width: 36,
@@ -796,18 +803,15 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
-  toggleContent: { flex: 1, marginRight: 4 },
+  toggleContent: { flex: 1 },
   toggleLabel: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
-    textAlign: 'right',
+    fontFamily: fontSemiBold(),
   },
   toggleSubtitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'right',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
 
@@ -818,6 +822,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     minHeight: 52,
+    gap: Spacing.md,
   },
   listItemIcon: {
     width: 36,
@@ -825,35 +830,30 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
   },
   listItemContent: { flex: 1 },
   listItemTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
-    textAlign: 'right',
+    fontFamily: fontSemiBold(),
   },
   listItemSubtitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    textAlign: 'right',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
   listItemValue: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
-    marginLeft: 8,
+    fontFamily: fontRegular(),
   },
 
   // Section
   section: { marginBottom: 20 },
   sectionTitle: {
     fontSize: 13,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textTransform: 'uppercase',
     marginBottom: 8,
     paddingHorizontal: 4,
-    textAlign: 'right',
   },
   sectionContent: {
     borderRadius: 16,
@@ -908,7 +908,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     borderRadius: 8,
-    gap: 4,
+    gap: Spacing.sm,
     zIndex: 2,
   },
   segmentIconWrap: {

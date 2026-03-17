@@ -1,7 +1,7 @@
 // app/worship-tracker/index.tsx
 // الصفحة الرئيسية لمتتبع العبادات - روح المسلم
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,8 @@ import {
   RefreshControl,
   Dimensions,
   StatusBar,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,6 +30,10 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +62,7 @@ const StatCard: React.FC<StatCardProps> = ({
   onPress,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -74,10 +79,8 @@ const StatCard: React.FC<StatCardProps> = ({
   };
 
   return (
-    <Animated.View
-      entering={FadeInRight.delay(index * 100).duration(500)}
-      style={animatedStyle}
-    >
+    <Animated.View entering={FadeInRight.delay(index * 100).duration(500)}>
+    <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={onPress}
@@ -85,15 +88,16 @@ const StatCard: React.FC<StatCardProps> = ({
         onPressOut={handlePressOut}
         style={[styles.statCard, isDarkMode && styles.statCardDark]}
       >
-        <View style={styles.statIconContainer}>
+        <View style={[styles.statIconContainer, { backgroundColor: `${color}15` }]}>
           <MaterialCommunityIcons name={icon} size={24} color={color} />
         </View>
-        <Text style={[styles.statValue, isDarkMode && styles.textLight]}>{value}</Text>
-        <Text style={[styles.statTitle, isDarkMode && styles.textMuted]}>{title}</Text>
+        <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+        <Text style={[styles.statTitle, { color: colors.textLight }]}>{title}</Text>
         {subtitle && (
-          <Text style={[styles.statSubtitle, isDarkMode && styles.textMuted]}>{subtitle}</Text>
+          <Text style={[styles.statSubtitle, { color: colors.textLight }]}>{subtitle}</Text>
         )}
       </TouchableOpacity>
+    </Animated.View>
     </Animated.View>
   );
 };
@@ -121,24 +125,31 @@ const TrackerCard: React.FC<TrackerCardProps> = ({
   onPress,
   isDarkMode = false,
 }) => {
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInDown.delay(index * 150).duration(500)}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
         <View
           style={[styles.trackerCard, { backgroundColor: `${colors[0]}CC` }]}
         >
-          <View style={styles.trackerContent}>
-            <View style={styles.trackerLeft}>
+          <View style={[styles.trackerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.trackerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.trackerIconBg}>
-                <MaterialCommunityIcons name={icon} size={32} color="#fff" />
+                <MaterialCommunityIcons name={icon} size={28} color="#fff" />
               </View>
               <View style={styles.trackerTextContainer}>
-                <Text style={styles.trackerTitle}>{title}</Text>
-                <Text style={styles.trackerDescription}>{description}</Text>
+                <Text style={[styles.trackerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
+                <Text style={[styles.trackerDescription, { textAlign: isRTL ? 'right' : 'left' }]}>{description}</Text>
               </View>
             </View>
             
-            <View style={styles.trackerRight}>
+            <View style={[styles.trackerRight, { flexDirection: 'row' }]}>
+              <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={22} color="rgba(255,255,255,0.7)" />
+              {status && (
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusText}>{status}</Text>
+                </View>
+              )}
               {progress !== undefined && (
                 <View style={styles.progressContainer}>
                   <View style={styles.progressCircle}>
@@ -146,12 +157,6 @@ const TrackerCard: React.FC<TrackerCardProps> = ({
                   </View>
                 </View>
               )}
-              {status && (
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusText}>{status}</Text>
-                </View>
-              )}
-              <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={24} color="rgba(255,255,255,0.7)" />
             </View>
           </View>
         </View>
@@ -177,6 +182,8 @@ const QuickAction: React.FC<QuickActionProps> = ({
   onPress,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <TouchableOpacity
       style={[
@@ -198,14 +205,14 @@ const QuickAction: React.FC<QuickActionProps> = ({
       <Text
         style={[
           styles.quickActionLabel,
-          isDarkMode && styles.textMuted,
+          { color: colors.textLight },
           isActive && { color },
         ]}
       >
         {label}
       </Text>
       {isActive && (
-        <View style={[styles.checkBadge, { backgroundColor: color }]}>
+        <View style={[styles.checkBadge, { backgroundColor: color, right: isRTL ? undefined : -5, left: isRTL ? -5 : undefined }]}>
           <MaterialCommunityIcons name="check" size={12} color="#fff" />
         </View>
       )}
@@ -218,8 +225,9 @@ const QuickAction: React.FC<QuickActionProps> = ({
 // ========================================
 
 export default function WorshipTrackerScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { context } = useLocalSearchParams();
+  const { context, section } = useLocalSearchParams();
   const {
     isLoading,
     stats,
@@ -234,9 +242,11 @@ export default function WorshipTrackerScreen() {
   } = useWorship();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const statsScrollRef = useRef<ScrollView>(null);
   
   const { isDarkMode, settings } = useSettings();
-  const language = 'ar';
+  const colors = useColors();
+
 
   // حساب إحصائيات الصلاة اليوم
   const getPrayerProgress = () => {
@@ -267,16 +277,17 @@ export default function WorshipTrackerScreen() {
     router.push(`/worship-tracker/${screen}` as any);
   };
 
-  // If a caller provided a ?context= parameter (e.g. ?context=quran), forward to that sub-screen
+  // If a caller provided a ?context= or ?section= parameter (e.g. ?section=prayer), forward to that sub-screen
   useEffect(() => {
-    if (!context) return;
+    const param = context || section;
+    if (!param) return;
     // Normalize to known keys
     const allowed = ['quran', 'prayer', 'fasting', 'azkar', 'tasbih'];
-    const key = String(context).toLowerCase();
+    const key = String(param).toLowerCase();
     if (allowed.includes(key)) {
       router.replace(`/worship-tracker/${key}` as any);
     }
-  }, [context]);
+  }, [context, section]);
 
   // أزرار سريعة
   const handleToggleFasting = async () => {
@@ -298,6 +309,7 @@ export default function WorshipTrackerScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
+      opacity={settings.display.backgroundOpacity ?? 1}
       style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (isDarkMode ? '#11151c' : '#fff') : 'transparent' }]}
     >
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
@@ -308,36 +320,22 @@ export default function WorshipTrackerScreen() {
       />
       
       {/* الهيدر */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'chevron-right' : 'chevron-left'}
-            size={26}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-            متتبع العبادات
-          </Text>
-          <Text style={[styles.headerSubtitle, isDarkMode && styles.textMuted]}>
-            تابع عباداتك اليومية
-          </Text>
+      <UniversalHeader
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+        rightActions={[{
+          icon: 'cog-outline',
+          onPress: () => router.push('/settings/worship-tracking'),
+          color: colors.text,
+          size: 24,
+        }]}
+      >
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('worship.title')}</Text>
+          <SectionInfoButton sectionKey="worship" />
         </View>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => router.push('/settings/worship-tracking')}
-        >
-          <MaterialCommunityIcons
-            name="cog-outline"
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-      </Animated.View>
+      </UniversalHeader>
 
       <ScrollView
         style={styles.scrollView}
@@ -354,18 +352,24 @@ export default function WorshipTrackerScreen() {
       >
         {/* إحصائيات سريعة */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            إحصائيات سريعة
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.statistics')}
           </Text>
           <ScrollView
+            ref={statsScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statsContainer}
+            contentContainerStyle={[styles.statsContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onContentSizeChange={() => {
+              if (isRTL) {
+                statsScrollRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
           >
             <StatCard
-              title="نسبة الصلاة"
+              title={t('worship.prayerTracker')}
               value={`${stats?.prayer?.percentage ?? 0}%`}
-              subtitle={`سلسلة: ${stats?.prayer?.streak ?? 0} يوم`}
+              subtitle={`${t('worship.currentStreak')}: ${stats?.prayer?.streak ?? 0} ${t('home.days')}`}
               icon="mosque"
               color="#2f7659"
               index={0}
@@ -373,9 +377,9 @@ export default function WorshipTrackerScreen() {
               isDarkMode={isDarkMode}
             />
             <StatCard
-              title="أيام الصيام"
+              title={t('worship.totalDays')}
               value={stats?.fasting?.totalDays ?? 0}
-              subtitle={`سلسلة: ${stats?.fasting?.currentStreak ?? 0} يوم`}
+              subtitle={`${t('worship.currentStreak')}: ${stats?.fasting?.currentStreak ?? 0} ${t('home.days')}`}
               icon="moon-waning-crescent"
               color="#5d4e8c"
               index={1}
@@ -383,9 +387,9 @@ export default function WorshipTrackerScreen() {
               isDarkMode={isDarkMode}
             />
             <StatCard
-              title="صفحات القرآن"
+              title={t('worship.totalPages')}
               value={stats?.quran?.totalPages ?? 0}
-              subtitle={`ختمات: ${stats?.quran?.khatmasCompleted ?? 0}`}
+              subtitle={`${t('worship.khatmaNumber')}: ${stats?.quran?.khatmasCompleted ?? 0}`}
               icon="book-open-page-variant"
               color="#c17f59"
               index={2}
@@ -393,9 +397,9 @@ export default function WorshipTrackerScreen() {
               isDarkMode={isDarkMode}
             />
             <StatCard
-              title="أيام الأذكار"
+              title={t('worship.consecutiveDays')}
               value={stats?.azkar?.totalDays ?? 0}
-              subtitle={`نسبة: ${stats?.azkar?.completionRate ?? 0}%`}
+              subtitle={`${stats?.azkar?.completionRate ?? 0}%`}
               icon="hand-heart"
               color="#3a7ca5"
               index={3}
@@ -406,13 +410,13 @@ export default function WorshipTrackerScreen() {
 
         {/* أفعال سريعة */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            أفعال سريعة
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.quickTools')}
           </Text>
-          <View style={styles.quickActionsGrid}>
+          <View style={[styles.quickActionsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <QuickAction
               icon="moon-waning-crescent"
-              label="صائم اليوم"
+              label={t('worship.recordFasting')}
               color="#5d4e8c"
               isActive={todayFasting?.fasted ?? false}
               onPress={handleToggleFasting}
@@ -420,7 +424,7 @@ export default function WorshipTrackerScreen() {
             />
             <QuickAction
               icon="weather-sunny"
-              label="أذكار الصباح"
+              label={t('home.morningAzkar')}
               color="#f5a623"
               isActive={todayAzkar?.morning ?? false}
               onPress={handleToggleMorningAzkar}
@@ -428,7 +432,7 @@ export default function WorshipTrackerScreen() {
             />
             <QuickAction
               icon="weather-night"
-              label="أذكار المساء"
+              label={t('home.eveningAzkar')}
               color="#3a7ca5"
               isActive={todayAzkar?.evening ?? false}
               onPress={handleToggleEveningAzkar}
@@ -439,13 +443,13 @@ export default function WorshipTrackerScreen() {
 
         {/* متتبعات العبادات */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            متتبعات العبادات
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.title')}
           </Text>
           <View style={styles.trackersContainer}>
             <TrackerCard
-              title="متتبع الصلاة"
-              description="سجل صلواتك الخمس يومياً"
+              title={t('worship.prayerTracker')}
+              description={t('worship.tapToSelectStatus')}
               icon="mosque"
               colors={['#2f7659', '#1d4a3a']}
               progress={getPrayerProgress()}
@@ -455,21 +459,21 @@ export default function WorshipTrackerScreen() {
               isDarkMode={isDarkMode}
             />
             <TrackerCard
-              title="متتبع الصيام"
-              description="سجل أيام صيامك"
+              title={t('worship.fastingTracker')}
+              description={t('worship.recordFasting')}
               icon="moon-waning-crescent"
               colors={['#5d4e8c', '#3d3260']}
-              status={todayFasting?.fasted ? 'صائم' : 'مفطر'}
+              status={todayFasting?.fasted ? t('worship.youAreFasting') : t('worship.tapToRecord')}
               index={1}
               onPress={() => navigateTo('fasting')}
               isDarkMode={isDarkMode}
             />
             <TrackerCard
-              title="متتبع القرآن"
-              description="تابع قراءتك اليومية"
+              title={t('worship.quranTracker')}
+              description={t('worship.dailyGoal')}
               icon="book-open-page-variant"
               colors={['#c17f59', '#8a5a3d']}
-              status={`${todayQuran?.pagesRead ?? 0} صفحة اليوم`}
+              status={`${todayQuran?.pagesRead ?? 0} ${t('worship.dailyPages')}`}
               index={2}
               onPress={() => navigateTo('quran')}
               isDarkMode={isDarkMode}
@@ -480,12 +484,12 @@ export default function WorshipTrackerScreen() {
         {/* نصيحة اليوم */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
           <GlassCard style={styles.tipCard}>
-            <View style={styles.tipHeader}>
+            <View style={[styles.tipHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#f5a623" />
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>نصيحة اليوم</Text>
+              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.tipOfDay')}</Text>
             </View>
-            <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
-              "من صلى البردين دخل الجنة" - حافظ على صلاة الفجر والعصر في وقتهما
+            <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.tipOfDayText')}
             </Text>
           </GlassCard>
         </Animated.View>
@@ -509,37 +513,14 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: '#11151c',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Cairo-Regular',
-    color: '#666',
-  },
+
   textLight: {
     color: '#fff',
   },
   textMuted: {
     color: '#999',
   },
-  settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(120,120,128,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   scrollView: {
     flex: 1,
   },
@@ -548,7 +529,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     paddingHorizontal: 20,
     marginTop: 10,
@@ -556,7 +537,7 @@ const styles = StyleSheet.create({
   },
   // إحصائيات
   statsContainer: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 20,
     gap: 12,
   },
   statCard: {
@@ -577,21 +558,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+    backgroundColor: 'rgba(120,120,128,0.08)',
   },
   statValue: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   statTitle: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginTop: 2,
   },
   statSubtitle: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
     marginTop: 2,
   },
@@ -607,9 +589,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 15,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
     position: 'relative',
   },
   quickActionDark: {
@@ -617,7 +598,7 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: {
     fontSize: 11,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginTop: 8,
     textAlign: 'center',
@@ -639,61 +620,64 @@ const styles = StyleSheet.create({
   },
   trackerCard: {
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   trackerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   trackerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: 12,
+    minWidth: 0,
   },
   trackerIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   trackerTextContainer: {
-    marginLeft: 15,
     flex: 1,
+    minWidth: 0,
   },
   trackerTitle: {
-    fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontSize: 16,
+    fontFamily: fontBold(),
     color: '#fff',
   },
   trackerDescription: {
-    fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontSize: 11,
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
   trackerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 0,
   },
   progressContainer: {
     alignItems: 'center',
   },
   progressCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   progressText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   statusBadge: {
@@ -704,7 +688,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#fff',
   },
   // نصيحة
@@ -721,12 +705,12 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   tipText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
   },

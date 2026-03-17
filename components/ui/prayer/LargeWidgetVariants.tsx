@@ -9,13 +9,17 @@ import {
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
-  formatTime12h,
+  formatPrayerTime,
 } from '@/lib/prayer-times';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 interface LargeWidgetVariantsProps {
   prayerTimes?: PrayerTimes | null;
   isDarkMode?: boolean;
+  show24Hour?: boolean;
+  iconSource?: any;
 }
 
 const PRAYER_KEYS: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
@@ -23,7 +27,10 @@ const PRAYER_KEYS: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
 const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   prayerTimes = null,
   isDarkMode = false,
+  show24Hour = false,
+  iconSource,
 }) => {
+  const isRTL = useIsRTL();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -67,50 +74,50 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* Top section: Countdown (left) + Logo (right) */}
-      <View style={styles.topRow}>
+      <View style={[styles.topRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         {/* Left: Countdown + label */}
         <View style={styles.topLeft}>
           <Text style={[styles.countdown, { color: textColor }]}>{countdownStr}</Text>
           <Text style={[styles.topLabel, { color: mutedColor }]}>
-            الوقت المتبقي على الصلاة القادمة
+            {t('prayer.remainingTimeForNextPrayer')}
           </Text>
         </View>
 
         {/* Right: Logo (static) */}
-        <View style={styles.topRight}>
+        <View style={[styles.topRight]}>
           <Image
-            source={require('@/assets/images/icon.png')}
+            source={iconSource || require('@/assets/images/icons/icon.png')}
             style={styles.logo}
           />
-          <Text style={styles.appName}>روح المسلم</Text>
+          <Text style={styles.appName}>{t('common.appName')}</Text>
         </View>
       </View>
 
       {/* Current prayer bar (green bordered) */}
-      <View style={styles.currentBar}>
+      <View style={[styles.currentBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         {/* Time pill (left) */}
-        <View style={styles.currentTimePill}>
+        <View style={[styles.currentTimePill]}>
           <Text style={styles.currentTimeText}>{countdownStr}</Text>
         </View>
         {/* Prayer name (right) */}
-        <Text style={styles.currentPrayerName}>صلاة {prayerName}</Text>
+        <Text style={[styles.currentPrayerName, { textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.salahPrefix')} {prayerName}</Text>
       </View>
 
       {/* Prayer schedule rows */}
       {schedule.map((prayer) => (
-        <View key={prayer.key} style={styles.prayerRow}>
+        <View key={prayer.key} style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Time pill */}
           <View style={[
             styles.timePill,
             prayer.isNext ? styles.timePillActive : styles.timePillInactive,
           ]}>
             <Text style={styles.timePillText}>
-              {prayer.time !== '--:--' ? formatTime12h(prayer.time) : '--:--'}
+              {prayer.time !== '--:--' ? formatPrayerTime(prayer.time, show24Hour) : '--:--'}
             </Text>
           </View>
           {/* Prayer name */}
-          <Text style={[styles.prayerNameText, { color: textColor }]}>
-            صلاة {prayer.name}
+          <Text style={[styles.prayerNameText, { color: textColor, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('prayer.salahPrefix')} {prayer.name}
           </Text>
         </View>
       ))}
@@ -133,24 +140,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 14,
+    gap: 12,
   },
   topLeft: {
     flex: 1,
   },
   countdown: {
     fontSize: 32,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     letterSpacing: 1,
     lineHeight: 40,
   },
   topLabel: {
     fontSize: 9,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     marginTop: 2,
   },
   topRight: {
     alignItems: 'center',
-    marginLeft: 12,
   },
   logo: {
     width: 30,
@@ -159,7 +166,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 8,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#0f987f',
     marginTop: 3,
   },
@@ -179,24 +186,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 4,
     paddingHorizontal: 12,
-    marginRight: 12,
   },
   currentTimeText: {
     color: '#fff',
     fontSize: 13,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   currentPrayerName: {
     color: '#fff',
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     flex: 1,
-    textAlign: 'right',
   },
   prayerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
+    gap: 12,
   },
   timePill: {
     borderRadius: 10,
@@ -204,7 +210,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     minWidth: 68,
     alignItems: 'center',
-    marginRight: 12,
   },
   timePillActive: {
     backgroundColor: 'rgba(15,152,127,0.9)',
@@ -215,13 +220,12 @@ const styles = StyleSheet.create({
   timePillText: {
     color: '#fff',
     fontSize: 13,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   prayerNameText: {
     fontSize: 16,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     flex: 1,
-    textAlign: 'right',
   },
 });
 

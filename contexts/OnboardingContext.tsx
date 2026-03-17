@@ -4,6 +4,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
+import { I18nManager } from 'react-native';
+import { setLanguage, getLanguage } from '@/lib/i18n';
+import { useSettings } from '@/contexts/SettingsContext';
 
 // ========================================
 // الأنواع
@@ -11,6 +14,7 @@ import { useRouter } from 'expo-router';
 
 export type OnboardingStep = 
   | 'welcome'
+  | 'prize'
   | 'language'
   | 'location'
   | 'notifications'
@@ -22,6 +26,8 @@ interface UserPreferences {
   notificationsEnabled: boolean;
   prayerNotifications: boolean;
   azkarNotifications: boolean;
+  salawatReminder: boolean;
+  dailyVerse: boolean;
   country?: string;
   city?: string;
   latitude?: number;
@@ -74,23 +80,26 @@ const STORAGE_KEYS = {
 };
 
 const STEPS_ORDER: OnboardingStep[] = [
-  'welcome',
   'language',
+  'welcome',
+  'prize',
   'location',
   'notifications',
   'complete',
 ];
 
 const DEFAULT_PREFERENCES: UserPreferences = {
-  language: 'ar',
+  language: getLanguage(),
   locationEnabled: false,
   notificationsEnabled: true,
   prayerNotifications: true,
   azkarNotifications: true,
+  salawatReminder: true,
+  dailyVerse: true,
 };
 
 const DEFAULT_PROGRESS: OnboardingProgress = {
-  currentStep: 'welcome',
+  currentStep: 'language',
   completedSteps: [],
   startedAt: new Date().toISOString(),
 };
@@ -111,6 +120,7 @@ interface OnboardingProviderProps {
 
 export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
   const router = useRouter();
+  const { reloadSettings } = useSettings();
   
   // الحالة
   const [isLoading, setIsLoading] = useState(true);
@@ -254,6 +264,45 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       // حفظ التفضيلات النهائية
       await savePreferences(preferences);
       
+      // ====== ربط التفضيلات بأنظمة التطبيق الفعلية ======
+      
+      // 1. تطبيق اللغة المختارة
+      await setLanguage(preferences.language as any);
+      
+      // 2. تحديث إعدادات التطبيق (app_settings) التي يقرأها SettingsContext
+      try {
+        const existingSettings = await AsyncStorage.getItem('app_settings');
+        const settings = existingSettings ? JSON.parse(existingSettings) : {};
+        
+        // تطبيق اللغة
+        settings.language = preferences.language;
+        
+        // تطبيق إعدادات الإشعارات
+        if (!settings.notifications) settings.notifications = {};
+        settings.notifications.enabled = preferences.notificationsEnabled;
+        settings.notifications.prayerTimes = preferences.prayerNotifications;
+        settings.notifications.morningAzkar = preferences.azkarNotifications;
+        settings.notifications.eveningAzkar = preferences.azkarNotifications;
+        settings.notifications.salawatReminder = preferences.salawatReminder;
+        settings.notifications.dailyVerse = preferences.dailyVerse;
+        
+        // تطبيق إعدادات الصلاة (الموقع)
+        if (preferences.locationEnabled && preferences.latitude && preferences.longitude) {
+          if (!settings.prayer) settings.prayer = {};
+          settings.prayer.latitude = preferences.latitude;
+          settings.prayer.longitude = preferences.longitude;
+          settings.prayer.city = preferences.city;
+          settings.prayer.country = preferences.country;
+        }
+        
+        await AsyncStorage.setItem('app_settings', JSON.stringify(settings));
+        
+        // إعادة تحميل الإعدادات في SettingsContext
+        await reloadSettings();
+      } catch (e) {
+        console.error('Error bridging onboarding preferences to app settings:', e);
+      }
+      
       setIsOnboardingComplete(true);
       
       // التوجيه للصفحة الرئيسية
@@ -261,15 +310,48 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     } catch (error) {
       console.error('Error completing onboarding:', error);
     }
-  }, [progress, preferences, router]);
+  }, [progress, preferences, router, reloadSettings]);
 
   const skipOnboarding = useCallback(async () => {
     try {
       // حفظ التفضيلات الافتراضية
-      await savePreferences(DEFAULT_PREFERENCES);
+      await savePreferences(preferences);
       
       // حفظ حالة الاكتمال
       await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true');
+      
+      // ====== ربط التفضيلات بأنظمة التطبيق (نفس منطق completeOnboarding) ======
+      try {
+        await setLanguage(preferences.language as any);
+        
+        const existingSettings = await AsyncStorage.getItem('app_settings');
+        const settings = existingSettings ? JSON.parse(existingSettings) : {};
+        
+        settings.language = preferences.language;
+        
+        if (!settings.notifications) settings.notifications = {};
+        settings.notifications.enabled = preferences.notificationsEnabled;
+        settings.notifications.prayerTimes = preferences.prayerNotifications;
+        settings.notifications.morningAzkar = preferences.azkarNotifications;
+        settings.notifications.eveningAzkar = preferences.azkarNotifications;
+        settings.notifications.salawatReminder = preferences.salawatReminder;
+        settings.notifications.dailyVerse = preferences.dailyVerse;
+        
+        if (preferences.locationEnabled && preferences.latitude && preferences.longitude) {
+          if (!settings.prayer) settings.prayer = {};
+          settings.prayer.latitude = preferences.latitude;
+          settings.prayer.longitude = preferences.longitude;
+          settings.prayer.city = preferences.city;
+          settings.prayer.country = preferences.country;
+        }
+        
+        await AsyncStorage.setItem('app_settings', JSON.stringify(settings));
+        
+        // إعادة تحميل الإعدادات في SettingsContext
+        await reloadSettings();
+      } catch (e) {
+        console.error('Error bridging skip-onboarding preferences:', e);
+      }
       
       setIsOnboardingComplete(true);
       
@@ -278,7 +360,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     } catch (error) {
       console.error('Error skipping onboarding:', error);
     }
-  }, [router]);
+  }, [preferences, router, reloadSettings]);
 
   const resetOnboarding = useCallback(async () => {
     try {
@@ -292,7 +374,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       setProgress(DEFAULT_PROGRESS);
       setPreferences(DEFAULT_PREFERENCES);
       
-      router.replace('/onboarding/welcome');
+      router.replace('/onboarding/language');
     } catch (error) {
       console.error('Error resetting onboarding:', error);
     }

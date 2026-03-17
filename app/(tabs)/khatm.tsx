@@ -17,10 +17,12 @@ import {
   markSurahComplete, unmarkSurahComplete, deleteKhatm,
   getKhatmStats, KhatmStats, getDurationText,
 } from '@/lib/khatm';
-import { SURAH_NAMES_AR } from '@/lib/quran-api';
+import { getSurahName } from '@/lib/quran-api';
+import { t, getDateLocale } from '@/lib/i18n';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 // Ayah counts per surah
 const SURAH_AYAH_COUNTS = [
   7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,
@@ -55,6 +57,7 @@ const JUZ_GROUPS = [
 
 export default function KhatmScreen() {
   const colors = useColors();
+  const isRTL = useIsRTL();
   const router = useRouter();
   const [stats, setStats] = useState<KhatmStats | null>(null);
   const [allKhatm, setAllKhatm] = useState<KhatmRecord[]>([]);
@@ -106,9 +109,9 @@ export default function KhatmScreen() {
   };
 
   const handleDelete = (khatmId: string) => {
-    Alert.alert('حذف الختمة', 'هل تريد حذف هذه الختمة؟', [
-      { text: 'إلغاء', style: 'cancel' },
-      { text: 'حذف', style: 'destructive', onPress: async () => { await deleteKhatm(khatmId); loadData(); } },
+    Alert.alert(t('khatma.delete'), t('khatma.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: async () => { await deleteKhatm(khatmId); loadData(); } },
     ]);
   };
 
@@ -126,13 +129,13 @@ export default function KhatmScreen() {
       margin: 16, backgroundColor: colors.primary, borderRadius: 22, padding: 24,
       borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)',
     },
-    khatmName: { fontSize: 18, fontWeight: '800', color: '#fff', textAlign: 'right', marginBottom: 4 },
-    khatmDuration: { fontSize: 13, color: 'rgba(255,255,255,0.75)', textAlign: 'right', marginBottom: 16 },
+    khatmName: { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 4 },
+    khatmDuration: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginBottom: 16 },
     progressBarBg: { height: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 5, marginBottom: 10 },
     progressBarFill: { height: 10, borderRadius: 5, backgroundColor: '#fff' },
     progressRow: { flexDirection: 'row', justifyContent: 'space-between' },
     progressPct: { fontSize: 24, fontWeight: '900', color: '#fff' },
-    progressDetails: { color: 'rgba(255,255,255,0.8)', fontSize: 13, textAlign: 'left' },
+    progressDetails: { color: 'rgba(255,255,255,0.8)', fontSize: 13, textAlign: isRTL ? 'right' : 'left' },
     viewSurahsBtn: {
       marginTop: 14, backgroundColor: 'rgba(255,255,255,0.2)',
       borderRadius: 16, paddingVertical: 10, alignItems: 'center',
@@ -160,18 +163,18 @@ export default function KhatmScreen() {
     },
     startBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
     // History
-    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, textAlign: 'right', paddingHorizontal: 16, marginBottom: 8 },
+    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginBottom: 8 },
     historyItem: {
       marginHorizontal: 16, marginBottom: 10, backgroundColor: 'rgba(120,120,128,0.12)',
       borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.border,
-      flexDirection: 'row', alignItems: 'center',
+      flexDirection: 'row', alignItems: 'center', gap: 10,
     },
     historyInfo: { flex: 1 },
-    historyName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    historyDates: { fontSize: 12, color: colors.muted, textAlign: 'right', marginTop: 3 },
+    historyName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    historyDates: { fontSize: 12, color: colors.muted, marginTop: 3 },
     completedBadge: {
       backgroundColor: colors.primary + '18', borderRadius: 20,
-      paddingHorizontal: 10, paddingVertical: 4, marginLeft: 10,
+      paddingHorizontal: 10, paddingVertical: 4,
     },
     completedBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primary },
     deleteBtn: { padding: 6 },
@@ -179,11 +182,11 @@ export default function KhatmScreen() {
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 16 },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 16 },
     input: {
       backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
       borderRadius: 14, padding: 14, fontSize: 16, color: colors.foreground,
-      textAlign: 'right', marginBottom: 16,
+      textAlign: isRTL ? 'right' : 'left', marginBottom: 16,
     },
     confirmBtn: { backgroundColor: colors.primary, borderRadius: 16, padding: 16, alignItems: 'center' },
     confirmBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
@@ -194,12 +197,12 @@ export default function KhatmScreen() {
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     surahItem: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
-      borderBottomWidth: 0.5, borderBottomColor: colors.border,
+      flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 12,
     },
-    surahNum: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginLeft: 12 },
+    surahNum: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
     surahNumText: { fontSize: 12, fontWeight: '700' },
-    surahName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.foreground, textAlign: 'right' },
+    surahName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
     checkCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
     // Celebration overlay
     celebOverlay: {
@@ -213,58 +216,58 @@ export default function KhatmScreen() {
   });
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="khatma">
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.addBtn} onPress={() => setShowNewModal(true)}>
           <IconSymbol name="plus" size={20} color="#fff" />
         </TouchableOpacity>
-        <Text style={s.title}>📖 ختمات القرآن</Text>
+        <Text style={s.title}>{t('khatma.title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Stats */}
-        <View style={[s.statsRow, { marginTop: 16 }]}>
+        <View style={[s.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 16 }]}>
           <View style={s.statCard}>
             <Text style={s.statNum}>{stats?.totalCompleted || 0}</Text>
-            <Text style={s.statLabel}>ختمات مكتملة</Text>
+            <Text style={s.statLabel}>{t('khatma.completedKhatmas')}</Text>
           </View>
           <View style={s.statCard}>
             <Text style={s.statNum}>{current ? stats?.completedSurahs || 0 : 0}</Text>
-            <Text style={s.statLabel}>سور مقروءة</Text>
+            <Text style={s.statLabel}>{t('khatma.markAsRead')}</Text>
           </View>
           <View style={s.statCard}>
             <Text style={s.statNum}>{current ? stats?.progressPercent || 0 : 0}%</Text>
-            <Text style={s.statLabel}>التقدم</Text>
+            <Text style={s.statLabel}>{t('khatma.progress')}</Text>
           </View>
         </View>
 
         {/* Current Khatm */}
         {current ? (
           <View style={s.progressCard}>
-            <Text style={s.khatmName}>{current.name}</Text>
-            <Text style={s.khatmDuration}>⏱ {getDurationText(current.startDate)}</Text>
-            <View style={s.progressBarBg}>
+            <Text style={[s.khatmName, { textAlign: isRTL ? 'right' : 'left' }]}>{current.name}</Text>
+            <Text style={[s.khatmDuration, { textAlign: isRTL ? 'right' : 'left' }]}>⏱ {getDurationText(current.startDate)}</Text>
+            <View style={[s.progressBarBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[s.progressBarFill, { width: `${stats?.progressPercent || 0}%` as any }]} />
             </View>
-            <View style={s.progressRow}>
-              <Text style={s.progressDetails}>
-                {stats?.remainingSurahs} سورة متبقية
+            <View style={[s.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[s.progressDetails, { textAlign: isRTL ? 'right' : 'left' }]}>
+                {stats?.remainingSurahs} {t('quran.surah')} {t('khatma.pagesRemaining').split(' ')[0]}
               </Text>
               <Text style={s.progressPct}>{stats?.progressPercent}%</Text>
             </View>
             <TouchableOpacity style={s.viewSurahsBtn} onPress={() => setShowSurahsModal(true)}>
-              <Text style={s.viewSurahsBtnText}>📋 تحديث السور المقروءة</Text>
+              <Text style={s.viewSurahsBtnText}>{t('khatma.updateProgress')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <View style={s.emptyCard}>
-            <Text style={s.emptyEmoji}>📖</Text>
-            <Text style={s.emptyTitle}>ابدأ ختمة جديدة</Text>
-            <Text style={s.emptyText}>تتبّع رحلتك في قراءة القرآن الكريم وسجّل ختماتك</Text>
+            <Text style={s.emptyEmoji}></Text>
+            <Text style={s.emptyTitle}>{t('khatma.newKhatma')}</Text>
+            <Text style={s.emptyText}>{t('khatma.khatmaCreatedMsg')}</Text>
             <TouchableOpacity style={s.startBtn} onPress={() => setShowNewModal(true)}>
-              <Text style={s.startBtnText}>+ ابدأ ختمة</Text>
+              <Text style={s.startBtnText}>+ {t('khatma.startKhatma')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -272,21 +275,21 @@ export default function KhatmScreen() {
         {/* History */}
         {allKhatm.filter(k => k.isCompleted).length > 0 && (
           <>
-            <Text style={[s.sectionTitle, { marginTop: 16 }]}>الختمات المكتملة 🏆</Text>
+            <Text style={[s.sectionTitle, { marginTop: 16, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.completedKhatmas')}</Text>
             {allKhatm.filter(k => k.isCompleted).map(khatm => (
-              <View key={khatm.id} style={s.historyItem}>
+              <View key={khatm.id} style={[s.historyItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(khatm.id)}>
                   <IconSymbol name="trash" size={18} color={colors.muted} />
                 </TouchableOpacity>
                 <View style={s.historyInfo}>
                   <Text style={s.historyName}>{khatm.name}</Text>
-                  <Text style={s.historyDates}>
-                    {new Date(khatm.startDate).toLocaleDateString('ar-EG')} — {khatm.endDate ? new Date(khatm.endDate).toLocaleDateString('ar-EG') : ''}
+                  <Text style={[s.historyDates, { textAlign: isRTL ? 'right' : 'left' }]}>
+                    {new Date(khatm.startDate).toLocaleDateString(getDateLocale())} — {khatm.endDate ? new Date(khatm.endDate).toLocaleDateString(getDateLocale()) : ''}
                     {'  •  '}{getDurationText(khatm.startDate, khatm.endDate)}
                   </Text>
                 </View>
                 <View style={s.completedBadge}>
-                  <Text style={s.completedBadgeText}>✅ مكتملة</Text>
+                  <Text style={s.completedBadgeText}>{t('khatma.completed')}</Text>
                 </View>
               </View>
             ))}
@@ -299,10 +302,10 @@ export default function KhatmScreen() {
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowNewModal(false)}>
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>📖 ختمة جديدة</Text>
+            <Text style={s.modalTitle}>{t('khatma.newKhatma')}</Text>
             <TextInput
               style={s.input}
-              placeholder={`ختمة ${new Date().toLocaleDateString('ar-EG')}`}
+              placeholder={`ختمة ${new Date().toLocaleDateString(getDateLocale())}`}
               placeholderTextColor={colors.muted}
               value={newKhatmName}
               onChangeText={setNewKhatmName}
@@ -310,7 +313,7 @@ export default function KhatmScreen() {
               onSubmitEditing={handleStartKhatm}
             />
             <TouchableOpacity style={s.confirmBtn} onPress={handleStartKhatm} disabled={loading}>
-              <Text style={s.confirmBtnText}>{loading ? 'جارٍ الحفظ...' : 'ابدأ الختمة'}</Text>
+              <Text style={s.confirmBtnText}>{loading ? t('khatma.creating') : t('khatma.startKhatma')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -319,12 +322,12 @@ export default function KhatmScreen() {
       {/* Surahs Selection Modal */}
       <Modal visible={showSurahsModal} animationType="slide" onRequestClose={() => setShowSurahsModal(false)}>
         <View style={s.surahsModal}>
-          <View style={s.surahsHeader}>
+          <View style={[s.surahsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity onPress={() => setShowSurahsModal(false)}>
               <IconSymbol name="xmark" size={22} color={colors.foreground} />
             </TouchableOpacity>
             <Text style={[s.title, { flex: 1 }]}>
-              السور المقروءة ({current?.completedSurahs.length || 0}/114)
+              {t('khatma.markAsRead')} ({current?.completedSurahs.length || 0}/114)
             </Text>
           </View>
           <FlatList
@@ -334,7 +337,7 @@ export default function KhatmScreen() {
               const isCompleted = current?.completedSurahs.includes(surahNum) || false;
               return (
                 <TouchableOpacity
-                  style={s.surahItem}
+                  style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => handleToggleSurah(surahNum)}
                   activeOpacity={0.7}
                 >
@@ -344,7 +347,7 @@ export default function KhatmScreen() {
                   }]}>
                     {isCompleted && <IconSymbol name="checkmark" size={14} color="#fff" />}
                   </View>
-                  <Text style={s.surahName}>{SURAH_NAMES_AR[surahNum - 1]}</Text>
+                  <Text style={s.surahName}>{getSurahName(surahNum)}</Text>
                   <View style={[s.surahNum, { backgroundColor: isCompleted ? colors.primary + '18' : 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border }]}>
                     <Text style={[s.surahNumText, { color: isCompleted ? colors.primary : colors.muted }]}>{surahNum}</Text>
                   </View>
@@ -358,10 +361,10 @@ export default function KhatmScreen() {
       {/* Celebration Overlay */}
       <Animated.View style={[s.celebOverlay, { opacity: celebAnim, pointerEvents: 'none' }]}>
         <View style={s.celebCard}>
-          <Text style={{ fontSize: 72, marginBottom: 10 }}>🎉</Text>
-          <Text style={{ fontSize: 22, fontWeight: '900', color: colors.primary, marginBottom: 8 }}>مبروك!</Text>
-          <Text style={{ fontSize: 16, color: '#555', textAlign: 'center' }}>أتممت ختمة القرآن الكريم</Text>
-          <Text style={{ fontSize: 24, marginTop: 12 }}>بارك الله فيك 🌟</Text>
+          <Text style={{ fontSize: 72, marginBottom: 10 }}></Text>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: colors.primary, marginBottom: 8 }}>{t('khatma.congratulations')}</Text>
+          <Text style={{ fontSize: 16, color: '#555', textAlign: 'center' }}>{t('khatma.khatmaCompleted')}</Text>
+          <Text style={{ fontSize: 24, marginTop: 12 }}>{t('khatma.barakAllah')}</Text>
         </View>
       </Animated.View>
     </ScreenContainer>

@@ -4,12 +4,12 @@
     "slug": "rooh-almuslim",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/icons/splash-icon_en.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a0a0a"
     },
@@ -18,6 +18,9 @@
       "bundleIdentifier": "com.rooh.almuslim",
       "buildNumber": "1",
       "infoPlist": {
+        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "GADApplicationIdentifier": "ca-app-pub-3645278220050673~7902167287",
+        "NSSupportsLiveActivities": true,
         "NSLocationWhenInUseUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
         "NSLocationAlwaysUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
         "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
@@ -33,9 +36,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png",
+        "foregroundImage": "./assets/images/icons/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/icons/android-icon-background.png",
+        "monochromeImage": "./assets/images/icons/android-icon-monochrome.png",
         "backgroundColor": "#0a0a0a"
       },
       "package": "com.rooh.almuslim",
@@ -63,7 +66,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/icons/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -72,7 +75,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
+          "icon": "./assets/images/icons/notification-icon.png",
           "color": "#10B981",
           "androidMode": "default",
           "androidCollapsedTitle": "روح المسلم"
@@ -91,7 +94,14 @@
         }
       ],
       "expo-asset",
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3645278220050673~7902167287",
+          "iosAppId": "ca-app-pub-3645278220050673~7902167287"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

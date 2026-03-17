@@ -1,0 +1,171 @@
+
+--- /app/(tabs)/hijri-calendar.tsx ---
+Line 302: <Text style={s.title}>🌙 التقويم الهجري</Text>
+Line 331: <Text key={d} style={[s.weekDay, d === 'جمعة' && { color: colors.primary }]}>{d}</Text>
+Line 360: <Text style={s.convTitle}>📅 محوّل التواريخ — اليوم</Text>
+Line 362: <Text style={s.convLabel}>ميلادي</Text>
+Line 366: <Text style={s.convLabel}>هجري</Text>
+Line 367: <Text style={[s.convValue, { color: colors.primary }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} هـ</Text>
+Line 370: <Text style={s.convLabel}>اليوم المختار</Text>
+Line 371: <Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} هـ</Text>
+Line 374: <Text style={s.convLabel}>يوافقه ميلادياً</Text>
+Line 383: <Text style={s.sectionTitle}>📅 المناسبات القادمة</Text>
+Line 387: <Text style={s.upcomingDiffText}>{ev.diff === 0 ? 'اليوم!' : `${ev.diff}د`}</Text>
+
+--- /app/(tabs)/khatm.tsx ---
+Line 268: <Text style={s.emptyText}>{t('khatma.khatmaCreatedMsg').replace('ابدأ القراءة الآن!', '')}</Text>
+Line 308: placeholder={`ختمة ${new Date().toLocaleDateString('ar-EG')}`}
+Line 367: <Text style={{ fontSize: 24, marginTop: 12 }}>بارك الله فيك 🌟</Text>
+
+--- /app/(tabs)/prayer.tsx ---
+Line 558: <Text style={styles.thumbWidgetPrayerLabel}>صلاة الظهر</Text>
+Line 594: <Text style={[styles.thumbDigitalLabel, { color: colors.textLight }]}>الفجر</Text>
+
+--- /app/(tabs)/qibla.tsx ---
+Line 394: <Text style={styles.retryText}>إعادة المحاولة</Text>
+Line 406: <Text style={styles.loadingText}>جاري تحديد اتجاه القبلة...</Text>
+Line 565: <Text style={styles.titleText}>اتجاه القبلة</Text>
+
+--- /app/(tabs)/quran-search.tsx ---
+Line 395: <Text style={s.juzText}>ج{item.juz}</Text>
+Line 419: <Text style={s.resultActionText}>التفسير</Text>
+Line 454: <Text style={s.headerTitle}>البحث في القرآن</Text>
+Line 472: placeholder={searchLang === 'ar' ? 'ابحث بالعربية...' : 'Search in English...'}
+Line 485: : <Text style={s.searchBtnText}>بحث</Text>
+Line 497: <Text style={[s.controlChipText, searchLang === 'ar' && s.controlChipTextActive]}>🇸🇦 عربي</Text>
+Line 523: <Text style={[s.controlChipText, showStats && s.controlChipTextActive]}>📊 إحصاء</Text>
+Line 549: <Text style={s.statLabel}> نتيجة</Text>
+Line 553: <Text style={s.statLabel}> سورة</Text>
+Line 557: <Text style={s.statLabel}> جزء</Text>
+Line 582: <Text style={{ color: colors.textLight, marginTop: 12, fontSize: 14 }}>جاري البحث...</Text>
+Line 599: <Text style={{ fontSize: 12, color: colors.textLight }}>مسح</Text>
+Line 601: <Text style={s.historyTitle}>🕐 عمليات البحث الأخيرة</Text>
+Line 617: <Text style={[s.historyTitle, { marginTop: 20 }]}>💡 جرّب البحث عن</Text>
+Line 627: <Text style={s.emptyTitle}>ابحث في القرآن الكريم</Text>
+Line 628: <Text style={s.emptyText}>ابحث بالكلمة أو العبارة بالعربية أو الإنجليزية</Text>
+Line 634: <Text style={s.emptyTitle}>لا توجد نتائج</Text>
+Line 635: <Text style={s.emptyText}>جرّب كلمات مختلفة أو غيّر لغة البحث</Text>
+Line 654: <Text style={s.modalTitle}>التفسير</Text>
+Line 696: <Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>
+Line 714: <Text style={[s.modalTitle, { flex: 1 }]}>اختر السورة للفلترة</Text>
+Line 720: <Text style={[s.surahItemName, surahFilter === null && { color: colors.primary }]}>كل السور</Text>
+
+--- /app/(tabs)/recitations.tsx ---
+Line 373: <Text style={s.title}>🎙️ التلاوات الكاملة</Text>
+Line 379: <Text style={s.changeBtnText}>تغيير</Text>
+Line 382: <Text style={s.reciterLabel}>القارئ المختار</Text>
+Line 396: <Text style={[s.toggleBtnText, view === 'surahs' && s.toggleBtnTextActive]}>📖 السور (114)</Text>
+Line 399: <Text style={[s.toggleBtnText, view === 'juz' && s.toggleBtnTextActive]}>📚 الأجزاء (30)</Text>
+Line 409: placeholder="ابحث عن سورة..."
+Line 424: <Text style={s.sectionTitle}>⭐ المفضلة</Text>
+Line 486: <Text style={s.modalTitle}>اختر القارئ</Text>
+
+--- /app/(tabs)/tafsir-search.tsx ---
+Line 118: <Text style={[s.juzBadgeText, { color: colors.muted }]}>ج {item.juz}</Text>
+Line 129: <Text style={s.tafsirBtnText}>التفسير</Text>
+Line 231: <Text style={[s.title, { marginBottom: 0, flex: 1 }]}>البحث في التفسير</Text>
+Line 245: placeholder="ابحث في القرآن..."
+Line 255: <Text style={s.searchBtnText}>بحث</Text>
+Line 273: <Text style={s.editionLabel}>عرض التفسير بـ:</Text>
+Line 307: <Text style={s.emptyTitle}>لا توجد نتائج</Text>
+Line 308: <Text style={s.emptyText}>جرّب البحث بكلمات مختلفة أو غيّر لغة البحث</Text>
+Line 313: <Text style={s.emptyTitle}>ابحث في القرآن</Text>
+Line 314: <Text style={s.emptyText}>ابحث بالكلمة أو العبارة لإيجاد الآيات وقراءة تفسيرها</Text>
+Line 335: <Text style={s.modalTitle}>التفسير</Text>
+Line 374: <Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>
+
+--- /app/(tabs)/tasbih.tsx ---
+Line 658: <Text style={[s.headerTitle, { color: C.text }, colors.textShadowStyle]}>التسبيح</Text>
+Line 840: <Text style={[s.chipText, { color: C.textSec }]}>{rounds} جولات</Text>
+Line 844: <Text style={[s.chipText, { color: C.textSec }]}>{totalCount} إجمالي</Text>
+Line 862: <Text style={[s.resetBtnText, { color: count > 0 ? GREEN : C.textSec }]}>إعادة العداد</Text>
+Line 879: <Text style={s.toastText}>تم حفظ تسبيحات الأمس وإعادة تعيين العداد</Text>
+Line 889: <Text style={[s.modalTitle, { color: C.text }]}>اختر التسبيح</Text>
+Line 896: <Text style={[s.sectionLabel, { color: C.textSec }]}>التسبيحات المعتمدة</Text>
+Line 917: <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تسبيحاتي المخصصة</Text>
+Line 942: <Text style={s.addBtnText}>إضافة تسبيح مخصص</Text>
+Line 958: <Text style={[s.modalTitle, { color: C.text }]}>إضافة تسبيح مخصص</Text>
+Line 963: <Text style={[s.inputLabel, { color: C.text }]}>نص التسبيح</Text>
+Line 968: placeholder="أدخل نص التسبيح..."
+Line 973: <Text style={[s.inputLabel, { color: C.text }]}>العدد</Text>
+Line 998: <Text style={s.saveBtnText}>حفظ</Text>
+Line 1009: <Text style={[s.modalTitle, { color: C.text }]}>الإعدادات</Text>
+Line 1014: <GlassToggle label="الاهتزاز" icon="cellphone" enabled={vibrationEnabled} onToggle={setVibrationEnabled} />
+Line 1015: <GlassToggle label="إظهار الفضل" icon="star-outline" enabled={showVirtue} onToggle={setShowVirtue} />
+Line 1016: <GlassToggle label="الانتقال التلقائي" icon="arrow-right-circle-outline" enabled={autoAdvance} onToggle={setAutoAdvance} subtitle="الانتقال للتسبيح التالي عند الإكمال" />
+Line 1018: <GlassToggle label="إظهار الترجمة" icon="translate" enabled={showTranslation} onToggle={setShowTranslation} />
+Line 1021: <Text style={s.saveBtnText}>إعادة تعيين كل شيء</Text>
+Line 1032: <Text style={[s.modalTitle, { color: C.text }]}>إحصائياتي</Text>
+Line 1043: <Text style={[s.statLabel, { color: C.textSec }]}>تسبيحات اليوم</Text>
+Line 1048: <Text style={[s.statLabel, { color: C.textSec }]}>جولات مكتملة</Text>
+Line 1055: <Text style={[s.statLabel, { color: C.textSec }]}>الإجمالي الكلي</Text>
+Line 1060: <Text style={[s.statLabel, { color: C.textSec }]}>متوسط يومي</Text>
+Line 1067: <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>تفصيل اليوم</Text>
+Line 1078: <Text style={[s.sectionLabel, { color: C.textSec, marginTop: 16 }]}>آخر ٧ أيام</Text>
+Line 1084: <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} تسبيحة</Text>
+
+--- /app/(tabs)/wird.tsx ---
+Line 235: <Text style={styles.headerTitle}>السبحة الإلكترونية</Text>
+Line 290: <Text style={styles.statLabel}>الجولات</Text>
+Line 299: <Text style={styles.statLabel}>المجموع</Text>
+Line 304: <Text style={styles.instructions}>اضغط على الدائرة للتسبيح</Text>
+
+--- /components/ui/BrandedCapture.tsx ---
+Line 393: <Text style={[styles.fontBtnLg, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>أ+</Text>
+Line 403: <Text style={[styles.fontBtnSm, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>أ-</Text>
+
+--- /components/ui/ErrorBoundary.tsx ---
+Line 111: <Text style={styles.title}>حدث خطأ غير متوقع</Text>
+Line 121: <Text style={styles.errorTitle}>تفاصيل الخطأ:</Text>
+Line 146: <Text style={styles.buttonText}>إعادة تشغيل التطبيق</Text>
+Line 156: <Text style={styles.secondaryButtonText}>المحاولة مرة أخرى</Text>
+
+--- /components/ui/MaintenanceGuard.tsx ---
+Line 28: <Text style={styles.title}>صيانة مؤقتة</Text>
+Line 43: <Text style={styles.title}>تحديث مطلوب</Text>
+
+--- /components/ui/OfflineBanner.tsx ---
+Line 36: <Text style={styles.text}>لا يوجد اتصال بالإنترنت</Text>
+
+--- /components/ui/PdfTemplatePicker.tsx ---
+Line 176: <Text style={previewStyles.headerTitle}>مناسك الحج</Text>
+Line 182: <Text style={[previewStyles.sectionTitle, { color: p.sectionTitle1 }]}>١. الإحرام</Text>
+Line 189: <Text style={[previewStyles.duaText, { color: p.duaText }]}>﴿ ربنا تقبل منا ﴾</Text>
+Line 195: <Text style={[previewStyles.sectionTitle, { color: p.sectionTitle2 }]}>٢. الطواف</Text>
+Line 209: <Text style={previewStyles.headerTitle}>مناسك الحج</Text>
+Line 213: <Text style={[previewStyles.sectionTitle, { color: ct.sectionTitleColor }]}>١. الإحرام</Text>
+Line 219: <Text style={[previewStyles.duaText, { color: ct.duaTextColor }]}>﴿ ربنا تقبل منا ﴾</Text>
+Line 223: <Text style={[previewStyles.sectionTitle, { color: ct.sectionAltTitleColor }]}>٢. الطواف</Text>
+Line 252: <Text style={previewStyles.headerTitle}>مناسك الحج</Text>
+Line 256: <Text style={[previewStyles.sectionTitle, { color: 'rgba(255,255,255,0.9)' }]}>١. الإحرام</Text>
+Line 262: <Text style={[previewStyles.duaText, { color: 'rgba(255,255,255,0.9)' }]}>﴿ ربنا تقبل منا ﴾</Text>
+Line 266: <Text style={[previewStyles.sectionTitle, { color: 'rgba(255,255,255,0.85)' }]}>٢. الطواف</Text>
+Line 431: <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 10, fontWeight: '600', marginTop: 6 }}>اختر خلفية</Text>
+Line 435: <Text style={[styles.cardTitle, { color: colors.text }]}>تخصيص</Text>
+Line 436: <Text style={[styles.cardDesc, { color: colors.textLight }]}>خلفية من التطبيق</Text>
+Line 449: <Text style={[styles.bgPickerTitle, { color: colors.textLight }]}>اختر خلفية التصدير</Text>
+Line 486: <Text style={[styles.uploadsTitle, { color: colors.textLight }]}>أو حمّل نسخة جاهزة</Text>
+Line 511: <Text style={[styles.uploadsTitle, { color: '#22C55E' }]}>نسخة جاهزة لهذا النمط</Text>
+Line 554: <Text style={styles.confirmText}>{linkedPdf ? 'تحميل PDF جاهز' : 'تصدير PDF'}</Text>
+
+--- /components/ui/PremiumGate.tsx ---
+Line 35: <Text style={[styles.lockText, { color: colors.text }]}>ميزة بريميوم</Text>
+Line 48: <Text style={styles.upgradeText}>ترقية</Text>
+
+--- /components/ui/ShareableCard.tsx ---
+Line 209: <Text style={styles.modeButtonText}>خلفية عشوائية</Text>
+Line 213: <Text style={styles.modeButtonText}>لون عشوائي</Text>
+Line 244: <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نسخ</Text>
+Line 253: <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>نص</Text>
+Line 260: <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>صورة</Text>
+
+--- /components/ui/prayer/CountdownTimer.tsx ---
+Line 240: <Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>باقي على الأذان</Text>
+Line 264: <TimeDigit value={timeRemaining.hours} label="س" isDarkMode={isDarkMode} />
+Line 266: <TimeDigit value={timeRemaining.minutes} label="د" isDarkMode={isDarkMode} />
+Line 268: <TimeDigit value={timeRemaining.seconds} label="ث" isDarkMode={isDarkMode} />
+
+--- /components/ui/prayer/PrayerCard.tsx ---
+Line 177: <CountdownDigit value={timeRemaining.hours} label="س" />
+Line 179: <CountdownDigit value={timeRemaining.minutes} label="د" />
+Line 181: <CountdownDigit value={timeRemaining.seconds} label="ث" />

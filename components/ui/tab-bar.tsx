@@ -25,6 +25,8 @@ import Animated, {
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t } from '@/lib/i18n';
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
 const SPRING_CONFIG = { damping: 20, stiffness: 260, mass: 0.6 };
@@ -32,7 +34,7 @@ const COLOR_TIMING = { duration: 220 };
 
 interface TabItem {
   name: string;
-  label: string;
+  labelKey: string;
   icon: string;
   iconFocused: string;
 }
@@ -40,25 +42,25 @@ interface TabItem {
 const TABS: TabItem[] = [
   {
     name: "settings",
-    label: "الإعدادات",
+    labelKey: "tabs.settings",
     icon: "gearshape",
     iconFocused: "gearshape.fill",
   },
   {
     name: "prayer",
-    label: "الصلاة",
+    labelKey: "tabs.prayer",
     icon: "building.columns",
     iconFocused: "building.columns.fill",
   },
   {
     name: "quran",
-    label: "القرآن",
+    labelKey: "tabs.quran",
     icon: "book",
     iconFocused: "book.fill",
   },
   {
     name: "index",
-    label: "الأذكار",
+    labelKey: "tabs.azkar",
     icon: "text.book.closed",
     iconFocused: "text.book.closed.fill",
   },
@@ -108,7 +110,7 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = React.memo(
           style={[styles.tabLabel, animatedLabelStyle]}
           numberOfLines={1}
         >
-          {tab.label}
+          {t(tab.labelKey)}
         </AnimatedText>
       </View>
     );
@@ -229,8 +231,8 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
             <AnimatedTabIcon
               tab={tab}
               activeProgress={progressRefs[index]}
-              activeColor={colors.tabBarActive}
-              inactiveColor={colors.tabBarInactive}
+              activeColor={(colors as any).tabBarActive || colors.primary}
+              inactiveColor={(colors as any).tabBarInactive || colors.muted}
             />
           </Pressable>
         );
@@ -263,7 +265,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
         styles.container,
         {
           paddingBottom: insets.bottom,
-          backgroundColor: colors.tabBarBackground,
+          backgroundColor: (colors as any).tabBarBackground || colors.background,
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
         },
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 4,
     minHeight: 48,
-    gap: 3,
+    gap: 8,
   },
   tabIconContainer: {
     width: 28,

@@ -10,16 +10,19 @@ import {
   getNextPrayer,
   getTimeRemaining,
 } from '@/lib/prayer-times';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { t } from '@/lib/i18n';
 
 interface GlassWidgetPreviewProps {
   prayerTimes?: PrayerTimes | null;
   isDarkMode?: boolean;
+  iconSource?: any;
 }
 
 export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   prayerTimes = null,
   isDarkMode = false,
+  iconSource,
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
@@ -43,7 +46,7 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   }, [prayerTimes]);
 
   const pad = (n: number) => String(n).padStart(2, '0');
-  const prayerName = nextPrayer ? t(`prayer.${nextPrayer.name}`) : 'الفجر';
+  const prayerName = nextPrayer ? t(`prayer.${nextPrayer.name}`) : t('prayer.fajr');
 
   const countdownStr = timeRemaining
     ? `${pad(timeRemaining.hours)}:${pad(timeRemaining.minutes)}:${pad(timeRemaining.seconds)}`
@@ -56,12 +59,12 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
       <View style={[styles.card, isDarkMode && styles.cardDark]}>
         {/* Logo (static) */}
         <Image
-          source={require('@/assets/images/icon.png')}
+          source={iconSource || require('@/assets/images/icons/icon.png')}
           style={styles.logo}
         />
 
         {/* App name (static) */}
-        <Text style={styles.appName}>روح المسلم</Text>
+        <Text style={styles.appName}>{t('common.appName')}</Text>
 
         {/* Countdown timer (dynamic) */}
         <Text style={[styles.countdown, { color: textColor }]}>
@@ -70,7 +73,7 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
 
         {/* Prayer label (dynamic) */}
         <Text style={[styles.label, { color: textColor, opacity: 0.6 }]}>
-          الوقت المتبقي على صلاة {prayerName}
+          {`${t('prayer.remainingTimeFor')} ${prayerName}`}
         </Text>
       </View>
     </View>
@@ -106,20 +109,20 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 10,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#0f987f',
     marginBottom: 8,
   },
   countdown: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     letterSpacing: 1,
     textAlign: 'center',
     lineHeight: 36,
   },
   label: {
     fontSize: 9,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center',
     marginTop: 4,
   },

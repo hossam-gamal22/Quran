@@ -36,10 +36,12 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  I18nManager,
   Switch,
   Pressable,
+  Animated,
+  Alert,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
@@ -49,12 +51,15 @@ import { BlurView } from 'expo-blur';
 import ViewShot from 'react-native-view-shot';
 import { useQuran } from '@/contexts/QuranContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t as translate } from '@/lib/i18n';
+import { useQuranTracker } from '@/contexts/WorshipContext';
 import {
   getQuranTextColor,
 } from '@/components/ui/QuranBackgroundWrapper';
-import { isThemeLight, ORNAMENT_NO_TINT_INDICES, QURAN_THEMES, getGoldenColor } from '@/constants/quran-themes';
+import { ORNAMENT_NO_TINT_INDICES, QURAN_THEMES, getGoldenColor, getSafeThemeIndex } from '@/constants/quran-themes';
 import { Spacing, FONT_SIZES } from '@/constants/theme';
-import { APP_NAME } from '@/constants/app';
+import { getAppName } from '@/constants/app';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
 function getTargetAyahBg(themeIndex: number): string {
@@ -63,7 +68,7 @@ function getTargetAyahBg(themeIndex: number): string {
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, 0.25)`;
+  return `rgba(${r}, ${g}, ${b}, 0.40)`;
 }
 import { setLastRead, addBookmark, removeBookmark, isBookmarked } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
@@ -101,8 +106,9 @@ import {
   BOOKMARK_COLOR_LABELS,
 } from '@/lib/quran-bookmarks';
 import tafsirData from '@/data/json/tafsir-muyassar.json';
-import { fetchSurahTranslation, TRANSLATION_EDITIONS } from '@/lib/quran-api';
+import { fetchSurahTranslation, TRANSLATION_EDITIONS, getSurahName } from '@/lib/quran-api';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 // ══════════════════════════════════════════════
 // Constants
 // ══════════════════════════════════════════════
@@ -118,10 +124,10 @@ const PLAYING_AYAH_BG = 'rgba(212, 175, 55, 0.12)';
 
 // Background images
 const QURAN_BG_IMAGES: Record<string, any> = {
-  quranbg1: require('@/assets/images/quranbg1.png'),
-  quranbg2: require('@/assets/images/quranbg2.png'),
-  quranbg3: require('@/assets/images/quranbg3.png'),
-  quranbg4: require('@/assets/images/quranbg4.png'),
+  quranbg1: require('@/assets/images/quran/quranbg1.png'),
+  quranbg2: require('@/assets/images/quran/quranbg2.png'),
+  quranbg3: require('@/assets/images/quran/quranbg3.png'),
+  quranbg4: require('@/assets/images/quran/quranbg4.png'),
 };
 
 
@@ -129,10 +135,7 @@ const QURAN_BG_IMAGES: Record<string, any> = {
 // Helpers
 // ══════════════════════════════════════════════
 
-const toArabicNumber = (n: number): string => {
-  const d = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
-  return String(n).split('').map(c => d[parseInt(c)] || c).join('');
-};
+const toArabicNumber = (n: number): string => String(n);
 
 const stripTashkeel = (text: string): string =>
   text.replace(/[\u064B-\u065F\u0670]/g, '');
@@ -148,9 +151,8 @@ const getTafsir = (surah: number, ayah: number): string => {
 // Image Assets
 // ══════════════════════════════════════════════
 
-const surahOrnament = require('@/assets/images/surah-ornament.png');
-const basmalaImg = require('@/assets/images/basmala.png');
-const appIcon = require('@/assets/images/App-icon.png');
+const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
+const basmalaImg = require('@/assets/images/quran/basmala.png');
 
 // ══════════════════════════════════════════════
 // SurahBanner — Golden surah header with ornament
@@ -164,8 +166,7 @@ function getSurahNameGlyph(surahNumber: number): string {
 function SurahBanner({ surahNumber, themeIndex }: { surahNumber: number; themeIndex: number }) {
   const goldenColor = getGoldenColor(themeIndex);
   const noTint = ORNAMENT_NO_TINT_INDICES.includes(themeIndex);
-  const surahData = getSurahData(surahNumber);
-  const surahName = stripTashkeel(surahData?.name || `سورة ${surahNumber}`);
+  const surahName = getSurahName(surahNumber);
 
   return (
     <View style={bs.wrap} collapsable={false}>
@@ -207,7 +208,7 @@ const bs = StyleSheet.create({
   overlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', width: '100%', paddingHorizontal: 24, height: 50 },
   metaSide: { fontSize: 12, fontFamily: 'Amiri-Bold', textAlign: 'center' },
   centerCol: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const },
-  surahName: { fontSize: 14, fontFamily: 'Cairo-Bold', textAlign: 'center' as const },
+  surahName: { fontSize: 14, fontFamily: fontBold(), textAlign: 'center' as const },
   qcfSurahName: { fontSize: 28, fontFamily: 'QCFSurahNames', textAlign: 'center' as const },
   amiriSurahName: { fontSize: 17, fontFamily: 'Amiri-Bold', textAlign: 'center' as const },
   basmalaWrap: { alignItems: 'center', marginVertical: 2, paddingHorizontal: '20%' },
@@ -240,7 +241,10 @@ const MushafPage = React.memo(function MushafPage({
   translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false,
 }: MushafPageProps) {
   const { isDarkMode } = useSettings();
-  const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page));
+  const isRTL = useIsRTL();
+  // Use forceLightText (actual background) to determine CPAL mode, not system isDarkMode
+  const needsDarkFont = forceLightText ?? isDarkMode;
+  const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, needsDarkFont));
   const [fontError, setFontError] = useState(false);
   const baseTextColor = getQuranTextColor('', themeIndex);
   // Determine if the theme's primary color is dark (i.e., designed for light backgrounds)
@@ -266,18 +270,21 @@ const MushafPage = React.memo(function MushafPage({
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
 
-  // Load QCF4 per-page font
+  // Load QCF4 per-page font (use needsDarkFont based on actual background)
   useEffect(() => {
-    if (!fontLoaded) {
-      setFontError(false);
-      loadPageFont(page, isDarkMode)
-        .then(() => setFontLoaded(true))
-        .catch(() => setFontError(true));
+    if (isPageFontLoaded(page, needsDarkFont)) {
+      setFontLoaded(true);
+      return;
     }
-  }, [page, fontLoaded, isDarkMode]);
+    setFontLoaded(false);
+    setFontError(false);
+    loadPageFont(page, needsDarkFont)
+      .then(() => setFontLoaded(true))
+      .catch(() => setFontError(true));
+  }, [page, needsDarkFont]);
 
   const blocks = useMemo(() => buildPageBlocks(page), [page]);
-  const fontFamily = getPageFontFamily(page);
+  const fontFamily = getPageFontFamily(page, needsDarkFont);
 
   // Dynamic font scaling: only boost very sparse pages, avoid cramping dense ones
   const contentLineCount = blocks.filter(b => b.type === 'ayah' || b.type === 'basmallah').length;
@@ -307,7 +314,7 @@ const MushafPage = React.memo(function MushafPage({
   if (fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-        <Text style={{ color: getQuranTextColor('', themeIndex), marginBottom: 12 }}>تعذر تحميل خط الصفحة</Text>
+        <Text style={{ color: textColor, marginBottom: 12 }}>{translate('quran.fontLoadError')}</Text>
         <TouchableOpacity
           onPress={() => {
             setFontError(false);
@@ -315,7 +322,7 @@ const MushafPage = React.memo(function MushafPage({
           }}
           style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: getGoldenColor(themeIndex), borderRadius: 10 }}
         >
-          <Text style={{ color: '#fff' }}>إعادة المحاولة</Text>
+          <Text style={{ color: '#fff' }}>{translate('common.retry')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -330,7 +337,8 @@ const MushafPage = React.memo(function MushafPage({
       contentContainerStyle={{
         flexGrow: 1,
         justifyContent: 'flex-start',
-        paddingVertical: 12,
+        paddingTop: 12,
+        paddingBottom: 44,
         paddingHorizontal: 8,
         minHeight: MIN_PAGE_HEIGHT,
       }}
@@ -459,7 +467,7 @@ const MushafPage = React.memo(function MushafPage({
                         color: forceLightText ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.6)',
                         textAlign: translationIsRTL ? 'right' : 'left',
                         writingDirection: dir,
-                        fontFamily: 'Cairo-Regular',
+                        fontFamily: fontRegular(),
                         lineHeight: translationFontSize * 1.6,
                         paddingHorizontal: 12,
                         paddingVertical: 2,
@@ -537,7 +545,7 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isP
               {toArabicNumber(currentPage)}
             </Text>
             <Text style={[gh.juzLabel, { color: isLightBg ? '#555' : '#bbb' }]}>
-              الجزء {toArabicNumber(juz)}
+              {translate('quran.juz')} {toArabicNumber(juz)}
             </Text>
           </View>
 
@@ -575,7 +583,7 @@ const gh = StyleSheet.create({
   right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 70, justifyContent: 'flex-end' },
   center: { alignItems: 'center', paddingHorizontal: 8 },
   pageNum: { fontSize: 17, fontFamily: 'Amiri-Bold' },
-  juzLabel: { fontSize: 11, fontFamily: 'Cairo-Regular', marginTop: -2 },
+  juzLabel: { fontSize: 11, fontFamily: fontRegular(), marginTop: -2 },
 });
 
 // ══════════════════════════════════════════════
@@ -589,26 +597,48 @@ export default function SurahScreen() {
   const targetAyah = targetAyahParam ? parseInt(targetAyahParam) : undefined;
 
   const router = useRouter();
-  const { settings, isDarkMode, updateDisplay } = useSettings();
+  const { settings, isDarkMode, updateDisplay, isLoading: settingsLoading, t } = useSettings();
+  const isRTL = useIsRTL();
+
+  // Guard: wait for settings to load to prevent theme flash (race condition)
+  if (settingsLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: isDarkMode ? '#1a1a2e' : '#f5f0e8', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#0f987f" />
+      </View>
+    );
+  }
   const { playAyah, playbackState, togglePlayPause, reciters, currentReciter, setReciter } = useQuran();
 
-  const themeIndex = settings.display.quranThemeIndex ?? 0;
+  const themeIndex = getSafeThemeIndex(settings.display.quranThemeIndex ?? 0);
   const fontSizeAdjust = settings.display.quranFontSizeAdjust ?? 0;
   // Intelligent default: light mode → quranbg1, dark mode → quranbg3
   const defaultBg = isDarkMode ? 'quranbg3' : 'quranbg1';
   const quranBgKey = settings.display.quranBackground ?? defaultBg;
   const hasDarkBackgroundImage = quranBgKey === 'quranbg3' || quranBgKey === 'quranbg4';
-  const hasLightBackgroundImage = quranBgKey === 'quranbg1' || quranBgKey === 'quranbg2';
-  const isLightBg = isThemeLight(themeIndex) && !hasDarkBackgroundImage;
+  const isLightBg = !hasDarkBackgroundImage;
   // Text color based on BACKGROUND IMAGE only (not system dark mode)
   // quranbg1/2 = light bg → dark/black text; quranbg3/4 = dark bg → light/white text
   const forceLightText = hasDarkBackgroundImage;
-  const textColor = getQuranTextColor('', themeIndex);
+  const rawTextColor = getQuranTextColor('', themeIndex);
+  // Adjust text color for readability on the actual background
+  const isRawColorDark = (() => {
+    const hex = (rawTextColor || '#000000').replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+  })();
+  const textColor = forceLightText
+    ? (isRawColorDark ? '#FFFFFF' : rawTextColor)
+    : (!isRawColorDark ? '#000000' : rawTextColor);
   const goldenColor = getGoldenColor(themeIndex);
+  const { logoSource: appIcon } = useAppIdentity();
 
   // Display settings for toggles
   const showTashkeel = settings.display.showTashkeel ?? true;
-  const showTranslation = settings.display.showTranslation ?? false;
+  const isArabicLang = (settings.language || 'ar') === 'ar';
+  const showTranslation = isArabicLang ? (settings.display.showTranslation ?? false) : true;
   const translationEdition = settings.display.translationEdition ?? 'en.sahih';
   const translationFontSize = settings.display.translationFontSize ?? 14;
   const highlightTajweed = settings.display.highlightTajweed ?? false;
@@ -619,6 +649,8 @@ export default function SurahScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const pageViewShotRef = useRef<ViewShot>(null);
+  const trackedPagesRef = useRef<Set<number>>(new Set());
+  const { addPagesRead } = useQuranTracker();
 
   // Initial page
   const initialPage = useMemo(() => {
@@ -732,7 +764,7 @@ export default function SurahScreen() {
       await addBookmark({
         surahNumber,
         ayahNumber: 1,
-        surahName: surahData?.name || `سورة ${surahNumber}`,
+        surahName: getSurahName(surahNumber),
         ayahText: firstAyahText,
       });
       setIsPageFavorited(true);
@@ -752,10 +784,24 @@ export default function SurahScreen() {
     targetAyah ? `${surahNumber}:${targetAyah}` : null
   );
 
+  // Fade animation for target ayah indicator
+  const targetIndicatorOpacity = useRef(new Animated.Value(targetAyah ? 1 : 0)).current;
+
   useEffect(() => {
     if (!highlightAyahKey) return;
-    const timer = setTimeout(() => setHighlightAyahKey(null), 5000);
-    return () => clearTimeout(timer);
+    targetIndicatorOpacity.setValue(1);
+    const fadeTimer = setTimeout(() => {
+      Animated.timing(targetIndicatorOpacity, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }).start();
+    }, 4200);
+    const clearTimer = setTimeout(() => setHighlightAyahKey(null), 5000);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(clearTimer);
+    };
   }, [highlightAyahKey]);
 
   // ── Tafsir split-screen data ──
@@ -774,7 +820,7 @@ export default function SurahScreen() {
         const t = getTafsir(seg.surah, seg.ayah);
         if (t) {
           const sd = getSurahData(seg.surah);
-          ayahs.push({ surah: seg.surah, ayah: seg.ayah, surahName: sd?.name || '', tafsir: t });
+          ayahs.push({ surah: seg.surah, ayah: seg.ayah, surahName: getSurahName(seg.surah), tafsir: t });
         }
       }
     }
@@ -788,8 +834,8 @@ export default function SurahScreen() {
   }, []);
 
   useEffect(() => {
-    ensurePagesLoaded(currentPage, 3, isDarkMode);
-  }, [currentPage]);
+    ensurePagesLoaded(currentPage, 3, forceLightText);
+  }, [currentPage, forceLightText]);
 
   // Surah names on current page
   const surahsOnPage = useMemo(() => {
@@ -802,18 +848,23 @@ export default function SurahScreen() {
         if (w) nums.add(w.s);
       }
     }
-    return Array.from(nums).map(n => getSurahData(n)?.name || '').filter(Boolean);
+    return Array.from(nums).map(n => getSurahName(n)).filter(Boolean);
   }, [currentPage]);
 
   const juz = getJuzForPage(currentPage);
 
-  // Save last read position
+  // Save last read position + track worship
   useEffect(() => {
     const sn = getFirstSurahOnPage(currentPage);
     const surah = getSurahData(sn);
     AsyncStorage.setItem(LAST_PAGE_KEY, JSON.stringify({ surah: sn, page: currentPage }));
     if (surah) {
-      setLastRead({ surahNumber: surah.number, ayahNumber: 1, surahName: surah.name });
+      setLastRead({ surahNumber: surah.number, ayahNumber: 1, surahName: getSurahName(surah.number) });
+    }
+    // Track page read for worship stats
+    if (!trackedPagesRef.current.has(currentPage)) {
+      trackedPagesRef.current.add(currentPage);
+      addPagesRead(1).catch(() => {});
     }
   }, [currentPage]);
 
@@ -838,7 +889,7 @@ export default function SurahScreen() {
     const surah = getSurahData(selectedAyah.surah);
     const updated = await addColoredBookmark(
       selectedAyah.surah, selectedAyah.ayah,
-      surah?.name || '', selectedAyah.page, color,
+      getSurahName(selectedAyah.surah), selectedAyah.page, color,
     );
     setBookmarks(updated);
     setShowAyahMenu(false);
@@ -860,7 +911,7 @@ export default function SurahScreen() {
     const surah = getSurahData(selectedAyah.surah);
     const ayahData = surah?.ayahs.find(a => a.ns === selectedAyah.ayah);
     if (ayahData && surah) {
-      await copyAyah(ayahData.t, surah.name, selectedAyah.ayah);
+      await copyAyah(ayahData.t, getSurahName(selectedAyah.surah), selectedAyah.ayah);
       if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     setShowAyahMenu(false);
@@ -873,8 +924,8 @@ export default function SurahScreen() {
     if (ayahData && surah) {
       setShareData({
         text: ayahData.t,
-        title: surah.name,
-        reference: `سورة ${surah.name} - آية ${selectedAyah.ayah}`,
+        title: getSurahName(selectedAyah.surah),
+        reference: `${getSurahName(selectedAyah.surah)} - ${t('quran.ayah')} ${selectedAyah.ayah}`,
       });
       setShowAyahMenu(false);
       setShowShareCard(true);
@@ -886,7 +937,7 @@ export default function SurahScreen() {
       if (shareViewShotRef.current?.capture) {
         const uri = await shareViewShotRef.current.capture();
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await shareImage(uri, `صفحة ${currentPage} - ${APP_NAME}`);
+        await shareImage(uri, `${translate('quran.page')} ${currentPage} - ${getAppName()}`);
       }
     } catch (e) {
       console.error('Error sharing page:', e);
@@ -939,7 +990,7 @@ export default function SurahScreen() {
     ({ item: page }: { item: number }) => (
       <TouchableOpacity
         activeOpacity={1}
-        onPress={() => setShowControls(p => !p)}
+        onPress={() => { if (settings.display.focusMode) setShowControls(p => !p); }}
         style={{ width: SCREEN_WIDTH, flex: 1 }}
       >
         <MushafPage
@@ -1019,24 +1070,26 @@ export default function SurahScreen() {
                     alignItems: 'center',
                     borderBottomWidth: StyleSheet.hairlineWidth,
                     borderBottomColor: isLightBg ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)',
+                    gap: 8,
+                    paddingEnd: 10,
                   }}>
                     {/* Tappable left area (title + chevron) — collapses panel */}
                     <Pressable
                       onPress={() => setTafsirMinimized(true)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 }}
+                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 6 }}
                     >
                       <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={goldenColor} />
-                      <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 14, color: goldenColor, marginStart: 6, flex: 1 }}>
-                        التفسير الميسّر
+                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: goldenColor, flex: 1 }}>
+                        {translate('home.tafsirMuyassar')}
                       </Text>
                       {/* Chevron indicator — always at this position */}
-                      <MaterialCommunityIcons name="chevron-down" size={20} color={isLightBg ? '#555' : '#bbb'} style={{ marginEnd: 4 }} />
+                      <MaterialCommunityIcons name="chevron-down" size={20} color={isLightBg ? '#555' : '#bbb'} />
                     </Pressable>
                     {/* Independent close — permanently disables the tafsir panel */}
                     <TouchableOpacity
                       hitSlop={10}
                       onPress={() => { updateDisplay({ showTafsir: false }); setTafsirMinimized(false); }}
-                      style={[s.tafsirActionBtn, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', marginEnd: 10 }]}
+                      style={[s.tafsirActionBtn, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]}
                     >
                       <MaterialCommunityIcons name="close" size={16} color={isLightBg ? '#333' : '#fff'} />
                     </TouchableOpacity>
@@ -1067,7 +1120,7 @@ export default function SurahScreen() {
                           }}
                         >
                           <Text style={{
-                            fontFamily: 'Cairo-Bold',
+                            fontFamily: fontBold(),
                             fontSize: 12,
                             color: goldenColor,
                             marginBottom: 4,
@@ -1075,7 +1128,7 @@ export default function SurahScreen() {
                             ﴿{item.surahName} : {item.ayah}﴾
                           </Text>
                           <Text style={{
-                            fontFamily: 'Cairo',
+                            fontFamily: fontRegular(),
                             fontSize: 14,
                             lineHeight: 24,
                             color: isLightBg ? '#333' : '#ddd',
@@ -1123,7 +1176,6 @@ export default function SurahScreen() {
             {/* Branding watermark — always present in capture */}
             <View style={s.shareWatermark} pointerEvents="none" collapsable={false}>
               <Image source={appIcon} style={s.shareWatermarkIcon} resizeMode="contain" />
-              <Text style={[s.shareWatermarkText, { color: goldenColor }]}>{APP_NAME}</Text>
             </View>
           </ImageBackground>
         </View>
@@ -1160,6 +1212,43 @@ export default function SurahScreen() {
           {/* ═══ MUSHAF PAGES ═══ */}
           {pageContent}
 
+          {/* ═══ TARGET AYAH INDICATOR ═══ */}
+          {targetAyah && highlightAyahKey && (
+            <Animated.View style={{
+              position: 'absolute',
+              bottom: 100,
+              alignSelf: 'center',
+              opacity: targetIndicatorOpacity,
+            }}>
+              <BlurView
+                intensity={Platform.OS === 'ios' ? 80 : 50}
+                tint={isLightBg ? 'light' : 'dark'}
+                style={{
+                  borderRadius: 20,
+                  overflow: 'hidden',
+                }}
+              >
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                  backgroundColor: isLightBg ? 'rgba(255,255,255,0.7)' : 'rgba(30,30,32,0.7)',
+                }}>
+                  <MaterialCommunityIcons name="target" size={18} color={goldenColor} />
+                  <Text style={{
+                    fontFamily: fontSemiBold(),
+                    fontSize: 14,
+                    color: isLightBg ? '#1a1a2e' : '#fff',
+                  }}>
+                    {t('quran.ayah')} {toArabicNumber(targetAyah)}
+                  </Text>
+                </View>
+              </BlurView>
+            </Animated.View>
+          )}
+
           {/* ═══ LONG-PRESS ONBOARDING HINT ═══ */}
           {showLongPressHint && (
             <TouchableOpacity
@@ -1175,7 +1264,7 @@ export default function SurahScreen() {
                 <View style={[s.longPressHintInner, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.85)' : 'rgba(38,38,42,0.85)' }]}>
                   <MaterialCommunityIcons name="gesture-tap-hold" size={22} color={goldenColor} />
                   <Text style={[s.longPressHintText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>
-                    اضغط مطولاً على أي آية لفتح القائمة
+                    {translate('quran.longPressHint')}
                   </Text>
                 </View>
               </BlurView>
@@ -1184,30 +1273,30 @@ export default function SurahScreen() {
 
           {/* ═══ MINIMIZED TAFSIR BAR ═══ */}
           {showTafsirPanel && tafsirMinimized && (
-            <View style={[s.tafsirMiniBar, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.95)' : '#212d39' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {/* Tappable left area (title + chevron) — mirrors expanded header layout */}
-                <Pressable
-                  onPress={() => setTafsirMinimized(false)}
-                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8 }}
-                >
-                  <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={goldenColor} />
-                  <Text style={{ color: isLightBg ? '#111' : '#fff', fontFamily: 'Cairo-SemiBold', fontSize: 13, marginStart: 6, flex: 1 }}>
-                    التفسير الميسّر
-                  </Text>
-                  {/* Chevron at same position as chevron-down in expanded state */}
-                  <MaterialCommunityIcons name="chevron-up" size={20} color={isLightBg ? '#555' : '#bbb'} style={{ marginEnd: 4 }} />
-                </Pressable>
-                {/* Independent close — permanently disables */}
+            <Pressable
+              onLongPress={() => setTafsirMinimized(false)}
+              onPress={() => setTafsirMinimized(false)}
+              style={[s.tafsirMiniBar, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.95)' : 'rgba(28,28,30,0.85)' }]}
+            >
+              <View style={{ flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}>
+                {/* Close — same position as audio bar X */}
                 <TouchableOpacity
-                  hitSlop={10}
+                  hitSlop={8}
                   onPress={() => { updateDisplay({ showTafsir: false }); setTafsirMinimized(false); }}
-                  style={[s.tafsirActionBtn, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', marginEnd: 10 }]}
+                  style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(120,120,128,0.4)', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <MaterialCommunityIcons name="close" size={16} color={isLightBg ? '#333' : '#aaa'} />
+                  <MaterialCommunityIcons name="close" size={14} color="#fff" />
                 </TouchableOpacity>
+                {/* Icon */}
+                <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={goldenColor} />
+                {/* Title */}
+                <Text style={{ color: isLightBg ? '#111' : '#fff', fontFamily: fontMedium(), fontSize: 13, flex: 1, textAlign: 'right' }} numberOfLines={1}>
+                  {translate('home.tafsirMuyassar')}
+                </Text>
+                {/* Expand chevron */}
+                <MaterialCommunityIcons name="chevron-up" size={18} color={isLightBg ? '#555' : '#bbb'} />
               </View>
-            </View>
+            </Pressable>
           )}
 
           {/* ═══ AUDIO PLAYER (handled globally in _layout.tsx) ═══ */}
@@ -1227,7 +1316,7 @@ export default function SurahScreen() {
                   borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)',
                 }]}>
                   {/* Bookmark color row */}
-                  <Text style={[s.menuLabel, { color: isLightBg ? '#333' : '#ccc' }]}>إضافة فاصل</Text>
+                  <Text style={[s.menuLabel, { color: isLightBg ? '#333' : '#ccc' }]}>{translate('quran.addBookmark')}</Text>
                   <View style={s.menuColorRow}>
                     {BOOKMARK_COLOR_ORDER.map(color => {
                       const isActive = selectedAyah && bookmarkMap[`${selectedAyah.surah}:${selectedAyah.ayah}`] === color;
@@ -1246,33 +1335,33 @@ export default function SurahScreen() {
                   <View style={[s.menuDivider, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]} />
 
                   <TouchableOpacity
-                    style={s.menuAction}
+                    style={[s.menuAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => selectedAyah && handleOpenTafsir(selectedAyah.surah, selectedAyah.ayah)}
                   >
                     <MaterialCommunityIcons name="book-open-variant" size={20} color={goldenColor} />
-                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>التفسير</Text>
+                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{translate('quran.tafsir')}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={s.menuAction} onPress={handleCopyAyah}>
+                  <TouchableOpacity style={[s.menuAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handleCopyAyah}>
                     <MaterialCommunityIcons name="content-copy" size={20} color={goldenColor} />
-                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>نسخ الآية</Text>
+                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{translate('quran.copyAyah')}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={s.menuAction} onPress={handleShareAyah}>
+                  <TouchableOpacity style={[s.menuAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handleShareAyah}>
                     <MaterialCommunityIcons name="share-variant" size={20} color={goldenColor} />
-                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>مشاركة بالعلامة</Text>
+                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{translate('quran.shareWithBranding')}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity style={s.menuAction} onPress={handlePlayAyah}>
+                  <TouchableOpacity style={[s.menuAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handlePlayAyah}>
                     <MaterialCommunityIcons name="play-circle-outline" size={20} color={goldenColor} />
-                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>تشغيل الآية</Text>
+                    <Text style={[s.menuActionText, { color: isLightBg ? '#1a1a2e' : '#fff', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{translate('quran.playAyah')}</Text>
                   </TouchableOpacity>
 
                   {selectedAyah && bookmarkMap[`${selectedAyah.surah}:${selectedAyah.ayah}`] && (
                     <>
                       <View style={[s.menuDivider, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)' }]} />
                       <TouchableOpacity
-                        style={s.menuAction}
+                        style={[s.menuAction, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                         onPress={async () => {
                           if (!selectedAyah) return;
                           const id = `${selectedAyah.surah}_${selectedAyah.ayah}`;
@@ -1282,7 +1371,7 @@ export default function SurahScreen() {
                         }}
                       >
                         <MaterialCommunityIcons name="bookmark-remove" size={20} color="#FF6B6B" />
-                        <Text style={[s.menuActionText, { color: '#FF6B6B' }]}>إزالة الفاصل</Text>
+                        <Text style={[s.menuActionText, { color: '#FF6B6B', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{translate('quran.removeBookmark')}</Text>
                       </TouchableOpacity>
                     </>
                   )}
@@ -1304,12 +1393,12 @@ export default function SurahScreen() {
                       <View style={[s.sheetHandleBar, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
                     </View>
 
-                    <View style={s.tafsirHeader}>
-                      <Text style={[s.tafsirTitle, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>التفسير</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={[s.tafsirSource, { color: goldenColor }]}>تفسير الميسّر</Text>
+                    <View style={[s.tafsirHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Text style={[s.tafsirTitle, { color: isLightBg ? '#1a1a2e' : '#fff' }]}>{translate('quran.tafsir')}</Text>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={[s.tafsirSource, { color: goldenColor }]}>{translate('home.tafsirMuyassar')}</Text>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
                         <TouchableOpacity hitSlop={10} onPress={() => { setShowTafsir(false); setTafsirMinimized(true); }} style={[s.tafsirActionBtn, { borderWidth: 1, borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)', backgroundColor: 'transparent' }]}>
                           <MaterialCommunityIcons name="chevron-down" size={16} color={isLightBg ? '#333' : '#fff'} />
                         </TouchableOpacity>
@@ -1334,13 +1423,13 @@ export default function SurahScreen() {
                           <View style={[s.tafsirSep, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)' }]} />
 
                           <Text style={[s.tafsirText, { color: isLightBg ? '#333' : '#ddd' }]}>
-                            {tafsirAyah.tafsir || 'لا يوجد تفسير متاح لهذه الآية'}
+                            {tafsirAyah.tafsir || translate('quran.noTafsirAvailable')}
                           </Text>
 
                           {tafsirAyah.translation && (
                             <>
                               <View style={[s.tafsirSep, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', marginTop: 16 }]} />
-                              <Text style={{ color: goldenColor, fontSize: 13, fontWeight: '600', marginTop: 12, marginBottom: 6 }}>الترجمة</Text>
+                              <Text style={{ color: goldenColor, fontSize: 13, fontWeight: '600', marginTop: 12, marginBottom: 6 }}>{translate('quran.translation')}</Text>
                               <Text style={[s.tafsirText, { color: isLightBg ? '#444' : '#ccc', writingDirection: currentLang === 'ur' ? 'rtl' : 'ltr' }]}>
                                 {tafsirAyah.translation}
                               </Text>
@@ -1376,8 +1465,8 @@ export default function SurahScreen() {
                       <View style={[s.sheetHandleBar, { backgroundColor: settingsIsLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)' }]} />
                     </View>
 
-                    <View style={s.settingsHeader}>
-                      <Text style={[s.settingsTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>الإعدادات</Text>
+                    <View style={[s.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Text style={[s.settingsTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('common.settings')}</Text>
                       <TouchableOpacity hitSlop={12} onPress={() => setShowSettings(false)}>
                         <Ionicons name="close-circle" size={24} color={settingsIsLight ? '#999' : '#666'} />
                       </TouchableOpacity>
@@ -1387,11 +1476,11 @@ export default function SurahScreen() {
 
                       {/* ─── Font Size ─── */}
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
-                        <View style={stg.sectionHeader}>
+                        <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <MaterialCommunityIcons name="format-size" size={20} color={goldenColor} />
-                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>حجم الخط</Text>
+                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('settings.fontSize')}</Text>
                         </View>
-                        <View style={stg.fontSizeRow}>
+                        <View style={[stg.fontSizeRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <TouchableOpacity
                             style={[stg.fontSizeBtn, { backgroundColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)' }]}
                             onPress={() => {
@@ -1405,7 +1494,7 @@ export default function SurahScreen() {
 
                           <View style={stg.fontSizePreview}>
                             <Text style={[stg.fontSizeLabel, { color: goldenColor }]}>
-                              {fontSizeAdjust === 0 ? 'افتراضي' : fontSizeAdjust > 0 ? `+${fontSizeAdjust}` : String(fontSizeAdjust)}
+                              {fontSizeAdjust === 0 ? translate('quran.defaultSize') : fontSizeAdjust > 0 ? `+${fontSizeAdjust}` : String(fontSizeAdjust)}
                             </Text>
                             <View style={stg.fontSizeDots}>
                               {[-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].map(v => (
@@ -1445,16 +1534,16 @@ export default function SurahScreen() {
                               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
                           >
-                            <Text style={[stg.resetText, { color: goldenColor }]}>إعادة تعيين</Text>
+                            <Text style={[stg.resetText, { color: goldenColor }]}>{translate('common.reset')}</Text>
                           </TouchableOpacity>
                         )}
                       </View>
 
                       {/* ─── Background Image ─── */}
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
-                        <View style={stg.sectionHeader}>
+                        <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <MaterialCommunityIcons name="image-outline" size={20} color={goldenColor} />
-                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>خلفية المصحف</Text>
+                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.mushafBackground')}</Text>
                         </View>
                         <View style={stg.bgGrid}>
                           {(['quranbg1', 'quranbg2', 'quranbg3', 'quranbg4'] as const).map(key => {
@@ -1485,9 +1574,9 @@ export default function SurahScreen() {
 
                       {/* ─── Reciter ─── */}
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
-                        <View style={stg.sectionHeader}>
+                        <View style={[stg.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                           <MaterialCommunityIcons name="microphone-outline" size={20} color={goldenColor} />
-                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>القارئ</Text>
+                          <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.reciterLabel')}</Text>
                         </View>
                         <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                           {reciters.map(r => {
@@ -1498,6 +1587,7 @@ export default function SurahScreen() {
                                 style={[
                                   stg.reciterItem,
                                   {
+                                    flexDirection: isRTL ? 'row-reverse' : 'row',
                                     backgroundColor: isActive
                                       ? (settingsIsLight ? 'rgba(201,169,78,0.12)' : 'rgba(212,175,55,0.15)')
                                       : 'transparent',
@@ -1510,8 +1600,8 @@ export default function SurahScreen() {
                                 }}
                               >
                                 <View style={{ flex: 1 }}>
-                                  <Text style={[stg.reciterName, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{r.name}</Text>
-                                  <Text style={[stg.reciterSub, { color: settingsIsLight ? '#666' : '#aaa' }]}>{r.englishName}</Text>
+                                  <Text style={[stg.reciterName, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{isArabicLang ? r.name : (r.englishName || r.name)}</Text>
+                                  <Text style={[stg.reciterSub, { color: settingsIsLight ? '#666' : '#aaa' }]}>{isArabicLang ? r.englishName : r.name}</Text>
                                 </View>
                                 {isActive && <MaterialCommunityIcons name="check-circle" size={22} color={goldenColor} />}
                               </TouchableOpacity>
@@ -1524,8 +1614,8 @@ export default function SurahScreen() {
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
                         <View style={stg.toggleRow}>
                           <View style={{ flex: 1 }}>
-                            <Text style={[stg.toggleLabel, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>إظهار التفسير</Text>
-                            <Text style={[stg.toggleHint, { color: settingsIsLight ? '#888' : '#777' }]}>عرض تفسير الآيات أسفل المصحف</Text>
+                            <Text style={[stg.toggleLabel, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.showTafsir')}</Text>
+                            <Text style={[stg.toggleHint, { color: settingsIsLight ? '#888' : '#777' }]}>{translate('quran.showTafsirDesc')}</Text>
                           </View>
                           <Switch
                             value={settings.display.showTafsir ?? false}
@@ -1535,6 +1625,37 @@ export default function SurahScreen() {
                             }}
                             trackColor={{ false: settingsIsLight ? '#e0e0e0' : '#444', true: goldenColor + '60' }}
                             thumbColor={(settings.display.showTafsir ?? false) ? goldenColor : (settingsIsLight ? '#fff' : '#888')}
+                            ios_backgroundColor={settingsIsLight ? '#e0e0e0' : '#444'}
+                          />
+                        </View>
+                      </View>
+
+                      {/* ─── Focus Mode Toggle ─── */}
+                      <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)' }]}>
+                        <View style={stg.toggleRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[stg.toggleLabel, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.focusMode')}</Text>
+                            <Text style={[stg.toggleHint, { color: settingsIsLight ? '#888' : '#777' }]}>{translate('quran.focusModeDesc')}</Text>
+                          </View>
+                          <Switch
+                            value={settings.display.focusMode ?? false}
+                            onValueChange={async (val) => {
+                              if (val) {
+                                const seen = await AsyncStorage.getItem('@focus_mode_intro_seen');
+                                if (!seen) {
+                                  Alert.alert(
+                                    translate('quran.focusModeAlertTitle'),
+                                    translate('quran.focusModeAlertMessage'),
+                                    [{ text: translate('common.done'), style: 'default' }],
+                                  );
+                                  await AsyncStorage.setItem('@focus_mode_intro_seen', '1');
+                                }
+                              }
+                              updateDisplay({ focusMode: val });
+                              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                            trackColor={{ false: settingsIsLight ? '#e0e0e0' : '#444', true: goldenColor + '60' }}
+                            thumbColor={(settings.display.focusMode ?? false) ? goldenColor : (settingsIsLight ? '#fff' : '#888')}
                             ios_backgroundColor={settingsIsLight ? '#e0e0e0' : '#444'}
                           />
                         </View>
@@ -1594,10 +1715,9 @@ const s = StyleSheet.create({
     flexDirection: 'row-reverse',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  shareWatermarkIcon: { width: 18, height: 18, opacity: 0.5 },
-  shareWatermarkText: { fontSize: 10, fontFamily: 'Cairo-Medium' },
+  shareWatermarkIcon: { width: 48, height: 48, borderRadius: 12, opacity: 0.7 },
 
   // Long-press onboarding hint
   longPressHint: {
@@ -1620,7 +1740,7 @@ const s = StyleSheet.create({
   },
   longPressHintText: {
     fontSize: FONT_SIZES.sm,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
   },
 
   // ── Bottom Sheet ──
@@ -1635,9 +1755,9 @@ const s = StyleSheet.create({
   sheetTabs: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 10, borderRadius: 12, overflow: 'hidden', backgroundColor: 'rgba(120,120,128,0.1)' },
   sheetTabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 12 },
   sheetSubTabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
-  sheetTabText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold', fontWeight: '600' },
+  sheetTabText: { fontSize: FONT_SIZES.md, fontFamily: fontSemiBold(), fontWeight: '600' },
   tafsirActionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  tafsirMiniBar: { position: 'absolute', left: Spacing.md, right: Spacing.md, bottom: 140, borderRadius: 12, paddingVertical: 10, zIndex: 80, overflow: 'hidden' },
+  tafsirMiniBar: { position: 'absolute', left: Spacing.md, right: Spacing.md, bottom: 90, borderRadius: 12, overflow: 'hidden', zIndex: 80 },
 
   // ── Ayah Action Menu ──
   menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' },
@@ -1652,43 +1772,43 @@ const s = StyleSheet.create({
       android: { elevation: 12 },
     }),
   },
-  menuLabel: { fontSize: FONT_SIZES.sm, fontFamily: 'Cairo-Medium', textAlign: 'center', marginBottom: 10 },
+  menuLabel: { fontSize: FONT_SIZES.sm, fontFamily: fontMedium(), textAlign: 'center', marginBottom: 10 },
   menuColorRow: { flexDirection: 'row', justifyContent: 'center', gap: 20, marginBottom: 12 },
   menuColorBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   menuDivider: { height: StyleSheet.hairlineWidth, marginVertical: 8 },
   menuAction: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
-  menuActionText: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Medium', flex: 1, textAlign: 'right' },
+  menuActionText: { fontSize: FONT_SIZES.md, fontFamily: fontMedium(), flex: 1 },
 
   // ── Tafsir ──
   tafsirHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: 8 },
-  tafsirTitle: { fontSize: FONT_SIZES.xl, fontFamily: 'Cairo-Bold' },
-  tafsirSource: { fontSize: FONT_SIZES.sm, fontFamily: 'Cairo-Regular' },
+  tafsirTitle: { fontSize: FONT_SIZES.xl, fontFamily: fontBold() },
+  tafsirSource: { fontSize: FONT_SIZES.sm, fontFamily: fontRegular() },
   tafsirFontBtn: { fontSize: 20, fontWeight: '700' },
   tafsirAyahBox: { borderRadius: 14, padding: 16, borderWidth: 1 },
   tafsirAyahText: { fontSize: 22, textAlign: 'center', lineHeight: 38 },
   tafsirSep: { height: 1, marginVertical: 16 },
-  tafsirText: { fontSize: FONT_SIZES.lg, fontFamily: 'Cairo-Regular', lineHeight: 30, textAlign: 'right' },
+  tafsirText: { fontSize: FONT_SIZES.lg, fontFamily: fontRegular(), lineHeight: 30, textAlign: 'right', writingDirection: 'rtl' },
 
   // ── Settings ──
   settingsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
-  settingsTitle: { fontSize: FONT_SIZES.xl, fontFamily: 'Cairo-Bold' },
+  settingsTitle: { fontSize: FONT_SIZES.xl, fontFamily: fontBold() },
 });
 
 // ── Settings Sheet Styles ──
 const stg = StyleSheet.create({
   section: { borderRadius: 14, padding: 14, marginBottom: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  sectionTitle: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Bold' },
+  sectionTitle: { fontSize: FONT_SIZES.md, fontFamily: fontBold() },
 
   // Font size
   fontSizeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   fontSizeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   fontSizePreview: { flex: 1, alignItems: 'center' },
-  fontSizeLabel: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-Bold', marginBottom: 6 },
+  fontSizeLabel: { fontSize: FONT_SIZES.md, fontFamily: fontBold(), marginBottom: 6 },
   fontSizeDots: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   fontSizeDot: { borderRadius: 4 },
   resetBtn: { alignSelf: 'center', marginTop: 8, paddingHorizontal: 12, paddingVertical: 4 },
-  resetText: { fontSize: FONT_SIZES.sm, fontFamily: 'Cairo-Medium' },
+  resetText: { fontSize: FONT_SIZES.sm, fontFamily: fontMedium() },
 
   // Toggle rows
   toggleRow: {
@@ -1698,8 +1818,8 @@ const stg = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(120,120,128,0.1)',
   },
-  toggleLabel: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold' },
-  toggleHint: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular', marginTop: 2 },
+  toggleLabel: { fontSize: FONT_SIZES.md, fontFamily: fontSemiBold() },
+  toggleHint: { fontSize: FONT_SIZES.xs, fontFamily: fontRegular(), marginTop: 2 },
 
   // Background grid
   bgGrid: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
@@ -1731,6 +1851,6 @@ const stg = StyleSheet.create({
 
   // Reciter
   reciterItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, marginBottom: 4 },
-  reciterName: { fontSize: FONT_SIZES.md, fontFamily: 'Cairo-SemiBold' },
-  reciterSub: { fontSize: FONT_SIZES.xs, fontFamily: 'Cairo-Regular', marginTop: 1 },
+  reciterName: { fontSize: FONT_SIZES.md, fontFamily: fontSemiBold() },
+  reciterSub: { fontSize: FONT_SIZES.xs, fontFamily: fontRegular(), marginTop: 1 },
 });

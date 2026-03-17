@@ -9,43 +9,53 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t } from '@/lib/i18n';
 
-const METHODS: { value: CalculationMethod; label: string; subtitle: string }[] = [
-  { value: 4, label: 'أم القرى', subtitle: 'مكة المكرمة' },
-  { value: 3, label: 'رابطة العالم الإسلامي', subtitle: 'Muslim World League' },
-  { value: 2, label: 'الجمعية الإسلامية لأمريكا الشمالية', subtitle: 'ISNA' },
-  { value: 5, label: 'الهيئة المصرية العامة للمساحة', subtitle: 'Egyptian General Authority' },
-  { value: 1, label: 'جامعة العلوم الإسلامية - كراتشي', subtitle: 'University of Islamic Sciences, Karachi' },
-  { value: 7, label: 'معهد الجيوفيزياء - جامعة طهران', subtitle: 'Institute of Geophysics, University of Tehran' },
-  { value: 0, label: 'جامعة أم درمان الإسلامية', subtitle: 'Shia Ithna-Ashari, Leva Institute, Qum' },
-  { value: 8, label: 'منطقة الخليج', subtitle: 'Gulf Region' },
-  { value: 9, label: 'الكويت', subtitle: 'Kuwait' },
-  { value: 10, label: 'قطر', subtitle: 'Qatar' },
-  { value: 11, label: 'سنغافورة', subtitle: 'Majlis Ugama Islam Singapura' },
-  { value: 12, label: 'فرنسا', subtitle: 'Union des organisations islamiques de France' },
-  { value: 13, label: 'تركيا', subtitle: 'Diyanet İşleri Başkanlığı' },
-  { value: 14, label: 'روسيا', subtitle: 'Spiritual Administration of Muslims of Russia' },
-  { value: 15, label: 'ماليزيا', subtitle: 'JAKIM' },
-];
+function getMethods(translate: typeof t): { value: CalculationMethod; label: string; subtitle: string }[] {
+  return [
+    { value: 4, label: translate('prayer.methodUmmAlQura'), subtitle: translate('prayer.methodUmmAlQuraDesc') },
+    { value: 3, label: translate('prayer.methodMuslimWorldLeague'), subtitle: translate('prayer.methodMuslimWorldLeagueDesc') },
+    { value: 2, label: translate('prayer.methodIsna'), subtitle: translate('prayer.methodIsnaDesc') },
+    { value: 5, label: translate('prayer.methodEgyptian'), subtitle: translate('prayer.methodEgyptianDesc') },
+    { value: 1, label: translate('prayer.methodKarachi'), subtitle: translate('prayer.methodKarachiDesc') },
+    { value: 7, label: translate('prayer.methodTehran'), subtitle: translate('prayer.methodTehranDesc') },
+    { value: 0, label: translate('prayer.methodOmdurman'), subtitle: translate('prayer.methodOmdurmanDesc') },
+    { value: 8, label: translate('prayer.methodGulf'), subtitle: translate('prayer.methodGulfDesc') },
+    { value: 9, label: translate('prayer.methodKuwait'), subtitle: translate('prayer.methodKuwaitDesc') },
+    { value: 10, label: translate('prayer.methodQatar'), subtitle: translate('prayer.methodQatarDesc') },
+    { value: 11, label: translate('prayer.methodSingapore'), subtitle: translate('prayer.methodSingaporeDesc') },
+    { value: 12, label: translate('prayer.methodFrance'), subtitle: translate('prayer.methodFranceDesc') },
+    { value: 13, label: translate('prayer.methodTurkey'), subtitle: translate('prayer.methodTurkeyDesc') },
+    { value: 14, label: translate('prayer.methodRussia'), subtitle: translate('prayer.methodRussiaDesc') },
+    { value: 15, label: translate('prayer.methodMalaysia'), subtitle: translate('prayer.methodMalaysiaDesc') },
+  ];
+}
 
-const ASR_METHODS = [
-  { value: 0, label: 'حنفي', subtitle: 'ظل المثلين' },
-  { value: 1, label: 'شافعي / حنبلي / مالكي', subtitle: 'ظل المثل' },
-];
+function getAsrMethods(translate: typeof t) {
+  return [
+    { value: 0, label: translate('prayer.asrMethodHanafi'), subtitle: translate('prayer.asrMethodHanafiDesc') },
+    { value: 1, label: translate('prayer.asrMethodShafii'), subtitle: translate('prayer.asrMethodShafiiDesc') },
+  ];
+}
 
 export default function PrayerCalculationScreen() {
-  const router = useRouter();
+  const isRTL = useIsRTL();
   const { settings, isDarkMode, updatePrayer } = useSettings();
+  const colors = useColors();
+  const METHODS = React.useMemo(() => getMethods(t), []);
+  const ASR_METHODS = React.useMemo(() => getAsrMethods(t), []);
 
   const handleMethod = (method: CalculationMethod) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -61,33 +71,28 @@ export default function PrayerCalculationScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
+      opacity={settings.display.backgroundOpacity ?? 1}
       style={[styles.container, isDarkMode && styles.containerDark]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>طريقة الحساب</Text>
-          <View style={{ width: 28 }} />
-        </View>
+        <UniversalHeader title={t('prayer.calculationMethodHeader')} />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* طريقة حساب العصر */}
           <Animated.View entering={FadeInDown.delay(50).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>حساب العصر</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.asrCalculation')}</Text>
             <View style={[styles.section, isDarkMode && styles.sectionDark]}>
               {ASR_METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}
-                  style={[styles.option, settings.prayer.asrJuristic === m.value && styles.optionSelected]}
+                  style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === m.value && styles.optionSelected]}
                   onPress={() => handleAsr(m.value)}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.optionLabel, isDarkMode && styles.textLight]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, isDarkMode && styles.textMuted]}>{m.subtitle}</Text>
+                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.asrJuristic === m.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
@@ -99,17 +104,17 @@ export default function PrayerCalculationScreen() {
 
           {/* طريقة الحساب */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>طريقة حساب المواقيت</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.calculationMethodSection')}</Text>
             <View style={[styles.section, isDarkMode && styles.sectionDark]}>
               {METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}
-                  style={[styles.option, settings.prayer.calculationMethod === m.value && styles.optionSelected]}
+                  style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === m.value && styles.optionSelected]}
                   onPress={() => handleMethod(m.value)}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.optionLabel, isDarkMode && styles.textLight]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, isDarkMode && styles.textMuted]}>{m.subtitle}</Text>
+                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.calculationMethod === m.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
@@ -127,24 +132,13 @@ export default function PrayerCalculationScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  containerDark: { backgroundColor: '#11151c' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: 'Cairo-Bold', color: '#333' },
-  textLight: { color: '#fff' },
-  textMuted: { color: '#999' },
+  container: { flex: 1, backgroundColor: 'transparent' },
+  containerDark: { backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 10 },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#666',
     marginTop: 20,
     marginBottom: 10,
@@ -165,6 +159,6 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(120,120,128,0.2)',
   },
   optionSelected: { backgroundColor: 'rgba(47,118,89,0.08)' },
-  optionLabel: { fontFamily: 'Cairo-SemiBold', fontSize: 15, color: '#333' },
-  optionSub: { fontFamily: 'Cairo-Regular', fontSize: 12, color: '#999', marginTop: 2 },
+  optionLabel: { fontFamily: fontSemiBold(), fontSize: 15, color: '#333' },
+  optionSub: { fontFamily: fontRegular(), fontSize: 12, color: '#999', marginTop: 2 },
 });

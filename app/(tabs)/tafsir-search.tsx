@@ -12,11 +12,13 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { t } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { SURAH_NAMES_AR, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS } from '@/lib/quran-api';
+import { getSurahName, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 interface SearchResult {
   number: number;
   text: string;
@@ -50,6 +52,7 @@ function HighlightText({ text, query, color }: { text: string; query: string; co
 
 export default function TafsirSearchScreen() {
   const colors = useColors();
+  const isRTL = useIsRTL();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -65,6 +68,10 @@ export default function TafsirSearchScreen() {
   const editionForLang = searchLang === 'ar' ? 'quran-uthmani' : 'en.sahih';
   const englishEditions = TRANSLATION_EDITIONS.filter(e => e.language === 'en');
   const allModalEditions = [...TAFSIR_EDITIONS, ...englishEditions];
+
+  const getEditionDisplayName = (ed: { name: string; nameEn?: string }) => {
+    return searchLang === 'ar' ? ed.name : (ed.nameEn || ed.name);
+  };
 
   const handleSearch = useCallback(async () => {
     if (!query.trim() || query.trim().length < 2) return;
@@ -91,39 +98,39 @@ export default function TafsirSearchScreen() {
       const { arabicText, tafsirText } = await fetchTafsir(surahNum, ayahNum, selectedEdition);
       setTafsirDetail({ surahNum, ayahNum, arabicText, tafsirText, edition: selectedEdition });
     } catch {
-      setTafsirDetail(prev => prev ? { ...prev, tafsirText: 'تعذر تحميل التفسير' } : null);
+      setTafsirDetail(prev => prev ? { ...prev, tafsirText: t('quranSearch.loadTafsirFailed') } : null);
     } finally {
       setLoadingTafsir(false);
     }
   }, [selectedEdition]);
 
   const renderResult = useCallback(({ item }: { item: SearchResult }) => {
-    const surahName = SURAH_NAMES_AR[item.surah.number] || item.surah.name;
+    const surahName = getSurahName(item.surah.number);
     return (
       <TouchableOpacity
         style={[s.resultCard, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}
         onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
         activeOpacity={0.8}
       >
-        <View style={s.resultHeader}>
+        <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[s.surahBadge, { backgroundColor: colors.primary + '18' }]}>
             <Text style={[s.surahBadgeText, { color: colors.primary }]}>
               {surahName} ({item.surah.number}:{item.numberInSurah})
             </Text>
           </View>
           <View style={[s.juzBadge, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}>
-            <Text style={[s.juzBadgeText, { color: colors.muted }]}>ج {item.juz}</Text>
+            <Text style={[s.juzBadgeText, { color: colors.muted }]}>{t('quranSearch.juzLabel')} {item.juz}</Text>
           </View>
         </View>
         <Text style={[s.resultText, { color: colors.foreground, fontSize: searchLang === 'ar' ? 18 : 14 }]}>
           <HighlightText text={item.text} query={query} color={colors.primary} />
         </Text>
-        <View style={s.resultFooter}>
+        <View style={[s.resultFooter, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
             style={[s.tafsirBtn, { backgroundColor: colors.primary }]}
             onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
           >
-            <Text style={s.tafsirBtnText}>التفسير</Text>
+            <Text style={s.tafsirBtnText}>{t('tafsirSearch.tafsirBtn')}</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -135,7 +142,7 @@ export default function TafsirSearchScreen() {
       paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
       borderBottomWidth: 1, borderBottomColor: colors.border,
     },
-    title: { fontSize: 22, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 14 },
+    title: { fontSize: 22, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 14 },
     // Search bar
     searchRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
     inputWrap: {
@@ -143,7 +150,7 @@ export default function TafsirSearchScreen() {
       backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, borderWidth: 1, borderColor: colors.border,
       paddingHorizontal: 14,
     },
-    input: { flex: 1, height: 46, fontSize: 16, color: colors.foreground, textAlign: 'right' },
+    input: { flex: 1, height: 46, fontSize: 16, color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
     clearBtn: { padding: 4 },
     searchBtn: {
       backgroundColor: colors.primary, borderRadius: 14,
@@ -160,7 +167,7 @@ export default function TafsirSearchScreen() {
     langBtnText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     langBtnTextActive: { color: '#fff' },
     // Tafsir edition chips
-    editionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+    editionRow: { flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
     editionChip: {
       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
       backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
@@ -168,9 +175,9 @@ export default function TafsirSearchScreen() {
     editionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     editionChipText: { fontSize: 12, fontWeight: '700', color: colors.muted },
     editionChipTextActive: { color: '#fff' },
-    editionLabel: { fontSize: 12, color: colors.muted, paddingHorizontal: 16, paddingBottom: 6, textAlign: 'right' },
+    editionLabel: { fontSize: 12, color: colors.muted, paddingHorizontal: 16, paddingBottom: 6, textAlign: isRTL ? 'right' : 'left' },
     // Results
-    resultCount: { fontSize: 13, color: colors.muted, textAlign: 'right', paddingHorizontal: 16, paddingVertical: 8 },
+    resultCount: { fontSize: 13, color: colors.muted, textAlign: isRTL ? 'right' : 'left', paddingHorizontal: 16, paddingVertical: 8 },
     resultCard: {
       marginHorizontal: 14, marginVertical: 6, borderRadius: 16,
       padding: 16, borderWidth: 1,
@@ -180,7 +187,7 @@ export default function TafsirSearchScreen() {
     surahBadgeText: { fontSize: 12, fontWeight: '700' },
     juzBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
     juzBadgeText: { fontSize: 12 },
-    resultText: { textAlign: 'right', lineHeight: 30, marginBottom: 10 },
+    resultText: { textAlign: isRTL ? 'right' : 'left', lineHeight: 30, marginBottom: 10 },
     resultFooter: { flexDirection: 'row', justifyContent: 'flex-end' },
     tafsirBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
     tafsirBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
@@ -197,13 +204,13 @@ export default function TafsirSearchScreen() {
     },
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.foreground },
     closeBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)' },
-    modalContent: { padding: 20 },
-    ayahRef: { fontSize: 14, color: colors.primary, textAlign: 'right', fontWeight: '700', marginBottom: 10 },
+    modalContent: { padding: 20, paddingBottom: 60 },
+    ayahRef: { fontSize: 14, color: colors.primary, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
       backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, padding: 16,
       borderWidth: 1, borderColor: colors.border, marginBottom: 16,
     },
-    arabicText: { fontSize: 22, color: colors.foreground, textAlign: 'right', lineHeight: 42 },
+    arabicText: { fontSize: 22, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
@@ -212,24 +219,24 @@ export default function TafsirSearchScreen() {
     editionTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     editionTabText: { fontSize: 12, fontWeight: '700', color: colors.muted },
     editionTabTextActive: { color: '#fff' },
-    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: 'right', marginBottom: 10 },
-    tafsirText: { fontSize: 16, color: colors.foreground, textAlign: 'right', lineHeight: 32 },
+    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
+    tafsirText: { fontSize: 16, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
   });
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Header */}
         <View style={s.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-              <Ionicons name="chevron-forward" size={26} color={colors.foreground} />
+              <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={26} color={colors.foreground} />
             </TouchableOpacity>
-            <Text style={[s.title, { marginBottom: 0, flex: 1 }]}>البحث في التفسير</Text>
+            <Text style={[s.title, { marginBottom: 0, flex: 1 }]}>{t('tafsirSearch.title')}</Text>
             <View style={{ width: 34 }} />
           </View>
           {/* Search Row */}
-          <View style={s.searchRow}>
+          <View style={[s.searchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.inputWrap}>
               {query.length > 0 && (
                 <TouchableOpacity style={s.clearBtn} onPress={() => { setQuery(''); setResults([]); setHasSearched(false); }}>
@@ -239,7 +246,7 @@ export default function TafsirSearchScreen() {
               <TextInput
                 ref={inputRef}
                 style={s.input}
-                placeholder="ابحث في القرآن..."
+                placeholder={t('tafsirSearch.placeholder')}
                 placeholderTextColor={colors.muted}
                 value={query}
                 onChangeText={setQuery}
@@ -249,14 +256,14 @@ export default function TafsirSearchScreen() {
               />
             </View>
             <TouchableOpacity style={s.searchBtn} onPress={handleSearch}>
-              <Text style={s.searchBtnText}>بحث</Text>
+              <Text style={s.searchBtnText}>{t('tafsirSearch.searchBtn')}</Text>
             </TouchableOpacity>
           </View>
           {/* Lang toggle */}
           <View style={s.langRow}>
             <NativeTabs
               tabs={[
-                { key: 'ar', label: 'عربي' },
+                { key: 'ar', label: t('tafsirSearch.arabicLang') },
                 { key: 'en', label: 'English' },
               ]}
               selected={searchLang}
@@ -267,16 +274,16 @@ export default function TafsirSearchScreen() {
         </View>
 
         {/* Tafsir Edition Selector */}
-        <Text style={s.editionLabel}>عرض التفسير بـ:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.editionRow}>
+        <Text style={s.editionLabel}>{t('quran.showTafsirBy')}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.editionRow} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
           {TAFSIR_EDITIONS.map(ed => (
             <TouchableOpacity
               key={ed.identifier}
-              style={[s.editionChip, selectedEdition === ed.identifier && s.editionChipActive]}
+              style={[s.editionChip, selectedEdition === ed.identifier && s.editionChipActive, isRTL && { transform: [{ scaleX: -1 }] }]}
               onPress={() => setSelectedEdition(ed.identifier)}
             >
               <Text style={[s.editionChipText, selectedEdition === ed.identifier && s.editionChipTextActive]}>
-                {ed.name}
+                {getEditionDisplayName(ed)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -289,7 +296,7 @@ export default function TafsirSearchScreen() {
           <>
             {hasSearched && (
               <Text style={s.resultCount}>
-                {resultCount > 0 ? `${resultCount} نتيجة` : 'لا توجد نتائج'}
+                {resultCount > 0 ? `${resultCount} ${t('common.result')}` : t('common.noResultsFound')}
               </Text>
             )}
             <FlatList
@@ -301,14 +308,14 @@ export default function TafsirSearchScreen() {
                 hasSearched ? (
                   <View style={s.emptyWrap}>
                     <MaterialCommunityIcons name="magnify" size={52} color={colors.muted} style={{ marginBottom: 12 }} />
-                    <Text style={s.emptyTitle}>لا توجد نتائج</Text>
-                    <Text style={s.emptyText}>جرّب البحث بكلمات مختلفة أو غيّر لغة البحث</Text>
+                    <Text style={s.emptyTitle}>{t('common.noResultsFound')}</Text>
+                    <Text style={s.emptyText}>{t('tafsirSearch.tryDifferentWords')}</Text>
                   </View>
                 ) : (
                   <View style={s.emptyWrap}>
                     <MaterialCommunityIcons name="book-search" size={52} color={colors.muted} style={{ marginBottom: 12 }} />
-                    <Text style={s.emptyTitle}>ابحث في القرآن</Text>
-                    <Text style={s.emptyText}>ابحث بالكلمة أو العبارة لإيجاد الآيات وقراءة تفسيرها</Text>
+                    <Text style={s.emptyTitle}>{t('quranSearch.title')}</Text>
+                    <Text style={s.emptyText}>{t('tafsirSearch.searchHint')}</Text>
                   </View>
                 )
               }
@@ -325,11 +332,11 @@ export default function TafsirSearchScreen() {
         onRequestClose={() => setTafsirDetail(null)}
       >
         <View style={s.modalWrap}>
-          <View style={s.modalHeader}>
+          <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={s.closeBtn} onPress={() => setTafsirDetail(null)}>
               <MaterialCommunityIcons name="close" size={18} color={colors.foreground} />
             </TouchableOpacity>
-            <Text style={s.modalTitle}>التفسير</Text>
+            <Text style={s.modalTitle}>{t('tafsirSearch.tafsirBtn')}</Text>
             <View style={{ width: 36 }} />
           </View>
 
@@ -338,7 +345,7 @@ export default function TafsirSearchScreen() {
           ) : tafsirDetail && (
             <ScrollView style={s.modalContent} showsVerticalScrollIndicator={false}>
               <Text style={s.ayahRef}>
-                {SURAH_NAMES_AR[tafsirDetail.surahNum]} • آية {tafsirDetail.ayahNum}
+                {getSurahName(tafsirDetail.surahNum)} • {t('quran.ayah')} {tafsirDetail.ayahNum}
               </Text>
               {tafsirDetail.arabicText ? (
                 <View style={s.arabicBox}>
@@ -362,13 +369,13 @@ export default function TafsirSearchScreen() {
                     }}
                   >
                     <Text style={[s.editionTabText, selectedEdition === ed.identifier && s.editionTabTextActive]}>
-                      {ed.name}
+                      {getEditionDisplayName(ed)}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={s.tafsirTitle}>{allModalEditions.find(e => e.identifier === selectedEdition)?.name}</Text>
-              <Text style={s.tafsirText}>{tafsirDetail.tafsirText || 'لا يتوفر تفسير'}</Text>
+              <Text style={s.tafsirTitle}>{(() => { const ed = allModalEditions.find(e => e.identifier === selectedEdition); return ed ? getEditionDisplayName(ed) : ''; })()}</Text>
+              <Text style={s.tafsirText}>{tafsirDetail.tafsirText || t('quranSearch.noTafsirAvailable')}</Text>
               <View style={{ height: 60 }} />
             </ScrollView>
           )}

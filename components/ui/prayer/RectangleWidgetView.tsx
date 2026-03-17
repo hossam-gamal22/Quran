@@ -11,19 +11,24 @@ import {
   getNextPrayer,
   getTimeRemaining,
 } from '@/lib/prayer-times';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 interface RectangleWidgetViewProps {
   prayerTimes: PrayerTimes | null;
   language?: string;
   isDarkMode?: boolean;
+  iconSource?: any;
 }
 
 const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   prayerTimes,
   language = 'ar',
   isDarkMode = false,
+  iconSource,
 }) => {
+  const isRTL = useIsRTL();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -66,24 +71,24 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   return (
     <View style={styles.wrapper}>
       <View style={[styles.card, { backgroundColor: bgColor }]}>
-        <View style={styles.mainRow}>
-          {/* Left side: Countdown + prayer label */}
-          <View style={styles.leftSection}>
-            <Text style={[styles.countdownText, { color: countdownColor }]}>
+        <View style={[styles.mainRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {/* Countdown + prayer label - on the right in RTL */}
+          <View style={[styles.countdownSection, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <Text style={[styles.countdownText, { color: countdownColor, textAlign: isRTL ? 'right' : 'left' }]}>
               {pad(timeRemaining.hours)}:{pad(timeRemaining.minutes)}:{pad(timeRemaining.seconds)}
             </Text>
-            <Text style={[styles.prayerLabel, { color: labelColor }]}>
-              الوقت المتبقي على صلاة {prayerName}
+            <Text style={[styles.prayerLabel, { color: labelColor, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('prayer.remainingTimeFor')} {prayerName}
             </Text>
           </View>
 
-          {/* Right side: App logo + app name (static) */}
-          <View style={styles.rightSection}>
+          {/* Logo side - on the left in RTL */}
+          <View style={[styles.logoSection]}>
             <Image
-              source={require('@/assets/images/icon.png')}
+              source={iconSource || require('@/assets/images/icons/icon.png')}
               style={styles.logo}
             />
-            <Text style={[styles.appName, { color: greenColor }]}>روح المسلم</Text>
+            <Text style={[styles.appName, { color: greenColor }]}>{t('common.appName')}</Text>
           </View>
         </View>
       </View>
@@ -115,26 +120,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 16,
   },
-  leftSection: {
+  logoSection: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  countdownSection: {
     flex: 1,
-    alignItems: 'flex-start',
   },
   countdownText: {
     fontSize: 42,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     letterSpacing: 2,
     lineHeight: 52,
   },
   prayerLabel: {
     fontSize: 12,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     marginTop: 4,
-  },
-  rightSection: {
-    alignItems: 'center',
-    marginLeft: 16,
-    gap: 6,
   },
   logo: {
     width: 48,
@@ -143,7 +147,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 11,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
 });
 

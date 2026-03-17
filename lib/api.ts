@@ -1,6 +1,7 @@
 // admin-panel/src/lib/api.ts
 // API Client للربط مع Backend
 
+// @ts-ignore
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.roohmuslim.com';
 
 interface ApiResponse<T> {

@@ -11,9 +11,12 @@ import {
   Text,
   ActivityIndicator,
 } from 'react-native';
+import { fontBold, fontRegular } from '@/lib/fonts';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Linking } from 'react-native';
 import { useSettings } from '@/contexts/SettingsContext';
+import { t } from '@/lib/i18n';
 import { 
   renderSections, 
   SectionAction 
@@ -233,7 +236,7 @@ export function DynamicScreen({
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.accent} />
         <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          جاري التحميل...
+          {t('common.loading')}
         </Text>
       </View>
     );
@@ -243,9 +246,9 @@ export function DynamicScreen({
   if (error && !config) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
-        <Text style={[styles.errorEmoji]}>⚠️</Text>
+        <MaterialCommunityIcons name="alert" size={40} color={colors.text} />
         <Text style={[styles.errorText, { color: colors.text }]}>
-          حدث خطأ في تحميل المحتوى
+          {t('common.errorLoadContent')}
         </Text>
         <Text style={[styles.errorDescription, { color: colors.textSecondary }]}>
           {error.message}
@@ -259,7 +262,7 @@ export function DynamicScreen({
     return (
       <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-          لا يوجد محتوى
+          {t('common.noContent')}
         </Text>
       </View>
     );
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 16,
   },
   errorEmoji: {
@@ -339,18 +342,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorText: {
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 8,
   },
   errorDescription: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 14,
     textAlign: 'center',
   },
   emptyText: {
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     fontSize: 16,
     textAlign: 'center',
   },

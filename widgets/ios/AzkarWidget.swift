@@ -15,6 +15,8 @@ struct ZikrData: Codable {
     var translation: String?
     var count: Int
     var category: String
+    var categoryName: String?
+    var timesLabel: String?
     var benefit: String?
 }
 
@@ -170,7 +172,10 @@ func getCategoryIcon(_ category: String) -> String {
     }
 }
 
-func getCategoryName(_ category: String) -> String {
+func getCategoryName(_ category: String, translatedName: String? = nil) -> String {
+    if let translated = translatedName, !translated.isEmpty {
+        return translated
+    }
     switch category {
     case "morning": return "أذكار الصباح"
     case "evening": return "أذكار المساء"
@@ -192,6 +197,10 @@ struct SmallAzkarWidgetView: View {
         entry.data?.randomZikr.category ?? "morning"
     }
     
+    var categoryTranslatedName: String? {
+        entry.data?.randomZikr.categoryName
+    }
+    
     var body: some View {
         ZStack {
             LinearGradient(
@@ -204,7 +213,7 @@ struct SmallAzkarWidgetView: View {
                 HStack {
                     Image(systemName: getCategoryIcon(category))
                         .font(.system(size: 12))
-                    Text(getCategoryName(category))
+                    Text(getCategoryName(category, translatedName: categoryTranslatedName))
                         .font(.system(size: 10, weight: .medium))
                 }
                 .foregroundColor(.white.opacity(0.9))
@@ -223,7 +232,7 @@ struct SmallAzkarWidgetView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "repeat")
                             .font(.system(size: 10))
-                        Text("\(entry.data?.randomZikr.count ?? 1) مرات")
+                        Text("\(entry.data?.randomZikr.count ?? 1) \(entry.data?.randomZikr.timesLabel ?? "مرات")")
                             .font(.system(size: 10, weight: .medium))
                     }
                     .foregroundColor(.white.opacity(0.8))
@@ -249,6 +258,10 @@ struct MediumAzkarWidgetView: View {
         entry.data?.randomZikr.category ?? "morning"
     }
     
+    var categoryTranslatedName: String? {
+        entry.data?.randomZikr.categoryName
+    }
+    
     var body: some View {
         ZStack {
             LinearGradient(
@@ -262,7 +275,7 @@ struct MediumAzkarWidgetView: View {
                     HStack {
                         Image(systemName: getCategoryIcon(category))
                             .font(.system(size: 14))
-                        Text(getCategoryName(category))
+                        Text(getCategoryName(category, translatedName: categoryTranslatedName))
                             .font(.system(size: 12, weight: .bold))
                     }
                     .foregroundColor(.white)
@@ -344,6 +357,10 @@ struct LargeAzkarWidgetView: View {
         entry.data?.randomZikr.category ?? "morning"
     }
     
+    var categoryTranslatedName: String? {
+        entry.data?.randomZikr.categoryName
+    }
+    
     var body: some View {
         ZStack {
             LinearGradient(
@@ -358,7 +375,7 @@ struct LargeAzkarWidgetView: View {
                     HStack(spacing: 8) {
                         Image(systemName: getCategoryIcon(category))
                             .font(.system(size: 18))
-                        Text(getCategoryName(category))
+                        Text(getCategoryName(category, translatedName: categoryTranslatedName))
                             .font(.system(size: 16, weight: .bold))
                     }
                     .foregroundColor(.white)

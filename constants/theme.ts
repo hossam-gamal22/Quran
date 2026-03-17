@@ -55,6 +55,11 @@ export const Colors = {
   glassLight: 'rgba(255, 255, 255, 0.85)',
   glassBorder: 'rgba(255, 255, 255, 0.3)',
   cardGlass: 'rgba(255, 255, 255, 0.75)',
+
+  // Aliases used by admin screens
+  textMuted: '#8E8E93',
+  accent: '#2f7659',
+  shadow: '#000000',
 };
 
 // ============================================
@@ -109,6 +114,11 @@ export const DarkColors = {
   glassLight: 'rgba(36, 43, 58, 0.9)',
   glassBorder: 'rgba(255, 255, 255, 0.1)',
   cardGlass: 'rgba(26, 31, 43, 0.85)',
+
+  // Aliases used by admin screens
+  textMuted: '#8E8E93',
+  accent: '#3d9970',
+  shadow: '#000000',
 };
 
 // ============================================
@@ -147,6 +157,10 @@ export const SchemeColors = {
     cardGlass: DarkColors.cardGlass,
   },
 };
+
+export type ThemeColors = typeof SchemeColors.light;
+
+export const ISLAMIC_PATTERN_OPACITY = { dark: 0.08, light: 0.05 };
 
 // ============================================
 // المسافات

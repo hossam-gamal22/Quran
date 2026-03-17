@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { Subscriber, AppStats } from '../../types/admin';
+import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function SubscribersScreen() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [stats, setStats] = useState<AppStats | null>(null);
@@ -87,24 +89,24 @@ export default function SubscribersScreen() {
         <View style={styles.statCard}>
           <Ionicons name="people" size={24} color={Colors.primary} />
           <Text style={styles.statNumber}>{stats?.premiumUsers || 0}</Text>
-          <Text style={styles.statLabel}>إجمالي المشتركين</Text>
+          <Text style={styles.statLabel}>{t('admin.totalSubscribers')}</Text>
         </View>
         <View style={styles.statCard}>
           <Ionicons name="cash" size={24} color={Colors.success} />
           <Text style={styles.statNumber}>${stats?.totalRevenue || 0}</Text>
-          <Text style={styles.statLabel}>إجمالي الأرباح</Text>
+          <Text style={styles.statLabel}>{t('admin.totalRevenue')}</Text>
         </View>
         <View style={styles.statCard}>
           <Ionicons name="trending-up" size={24} color={Colors.warning} />
           <Text style={styles.statNumber}>${stats?.todayRevenue || 0}</Text>
-          <Text style={styles.statLabel}>أرباح اليوم</Text>
+          <Text style={styles.statLabel}>{t('admin.todayRevenue')}</Text>
         </View>
       </View>
 
       {/* Top Countries */}
       {stats?.topCountries && stats.topCountries.length > 0 && (
         <View style={styles.topCountries}>
-          <Text style={styles.sectionTitle}>أعلى الدول</Text>
+          <Text style={styles.sectionTitle}>{t('admin.topCountries')}</Text>
           <View style={styles.countriesRow}>
             {stats.topCountries.slice(0, 3).map((item, index) => (
               <View key={item.country} style={styles.countryItem}>
@@ -126,7 +128,7 @@ export default function SubscribersScreen() {
           <Text
             style={[styles.filterTabText, filter === 'all' && styles.filterTabTextActive]}
           >
-            الكل ({subscribers.length})
+            {t('admin.allFilter')} ({subscribers.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -136,7 +138,7 @@ export default function SubscribersScreen() {
           <Text
             style={[styles.filterTabText, filter === 'active' && styles.filterTabTextActive]}
           >
-            نشط ({subscribers.filter((s) => s.isActive).length})
+            {t('admin.active')} ({subscribers.filter((s) => s.isActive).length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -146,7 +148,7 @@ export default function SubscribersScreen() {
           <Text
             style={[styles.filterTabText, filter === 'expired' && styles.filterTabTextActive]}
           >
-            منتهي ({subscribers.filter((s) => !s.isActive).length})
+            {t('admin.expired')} ({subscribers.filter((s) => !s.isActive).length})
           </Text>
         </TouchableOpacity>
       </View>
@@ -171,7 +173,7 @@ export default function SubscribersScreen() {
                       <Ionicons name="person" size={20} color={Colors.primary} />
                     </View>
                     <View>
-                      <Text style={styles.email}>{sub.email || 'بدون بريد'}</Text>
+                      <Text style={styles.email}>{sub.email || t('admin.noEmail')}</Text>
                       <Text style={styles.country}>{sub.country}</Text>
                     </View>
                   </View>
@@ -201,9 +203,9 @@ export default function SubscribersScreen() {
                     >
                       {sub.isActive
                         ? isExpiringSoon
-                          ? `ينتهي خلال ${daysRemaining} يوم`
-                          : 'نشط'
-                        : 'منتهي'}
+                          ? `${t('admin.expiresIn')} ${daysRemaining} ${t('common.days')}`
+                          : t('admin.active')
+                        : t('admin.expired')}
                     </Text>
                   </View>
                 </View>
@@ -211,13 +213,13 @@ export default function SubscribersScreen() {
                 <View style={styles.cardDetails}>
                   <View style={styles.detailRow}>
                     <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>نوع الاشتراك</Text>
+                      <Text style={styles.detailLabel}>{t('admin.subscriptionType')}</Text>
                       <Text style={styles.detailValue}>
-                        {sub.subscriptionType === 'monthly' ? 'شهري' : 'سنوي'}
+                        {sub.subscriptionType === 'monthly' ? t('common.monthly') : t('common.yearly')}
                       </Text>
                     </View>
                     <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>المبلغ</Text>
+                      <Text style={styles.detailLabel}>{t('admin.amount')}</Text>
                       <Text style={styles.detailValue}>
                         {sub.amount} {sub.currency}
                       </Text>
@@ -225,11 +227,11 @@ export default function SubscribersScreen() {
                   </View>
                   <View style={styles.detailRow}>
                     <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>تاريخ البدء</Text>
+                      <Text style={styles.detailLabel}>{t('admin.startDate')}</Text>
                       <Text style={styles.detailValue}>{formatDate(sub.startDate)}</Text>
                     </View>
                     <View style={styles.detailItem}>
-                      <Text style={styles.detailLabel}>تاريخ الانتهاء</Text>
+                      <Text style={styles.detailLabel}>{t('admin.endDate')}</Text>
                       <Text style={styles.detailValue}>{formatDate(sub.endDate)}</Text>
                     </View>
                   </View>
@@ -237,7 +239,7 @@ export default function SubscribersScreen() {
 
                 <View style={styles.cardFooter}>
                   <Text style={styles.transactionId}>
-                    معرّف العملية: {sub.odPaymentId || sub.id}
+                    {t('admin.transactionId')}: {sub.odPaymentId || sub.id}
                   </Text>
                 </View>
               </View>
@@ -248,7 +250,7 @@ export default function SubscribersScreen() {
         {filteredSubscribers.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="people-outline" size={64} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>لا يوجد مشتركين</Text>
+            <Text style={styles.emptyText}>{t('admin.noSubscribers')}</Text>
           </View>
         )}
 

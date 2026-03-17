@@ -23,13 +23,13 @@ export default function Login() {
             <label className="block text-sm font-medium text-gray-700 mb-2">البريد الإلكتروني</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              placeholder="admin@example.com" required />
+              placeholder="admin@example.com" aria-label="البريد الإلكتروني" required />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">كلمة المرور</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-              placeholder="••••••••" required />
+              placeholder="••••••••" aria-label="كلمة المرور" required />
           </div>
           <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700">
             تسجيل الدخول

@@ -10,13 +10,19 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { setLanguage } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -24,20 +30,51 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
+const FLAG_IMAGES: Record<string, ImageSourcePropType> = {
+  ar: require('@/assets/images/flags/sa.png'),
+  en: require('@/assets/images/flags/us.png'),
+  fr: require('@/assets/images/flags/fr.png'),
+  de: require('@/assets/images/flags/de.png'),
+  es: require('@/assets/images/flags/es.png'),
+  tr: require('@/assets/images/flags/tr.png'),
+  ur: require('@/assets/images/flags/pk.png'),
+  id: require('@/assets/images/flags/id.png'),
+  ms: require('@/assets/images/flags/my.png'),
+  hi: require('@/assets/images/flags/in.png'),
+  bn: require('@/assets/images/flags/bd.png'),
+  ru: require('@/assets/images/flags/ru.png'),
+};
+
 const LANGUAGES = [
-  { code: 'ar', name: 'العربية', nameEn: 'Arabic', flag: '🇸🇦', isRTL: true },
-  { code: 'en', name: 'English', nameEn: 'English', flag: '🇺🇸', isRTL: false },
-  { code: 'ur', name: 'اردو', nameEn: 'Urdu', flag: '🇵🇰', isRTL: true },
-  { code: 'id', name: 'Bahasa Indonesia', nameEn: 'Indonesian', flag: '🇮🇩', isRTL: false },
-  { code: 'tr', name: 'Türkçe', nameEn: 'Turkish', flag: '🇹🇷', isRTL: false },
-  { code: 'fr', name: 'Français', nameEn: 'French', flag: '🇫🇷', isRTL: false },
-  { code: 'de', name: 'Deutsch', nameEn: 'German', flag: '🇩🇪', isRTL: false },
-  { code: 'hi', name: 'हिन्दी', nameEn: 'Hindi', flag: '🇮🇳', isRTL: false },
-  { code: 'bn', name: 'বাংলা', nameEn: 'Bengali', flag: '🇧🇩', isRTL: false },
-  { code: 'ms', name: 'Bahasa Melayu', nameEn: 'Malay', flag: '🇲🇾', isRTL: false },
-  { code: 'ru', name: 'Русский', nameEn: 'Russian', flag: '🇷🇺', isRTL: false },
-  { code: 'es', name: 'Español', nameEn: 'Spanish', flag: '🇪🇸', isRTL: false },
+  { code: 'ar', name: 'العربية', nameEn: 'Arabic', flagIcon: FLAG_IMAGES.ar, isRTL: true },
+  { code: 'en', name: 'English', nameEn: 'English', flagIcon: FLAG_IMAGES.en, isRTL: false },
+  { code: 'fr', name: 'Français', nameEn: 'French', flagIcon: FLAG_IMAGES.fr, isRTL: false },
+  { code: 'tr', name: 'Türkçe', nameEn: 'Turkish', flagIcon: FLAG_IMAGES.tr, isRTL: false },
+  { code: 'ur', name: 'اردو', nameEn: 'Urdu', flagIcon: FLAG_IMAGES.ur, isRTL: true },
+  { code: 'de', name: 'Deutsch', nameEn: 'German', flagIcon: FLAG_IMAGES.de, isRTL: false },
+  { code: 'hi', name: 'हिन्दी', nameEn: 'Hindi', flagIcon: FLAG_IMAGES.hi, isRTL: false },
+  { code: 'bn', name: 'বাংলা', nameEn: 'Bengali', flagIcon: FLAG_IMAGES.bn, isRTL: false },
+  { code: 'id', name: 'Bahasa Indonesia', nameEn: 'Indonesian', flagIcon: FLAG_IMAGES.id, isRTL: false },
+  { code: 'ms', name: 'Bahasa Melayu', nameEn: 'Malay', flagIcon: FLAG_IMAGES.ms, isRTL: false },
+  { code: 'es', name: 'Español', nameEn: 'Spanish', flagIcon: FLAG_IMAGES.es, isRTL: false },
+  { code: 'ru', name: 'Русский', nameEn: 'Russian', flagIcon: FLAG_IMAGES.ru, isRTL: false },
 ];
+
+// ترجمات شاشة اللغة — تتغير فوراً عند اختيار لغة جديدة
+const LANG_SCREEN_TEXT: Record<string, { title: string; desc: string; btn: string }> = {
+  ar: { title: 'اختر لغتك', desc: 'اختر اللغة التي تفضلها للتطبيق. يمكنك تغييرها لاحقاً من الإعدادات.', btn: 'متابعة' },
+  en: { title: 'Choose Language', desc: 'Choose your preferred language. You can change it later in Settings.', btn: 'Continue' },
+  ur: { title: 'اپنی زبان منتخب کریں', desc: 'ایپ کے لیے اپنی پسندیدہ زبان منتخب کریں۔ آپ بعد میں سیٹنگز سے تبدیل کر سکتے ہیں۔', btn: 'جاری رکھیں' },
+  id: { title: 'Pilih Bahasa', desc: 'Pilih bahasa yang Anda inginkan. Anda bisa mengubahnya nanti di Pengaturan.', btn: 'Lanjutkan' },
+  tr: { title: 'Dilinizi Seçin', desc: 'Tercih ettiğiniz dili seçin. Daha sonra Ayarlar\'dan değiştirebilirsiniz.', btn: 'Devam' },
+  fr: { title: 'Choisir la langue', desc: 'Choisissez votre langue préférée. Vous pouvez la changer plus tard dans les Paramètres.', btn: 'Continuer' },
+  de: { title: 'Sprache wählen', desc: 'Wählen Sie Ihre bevorzugte Sprache. Sie können sie später in den Einstellungen ändern.', btn: 'Weiter' },
+  hi: { title: 'भाषा चुनें', desc: 'अपनी पसंदीदा भाषा चुनें। आप इसे बाद में सेटिंग्स में बदल सकते हैं।', btn: 'जारी रखें' },
+  bn: { title: 'ভাষা নির্বাচন করুন', desc: 'আপনার পছন্দের ভাষা নির্বাচন করুন। আপনি পরে সেটিংস থেকে পরিবর্তন করতে পারেন।', btn: 'চালিয়ে যান' },
+  ms: { title: 'Pilih Bahasa', desc: 'Pilih bahasa pilihan anda. Anda boleh menukarnya kemudian di Tetapan.', btn: 'Teruskan' },
+  ru: { title: 'Выберите язык', desc: 'Выберите предпочитаемый язык. Вы можете изменить его позже в Настройках.', btn: 'Продолжить' },
+  es: { title: 'Elige tu idioma', desc: 'Elige tu idioma preferido. Puedes cambiarlo después en Ajustes.', btn: 'Continuar' },
+};
 
 // ========================================
 // مكون اللغة
@@ -56,6 +93,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
   onSelect,
   index,
 }) => {
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInRight.delay(index * 50).duration(400)}>
       <TouchableOpacity
@@ -66,18 +104,13 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         }}
         activeOpacity={0.7}
       >
-        <Text style={styles.flag}>{language.flag}</Text>
+        <Image source={language.flagIcon} style={styles.flag} resizeMode="contain" />
         <View style={styles.languageInfo}>
-          <Text style={[styles.languageName, isSelected && styles.languageNameSelected]}>
+          <Text style={[styles.languageName, isSelected && styles.languageNameSelected, { textAlign: isRTL ? 'right' : 'left' }]}>
             {language.name}
           </Text>
-          <Text style={styles.languageNameEn}>{language.nameEn}</Text>
+          <Text style={[styles.languageNameEn, { textAlign: isRTL ? 'right' : 'left' }]}>{language.nameEn}</Text>
         </View>
-        {language.isRTL && (
-          <View style={styles.rtlBadge}>
-            <Text style={styles.rtlText}>RTL</Text>
-          </View>
-        )}
         <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
           {isSelected && <View style={styles.radioInner} />}
         </View>
@@ -91,12 +124,28 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
 // ========================================
 
 export default function LanguageScreen() {
+  const isRTL = useIsRTL();
   const { preferences, updatePreferences, goToNextStep, goToPreviousStep } = useOnboarding();
   const [selectedLanguage, setSelectedLanguage] = useState(preferences.language || 'ar');
 
-  const handleLanguageSelect = (code: string) => {
+  // ترجمات تفاعلية بناءً على اللغة المختارة
+  const screenText = LANG_SCREEN_TEXT[selectedLanguage] || LANG_SCREEN_TEXT.ar;
+  const isSelectedRTL = LANGUAGES.find(l => l.code === selectedLanguage)?.isRTL ?? false;
+
+  const handleLanguageSelect = async (code: string) => {
     setSelectedLanguage(code);
     updatePreferences({ language: code });
+    await setLanguage(code as any);
+    
+    // Also save to app_settings so SettingsContext picks up the language on load
+    try {
+      const stored = await AsyncStorage.getItem('app_settings');
+      const parsed = stored ? JSON.parse(stored) : {};
+      parsed.language = code;
+      await AsyncStorage.setItem('app_settings', JSON.stringify(parsed));
+    } catch (e) {
+      // Non-blocking — loadSettings will fall back to @app_language
+    }
   };
 
   const handleContinue = () => {
@@ -116,20 +165,17 @@ export default function LanguageScreen() {
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
-            </TouchableOpacity>
+          <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { flexDirection: isSelectedRTL ? 'row-reverse' : 'row' }]}>
+            <View style={styles.headerPlaceholder} />
             <View style={styles.headerContent}>
-              <Text style={styles.stepText}>الخطوة 1 من 4</Text>
-              <Text style={styles.headerTitle}>اختر لغتك</Text>
+              <Text style={styles.headerTitle}>{screenText.title}</Text>
             </View>
             <View style={styles.headerPlaceholder} />
           </Animated.View>
 
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
-            <View style={styles.progressBg}>
+            <View style={[styles.progressBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Animated.View 
                 entering={FadeInDown.delay(200).duration(600)}
                 style={[styles.progressFill, { width: '25%' }]} 
@@ -140,8 +186,8 @@ export default function LanguageScreen() {
           {/* الوصف */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.descContainer}>
             <MaterialCommunityIcons name="translate" size={40} color="#2f7659" />
-            <Text style={styles.descText}>
-              اختر اللغة التي تفضلها للتطبيق. يمكنك تغييرها لاحقاً من الإعدادات.
+            <Text style={[styles.descText, { textAlign: isSelectedRTL ? 'right' : 'left' }]}>
+              {screenText.desc}
             </Text>
           </Animated.View>
 
@@ -173,15 +219,16 @@ export default function LanguageScreen() {
                 <View
                   style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
                 >
-                  <Text style={styles.continueButtonText}>متابعة</Text>
-                  <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+                  <Text style={styles.continueButtonText}>{screenText.btn}</Text>
+<MaterialCommunityIcons name={isSelectedRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
                 </View>
               </TouchableOpacity>
 
               {/* مؤشر الصفحات */}
-              <View style={styles.pageIndicator}>
-                <View style={styles.dot} />
+              <View style={[styles.pageIndicator, { flexDirection: isSelectedRTL ? 'row-reverse' : 'row' }]}>
                 <View style={[styles.dot, styles.dotActive]} />
+                <View style={styles.dot} />
+                <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
               </View>
@@ -225,12 +272,12 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.6)',
   },
   headerTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   headerPlaceholder: {
@@ -258,7 +305,7 @@ const styles = StyleSheet.create({
   },
   descText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 24,
@@ -271,7 +318,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   languageItem: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
@@ -279,21 +326,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 2,
     borderColor: 'transparent',
+    gap: 12,
   },
   languageItemSelected: {
     backgroundColor: 'rgba(47,118,89,0.2)',
     borderColor: '#2f7659',
   },
   flag: {
-    fontSize: 32,
-    marginRight: 14,
+    width: 36,
+    height: 24,
+    borderRadius: 4,
   },
   languageInfo: {
     flex: 1,
+    alignItems: 'flex-end',
   },
   languageName: {
     fontSize: 17,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   languageNameSelected: {
@@ -301,7 +351,7 @@ const styles = StyleSheet.create({
   },
   languageNameEn: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.5)',
   },
   rtlBadge: {
@@ -309,11 +359,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    marginRight: 12,
   },
   rtlText: {
     fontSize: 10,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.7)',
   },
   radioOuter: {
@@ -352,7 +401,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   pageIndicator: {

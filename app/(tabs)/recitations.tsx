@@ -6,16 +6,27 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, ActivityIndicator, ScrollView, Platform, Animated,
-  TextInput,
+  TextInput, Alert,
 } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
+import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 // ✅ استخدم expo-audio بدلاً من expo-av
 import { useAudioPlayer } from 'expo-audio';
-import { SURAH_NAMES_AR, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
+import { getSurahName, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import {
+  downloadSurah as downloadSurahAudio,
+  isDownloaded as checkIsDownloaded,
+  getLocalUri,
+  deleteDownload,
+  isDownloading,
+  getDownloadedForReciter,
+} from '@/lib/audio-download-manager';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const AYAH_COUNTS_114 = [
@@ -61,6 +72,9 @@ const STORAGE_KEY_RECITER = '@recitations_reciter';
 
 export default function RecitationsScreen() {
   const colors = useColors();
+  const isRTL = useIsRTL();
+  const language = getLanguage();
+  const isArabic = language === 'ar';
   const [selectedReciter, setSelectedReciter] = useState(RECITERS[0]);
   const [showReciterModal, setShowReciterModal] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
@@ -72,6 +86,8 @@ export default function RecitationsScreen() {
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [downloadedSet, setDownloadedSet] = useState<Set<number>>(new Set());
+  const [downloadingSet, setDownloadingSet] = useState<Set<number>>(new Set());
 
   // ✅ استخدم expo-audio hook
   const player = useAudioPlayer(audioUrl || '');
@@ -81,7 +97,7 @@ export default function RecitationsScreen() {
       if (v) setSelectedReciter(RECITERS.find(r => r.identifier === v) || RECITERS[0]);
     });
     AsyncStorage.getItem('@recitation_favs').then(v => {
-      if (v) setFavorites(JSON.parse(v));
+      if (v) try { setFavorites(JSON.parse(v)); } catch {}
     });
   }, []);
 
@@ -101,6 +117,48 @@ export default function RecitationsScreen() {
     AsyncStorage.setItem(STORAGE_KEY_RECITER, r.identifier);
   };
 
+  // Load downloaded surahs for current reciter
+  const loadDownloaded = useCallback(async () => {
+    const items = await getDownloadedForReciter(selectedReciter.identifier);
+    setDownloadedSet(new Set(items.map(d => d.surahNumber)));
+  }, [selectedReciter.identifier]);
+
+  useEffect(() => { loadDownloaded(); }, [loadDownloaded]);
+
+  const handleDownload = useCallback(async (surahNum: number) => {
+    if (isDownloading(surahNum, selectedReciter.identifier)) return;
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDownloadingSet(prev => new Set(prev).add(surahNum));
+    try {
+      await downloadSurahAudio(surahNum, selectedReciter.identifier);
+      setDownloadedSet(prev => new Set(prev).add(surahNum));
+    } catch (e: any) {
+      Alert.alert(t('common.error'), e?.message || 'Failed to download surah');
+    } finally {
+      setDownloadingSet(prev => {
+        const next = new Set(prev);
+        next.delete(surahNum);
+        return next;
+      });
+    }
+  }, [selectedReciter.identifier]);
+
+  const handleDeleteDownload = useCallback(async (surahNum: number) => {
+    Alert.alert(t('common.delete'), `${t('common.delete')} ${getSurahName(surahNum)}?`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'), style: 'destructive', onPress: async () => {
+          await deleteDownload(surahNum, selectedReciter.identifier);
+          setDownloadedSet(prev => {
+            const next = new Set(prev);
+            next.delete(surahNum);
+            return next;
+          });
+        }
+      },
+    ]);
+  }, [selectedReciter.identifier]);
+
   const toggleFav = (num: number) => {
     setFavorites(prev => {
       const next = prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num];
@@ -114,15 +172,17 @@ export default function RecitationsScreen() {
     const key = `${mode}_${surahNum}`;
     setLoadingItem(key);
     try {
-      const url = getSurahAudioUrl(surahNum, selectedReciter.identifier);
+      // Check for offline file first
+      const localUri = await getLocalUri(surahNum, selectedReciter.identifier);
+      const url = localUri || getSurahAudioUrl(surahNum, selectedReciter.identifier);
       setAudioUrl(url);
       setIsPlaying(true);
       setCurrentSurahIdx(surahNum - 1);
       setNowPlaying({
         surahNum,
-        surahName: SURAH_NAMES_AR[surahNum - 1],
+        surahName: getSurahName(surahNum),
         reciter: selectedReciter.name,
-        reciterAr: selectedReciter.nameAr,
+        reciterAr: isArabic ? selectedReciter.nameAr : selectedReciter.name,
         mode, juzNum,
       });
       // انتظر قليلاً ثم شغّل
@@ -170,7 +230,7 @@ export default function RecitationsScreen() {
 
   const surahs = Array.from({ length: 114 }, (_, i) => ({
     num: i + 1,
-    name: SURAH_NAMES_AR[i],
+    name: getSurahName(i + 1),
     ayahs: AYAH_COUNTS_114[i] || 10,
   })).filter(s =>
     !searchQuery || s.name.includes(searchQuery) || s.num.toString().includes(searchQuery)
@@ -191,8 +251,8 @@ export default function RecitationsScreen() {
       gap: 10,
     },
     reciterInfo: { flex: 1 },
-    reciterLabel: { fontSize: 10, color: colors.muted, textAlign: 'right' },
-    reciterName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
+    reciterLabel: { fontSize: 10, color: colors.muted, textAlign: isRTL ? 'right' : 'left' },
+    reciterName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
     changeBtn: { backgroundColor: colors.primary + '18', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
     changeBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
     viewToggle: { flexDirection: 'row', margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
@@ -205,36 +265,37 @@ export default function RecitationsScreen() {
       backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 12, borderWidth: 1, borderColor: colors.border,
       paddingHorizontal: 12, height: 42,
     },
-    searchInput: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: 'right', height: 42 },
+    searchInput: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', height: 42 },
     surahItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border,
+      gap: 8,
     },
     surahNum: {
       width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center',
-      marginLeft: 12,
     },
     surahNumText: { fontSize: 13, fontWeight: '800' },
     surahInfo: { flex: 1 },
-    surahName: { fontSize: 16, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    surahMeta: { fontSize: 11, color: colors.muted, textAlign: 'right', marginTop: 1 },
+    surahName: { fontSize: 16, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    surahMeta: { fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 1 },
     playBtn: {
       width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center',
-      marginLeft: 8,
     },
-    favBtn: { padding: 6, marginLeft: 4 },
+    favBtn: { padding: 6 },
+    downloadBtn: { padding: 6, justifyContent: 'center' as const, alignItems: 'center' as const },
     juzItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border,
+      gap: 8,
     },
     juzNum: {
       width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary,
-      justifyContent: 'center', alignItems: 'center', marginLeft: 12,
+      justifyContent: 'center', alignItems: 'center',
     },
     juzNumText: { fontSize: 16, fontWeight: '900', color: '#fff' },
     juzInfo: { flex: 1 },
-    juzName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    juzMeta: { fontSize: 11, color: colors.muted, textAlign: 'right', marginTop: 2 },
+    juzName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    juzMeta: { fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
     nowPlayingBar: {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       backgroundColor: '#1B6B3A',
@@ -242,30 +303,46 @@ export default function RecitationsScreen() {
       flexDirection: 'row', alignItems: 'center', gap: 10,
     },
     nowPlayingInfo: { flex: 1 },
-    nowPlayingName: { fontSize: 14, fontWeight: '800', color: '#fff', textAlign: 'right' },
-    nowPlayingReciter: { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'right' },
+    nowPlayingName: { fontSize: 14, fontWeight: '800', color: '#fff', textAlign: isRTL ? 'right' : 'left' },
+    nowPlayingReciter: { fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: isRTL ? 'right' : 'left' },
     controlBtn: { padding: 8 },
-    sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: 'right' },
+    sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left' },
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10 },
-    modalTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: 'right', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
+    modalTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
     reciterItem: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13,
       borderBottomWidth: 0.5, borderBottomColor: colors.border,
     },
     reciterItemInfo: { flex: 1 },
-    reciterItemAr: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    reciterItemEn: { fontSize: 12, color: colors.muted, textAlign: 'right' },
+    reciterItemAr: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    reciterItemEn: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left' },
   });
 
   const renderSurahItem = ({ item }: { item: typeof surahs[0] }) => {
     const isCurrentlyPlaying = nowPlaying?.surahNum === item.num && isPlaying;
     const isLoading = loadingItem === `surah_${item.num}`;
+    const isItemDownloaded = downloadedSet.has(item.num);
+    const isItemDownloading = downloadingSet.has(item.num);
     return (
-      <View style={[s.surahItem, isCurrentlyPlaying && { backgroundColor: colors.primary + '08' }]}>
+      <View style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isCurrentlyPlaying && { backgroundColor: colors.primary + '08' }]}>
         <TouchableOpacity style={s.favBtn} onPress={() => toggleFav(item.num)}>
           <IconSymbol name={favorites.includes(item.num) ? 'bookmark.fill' : 'bookmark'} size={16} color={favorites.includes(item.num) ? '#DC2626' : colors.muted} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.downloadBtn}
+          onPress={() => isItemDownloaded ? handleDeleteDownload(item.num) : handleDownload(item.num)}
+          disabled={isItemDownloading}
+        >
+          {isItemDownloading
+            ? <ActivityIndicator size={14} color={colors.primary} />
+            : <MaterialCommunityIcons
+                name={isItemDownloaded ? 'check-circle' : 'download-circle-outline'}
+                size={22}
+                color={isItemDownloaded ? '#22C55E' : colors.muted}
+              />
+          }
         </TouchableOpacity>
         <TouchableOpacity
           style={[s.playBtn, { backgroundColor: isCurrentlyPlaying ? colors.primary : colors.primary + '15' }]}
@@ -278,7 +355,9 @@ export default function RecitationsScreen() {
         </TouchableOpacity>
         <View style={s.surahInfo}>
           <Text style={[s.surahName, isCurrentlyPlaying && { color: colors.primary }]}>{item.name}</Text>
-          <Text style={s.surahMeta}>سورة {item.num} • {item.ayahs} آية</Text>
+          <Text style={s.surahMeta}>
+            {t('quran.surah')} {item.num} • {item.ayahs} {t('quran.ayah')}{isItemDownloaded ? ` • ${t('recitations.downloaded')}` : ''}
+          </Text>
         </View>
         <View style={[s.surahNum, { backgroundColor: isCurrentlyPlaying ? colors.primary : colors.primary + '15' }]}>
           <Text style={[s.surahNumText, { color: isCurrentlyPlaying ? '#fff' : colors.primary }]}>{item.num}</Text>
@@ -289,47 +368,47 @@ export default function RecitationsScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']}>
-      <View style={s.header}>
+      <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.iconBtn} onPress={() => setShowReciterModal(true)}>
           <IconSymbol name="music.microphone" size={18} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={s.title}>🎙️ التلاوات الكاملة</Text>
+        <Text style={s.title}>{t('recitations.title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      <View style={s.reciterBar}>
+      <View style={[s.reciterBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.changeBtn} onPress={() => setShowReciterModal(true)}>
-          <Text style={s.changeBtnText}>تغيير</Text>
+          <Text style={s.changeBtnText}>{t('common.change')}</Text>
         </TouchableOpacity>
         <View style={s.reciterInfo}>
-          <Text style={s.reciterLabel}>القارئ المختار</Text>
-          <Text style={s.reciterName}>{selectedReciter.nameAr}</Text>
+          <Text style={s.reciterLabel}>{t('quran.selectedReciter')}</Text>
+          <Text style={s.reciterName}>{isArabic ? selectedReciter.nameAr : selectedReciter.name}</Text>
         </View>
         <Animated.View style={[{
           width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary,
           justifyContent: 'center', alignItems: 'center',
           transform: [{ scale: isPlaying ? pulseAnim : 1 }],
         }]}>
-          <Text style={{ fontSize: 18 }}>🎙️</Text>
+          <MaterialCommunityIcons name="microphone" size={18} color="#fff" />
         </Animated.View>
       </View>
 
-      <View style={s.viewToggle}>
+      <View style={[s.viewToggle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={[s.toggleBtn, view === 'surahs' && s.toggleBtnActive]} onPress={() => setView('surahs')}>
-          <Text style={[s.toggleBtnText, view === 'surahs' && s.toggleBtnTextActive]}>📖 السور (114)</Text>
+          <Text style={[s.toggleBtnText, view === 'surahs' && s.toggleBtnTextActive]}>{t('recitations.surahsTab')} (114)</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[s.toggleBtn, view === 'juz' && s.toggleBtnActive]} onPress={() => setView('juz')}>
-          <Text style={[s.toggleBtnText, view === 'juz' && s.toggleBtnTextActive]}>📚 الأجزاء (30)</Text>
+          <Text style={[s.toggleBtnText, view === 'juz' && s.toggleBtnTextActive]}>{t('recitations.juzTab')} (30)</Text>
         </TouchableOpacity>
       </View>
 
       {view === 'surahs' ? (
         <>
-          <View style={s.searchWrap}>
+          <View style={[s.searchWrap, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <IconSymbol name="magnifyingglass" size={16} color={colors.muted} />
             <TextInput
               style={s.searchInput}
-              placeholder="ابحث عن سورة..."
+              placeholder={t('recitations.searchSurah')}
               placeholderTextColor={colors.muted}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -344,7 +423,7 @@ export default function RecitationsScreen() {
             contentContainerStyle={{ paddingBottom: nowPlaying ? 80 : 20 }}
             ListHeaderComponent={
               favSurahs.length > 0 && !searchQuery ? (
-                <Text style={s.sectionTitle}>⭐ المفضلة</Text>
+                <Text style={s.sectionTitle}>{t('recitations.favoritesLabel')}</Text>
               ) : null
             }
           />
@@ -358,7 +437,7 @@ export default function RecitationsScreen() {
           renderItem={({ item }) => {
             const isCurrentlyPlaying = nowPlaying?.juzNum === item.juz && nowPlaying?.mode === 'juz' && isPlaying;
             return (
-              <View style={[s.juzItem, isCurrentlyPlaying && { backgroundColor: colors.primary + '08' }]}>
+              <View style={[s.juzItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isCurrentlyPlaying && { backgroundColor: colors.primary + '08' }]}>
                 <TouchableOpacity
                   style={[s.playBtn, { backgroundColor: isCurrentlyPlaying ? colors.primary : colors.primary + '15', width: 44, height: 44, borderRadius: 22 }]}
                   onPress={() => isCurrentlyPlaying ? togglePlay() : playJuz(item.juz)}
@@ -366,8 +445,8 @@ export default function RecitationsScreen() {
                   <IconSymbol name={isCurrentlyPlaying ? 'pause.fill' : 'play.fill'} size={18} color={isCurrentlyPlaying ? '#fff' : colors.primary} />
                 </TouchableOpacity>
                 <View style={s.juzInfo}>
-                  <Text style={[s.juzName, isCurrentlyPlaying && { color: colors.primary }]}>الجزء {item.juz}</Text>
-                  <Text style={s.juzMeta}>يبدأ من {SURAH_NAMES_AR[item.surah - 1]} آية {item.ayah}</Text>
+                  <Text style={[s.juzName, isCurrentlyPlaying && { color: colors.primary }]}>{t('quran.juz')} {item.juz}</Text>
+                  <Text style={s.juzMeta}>{getSurahName(item.surah)} {t('quran.ayah')} {item.ayah}</Text>
                 </View>
                 <View style={s.juzNum}>
                   <Text style={s.juzNumText}>{item.juz}</Text>
@@ -379,7 +458,7 @@ export default function RecitationsScreen() {
       )}
 
       {nowPlaying && (
-        <View style={s.nowPlayingBar}>
+        <View style={[s.nowPlayingBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={s.controlBtn} onPress={stopPlayback}>
             <IconSymbol name="xmark" size={18} color="#fff" />
           </TouchableOpacity>
@@ -396,7 +475,7 @@ export default function RecitationsScreen() {
             <IconSymbol name="backward.fill" size={18} color="#fff" />
           </TouchableOpacity>
           <View style={s.nowPlayingInfo}>
-            <Text style={s.nowPlayingName}>🎙️ {nowPlaying.surahName}</Text>
+            <Text style={s.nowPlayingName}>{nowPlaying.surahName}</Text>
             <Text style={s.nowPlayingReciter}>{nowPlaying.reciterAr}</Text>
           </View>
         </View>
@@ -406,12 +485,12 @@ export default function RecitationsScreen() {
         <TouchableOpacity style={s.modalWrap} activeOpacity={1} onPress={() => setShowReciterModal(false)}>
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
-            <Text style={s.modalTitle}>اختر القارئ</Text>
-            <ScrollView>
+            <Text style={s.modalTitle}>{t('quran.chooseReciter')}</Text>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
               {RECITERS.map(r => (
                 <TouchableOpacity
                   key={r.identifier}
-                  style={[s.reciterItem, selectedReciter.identifier === r.identifier && { backgroundColor: colors.primary + '10' }]}
+                  style={[s.reciterItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, selectedReciter.identifier === r.identifier && { backgroundColor: colors.primary + '10' }]}
                   onPress={() => { saveReciter(r); setShowReciterModal(false); }}
                   activeOpacity={0.7}
                 >
@@ -419,8 +498,8 @@ export default function RecitationsScreen() {
                     <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
                   )}
                   <View style={s.reciterItemInfo}>
-                    <Text style={[s.reciterItemAr, selectedReciter.identifier === r.identifier && { color: colors.primary }]}>{r.nameAr}</Text>
-                    <Text style={s.reciterItemEn}>{r.name}</Text>
+                    <Text style={[s.reciterItemAr, selectedReciter.identifier === r.identifier && { color: colors.primary }]}>{isArabic ? r.nameAr : r.name}</Text>
+                    <Text style={s.reciterItemEn}>{isArabic ? r.name : r.nameAr}</Text>
                   </View>
                 </TouchableOpacity>
               ))}

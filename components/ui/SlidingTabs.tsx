@@ -20,8 +20,10 @@ import Animated, {
   runOnJS,
   type SharedValue,
 } from 'react-native-reanimated';
+import { fontSemiBold } from '@/lib/fonts';
 import * as Haptics from 'expo-haptics';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 // ========================================
 // Types
 // ========================================
@@ -142,10 +144,11 @@ export function SlidingTabs({
   pillBorderRadius = 10,
   tabPaddingVertical = 10,
   style,
-  fontFamily = 'Cairo-SemiBold',
+  fontFamily = fontSemiBold(),
   fontSize = 14,
   pillBorderColor,
 }: SlidingTabsProps) {
+  const isRTL = useIsRTL();
   const indicatorX = useSharedValue(0);
   const indicatorW = useSharedValue(0);
   const [layoutsReady, setLayoutsReady] = React.useState(false);
@@ -207,7 +210,7 @@ export function SlidingTabs({
     <View
       style={[
         styles.container,
-        { backgroundColor: containerBg, borderRadius },
+        { backgroundColor: containerBg, borderRadius, flexDirection: isRTL ? 'row-reverse' : 'row' },
         style,
       ]}
     >

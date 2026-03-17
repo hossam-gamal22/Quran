@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
+import { t } from '@/lib/i18n';
 
 export interface AzkarAudioState {
   isPlaying: boolean;
@@ -34,7 +35,7 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
   // تحميل الملف الصوتي
   const loadAudio = useCallback(async () => {
     if (!audioUrl) {
-      setState(prev => ({ ...prev, error: 'لا يوجد ملف صوتي' }));
+      setState(prev => ({ ...prev, error: t('common.noAudioFile') }));
       return;
     }
 

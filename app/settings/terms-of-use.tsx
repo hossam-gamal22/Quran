@@ -7,133 +7,135 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   StatusBar,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getLanguage } from '@/lib/i18n';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { TranslatedText } from '@/components/ui/TranslatedText';
+import { UniversalHeader } from '@/components/ui';
 
 export default function TermsOfUseScreen() {
-  const router = useRouter();
-  const { isDarkMode, t } = useSettings();
-  const isRTL = I18nManager.isRTL;
+  const { isDarkMode, t, settings } = useSettings();
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const lang = getLanguage();
+  const isArabic = lang === 'ar';
+
+  const Section = ({ titleAr, titleEn, bodyAr, bodyEn }: { titleAr: string; titleEn: string; bodyAr: string; bodyEn: string }) => (
+    <>
+      {isArabic ? (
+        <Text style={[styles.sectionTitle, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}>{titleAr}</Text>
+      ) : lang === 'en' ? (
+        <Text style={[styles.sectionTitle, { color: colors.text, textAlign: 'left' }]}>{titleEn}</Text>
+      ) : (
+        <TranslatedText from="en" style={[styles.sectionTitle, { color: colors.text, textAlign: 'left' }]}>{titleEn}</TranslatedText>
+      )}
+      {isArabic ? (
+        <Text style={[styles.paragraph, { color: colors.textLight, textAlign: 'right', writingDirection: 'rtl' }]}>{bodyAr}</Text>
+      ) : lang === 'en' ? (
+        <Text style={[styles.paragraph, { color: colors.textLight, textAlign: 'left' }]}>{bodyEn}</Text>
+      ) : (
+        <TranslatedText from="en" style={[styles.paragraph, { color: colors.textLight, textAlign: 'left' }]}>{bodyEn}</TranslatedText>
+      )}
+    </>
+  );
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
-      <View style={[styles.header, isDarkMode && styles.headerDark]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
-        >
-          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.termsOfService')}</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <UniversalHeader title={t('settings.termsOfService')} />
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.lastUpdated, isDarkMode && styles.textMuted]}>
-          آخر تحديث: مارس 2026
+        <Text style={[styles.lastUpdated, { color: colors.textLight }]}>
+          {isArabic ? 'آخر تحديث: مارس 2026' : 'Last updated: March 2026'}
         </Text>
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>القبول بالشروط</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          باستخدامك لتطبيق "روح المسلم"، فإنك توافق على هذه الشروط. إذا كنت لا توافق عليها، يرجى عدم استخدام التطبيق.
-        </Text>
+        <Section
+          titleAr="القبول بالشروط"
+          titleEn="Acceptance of Terms"
+          bodyAr={'باستخدامك لتطبيق "روح المسلم"، فإنك توافق على هذه الشروط. إذا كنت لا توافق عليها، يرجى عدم استخدام التطبيق.'}
+          bodyEn={'By using the "Ruh Al-Muslim" app, you agree to these terms. If you do not agree, please do not use the app.'}
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>الغرض من التطبيق</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          تطبيق "روح المسلم" هو تطبيق إسلامي يهدف إلى مساعدة المسلمين في عباداتهم اليومية، ويشمل:{'\n'}
-          • قراءة القرآن الكريم والاستماع إليه{'\n'}
-          • متابعة أوقات الصلاة{'\n'}
-          • الأذكار والأدعية{'\n'}
-          • التسبيح والاستغفار{'\n'}
-          • ختمة القرآن{'\n'}
-          • الرقية الشرعية{'\n'}
-          • أسماء الله الحسنى
-        </Text>
+        <Section
+          titleAr="الغرض من التطبيق"
+          titleEn="Purpose of the App"
+          bodyAr={'تطبيق "روح المسلم" هو تطبيق إسلامي يهدف إلى مساعدة المسلمين في عباداتهم اليومية، ويشمل:\n• قراءة القرآن الكريم والاستماع إليه\n• متابعة أوقات الصلاة\n• الأذكار والأدعية\n• التسبيح والاستغفار\n• ختمة القرآن\n• الرقية الشرعية\n• أسماء الله الحسنى'}
+          bodyEn={'Ruh Al-Muslim is an Islamic app designed to help Muslims with their daily worship, including:\n• Reading and listening to the Holy Quran\n• Tracking prayer times\n• Adhkar and supplications\n• Tasbih and Istighfar\n• Quran Khatma\n• Ruqyah (spiritual healing)\n• Names of Allah'}
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>المحتوى الإسلامي</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          نحرص على أن يكون المحتوى المقدّم دقيقاً وموثوقاً من مصادر إسلامية معتمدة. النصوص القرآنية مأخوذة من مصحف المدينة المنوّرة. الأذكار والأدعية من مصادر حديثية صحيحة.
-        </Text>
+        <Section
+          titleAr="المحتوى الإسلامي"
+          titleEn="Islamic Content"
+          bodyAr="نحرص على أن يكون المحتوى المقدّم دقيقاً وموثوقاً من مصادر إسلامية معتمدة. النصوص القرآنية مأخوذة من مصحف المدينة المنوّرة. الأذكار والأدعية من مصادر حديثية صحيحة."
+          bodyEn="We ensure that all content is accurate and sourced from authentic Islamic references. Quranic texts are taken from the Madinah Mushaf. Adhkar and supplications are from authentic Hadith sources."
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>مسؤوليات المستخدم</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          • استخدام التطبيق لأغراض مشروعة فقط{'\n'}
-          • عدم محاولة التلاعب بمحتوى التطبيق أو أنظمته{'\n'}
-          • الإبلاغ عن أي خطأ في المحتوى الإسلامي عبر البريد الإلكتروني
-        </Text>
+        <Section
+          titleAr="مسؤوليات المستخدم"
+          titleEn="User Responsibilities"
+          bodyAr={'• استخدام التطبيق لأغراض مشروعة فقط\n• عدم محاولة التلاعب بمحتوى التطبيق أو أنظمته\n• الإبلاغ عن أي خطأ في المحتوى الإسلامي عبر البريد الإلكتروني'}
+          bodyEn={'• Use the app for lawful purposes only\n• Do not attempt to tamper with the app\'s content or systems\n• Report any errors in Islamic content via email'}
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>الملكية الفكرية</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          التطبيق وتصميمه ومحتواه (باستثناء النصوص القرآنية والأحاديث) محميّة بحقوق الملكية الفكرية. لا يجوز نسخ أو إعادة توزيع التطبيق أو أجزاء منه دون إذن مسبق.
-        </Text>
+        <Section
+          titleAr="الملكية الفكرية"
+          titleEn="Intellectual Property"
+          bodyAr="التطبيق وتصميمه ومحتواه (باستثناء النصوص القرآنية والأحاديث) محميّة بحقوق الملكية الفكرية. لا يجوز نسخ أو إعادة توزيع التطبيق أو أجزاء منه دون إذن مسبق."
+          bodyEn="The app, its design, and content (excluding Quranic texts and Hadiths) are protected by intellectual property rights. Copying or redistributing the app or parts of it without prior permission is prohibited."
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>إخلاء المسؤولية</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          • أوقات الصلاة تقريبية وقد تختلف حسب طريقة الحساب المستخدمة{'\n'}
-          • اتجاه القبلة يعتمد على بوصلة جهازك وقد يتأثر بالمجالات المغناطيسية{'\n'}
-          • التطبيق لا يغني عن استشارة أهل العلم في المسائل الشرعية
-        </Text>
+        <Section
+          titleAr="إخلاء المسؤولية"
+          titleEn="Disclaimer"
+          bodyAr={'• أوقات الصلاة تقريبية وقد تختلف حسب طريقة الحساب المستخدمة\n• اتجاه القبلة يعتمد على بوصلة جهازك وقد يتأثر بالمجالات المغناطيسية\n• التطبيق لا يغني عن استشارة أهل العلم في المسائل الشرعية'}
+          bodyEn={'• Prayer times are approximate and may vary based on the calculation method used\n• Qibla direction relies on your device\'s compass and may be affected by magnetic fields\n• The app does not replace consulting scholars on religious matters'}
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>التحديثات</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          نحتفظ بالحق في تحديث هذه الشروط في أي وقت. سيتم إخطارك بأي تغييرات جوهرية من خلال التطبيق.
-        </Text>
+        <Section
+          titleAr="التحديثات"
+          titleEn="Updates"
+          bodyAr="نحتفظ بالحق في تحديث هذه الشروط في أي وقت. سيتم إخطارك بأي تغييرات جوهرية من خلال التطبيق."
+          bodyEn="We reserve the right to update these terms at any time. You will be notified of any significant changes through the app."
+        />
 
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>التواصل</Text>
-        <Text style={[styles.paragraph, isDarkMode && styles.textMuted]}>
-          لأي استفسار أو اقتراح، يمكنك مراسلتنا عبر:{'\n'}
-          hossamgamal290@gmail.com
-        </Text>
+        <Section
+          titleAr="التواصل"
+          titleEn="Contact Us"
+          bodyAr={'لأي استفسار أو اقتراح، يمكنك مراسلتنا عبر:\nhossamgamal290@gmail.com'}
+          bodyEn={'For any inquiries or suggestions, you can reach us at:\nhossamgamal290@gmail.com'}
+        />
 
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   containerDark: { backgroundColor: '#11151c' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerDark: { backgroundColor: '#1a1a2e', borderBottomColor: '#2a2a3e' },
-  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontFamily: 'Cairo-Bold', color: '#333' },
-  headerPlaceholder: { width: 40 },
-  textLight: { color: '#fff' },
-  textMuted: { color: '#aaa' },
+
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
-  lastUpdated: { fontSize: 13, fontFamily: 'Cairo-Regular', color: '#999', marginBottom: 20, textAlign: 'center' },
-  sectionTitle: { fontSize: 18, fontFamily: 'Cairo-Bold', color: '#333', marginTop: 20, marginBottom: 10 },
-  paragraph: { fontSize: 15, fontFamily: 'Cairo-Regular', color: '#555', lineHeight: 26, marginBottom: 10 },
-  bold: { fontFamily: 'Cairo-Bold' },
+  lastUpdated: { fontSize: 13, fontFamily: fontRegular(), color: '#999', marginBottom: 20, textAlign: 'center' },
+  sectionTitle: { fontSize: 18, fontFamily: fontBold(), color: '#333', marginTop: 20, marginBottom: 10 },
+  paragraph: { fontSize: 15, fontFamily: fontRegular(), color: '#555', lineHeight: 26, marginBottom: 10 },
+  bold: { fontFamily: fontBold() },
   bottomSpace: { height: 60 },
 });

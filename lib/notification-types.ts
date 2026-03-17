@@ -18,6 +18,6 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     maghrib: true,
     isha: true,
   },
-  advanceMinutes: 0,
+  advanceMinutes: 5,
   adhanSound: false,
 };

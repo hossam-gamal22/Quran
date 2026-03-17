@@ -13,6 +13,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,34 +29,33 @@ import {
   requestWidgetUpdate,
 } from '@/lib/widget-data';
 import GlassCard from '@/components/ui/GlassCard';
+import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { t } from '@/lib/i18n';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { UniversalHeader } from '@/components/ui';
 // ========================================
 // الثوابت
 // ========================================
 
 const ACCENT_COLORS = [
-  { name: 'أخضر', value: '#2f7659' },
-  { name: 'أزرق', value: '#3a7ca5' },
-  { name: 'بنفسجي', value: '#5d4e8c' },
-  { name: 'برتقالي', value: '#c17f59' },
-  { name: 'أحمر', value: '#c0392b' },
-  { name: 'ذهبي', value: '#d4a017' },
-];
-
-const REFRESH_INTERVALS = [
-  { label: 'كل 30 دقيقة', value: 30 },
-  { label: 'كل ساعة', value: 60 },
-  { label: 'كل ساعتين', value: 120 },
-  { label: 'كل 4 ساعات', value: 240 },
+  { nameKey: 'widget.green', value: '#2f7659' },
+  { nameKey: 'widget.blue', value: '#3a7ca5' },
+  { nameKey: 'widget.purple', value: '#5d4e8c' },
+  { nameKey: 'widget.orange', value: '#c17f59' },
+  { nameKey: 'widget.red', value: '#c0392b' },
+  { nameKey: 'widget.gold', value: '#d4a017' },
 ];
 
 const AZKAR_CATEGORIES = [
-  { key: 'morning', name: 'أذكار الصباح', icon: 'weather-sunny' },
-  { key: 'evening', name: 'أذكار المساء', icon: 'weather-night' },
-  { key: 'sleep', name: 'أذكار النوم', icon: 'sleep' },
-  { key: 'wakeup', name: 'أذكار الاستيقاظ', icon: 'alarm' },
-  { key: 'afterPrayer', name: 'أذكار بعد الصلاة', icon: 'mosque' },
-  { key: 'misc', name: 'أذكار متنوعة', icon: 'bookmark-multiple' },
+  { key: 'morning', nameKey: 'widget.morningAzkar', icon: 'weather-sunny' },
+  { key: 'evening', nameKey: 'widget.eveningAzkar', icon: 'weather-night' },
+  { key: 'sleep', nameKey: 'widget.sleepAzkar', icon: 'sleep' },
+  { key: 'wakeup', nameKey: 'widget.wakeupAzkar', icon: 'alarm' },
+  { key: 'afterPrayer', nameKey: 'widget.afterPrayerAzkar', icon: 'mosque' },
+  { key: 'misc', nameKey: 'widget.miscAzkar', icon: 'bookmark-multiple' },
 ];
 
 // ========================================
@@ -68,6 +68,7 @@ interface SettingSectionProps {
   children: React.ReactNode;
   index: number;
   isDarkMode?: boolean;
+  isRTL?: boolean;
 }
 
 const SettingSection: React.FC<SettingSectionProps> = ({
@@ -76,17 +77,18 @@ const SettingSection: React.FC<SettingSectionProps> = ({
   children,
   index,
   isDarkMode = false,
+  isRTL = false,
 }) => {
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
       <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-        <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons
             name={icon}
             size={22}
             color={isDarkMode ? '#fff' : '#333'}
           />
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
+          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
             {title}
           </Text>
         </View>
@@ -102,6 +104,7 @@ interface SettingRowProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
   isDarkMode?: boolean;
+  isRTL?: boolean;
 }
 
 const SettingRow: React.FC<SettingRowProps> = ({
@@ -110,15 +113,16 @@ const SettingRow: React.FC<SettingRowProps> = ({
   value,
   onValueChange,
   isDarkMode = false,
+  isRTL = false,
 }) => {
   return (
-    <View style={styles.settingRow}>
-      <View style={styles.settingInfo}>
-        <Text style={[styles.settingLabel, isDarkMode && styles.textLight]}>
+    <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.settingInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <Text style={[styles.settingLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
           {label}
         </Text>
         {description && (
-          <Text style={[styles.settingDescription, isDarkMode && styles.textMuted]}>
+          <Text style={[styles.settingDescription, { color: isDarkMode ? '#999' : '#666', textAlign: isRTL ? 'right' : 'left' }]}>
             {description}
           </Text>
         )}
@@ -147,8 +151,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
   onSelect,
   isDarkMode = false,
 }) => {
+  const isRTL = useIsRTL();
   return (
-    <View style={styles.colorPicker}>
+    <View style={[styles.colorPicker, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
       {ACCENT_COLORS.map((color, index) => (
         <TouchableOpacity
           key={color.value}
@@ -171,57 +176,18 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
   );
 };
 
-interface IntervalSelectorProps {
-  selectedInterval: number;
-  onSelect: (interval: number) => void;
-  isDarkMode?: boolean;
-}
-
-const IntervalSelector: React.FC<IntervalSelectorProps> = ({
-  selectedInterval,
-  onSelect,
-  isDarkMode = false,
-}) => {
-  return (
-    <View style={styles.intervalSelector}>
-      {REFRESH_INTERVALS.map((interval) => (
-        <TouchableOpacity
-          key={interval.value}
-          style={[
-            styles.intervalOption,
-            isDarkMode && styles.intervalOptionDark,
-            selectedInterval === interval.value && styles.intervalOptionSelected,
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onSelect(interval.value);
-          }}
-        >
-          <Text
-            style={[
-              styles.intervalText,
-              isDarkMode && styles.textMuted,
-              selectedInterval === interval.value && styles.intervalTextSelected,
-            ]}
-          >
-            {interval.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-};
-
 interface CategorySelectorProps {
   selectedCategories: string[];
   onToggle: (category: string) => void;
   isDarkMode?: boolean;
+  isRTL?: boolean;
 }
 
 const CategorySelector: React.FC<CategorySelectorProps> = ({
   selectedCategories,
   onToggle,
   isDarkMode = false,
+  isRTL = false,
 }) => {
   return (
     <View style={styles.categorySelector}>
@@ -235,6 +201,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
             <TouchableOpacity
               style={[
                 styles.categoryOption,
+                { flexDirection: isRTL ? 'row-reverse' : 'row' },
                 isDarkMode && styles.categoryOptionDark,
                 isSelected && styles.categoryOptionSelected,
               ]}
@@ -255,7 +222,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
                   isSelected && styles.categoryTextSelected,
                 ]}
               >
-                {category.name}
+                {t(category.nameKey)}
               </Text>
               {isSelected && (
                 <MaterialCommunityIcons name="check" size={16} color="#fff" />
@@ -278,7 +245,9 @@ export default function WidgetSettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const isDarkMode = false;
+  const { settings: appSettings, isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
+  const colors = useColors();
 
   // تحميل الإعدادات
   useEffect(() => {
@@ -362,7 +331,7 @@ export default function WidgetSettingsScreen() {
       
       // يجب اختيار فئة واحدة على الأقل
       if (categories.length === 0) {
-        Alert.alert('تنبيه', 'يجب اختيار فئة واحدة على الأقل');
+        Alert.alert(t('common.warning'), t('widgets.selectAtLeastOneCategory'));
         return prev;
       }
       
@@ -380,18 +349,18 @@ export default function WidgetSettingsScreen() {
     await saveWidgetSettings(settings);
     await requestWidgetUpdate();
     setHasChanges(false);
-    Alert.alert('تم الحفظ', 'تم حفظ إعدادات الويدجت بنجاح');
+    Alert.alert(t('common.savedSuccess'), t('widgets.settingsSaved'));
   };
 
   // إعادة تعيين الإعدادات
   const handleReset = () => {
     Alert.alert(
-      'إعادة التعيين',
-      'هل تريد إعادة تعيين جميع إعدادات الويدجت إلى الافتراضية؟',
+      t('widgets.reset'),
+      t('widgets.resetConfirm'),
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('widgets.cancel'), style: 'cancel' },
         {
-          text: 'إعادة تعيين',
+          text: t('widgets.reset'),
           style: 'destructive',
           onPress: () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -407,12 +376,13 @@ export default function WidgetSettingsScreen() {
   const handleRefreshWidget = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await requestWidgetUpdate();
-    Alert.alert('تم التحديث', 'تم تحديث الويدجت بنجاح');
+    Alert.alert(t('common.success'), t('widgets.widgetUpdated'));
   };
 
   return (
+    <BackgroundWrapper backgroundKey={appSettings.display.appBackground} backgroundUrl={appSettings.display.appBackgroundUrl} opacity={appSettings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]}
       edges={['top']}
     >
       <StatusBar
@@ -421,25 +391,12 @@ export default function WidgetSettingsScreen() {
       />
 
       {/* الهيدر */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialCommunityIcons
-            name="arrow-right"
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-          إعدادات الويدجت
-        </Text>
-        <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
-          <MaterialCommunityIcons
-            name="refresh"
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-      </Animated.View>
+      <UniversalHeader
+        title={t('widgets.widgetSettingsTitle')}
+        titleColor={colors.text}
+        rightActions={[{ icon: 'refresh', onPress: handleReset, color: colors.text }]}
+        style={{ backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border }}
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -456,7 +413,7 @@ export default function WidgetSettingsScreen() {
           >
             <View style={styles.previewContent}>
               <MaterialCommunityIcons name="widgets" size={32} color="#fff" />
-              <Text style={styles.previewTitle}>معاينة الويدجت</Text>
+              <Text style={styles.previewTitle}>{t('widgets.widgetPreview')}</Text>
               <Text style={styles.previewSubtitle}>
                 {Platform.OS === 'ios' ? 'iOS' : 'Android'} Widget
               </Text>
@@ -466,63 +423,71 @@ export default function WidgetSettingsScreen() {
 
         {/* تفعيل الويدجت */}
         <SettingSection
-          title="الإعدادات العامة"
+          title={t('widgets.generalSettings')}
           icon="cog"
           index={0}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل الويدجت"
-            description="تفعيل أو تعطيل جميع الويدجت"
+            label={t('widgets.enableWidgets')}
+            description={t('widgets.enableWidgetsDesc')}
             value={settings.enabled}
             onValueChange={(value) => updateSettings({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
         </SettingSection>
 
         {/* ويدجت الصلاة */}
         <SettingSection
-          title="ويدجت مواقيت الصلاة"
+          title={t('widgets.prayerTimesWidget')}
           icon="mosque"
           index={1}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل"
+            label={t('widgets.enable')}
             value={settings.prayerWidget.enabled}
             onValueChange={(value) => updatePrayerWidget({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض جميع الصلوات"
-            description="عرض قائمة بجميع مواقيت الصلاة"
+            label={t('widgets.showAllPrayers')}
+            description={t('widgets.showAllPrayersDesc')}
             value={settings.prayerWidget.showAllPrayers}
             onValueChange={(value) => updatePrayerWidget({ showAllPrayers: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض التاريخ الهجري"
+            label={t('widgets.showHijriDate')}
             value={settings.prayerWidget.showHijriDate}
             onValueChange={(value) => updatePrayerWidget({ showHijriDate: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض الموقع"
+            label={t('widgets.showLocation')}
             value={settings.prayerWidget.showLocation}
             onValueChange={(value) => updatePrayerWidget({ showLocation: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="تسجيل إكمال الصلاة"
-            description="عرض علامة إكمال الصلاة في الويدجت"
+            label={t('widgets.trackPrayerCompletion')}
+            description={t('widgets.trackPrayerCompletionDesc')}
             value={settings.prayerWidget.showCompletion}
             onValueChange={(value) => updatePrayerWidget({ showCompletion: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
 
-          <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.textLight]}>
-              اللون الأساسي
+          <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('widgets.accentColor')}
             </Text>
           </View>
           <ColorPicker
@@ -534,131 +499,121 @@ export default function WidgetSettingsScreen() {
 
         {/* ويدجت الأذكار */}
         <SettingSection
-          title="ويدجت الأذكار"
+          title={t('widgets.azkarWidget')}
           icon="hand-heart"
           index={2}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل"
+            label={t('widgets.enable')}
             value={settings.azkarWidget.enabled}
             onValueChange={(value) => updateAzkarWidget({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض الترجمة"
-            description="عرض ترجمة الذكر بالإنجليزية"
+            label={t('widgets.showTranslation')}
+            description={t('widgets.showTranslationDesc')}
             value={settings.azkarWidget.showTranslation}
             onValueChange={(value) => updateAzkarWidget({ showTranslation: value })}
             isDarkMode={isDarkMode}
-          />
-          <SettingRow
-            label="تحديث تلقائي"
-            description="تحديث الذكر تلقائياً"
-            value={settings.azkarWidget.autoRefresh}
-            onValueChange={(value) => updateAzkarWidget({ autoRefresh: value })}
-            isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
 
-          {settings.azkarWidget.autoRefresh && (
-            <>
-              <View style={styles.settingRow}>
-                <Text style={[styles.settingLabel, isDarkMode && styles.textLight]}>
-                  فترة التحديث
-                </Text>
-              </View>
-              <IntervalSelector
-                selectedInterval={settings.azkarWidget.refreshInterval}
-                onSelect={(interval) =>
-                  updateAzkarWidget({ refreshInterval: interval })
-                }
-                isDarkMode={isDarkMode}
-              />
-            </>
-          )}
-
-          <View style={[styles.settingRow, { marginTop: 15 }]}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.textLight]}>
-              فئات الأذكار
+          <View style={[styles.settingRow, { marginTop: 15, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('widgets.azkarCategories')}
             </Text>
           </View>
           <CategorySelector
             selectedCategories={settings.azkarWidget.categories}
             onToggle={toggleAzkarCategory}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
         </SettingSection>
 
         {/* ويدجت التاريخ الهجري */}
         <SettingSection
-          title="ويدجت التاريخ الهجري"
+          title={t('widgets.hijriWidget')}
           icon="calendar-month"
           index={3}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل"
+            label={t('widgets.enable')}
             value={settings.hijriWidget.enabled}
             onValueChange={(value) => updateHijriWidget({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض التاريخ الميلادي"
-            description="عرض التاريخ الميلادي مع الهجري"
+            label={t('widgets.showGregorianDate')}
+            description={t('widgets.showGregorianDateDesc')}
             value={settings.hijriWidget.showGregorian}
             onValueChange={(value) => updateHijriWidget({ showGregorian: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
         </SettingSection>
 
         {/* ويدجت آية اليوم */}
         <SettingSection
-          title="ويدجت آية اليوم"
+          title={t('widgets.verseWidget')}
           icon="book-open-page-variant"
           index={4}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل"
+            label={t('widgets.enable')}
             value={settings.verseWidget.enabled}
             onValueChange={(value) => updateVerseWidget({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض الترجمة"
-            description="عرض ترجمة الآية"
+            label={t('widgets.showVerseTranslation')}
+            description={t('widgets.showVerseTranslationDesc')}
             value={settings.verseWidget.showTranslation}
             onValueChange={(value) => updateVerseWidget({ showTranslation: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
         </SettingSection>
 
         {/* ويدجت ذكر اليوم */}
         <SettingSection
-          title="ويدجت ذكر اليوم"
+          title={t('widgets.dhikrWidget')}
           icon="hand-heart"
           index={5}
           isDarkMode={isDarkMode}
+          isRTL={isRTL}
         >
           <SettingRow
-            label="تفعيل"
+            label={t('widgets.enable')}
             value={settings.dhikrWidget.enabled}
             onValueChange={(value) => updateDhikrWidget({ enabled: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض الترجمة"
-            description="عرض ترجمة الذكر"
+            label={t('widgets.showDhikrTranslation')}
+            description={t('widgets.showDhikrTranslationDesc')}
             value={settings.dhikrWidget.showTranslation}
             onValueChange={(value) => updateDhikrWidget({ showTranslation: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
           <SettingRow
-            label="عرض الفضل"
-            description="عرض فضل الذكر"
+            label={t('widgets.showVirtue')}
+            description={t('widgets.showVirtueDesc')}
             value={settings.dhikrWidget.showBenefit}
             onValueChange={(value) => updateDhikrWidget({ showBenefit: value })}
             isDarkMode={isDarkMode}
+            isRTL={isRTL}
           />
         </SettingSection>
 
@@ -668,32 +623,32 @@ export default function WidgetSettingsScreen() {
           style={styles.actionsContainer}
         >
           <TouchableOpacity
-            style={styles.refreshButton}
+            style={[styles.refreshButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleRefreshWidget}
           >
             <MaterialCommunityIcons name="refresh" size={20} color="#2f7659" />
-            <Text style={styles.refreshButtonText}>تحديث الويدجت الآن</Text>
+            <Text style={styles.refreshButtonText}>{t('widgets.updateWidgetNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* ملاحظة */}
         <Animated.View entering={FadeInDown.delay(450).duration(500)}>
           <GlassCard style={styles.noteCard}>
-            <View style={styles.noteHeader}>
+            <View style={[styles.noteHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons
                 name="information-outline"
                 size={20}
                 color="#3a7ca5"
               />
-              <Text style={[styles.noteTitle, isDarkMode && styles.textLight]}>
-                ملاحظة
+              <Text style={[styles.noteTitle, { color: colors.text }]}>
+                {t('widgets.note')}
               </Text>
             </View>
-            <Text style={[styles.noteText, isDarkMode && styles.textMuted]}>
-              لإضافة الويدجت إلى الشاشة الرئيسية:{'\n'}
+            <Text style={[styles.noteText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+              {t('widgets.addToHomeScreen')}:{'\n'}
               {Platform.OS === 'ios'
-                ? '• اضغط مطولاً على الشاشة الرئيسية\n• اضغط على زر (+)\n• ابحث عن "روح المسلم"'
-                : '• اضغط مطولاً على الشاشة الرئيسية\n• اختر "Widgets"\n• ابحث عن "روح المسلم"'}
+                ? `• ${t('widgets.addWidgetIosInstructions')}\n• ${t('common.appName')}`
+                : `• ${t('widgets.addWidgetIosInstructions')}\n• ${t('common.appName')}`}
             </Text>
           </GlassCard>
         </Animated.View>
@@ -705,22 +660,23 @@ export default function WidgetSettingsScreen() {
       {hasChanges && (
         <Animated.View
           entering={FadeInDown.duration(300)}
-          style={styles.saveButtonContainer}
+          style={[styles.saveButtonContainer, { backgroundColor: isDarkMode ? 'rgba(17,21,28,0.95)' : 'rgba(255,255,255,0.95)', borderTopColor: colors.border }]}
         >
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <LinearGradient
               colors={['#2f7659', '#1d4a3a']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={styles.saveButtonGradient}
+              style={[styles.saveButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             >
               <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
-              <Text style={styles.saveButtonText}>حفظ التغييرات</Text>
+              <Text style={styles.saveButtonText}>{t('widgets.saveChanges')}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
       )}
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -736,36 +692,7 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: '#11151c',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  resetButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   textLight: {
     color: '#fff',
   },
@@ -790,19 +717,18 @@ const styles = StyleSheet.create({
   },
   previewTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginTop: 10,
   },
   previewSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 5,
   },
   // الأقسام
   section: {
-    backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 15,
     borderRadius: 20,
@@ -823,12 +749,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
+    fontFamily: fontBold(),
   },
   // صف الإعداد
   settingRow: {
@@ -836,20 +760,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
+    gap: 15,
   },
   settingInfo: {
     flex: 1,
-    marginRight: 15,
   },
   settingLabel: {
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
-    color: '#333',
+    fontFamily: fontMedium(),
   },
   settingDescription: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
-    color: '#666',
+    fontFamily: fontRegular(),
     marginTop: 2,
   },
   // اختيار الألوان
@@ -876,35 +798,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   // اختيار الفترة
-  intervalSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
-  },
-  intervalOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  intervalOptionDark: {
-    backgroundColor: '#252540',
-  },
-  intervalOptionSelected: {
-    borderColor: '#2f7659',
-    backgroundColor: '#2f765915',
-  },
-  intervalText: {
-    fontSize: 13,
-    fontFamily: 'Cairo-Medium',
-    color: '#666',
-  },
-  intervalTextSelected: {
-    color: '#2f7659',
-  },
   // اختيار الفئات
   categorySelector: {
     gap: 10,
@@ -917,7 +810,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#f5f5f5',
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -931,8 +823,7 @@ const styles = StyleSheet.create({
   categoryText: {
     flex: 1,
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
-    color: '#666',
+    fontFamily: fontMedium(),
   },
   categoryTextSelected: {
     color: '#fff',
@@ -955,7 +846,7 @@ const styles = StyleSheet.create({
   },
   refreshButtonText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#2f7659',
   },
   // الملاحظة
@@ -972,13 +863,11 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
+    fontFamily: fontBold(),
   },
   noteText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
-    color: '#666',
+    fontFamily: fontRegular(),
     lineHeight: 22,
   },
   // زر الحفظ
@@ -988,9 +877,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   saveButton: {
     borderRadius: 16,
@@ -1005,7 +892,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   bottomSpace: {

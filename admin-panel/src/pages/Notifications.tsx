@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Languages,
+  UserX,
 } from 'lucide-react';
 import { db } from '../firebase';
 import { 
@@ -40,11 +41,14 @@ import {
 import { 
   sendPushNotification, 
   getUserStats, 
+  getInactiveUserCount,
+  sendReengagementNotification,
   SUPPORTED_LANGUAGES,
   SupportedLanguage,
   NotificationTranslations,
   UserStats
 } from '../services/pushNotifications';
+import AutoTranslateField from '../components/AutoTranslateField';
 
 // ========================================
 // الأنواع
@@ -101,10 +105,25 @@ const APP_SCREENS = [
   { value: '/', label: 'الصفحة الرئيسية' },
   { value: '/azkar/morning', label: 'أذكار الصباح' },
   { value: '/azkar/evening', label: 'أذكار المساء' },
-  { value: '/quran', label: 'القرآن الكريم' },
-  { value: '/prayer', label: 'أوقات الصلاة' },
-  { value: '/tasbih', label: 'التسبيح' },
-  { value: '/khatma', label: 'الختمة' },
+  { value: '/azkar/sleep', label: 'أذكار النوم' },
+  { value: '/azkar/wakeup', label: 'أذكار الاستيقاظ' },
+  { value: '/azkar/after_prayer', label: 'أذكار بعد الصلاة' },
+  { value: '/(tabs)/quran', label: 'القرآن الكريم' },
+  { value: '/(tabs)/prayer', label: 'أوقات الصلاة' },
+  { value: '/(tabs)/tasbih', label: 'التسبيح' },
+  { value: '/daily-ayah', label: 'آية اليوم' },
+  { value: '/daily-dua', label: 'دعاء اليوم' },
+  { value: '/daily-dhikr', label: 'ذكر اليوم' },
+  { value: '/hijri', label: 'التقويم الهجري' },
+  { value: '/names', label: 'أسماء الله الحسنى' },
+  { value: '/hajj-umrah', label: 'الحج والعمرة' },
+  { value: '/ruqya', label: 'الرقية الشرعية' },
+  { value: '/companions', label: 'قصص الصحابة' },
+  { value: '/seerah', label: 'السيرة النبوية' },
+  { value: '/radio', label: 'إذاعة القرآن' },
+  { value: '/hadith-of-day', label: 'حديث اليوم' },
+  { value: '/worship-tracker', label: 'تتبع العبادات' },
+  { value: '/subscription', label: 'الاشتراك' },
 ];
 
 const PRESET_REMINDERS = [
@@ -210,7 +229,7 @@ const PRESET_NOTIFICATIONS: {
 
 const NotificationsPage: React.FC = () => {
   // الحالات
-  const [activeTab, setActiveTab] = useState<'push' | 'scheduled' | 'reminders' | 'history'>('push');
+  const [activeTab, setActiveTab] = useState<'push' | 'scheduled' | 'reminders' | 'history' | 'reengagement'>('push');
   const [notifications, setNotifications] = useState<PushNotification[]>([]);
   const [reminders, setReminders] = useState<ScheduledReminder[]>([]);
   const [userStats, setUserStats] = useState<UserStats>({ 
@@ -222,6 +241,8 @@ const NotificationsPage: React.FC = () => {
   const [sendResult, setSendResult] = useState<{ success: boolean; message: string } | null>(null);
   const [expandedLanguages, setExpandedLanguages] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [tempPages, setTempPages] = useState<{ id: string; title: string }[]>([]);
+  const [autoProcessLog, setAutoProcessLog] = useState<string[]>([]);
 
   // نموذج الإشعار - يدعم 12 لغة
   const emptyTranslations: NotificationTranslations = {
@@ -231,6 +252,7 @@ const NotificationsPage: React.FC = () => {
 
   const [translations, setTranslations] = useState<NotificationTranslations>(emptyTranslations);
   const [targetAudience, setTargetAudience] = useState<TargetAudience>('all');
+  const [targetLanguages, setTargetLanguages] = useState<string[]>([]);
   const [actionUrl, setActionUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
@@ -241,6 +263,69 @@ const NotificationsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // ========================================
+  // معالج الإشعارات المجدولة تلقائياً
+  // Auto-process scheduled notifications
+  // ========================================
+  useEffect(() => {
+    const processScheduled = async () => {
+      try {
+        const snapshot = await getDocs(
+          query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))
+        );
+        
+        const now = new Date();
+        
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data() as PushNotification;
+          if (data.status !== 'scheduled' || !data.scheduledAt) continue;
+          
+          const scheduledTime = new Date(data.scheduledAt);
+          if (scheduledTime > now) continue;
+          
+          // Time to send!
+          console.log(`⏰ Auto-sending scheduled notification: ${docSnap.id}`);
+          setAutoProcessLog(prev => [...prev.slice(-9), `⏰ ${new Date().toLocaleTimeString('ar')} — جاري إرسال إشعار مجدول...`]);
+          
+          try {
+            const result = await sendPushNotification({
+              translations: data.translations || {},
+              targetAudience: data.targetAudience || 'all',
+              targetLanguages: (data as PushNotification & { targetLanguages?: string[] }).targetLanguages,
+              actionUrl: data.actionUrl,
+              imageUrl: data.imageUrl,
+            });
+            
+            // Update status in Firestore
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(doc(db, 'notifications', docSnap.id), {
+              status: 'sent',
+              sentAt: new Date().toISOString(),
+              sentCount: result.sentCount,
+              perLanguage: result.perLanguage,
+            });
+            
+            setAutoProcessLog(prev => [...prev.slice(-9), `✅ ${new Date().toLocaleTimeString('ar')} — تم إرسال ${result.sentCount} إشعار`]);
+            
+            // Reload data to reflect changes
+            loadData();
+          } catch (sendError) {
+            console.error('Auto-send failed:', sendError);
+            setAutoProcessLog(prev => [...prev.slice(-9), `❌ ${new Date().toLocaleTimeString('ar')} — فشل الإرسال: ${(sendError as Error).message}`]);
+          }
+        }
+      } catch (error) {
+        console.error('Auto-process check failed:', error);
+      }
+    };
+
+    // Run immediately on mount, then every 60 seconds
+    processScheduled();
+    const interval = setInterval(processScheduled, 60_000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
@@ -275,6 +360,12 @@ const NotificationsPage: React.FC = () => {
           repeatDays: [0, 1, 2, 3, 4, 5, 6],
         }))
       );
+
+      // 4. تحميل الصفحات المؤقتة
+      try {
+        const tpSnapshot = await getDocs(collection(db, 'tempPages'));
+        setTempPages(tpSnapshot.docs.map(d => ({ id: d.id, title: (d.data() as { title?: string }).title || d.id })));
+      } catch {}
       
     } catch (error) {
       console.error('Error loading data:', error);
@@ -344,6 +435,7 @@ const NotificationsPage: React.FC = () => {
       const result = await sendPushNotification({
         translations,
         targetAudience,
+        targetLanguages: targetLanguages.length > 0 ? targetLanguages : undefined,
         actionUrl: actionUrl || undefined,
         imageUrl: imageUrl || undefined,
       });
@@ -400,6 +492,7 @@ const NotificationsPage: React.FC = () => {
       await addDoc(collection(db, 'notifications'), {
         translations,
         targetAudience,
+        targetLanguages: targetLanguages.length > 0 ? targetLanguages : undefined,
         actionUrl,
         imageUrl,
         scheduledAt,
@@ -440,6 +533,7 @@ const NotificationsPage: React.FC = () => {
   const resetForm = () => {
     setTranslations(emptyTranslations);
     setTargetAudience('all');
+    setTargetLanguages([]);
     setActionUrl('');
     setImageUrl('');
     setScheduledAt('');
@@ -511,7 +605,7 @@ const NotificationsPage: React.FC = () => {
       </div>
 
       {/* الإحصائيات */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-500/20 rounded-lg">
@@ -569,6 +663,15 @@ const NotificationsPage: React.FC = () => {
             </div>
           </div>
         </div>
+        {/* Auto-processor status */}
+        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-slate-400 text-sm">المعالج التلقائي</span>
+          </div>
+          <p className="text-xl font-bold text-emerald-400">نشط</p>
+          <p className="text-xs text-slate-500 mt-1">فحص كل 60 ثانية</p>
+        </div>
       </div>
 
       {/* توزيع اللغات */}
@@ -604,6 +707,7 @@ const NotificationsPage: React.FC = () => {
           { id: 'push', label: 'إشعارات فورية', icon: Zap },
           { id: 'scheduled', label: 'مجدولة', icon: Calendar },
           { id: 'reminders', label: 'التذكيرات', icon: Bell },
+          { id: 'reengagement', label: 'إعادة التفاعل', icon: UserX },
           { id: 'history', label: 'السجل', icon: Clock },
         ].map(tab => (
           <button
@@ -643,6 +747,8 @@ const NotificationsPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => handleToggleReminder(reminder.id)}
+                  title={reminder.isActive ? 'تعطيل التذكير' : 'تفعيل التذكير'}
+                  aria-label={reminder.isActive ? 'تعطيل التذكير' : 'تفعيل التذكير'}
                   className={`relative w-12 h-6 rounded-full transition-colors ${
                     reminder.isActive ? 'bg-emerald-500' : 'bg-slate-600'
                   }`}
@@ -675,7 +781,24 @@ const NotificationsPage: React.FC = () => {
             </div>
           ))}
         </div>
+      ) : activeTab === 'reengagement' ? (
+        <ReengagementTab />
       ) : (
+        <>
+          {/* سجل المعالجة التلقائية */}
+          {activeTab === 'scheduled' && autoProcessLog.length > 0 && (
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 mb-4">
+              <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                <RefreshCw size={14} className="text-emerald-400 animate-spin" />
+                سجل المعالجة التلقائية
+              </h4>
+              <div className="space-y-1 text-sm font-mono">
+                {autoProcessLog.map((log, i) => (
+                  <div key={i} className="text-slate-400">{log}</div>
+                ))}
+              </div>
+            </div>
+          )}
         <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
           {isLoading ? (
             <div className="p-8 text-center text-slate-400">
@@ -765,6 +888,8 @@ const NotificationsPage: React.FC = () => {
 
                       <button
                         onClick={() => handleDelete(notification.id)}
+                        title="حذف الإشعار"
+                        aria-label="حذف الإشعار"
                         className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-red-400"
                       >
                         <Trash2 size={16} />
@@ -775,6 +900,7 @@ const NotificationsPage: React.FC = () => {
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* نافذة إنشاء إشعار */}
@@ -789,6 +915,8 @@ const NotificationsPage: React.FC = () => {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
+                title="إغلاق"
+                aria-label="إغلاق"
                 className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400"
               >
                 <X size={20} />
@@ -845,6 +973,7 @@ const NotificationsPage: React.FC = () => {
                     onChange={e => updateTranslation('ar', 'title', e.target.value)}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
                     placeholder="العنوان"
+                    aria-label="عنوان الإشعار بالعربية"
                   />
                   <textarea
                     value={translations.ar?.body || ''}
@@ -852,6 +981,7 @@ const NotificationsPage: React.FC = () => {
                     rows={2}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-white"
                     placeholder="المحتوى"
+                    aria-label="محتوى الإشعار بالعربية"
                   />
                 </div>
 
@@ -867,6 +997,7 @@ const NotificationsPage: React.FC = () => {
                     onChange={e => updateTranslation('en', 'title', e.target.value)}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 mb-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
                     placeholder="Title"
+                    aria-label="Notification title in English"
                     dir="ltr"
                   />
                   <textarea
@@ -875,6 +1006,7 @@ const NotificationsPage: React.FC = () => {
                     rows={2}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-white"
                     placeholder="Body"
+                    aria-label="Notification body in English"
                     dir="ltr"
                   />
                 </div>
@@ -929,6 +1061,7 @@ const NotificationsPage: React.FC = () => {
                             onChange={e => updateTranslation(lang.code, 'title', e.target.value)}
                             className="w-full bg-slate-700 rounded-lg px-3 py-2 mb-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none text-white"
                             placeholder="العنوان"
+                            aria-label={`عنوان الإشعار ب${lang.name}`}
                             dir={lang.rtl ? 'rtl' : 'ltr'}
                           />
                           <textarea
@@ -937,6 +1070,7 @@ const NotificationsPage: React.FC = () => {
                             rows={2}
                             className="w-full bg-slate-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none text-white"
                             placeholder="المحتوى"
+                            aria-label={`محتوى الإشعار ب${lang.name}`}
                             dir={lang.rtl ? 'rtl' : 'ltr'}
                           />
                         </div>
@@ -966,18 +1100,58 @@ const NotificationsPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* تصفية حسب اللغة */}
+              <div>
+                <label className="block text-sm text-slate-400 mb-2">تصفية حسب لغة التطبيق (اختياري)</label>
+                <p className="text-xs text-slate-500 mb-2">اترك الكل فارغ للإرسال لجميع اللغات</p>
+                <div className="flex flex-wrap gap-2">
+                  {SUPPORTED_LANGUAGES.map(lang => {
+                    const isSelected = targetLanguages.includes(lang.code);
+                    return (
+                      <button
+                        key={lang.code}
+                        onClick={() => setTargetLanguages(prev =>
+                          isSelected ? prev.filter(l => l !== lang.code) : [...prev, lang.code]
+                        )}
+                        className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                          isSelected
+                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                            : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:border-slate-500'
+                        }`}
+                      >
+                        {lang.flag} {lang.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {targetLanguages.length > 0 && (
+                  <p className="text-xs text-emerald-400 mt-2">
+                    سيتم الإرسال فقط للمستخدمين الذين لغة تطبيقهم: {targetLanguages.map(l => SUPPORTED_LANGUAGES.find(s => s.code === l)?.name).join('، ')}
+                  </p>
+                )}
+              </div>
+
               {/* الإجراء */}
               <div>
                 <label className="block text-sm text-slate-400 mb-2">فتح صفحة عند النقر (اختياري)</label>
                 <select
                   value={actionUrl}
                   onChange={e => setActionUrl(e.target.value)}
+                  title="فتح صفحة عند النقر"
+                  aria-label="فتح صفحة عند النقر"
                   className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
                 >
                   <option value="">بدون إجراء</option>
                   {APP_SCREENS.map(screen => (
                     <option key={screen.value} value={screen.value}>{screen.label}</option>
                   ))}
+                  {tempPages.length > 0 && (
+                    <optgroup label="📄 صفحات مؤقتة">
+                      {tempPages.map(tp => (
+                        <option key={tp.id} value={`/temp-page/${tp.id}`}>📄 {tp.title}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 
@@ -990,6 +1164,8 @@ const NotificationsPage: React.FC = () => {
                     value={scheduledAt}
                     onChange={e => setScheduledAt(e.target.value)}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                    title="جدولة الإرسال"
+                    aria-label="جدولة الإرسال"
                   />
                 </div>
                 <div>
@@ -1000,6 +1176,7 @@ const NotificationsPage: React.FC = () => {
                     onChange={e => setImageUrl(e.target.value)}
                     className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
                     placeholder="https://..."
+                    aria-label="رابط الصورة"
                     dir="ltr"
                   />
                 </div>
@@ -1056,3 +1233,368 @@ const NotificationsPage: React.FC = () => {
 };
 
 export default NotificationsPage;
+
+// ==================== إعادة التفاعل ====================
+
+const DEFAULT_REENGAGEMENT: NotificationTranslations = {
+  ar: { title: 'اشتقنالك! 💚', body: 'حان الوقت لتعود لأذكارك وعباداتك' },
+  en: { title: 'We miss you! 💚', body: "It's time to return to your daily adhkar" },
+  fr: { title: 'Tu nous manques ! 💚', body: 'Il est temps de revenir à vos adhkar quotidiens' },
+  de: { title: 'Du fehlst uns! 💚', body: 'Es ist Zeit, zu deinen täglichen Adhkar zurückzukehren' },
+  es: { title: '¡Te extrañamos! 💚', body: 'Es hora de volver a tus adhkar diarios' },
+  tr: { title: 'Seni özledik! 💚', body: 'Günlük zikirlerine dönme zamanı' },
+  ur: { title: 'ہم آپ کو یاد کرتے ہیں! 💚', body: 'آپ کے روزانہ اذکار پر واپس آنے کا وقت آ گیا ہے' },
+  id: { title: 'Kami merindukanmu! 💚', body: 'Saatnya kembali ke dzikir harianmu' },
+  ms: { title: 'Kami rindu anda! 💚', body: 'Masa untuk kembali ke zikir harian anda' },
+  hi: { title: 'हम आपको याद करते हैं! 💚', body: 'अपने दैनिक अज़कार पर लौटने का समय आ गया है' },
+  bn: { title: 'আমরা আপনাকে মিস করি! 💚', body: 'আপনার দৈনিক আযকারে ফিরে আসার সময় হয়েছে' },
+  ru: { title: 'Мы скучаем! 💚', body: 'Пора вернуться к ежедневным азкарам' },
+};
+
+const THRESHOLD_OPTIONS = [7, 14, 30, 60, 90];
+
+const ReengagementTab: React.FC = () => {
+  const [inactiveDays, setInactiveDays] = useState(30);
+  const [customDays, setCustomDays] = useState('');
+  const [translations, setTranslations] = useState<NotificationTranslations>(DEFAULT_REENGAGEMENT);
+  const [inactiveCount, setInactiveCount] = useState<number | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
+  const [loadingCount, setLoadingCount] = useState(false);
+  const [autoSend, setAutoSend] = useState(false);
+  const [autoSendIntervalDays, setAutoSendIntervalDays] = useState(7);
+  const [lastAutoSentAt, setLastAutoSentAt] = useState<string | null>(null);
+  const [lastSentCount, setLastSentCount] = useState<number | null>(null);
+  const [savingAutoSend, setSavingAutoSend] = useState(false);
+
+  // Fetch inactive count when threshold changes
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingCount(true);
+    getInactiveUserCount(inactiveDays).then(count => {
+      if (!cancelled) {
+        setInactiveCount(count);
+        setLoadingCount(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [inactiveDays]);
+
+  // Load saved settings from Firestore
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { getDoc } = await import('firebase/firestore');
+        const snap = await getDoc(doc(db, 'appConfig', 'reengagementSettings'));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.inactiveDays) setInactiveDays(data.inactiveDays);
+          if (data.translations) setTranslations(data.translations);
+          if (data.autoSend !== undefined) setAutoSend(data.autoSend);
+          if (data.autoSendIntervalDays) setAutoSendIntervalDays(data.autoSendIntervalDays);
+          if (data.lastAutoSentAt) setLastAutoSentAt(data.lastAutoSentAt);
+          if (data.lastSentCount !== undefined) setLastSentCount(data.lastSentCount);
+
+          // Auto-send check: if enabled and interval has elapsed, trigger send
+          if (data.autoSend && data.autoSendIntervalDays && data.translations) {
+            const lastSent = data.lastAutoSentAt ? new Date(data.lastAutoSentAt).getTime() : 0;
+            const intervalMs = (data.autoSendIntervalDays || 7) * 24 * 60 * 60 * 1000;
+            if (Date.now() - lastSent >= intervalMs) {
+              // Trigger auto-send
+              try {
+                const result = await sendReengagementNotification({
+                  translations: data.translations,
+                  inactiveDays: data.inactiveDays || 30,
+                  actionUrl: '/',
+                });
+                const now = new Date().toISOString();
+                const { setDoc: setDocAutoFn } = await import('firebase/firestore');
+                await setDocAutoFn(doc(db, 'appConfig', 'reengagementSettings'), {
+                  lastAutoSentAt: now,
+                  lastSentAt: now,
+                  lastSentCount: result.sentCount,
+                }, { merge: true });
+                setLastAutoSentAt(now);
+                setLastSentCount(result.sentCount);
+                setSendResult(`✅ تم الإرسال التلقائي — ${result.sentCount} مستخدم`);
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    };
+    load();
+  }, []);
+
+  const handleSend = async () => {
+    setIsSending(true);
+    setSendResult(null);
+    try {
+      const result = await sendReengagementNotification({
+        translations,
+        inactiveDays,
+        actionUrl: '/',
+      });
+
+      const now = new Date().toISOString();
+      // Save settings for future
+      const { setDoc: setDocFn } = await import('firebase/firestore');
+      await setDocFn(doc(db, 'appConfig', 'reengagementSettings'), {
+        inactiveDays,
+        translations,
+        lastSentAt: now,
+        lastAutoSentAt: now,
+        lastSentCount: result.sentCount,
+      }, { merge: true });
+
+      setLastAutoSentAt(now);
+      setLastSentCount(result.sentCount);
+
+      setSendResult(
+        result.success
+          ? `✅ تم الإرسال بنجاح — ${result.sentCount} مستخدم`
+          : `❌ فشل الإرسال: ${result.errors[0] || 'خطأ غير معروف'}`
+      );
+    } catch (error) {
+      setSendResult(`❌ خطأ: ${(error as Error).message}`);
+    }
+    setIsSending(false);
+  };
+
+  const handleSaveAutoSend = async () => {
+    setSavingAutoSend(true);
+    try {
+      const { setDoc: setDocFn } = await import('firebase/firestore');
+      await setDocFn(doc(db, 'appConfig', 'reengagementSettings'), {
+        autoSend,
+        autoSendIntervalDays,
+        inactiveDays,
+        translations,
+      }, { merge: true });
+      setSendResult(autoSend ? '✅ تم تفعيل الإرسال التلقائي' : '✅ تم إيقاف الإرسال التلقائي');
+    } catch (error) {
+      setSendResult(`❌ خطأ: ${(error as Error).message}`);
+    }
+    setSavingAutoSend(false);
+  };
+
+  const handleCustomDays = () => {
+    const num = parseInt(customDays, 10);
+    if (num >= 1 && num <= 365) {
+      setInactiveDays(num);
+      setCustomDays('');
+    }
+  };
+
+  const updateTranslation = (lang: SupportedLanguage, field: 'title' | 'body', value: string) => {
+    setTranslations(prev => ({
+      ...prev,
+      [lang]: { ...prev[lang], [field]: value },
+    }));
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* عتبة عدم النشاط */}
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+          <UserX size={20} className="text-orange-400" />
+          عتبة عدم النشاط
+        </h3>
+        <div className="flex gap-2 flex-wrap items-center">
+          {THRESHOLD_OPTIONS.map(days => (
+            <button
+              key={days}
+              onClick={() => setInactiveDays(days)}
+              className={`px-4 py-2 rounded-lg transition-all ${
+                inactiveDays === days && !customDays
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              {days} يوم
+            </button>
+          ))}
+          {/* Custom threshold input */}
+          <div className="flex items-center gap-1.5">
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={customDays}
+              onChange={e => setCustomDays(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCustomDays()}
+              placeholder="مخصص"
+              aria-label="عدد أيام مخصص لعتبة عدم النشاط"
+              className="w-20 bg-slate-700 text-white rounded-lg px-3 py-2 text-sm text-center placeholder-slate-500"
+            />
+            <button
+              onClick={handleCustomDays}
+              disabled={!customDays}
+              className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white text-sm transition-all"
+            >
+              ✓
+            </button>
+          </div>
+          {!THRESHOLD_OPTIONS.includes(inactiveDays) && (
+            <span className="px-4 py-2 rounded-lg bg-emerald-600 text-white">
+              {inactiveDays} يوم
+            </span>
+          )}
+        </div>
+        <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
+          <p className="text-slate-300">
+            {loadingCount ? (
+              <span className="animate-pulse">جاري العد...</span>
+            ) : (
+              <>
+                <span className="text-emerald-400 font-bold text-lg">{inactiveCount ?? 0}</span>
+                {' '}مستخدم غير نشط منذ {inactiveDays} يوم
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/* الإرسال التلقائي */}
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+          <RefreshCw size={20} className="text-purple-400" />
+          الإرسال التلقائي
+        </h3>
+
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-white font-medium">تفعيل الإرسال التلقائي</p>
+            <p className="text-slate-400 text-sm">إرسال إشعارات تلقائية للمستخدمين غير النشطين بشكل دوري</p>
+          </div>
+          <button
+            onClick={() => setAutoSend(!autoSend)}
+            title={autoSend ? 'إيقاف الإرسال التلقائي' : 'تفعيل الإرسال التلقائي'}
+            aria-label={autoSend ? 'إيقاف الإرسال التلقائي' : 'تفعيل الإرسال التلقائي'}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              autoSend ? 'bg-emerald-600' : 'bg-slate-600'
+            }`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+              autoSend ? 'right-0.5' : 'left-0.5'
+            }`} />
+          </button>
+        </div>
+
+        {autoSend && (
+          <div className="space-y-3 pt-3 border-t border-slate-700/50">
+            <div className="flex items-center gap-3">
+              <Clock size={16} className="text-slate-400" />
+              <span className="text-slate-300 text-sm">التكرار كل:</span>
+              <div className="flex gap-2">
+                {[3, 7, 14, 30].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setAutoSendIntervalDays(d)}
+                    className={`px-3 py-1 rounded-lg text-sm transition-all ${
+                      autoSendIntervalDays === d
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {d} أيام
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {lastAutoSentAt && (
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <CheckCircle size={14} className="text-emerald-400" />
+                آخر إرسال: {new Date(lastAutoSentAt).toLocaleDateString('ar-EG', { 
+                  year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                })}
+                {lastSentCount !== null && (
+                  <span className="text-emerald-400">({lastSentCount} مستخدم)</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          onClick={handleSaveAutoSend}
+          disabled={savingAutoSend}
+          className="mt-4 flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white rounded-lg text-sm transition-all"
+        >
+          {savingAutoSend ? (
+            <RefreshCw size={14} className="animate-spin" />
+          ) : (
+            <CheckCircle size={14} />
+          )}
+          {savingAutoSend ? 'جاري الحفظ...' : 'حفظ إعدادات الإرسال التلقائي'}
+        </button>
+      </div>
+
+      {/* قوالب الرسائل */}
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+        <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+          <Languages size={20} className="text-blue-400" />
+          قوالب الرسائل (12 لغة)
+        </h3>
+
+        {/* Auto-translate notification body */}
+        <div className="mb-6">
+          <AutoTranslateField
+            label="ترجمة نص الإشعار تلقائياً"
+            fieldName="notificationBody"
+            contentType="notification"
+            initialValues={Object.fromEntries(
+              SUPPORTED_LANGUAGES.map(l => [l.code, translations[l.code as SupportedLanguage]?.body || ''])
+            )}
+            onSave={(result) => {
+              Object.entries(result).forEach(([code, text]) => {
+                if (text) updateTranslation(code as SupportedLanguage, 'body', text);
+              });
+            }}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {SUPPORTED_LANGUAGES.map(lang => (
+            <div key={lang.code} className="bg-slate-700/50 rounded-lg p-3">
+              <p className="text-slate-400 text-sm mb-2">{lang.name}</p>
+              <input
+                className="w-full bg-slate-600/50 text-white rounded px-3 py-1.5 text-sm mb-2"
+                placeholder="العنوان"
+                aria-label={`عنوان إشعار إعادة التفاعل ب${lang.name}`}
+                value={translations[lang.code as SupportedLanguage]?.title || ''}
+                onChange={e => updateTranslation(lang.code as SupportedLanguage, 'title', e.target.value)}
+              />
+              <input
+                className="w-full bg-slate-600/50 text-white rounded px-3 py-1.5 text-sm"
+                placeholder="النص"
+                aria-label={`نص إشعار إعادة التفاعل ب${lang.name}`}
+                value={translations[lang.code as SupportedLanguage]?.body || ''}
+                onChange={e => updateTranslation(lang.code as SupportedLanguage, 'body', e.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* زر الإرسال */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handleSend}
+          disabled={isSending || !inactiveCount}
+          className="flex items-center gap-2 px-6 py-3 bg-orange-600 hover:bg-orange-700 disabled:bg-slate-600 text-white rounded-xl transition-all"
+        >
+          <Send size={18} />
+          {isSending ? 'جاري الإرسال...' : 'إرسال إشعار إعادة التفاعل'}
+        </button>
+        {sendResult && (
+          <p className={`text-sm ${sendResult.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
+            {sendResult}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};

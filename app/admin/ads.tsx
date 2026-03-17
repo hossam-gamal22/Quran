@@ -11,26 +11,46 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
-import { adminService } from '../../services/adminService';
-import { AdSettings } from '../../types/admin';
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { AdsConfig, DEFAULT_ADS_CONFIG, PRODUCTION_AD_IDS, AdScreenKey } from '@/lib/ads-config';
+import { db } from '@/lib/firebase-config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
+const FIRESTORE_PATH = 'config';
+const FIRESTORE_DOC = 'ads-settings';
+
+const BANNER_SCREENS: { key: AdScreenKey; label: string; icon: string }[] = [
+  { key: 'home', label: 'الرئيسية', icon: 'home' },
+  { key: 'quran', label: 'القرآن', icon: 'book-open-variant' },
+  { key: 'azkar', label: 'الأذكار', icon: 'hands-pray' },
+  { key: 'prayer', label: 'الصلاة', icon: 'mosque' },
+  { key: 'tasbih', label: 'التسبيح', icon: 'counter' },
+  { key: 'names', label: 'الأسماء الحسنى', icon: 'star-crescent' },
+  { key: 'ruqya', label: 'الرقية', icon: 'shield-cross' },
+  { key: 'hijri', label: 'التقويم الهجري', icon: 'calendar-month' },
+  { key: 'seerah', label: 'السيرة', icon: 'book-open-page-variant' },
+  { key: 'companions', label: 'الصحابة', icon: 'account-group' },
+  { key: 'hajj_umrah', label: 'الحج والعمرة', icon: 'kabaddi' },
+  { key: 'daily_ayah', label: 'آية اليوم', icon: 'format-quote-close' },
+  { key: 'hadith', label: 'الأحاديث', icon: 'book-alphabet' },
+  { key: 'ayat_universe', label: 'آيات كونية', icon: 'earth' },
+  { key: 'hadith_sifat', label: 'صفات', icon: 'text-box-outline' },
+  { key: 'duas', label: 'الأدعية', icon: 'hand-heart' },
+  { key: 'surah', label: 'المصحف', icon: 'book-open-variant' },
+  { key: 'tafsir', label: 'التفسير', icon: 'text-search' },
+  { key: 'khatma', label: 'الختمة', icon: 'bookmark-check' },
+  { key: 'worship', label: 'العبادات', icon: 'chart-line' },
+];
 export default function AdsSettingsScreen() {
-  const [settings, setSettings] = useState<AdSettings>({
-    adsEnabled: true,
-    bannerAdId: '',
-    interstitialAdId: '',
-    rewardedAdId: '',
-    showBannerOnHome: true,
-    showBannerOnQuran: false,
-    showBannerOnAzkar: true,
-    showBannerOnPrayers: true,
-    interstitialFrequency: 5,
-  });
+  const [config, setConfig] = useState<AdsConfig>(DEFAULT_ADS_CONFIG);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const isRTL = useIsRTL();
 
   useEffect(() => {
     loadSettings();
@@ -38,12 +58,13 @@ export default function AdsSettingsScreen() {
 
   const loadSettings = async () => {
     try {
-      const data = await adminService.getAdSettings();
-      if (data) {
-        setSettings(data);
+      const docRef = doc(db, FIRESTORE_PATH, FIRESTORE_DOC);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        setConfig({ ...DEFAULT_ADS_CONFIG, ...docSnap.data() as Partial<AdsConfig> });
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('Error loading ads settings:', error);
     } finally {
       setIsLoading(false);
     }
@@ -52,21 +73,54 @@ export default function AdsSettingsScreen() {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      const success = await adminService.updateAdSettings(settings);
-      if (success) {
-        Alert.alert('تم', 'تم حفظ الإعدادات بنجاح');
-      } else {
-        Alert.alert('خطأ', 'فشل في حفظ الإعدادات');
-      }
+      const docRef = doc(db, FIRESTORE_PATH, FIRESTORE_DOC);
+      await setDoc(docRef, { ...config, updatedAt: new Date().toISOString() }, { merge: true });
+      Alert.alert(t('common.done'), t('admin.settingsSaved'));
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.saveFailed'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const updateSetting = (key: keyof AdSettings, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+  const updateConfig = <K extends keyof AdsConfig>(key: K, value: AdsConfig[K]) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateBannerScreen = (screen: string, value: boolean) => {
+    setConfig(prev => ({
+      ...prev,
+      bannerScreens: { ...prev.bannerScreens, [screen]: value },
+    }));
+  };
+
+  const updateAdUnitId = (type: 'bannerAdId' | 'interstitialAdId' | 'appOpenAdId', platform: 'ios' | 'android', value: string) => {
+    setConfig(prev => ({
+      ...prev,
+      [type]: { ...prev[type], [platform]: value },
+    }));
+  };
+
+  const resetToProduction = () => {
+    Alert.alert(
+      'إعادة تعيين',
+      'إعادة تعيين جميع Ad Unit IDs للقيم الإنتاجية؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'إعادة تعيين',
+          style: 'destructive',
+          onPress: () => {
+            setConfig(prev => ({
+              ...prev,
+              bannerAdId: { android: PRODUCTION_AD_IDS.android.banner, ios: PRODUCTION_AD_IDS.ios.banner },
+              interstitialAdId: { android: PRODUCTION_AD_IDS.android.interstitial, ios: PRODUCTION_AD_IDS.ios.interstitial },
+              appOpenAdId: { android: PRODUCTION_AD_IDS.android.appOpen, ios: PRODUCTION_AD_IDS.ios.appOpen },
+            }));
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -80,131 +134,254 @@ export default function AdsSettingsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Main Toggle */}
+        {/* Master Toggle */}
         <View style={styles.mainToggle}>
-          <View style={styles.toggleInfo}>
-            <Ionicons
-              name={settings.adsEnabled ? 'megaphone' : 'megaphone-outline'}
+          <View style={[styles.toggleInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons
+              name={config.enabled ? 'advertisements' : 'advertisements-off'}
               size={32}
-              color={settings.adsEnabled ? Colors.success : Colors.textMuted}
+              color={config.enabled ? Colors.success : Colors.textMuted}
             />
-            <View style={styles.toggleText}>
-              <Text style={styles.toggleTitle}>الإعلانات</Text>
-              <Text style={styles.toggleStatus}>
-                {settings.adsEnabled ? 'مفعّلة' : 'معطّلة'}
+            <View>
+              <Text style={[styles.toggleTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
+                {t('admin.adsTitle')}
+              </Text>
+              <Text style={[styles.toggleStatus, { textAlign: isRTL ? 'right' : 'left' }]}>
+                {config.enabled ? t('admin.enabled') : t('admin.disabled')}
               </Text>
             </View>
           </View>
           <Switch
-            value={settings.adsEnabled}
-            onValueChange={(value) => updateSetting('adsEnabled', value)}
+            value={config.enabled}
+            onValueChange={(value) => updateConfig('enabled', value)}
             trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor={settings.adsEnabled ? Colors.primary : Colors.textMuted}
+            thumbColor={config.enabled ? Colors.primary : Colors.textMuted}
           />
         </View>
 
-        {/* Ad IDs */}
+        {/* ==================== Ad Unit IDs ==================== */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>معرّفات الإعلانات</Text>
-          
+          <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={styles.sectionTitle}>Ad Unit IDs</Text>
+            <TouchableOpacity onPress={resetToProduction} style={styles.resetBtn}>
+              <Ionicons name="refresh" size={16} color={Colors.primary} />
+              <Text style={styles.resetBtnText}>Production</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Banner IDs */}
+          <Text style={styles.subTitle}>Banner</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Banner Ad ID</Text>
+            <Text style={styles.inputLabel}>iOS</Text>
             <TextInput
               style={styles.input}
-              value={settings.bannerAdId}
-              onChangeText={(value) => updateSetting('bannerAdId', value)}
+              value={config.bannerAdId.ios}
+              onChangeText={(v) => updateAdUnitId('bannerAdId', 'ios', v)}
               placeholder="ca-app-pub-xxxxx/xxxxx"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Android</Text>
+            <TextInput
+              style={styles.input}
+              value={config.bannerAdId.android}
+              onChangeText={(v) => updateAdUnitId('bannerAdId', 'android', v)}
+              placeholder="ca-app-pub-xxxxx/xxxxx"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
           </View>
 
+          {/* Interstitial IDs */}
+          <Text style={styles.subTitle}>Interstitial</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Interstitial Ad ID</Text>
+            <Text style={styles.inputLabel}>iOS</Text>
             <TextInput
               style={styles.input}
-              value={settings.interstitialAdId}
-              onChangeText={(value) => updateSetting('interstitialAdId', value)}
+              value={config.interstitialAdId.ios}
+              onChangeText={(v) => updateAdUnitId('interstitialAdId', 'ios', v)}
               placeholder="ca-app-pub-xxxxx/xxxxx"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Android</Text>
+            <TextInput
+              style={styles.input}
+              value={config.interstitialAdId.android}
+              onChangeText={(v) => updateAdUnitId('interstitialAdId', 'android', v)}
+              placeholder="ca-app-pub-xxxxx/xxxxx"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
           </View>
 
+          {/* App Open IDs */}
+          <Text style={styles.subTitle}>App Open</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Rewarded Ad ID</Text>
+            <Text style={styles.inputLabel}>iOS</Text>
             <TextInput
               style={styles.input}
-              value={settings.rewardedAdId}
-              onChangeText={(value) => updateSetting('rewardedAdId', value)}
+              value={config.appOpenAdId.ios}
+              onChangeText={(v) => updateAdUnitId('appOpenAdId', 'ios', v)}
               placeholder="ca-app-pub-xxxxx/xxxxx"
               placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Android</Text>
+            <TextInput
+              style={styles.input}
+              value={config.appOpenAdId.android}
+              onChangeText={(v) => updateAdUnitId('appOpenAdId', 'android', v)}
+              placeholder="ca-app-pub-xxxxx/xxxxx"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
             />
           </View>
         </View>
 
-        {/* Banner Placement */}
+        {/* ==================== Banner Placement ==================== */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>مواضع Banner</Text>
-          
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>الصفحة الرئيسية</Text>
+          <Text style={styles.sectionTitle}>{t('admin.bannerPlacement')}</Text>
+          {BANNER_SCREENS.map(({ key, label, icon }) => (
+            <View key={key} style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.screenLabel, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name={icon as any} size={18} color={Colors.textMuted} />
+                <Text style={styles.switchLabel}>{label}</Text>
+              </View>
+              <Switch
+                value={config.bannerScreens[key] ?? false}
+                onValueChange={(value) => updateBannerScreen(key, value)}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor={Colors.primary}
+              />
+            </View>
+          ))}
+        </View>
+
+        {/* ==================== App Open Ad ==================== */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App Open Ad</Text>
+          <View style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={styles.switchLabel}>إعلان عند فتح التطبيق</Text>
             <Switch
-              value={settings.showBannerOnHome}
-              onValueChange={(value) => updateSetting('showBannerOnHome', value)}
+              value={config.showAdOnAppOpen}
+              onValueChange={(value) => updateConfig('showAdOnAppOpen', value)}
               trackColor={{ false: Colors.border, true: Colors.accent }}
               thumbColor={Colors.primary}
             />
           </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>شاشة القرآن</Text>
+          <View style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={styles.switchLabel}>إعلان عند تغيير نمط القبلة</Text>
             <Switch
-              value={settings.showBannerOnQuran}
-              onValueChange={(value) => updateSetting('showBannerOnQuran', value)}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor={Colors.primary}
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>شاشة الأذكار</Text>
-            <Switch
-              value={settings.showBannerOnAzkar}
-              onValueChange={(value) => updateSetting('showBannerOnAzkar', value)}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor={Colors.primary}
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>شاشة الصلوات</Text>
-            <Switch
-              value={settings.showBannerOnPrayers}
-              onValueChange={(value) => updateSetting('showBannerOnPrayers', value)}
+              value={config.showAdOnQiblaStyleChange}
+              onValueChange={(value) => updateConfig('showAdOnQiblaStyleChange', value)}
               trackColor={{ false: Colors.border, true: Colors.accent }}
               thumbColor={Colors.primary}
             />
           </View>
         </View>
 
-        {/* Interstitial Settings */}
+        {/* ==================== Interstitial Settings ==================== */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>إعدادات Interstitial</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>
-              التكرار (كل كم دقيقة)
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={String(settings.interstitialFrequency)}
-              onChangeText={(value) =>
-                updateSetting('interstitialFrequency', parseInt(value) || 5)
-              }
-              keyboardType="number-pad"
-              placeholder="5"
-              placeholderTextColor={Colors.textMuted}
+          <Text style={styles.sectionTitle}>{t('admin.interstitialSettings')}</Text>
+
+          {/* Mode selector */}
+          <Text style={styles.inputLabel}>Mode</Text>
+          <View style={styles.modeRow}>
+            {(['pages', 'time', 'session'] as const).map((mode) => (
+              <TouchableOpacity
+                key={mode}
+                style={[
+                  styles.modeBtn,
+                  config.interstitialMode === mode && styles.modeBtnActive,
+                ]}
+                onPress={() => updateConfig('interstitialMode', mode)}
+              >
+                <Text style={[
+                  styles.modeBtnText,
+                  config.interstitialMode === mode && styles.modeBtnTextActive,
+                ]}>
+                  {mode === 'pages' ? 'عدد صفحات' : mode === 'time' ? 'وقت' : 'جلسة'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Frequency (pages mode) */}
+          {config.interstitialMode === 'pages' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>عدد الصفحات بين الإعلانات</Text>
+              <TextInput
+                style={styles.input}
+                value={String(config.interstitialFrequency)}
+                onChangeText={(v) => updateConfig('interstitialFrequency', parseInt(v) || 5)}
+                keyboardType="number-pad"
+                placeholder="5"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          )}
+
+          {/* Time interval (time mode) */}
+          {config.interstitialMode === 'time' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>دقائق بين الإعلانات</Text>
+              <TextInput
+                style={styles.input}
+                value={String(config.interstitialTimeInterval)}
+                onChangeText={(v) => updateConfig('interstitialTimeInterval', parseInt(v) || 3)}
+                keyboardType="number-pad"
+                placeholder="3"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          )}
+
+          {/* Session limit (session mode) */}
+          {config.interstitialMode === 'session' && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>حد الإعلانات في الجلسة</Text>
+              <TextInput
+                style={styles.input}
+                value={String(config.interstitialSessionLimit)}
+                onChangeText={(v) => updateConfig('interstitialSessionLimit', parseInt(v) || 2)}
+                keyboardType="number-pad"
+                placeholder="2"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          )}
+
+          {/* First ad delay */}
+          <View style={[styles.switchRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: Spacing.sm }]}>
+            <Text style={styles.switchLabel}>تأخير أول إعلان</Text>
+            <Switch
+              value={config.delayFirstAd}
+              onValueChange={(value) => updateConfig('delayFirstAd', value)}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor={Colors.primary}
             />
           </View>
+
+          {config.delayFirstAd && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>ثواني التأخير</Text>
+              <TextInput
+                style={styles.input}
+                value={String(config.firstAdDelay)}
+                onChangeText={(v) => updateConfig('firstAdDelay', parseInt(v) || 30)}
+                keyboardType="number-pad"
+                placeholder="30"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+          )}
         </View>
 
         {/* Save Button */}
@@ -218,7 +395,7 @@ export default function AdsSettingsScreen() {
           ) : (
             <>
               <Ionicons name="save" size={20} color={Colors.textLight} />
-              <Text style={styles.saveBtnText}>حفظ الإعدادات</Text>
+              <Text style={styles.saveBtnText}>{t('admin.saveSettings')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -249,11 +426,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   toggleInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
   },
-  toggleText: {},
   toggleTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -275,40 +450,98 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  sectionHeader: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
     marginBottom: Spacing.md,
   },
+  subTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
   inputGroup: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   inputLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textMuted,
     marginBottom: Spacing.xs,
   },
   input: {
     backgroundColor: Colors.background,
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    fontSize: 14,
+    padding: Spacing.sm,
+    fontSize: 13,
     color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.border,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   switchRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
+    paddingVertical: Spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
+  },
+  screenLabel: {
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   switchLabel: {
     fontSize: 14,
     color: Colors.text,
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  modeBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primary + '15',
+  },
+  modeBtnText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  modeBtnTextActive: {
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  resetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  resetBtnText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
   },
   saveBtn: {
     backgroundColor: Colors.primary,

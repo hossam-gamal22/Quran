@@ -413,7 +413,7 @@ export const getLastPerformanceReport = async (): Promise<PerformanceReport | nu
 // مراقبة الأداء
 // ========================================
 
-let cleanupIntervalId: NodeJS.Timeout | null = null;
+let cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
 
 export const startPerformanceMonitoring = (): void => {
   if (isMonitoring) return;
@@ -449,7 +449,7 @@ export const debounce = <T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): ((...args: Parameters<T>) => void) => {
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   
   return (...args: Parameters<T>) => {
     if (timeoutId) {

@@ -7,15 +7,18 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SURAH_NAMES_AR, fetchTafsir, TAFSIR_EDITIONS } from '@/lib/quran-api';
-
+import { getSurahName, fetchTafsir, TAFSIR_EDITIONS } from '@/lib/quran-api';
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function TafsirScreen() {
   const { surah, ayah } = useLocalSearchParams<{ surah: string; ayah: string }>();
   const colors = useColors();
+  const isRTL = useIsRTL();
   const router = useRouter();
 
   const [arabicText, setArabicText] = useState('');
@@ -29,11 +32,11 @@ export default function TafsirScreen() {
   useEffect(() => {
     setLoading(true);
     fetchTafsir(surahNum, ayahNum, selectedEdition)
-      .then(({ arabicText: ar, tafsirText: t }) => {
+      .then(({ arabicText: ar, tafsirText: tf }) => {
         setArabicText(ar);
-        setTafsirText(t);
+        setTafsirText(tf);
       })
-      .catch(() => setTafsirText('تعذر تحميل التفسير'))
+      .catch(() => setTafsirText(t('quranSearch.loadTafsirFailed')))
       .finally(() => setLoading(false));
   }, [surahNum, ayahNum, selectedEdition]);
 
@@ -46,14 +49,14 @@ export default function TafsirScreen() {
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', fontFamily: 'Cairo-Bold', color: colors.text },
+    title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', fontFamily: fontBold(), color: colors.text },
     closeBtn: { padding: 8 },
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
     surahRef: {
       fontSize: 14,
       color: colors.primary,
-      textAlign: 'right',
-      fontFamily: 'Cairo-SemiBold',
+      textAlign: isRTL ? 'right' : 'left',
+      fontFamily: fontSemiBold(),
       marginBottom: 12,
     },
     arabicText: {
@@ -82,33 +85,34 @@ export default function TafsirScreen() {
       backgroundColor: colors.primary,
       borderColor: colors.primary,
     },
-    editionTabText: { fontSize: 12, color: colors.textLight, fontFamily: 'Cairo-SemiBold' },
+    editionTabText: { fontSize: 12, color: colors.textLight, fontFamily: fontSemiBold() },
     editionTabTextActive: { color: '#fff' },
     tafsirTitle: {
       fontSize: 16,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: colors.text,
-      textAlign: 'right',
+      textAlign: isRTL ? 'right' : 'left',
       marginBottom: 10,
     },
     tafsirText: {
       fontSize: 16,
       color: colors.text,
       textAlign: 'right',
+      writingDirection: 'rtl',
       lineHeight: 30,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
     },
   });
 
-  const editionName = TAFSIR_EDITIONS.find(e => e.identifier === selectedEdition)?.name || 'التفسير';
+  const editionName = TAFSIR_EDITIONS.find(e => e.identifier === selectedEdition)?.name || t('quran.tafsir');
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
-      <View style={s.header}>
+    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="tafsir">
+      <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.closeBtn} onPress={() => router.back()}>
           <MaterialCommunityIcons name="close" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={s.title}>التفسير</Text>
+        <Text style={s.title}>{t('quranSearch.tafsir')}</Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -117,7 +121,7 @@ export default function TafsirScreen() {
       ) : (
         <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
           <Text style={s.surahRef}>
-            {SURAH_NAMES_AR[surahNum] || `سورة ${surahNum}`} - آية {ayahNum}
+            {getSurahName(surahNum)} - {t('quran.ayah')} {ayahNum}
           </Text>
           {arabicText ? (
             <View style={s.arabicText}>
@@ -144,8 +148,8 @@ export default function TafsirScreen() {
             ))}
           </View>
 
-          <Text style={s.tafsirTitle}>📖 {editionName}</Text>
-          <Text style={s.tafsirText}>{tafsirText || 'لا يتوفر تفسير لهذه الآية'}</Text>
+          <Text style={s.tafsirTitle}>{editionName}</Text>
+          <Text style={s.tafsirText}>{tafsirText || t('quranSearch.noTafsirAvailable')}</Text>
 
           <View style={{ height: 40 }} />
         </ScrollView>

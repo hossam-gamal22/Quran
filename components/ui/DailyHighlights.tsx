@@ -15,19 +15,24 @@ import {
   LayoutAnimation,
   Platform,
 } from 'react-native';
+import { fontBold, fontMedium, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
-import { getHijriDate } from '../../lib/hijri-date';
+import { getLocalizedHijriDate } from '../../lib/hijri-date';
 import { getTodayAyahWithAudio, QuranAyahWithAudio } from '../../lib/api/quran-cloud-api';
-import { fetchAppConfig, HighlightItemConfig } from '../../lib/app-config-api';
+import { fetchAppConfig, fetchActiveTempPages, subscribeToHighlights, getHighlightTitle, HighlightItemConfig } from '../../lib/app-config-api';
 import { getDuaOfTheDay } from '../../data/daily-duas';
+import { getLanguage, t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { safeIcon } from '@/lib/safe-icon';
 const STORY_CACHE_KEY = 'story_of_day_cache';
 const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
+const STORY_THUMBNAIL_KEY = '@story_thumbnail_cache';
 
 // Match SOLID_BACKGROUNDS from story-of-day page
 const STORY_COLORS = ['#1a3a2a', '#1a2744', '#2d2d2d', '#2d1b4e', '#1a3044'];
@@ -66,12 +71,14 @@ interface DailyHighlightsProps {
 const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton }) => {
   const router = useRouter();
   const { isDarkMode } = useSettings();
+  const isRTL = useIsRTL();
 
-  const hijriDate = getHijriDate();
+  const hijriDate = getLocalizedHijriDate();
 
   const [ayah, setAyah] = useState<QuranAyahWithAudio | null>(null);
   const [storyAyahText, setStoryAyahText] = useState<string | null>(null);
   const [storySurahName, setStorySurahName] = useState<string | null>(null);
+  const [storyThumbnailUrl, setStoryThumbnailUrl] = useState<string | null>(null);
   const [adminHighlights, setAdminHighlights] = useState<DailyHighlight[]>([]);
   const [loading, setLoading] = useState(true);
   const [highlightOrder, setHighlightOrder] = useState<string[]>([]);
@@ -96,18 +103,31 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                 setStoryAyahText(parsed.ayah.text);
                 setStorySurahName(parsed.ayah.surah?.name || null);
               }
-              return;
             }
           } catch { /* ignore parse errors */ }
         }
 
-        // Fetch today's ayah if not cached
-        const ayahResult = await getTodayAyahWithAudio();
-        if (!mounted) return;
-        if (ayahResult) {
-          setAyah(ayahResult);
-          setStoryAyahText(ayahResult.text || null);
-          setStorySurahName(ayahResult.surah?.name || null);
+        // Load photo thumbnail
+        const thumbCached = await AsyncStorage.getItem(STORY_THUMBNAIL_KEY);
+        if (thumbCached) {
+          try {
+            const thumbParsed = JSON.parse(thumbCached);
+            if (thumbParsed.date === todayStr && thumbParsed.url) {
+              if (mounted) setStoryThumbnailUrl(thumbParsed.url);
+              return; // We have both text and thumbnail
+            }
+          } catch {}
+        }
+
+        // If no cached text, fetch today's ayah
+        if (!storyAyahText) {
+          const ayahResult = await getTodayAyahWithAudio();
+          if (!mounted) return;
+          if (ayahResult) {
+            setAyah(ayahResult);
+            setStoryAyahText(ayahResult.text || null);
+            setStorySurahName(ayahResult.surah?.name || null);
+          }
         }
       } catch {
         // Silently degrade
@@ -119,28 +139,55 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     return () => { mounted = false; };
   }, []);
 
-  // Fetch admin-managed highlights from Firestore
+  // Subscribe to real-time admin highlights + fetch temp pages
   useEffect(() => {
     let mounted = true;
-    fetchAppConfig().then(cfg => {
+    const lang = getLanguage();
+
+    // Real-time subscription for admin highlights
+    const unsubscribe = subscribeToHighlights((highlights) => {
       if (!mounted) return;
-      const items = cfg.highlights;
-      if (items && items.length > 0) {
-        const mapped: DailyHighlight[] = items
-          .filter(h => h.enabled)
-          .map(h => ({
-            id: `admin-${h.id}`,
-            title: h.title,
-            icon: h.icon,
-            color: h.color,
-            imageUrl: h.imageUrl || undefined,
-            route: h.route,
-            htmlContent: h.htmlContent || undefined,
+      const mapped: DailyHighlight[] = highlights
+        .filter(h => h.type !== 'temp_page') // temp pages handled separately
+        .map(h => ({
+          id: `admin-${h.id}`,
+          title: getHighlightTitle(h, lang),
+          icon: h.icon,
+          color: h.color,
+          imageUrl: h.imageUrl || undefined,
+          route: h.route,
+          htmlContent: h.htmlContent || undefined,
+        }));
+      setAdminHighlights(prev => [...mapped, ...prev.filter(p => p.id.startsWith('temp-'))]);
+    });
+
+    // Fetch active temp pages (one-time)
+    const loadTempPages = async () => {
+      try {
+        const tempPages = await fetchActiveTempPages();
+        if (!mounted) return;
+        if (tempPages.length > 0) {
+          const isArabic = lang === 'ar';
+          const tempHighlights: DailyHighlight[] = tempPages.map(tp => ({
+            id: `temp-${tp.id}`,
+            title: isArabic ? tp.title : (tp.titleEn || tp.title),
+            icon: tp.icon || 'file-document-outline',
+            color: tp.color || '#0f987f',
+            route: `/temp-page/${tp.id}`,
           }));
-        setAdminHighlights(mapped);
-      }
-    }).catch(() => {});
-    return () => { mounted = false; };
+          setAdminHighlights(prev => [
+            ...prev.filter(p => !p.id.startsWith('temp-')),
+            ...tempHighlights,
+          ]);
+        }
+      } catch {}
+    };
+    loadTempPages();
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -163,7 +210,13 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       // Open URL in in-app webview
       router.push({ pathname: '/webview', params: { url: highlight.route, title: highlight.title } } as any);
     } else {
-      router.push(highlight.route as any);
+      // Sanitize deprecated /special-surah routes → /surah/{number}
+      let route = highlight.route;
+      if (route.startsWith('/special-surah')) {
+        const match = route.match(/[?&]surah=(\d+)/);
+        route = `/surah/${match ? match[1] : '18'}`;
+      }
+      router.push(route as any);
     }
   };
 
@@ -173,42 +226,49 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
   const builtInHighlights: DailyHighlight[] = [
     {
       id: 'hijri-date',
-      title: `${hijriDate.day} ${hijriDate.monthNameAr}`,
+      title: `${hijriDate.day} ${hijriDate.monthName}`,
       icon: 'calendar-month',
       color: '#2f7659',
       route: '/hijri',
     },
     {
+      id: 'radio',
+      title: t('radio.title'),
+      icon: 'radio',
+      color: '#16a34a',
+      route: '/radio',
+    },
+    {
       id: 'azkar-adhkar',
-      title: 'أدعية وأذكار',
+      title: t('azkar.dailyAzkar'),
       icon: 'hands-pray',
       color: '#be123c',
-      route: '/azkar/morning',
+      route: '/daily-dhikr',
     },
     {
       id: 'daily-dua',
-      title: 'دعاء اليوم',
+      title: t('home.dailyDua'),
       icon: 'book-heart',
       color: '#7c3aed',
       route: `/daily-dua`,
     },
     {
       id: 'daily-ayah',
-      title: 'آية اليوم',
+      title: t('home.dailyVerse'),
       icon: 'book-open-page-variant',
       color: '#1e40af',
       route: '/daily-ayah',
     },
     {
       id: 'daily-story',
-      title: 'ستوري اليوم',
+      title: t('home.dailyStory'),
       icon: 'book-open-variant',
       color: storyBgColor,
       route: '/story-of-day',
     },
     {
       id: 'next-prayer',
-      title: 'صلاتي القادمة',
+      title: t('prayer.nextPrayer'),
       icon: 'mosque',
       color: '#7c2d12',
       route: '/(tabs)/prayer',
@@ -275,15 +335,14 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     scrollX.current = contentOffset.x;
     maxScrollX.current = contentSize.width - layoutMeasurement.width;
-    // RTL layout: content starts from right. x=0 is at the right end.
-    // As user scrolls left (revealing more items on the left), x increases.
-    setCanScrollLeft(contentOffset.x < maxScrollX.current - 10); // can scroll further left (more items on left)
-    setCanScrollRight(contentOffset.x > 10); // can scroll back right (items on right)
+    // With scaleX: -1, physical x=0 is visual right. Increasing x = visual left.
+    setCanScrollLeft(contentOffset.x < maxScrollX.current - 10);
+    setCanScrollRight(contentOffset.x > 10);
   }, []);
 
   return (
     <View style={styles.container}>
-      {/* Left arrow — scroll to reveal more items on the left */}
+      {/* Left arrow — scroll forward (reveal more items) */}
       {canScrollLeft && (
         <TouchableOpacity
           style={[styles.arrowBtn, styles.arrowLeft]}
@@ -294,7 +353,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name="chevron-left" size={24} color={arrowColor} />
+          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 
@@ -303,7 +362,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        style={{ overflow: 'visible' }}
+        style={[{ overflow: 'visible' }, isRTL && { transform: [{ scaleX: -1 }] }]}
         snapToInterval={ITEM_WIDTH}
         decelerationRate="fast"
         onScroll={handleScroll}
@@ -312,14 +371,31 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
         {sortedHighlights.map((h) => (
           <TouchableOpacity
             key={h.id}
-            style={styles.itemWrapper}
+            style={[styles.itemWrapper, isRTL && { transform: [{ scaleX: -1 }] }]}
             onPress={() => handlePress(h)}
             activeOpacity={0.75}
           >
             <View style={[styles.ring, { borderColor: h.color }]}>  
               {h.id === 'daily-story' ? (
                 <View style={[styles.storyThumbWrapper, { backgroundColor: storyBgColor }]}>
-                  {storyAyahText ? (
+                  {storyThumbnailUrl ? (
+                    <View style={styles.storyThumbContent}>
+                      <Image
+                        source={{ uri: storyThumbnailUrl }}
+                        style={styles.storyThumbImage}
+                        resizeMode="cover"
+                      />
+                      {/* Dark overlay for text readability */}
+                      <View style={styles.storyThumbOverlay} />
+                      {storyAyahText ? (
+                        <View style={styles.storyThumbTextOverlay}>
+                          <Text style={styles.storyThumbText} numberOfLines={2}>
+                            {storyAyahText.slice(0, 40)}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : storyAyahText ? (
                     <View style={styles.storyThumbContent}>
                       <Text style={styles.storyThumbText} numberOfLines={3}>
                         {storyAyahText.slice(0, 50)}
@@ -344,21 +420,21 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
               ) : (
                 <View style={[styles.circleInner, { backgroundColor: h.color }]}>
                   <MaterialCommunityIcons
-                    name={h.icon as any}
+                    name={safeIcon(h.icon) as any}
                     size={28}
                     color="#fff"
                   />
                 </View>
               )}
             </View>
-            <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
+            <Text style={[styles.label, { color: labelColor, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {h.title}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Right arrow — scroll back to show items on the right */}
+      {/* Right arrow — scroll back to start */}
       {canScrollRight && (
         <TouchableOpacity
           style={[styles.arrowBtn, styles.arrowRight]}
@@ -369,12 +445,12 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name="chevron-right" size={24} color={arrowColor} />
+          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 
       {loading && (
-        <View style={styles.loadingBadge}>
+        <View style={[styles.loadingBadge, isRTL ? { left: 12, right: undefined } : null]}>
           <ActivityIndicator size="small" color="#2f7659" />
         </View>
       )}
@@ -387,12 +463,12 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           style={styles.fullReorderBlur}
         >
           <TouchableOpacity
-            style={styles.fullReorderBtn}
+            style={[styles.fullReorderBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={openReorderModal}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="swap-vertical" size={18} color={isDarkMode ? '#fff' : '#333'} style={{ marginLeft: 8 }} />
-            <Text style={[styles.fullReorderBtnText, { color: isDarkMode ? '#fff' : '#333' }]}>ترتيب الأقسام</Text>
+            <MaterialCommunityIcons name="swap-vertical" size={18} color={isDarkMode ? '#fff' : '#333'} />
+            <Text style={[styles.fullReorderBtnText, { color: isDarkMode ? '#fff' : '#333' }]}>{t('home.reorderSections')}</Text>
           </TouchableOpacity>
         </BlurView>
       )}
@@ -424,33 +500,31 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                 styles.reorderTitle,
                 { color: isDarkMode ? '#fff' : '#333' },
               ]}>
-                ترتيب الأبرز
-              </Text>
+                {t('home.reorderHighlights')}              </Text>
 
               <ScrollView style={styles.reorderList} showsVerticalScrollIndicator={false}>
                 {tempOrder.map((id, index) => {
-                  const item = highlights.find(h => h.id === id);
-                  if (!item) return null;
+                  const item = highlights.find(h => h.id === id);                  if (!item) return null;
                   return (
                     <View
                       key={id}
                       style={[
                         styles.reorderItem,
-                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' },
+                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', flexDirection: isRTL ? 'row-reverse' : 'row' },
                       ]}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                         <View style={[styles.reorderItemIcon, { backgroundColor: item.color }]}>
                           <MaterialCommunityIcons name={item.icon as any} size={18} color="#fff" />
                         </View>
                         <Text style={[
                           styles.reorderItemLabel,
-                          { color: isDarkMode ? '#fff' : '#333' },
+                          { color: isDarkMode ? '#fff' : '#333', textAlign: isRTL ? 'right' : 'left' },
                         ]}>
                           {item.title}
                         </Text>
                       </View>
-                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 4 }}>
                         <TouchableOpacity
                           disabled={index === 0}
                           onPress={() => moveHighlightItem(index, -1)}
@@ -471,7 +545,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                 })}
               </ScrollView>
 
-              <View style={styles.reorderButtons}>
+              <View style={[styles.reorderButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <TouchableOpacity
                   style={[styles.reorderBtn2, styles.reorderResetBtn]}
                   onPress={resetHighlightOrder}
@@ -480,14 +554,14 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                     styles.reorderBtnText,
                     { color: isDarkMode ? '#aaa' : '#666' },
                   ]}>
-                    إعادة تعيين
+                    {t('common.reset')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.reorderBtn2, styles.reorderDoneBtn]}
                   onPress={saveHighlightOrder}
                 >
-                  <Text style={styles.reorderDoneBtnText}>تم</Text>
+                  <Text style={styles.reorderDoneBtnText}>{t('common.done')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -507,7 +581,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 28,
     gap: 14,
-    flexDirection: 'row-reverse',
     alignItems: 'flex-start',
     paddingVertical: 4,
   },
@@ -564,16 +637,33 @@ const styles = StyleSheet.create({
   },
   storyThumbContent: {
     flex: 1,
+    width: '100%' as any,
+    height: '100%' as any,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  storyThumbImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%' as any,
+    height: '100%' as any,
+    borderRadius: CIRCLE_SIZE / 2,
+  },
+  storyThumbOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: CIRCLE_SIZE / 2,
+  },
+  storyThumbTextOverlay: {
+    zIndex: 1,
     paddingHorizontal: 3,
-    paddingVertical: 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
   },
   storyThumbText: {
     color: '#fff',
     fontSize: 7,
     lineHeight: 11,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textAlign: 'center' as const,
   },
   storyThumbDivider: {
@@ -585,12 +675,12 @@ const styles = StyleSheet.create({
   storyThumbSurah: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 5.5,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     textAlign: 'center' as const,
   },
   label: {
     fontSize: 11,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     marginTop: 4,
     textAlign: 'center',
     width: RING_SIZE + 12,
@@ -609,7 +699,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   fullReorderBtn: {
-    flexDirection: 'row-reverse' as const,
+    flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     paddingHorizontal: 16,
@@ -618,7 +708,7 @@ const styles = StyleSheet.create({
   },
   fullReorderBtnText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   reorderOverlay: {
     flex: 1,
@@ -640,7 +730,7 @@ const styles = StyleSheet.create({
   },
   reorderTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     textAlign: 'center' as const,
     marginBottom: 16,
   },
@@ -663,8 +753,7 @@ const styles = StyleSheet.create({
   },
   reorderItemLabel: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
-    textAlign: 'right' as const,
+    fontFamily: fontSemiBold(),
   },
   reorderArrow: {
     padding: 4,
@@ -688,11 +777,11 @@ const styles = StyleSheet.create({
   },
   reorderBtnText: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
   },
   reorderDoneBtnText: {
     fontSize: 15,
-    fontFamily: 'Cairo-SemiBold',
+    fontFamily: fontSemiBold(),
     color: '#fff',
   },
 });

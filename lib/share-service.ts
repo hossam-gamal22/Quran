@@ -5,7 +5,8 @@ import { Share, Platform } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { APP_CONFIG, APP_NAME } from '../constants/app';
+import { APP_CONFIG, getAppName } from '../constants/app';
+import { t } from '@/lib/i18n';
 
 // ===============================
 // أنواع
@@ -40,10 +41,10 @@ export function formatAyahForShare(
   const { includeAppName = true, includeTranslation = true } = options;
   
   let text = `﴿ ${arabicText} ﴾\n`;
-  text += `\n📖 ${surahName} - آية ${ayahNumber}`;
+  text += `\n📖 ${surahName} - ${t('shareService.ayahRef')} ${ayahNumber}`;
   
   if (translation && includeTranslation) {
-    text += `\n\n💬 الترجمة:\n${translation}`;
+    text += `\n\n💬 ${t('shareService.translation')}:\n${translation}`;
   }
   
   if (includeAppName) {
@@ -66,18 +67,18 @@ export function formatZikrForShare(
     includeBenefit = true 
   } = options;
   
-  let text = `📿 ${content.title || 'ذكر'}\n\n`;
+  let text = `📿 ${content.title || t('shareService.dhikr')}\n\n`;
   text += `「 ${content.arabicText} 」`;
   
   if (content.reference && includeReference) {
-    text += `\n\n📚 المصدر: ${content.reference}`;
+    text += `\n\n📚 ${t('shareService.source')}: ${content.reference}`;
     if (content.referenceNumber) {
       text += ` (${content.referenceNumber})`;
     }
   }
   
   if (content.benefit && includeBenefit) {
-    text += `\n\n✨ الفضل: ${content.benefit}`;
+    text += `\n\n✨ ${t('shareService.virtue')}: ${content.benefit}`;
   }
   
   if (includeAppName) {
@@ -95,7 +96,7 @@ export function formatPrayerTimesForShare(
   date: string,
   location?: string
 ): string {
-  let text = `🕌 مواقيت الصلاة\n`;
+  let text = `🕌 ${t('shareService.prayerTimes')}\n`;
   if (location) text += `📍 ${location}\n`;
   text += `📅 ${date}\n\n`;
   
@@ -114,7 +115,7 @@ export async function shareText(text: string, title?: string): Promise<void> {
   try {
     await Share.share(
       { message: text, title },
-      { dialogTitle: title || 'مشاركة من ' + APP_NAME }
+      { dialogTitle: title || t('shareService.shareFrom') + ' ' + getAppName() }
     );
   } catch (error) {
     console.error('Error sharing text:', error);
@@ -133,7 +134,7 @@ export async function shareImage(imageUri: string, title?: string): Promise<void
     
     await Sharing.shareAsync(imageUri, {
       mimeType: 'image/png',
-      dialogTitle: title || 'مشاركة من ' + APP_NAME,
+      dialogTitle: title || t('shareService.shareFrom') + ' ' + getAppName(),
       UTI: 'public.png',
     });
   } catch (error) {

@@ -11,45 +11,27 @@ import {
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 
-// ─── Hijri month names ────────────────────────────────────────────────────────
-const HIJRI_MONTHS = [
-  'محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني',
-  'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان',
-  'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة',
-];
-
-const ARABIC_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-const ARABIC_DAYS_SHORT = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+import { useSettings } from '@/contexts/SettingsContext';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getDateLocale, tArray } from '@/lib/i18n';
+import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from '@/lib/admin-data-api';
 
 // ─── Islamic Events ───────────────────────────────────────────────────────────
+// We will generate the events inside the component to support translations
+
 interface IslamicEvent {
   month: number;
   day: number;
+  dayEnd?: number;
   name: string;
   icon: string;
   description: string;
   color: string;
 }
-
-const ISLAMIC_EVENTS: IslamicEvent[] = [
-  { month: 1, day: 1,   name: 'رأس السنة الهجرية', icon: '🌙', description: 'بداية العام الهجري الجديد', color: '#1B6B3A' },
-  { month: 1, day: 10,  name: 'يوم عاشوراء',       icon: '✨', description: 'يوم صيام مستحب - اليوم الذي نجّى الله فيه موسى عليه السلام', color: '#7C3AED' },
-  { month: 3, day: 12,  name: 'المولد النبوي',     icon: '⭐', description: 'ذكرى مولد النبي محمد ﷺ', color: '#D97706' },
-  { month: 7, day: 27,  name: 'ليلة المعراج',      icon: '🌌', description: 'ذكرى الإسراء والمعراج', color: '#2563EB' },
-  { month: 8, day: 15,  name: 'ليلة النصف من شعبان', icon: '🌕', description: 'ليلة مباركة', color: '#059669' },
-  { month: 9, day: 1,   name: 'أول رمضان',         icon: '🌙', description: 'بداية شهر رمضان المبارك', color: '#DC2626' },
-  { month: 9, day: 17,  name: 'غزوة بدر',          icon: '📜', description: 'ذكرى غزوة بدر الكبرى', color: '#6B7280' },
-  { month: 9, day: 21,  name: 'ليالي القدر تبدأ',  icon: '✨', description: 'أوتار العشر الأواخر من رمضان', color: '#7C3AED' },
-  { month: 9, day: 27,  name: 'ليلة القدر',        icon: '🌟', description: 'خير من ألف شهر - ليلة السابع والعشرين', color: '#F59E0B' },
-  { month: 10, day: 1,  name: 'عيد الفطر',         icon: '🎉', description: 'عيد الفطر المبارك', color: '#1B6B3A' },
-  { month: 12, day: 8,  name: 'يوم التروية',       icon: '🕋', description: 'بداية الحج الأكبر', color: '#B45309' },
-  { month: 12, day: 9,  name: 'يوم عرفة',          icon: '🕋', description: 'أفضل أيام الدنيا - ركن الحج الأعظم', color: '#DC2626' },
-  { month: 12, day: 10, name: 'عيد الأضحى',        icon: '🌟', description: 'عيد الأضحى المبارك', color: '#1B6B3A' },
-  { month: 12, day: 11, name: 'أيام التشريق',      icon: '📿', description: 'أيام أكل وشرب وذكر لله', color: '#059669' },
-];
 
 // ─── Hijri conversion (Kuwaiti algorithm) ────────────────────────────────────
 function gregorianToHijri(gYear: number, gMonth: number, gDay: number): [number, number, number] {
@@ -84,8 +66,40 @@ function getDaysInHijriMonth(hYear: number, hMonth: number): number {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function HijriCalendarScreen() {
+  const { t, settings } = useSettings();
   const colors = useColors();
+  const isRTL = useIsRTL();
   const today = new Date();
+  
+  // ─── Translations ────────────────────────────────────────────────────────────
+  const hijriMonthsArr = tArray('calendar.hijriMonths');
+  const HIJRI_MONTHS = hijriMonthsArr.length > 0 ? hijriMonthsArr : [
+    'Muharram', 'Safar', 'Rabi al-Awwal', 'Rabi al-Thani',
+    'Jumada al-Ula', 'Jumada al-Akhirah', 'Rajab', 'Shaban',
+    'Ramadan', 'Shawwal', 'Dhul Qadah', 'Dhul Hijjah',
+  ];
+
+  const daysArr = tArray('calendar.weekDays');
+  const ARABIC_DAYS = daysArr.length > 0 ? daysArr : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const daysShortArr = tArray('calendar.weekDaysShort');
+  const ARABIC_DAYS_SHORT = daysShortArr.length > 0 ? daysShortArr : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  
+  const ISLAMIC_EVENTS: IslamicEvent[] = [
+    { month: 1, day: 1,   name: t('calendar.newYear'), icon: 'weather-night', description: t('calendar.newYearDesc'), color: '#1B6B3A' },
+    { month: 1, day: 10,  name: t('calendar.ashura'),       icon: 'star-four-points', description: t('calendar.ashuraDesc'), color: '#7C3AED' },
+    { month: 3, day: 12,  name: t('calendar.mawlid'),     icon: 'star', description: t('calendar.mawlidDesc'), color: '#D97706' },
+    { month: 7, day: 27,  name: t('calendar.isra'),      icon: 'weather-night', description: t('calendar.israDesc'), color: '#2563EB' },
+    { month: 8, day: 15,  name: t('calendar.shaban15'), icon: 'moon-full', description: t('calendar.shaban15Desc'), color: '#059669' },
+    { month: 9, day: 1,   name: t('calendar.ramadan'),         icon: 'weather-night', description: t('calendar.ramadanDesc'), color: '#DC2626' },
+    { month: 9, day: 17,  name: t('calendar.badr'),          icon: 'script-text-outline', description: t('calendar.badrDesc'), color: '#6B7280' },
+    { month: 9, day: 21, dayEnd: 30, name: t('calendar.lastTenNights'), icon: 'star-crescent', description: t('calendar.lastTenNightsDesc') || '', color: '#F5A623' },
+    { month: 10, day: 1,  name: t('calendar.eidAlFitr'),         icon: 'party-popper', description: t('calendar.eidAlFitrDesc'), color: '#1B6B3A' },
+    { month: 12, day: 8,  name: t('calendar.tarwiyah'),       icon: 'mosque', description: t('calendar.tarwiyahDesc'), color: '#B45309' },
+    { month: 12, day: 9,  name: t('calendar.arafat'),          icon: 'mosque', description: t('calendar.arafatDesc'), color: '#DC2626' },
+    { month: 12, day: 10, name: t('calendar.eidAlAdha'),        icon: 'star-shooting', description: t('calendar.eidAlAdhaDesc'), color: '#1B6B3A' },
+    { month: 12, day: 11, dayEnd: 13, name: t('calendar.tashreeq'),      icon: 'counter', description: t('calendar.tashreeqDesc'), color: '#059669' },
+  ];
+
   const [todayHijri] = useState(() => gregorianToHijri(today.getFullYear(), today.getMonth() + 1, today.getDate()));
 
   const [hYear, setHYear]   = useState(todayHijri[0]);
@@ -93,22 +107,68 @@ export default function HijriCalendarScreen() {
   const [selectedDay, setSelectedDay] = useState(todayHijri[2]);
   const [selectedEvent, setSelectedEvent] = useState<IslamicEvent | null>(null);
   const [showConverter, setShowConverter] = useState(false);
+  const [gcalEvents, setGcalEvents] = useState<IslamicEvent[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Fetch admin Google Calendar events
+  useEffect(() => {
+    fetchGoogleCalendarEvents().then((events) => {
+      const mapped: IslamicEvent[] = events
+        .filter(e => e.hijriMonth && e.hijriDay)
+        .map(e => ({
+          month: e.hijriMonth!,
+          day: e.hijriDay!,
+          dayEnd: e.hijriDayEnd,
+          name: e.titleAr || e.title,
+          icon: e.icon || 'calendar',
+          description: e.descriptionAr || e.description || '',
+          color: e.color || '#607D8B',
+        }));
+      setGcalEvents(mapped);
+    }).catch(() => {});
+  }, []);
 
   const daysInMonth = getDaysInHijriMonth(hYear, hMonth);
   const firstDayGregorian = hijriToGregorian(hYear, hMonth, 1);
   const firstDayOfWeek = firstDayGregorian.getDay(); // 0=Sun
 
-  // Events for current month
-  const monthEvents = ISLAMIC_EVENTS.filter(e => e.month === hMonth);
-  const eventDays = new Set(monthEvents.map(e => e.day));
+  // Events for current month (support range events) — includes Google Calendar events
+  const allEvents = [...ISLAMIC_EVENTS, ...gcalEvents];
+  const monthEvents = allEvents.filter(e => {
+    if (e.month !== hMonth) return false;
+    return true;
+  });
+  const eventDays = new Set<number>();
+  monthEvents.forEach(e => {
+    if (e.dayEnd) {
+      for (let d = e.day; d <= e.dayEnd; d++) eventDays.add(d);
+    } else {
+      eventDays.add(e.day);
+    }
+  });
+  // Add Ayyam al-Bidh (13, 14, 15) to every month
+  eventDays.add(13); eventDays.add(14); eventDays.add(15);
+
+  // Ayyam al-Bidh event object for display
+  const AYYAM_AL_BIDH_EVENT: IslamicEvent = {
+    month: hMonth,
+    day: 13,
+    dayEnd: 15,
+    name: t('calendar.ayyamAlBidh'),
+    icon: 'moon-full',
+    description: t('calendar.ayyamAlBidhDesc'),
+    color: '#4CAF50',
+  };
+
+  const localeStr = getDateLocale();
+  const ahSuffix = t('calendar.ahSuffix') || (settings.language === 'ar' ? 'هـ' : 'AH');
 
   const getDateString = () => {
     try {
       const selectedGreg = hijriToGregorian(hYear, hMonth, selectedDay);
-      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} هـ\n${selectedGreg.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} ${ahSuffix}\n${selectedGreg.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
     } catch {
-      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} هـ`;
+      return `${selectedDay} ${HIJRI_MONTHS[hMonth - 1]} ${hYear} ${ahSuffix}`;
     }
   };
 
@@ -122,7 +182,7 @@ export default function HijriCalendarScreen() {
   const handleShare = async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Share.share({ message: `🌙 ${getDateString()}\n\n— روح المسلم` });
+      await Share.share({ message: `🌙 ${getDateString()}\n\n— ${t('common.appSharingSig') || 'Rooh Al Muslim'}` });
     } catch {}
   };
 
@@ -146,10 +206,21 @@ export default function HijriCalendarScreen() {
     try { return hijriToGregorian(hYear, hMonth, safeSelectedDay); }
     catch { return new Date(); }
   })();
-  const selectedEvents = ISLAMIC_EVENTS.filter(e => e.month === hMonth && e.day === safeSelectedDay);
+  const selectedEvents = (() => {
+    const matched = allEvents.filter(e => {
+      if (e.month !== hMonth) return false;
+      if (e.dayEnd) return safeSelectedDay >= e.day && safeSelectedDay <= e.dayEnd;
+      return e.day === safeSelectedDay;
+    });
+    // Add Ayyam al-Bidh if 13th-15th
+    if (safeSelectedDay >= 13 && safeSelectedDay <= 15) {
+      matched.push(AYYAM_AL_BIDH_EVENT);
+    }
+    return matched;
+  })();
 
-  // All events for upcoming section (sorted)
-  const upcomingEvents = ISLAMIC_EVENTS
+  // All events for upcoming section (sorted) — includes Google Calendar events
+  const upcomingEvents = allEvents
     .map(e => {
       try {
         const evDate = hijriToGregorian(todayHijri[0], e.month, e.day);
@@ -169,7 +240,7 @@ export default function HijriCalendarScreen() {
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
-    iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)' },
+    iconBtn: { padding: 8, borderRadius: 20 },
     // Month nav
     monthNav: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
@@ -198,25 +269,25 @@ export default function HijriCalendarScreen() {
       margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
       padding: 14, borderWidth: 1, borderColor: colors.border,
     },
-    selectedDate: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    selectedGreg: { fontSize: 12, color: colors.muted, textAlign: 'right', marginTop: 2 },
+    selectedDate: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    selectedGreg: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
     eventItem: {
       flexDirection: 'row', alignItems: 'center', marginTop: 10,
       backgroundColor: colors.primary + '10', borderRadius: 12, padding: 10, gap: 10,
     },
     eventIcon: { fontSize: 20 },
-    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, flex: 1, textAlign: 'right' },
+    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, flex: 1, textAlign: isRTL ? 'right' : 'left' },
     // Section title
-    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginTop: 8, marginBottom: 6, textAlign: 'right' },
+    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginTop: 8, marginBottom: 6, textAlign: isRTL ? 'right' : 'left' },
     // Upcoming events
     upcomingItem: {
-      flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border,
+      flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16,
+      paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 12,
     },
-    upcomingIcon: { fontSize: 22, marginLeft: 12 },
+    upcomingIcon: { fontSize: 22 },
     upcomingInfo: { flex: 1 },
-    upcomingName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: 'right' },
-    upcomingDate: { fontSize: 12, color: colors.muted, textAlign: 'right', marginTop: 2 },
+    upcomingName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    upcomingDate: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
     upcomingDiff: {
       backgroundColor: colors.primary, borderRadius: 16,
       paddingHorizontal: 10, paddingVertical: 4,
@@ -238,7 +309,7 @@ export default function HijriCalendarScreen() {
       margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
       padding: 16, borderWidth: 1, borderColor: colors.border,
     },
-    convTitle: { fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: 'right', marginBottom: 10 },
+    convTitle: { fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
     convRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     convLabel: { fontSize: 13, color: colors.muted },
     convValue: { fontSize: 13, fontWeight: '700', color: colors.foreground },
@@ -254,7 +325,13 @@ export default function HijriCalendarScreen() {
       const isSelected = d === selectedDay;
       const isTodayDay = isToday(d);
       const hasEvent = eventDays.has(d);
-      const dayEvent = ISLAMIC_EVENTS.find(e => e.month === hMonth && e.day === d);
+      const dayEvent = allEvents.find(e => {
+        if (e.month !== hMonth) return false;
+        if (e.dayEnd) return d >= e.day && d <= e.dayEnd;
+        return e.day === d;
+      }) || (d >= 13 && d <= 15 ? AYYAM_AL_BIDH_EVENT : undefined);
+      const isBlessedPeriod = dayEvent?.dayEnd !== undefined && dayEvent !== AYYAM_AL_BIDH_EVENT;
+      const isAyyamDay = d >= 13 && d <= 15 && !dayEvent?.dayEnd; // Show green style for Ayyam al-Bidh only if no other range event
       cells.push(
         <TouchableOpacity
           key={d}
@@ -270,12 +347,14 @@ export default function HijriCalendarScreen() {
             isSelected && { backgroundColor: colors.primary },
             isTodayDay && !isSelected && { borderWidth: 2, borderColor: colors.primary },
             hasEvent && !isSelected && { backgroundColor: (dayEvent?.color || colors.primary) + '15' },
+            isBlessedPeriod && !isSelected && { backgroundColor: '#F5A62318', borderWidth: 0.5, borderColor: '#F5A62340' },
           ]}>
             <Text style={[
               s.dayNum,
               isSelected && { color: '#fff', fontWeight: '800' },
               isTodayDay && !isSelected && { color: colors.primary, fontWeight: '800' },
               hasEvent && !isSelected && { color: dayEvent?.color || colors.primary },
+              isBlessedPeriod && !isSelected && { color: '#F5A623' },
             ]}>
               {d}
             </Text>
@@ -288,16 +367,16 @@ export default function HijriCalendarScreen() {
   };
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="hijri">
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.iconBtn} onPress={handleCopy}>
           <IconSymbol name="doc.on.doc" size={20} color={colors.primary} />
         </TouchableOpacity>
         <TouchableOpacity style={s.iconBtn} onPress={handleShare}>
           <IconSymbol name="square.and.arrow.up" size={20} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={s.title}>🌙 التقويم الهجري</Text>
+        <Text style={s.title}>{t('calendar.hijriCalendar') || 'Hijri Calendar'}</Text>
         <TouchableOpacity style={s.iconBtn} onPress={() => { setHYear(todayHijri[0]); setHMonth(todayHijri[1]); setSelectedDay(todayHijri[2]); }}>
           <IconSymbol name="calendar.circle" size={20} color={colors.primary} />
         </TouchableOpacity>
@@ -307,26 +386,26 @@ export default function HijriCalendarScreen() {
       </View>
 
       {/* Month Navigator */}
-      <View style={s.monthNav}>
+      <View style={[s.monthNav, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
-          <IconSymbol name="chevron.right" size={18} color={colors.primary} />
+          <IconSymbol name={isRTL ? 'chevron.left' : 'chevron.right'} size={18} color={colors.primary} />
         </TouchableOpacity>
         <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
           <Text style={s.monthTitle}>{HIJRI_MONTHS[hMonth - 1]} {hYear}</Text>
           <Text style={s.yearText}>
-            {firstDayGregorian.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}
+            {firstDayGregorian.toLocaleDateString(localeStr, { month: 'long', year: 'numeric' })}
           </Text>
         </Animated.View>
         <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
-          <IconSymbol name="chevron.left" size={18} color={colors.primary} />
+          <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Weekday headers */}
         <View style={s.weekRow}>
-          {ARABIC_DAYS_SHORT.map(d => (
-            <Text key={d} style={[s.weekDay, d === 'جمعة' && { color: colors.primary }]}>{d}</Text>
+          {ARABIC_DAYS_SHORT.map((d, idx) => (
+            <Text key={d} style={[s.weekDay, idx === 5 && { color: colors.primary }]}>{d}</Text>
           ))}
         </View>
 
@@ -338,16 +417,16 @@ export default function HijriCalendarScreen() {
         {/* Selected Day Info */}
         <View style={s.selectedCard}>
           <Text style={s.selectedDate}>
-            {ARABIC_DAYS[selectedGregorian.getDay()]} {selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} هـ
+            {ARABIC_DAYS[selectedGregorian.getDay()]} {selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}
           </Text>
           <Text style={s.selectedGreg}>
-            {selectedGregorian.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {selectedGregorian.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </Text>
           {selectedEvents.map(ev => (
-            <TouchableOpacity key={ev.name} style={[s.eventItem, { backgroundColor: ev.color + '12' }]} onPress={() => setSelectedEvent(ev)}>
-              <Text style={s.eventIcon}>{ev.icon}</Text>
+            <TouchableOpacity key={ev.name} style={[s.eventItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: ev.color + '12' }]} onPress={() => setSelectedEvent(ev)}>
+              <MaterialCommunityIcons name={ev.icon as any} size={20} color={ev.color || colors.primary} />
               <Text style={[s.eventName, { color: ev.color }]}>{ev.name}</Text>
-              <IconSymbol name="chevron.left" size={14} color={ev.color} />
+              <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={14} color={ev.color} />
             </TouchableOpacity>
           ))}
         </View>
@@ -355,40 +434,40 @@ export default function HijriCalendarScreen() {
         {/* Date Converter */}
         {showConverter && (
           <View style={s.convCard}>
-            <Text style={s.convTitle}>📅 محوّل التواريخ — اليوم</Text>
-            <View style={s.convRow}>
-              <Text style={s.convLabel}>ميلادي</Text>
-              <Text style={s.convValue}>{today.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+            <Text style={s.convTitle}>{t('calendar.dateConverter') || 'Date Converter — Today'}</Text>
+            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={s.convLabel}>{t('calendar.gregorian') || 'Gregorian'}</Text>
+              <Text style={s.convValue}>{today.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
             </View>
-            <View style={s.convRow}>
-              <Text style={s.convLabel}>هجري</Text>
-              <Text style={[s.convValue, { color: colors.primary }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} هـ</Text>
+            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={s.convLabel}>{t('calendar.hijri') || 'Hijri'}</Text>
+              <Text style={[s.convValue, { color: colors.primary }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} {ahSuffix}</Text>
             </View>
-            <View style={s.convRow}>
-              <Text style={s.convLabel}>اليوم المختار</Text>
-              <Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} هـ</Text>
+            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={s.convLabel}>{t('calendar.selectedDay') || 'Selected Day'}</Text>
+              <Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}</Text>
             </View>
-            <View style={s.convRow}>
-              <Text style={s.convLabel}>يوافقه ميلادياً</Text>
+            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={s.convLabel}>{t('calendar.correspondsTo') || 'Corresponds To'}</Text>
               <Text style={[s.convValue, { color: colors.primary }]}>
-                {selectedGregorian.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}
+                {selectedGregorian.toLocaleDateString(localeStr, { year: 'numeric', month: 'long', day: 'numeric' })}
               </Text>
             </View>
           </View>
         )}
 
         {/* Upcoming Events */}
-        <Text style={s.sectionTitle}>📅 المناسبات القادمة</Text>
+        <Text style={s.sectionTitle}>{t('calendar.upcomingEvents') || 'Upcoming Events'}</Text>
         {upcomingEvents.map((ev, i) => (
-          <TouchableOpacity key={i} style={s.upcomingItem} onPress={() => setSelectedEvent(ev)} activeOpacity={0.7}>
+          <TouchableOpacity key={i} style={[s.upcomingItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={() => setSelectedEvent(ev)} activeOpacity={0.7}>
             <View style={[s.upcomingDiff, { backgroundColor: ev.diff === 0 ? '#DC2626' : colors.primary }]}>
-              <Text style={s.upcomingDiffText}>{ev.diff === 0 ? 'اليوم!' : `${ev.diff}د`}</Text>
+              <Text style={s.upcomingDiffText}>{ev.diff === 0 ? (t('calendar.today') || 'Today!') : `${ev.diff}${t('calendar.daysShort') || 'd'}`}</Text>
             </View>
             <View style={s.upcomingInfo}>
               <Text style={s.upcomingName}>{ev.name}</Text>
-              <Text style={s.upcomingDate}>{ev.day} {HIJRI_MONTHS[ev.month - 1]} • {ev.evDate.toLocaleDateString('ar-EG')}</Text>
+              <Text style={s.upcomingDate}>{ev.day} {HIJRI_MONTHS[ev.month - 1]} • {ev.evDate.toLocaleDateString(localeStr)}</Text>
             </View>
-            <Text style={s.upcomingIcon}>{ev.icon}</Text>
+            <MaterialCommunityIcons name={ev.icon as any} size={22} color={ev.color || colors.primary} />
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -399,7 +478,7 @@ export default function HijriCalendarScreen() {
           <View style={s.modalCard}>
             <View style={s.modalHandle} />
             {selectedEvent && (<>
-              <Text style={s.modalEventIcon}>{selectedEvent.icon}</Text>
+              <MaterialCommunityIcons name={selectedEvent.icon as any} size={48} color={selectedEvent.color || colors.primary} style={{ textAlign: 'center', marginBottom: 8 }} />
               <Text style={[s.modalTitle, { color: selectedEvent.color }]}>{selectedEvent.name}</Text>
               <Text style={s.modalDesc}>{selectedEvent.description}</Text>
               <Text style={s.modalDate}>

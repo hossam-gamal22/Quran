@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface AdUnitIds {
   android: string;
   ios: string;
+}
+
+interface AdSlot {
+  enabled: boolean;
+  adUnitId: AdUnitIds;
+  type: 'banner' | 'interstitial';
+  label: string;
+  screens?: string[];
+  position?: 'top' | 'bottom';
 }
 
 interface AdsSettings {
@@ -13,6 +23,8 @@ interface AdsSettings {
   bannerAdId: AdUnitIds;
   interstitialAdId: AdUnitIds;
   appOpenAdId: AdUnitIds;
+  // Named ad slots
+  adSlots: Record<string, AdSlot>;
   // Per-screen banner visibility
   bannerScreens: Record<string, boolean>;
   // App Open Ad
@@ -26,6 +38,33 @@ interface AdsSettings {
   firstAdDelay: number;
   updatedAt: string;
 }
+
+// Production Ad Unit IDs
+const PROD_IDS = {
+  ios: {
+    banner: 'ca-app-pub-3645278220050673/9534813157',
+    interstitial: 'ca-app-pub-3645278220050673/7064203695',
+    appOpen: 'ca-app-pub-3645278220050673/6908649810',
+    nativeAdvanced: 'ca-app-pub-3645278220050673/8070163603',
+  },
+  android: {
+    banner: 'ca-app-pub-3645278220050673/6453829605',
+    interstitial: 'ca-app-pub-3645278220050673/5882983961',
+    appOpen: 'ca-app-pub-3645278220050673/3627880358',
+    nativeAdvanced: 'ca-app-pub-3645278220050673/5595568144',
+  },
+};
+
+// Predefined ad slot definitions
+const PREDEFINED_SLOTS: { key: string; label: string; type: 'banner' | 'interstitial' }[] = [
+  { key: 'ad_home_banner', label: 'بانر الصفحة الرئيسية', type: 'banner' },
+  { key: 'ad_home_interstitial', label: 'إعلان بيني — الرئيسية', type: 'interstitial' },
+  { key: 'ad_quran_between_surahs', label: 'بانر بين السور', type: 'banner' },
+  { key: 'ad_prayer_times_bottom', label: 'بانر أسفل المواقيت', type: 'banner' },
+  { key: 'ad_tasbih_completion', label: 'إعلان بيني — إتمام التسبيح', type: 'interstitial' },
+  { key: 'ad_settings_top', label: 'بانر أعلى الإعدادات', type: 'banner' },
+  { key: 'ad_section_detail_banner', label: 'بانر تفاصيل الأقسام', type: 'banner' },
+];
 
 const SCREEN_LABELS: Record<string, string> = {
   home: 'الصفحة الرئيسية',
@@ -41,13 +80,31 @@ const SCREEN_LABELS: Record<string, string> = {
   tafsir: 'التفسير',
   khatma: 'الختمة',
   worship: 'متتبع العبادات',
+  seerah: 'السيرة النبوية',
+  companions: 'قصص الصحابة',
+  hajj_umrah: 'الحج والعمرة',
+  daily_ayah: 'آية اليوم',
+  hadith: 'أحاديث',
+  ayat_universe: 'آيات كونية',
+  hadith_sifat: 'أحاديث صفات',
 };
 
 const DEFAULT_SETTINGS: AdsSettings = {
   enabled: true,
-  bannerAdId: { android: '', ios: '' },
-  interstitialAdId: { android: '', ios: '' },
-  appOpenAdId: { android: '', ios: '' },
+  bannerAdId: { android: PROD_IDS.android.banner, ios: PROD_IDS.ios.banner },
+  interstitialAdId: { android: PROD_IDS.android.interstitial, ios: PROD_IDS.ios.interstitial },
+  appOpenAdId: { android: PROD_IDS.android.appOpen, ios: PROD_IDS.ios.appOpen },
+  adSlots: Object.fromEntries(
+    PREDEFINED_SLOTS.map(s => [s.key, {
+      enabled: false,
+      adUnitId: {
+        android: s.type === 'banner' ? PROD_IDS.android.banner : PROD_IDS.android.interstitial,
+        ios: s.type === 'banner' ? PROD_IDS.ios.banner : PROD_IDS.ios.interstitial,
+      },
+      type: s.type,
+      label: s.label,
+    }])
+  ),
   bannerScreens: {
     home: true,
     quran: false,
@@ -62,6 +119,13 @@ const DEFAULT_SETTINGS: AdsSettings = {
     tafsir: false,
     khatma: false,
     worship: false,
+    seerah: true,
+    companions: true,
+    hajj_umrah: true,
+    daily_ayah: true,
+    hadith: true,
+    ayat_universe: true,
+    hadith_sifat: true,
   },
   showAdOnAppOpen: false,
   interstitialMode: 'pages',
@@ -101,8 +165,8 @@ export default function Ads() {
     }
   };
 
-  const migrateSettings = (data: Record<string, any>): Partial<AdsSettings> => {
-    const result: any = { ...data };
+  const migrateSettings = (data: Record<string, unknown>): Partial<AdsSettings> => {
+    const result: Record<string, unknown> = { ...data };
 
     // Migrate old single ad codes to per-platform format
     if (data.bannerAdCode && !data.bannerAdId) {
@@ -116,16 +180,17 @@ export default function Ads() {
 
     // Migrate old flat boolean screens to bannerScreens object
     if (!data.bannerScreens) {
-      result.bannerScreens = { ...DEFAULT_SETTINGS.bannerScreens };
-      if (data.showBannerOnHome !== undefined) result.bannerScreens.home = data.showBannerOnHome;
-      if (data.showBannerOnQuran !== undefined) result.bannerScreens.quran = data.showBannerOnQuran;
-      if (data.showBannerOnAzkar !== undefined) result.bannerScreens.azkar = data.showBannerOnAzkar;
+      const bannerScreens = { ...DEFAULT_SETTINGS.bannerScreens };
+      if (data.showBannerOnHome !== undefined) bannerScreens.home = data.showBannerOnHome as boolean;
+      if (data.showBannerOnQuran !== undefined) bannerScreens.quran = data.showBannerOnQuran as boolean;
+      if (data.showBannerOnAzkar !== undefined) bannerScreens.azkar = data.showBannerOnAzkar as boolean;
+      result.bannerScreens = bannerScreens;
       delete result.showBannerOnHome;
       delete result.showBannerOnQuran;
       delete result.showBannerOnAzkar;
     }
 
-    return result;
+    return result as Partial<AdsSettings>;
   };
 
   const handleSave = async () => {
@@ -157,6 +222,77 @@ export default function Ads() {
       ...settings,
       [type]: { ...settings[type], [platform]: value },
     });
+  };
+
+  // === Ad Slot management ===
+  const [showAddSlot, setShowAddSlot] = useState(false);
+  const [newSlotKey, setNewSlotKey] = useState('');
+  const [newSlotLabel, setNewSlotLabel] = useState('');
+  const [newSlotType, setNewSlotType] = useState<'banner' | 'interstitial'>('banner');
+  const [newSlotScreens, setNewSlotScreens] = useState<string[]>([]);
+  const [newSlotPosition, setNewSlotPosition] = useState<'top' | 'bottom'>('bottom');
+
+  const updateSlot = (key: string, field: string, value: string | boolean) => {
+    const slots = { ...(settings.adSlots || {}) };
+    if (!slots[key]) return;
+    if (field === 'enabled') {
+      slots[key] = { ...slots[key], enabled: value };
+    } else if (field === 'type') {
+      slots[key] = { ...slots[key], type: value };
+    } else if (field === 'label') {
+      slots[key] = { ...slots[key], label: value };
+    } else if (field === 'position') {
+      slots[key] = { ...slots[key], position: value };
+    } else if (field === 'adUnitId.android') {
+      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, android: value } };
+    } else if (field === 'adUnitId.ios') {
+      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, ios: value } };
+    }
+    setSettings({ ...settings, adSlots: slots });
+  };
+
+  const toggleSlotScreen = (slotKey: string, screen: string) => {
+    const slots = { ...(settings.adSlots || {}) };
+    if (!slots[slotKey]) return;
+    const current = slots[slotKey].screens || [];
+    const updated = current.includes(screen) ? current.filter(s => s !== screen) : [...current, screen];
+    slots[slotKey] = { ...slots[slotKey], screens: updated };
+    setSettings({ ...settings, adSlots: slots });
+  };
+
+  const addCustomSlot = () => {
+    const key = newSlotKey.trim().replace(/\s+/g, '_').toLowerCase();
+    if (!key || !newSlotLabel.trim()) return;
+    const slots = { ...(settings.adSlots || {}) };
+    if (slots[key]) {
+      setMessage('يوجد موضع بنفس المعرّف');
+      setTimeout(() => setMessage(''), 3000);
+      return;
+    }
+    slots[key] = {
+      enabled: false,
+      adUnitId: {
+        android: newSlotType === 'banner' ? PROD_IDS.android.banner : PROD_IDS.android.interstitial,
+        ios: newSlotType === 'banner' ? PROD_IDS.ios.banner : PROD_IDS.ios.interstitial,
+      },
+      type: newSlotType,
+      label: newSlotLabel.trim(),
+      screens: newSlotScreens,
+      position: newSlotPosition,
+    };
+    setSettings({ ...settings, adSlots: slots });
+    setNewSlotKey('');
+    setNewSlotLabel('');
+    setNewSlotType('banner');
+    setNewSlotScreens([]);
+    setNewSlotPosition('bottom');
+    setShowAddSlot(false);
+  };
+
+  const removeSlot = (key: string) => {
+    const slots = { ...(settings.adSlots || {}) };
+    delete slots[key];
+    setSettings({ ...settings, adSlots: slots });
   };
 
   const enabledScreenCount = Object.values(settings.bannerScreens).filter(Boolean).length;
@@ -386,6 +522,7 @@ export default function Ads() {
                 onChange={(e) => setSettings({ ...settings, interstitialFrequency: Number(e.target.value) })}
                 min="1"
                 max="50"
+                aria-label="عدد الصفحات بين الإعلانات"
                 className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <span className="text-gray-600">صفحة</span>
@@ -404,6 +541,7 @@ export default function Ads() {
                 onChange={(e) => setSettings({ ...settings, interstitialTimeInterval: Number(e.target.value) })}
                 min="1"
                 max="60"
+                aria-label="الفاصل الزمني بالدقائق"
                 className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <span className="text-gray-600">دقيقة</span>
@@ -422,6 +560,7 @@ export default function Ads() {
                 onChange={(e) => setSettings({ ...settings, interstitialSessionLimit: Number(e.target.value) })}
                 min="1"
                 max="20"
+                aria-label="الحد الأقصى للإعلانات لكل جلسة"
                 className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <span className="text-gray-600">إعلان لكل فتح للتطبيق</span>
@@ -453,12 +592,252 @@ export default function Ads() {
                 onChange={(e) => setSettings({ ...settings, firstAdDelay: Number(e.target.value) })}
                 min="5"
                 max="300"
+                aria-label="تأخير أول إعلان بالثواني"
                 className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
               />
               <span className="text-gray-600">ثانية</span>
             </div>
           )}
         </div>
+      </div>
+
+      {/* مواضع الإعلانات (Ad Slots) */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">مواضع الإعلانات</h2>
+            <p className="text-gray-500 text-sm">تحكم في كل موضع إعلاني بشكل مستقل — يمكنك إضافة مواضع جديدة لأي صفحة</p>
+          </div>
+          <button
+            onClick={() => setShowAddSlot(!showAddSlot)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-sm font-medium"
+          >
+            <Plus size={16} />
+            إضافة موضع
+          </button>
+        </div>
+
+        {/* Add new slot form */}
+        {showAddSlot && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 mb-5">
+            <h3 className="font-medium text-emerald-800 mb-3">إضافة موضع إعلاني جديد</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">المعرّف (key)</label>
+                <input
+                  type="text"
+                  value={newSlotKey}
+                  onChange={(e) => setNewSlotKey(e.target.value)}
+                  placeholder="ad_page_name"
+                  aria-label="معرّف الموضع الإعلاني"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">الاسم (بالعربية)</label>
+                <input
+                  type="text"
+                  value={newSlotLabel}
+                  onChange={(e) => setNewSlotLabel(e.target.value)}
+                  placeholder="بانر الصفحة"
+                  aria-label="اسم الموضع الإعلاني"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">النوع</label>
+                <select
+                  value={newSlotType}
+                  onChange={(e) => setNewSlotType(e.target.value as 'banner' | 'interstitial')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  aria-label="نوع الإعلان"
+                  title="نوع الإعلان"
+                >
+                  <option value="banner">Banner</option>
+                  <option value="interstitial">Interstitial</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">الموقع</label>
+                <select
+                  value={newSlotPosition}
+                  onChange={(e) => setNewSlotPosition(e.target.value as 'top' | 'bottom')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  aria-label="موقع الإعلان"
+                  title="موقع الإعلان"
+                >
+                  <option value="top">أعلى الصفحة</option>
+                  <option value="bottom">أسفل الصفحة</option>
+                </select>
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-600 mb-2">الصفحات المستهدفة (اختياري — اترك فارغاً للربط اليدوي)</label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(SCREEN_LABELS).map(([sKey, sLabel]) => (
+                  <button
+                    key={sKey}
+                    onClick={() => setNewSlotScreens(prev => prev.includes(sKey) ? prev.filter(s => s !== sKey) : [...prev, sKey])}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${newSlotScreens.includes(sKey) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'}`}
+                  >
+                    {sLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={addCustomSlot}
+                disabled={!newSlotKey.trim() || !newSlotLabel.trim()}
+                className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                إضافة
+              </button>
+              <button
+                onClick={() => setShowAddSlot(false)}
+                className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm font-medium"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Slot list */}
+        <div className="space-y-4">
+          {Object.entries(settings.adSlots || {}).map(([key, slot]) => {
+            const isPredefined = PREDEFINED_SLOTS.some(s => s.key === key);
+            return (
+              <div key={key} className={`border rounded-xl p-5 transition-colors ${slot.enabled ? 'border-emerald-300 bg-emerald-50/30' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => updateSlot(key, 'enabled', !slot.enabled)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${slot.enabled ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-600'}`}
+                    >
+                      {slot.enabled ? 'مفعّل' : 'معطّل'}
+                    </button>
+                    <div>
+                      <div className="font-medium text-gray-800 flex items-center gap-2">
+                        {slot.label}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${slot.type === 'banner' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                          {slot.type}
+                        </span>
+                        {slot.position && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            {slot.position === 'top' ? '⬆ أعلى' : '⬇ أسفل'}
+                          </span>
+                        )}
+                        {slot.screens && slot.screens.length > 0 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            {slot.screens.length} صفحة
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-400 font-mono">{key}</span>
+                    </div>
+                  </div>
+                  {!isPredefined && (
+                    <button
+                      onClick={() => removeSlot(key)}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="حذف الموضع"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {slot.enabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">🤖 Android Ad Unit ID</label>
+                      <input
+                        type="text"
+                        value={slot.adUnitId.android}
+                        onChange={(e) => updateSlot(key, 'adUnitId.android', e.target.value)}
+                        placeholder="ca-app-pub-xxx/yyy"
+                        aria-label="Android Ad Unit ID"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">🍎 iOS Ad Unit ID</label>
+                      <input
+                        type="text"
+                        value={slot.adUnitId.ios}
+                        onChange={(e) => updateSlot(key, 'adUnitId.ios', e.target.value)}
+                        placeholder="ca-app-pub-xxx/yyy"
+                        aria-label="iOS Ad Unit ID"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+                    <div className="md:col-span-2 flex gap-3 items-center flex-wrap">
+                      <label className="text-xs font-medium text-gray-500">النوع:</label>
+                      <select
+                        value={slot.type}
+                        onChange={(e) => updateSlot(key, 'type', e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                        aria-label="نوع الإعلان"
+                        title="نوع الإعلان"
+                      >
+                        <option value="banner">Banner</option>
+                        <option value="interstitial">Interstitial</option>
+                      </select>
+                      <label className="text-xs font-medium text-gray-500">الموقع:</label>
+                      <select
+                        value={slot.position || 'bottom'}
+                        onChange={(e) => updateSlot(key, 'position', e.target.value)}
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                        aria-label="موقع الإعلان"
+                        title="موقع الإعلان"
+                      >
+                        <option value="top">أعلى الصفحة</option>
+                        <option value="bottom">أسفل الصفحة</option>
+                      </select>
+                      {!isPredefined && (
+                        <>
+                          <label className="text-xs font-medium text-gray-500 mr-3">الاسم:</label>
+                          <input
+                            type="text"
+                            value={slot.label}
+                            onChange={(e) => updateSlot(key, 'label', e.target.value)}
+                            placeholder="اسم الموضع"
+                            aria-label="اسم الموضع"
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                            title="اسم الموضع"
+                          />
+                        </>
+                      )}
+                    </div>
+                    {/* Screen targeting */}
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-2">الصفحات المستهدفة (تلقائي بدون كود):</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(SCREEN_LABELS).map(([sKey, sLabel]) => (
+                          <button
+                            key={sKey}
+                            onClick={() => toggleSlotScreen(key, sKey)}
+                            className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${(slot.screens || []).includes(sKey) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-400'}`}
+                          >
+                            {sLabel}
+                          </button>
+                        ))}
+                      </div>
+                      {(!slot.screens || slot.screens.length === 0) && (
+                        <p className="text-xs text-amber-600 mt-1">⚠ لم يتم تحديد صفحات — سيحتاج ربط يدوي في الكود</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-gray-400 text-xs mt-4">⚠️ الموضع المعطّل أو بدون Ad Unit ID لن يظهر أي شيء — صفر مساحة فارغة</p>
       </div>
 
       {/* ملخص الإعدادات */}
@@ -468,6 +847,7 @@ export default function Ads() {
           <li>• الإعلانات: <span className="font-medium">{settings.enabled ? 'مفعّلة' : 'معطّلة'}</span></li>
           <li>• إعلان فتح التطبيق: <span className="font-medium">{settings.showAdOnAppOpen ? 'مفعّل' : 'معطّل'}</span></li>
           <li>• البانر: <span className="font-medium">{enabledScreenCount} شاشة مفعّلة</span></li>
+          <li>• مواضع إعلانية: <span className="font-medium">{Object.values(settings.adSlots || {}).filter(s => s.enabled).length} مفعّل من {Object.keys(settings.adSlots || {}).length}</span></li>
           <li>• الإعلانات البينية: <span className="font-medium">
             {settings.interstitialMode === 'pages' && `كل ${settings.interstitialFrequency} صفحات`}
             {settings.interstitialMode === 'time' && `كل ${settings.interstitialTimeInterval} دقائق`}

@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -25,11 +26,12 @@ import {
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
-  formatTime12h,
+  formatPrayerTime,
   getPrayerIcon,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width } = Dimensions.get('window');
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -46,6 +48,7 @@ interface CountdownTimerProps {
   primaryColor?: string;
   secondaryColor?: string;
   variant?: 'classic' | 'creative';
+  show24Hour?: boolean;
 }
 
 // ========================================
@@ -61,6 +64,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   primaryColor = '#2f7659',
   secondaryColor = '#4ade80',
   variant = 'creative',
+  show24Hour = false,
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
@@ -73,6 +77,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     time: string;
   } | null>(null);
   const [totalDuration, setTotalDuration] = useState<number>(0);
+  const isRTL = useIsRTL();
 
   // حساب أبعاد الدائرة
   const radius = (size - strokeWidth) / 2;
@@ -236,10 +241,12 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
               {formatHMS(timeRemaining)}
             </Text>
 
-            <Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>باقي على الأذان</Text>
+            <Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>
+              {t('prayer.timeRemaining')}
+            </Text>
 
             <Text style={[styles.adhanTimeCreative, isDarkMode && styles.textMuted]}>
-              {formatTime12h(nextPrayer.time)}
+              {formatPrayerTime(nextPrayer.time, show24Hour)}
             </Text>
           </>
         ) : (
@@ -260,16 +267,16 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
             {/* الوقت المتبقي */}
             <View style={styles.timeContainer}>
-              <TimeDigit value={timeRemaining.hours} label="س" isDarkMode={isDarkMode} />
+              <TimeDigit value={timeRemaining.hours} label={t('countdown.hourLabel')} isDarkMode={isDarkMode} />
               <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-              <TimeDigit value={timeRemaining.minutes} label="د" isDarkMode={isDarkMode} />
+              <TimeDigit value={timeRemaining.minutes} label={t('countdown.minuteLabel')} isDarkMode={isDarkMode} />
               <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-              <TimeDigit value={timeRemaining.seconds} label="ث" isDarkMode={isDarkMode} />
+              <TimeDigit value={timeRemaining.seconds} label={t('countdown.secondLabel')} isDarkMode={isDarkMode} />
             </View>
 
             {/* وقت الأذان */}
             <Text style={[styles.adhanTime, isDarkMode && styles.textMuted]}>
-              {formatTime12h(nextPrayer.time)}
+              {formatPrayerTime(nextPrayer.time, show24Hour)}
             </Text>
           </>
         )}
@@ -341,19 +348,19 @@ const styles = StyleSheet.create({
   },
   prayerName: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 4,
   },
   prayerNameCreative: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#e6fff6',
     marginBottom: 6,
   },
   bigTime: {
     fontSize: 56,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     marginTop: 4,
   },
@@ -380,7 +387,7 @@ const styles = StyleSheet.create({
   },
   timeSeparator: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginHorizontal: 2,
   },
@@ -390,18 +397,18 @@ const styles = StyleSheet.create({
   },
   digitValue: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   digitLabel: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: -4,
   },
   adhanTime: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginTop: 8,
   },

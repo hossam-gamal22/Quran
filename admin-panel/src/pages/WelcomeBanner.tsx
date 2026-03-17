@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { Styled } from '../components/Styled';
 
 // ========================================
 // الأنواع
@@ -75,7 +76,7 @@ const ROUTE_OPTIONS = [
   { value: '/azkar/evening', label: 'أذكار المساء' },
   { value: '/names', label: 'أسماء الله الحسنى' },
   { value: '/hajj-umrah', label: 'الحج والعمرة' },
-  { value: '/story-of-day', label: 'ستوري اليوم' },
+  { value: '/story-of-day', label: 'فيديو اليوم' },
   { value: '/hijri', label: 'التقويم الهجري' },
   { value: '/khatma', label: 'ختمة القرآن' },
   { value: '/worship-tracker', label: 'تتبع العبادات' },
@@ -160,7 +161,7 @@ export default function WelcomeBanner() {
     }
   };
 
-  const updateBanner = (key: keyof WelcomeBannerData, value: any) => {
+  const updateBanner = <K extends keyof WelcomeBannerData>(key: K, value: WelcomeBannerData[K]) => {
     setBanner(prev => ({ ...prev, [key]: value }));
   };
 
@@ -232,6 +233,8 @@ export default function WelcomeBanner() {
                 className={`relative w-14 h-7 rounded-full transition-colors ${
                   banner.enabled ? 'bg-emerald-500' : 'bg-slate-600'
                 }`}
+                aria-label={banner.enabled ? 'تعطيل الرسالة الترحيبية' : 'تفعيل الرسالة الترحيبية'}
+                title={banner.enabled ? 'تعطيل الرسالة الترحيبية' : 'تفعيل الرسالة الترحيبية'}
               >
                 <div
                   className={`absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
@@ -283,6 +286,7 @@ export default function WelcomeBanner() {
                 onChange={(e) => updateBanner('backgroundImage', e.target.value)}
                 className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
                 placeholder="https://example.com/image.jpg"
+                aria-label="رابط صورة الخلفية"
                 dir="ltr"
               />
               <p className="text-xs text-slate-400 mt-2">أدخل رابط الصورة (يفضل بأبعاد 800×200 أو نسبة 4:1)</p>
@@ -315,6 +319,7 @@ export default function WelcomeBanner() {
                 onChange={(e) => updateBanner('title', e.target.value)}
                 className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors"
                 placeholder="مثال: رمضان مبارك"
+                aria-label="العنوان الرئيسي"
                 dir="rtl"
               />
             </div>
@@ -327,6 +332,7 @@ export default function WelcomeBanner() {
                 onChange={(e) => updateBanner('subtitle', e.target.value)}
                 className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors"
                 placeholder="مثال: كل عام وأنتم بخير"
+                aria-label="العنوان الفرعي"
                 dir="rtl"
               />
             </div>
@@ -377,9 +383,9 @@ export default function WelcomeBanner() {
                       : 'border-slate-600 hover:border-slate-500'
                   }`}
                 >
-                  <div
+                  <Styled
                     className="w-5 h-5 rounded-full"
-                    style={{ backgroundColor: c.value }}
+                    css={{ backgroundColor: c.value }}
                   />
                   <span className="text-sm text-slate-300">{c.label}</span>
                 </button>
@@ -392,12 +398,15 @@ export default function WelcomeBanner() {
                 value={banner.color}
                 onChange={(e) => updateBanner('color', e.target.value)}
                 className="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer"
+                aria-label="اختيار لون مخصص"
               />
               <input
                 type="text"
                 value={banner.color}
                 onChange={(e) => updateBanner('color', e.target.value)}
                 className="bg-slate-700 text-white rounded-lg px-3 py-2 w-32 border border-slate-600 text-sm font-mono"
+                aria-label="كود اللون"
+                placeholder="#000000"
                 dir="ltr"
               />
             </div>
@@ -441,6 +450,7 @@ export default function WelcomeBanner() {
                 }}
                 className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
                 placeholder="/custom/route"
+                aria-label="رابط مخصص"
                 dir="ltr"
               />
             </div>
@@ -461,9 +471,9 @@ export default function WelcomeBanner() {
                     <img src={banner.backgroundImage} alt="banner" className="w-full h-24 object-cover" />
                   </div>
                 ) : banner.displayMode === 'text_image' && banner.backgroundImage ? (
-                  <div
+                  <Styled
                     className="rounded-2xl p-5 text-white relative overflow-hidden"
-                    style={{ backgroundImage: `url(${banner.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                    css={{ backgroundImage: `url(${banner.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                   >
                     <div className="absolute inset-0 bg-black/40 rounded-2xl" />
                     <div className="flex items-center justify-between relative z-10">
@@ -475,11 +485,11 @@ export default function WelcomeBanner() {
                         {ICON_OPTIONS.find(i => i.value === banner.icon)?.label.split(' ')[0] || '🌙'}
                       </div>
                     </div>
-                  </div>
+                  </Styled>
                 ) : (
-                  <div
+                  <Styled
                     className="rounded-2xl p-5 text-white"
-                    style={{ backgroundColor: `${banner.color}CC` }}
+                    css={{ backgroundColor: `${banner.color}CC` }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -490,7 +500,7 @@ export default function WelcomeBanner() {
                         {ICON_OPTIONS.find(i => i.value === banner.icon)?.label.split(' ')[0] || '🌙'}
                       </div>
                     </div>
-                  </div>
+                  </Styled>
                 )
               ) : (
                 <div className="rounded-2xl p-5 bg-gray-300 text-gray-500 text-center">
@@ -509,9 +519,9 @@ export default function WelcomeBanner() {
                     <img src={banner.backgroundImage} alt="banner" className="w-full h-24 object-cover" />
                   </div>
                 ) : banner.displayMode === 'text_image' && banner.backgroundImage ? (
-                  <div
+                  <Styled
                     className="rounded-2xl p-5 text-white relative overflow-hidden"
-                    style={{ backgroundImage: `url(${banner.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+                    css={{ backgroundImage: `url(${banner.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                   >
                     <div className="absolute inset-0 bg-black/40 rounded-2xl" />
                     <div className="flex items-center justify-between relative z-10">
@@ -523,11 +533,11 @@ export default function WelcomeBanner() {
                         {ICON_OPTIONS.find(i => i.value === banner.icon)?.label.split(' ')[0] || '🌙'}
                       </div>
                     </div>
-                  </div>
+                  </Styled>
                 ) : (
-                  <div
+                  <Styled
                     className="rounded-2xl p-5 text-white"
-                    style={{ backgroundColor: `${banner.color}CC` }}
+                    css={{ backgroundColor: `${banner.color}CC` }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -538,7 +548,7 @@ export default function WelcomeBanner() {
                         {ICON_OPTIONS.find(i => i.value === banner.icon)?.label.split(' ')[0] || '🌙'}
                       </div>
                     </div>
-                  </div>
+                  </Styled>
                 )
               ) : (
                 <div className="rounded-2xl p-5 bg-slate-800 text-slate-500 text-center">

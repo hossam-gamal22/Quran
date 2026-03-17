@@ -134,3 +134,19 @@ export function getContrastRatio(color1: string, color2: string): number {
 export function meetsContrastAA(textColor: string, bgColor: string): boolean {
   return getContrastRatio(textColor, bgColor) >= 4.5;
 }
+
+/**
+ * Blend a color with a black dim overlay at given opacity.
+ * Simulates: image color visible through rgba(0,0,0,dimOpacity) overlay.
+ * Higher dimOpacity → darker effective color.
+ */
+export function blendWithDimOverlay(color: string, dimOpacity: number): string {
+  const parsed = parseColor(color);
+  if (!parsed) return '#808080';
+  // blending: result = image * (1 - dimOpacity) + black * dimOpacity
+  const factor = 1 - dimOpacity;
+  const r = Math.round(parsed.r * factor);
+  const g = Math.round(parsed.g * factor);
+  const b = Math.round(parsed.b * factor);
+  return `rgb(${r},${g},${b})`;
+}

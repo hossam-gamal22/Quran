@@ -27,7 +27,11 @@ import {
   MoreVertical,
   GripVertical,
   Volume2,
+  type LucideIcon,
 } from 'lucide-react';
+import { collection, doc, getDocs, setDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
+import AutoTranslateField from '../components/AutoTranslateField';
 
 // ========================================
 // الأنواع
@@ -98,7 +102,7 @@ interface Category {
 // البيانات الافتراضية
 // ========================================
 
-const CONTENT_TYPES: { value: ContentType; label: string; icon: any; color: string }[] = [
+const CONTENT_TYPES: { value: ContentType; label: string; icon: LucideIcon; color: string }[] = [
   { value: 'azkar', label: 'أذكار', icon: Star, color: '#2f7659' },
   { value: 'ayah', label: 'آيات', icon: BookOpen, color: '#3b82f6' },
   { value: 'hadith', label: 'أحاديث', icon: MessageCircle, color: '#f59e0b' },
@@ -203,61 +207,16 @@ const ContentPage: React.FC = () => {
 
   const loadContent = async () => {
     setIsLoading(true);
-    
-    // TODO: API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // بيانات تجريبية
-    const mockData: ContentItem[] = [
-      {
-        id: '1',
-        type: 'azkar',
-        textAr: 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَـهَ إِلاَّ اللهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
-        textEn: 'We have reached the morning and at this very time unto Allah belongs all sovereignty...',
-        titleAr: 'دعاء الصباح',
-        category: 'morning',
-        source: 'muslim',
-        sourceDetail: 'صحيح مسلم',
-        count: 1,
-        virtue: 'من قالها حين يصبح وحين يمسي كفته من كل شيء',
-        translations: {
-          en: 'We have reached the morning and at this very time unto Allah belongs all sovereignty...',
-          ur: 'ہم نے صبح کی اور اللہ کی بادشاہی صبح ہوئی...',
-        },
-        isActive: true,
-        isFeatured: true,
-        order: 1,
-        tags: ['صباح', 'يومي'],
-        viewCount: 15000,
-        shareCount: 2500,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-03-01T00:00:00Z',
-      },
-      {
-        id: '2',
-        type: 'azkar',
-        textAr: 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ',
-        textEn: 'Glory is to Allah and praise is to Him',
-        titleAr: 'التسبيح',
-        category: 'morning',
-        source: 'bukhari',
-        count: 100,
-        virtue: 'من قالها مائة مرة حين يصبح وحين يمسي لم يأت أحد يوم القيامة بأفضل مما جاء به',
-        translations: {
-          en: 'Glory is to Allah and praise is to Him',
-        },
-        isActive: true,
-        isFeatured: false,
-        order: 2,
-        tags: ['تسبيح', 'صباح', 'مساء'],
-        viewCount: 25000,
-        shareCount: 5000,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-03-01T00:00:00Z',
-      },
-    ];
-    
-    setItems(mockData.filter(item => item.type === activeTab));
+    try {
+      const q = query(collection(db, 'content'), where('type', '==', activeTab));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ContentItem));
+      data.sort((a, b) => (a.order || 0) - (b.order || 0));
+      setItems(data);
+    } catch (error) {
+      console.error('Error loading content:', error);
+      setItems([]);
+    }
     setIsLoading(false);
   };
 
@@ -281,29 +240,37 @@ const ContentPage: React.FC = () => {
   const handleSave = async () => {
     const updatedItem = { ...formData, updatedAt: new Date().toISOString() };
     
-    if (editingItem) {
-      setItems(prev => prev.map(item => item.id === editingItem.id ? updatedItem : item));
-    } else {
-      setItems(prev => [...prev, updatedItem]);
+    try {
+      await setDoc(doc(db, 'content', updatedItem.id), updatedItem);
+      await loadContent();
+    } catch (error) {
+      console.error('Error saving content:', error);
     }
-    
     setIsModalOpen(false);
-    // TODO: API call
   };
 
   // حذف
   const handleDelete = async (id: string) => {
     if (confirm('هل أنت متأكد من حذف هذا العنصر؟')) {
-      setItems(prev => prev.filter(item => item.id !== id));
-      // TODO: API call
+      try {
+        await deleteDoc(doc(db, 'content', id));
+        await loadContent();
+      } catch (error) {
+        console.error('Error deleting content:', error);
+      }
     }
   };
 
   // تفعيل/تعطيل
-  const handleToggleActive = (id: string) => {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, isActive: !item.isActive } : item
-    ));
+  const handleToggleActive = async (id: string) => {
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+    try {
+      await setDoc(doc(db, 'content', id), { ...item, isActive: !item.isActive, updatedAt: new Date().toISOString() });
+      await loadContent();
+    } catch (error) {
+      console.error('Error toggling content:', error);
+    }
   };
 
   // نسخ
@@ -377,6 +344,7 @@ const ContentPage: React.FC = () => {
           <input
             type="text"
             placeholder="بحث في المحتوى..."
+            aria-label="بحث في المحتوى"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full bg-gray-800 border border-gray-700 rounded-lg pr-10 pl-4 py-3 focus:border-green-500 outline-none"
@@ -385,6 +353,7 @@ const ContentPage: React.FC = () => {
         <select
           value={selectedCategory}
           onChange={e => setSelectedCategory(e.target.value)}
+          aria-label="فلترة حسب القسم"
           className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 focus:border-green-500 outline-none min-w-[200px]"
         >
           <option value="all">جميع الأقسام</option>
@@ -483,6 +452,8 @@ const ContentPage: React.FC = () => {
                   <button
                     onClick={() => handleToggleActive(item.id)}
                     className={`p-1 rounded ${item.isActive ? 'text-green-500' : 'text-gray-500'}`}
+                    aria-label={item.isActive ? 'إخفاء' : 'تفعيل'}
+                    title={item.isActive ? 'إخفاء' : 'تفعيل'}
                   >
                     {item.isActive ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
@@ -528,6 +499,8 @@ const ContentPage: React.FC = () => {
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                aria-label="إغلاق"
+                title="إغلاق"
               >
                 <X size={20} />
               </button>
@@ -535,14 +508,14 @@ const ContentPage: React.FC = () => {
 
             {/* Tabs */}
             <div className="flex border-b border-gray-700">
-              {[
-                { id: 'content', label: 'المحتوى' },
-                { id: 'translations', label: 'الترجمات' },
-                { id: 'settings', label: 'الإعدادات' },
-              ].map(tab => (
+              {([
+                { id: 'content' as const, label: 'المحتوى' },
+                { id: 'translations' as const, label: 'الترجمات' },
+                { id: 'settings' as const, label: 'الإعدادات' },
+              ]).map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveFormTab(tab.id as any)}
+                  onClick={() => setActiveFormTab(tab.id)}
                   className={`px-6 py-3 transition-colors ${
                     activeFormTab === tab.id
                       ? 'bg-gray-700 text-white border-b-2 border-green-500'
@@ -567,6 +540,7 @@ const ContentPage: React.FC = () => {
                       onChange={e => setFormData({ ...formData, textAr: e.target.value })}
                       rows={4}
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none text-lg leading-relaxed"
+                      aria-label="النص العربي"
                       placeholder="أدخل النص العربي..."
                       dir="rtl"
                     />
@@ -604,6 +578,7 @@ const ContentPage: React.FC = () => {
                       <select
                         value={formData.category}
                         onChange={e => setFormData({ ...formData, category: e.target.value })}
+                        aria-label="القسم"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       >
                         <option value="">اختر القسم</option>
@@ -617,6 +592,7 @@ const ContentPage: React.FC = () => {
                       <select
                         value={formData.source}
                         onChange={e => setFormData({ ...formData, source: e.target.value as SourceType })}
+                        aria-label="المصدر"
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       >
                         {SOURCE_TYPES.map(src => (
@@ -648,6 +624,7 @@ const ContentPage: React.FC = () => {
                           min="1"
                           value={formData.count || 1}
                           onChange={e => setFormData({ ...formData, count: parseInt(e.target.value) || 1 })}
+                          aria-label="عدد التكرار"
                           className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                         />
                       </div>
@@ -673,6 +650,7 @@ const ContentPage: React.FC = () => {
                       onChange={e => setFormData({ ...formData, virtue: e.target.value })}
                       rows={2}
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                      aria-label="الفضل / الفائدة"
                       placeholder="فضل هذا الذكر أو الدعاء..."
                     />
                   </div>
@@ -685,6 +663,19 @@ const ContentPage: React.FC = () => {
                   <p className="text-gray-400 text-sm mb-4">
                     أضف ترجمات للمحتوى بلغات مختلفة
                   </p>
+
+                  {/* Auto-translate */}
+                  <AutoTranslateField
+                    label="ترجمة تلقائية"
+                    fieldName="translations"
+                    contentType={formData.type === 'ayah' ? 'quran' : formData.type === 'hadith' ? 'hadith' : 'adhkar'}
+                    arabicText={formData.arabic}
+                    initialValues={formData.translations}
+                    onSave={(translations) => setFormData({
+                      ...formData,
+                      translations: { ...formData.translations, ...translations },
+                    })}
+                  />
                   
                   {SUPPORTED_LANGUAGES.filter(lang => lang.code !== 'ar').map(lang => (
                     <div key={lang.code}>
@@ -702,6 +693,7 @@ const ContentPage: React.FC = () => {
                         })}
                         rows={2}
                         className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none resize-none"
+                        aria-label={`ترجمة ${lang.name}`}
                         placeholder={`الترجمة بـ ${lang.name}...`}
                         dir={['ur', 'fa', 'ps'].includes(lang.code) ? 'rtl' : 'ltr'}
                       />
@@ -721,6 +713,7 @@ const ContentPage: React.FC = () => {
                       min="0"
                       value={formData.order}
                       onChange={e => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                      aria-label="الترتيب"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                     />
                   </div>
@@ -735,6 +728,7 @@ const ContentPage: React.FC = () => {
                         ...formData,
                         tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean),
                       })}
+                      aria-label="الوسوم"
                       className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                       placeholder="صباح، يومي، مهم"
                     />

@@ -4,7 +4,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { getHijriDateObject } from './hijri-date';
+import { getLocalizedHijriDate } from './hijri-date';
+import { getDateLocale } from './i18n';
 
 // ========================================
 // Types matching native widget entries
@@ -101,13 +102,13 @@ function getCurrentDhikr(): AzkarWidgetNativeData {
  * Get current Hijri date for widget.
  */
 function getCurrentHijriData(): HijriWidgetNativeData {
-  const hijri = getHijriDateObject();
+  const hijri = getLocalizedHijriDate();
   const now = new Date();
   return {
     hijriDay: hijri?.day ?? 1,
-    hijriMonth: hijri?.monthAr ?? 'محرم',
+    hijriMonth: hijri?.monthName ?? 'محرم',
     hijriYear: hijri?.year ?? 1447,
-    gregorianDate: now.toLocaleDateString('ar-SA', {
+    gregorianDate: now.toLocaleDateString(getDateLocale(), {
       weekday: 'long',
       day: 'numeric',
       month: 'long',

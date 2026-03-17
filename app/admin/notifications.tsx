@@ -17,8 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { PushNotification } from '../../types/admin';
-
+import { t } from '@/lib/i18n';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function NotificationsScreen() {
+  const isRTL = useIsRTL();
   const [notifications, setNotifications] = useState<PushNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -87,7 +89,7 @@ export default function NotificationsScreen() {
 
   const saveNotification = async () => {
     if (!formData.titleAr || !formData.bodyAr) {
-      Alert.alert('خطأ', 'يرجى ملء العنوان والنص بالعربية');
+      Alert.alert(t('common.error'), t('admin.notifFillRequired'));
       return;
     }
 
@@ -101,22 +103,22 @@ export default function NotificationsScreen() {
       }
 
       if (success) {
-        Alert.alert('تم', 'تم حفظ الإشعار بنجاح');
+        Alert.alert(t('common.done'), t('admin.notifSaved'));
         setShowModal(false);
         loadNotifications();
       } else {
-        Alert.alert('خطأ', 'فشل في حفظ الإشعار');
+        Alert.alert(t('common.error'), t('admin.notifSaveFailed'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ غير متوقع');
+      Alert.alert(t('common.error'), t('admin.unexpectedError'));
     }
   };
 
   const deleteNotification = async (id: string) => {
-    Alert.alert('تأكيد الحذف', 'هل أنت متأكد من حذف هذا الإشعار؟', [
-      { text: 'إلغاء', style: 'cancel' },
+    Alert.alert(t('admin.confirmDelete'), t('admin.notifDeleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'حذف',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           const success = await adminService.deleteNotification(id);
@@ -129,13 +131,13 @@ export default function NotificationsScreen() {
   };
 
   const sendNow = async (item: PushNotification) => {
-    Alert.alert('إرسال الآن', 'هل تريد إرسال هذا الإشعار الآن لجميع المستخدمين؟', [
-      { text: 'إلغاء', style: 'cancel' },
+    Alert.alert(t('admin.sendNow'), t('admin.sendNowConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'إرسال',
+        text: t('admin.sendNow'),
         onPress: async () => {
           // هنا يتم الاتصال بـ Cloud Function لإرسال الإشعار
-          Alert.alert('تم', 'تم إرسال الإشعار بنجاح');
+          Alert.alert(t('common.done'), t('admin.sentSuccess'));
           loadNotifications();
         },
       },
@@ -145,11 +147,11 @@ export default function NotificationsScreen() {
   const getRepeatLabel = (repeat: string) => {
     switch (repeat) {
       case 'once':
-        return 'مرة واحدة';
+        return t('admin.repeatOnce');
       case 'daily':
-        return 'يومياً';
+        return t('admin.repeatDaily');
       case 'weekly':
-        return 'أسبوعياً';
+        return t('admin.repeatWeekly');
       default:
         return repeat;
     }
@@ -158,11 +160,11 @@ export default function NotificationsScreen() {
   const getAudienceLabel = (audience: string) => {
     switch (audience) {
       case 'all':
-        return 'الجميع';
+        return t('admin.allUsers');
       case 'premium':
-        return 'المشتركين فقط';
+        return t('admin.premiumOnly');
       case 'free':
-        return 'المجانيين فقط';
+        return t('admin.freeOnly');
       default:
         return audience;
     }
@@ -183,7 +185,7 @@ export default function NotificationsScreen() {
       {/* Add Button */}
       <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
         <Ionicons name="add-circle" size={24} color={Colors.textLight} />
-        <Text style={styles.addBtnText}>إضافة إشعار جديد</Text>
+        <Text style={styles.addBtnText}>{t('admin.addNotification')}</Text>
       </TouchableOpacity>
 
       {/* Notifications List */}
@@ -200,7 +202,7 @@ export default function NotificationsScreen() {
                     ]}
                   />
                   <Text style={styles.statusText}>
-                    {item.isActive ? 'مفعّل' : 'معطّل'}
+                    {item.isActive ? t('admin.active') : t('admin.draft')}
                   </Text>
                 </View>
                 <View style={styles.cardActions}>
@@ -209,7 +211,7 @@ export default function NotificationsScreen() {
                     onPress={() => sendNow(item)}
                   >
                     <Ionicons name="send" size={16} color={Colors.primary} />
-                    <Text style={styles.sendBtnText}>إرسال الآن</Text>
+                    <Text style={styles.sendBtnText}>{t('admin.sendNow')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.iconBtn}
@@ -226,8 +228,8 @@ export default function NotificationsScreen() {
                 </View>
               </View>
 
-              <Text style={styles.cardTitle}>{item.titleAr}</Text>
-              <Text style={styles.cardBody}>{item.bodyAr}</Text>
+              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{item.titleAr}</Text>
+              <Text style={[styles.cardBody, { textAlign: isRTL ? 'right' : 'left' }]}>{item.bodyAr}</Text>
 
               <View style={styles.cardMeta}>
                 <View style={styles.metaItem}>
@@ -252,7 +254,7 @@ export default function NotificationsScreen() {
         {notifications.length === 0 && (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-outline" size={64} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>لا توجد إشعارات</Text>
+            <Text style={styles.emptyText}>{t('admin.notificationsTitle')}</Text>
           </View>
         )}
 
@@ -272,10 +274,10 @@ export default function NotificationsScreen() {
               <Ionicons name="close" size={28} color={Colors.text} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>
-              {editingNotification ? 'تعديل الإشعار' : 'إضافة إشعار جديد'}
+              {editingNotification ? t('admin.notificationsTitle') : t('admin.addNotification')}
             </Text>
             <TouchableOpacity onPress={saveNotification}>
-              <Text style={styles.saveText}>حفظ</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -283,7 +285,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (عربي) *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.titleAr}
                 onChangeText={(value) => setFormData({ ...formData, titleAr: value })}
                 placeholder="عنوان الإشعار"
@@ -294,7 +296,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.title}
                 onChangeText={(value) => setFormData({ ...formData, title: value })}
                 placeholder="Notification Title"
@@ -305,7 +307,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>النص (عربي) *</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.bodyAr}
                 onChangeText={(value) => setFormData({ ...formData, bodyAr: value })}
                 placeholder="نص الإشعار..."
@@ -318,7 +320,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>النص (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.body}
                 onChangeText={(value) => setFormData({ ...formData, body: value })}
                 placeholder="Notification body..."
@@ -331,7 +333,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
                 value={formData.imageUrl}
                 onChangeText={(value) => setFormData({ ...formData, imageUrl: value })}
                 placeholder="https://..."
@@ -477,7 +479,7 @@ const styles = StyleSheet.create({
   sendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     backgroundColor: Colors.primary + '20',
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
@@ -495,13 +497,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
-    textAlign: 'right',
     marginBottom: Spacing.xs,
   },
   cardBody: {
     fontSize: 14,
     color: Colors.textMuted,
-    textAlign: 'right',
     lineHeight: 20,
   },
   cardMeta: {
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   metaText: {
     fontSize: 12,
@@ -572,7 +572,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.border,
-    textAlign: 'right',
   },
   textArea: {
     minHeight: 80,

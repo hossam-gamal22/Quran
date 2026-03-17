@@ -1,7 +1,7 @@
 // app/worship-tracker/quran.tsx
 // صفحة متتبع القرآن - روح المسلم
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,32 +9,31 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  TextInput,
   Dimensions,
   StatusBar,
-  Alert,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeInDown,
-  FadeInRight,
   useAnimatedStyle,
-  useSharedValue,
   withSpring,
-  withSequence,
   withTiming,
-  interpolate,
-  Extrapolate,
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
 import { useQuranTracker } from '@/contexts/WorshipContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import GlassCard from '@/components/ui/GlassCard';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getAllQuranRecords, DailyQuranRecord } from '@/lib/worship-storage';
+import { t, getDateLocale } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
 
@@ -46,14 +45,12 @@ const TOTAL_PAGES = 604; // إجمالي صفحات المصحف
 const TOTAL_JUZS = 30;
 const PAGES_PER_JUZ = Math.ceil(TOTAL_PAGES / TOTAL_JUZS);
 
-const QUICK_ADD_OPTIONS = [1, 2, 5, 10, 20];
-
 const READING_GOALS = [
-  { pages: 1, label: 'صفحة واحدة', description: 'ختمة في سنتين' },
-  { pages: 2, label: 'صفحتان', description: 'ختمة في سنة' },
-  { pages: 4, label: '4 صفحات', description: 'ختمة في 5 أشهر' },
-  { pages: 10, label: '10 صفحات', description: 'ختمة في شهرين' },
-  { pages: 20, label: 'جزء كامل', description: 'ختمة في شهر' },
+  { pages: 1, labelKey: 'worship.onePage', descKey: 'worship.onePageTime' },
+  { pages: 2, labelKey: 'worship.twoPages', descKey: 'worship.twoPagesTime' },
+  { pages: 4, labelKey: 'worship.fourPages', descKey: 'worship.fourPagesTime' },
+  { pages: 10, labelKey: 'worship.tenPages', descKey: 'worship.tenPagesTime' },
+  { pages: 20, labelKey: 'worship.fullJuz', descKey: 'worship.fullJuzTime' },
 ];
 
 // ========================================
@@ -110,50 +107,6 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   );
 };
 
-interface QuickAddButtonProps {
-  value: number;
-  onPress: () => void;
-  isDarkMode?: boolean;
-}
-
-const QuickAddButton: React.FC<QuickAddButtonProps> = ({
-  value,
-  onPress,
-  isDarkMode = false,
-}) => {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePress = () => {
-    scale.value = withSequence(
-      withTiming(0.9, { duration: 100 }),
-      withSpring(1)
-    );
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress();
-  };
-
-  return (
-    <Animated.View style={animatedStyle}>
-      <TouchableOpacity
-        style={[styles.quickAddButton, isDarkMode && styles.quickAddButtonDark]}
-        onPress={handlePress}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.quickAddText, isDarkMode && styles.textLight]}>
-          +{value}
-        </Text>
-        <Text style={[styles.quickAddLabel, isDarkMode && styles.textMuted]}>
-          {value === 1 ? 'صفحة' : 'صفحات'}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
-
 interface JuzProgressProps {
   juzNumber: number;
   pagesRead: number;
@@ -167,20 +120,22 @@ const JuzProgress: React.FC<JuzProgressProps> = ({
   totalPages,
   isDarkMode = false,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   const progress = Math.min((pagesRead / totalPages) * 100, 100);
   const isComplete = progress >= 100;
 
   return (
     <View style={[styles.juzItem, isDarkMode && styles.juzItemDark]}>
-      <View style={styles.juzHeader}>
-        <Text style={[styles.juzNumber, isDarkMode && styles.textLight]}>
-          الجزء {juzNumber}
+      <View style={[styles.juzHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Text style={[styles.juzNumber, { color: colors.text }]}>
+          {t('worship.juzNumber')} {juzNumber}
         </Text>
         {isComplete && (
           <MaterialCommunityIcons name="check-circle" size={18} color="#2f7659" />
         )}
       </View>
-      <View style={styles.juzProgressBar}>
+      <View style={[styles.juzProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View
           style={[
             styles.juzProgressFill,
@@ -189,7 +144,7 @@ const JuzProgress: React.FC<JuzProgressProps> = ({
           ]}
         />
       </View>
-      <Text style={[styles.juzPages, isDarkMode && styles.textMuted]}>
+      <Text style={[styles.juzPages, { color: colors.textLight }]}>
         {pagesRead}/{totalPages}
       </Text>
     </View>
@@ -201,6 +156,7 @@ interface GoalCardProps {
   isSelected: boolean;
   onSelect: () => void;
   isDarkMode?: boolean;
+  isRTL?: boolean;
 }
 
 const GoalCard: React.FC<GoalCardProps> = ({
@@ -208,7 +164,9 @@ const GoalCard: React.FC<GoalCardProps> = ({
   isSelected,
   onSelect,
   isDarkMode = false,
+  isRTL = true,
 }) => {
+  const colors = useColors();
   return (
     <TouchableOpacity
       style={[
@@ -224,20 +182,20 @@ const GoalCard: React.FC<GoalCardProps> = ({
     >
       <Text style={[
         styles.goalLabel,
-        isDarkMode && styles.textLight,
+        { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
         isSelected && styles.goalLabelSelected,
       ]}>
-        {goal.label}
+        {t(goal.labelKey)}
       </Text>
       <Text style={[
         styles.goalDescription,
-        isDarkMode && styles.textMuted,
+        { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
         isSelected && styles.goalDescriptionSelected,
       ]}>
-        {goal.description}
+        {t(goal.descKey)}
       </Text>
       {isSelected && (
-        <View style={styles.goalCheck}>
+        <View style={[styles.goalCheck, { right: isRTL ? undefined : -8, left: isRTL ? -8 : undefined }]}>
           <MaterialCommunityIcons name="check" size={16} color="#fff" />
         </View>
       )}
@@ -250,20 +208,36 @@ const GoalCard: React.FC<GoalCardProps> = ({
 // ========================================
 
 export default function QuranTrackerScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
   const {
     todayQuran,
     quranStats,
-    addPagesRead,
     updateQuranRecord,
     todayPages,
   } = useQuranTracker();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [customPages, setCustomPages] = useState('');
   const [dailyGoal, setDailyGoal] = useState(2);
+  const [readingHistory, setReadingHistory] = useState<{ date: string; pages: number }[]>([]);
   
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const colors = useColors();
+
+  // تحميل سجل القراءة
+  useEffect(() => {
+    loadHistory();
+  }, [todayPages]);
+
+  const loadHistory = async () => {
+    const records = await getAllQuranRecords();
+    const entries = Object.entries(records)
+      .map(([date, r]) => ({ date, pages: r.pagesRead || 0 }))
+      .filter(e => e.pages > 0)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 30); // آخر 30 يوم
+    setReadingHistory(entries);
+  };
 
   // حساب التقدم
   const totalProgress = useMemo(() => {
@@ -293,22 +267,6 @@ export default function QuranTrackerScreen() {
     setIsRefreshing(false);
   }, []);
 
-  // إضافة صفحات
-  const handleAddPages = async (pages: number) => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await addPagesRead(pages);
-  };
-
-  const handleAddCustomPages = async () => {
-    const pages = parseInt(customPages, 10);
-    if (isNaN(pages) || pages <= 0) {
-      Alert.alert('خطأ', 'الرجاء إدخال عدد صحيح');
-      return;
-    }
-    await handleAddPages(pages);
-    setCustomPages('');
-  };
-
   // تعيين الهدف
   const handleSetGoal = (pages: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -316,6 +274,7 @@ export default function QuranTrackerScreen() {
   };
 
   return (
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
@@ -324,22 +283,12 @@ export default function QuranTrackerScreen() {
       />
       
       {/* الهيدر */}
-      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'}
-            size={24}
-            color={isDarkMode ? '#fff' : '#333'}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>
-          متتبع القرآن
-        </Text>
-        <View style={styles.headerSpacer} />
-      </Animated.View>
+      <UniversalHeader
+        title={t('worship.quranTracker')}
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -368,7 +317,7 @@ export default function QuranTrackerScreen() {
               >
                 <View style={styles.progressCenter}>
                   <Text style={styles.progressKhatma}>
-                    {currentKhatma.completed > 0 ? `الختمة ${currentKhatma.completed + 1}` : 'الختمة الأولى'}
+                    {currentKhatma.completed > 0 ? `${t('worship.khatmaNumber')} ${currentKhatma.completed + 1}` : t('worship.firstKhatma')}
                   </Text>
                   <Text style={styles.progressPercent}>
                     {Math.round(currentKhatma.progress)}%
@@ -379,20 +328,20 @@ export default function QuranTrackerScreen() {
                 </View>
               </CircularProgress>
               
-              <View style={styles.mainStats}>
+              <View style={[styles.mainStats, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={styles.mainStatItem}>
                   <Text style={styles.mainStatValue}>{todayPages}</Text>
-                  <Text style={styles.mainStatLabel}>صفحات اليوم</Text>
+                  <Text style={styles.mainStatLabel}>{t('worship.dailyPages')}</Text>
                 </View>
                 <View style={styles.mainStatDivider} />
                 <View style={styles.mainStatItem}>
                   <Text style={styles.mainStatValue}>{quranStats?.totalPages ?? 0}</Text>
-                  <Text style={styles.mainStatLabel}>إجمالي الصفحات</Text>
+                  <Text style={styles.mainStatLabel}>{t('worship.totalPages')}</Text>
                 </View>
                 <View style={styles.mainStatDivider} />
                 <View style={styles.mainStatItem}>
                   <Text style={styles.mainStatValue}>{quranStats?.currentStreak ?? 0}</Text>
-                  <Text style={styles.mainStatLabel}>أيام متتالية</Text>
+                  <Text style={styles.mainStatLabel}>{t('worship.consecutiveDays')}</Text>
                 </View>
               </View>
             </View>
@@ -402,74 +351,36 @@ export default function QuranTrackerScreen() {
         {/* تقدم اليوم */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
           <GlassCard style={styles.todayCard}>
-            <View style={styles.todayHeader}>
-              <Text style={[styles.todayTitle, isDarkMode && styles.textLight]}>
-                هدف اليوم
+            <View style={[styles.todayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[styles.todayTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {t('worship.todayGoal')}
               </Text>
-              <Text style={[styles.todayGoal, isDarkMode && styles.textMuted]}>
-                {todayPages}/{dailyGoal} صفحة
+              <Text style={[styles.todayGoal, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {todayPages}/{dailyGoal} {t('worship.pages')}
               </Text>
             </View>
-            <View style={styles.todayProgressBar}>
+            <View style={[styles.todayProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.todayProgressFill, { width: `${todayProgress}%` }]} />
             </View>
             {todayProgress >= 100 && (
-              <View style={styles.completedBadge}>
+              <View style={[styles.completedBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="check-circle" size={18} color="#2f7659" />
-                <Text style={styles.completedText}>أحسنت! أكملت هدف اليوم</Text>
+                <Text style={styles.completedText}>{t('worship.todayGoalComplete')}</Text>
               </View>
             )}
           </GlassCard>
         </Animated.View>
 
-        {/* إضافة سريعة */}
-        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            إضافة صفحات
-          </Text>
-          <View style={styles.quickAddContainer}>
-            {QUICK_ADD_OPTIONS.map((value, index) => (
-              <Animated.View
-                key={value}
-                entering={FadeInRight.delay(index * 50).duration(300)}
-              >
-                <QuickAddButton
-                  value={value}
-                  onPress={() => handleAddPages(value)}
-                  isDarkMode={isDarkMode}
-                />
-              </Animated.View>
-            ))}
-          </View>
-          
-          {/* إدخال مخصص */}
-          <View style={[styles.customInput, isDarkMode && styles.customInputDark]}>
-            <TextInput
-              style={[styles.customInputField, isDarkMode && styles.textLight]}
-              placeholder="عدد مخصص..."
-              placeholderTextColor={isDarkMode ? '#666' : '#999'}
-              keyboardType="numeric"
-              value={customPages}
-              onChangeText={setCustomPages}
-            />
-            <TouchableOpacity
-              style={styles.customInputButton}
-              onPress={handleAddCustomPages}
-            >
-              <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-
         {/* اختيار الهدف اليومي */}
-        <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight]}>
-            الهدف اليومي
+        <Animated.View entering={FadeInDown.delay(200).duration(500)}>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('worship.dailyGoal')}
           </Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.goalsContainer}
+            contentContainerStyle={[styles.goalsContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={{ overflow: 'visible' }}
           >
             {READING_GOALS.map((goal, index) => (
               <GoalCard
@@ -478,6 +389,7 @@ export default function QuranTrackerScreen() {
                 isSelected={dailyGoal === goal.pages}
                 onSelect={() => handleSetGoal(goal.pages)}
                 isDarkMode={isDarkMode}
+                isRTL={isRTL}
               />
             ))}
           </ScrollView>
@@ -486,67 +398,103 @@ export default function QuranTrackerScreen() {
         {/* الإحصائيات */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <GlassCard style={styles.statsCard}>
-            <Text style={[styles.statsTitle, isDarkMode && styles.textLight]}>
-              إحصائياتك
+            <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.yourStats')}
             </Text>
-            <View style={styles.statsGrid}>
+            <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="book-open-page-variant" size={24} color="#c17f59" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.totalPages ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  إجمالي الصفحات
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.totalPages')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="check-decagram" size={24} color="#2f7659" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.khatmasCompleted ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  ختمات مكتملة
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.completedKhatmas')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="chart-line" size={24} color="#3a7ca5" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.averagePagesPerDay?.toFixed(1) ?? '0'}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  متوسط يومي
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.dailyAverage')}
                 </Text>
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
                   <MaterialCommunityIcons name="fire" size={24} color="#ff6b35" />
                 </View>
-                <Text style={[styles.statValue, isDarkMode && styles.textLight]}>
+                <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.bestStreak ?? 0}
                 </Text>
-                <Text style={[styles.statLabel, isDarkMode && styles.textMuted]}>
-                  أفضل سلسلة
+                <Text style={[styles.statLabel, { color: colors.textLight }]}>
+                  {t('worship.bestStreak')}
                 </Text>
               </View>
             </View>
           </GlassCard>
         </Animated.View>
 
+        {/* سجل القراءة اليومي */}
+        {readingHistory.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(320).duration(500)}>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.readingHistory')}
+            </Text>
+            <GlassCard style={styles.statsCard}>
+              {readingHistory.map((entry, idx) => {
+                const dateObj = new Date(entry.date + 'T00:00:00');
+                const dayName = dateObj.toLocaleDateString(getDateLocale(), { weekday: 'short' });
+                const dateStr = dateObj.toLocaleDateString(getDateLocale(), { day: 'numeric', month: 'short' });
+                const barWidth = Math.min((entry.pages / Math.max(dailyGoal, 1)) * 100, 100);
+                const isToday = entry.date === new Date().toISOString().split('T')[0];
+                return (
+                  <View key={entry.date} style={[historyStyles.row, idx < readingHistory.length - 1 && historyStyles.rowBorder]}>
+                    <View style={historyStyles.dateCol}>
+                      <Text style={[historyStyles.dayName, { color: isToday ? '#c17f59' : colors.textLight }]}>
+                        {isToday ? t('worship.today') : dayName}
+                      </Text>
+                      <Text style={[historyStyles.dateStr, { color: colors.textLight }]}>{dateStr}</Text>
+                    </View>
+                    <View style={historyStyles.barCol}>
+                      <View style={[historyStyles.barBg, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
+                        <View style={[historyStyles.barFill, { width: `${barWidth}%`, backgroundColor: barWidth >= 100 ? '#2f7659' : '#c17f59' }]} />
+                      </View>
+                    </View>
+                    <Text style={[historyStyles.pagesText, { color: entry.pages >= dailyGoal ? '#2f7659' : colors.text }]}>
+                      {entry.pages} {t('worship.pages')}
+                    </Text>
+                  </View>
+                );
+              })}
+            </GlassCard>
+          </Animated.View>
+        )}
+
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(350).duration(500)}>
           <GlassCard style={styles.tipCard}>
-            <View style={styles.tipHeader}>
+            <View style={[styles.tipHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#c17f59" />
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>نصيحة</Text>
+              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('worship.tip')}</Text>
             </View>
-            <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
-              "خيركم من تعلم القرآن وعلمه" - اجعل لك وردًا يوميًا ولو صفحة واحدة
+            <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('worship.tipText')}
             </Text>
           </GlassCard>
         </Animated.View>
@@ -554,6 +502,7 @@ export default function QuranTrackerScreen() {
         <View style={styles.bottomSpace} />
       </ScrollView>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -564,35 +513,12 @@ export default function QuranTrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
     backgroundColor: 'transparent',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+  containerDark: {
+    backgroundColor: 'transparent',
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontFamily: 'Cairo-Bold',
-    color: '#333',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
+
   textLight: {
     color: '#fff',
   },
@@ -607,7 +533,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
@@ -627,17 +553,17 @@ const styles = StyleSheet.create({
   },
   progressKhatma: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.8)',
   },
   progressPercent: {
     fontSize: 32,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   progressPages: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   mainStats: {
@@ -654,12 +580,12 @@ const styles = StyleSheet.create({
   },
   mainStatValue: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   mainStatLabel: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
@@ -682,12 +608,12 @@ const styles = StyleSheet.create({
   },
   todayTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   todayGoal: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
   },
   todayProgressBar: {
@@ -713,7 +639,7 @@ const styles = StyleSheet.create({
   },
   completedText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#2f7659',
   },
   // إضافة سريعة
@@ -736,12 +662,12 @@ const styles = StyleSheet.create({
   },
   quickAddText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#c17f59',
   },
   quickAddLabel: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
   // إدخال مخصص
@@ -762,19 +688,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     fontSize: 16,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#333',
-    textAlign: 'right',
   },
   customInputButton: {
-    width: 56,
+    flexDirection: 'row',
     backgroundColor: '#c17f59',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  stepperBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   // اختيار الهدف
   goalsContainer: {
     paddingHorizontal: 12,
+    paddingTop: 10,
     gap: 10,
   },
   goalCard: {
@@ -782,9 +718,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 15,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'visible',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   goalCardDark: {
     backgroundColor: '#1a1a2e',
@@ -795,7 +731,7 @@ const styles = StyleSheet.create({
   },
   goalLabel: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   goalLabelSelected: {
@@ -803,9 +739,10 @@ const styles = StyleSheet.create({
   },
   goalDescription: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 4,
+    textAlign: 'right',
   },
   goalDescriptionSelected: {
     color: '#c17f59',
@@ -829,7 +766,7 @@ const styles = StyleSheet.create({
   },
   statsTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 15,
   },
@@ -850,12 +787,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   statLabel: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
   },
@@ -873,12 +810,12 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   tipText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
   },
@@ -896,11 +833,11 @@ const styles = StyleSheet.create({
   juzHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   juzNumber: {
     fontSize: 11,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
   },
   juzProgressBar: {
@@ -921,11 +858,55 @@ const styles = StyleSheet.create({
   },
   juzPages: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 4,
   },
   bottomSpace: {
     height: 100,
+  },
+});
+
+const historyStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
+  dateCol: {
+    width: 55,
+    alignItems: 'center',
+  },
+  dayName: {
+    fontSize: 12,
+    fontFamily: fontSemiBold(),
+  },
+  dateStr: {
+    fontSize: 10,
+    fontFamily: fontRegular(),
+    marginTop: 1,
+  },
+  barCol: {
+    flex: 1,
+  },
+  barBg: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  pagesText: {
+    width: 60,
+    textAlign: 'center',
+    fontSize: 12,
+    fontFamily: fontSemiBold(),
   },
 });

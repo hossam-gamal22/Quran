@@ -66,7 +66,9 @@ export interface DailySeasonalData {
 // بيانات المواسم
 // ========================================
 
-const SEASONS_DATA: Record<SeasonType, Omit<SeasonInfo, 'isActive' | 'daysRemaining' | 'currentDay' | 'totalDays'>> = {
+type SeasonDataEntry = Omit<SeasonInfo, 'isActive' | 'daysRemaining' | 'currentDay' | 'totalDays'>;
+
+const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
   ramadan: {
     type: 'ramadan',
     nameAr: 'رمضان المبارك',
@@ -81,8 +83,8 @@ const SEASONS_DATA: Record<SeasonType, Omit<SeasonInfo, 'isActive' | 'daysRemain
         day: 1,
         nameAr: 'أول رمضان',
         nameEn: 'First of Ramadan',
-        description: 'بداية شهر الخير والبركة',
-        virtues: ['تُفتح أبواب الجنة', 'تُغلق أبواب النار', 'تُصفد الشياطين'],
+        description: 'بداية شهر الخير والبركة — ﴿شَهْرُ رَمَضَانَ الَّذِي أُنزِلَ فِيهِ الْقُرْآنُ﴾',
+        virtues: ['تُفتح أبواب الجنة', 'تُغلق أبواب النار', 'تُصفد الشياطين', '﴿كُتِبَ عَلَيْكُمُ الصِّيَامُ كَمَا كُتِبَ عَلَى الَّذِينَ مِن قَبْلِكُمْ﴾'],
         recommendedActions: ['تبييت النية للصيام', 'صلاة التراويح', 'قراءة القرآن'],
       },
       {
@@ -90,24 +92,48 @@ const SEASONS_DATA: Record<SeasonType, Omit<SeasonInfo, 'isActive' | 'daysRemain
         nameAr: 'منتصف رمضان',
         nameEn: 'Mid Ramadan',
         description: 'منتصف الشهر الكريم',
-        virtues: ['استمرار الأجر المضاعف'],
+        virtues: ['استمرار الأجر المضاعف', '﴿وَأَن تَصُومُوا خَيْرٌ لَّكُمْ إِن كُنتُمْ تَعْلَمُونَ﴾'],
         recommendedActions: ['المحافظة على الصيام', 'الإكثار من الذكر'],
       },
       {
         day: 21,
-        nameAr: 'بداية العشر الأواخر',
-        nameEn: 'Last Ten Nights Begin',
-        description: 'أفضل ليالي السنة',
-        virtues: ['فيها ليلة القدر', 'العتق من النار'],
+        nameAr: 'ليلة الحادي والعشرين',
+        nameEn: 'Night of 21st',
+        description: 'أول ليالي العشر الأواخر — ﴿إِنَّا أَنزَلْنَاهُ فِي لَيْلَةِ الْقَدْرِ﴾',
+        virtues: ['فيها ليلة القدر', 'العتق من النار', '﴿لَيْلَةُ الْقَدْرِ خَيْرٌ مِّنْ أَلْفِ شَهْرٍ﴾'],
         recommendedActions: ['الاعتكاف', 'قيام الليل', 'الإكثار من الدعاء'],
+      },
+      {
+        day: 23,
+        nameAr: 'ليلة الثالث والعشرين',
+        nameEn: 'Night of 23rd',
+        description: 'من أرجى ليالي القدر',
+        virtues: ['﴿تَنَزَّلُ الْمَلَائِكَةُ وَالرُّوحُ فِيهَا﴾', 'مضاعفة أجر العبادة'],
+        recommendedActions: ['قيام الليل', 'الإكثار من الاستغفار', 'الدعاء: اللهم إنك عفو تحب العفو فاعف عني'],
+      },
+      {
+        day: 25,
+        nameAr: 'ليلة الخامس والعشرين',
+        nameEn: 'Night of 25th',
+        description: 'من أرجى ليالي القدر',
+        virtues: ['﴿سَلَامٌ هِيَ حَتَّىٰ مَطْلَعِ الْفَجْرِ﴾', 'ليلة سلام وأمان'],
+        recommendedActions: ['قيام الليل', 'الصدقة', 'تلاوة القرآن'],
       },
       {
         day: 27,
         nameAr: 'ليلة السابع والعشرين',
         nameEn: 'Night of 27th',
-        description: 'أرجى ليالي القدر',
-        virtues: ['خير من ألف شهر', 'تنزل الملائكة'],
+        description: 'أرجى ليالي القدر — ﴿إِنَّا أَنزَلْنَاهُ فِي لَيْلَةِ الْقَدْرِ﴾',
+        virtues: ['﴿لَيْلَةُ الْقَدْرِ خَيْرٌ مِّنْ أَلْفِ شَهْرٍ﴾', '﴿تَنَزَّلُ الْمَلَائِكَةُ وَالرُّوحُ فِيهَا﴾'],
         recommendedActions: ['إحياء الليلة بالعبادة', 'الدعاء: اللهم إنك عفو تحب العفو فاعف عني'],
+      },
+      {
+        day: 29,
+        nameAr: 'ليلة التاسع والعشرين',
+        nameEn: 'Night of 29th',
+        description: 'آخر ليالي القدر الوترية',
+        virtues: ['﴿سَلَامٌ هِيَ حَتَّىٰ مَطْلَعِ الْفَجْرِ﴾', 'فرصة أخيرة لإدراك ليلة القدر'],
+        recommendedActions: ['إحياء الليلة كاملة', 'الدعاء والاستغفار', 'الصدقة'],
       },
     ],
   },
@@ -277,6 +303,36 @@ const SEASONS_DATA: Record<SeasonType, Omit<SeasonInfo, 'isActive' | 'daysRemain
   },
 };
 
+// Mutable copy that CMS overrides can modify
+let SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = { ...DEFAULT_SEASONS_DATA };
+
+/**
+ * Apply CMS overrides to seasons metadata.
+ * Called once from SeasonalContext on mount after fetching CMS data.
+ */
+export const applySeasonsMetadataOverrides = (
+  overrides: Record<string, {
+    nameAr?: string; nameEn?: string; description?: string;
+    startDate?: { month: number; day: number }; endDate?: { month: number; day: number };
+    color?: string; icon?: string; specialDays?: SpecialDay[]; greetings?: string[];
+  }>
+): void => {
+  for (const [key, override] of Object.entries(overrides)) {
+    if (key in SEASONS_DATA) {
+      const seasonKey = key as SeasonType;
+      SEASONS_DATA[seasonKey] = {
+        ...SEASONS_DATA[seasonKey],
+        ...override,
+        type: seasonKey, // never override type
+      };
+      // Apply greetings override
+      if (override.greetings?.length) {
+        SEASONAL_GREETINGS[seasonKey] = override.greetings;
+      }
+    }
+  }
+};
+
 // ========================================
 // دوال التحقق من الموسم
 // ========================================
@@ -422,7 +478,7 @@ export const getAllSeasons = (): SeasonInfo[] => {
 // التحيات الموسمية
 // ========================================
 
-const SEASONAL_GREETINGS: Record<SeasonType, string[]> = {
+let SEASONAL_GREETINGS: Record<SeasonType, string[]> = {
   ramadan: [
     'رمضان كريم! 🌙',
     'مبارك عليكم الشهر',

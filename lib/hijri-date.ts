@@ -1,5 +1,7 @@
 // lib/hijri-date.ts
 
+import { t, tArray, getDateLocale } from '@/lib/i18n';
+
 export interface HijriDate {
   day: number;
   month: number;
@@ -8,6 +10,72 @@ export interface HijriDate {
   year: number;
   weekday: string;
   weekdayAr: string;
+}
+
+/**
+ * Get localized date names using translations system (12 languages)
+ */
+export function getLocalizedDateNames() {
+  const hijriMonths = tArray('calendar.hijriMonths');
+  const months = tArray('calendar.months');
+  const weekDays = tArray('calendar.weekDays');
+  const weekDaysShort = tArray('calendar.weekDaysShort');
+
+  return {
+    hijriMonths: hijriMonths.length > 0 ? hijriMonths : HIJRI_MONTHS_AR,
+    months: months.length > 0 ? months : GREGORIAN_MONTHS_AR,
+    weekDays: weekDays.length > 0 ? weekDays : WEEKDAYS_AR,
+    weekDaysShort: weekDaysShort.length > 0 ? weekDaysShort : WEEKDAYS_AR,
+  };
+}
+
+/**
+ * Format a number using locale-appropriate numerals.
+ * Uses Intl.NumberFormat for digit script conversion (e.g. ١٢٣ for Arabic)
+ * but strips any grouping separators (commas/dots) to avoid "2,026" style years.
+ */
+function localizeNumber(n: number, _locale?: string): string {
+  return String(n);
+}
+
+/**
+ * Get localized Hijri date (uses current app language)
+ */
+export function getLocalizedHijriDate(date: Date = new Date()): HijriDate {
+  const hijri = gregorianToHijri(date);
+  const names = getLocalizedDateNames();
+  return {
+    ...hijri,
+    monthName: names.hijriMonths[hijri.month - 1] || hijri.monthName,
+    monthNameAr: HIJRI_MONTHS_AR[hijri.month - 1] || '',
+    weekday: names.weekDays[date.getDay()] || hijri.weekday,
+    weekdayAr: WEEKDAYS_AR[date.getDay()] || '',
+  };
+}
+
+/**
+ * Get localized full date (uses current app language)
+ */
+export function getLocalizedFullDate(date: Date = new Date()) {
+  const hijri = getLocalizedHijriDate(date);
+  const names = getLocalizedDateNames();
+  const gregorianMonth = names.months[date.getMonth()] || '';
+  
+  const locale = getDateLocale();
+  return {
+    hijri,
+    gregorian: {
+      day: date.getDate(),
+      month: date.getMonth() + 1,
+      monthName: gregorianMonth,
+      year: date.getFullYear(),
+      weekday: names.weekDays[date.getDay()] || '',
+    },
+    formatted: {
+      hijri: `${localizeNumber(hijri.day, locale)} ${hijri.monthName} ${localizeNumber(hijri.year, locale)}`,
+      gregorian: `${localizeNumber(date.getDate(), locale)} ${gregorianMonth} ${localizeNumber(date.getFullYear(), locale)}`,
+    },
+  };
 }
 
 export interface IslamicEvent {
@@ -70,23 +138,58 @@ export const WEEKDAYS_EN = [
   'Saturday',
 ];
 
+// أسماء الأشهر الميلادية بالعربية (fallback)
+const GREGORIAN_MONTHS_AR = [
+  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+];
+
 // Islamic Events - from trusted Islamic calendar sources
 // Based on lunar Hijri calendar calculations
 export interface IslamicEventDetails {
   name: string;
   nameAr: string;
+  translationKey?: string;
+  descriptionKey?: string;
   hijriMonth: number;
   hijriDay: number;
+  hijriDayEnd?: number;
   description?: string;
   descriptionAr?: string;
-  type: 'holiday' | 'fasting' | 'special' | 'observance';
+  type: 'holiday' | 'fasting' | 'special' | 'observance' | 'blessed_period' | 'sunnah_fasting';
   importance: 'major' | 'minor';
+}
+
+/**
+ * Ayyam al-Bidh — the "White Days" (13th, 14th, 15th of every Hijri month)
+ * Sunnah fasting days recommended by the Prophet ﷺ
+ */
+export function isAyyamAlBidh(hijriDay: number): boolean {
+  return hijriDay === 13 || hijriDay === 14 || hijriDay === 15;
+}
+
+export function getAyyamAlBidhEvent(): IslamicEventDetails {
+  return {
+    name: 'Sunnah Fasting (Ayyam al-Bidh)',
+    nameAr: 'صيام الأيام البيض',
+    translationKey: 'calendar.ayyamAlBidh',
+    descriptionKey: 'calendar.ayyamAlBidhDesc',
+    hijriMonth: 0, // applies to every month
+    hijriDay: 13,
+    hijriDayEnd: 15,
+    description: 'The 13th, 14th, and 15th of every Hijri month — Sunnah fasting days',
+    descriptionAr: 'اليوم ١٣ و١٤ و١٥ من كل شهر هجري — أيام يُستحب صيامها',
+    type: 'sunnah_fasting',
+    importance: 'minor',
+  };
 }
 
 export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Islamic New Year',
     nameAr: 'رأس السنة الهجرية',
+    translationKey: 'calendar.newYear',
+    descriptionKey: 'calendar.newYearDesc',
     hijriMonth: 1,
     hijriDay: 1,
     description: 'First day of the Islamic calendar year',
@@ -97,6 +200,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Day of Ashura',
     nameAr: 'يوم عاشوراء',
+    translationKey: 'calendar.ashura',
+    descriptionKey: 'calendar.ashuraDesc',
     hijriMonth: 1,
     hijriDay: 10,
     description: 'A significant day in Islamic history. It is recommended to fast on this day',
@@ -107,6 +212,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Mawlid al-Nabi (Birthnight of Prophet)',
     nameAr: 'المولد النبوي الشريف',
+    translationKey: 'calendar.mawlid',
+    descriptionKey: 'calendar.mawlidDesc',
     hijriMonth: 3,
     hijriDay: 12,
     description: 'Celebration of the birth of Prophet Muhammad (PBUH)',
@@ -117,6 +224,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Isra and Miraj',
     nameAr: 'الإسراء والمعراج',
+    translationKey: 'calendar.isra',
+    descriptionKey: 'calendar.israDesc',
     hijriMonth: 7,
     hijriDay: 27,
     description: 'The night journey and ascension of Prophet Muhammad (PBUH)',
@@ -127,6 +236,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Half of Shaban',
     nameAr: 'ليلة النصف من شعبان',
+    translationKey: 'calendar.shaban15',
+    descriptionKey: 'calendar.shaban15Desc',
     hijriMonth: 8,
     hijriDay: 15,
     description: 'A blessed night with special spiritual significance',
@@ -137,6 +248,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'First Day of Ramadan',
     nameAr: 'أول رمضان - بداية شهر الصيام',
+    translationKey: 'calendar.ramadan',
+    descriptionKey: 'calendar.ramadanDesc',
     hijriMonth: 9,
     hijriDay: 1,
     description: 'Beginning of the holy month of fasting',
@@ -145,18 +258,35 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
     importance: 'major',
   },
   {
-    name: 'Laylat al-Qadr (Night of Power)',
-    nameAr: 'ليلة القدر',
+    name: 'Battle of Badr',
+    nameAr: 'غزوة بدر',
+    translationKey: 'calendar.badr',
+    descriptionKey: 'calendar.badrDesc',
     hijriMonth: 9,
-    hijriDay: 27,
-    description: 'The most blessed night of the year. Worship on this night is better than a thousand months',
-    descriptionAr: 'أفضل ليلة في السنة. العمل فيها خير من العمل ألف شهر',
-    type: 'special',
+    hijriDay: 17,
+    description: 'The great Battle of Badr, the first major victory in Islam',
+    descriptionAr: 'غزوة بدر الكبرى، أول انتصار عظيم في الإسلام',
+    type: 'observance',
+    importance: 'minor',
+  },
+  {
+    name: 'The Blessed Last Ten Nights',
+    nameAr: 'العشر الأواخر المباركة',
+    translationKey: 'calendar.lastTenNights',
+    descriptionKey: 'calendar.lastTenNightsDesc',
+    hijriMonth: 9,
+    hijriDay: 21,
+    hijriDayEnd: 30,
+    description: 'The blessed last ten nights of Ramadan — seek Laylat al-Qadr in all of them',
+    descriptionAr: 'العشر الأواخر المباركة من رمضان — تحرّوا ليلة القدر فيها',
+    type: 'blessed_period',
     importance: 'major',
   },
   {
     name: 'Eid al-Fitr',
     nameAr: 'عيد الفطر المبارك',
+    translationKey: 'calendar.eidAlFitr',
+    descriptionKey: 'calendar.eidAlFitrDesc',
     hijriMonth: 10,
     hijriDay: 1,
     description: 'Festival of Breaking the Fast - a joyful celebration after Ramadan',
@@ -167,6 +297,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Day of Tarwiyah',
     nameAr: 'يوم التروية',
+    translationKey: 'calendar.tarwiyah',
+    descriptionKey: 'calendar.tarwiyahDesc',
     hijriMonth: 12,
     hijriDay: 8,
     description: 'The eighth day of Dhul-Hijjah, the beginning of the Hajj season',
@@ -177,6 +309,8 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Day of Arafah',
     nameAr: 'يوم عرفة',
+    translationKey: 'calendar.arafat',
+    descriptionKey: 'calendar.arafatDesc',
     hijriMonth: 12,
     hijriDay: 9,
     description: 'The greatest day of the Hajj. Fasting on this day is highly recommended for those not on Hajj',
@@ -187,12 +321,27 @@ export const ISLAMIC_EVENTS: IslamicEventDetails[] = [
   {
     name: 'Eid al-Adha',
     nameAr: 'عيد الأضحى المبارك',
+    translationKey: 'calendar.eidAlAdha',
+    descriptionKey: 'calendar.eidAlAdhaDesc',
     hijriMonth: 12,
     hijriDay: 10,
     description: 'Festival of Sacrifice - the greatest Islamic holiday',
     descriptionAr: 'عيد الأضحى - أعظم أعياد الإسلام',
     type: 'holiday',
     importance: 'major',
+  },
+  {
+    name: 'Days of Tashreeq',
+    nameAr: 'أيام التشريق',
+    translationKey: 'calendar.tashreeq',
+    descriptionKey: 'calendar.tashreeqDesc',
+    hijriMonth: 12,
+    hijriDay: 11,
+    hijriDayEnd: 13,
+    description: 'The three days following Eid al-Adha, days of eating, drinking and remembrance of Allah',
+    descriptionAr: 'الأيام الثلاثة بعد عيد الأضحى، أيام أكل وشرب وذكر لله',
+    type: 'observance',
+    importance: 'minor',
   },
 ];
 
@@ -291,8 +440,10 @@ export function hijriToGregorian(hijriYear: number, hijriMonth: number, hijriDay
  * الحصول على التاريخ الهجري المنسق
  */
 export function getFormattedHijriDate(date: Date = new Date()): string {
-  const hijri = gregorianToHijri(date);
-  return `${hijri.day} ${hijri.monthNameAr} ${hijri.year}`;
+  const hijri = getLocalizedHijriDate(date);
+  const locale = getDateLocale();
+  const ahSuffix = t('calendar.ahSuffix') || 'هـ';
+  return `${localizeNumber(hijri.day, locale)} ${hijri.monthName} ${localizeNumber(hijri.year, locale)} ${ahSuffix}`;
 }
 
 /**
@@ -311,50 +462,61 @@ export function getFullDate(date: Date = new Date()): {
   formatted: {
     hijriAr: string;
     hijriEn: string;
+    hijri: string;
     gregorianAr: string;
     gregorianEn: string;
+    gregorian: string;
   };
 } {
   const hijri = gregorianToHijri(date);
   const weekdayIndex = date.getDay();
-  
-  const gregorianMonthsAr = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-  ];
-  
-  const gregorianMonthsEn = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+  const names = getLocalizedDateNames();
+  const locale = getDateLocale();
+  const localizedHijri = getLocalizedHijriDate(date);
+  const ahSuffix = t('calendar.ahSuffix') || 'هـ';
 
   return {
     hijri,
     gregorian: {
       day: date.getDate(),
       month: date.getMonth() + 1,
-      monthName: gregorianMonthsEn[date.getMonth()],
+      monthName: names.months[date.getMonth()] || '',
       year: date.getFullYear(),
-      weekday: WEEKDAYS_EN[weekdayIndex],
+      weekday: names.weekDays[weekdayIndex] || WEEKDAYS_EN[weekdayIndex],
       weekdayAr: WEEKDAYS_AR[weekdayIndex],
     },
     formatted: {
-      hijriAr: `${hijri.day} ${hijri.monthNameAr} ${hijri.year} هـ`,
-      hijriEn: `${hijri.day} ${hijri.monthName} ${hijri.year} AH`,
-      gregorianAr: `${date.getDate()} ${gregorianMonthsAr[date.getMonth()]} ${date.getFullYear()} م`,
-      gregorianEn: `${gregorianMonthsEn[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`,
+      hijriAr: `${hijri.day} ${HIJRI_MONTHS_AR[hijri.month - 1]} ${hijri.year} هـ`,
+      hijriEn: `${hijri.day} ${HIJRI_MONTHS_EN[hijri.month - 1]} ${hijri.year} AH`,
+      hijri: `${localizeNumber(localizedHijri.day, locale)} ${localizedHijri.monthName} ${localizeNumber(localizedHijri.year, locale)} ${ahSuffix}`,
+      gregorianAr: `${date.getDate()} ${GREGORIAN_MONTHS_AR[date.getMonth()]} ${date.getFullYear()} م`,
+      gregorianEn: `${names.months[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`,
+      gregorian: `${localizeNumber(date.getDate(), locale)} ${names.months[date.getMonth()] || ''} ${localizeNumber(date.getFullYear(), locale)}`,
     },
   };
 }
 
+
+
 /**
- * الحصول على مناسبات اليوم
+ * الحصول على مناسبات اليوم (including Ayyam al-Bidh)
  */
-export function getTodayEvents(date: Date = new Date()): IslamicEvent[] {
+export function getTodayEvents(date: Date = new Date()): IslamicEventDetails[] {
   const hijri = gregorianToHijri(date);
-  return ISLAMIC_EVENTS.filter(
-    event => event.hijriMonth === hijri.month && event.hijriDay === hijri.day
-  );
+  const events: IslamicEventDetails[] = ISLAMIC_EVENTS.filter(event => {
+    if (event.hijriMonth !== hijri.month) return false;
+    if (event.hijriDayEnd) {
+      return hijri.day >= event.hijriDay && hijri.day <= event.hijriDayEnd;
+    }
+    return event.hijriDay === hijri.day;
+  });
+
+  // Add Ayyam al-Bidh if it's 13th, 14th, or 15th
+  if (isAyyamAlBidh(hijri.day)) {
+    events.push(getAyyamAlBidhEvent());
+  }
+
+  return events;
 }
 
 /**
@@ -368,6 +530,7 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
   const today = new Date();
   const hijriToday = gregorianToHijri(today);
   const events: Array<IslamicEvent & { hijriDate: string; gregorianDate: string; daysUntil: number }> = [];
+  const names = getLocalizedDateNames();
 
   // نبحث في السنة الحالية والقادمة
   for (let yearOffset = 0; yearOffset <= 1; yearOffset++) {
@@ -380,12 +543,8 @@ export function getUpcomingEvents(count: number = 5): Array<IslamicEvent & {
       if (daysUntil > 0 && daysUntil <= 365) {
         events.push({
           ...event,
-          hijriDate: `${event.hijriDay} ${HIJRI_MONTHS_AR[event.hijriMonth - 1]} ${year}`,
-          gregorianDate: gregorianDate.toLocaleDateString('ar-EG', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          }),
+          hijriDate: `${event.hijriDay} ${names.hijriMonths[event.hijriMonth - 1] || HIJRI_MONTHS_AR[event.hijriMonth - 1]} ${year}`,
+          gregorianDate: `${gregorianDate.getDate()} ${names.months[gregorianDate.getMonth()] || ''} ${gregorianDate.getFullYear()}`,
           daysUntil,
         });
       }
@@ -423,13 +582,13 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
   hijriDay: number;
   gregorianDate: Date;
   isToday: boolean;
-  events: IslamicEvent[];
+  events: IslamicEventDetails[];
 }> {
   const days: Array<{
     hijriDay: number;
     gregorianDate: Date;
     isToday: boolean;
-    events: IslamicEvent[];
+    events: IslamicEventDetails[];
   }> = [];
   
   const daysInMonth = getHijriMonthDays(hijriYear, hijriMonth);
@@ -443,9 +602,18 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
       todayHijri.month === hijriMonth && 
       todayHijri.day === day;
     
-    const events = ISLAMIC_EVENTS.filter(
-      e => e.hijriMonth === hijriMonth && e.hijriDay === day
-    );
+    const events: IslamicEventDetails[] = ISLAMIC_EVENTS.filter(e => {
+      if (e.hijriMonth !== hijriMonth) return false;
+      if (e.hijriDayEnd) {
+        return day >= e.hijriDay && day <= e.hijriDayEnd;
+      }
+      return e.hijriDay === day;
+    });
+
+    // Add Ayyam al-Bidh
+    if (isAyyamAlBidh(day)) {
+      events.push(getAyyamAlBidhEvent());
+    }
     
     days.push({
       hijriDay: day,
@@ -456,4 +624,67 @@ export function getHijriMonthCalendar(hijriYear: number, hijriMonth: number): Ar
   }
   
   return days;
+}
+
+// ============================================
+// Hijri Offset System
+// ============================================
+
+const HIJRI_OFFSET_STORAGE_KEY = '@hijri_date_offset';
+
+/**
+ * Get the stored Hijri offset (±1-2 days for moon sighting differences)
+ */
+export async function getHijriOffset(): Promise<number> {
+  try {
+    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+    const val = await AsyncStorage.getItem(HIJRI_OFFSET_STORAGE_KEY);
+    return val ? parseInt(val, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Save the Hijri offset
+ */
+export async function setHijriOffset(offset: number): Promise<void> {
+  try {
+    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage');
+    await AsyncStorage.setItem(HIJRI_OFFSET_STORAGE_KEY, String(offset));
+  } catch {}
+}
+
+/**
+ * Convert Gregorian date to Hijri with offset applied
+ */
+export function gregorianToHijriWithOffset(date: Date, offset: number): HijriDate {
+  const adjusted = new Date(date);
+  if (offset !== 0) {
+    adjusted.setDate(adjusted.getDate() + offset);
+  }
+  return gregorianToHijri(adjusted);
+}
+
+/**
+ * Get all events for a specific Hijri day (including Ayyam al-Bidh)
+ */
+export function getEventsForHijriDay(
+  hijriMonth: number,
+  hijriDay: number,
+  events: IslamicEventDetails[] = ISLAMIC_EVENTS,
+): IslamicEventDetails[] {
+  const matched = events.filter(e => {
+    if (e.hijriMonth !== hijriMonth) return false;
+    if (e.hijriDayEnd) {
+      return hijriDay >= e.hijriDay && hijriDay <= e.hijriDayEnd;
+    }
+    return e.hijriDay === hijriDay;
+  });
+
+  if (isAyyamAlBidh(hijriDay)) {
+    matched.push(getAyyamAlBidhEvent());
+  }
+
+  return matched;
 }

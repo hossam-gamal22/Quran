@@ -135,13 +135,14 @@ class NextPrayerWidget : AppWidgetProvider() {
             val nextPrayerNameAr = data.optString("nextPrayerNameAr", "الظهر")
             val nextPrayerTime = data.optString("nextPrayerTime", "12:15 م")
             val timeRemaining = data.optString("timeRemaining", "2:30")
+            val timeRemainingLabel = data.optString("timeRemainingLabel", "الوقت المتبقي")
             val hijriDate = data.optString("hijriDate", "")
             val location = data.optString("location", "")
             
             // تحديث العناصر
             views.setTextViewText(R.id.tv_prayer_name, nextPrayerNameAr)
             views.setTextViewText(R.id.tv_prayer_time, nextPrayerTime)
-            views.setTextViewText(R.id.tv_time_remaining, "متبقي $timeRemaining")
+            views.setTextViewText(R.id.tv_time_remaining, "$timeRemainingLabel $timeRemaining")
             
             // التاريخ الهجري
             if (settings?.optBoolean("showHijriDate", true) == true && hijriDate.isNotEmpty()) {
@@ -175,7 +176,7 @@ class NextPrayerWidget : AppWidgetProvider() {
             // بيانات افتراضية
             views.setTextViewText(R.id.tv_prayer_name, "الظهر")
             views.setTextViewText(R.id.tv_prayer_time, "12:15 م")
-            views.setTextViewText(R.id.tv_time_remaining, "متبقي 2:30")
+            views.setTextViewText(R.id.tv_time_remaining, "2:30")
         }
         
         // إعداد الضغطات

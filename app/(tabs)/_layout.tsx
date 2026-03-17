@@ -1,91 +1,101 @@
 // app/(tabs)/_layout.tsx
 // Native system tabs for iOS/Android behavior — icons + text labels
+// Tab order adapts to RTL/LTR: Home on the leading edge (left in LTR, right in RTL)
 
 import React from 'react';
-import { Platform } from 'react-native';
-import { NativeTabs, Label } from 'expo-router/unstable-native-tabs';
+import { Platform, View } from 'react-native';
+import { NativeTabs, Label, Icon, VectorIcon } from 'expo-router/unstable-native-tabs';
 import { useSettings } from '@/contexts/SettingsContext';
-
-// Icon/VectorIcon crash on web SSR (expo-font.renderToImageAsync unavailable)
-// Only import and use on native platforms
-let Icon: any = null;
-let VectorIcon: any = null;
-let MaterialCommunityIcons: any = null;
-
-if (Platform.OS !== 'web') {
-  const nativeTabs = require('expo-router/unstable-native-tabs');
-  Icon = nativeTabs.Icon;
-  VectorIcon = nativeTabs.VectorIcon;
-  MaterialCommunityIcons = require('@expo/vector-icons/MaterialCommunityIcons').default;
-}
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { fontMedium, fontSemiBold } from '@/lib/fonts';
 
 const FALLBACK_LABELS: Record<string, string> = {
-  settings: 'الإعدادات',
-  prayer: 'الصلاة',
-  tasbih: 'تسبيح',
-  quran: 'القرآن',
-  home: 'الرئيسية',
+  settings: 'Settings',
+  prayer: 'Prayer',
+  tasbih: 'Tasbih',
+  quran: 'Quran',
+  home: 'Home',
 };
 
-const TAB_ICONS: Record<string, string> = {
-  settings: 'cog-outline',
-  prayer: 'mosque',
-  tasbih: 'counter',
-  quran: 'book-open-variant',
-  index: 'home-variant',
-};
+// Tab configuration — each tab's route name, icon, and translation key
+const TAB_CONFIG = [
+  { name: 'index', iconName: 'home-variant' as const, labelKey: 'home' },
+  { name: 'quran', iconName: 'book-open-variant' as const, labelKey: 'quran' },
+  { name: 'tasbih', iconName: 'counter' as const, labelKey: 'tasbih' },
+  { name: 'prayer', iconName: 'mosque' as const, labelKey: 'prayer' },
+  { name: 'settings', iconName: 'cog-outline' as const, labelKey: 'settings' },
+];
 
-function TabIcon({ name }: { name: string }) {
-  if (Platform.OS === 'web' || !Icon || !VectorIcon || !MaterialCommunityIcons) return null;
-  return <Icon src={<VectorIcon family={MaterialCommunityIcons} name={TAB_ICONS[name]} />} />;
-}
+// LTR order: Home(left) → Quran → Tasbih → Prayer → Settings(right)
+const LTR_ORDER = ['index', 'quran', 'tasbih', 'prayer', 'settings'];
+// RTL order: Settings(left) → Prayer → Tasbih → Quran → Home(right)
+// Home visually appears on the right (leading edge in RTL)
+const RTL_ORDER = ['settings', 'prayer', 'tasbih', 'quran', 'index'];
 
 export default function TabsLayout() {
-  const { t } = useSettings();
+  const { t, settings } = useSettings();
+  const colors = useColors();
+  const isRTLMode = useIsRTL();
 
   const resolveLabel = (key: string) => t(`tabs.${key}`) || FALLBACK_LABELS[key];
 
   const LABEL_SIZE = 10;
-  const ACTIVE_GREEN = '#22C55E';
-  const inactiveColor = Platform.OS === 'ios' ? '#6B7280' : '#B8C0CC';
+  const activeColor = (colors as any).tabBarActive || '#22C55E';
+  const inactiveColor = (colors as any).tabBarInactive || (Platform.OS === 'ios' ? '#6B7280' : '#B8C0CC');
+  const bgColor = (colors as any).tabBarBackground;
 
-  const selectedStyle = { color: ACTIVE_GREEN, fontFamily: 'Cairo-SemiBold', fontSize: LABEL_SIZE + 1 };
+  const hasBg = settings?.display?.appBackground && settings.display.appBackground !== 'none';
 
-  return (
+  const selectedStyle = { color: activeColor, fontFamily: fontSemiBold(), fontSize: LABEL_SIZE + 1 };
+
+  const isNative = Platform.OS !== 'web';
+
+  // When a background is active, make tab bar transparent so the background shows through
+  const tabBarBg = hasBg
+    ? 'transparent'
+    : (bgColor || (Platform.OS === 'ios' ? undefined : '#101621'));
+
+  // Pick tab order based on language direction
+  const tabOrder = isRTLMode ? RTL_ORDER : LTR_ORDER;
+  const orderedTabs = tabOrder.map(name => TAB_CONFIG.find(tab => tab.name === name)!);
+
+  const tabs = (
     <NativeTabs
+      key={isRTLMode ? 'rtl' : 'ltr'}
       disableTransparentOnScrollEdge
-      tintColor={ACTIVE_GREEN}
+      tintColor={activeColor}
       labelStyle={{
-        fontFamily: 'Cairo-Medium',
+        fontFamily: fontMedium(),
         fontSize: LABEL_SIZE,
         color: inactiveColor,
       }}
-      backgroundColor={Platform.OS === 'ios' ? undefined : '#101621'}
+      backgroundColor={tabBarBg}
     >
-      <NativeTabs.Trigger name="settings" options={{ selectedLabelStyle: selectedStyle }}>
-        <TabIcon name="settings" />
-        <Label>{resolveLabel('settings')}</Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="prayer" options={{ selectedLabelStyle: selectedStyle }}>
-        <TabIcon name="prayer" />
-        <Label>{resolveLabel('prayer')}</Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="tasbih" options={{ selectedLabelStyle: selectedStyle }}>
-        <TabIcon name="tasbih" />
-        <Label>{resolveLabel('tasbih')}</Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="quran" options={{ selectedLabelStyle: selectedStyle }}>
-        <TabIcon name="quran" />
-        <Label>{resolveLabel('quran')}</Label>
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="index" options={{ selectedLabelStyle: selectedStyle }}>
-        <TabIcon name="index" />
-        <Label>{resolveLabel('home')}</Label>
-      </NativeTabs.Trigger>
+      {orderedTabs.map((tab) => (
+        <NativeTabs.Trigger key={tab.name} name={tab.name} options={{ selectedLabelStyle: selectedStyle }}>
+          {isNative && <Icon src={<VectorIcon family={MaterialCommunityIcons} name={tab.iconName} />} />}
+          <Label>{resolveLabel(tab.labelKey)}</Label>
+        </NativeTabs.Trigger>
+      ))}
     </NativeTabs>
   );
+
+  // Wrap in BackgroundWrapper when a background is active so img extends behind tab bar
+  if (hasBg) {
+    return (
+      <BackgroundWrapper
+        backgroundKey={settings.display.appBackground}
+        backgroundUrl={settings.display.appBackgroundUrl}
+        opacity={settings.display.backgroundOpacity ?? 1}
+        style={{ flex: 1 }}
+      >
+        {tabs}
+      </BackgroundWrapper>
+    );
+  }
+
+  return tabs;
 }

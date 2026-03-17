@@ -10,10 +10,12 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 
+import { isRTL, t } from '@/lib/i18n';
 const { width } = Dimensions.get('window');
 
 // ========================================
@@ -107,17 +109,17 @@ class ErrorBoundary extends Component<Props, State> {
               </View>
 
               {/* العنوان */}
-              <Text style={styles.title}>حدث خطأ غير متوقع</Text>
+              <Text style={styles.title}>{t('errorBoundary.title')}</Text>
               
               {/* الوصف */}
               <Text style={styles.description}>
-                نعتذر عن هذا الخطأ. يرجى إعادة تشغيل التطبيق أو المحاولة مرة أخرى.
+                {t('errorBoundary.description')}
               </Text>
 
               {/* تفاصيل الخطأ (للمطورين) */}
               {__DEV__ && this.state.error && (
                 <View style={styles.errorDetails}>
-                  <Text style={styles.errorTitle}>تفاصيل الخطأ:</Text>
+                  <Text style={styles.errorTitle}>{t('errorBoundary.errorDetails')}</Text>
                   <ScrollView style={styles.errorScroll} nestedScrollEnabled>
                     <Text style={styles.errorText}>
                       {this.state.error.toString()}
@@ -139,34 +141,34 @@ class ErrorBoundary extends Component<Props, State> {
                   activeOpacity={0.8}
                 >
                   <View
-                    style={[styles.buttonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+                    style={[styles.buttonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL() ? 'row-reverse' : 'row' }]}
                   >
                     <MaterialCommunityIcons name="reload" size={22} color="#fff" />
-                    <Text style={styles.buttonText}>إعادة تشغيل التطبيق</Text>
+                    <Text style={styles.buttonText}>{t('errorBoundary.restartApp')}</Text>
                   </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.secondaryButton}
+                  style={[styles.secondaryButton, { flexDirection: isRTL() ? 'row-reverse' : 'row' }]}
                   onPress={this.handleReset}
                   activeOpacity={0.8}
                 >
-                  <MaterialCommunityIcons name="arrow-left" size={22} color="#fff" />
-                  <Text style={styles.secondaryButtonText}>المحاولة مرة أخرى</Text>
+                  <MaterialCommunityIcons name={isRTL() ? 'arrow-right' : 'arrow-left'} size={22} color="#fff" />
+                  <Text style={styles.secondaryButtonText}>{t('errorBoundary.tryAgain')}</Text>
                 </TouchableOpacity>
               </View>
 
               {/* رسالة الدعم */}
-              <View style={styles.supportContainer}>
+              <View style={[styles.supportContainer, { flexDirection: isRTL() ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="phone-outline" size={18} color="#666" />
                 <Text style={styles.supportText}>
-                  إذا استمرت المشكلة، يرجى التواصل مع الدعم الفني
+                  {t('errorBoundary.contactSupport')}
                 </Text>
               </View>
 
               {/* دعاء */}
               <Text style={styles.dua}>
-                اللهم يسر ولا تعسر
+                {t('errorBoundary.duaEase')}
               </Text>
             </ScrollView>
           </View>
@@ -211,14 +213,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     lineHeight: 26,
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
   },
   errorTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#e74c3c',
     marginBottom: 8,
   },
@@ -244,13 +246,13 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.6)',
     lineHeight: 20,
   },
   errorStack: {
     fontSize: 10,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.4)',
     marginTop: 8,
   },
@@ -273,7 +275,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontSize: 17,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   secondaryButton: {
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#fff',
   },
   supportContainer: {
@@ -299,12 +301,12 @@ const styles = StyleSheet.create({
   },
   supportText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
   dua: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.4)',
     fontStyle: 'italic',
   },

@@ -13,6 +13,7 @@ struct DhikrData: Codable {
     var arabic: String
     var translation: String?
     var count: Int
+    var timesLabel: String?
     var category: String
     var categoryName: String
     var benefit: String?
@@ -208,7 +209,7 @@ struct SmallDhikrWidgetView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "repeat")
                             .font(.system(size: 10))
-                        Text("\(entry.data?.count ?? 1) مرات")
+                        Text("\(entry.data?.count ?? 1) \(entry.data?.timesLabel ?? "مرات")")
                             .font(.system(size: 10, weight: .medium))
                     }
                     .foregroundColor(.white.opacity(0.8))

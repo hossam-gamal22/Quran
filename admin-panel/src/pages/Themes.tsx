@@ -40,6 +40,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from 'firebase/storage';
+import { Styled } from '../components/Styled';
 
 // ========================================
 // الأنواع
@@ -244,9 +245,34 @@ const ThemesPage: React.FC = () => {
   // حفظ الإعدادات
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      // Save theme colors to appConfig/themeConfig for the app to read
+      const activeLight = themes.find(t => t.isActive && t.type === 'light');
+      const activeDark = themes.find(t => t.isActive && t.type === 'dark');
+
+      const themeConfig: Record<string, any> = {
+        updatedAt: new Date().toISOString(),
+        version: Date.now(),
+      };
+
+      if (activeLight) {
+        themeConfig.light = activeLight.colors;
+      }
+      if (activeDark) {
+        themeConfig.dark = activeDark.colors;
+      }
+
+      await setDoc(doc(db, 'appConfig', 'themeConfig'), themeConfig, { merge: true });
+
+      // Also save font settings
+      await setDoc(doc(db, 'appConfig', 'fontSettings'), {
+        ...fontSettings,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error saving theme config:', error);
+    }
     setIsSaving(false);
-    // TODO: API call
   };
 
   // ========================================
@@ -397,7 +423,7 @@ const ThemesPage: React.FC = () => {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'themes' | 'seasonal' | 'backgrounds' | 'fonts')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
               activeTab === tab.id
                 ? 'bg-gray-700 text-white'
@@ -444,95 +470,99 @@ const ThemesPage: React.FC = () => {
 
             {/* محاكاة الموبايل */}
             <div className="flex justify-center">
-              <div
+              <Styled
                 className="w-[300px] h-[500px] rounded-[30px] border-4 border-gray-600 overflow-hidden"
-                style={{
+                css={{
                   backgroundColor: themes.find(t => t.type === previewMode)?.colors.background || '#fff',
                 }}
               >
                 {/* Status Bar */}
-                <div
+                <Styled
                   className="h-6 flex items-center justify-between px-4 text-xs"
-                  style={{
+                  css={{
                     backgroundColor: themes.find(t => t.type === previewMode)?.colors.surface,
                     color: themes.find(t => t.type === previewMode)?.colors.text,
                   }}
                 >
                   <span>9:41</span>
                   <span>100%</span>
-                </div>
+                </Styled>
 
                 {/* Header */}
-                <div
+                <Styled
                   className="p-4"
-                  style={{
+                  css={{
                     backgroundColor: themes.find(t => t.type === previewMode)?.colors.surface,
                   }}
                 >
-                  <h1
+                  <Styled
+                    as="h1"
                     className="text-lg font-bold"
-                    style={{ color: themes.find(t => t.type === previewMode)?.colors.text }}
+                    css={{ color: themes.find(t => t.type === previewMode)?.colors.text }}
                   >
                     روح المسلم
-                  </h1>
-                  <p
+                  </Styled>
+                  <Styled
+                    as="p"
                     className="text-sm"
-                    style={{ color: themes.find(t => t.type === previewMode)?.colors.textSecondary }}
+                    css={{ color: themes.find(t => t.type === previewMode)?.colors.textSecondary }}
                   >
                     ١٥ رمضان ١٤٤٧
-                  </p>
-                </div>
+                  </Styled>
+                </Styled>
 
                 {/* Content */}
                 <div className="p-4 space-y-3">
                   {/* Card */}
-                  <div
+                  <Styled
                     className="p-4 rounded-xl"
-                    style={{
+                    css={{
                       backgroundColor: themes.find(t => t.type === previewMode)?.colors.secondary,
                     }}
                   >
                     <p className="text-white text-sm">أذكار الصباح</p>
                     <p className="text-white/80 text-xs mt-1">33 ذكر</p>
-                  </div>
+                  </Styled>
 
                   {/* Items */}
                   {[1, 2, 3].map(i => (
-                    <div
+                    <Styled
                       key={i}
                       className="p-3 rounded-lg"
-                      style={{
+                      css={{
                         backgroundColor: themes.find(t => t.type === previewMode)?.colors.surface,
                         borderColor: themes.find(t => t.type === previewMode)?.colors.border,
                         borderWidth: 1,
                       }}
                     >
                       <div className="flex items-center gap-3">
-                        <div
+                        <Styled
                           className="w-10 h-10 rounded-lg"
-                          style={{
+                          css={{
                             backgroundColor: `${themes.find(t => t.type === previewMode)?.colors.secondary}20`,
                           }}
                         />
                         <div>
-                          <p
+                          <Styled
+                            as="p"
                             className="text-sm font-medium"
-                            style={{ color: themes.find(t => t.type === previewMode)?.colors.text }}
+                            css={{ color: themes.find(t => t.type === previewMode)?.colors.text }}
                           >
                             عنوان القسم {i}
-                          </p>
-                          <p
+                          </Styled>
+                          <Styled
+                            as="p"
                             className="text-xs"
-                            style={{ color: themes.find(t => t.type === previewMode)?.colors.textSecondary }}
+                            css={{ color: themes.find(t => t.type === previewMode)?.colors.textSecondary }}
                           >
                             وصف مختصر
-                          </p>
+                          </Styled>
                         </div>
                       </div>
-                    </div>
+                    </Styled>
                   ))}
                 </div>
-              </div>
+              </Styled>
             </div>
           </div>
 
@@ -578,12 +608,15 @@ const ThemesPage: React.FC = () => {
                         type="color"
                         value={value}
                         onChange={e => updateThemeColor(theme.id, key as keyof ThemeColors, e.target.value)}
+                        aria-label={`اختيار لون ${key}`}
                         className="w-12 h-10 rounded cursor-pointer border-0"
                       />
                       <input
                         type="text"
                         value={value}
                         onChange={e => updateThemeColor(theme.id, key as keyof ThemeColors, e.target.value)}
+                        aria-label={`كود لون ${key}`}
+                        placeholder="#000000"
                         className="flex-1 bg-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-green-500 outline-none"
                         dir="ltr"
                       />
@@ -597,13 +630,16 @@ const ThemesPage: React.FC = () => {
                 <p className="text-sm text-gray-400 mb-2">ألوان مقترحة للون الثانوي:</p>
                 <div className="flex gap-2 flex-wrap">
                   {PRESET_COLORS.map(color => (
-                    <button
+                    <Styled
+                      as="button"
                       key={color}
                       onClick={() => updateThemeColor(theme.id, 'secondary', color)}
                       className={`w-8 h-8 rounded-lg border-2 transition-all hover:scale-110 ${
                         theme.colors.secondary === color ? 'border-white' : 'border-transparent'
                       }`}
-                      style={{ backgroundColor: color }}
+                      css={{ backgroundColor: color }}
+                      aria-label={`اختيار اللون الثانوي ${color}`}
+                      title={color}
                     />
                   ))}
                 </div>
@@ -665,9 +701,9 @@ const ThemesPage: React.FC = () => {
               {backgrounds.map(bg => (
                 <div key={bg.id} className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
                   {/* معاينة الصورة */}
-                  <div
+                  <Styled
                     className="h-40 relative flex items-center justify-center"
-                    style={{
+                    css={{
                       backgroundColor: '#1a1a2e',
                       backgroundImage: bg.fullUrl ? `url(${bg.fullUrl})` : undefined,
                       backgroundSize: 'cover',
@@ -681,12 +717,13 @@ const ThemesPage: React.FC = () => {
                       <div
                         className="absolute inset-0 flex items-center justify-center"
                       >
-                        <span
+                        <Styled
+                          as="span"
                           className="text-lg font-bold px-3 py-1 rounded"
-                          style={{ color: bg.textColor === 'white' ? '#fff' : '#000' }}
+                          css={{ color: bg.textColor === 'white' ? '#fff' : '#000' }}
                         >
                           نص تجريبي — Sample Text
-                        </span>
+                        </Styled>
                       </div>
                     )}
                     {/* شارة التفعيل */}
@@ -695,7 +732,7 @@ const ThemesPage: React.FC = () => {
                     }`}>
                       {bg.enabled ? 'مفعّل' : 'معطّل'}
                     </div>
-                  </div>
+                  </Styled>
 
                   {/* بيانات الخلفية */}
                   <div className="p-4 space-y-4">
@@ -706,6 +743,8 @@ const ThemesPage: React.FC = () => {
                         type="text"
                         value={bg.name}
                         onChange={e => updateBackground(bg.id, { name: e.target.value })}
+                        aria-label="اسم الخلفية"
+                        placeholder="خلفية جديدة"
                         className="w-full bg-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
                       />
                     </div>
@@ -721,6 +760,7 @@ const ThemesPage: React.FC = () => {
                             type="file"
                             accept="image/*"
                             className="hidden"
+                            aria-label="رفع الصورة الكاملة"
                             onChange={e => {
                               const file = e.target.files?.[0];
                               if (file) handleBgImageUpload(file, bg.id, 'fullUrl');
@@ -737,6 +777,7 @@ const ThemesPage: React.FC = () => {
                             type="file"
                             accept="image/*"
                             className="hidden"
+                            aria-label="رفع الصورة المصغرة"
                             onChange={e => {
                               const file = e.target.files?.[0];
                               if (file) handleBgImageUpload(file, bg.id, 'thumbnailUrl');
@@ -755,6 +796,7 @@ const ThemesPage: React.FC = () => {
                           value={bg.fullUrl}
                           onChange={e => updateBackground(bg.id, { fullUrl: e.target.value })}
                           placeholder="https://..."
+                          aria-label="رابط الصورة الكاملة"
                           className="w-full bg-gray-700 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-green-500 outline-none"
                           dir="ltr"
                         />
@@ -766,6 +808,7 @@ const ThemesPage: React.FC = () => {
                           value={bg.thumbnailUrl}
                           onChange={e => updateBackground(bg.id, { thumbnailUrl: e.target.value })}
                           placeholder="https://..."
+                          aria-label="رابط الصورة المصغرة"
                           className="w-full bg-gray-700 rounded-lg px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-green-500 outline-none"
                           dir="ltr"
                         />
@@ -810,6 +853,8 @@ const ThemesPage: React.FC = () => {
                           type="number"
                           value={bg.order}
                           onChange={e => updateBackground(bg.id, { order: parseInt(e.target.value) || 0 })}
+                          aria-label="ترتيب الخلفية"
+                          placeholder="0"
                           className="w-full bg-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
                           min={0}
                         />
@@ -844,6 +889,8 @@ const ThemesPage: React.FC = () => {
                       </button>
                       <button
                         onClick={() => deleteBackground(bg.id)}
+                        aria-label="حذف الخلفية"
+                        title="حذف الخلفية"
                         className="flex items-center gap-1 bg-gray-700 hover:bg-red-600 px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-white transition"
                       >
                         <Trash2 size={14} />
@@ -884,6 +931,8 @@ const ThemesPage: React.FC = () => {
                           prev.map(t => t.id === theme.id ? { ...t, nameAr: e.target.value } : t)
                         );
                       }}
+                      aria-label="اسم الثيم الموسمي"
+                      placeholder="ثيم موسمي جديد"
                       className="bg-transparent text-lg font-bold focus:outline-none focus:border-b focus:border-green-500"
                     />
                   </div>
@@ -895,10 +944,11 @@ const ThemesPage: React.FC = () => {
                         prev.map(t => t.id === theme.id ? { ...t, isActive: !t.isActive } : t)
                       );
                     }}
+                    aria-label={theme.isActive ? 'تعطيل الثيم' : 'تفعيل الثيم'}
+                    title={theme.isActive ? 'تعطيل الثيم' : 'تفعيل الثيم'}
                     className={`relative w-12 h-6 rounded-full transition-colors ${
                       theme.isActive ? 'bg-green-500' : 'bg-gray-600'
-                    }`}
-                  >
+                    }`}>
                     <div
                       className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
                         theme.isActive ? 'right-1' : 'left-1'
@@ -907,6 +957,8 @@ const ThemesPage: React.FC = () => {
                   </button>
                   <button
                     onClick={() => deleteSeasonalTheme(theme.id)}
+                    aria-label="حذف الثيم الموسمي"
+                    title="حذف الثيم الموسمي"
                     className="p-2 hover:bg-gray-700 rounded text-gray-400 hover:text-red-500 transition-colors"
                   >
                     <Trash2 size={18} />
@@ -921,9 +973,10 @@ const ThemesPage: React.FC = () => {
                     value={theme.season}
                     onChange={e => {
                       setSeasonalThemes(prev =>
-                        prev.map(t => t.id === theme.id ? { ...t, season: e.target.value as any } : t)
+                        prev.map(t => t.id === theme.id ? { ...t, season: e.target.value as SeasonalTheme['season'] } : t)
                       );
                     }}
+                    aria-label="الموسم"
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   >
                     {SEASON_OPTIONS.map(opt => (
@@ -941,6 +994,7 @@ const ThemesPage: React.FC = () => {
                         prev.map(t => t.id === theme.id ? { ...t, startDate: e.target.value } : t)
                       );
                     }}
+                    aria-label="تاريخ بداية الموسم"
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   />
                 </div>
@@ -954,6 +1008,7 @@ const ThemesPage: React.FC = () => {
                         prev.map(t => t.id === theme.id ? { ...t, endDate: e.target.value } : t)
                       );
                     }}
+                    aria-label="تاريخ نهاية الموسم"
                     className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                   />
                 </div>
@@ -968,6 +1023,7 @@ const ThemesPage: React.FC = () => {
                           prev.map(t => t.id === theme.id ? { ...t, colors: { ...t.colors, secondary: e.target.value } } : t)
                         );
                       }}
+                      aria-label="اختيار اللون الثانوي للموسم"
                       className="w-12 h-10 rounded cursor-pointer"
                     />
                     <input
@@ -978,6 +1034,8 @@ const ThemesPage: React.FC = () => {
                           prev.map(t => t.id === theme.id ? { ...t, colors: { ...t.colors, secondary: e.target.value } } : t)
                         );
                       }}
+                      aria-label="كود اللون الثانوي للموسم"
+                      placeholder="#2f7659"
                       className="flex-1 bg-gray-700 rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-green-500 outline-none"
                       dir="ltr"
                     />
@@ -1011,6 +1069,7 @@ const ThemesPage: React.FC = () => {
                 <select
                   value={fontSettings.arabicFont}
                   onChange={e => setFontSettings({ ...fontSettings, arabicFont: e.target.value })}
+                  aria-label="الخط العربي"
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                 >
                   {FONT_OPTIONS.arabic.map(font => (
@@ -1024,6 +1083,7 @@ const ThemesPage: React.FC = () => {
                 <select
                   value={fontSettings.latinFont}
                   onChange={e => setFontSettings({ ...fontSettings, latinFont: e.target.value })}
+                  aria-label="الخط اللاتيني"
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                 >
                   {FONT_OPTIONS.latin.map(font => (
@@ -1037,6 +1097,7 @@ const ThemesPage: React.FC = () => {
                 <select
                   value={fontSettings.quranFont}
                   onChange={e => setFontSettings({ ...fontSettings, quranFont: e.target.value })}
+                  aria-label="خط القرآن"
                   className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
                 >
                   {FONT_OPTIONS.quran.map(font => (
@@ -1055,6 +1116,7 @@ const ThemesPage: React.FC = () => {
                   max="24"
                   value={fontSettings.baseFontSize}
                   onChange={e => setFontSettings({ ...fontSettings, baseFontSize: parseInt(e.target.value) })}
+                  aria-label="حجم الخط الأساسي"
                   className="w-full"
                 />
               </div>
@@ -1070,6 +1132,7 @@ const ThemesPage: React.FC = () => {
                   step="0.05"
                   value={fontSettings.headingScale}
                   onChange={e => setFontSettings({ ...fontSettings, headingScale: parseFloat(e.target.value) })}
+                  aria-label="مقياس العناوين"
                   className="w-full"
                 />
               </div>
@@ -1079,20 +1142,21 @@ const ThemesPage: React.FC = () => {
             <div className="mt-6 pt-6 border-t border-gray-700">
               <h3 className="text-sm text-gray-400 mb-4">معاينة:</h3>
               <div className="space-y-4 p-4 bg-gray-700/50 rounded-lg">
-                <p style={{ fontFamily: fontSettings.arabicFont, fontSize: fontSettings.baseFontSize }}>
+                <Styled as="p" css={{ fontFamily: fontSettings.arabicFont, fontSize: fontSettings.baseFontSize }}>
                   بسم الله الرحمن الرحيم
-                </p>
-                <p
-                  style={{
+                </Styled>
+                <Styled
+                  as="p"
+                  css={{
                     fontFamily: fontSettings.quranFont,
                     fontSize: fontSettings.baseFontSize * fontSettings.headingScale,
                   }}
                 >
                   ﴿ الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ ﴾
-                </p>
-                <p style={{ fontFamily: fontSettings.latinFont, fontSize: fontSettings.baseFontSize }} dir="ltr">
+                </Styled>
+                <Styled as="p" css={{ fontFamily: fontSettings.latinFont, fontSize: fontSettings.baseFontSize }} dir="ltr">
                   In the name of Allah, the Most Gracious, the Most Merciful
-                </p>
+                </Styled>
               </div>
             </div>
           </div>

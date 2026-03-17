@@ -114,6 +114,8 @@ function SectionEditor({
         <button
           onClick={addItem}
           className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-700"
+          aria-label="إضافة عنصر"
+          title="إضافة عنصر"
         >
           <Plus size={16} />
           إضافة
@@ -133,6 +135,8 @@ function SectionEditor({
                     onChange={(e) => updateItem(index, { key: e.target.value })}
                     className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                     dir="ltr"
+                    aria-label="المفتاح"
+                    placeholder="key"
                   />
                 </div>
                 <div>
@@ -141,6 +145,8 @@ function SectionEditor({
                     value={item.labelAr}
                     onChange={(e) => updateItem(index, { labelAr: e.target.value })}
                     className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
+                    aria-label="الاسم عربي"
+                    placeholder="الاسم عربي"
                   />
                 </div>
                 <div>
@@ -150,12 +156,16 @@ function SectionEditor({
                     onChange={(e) => updateItem(index, { labelEn: e.target.value })}
                     className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                     dir="ltr"
+                    aria-label="الاسم English"
+                    placeholder="Name (English)"
                   />
                 </div>
                 <div className="flex items-end justify-end">
                   <button
                     onClick={() => removeItem(index)}
                     className="px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
+                    aria-label="حذف العنصر"
+                    title="حذف العنصر"
                   >
                     <Trash2 size={14} className="inline ml-1" />
                     حذف
@@ -170,6 +180,7 @@ function SectionEditor({
                     value={item.icon.mode}
                     onChange={(e) => updateIcon(index, { mode: e.target.value as IconMode })}
                     className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
+                    aria-label="نوع الأيقونة"
                   >
                     <option value="material">MaterialCommunity</option>
                     <option value="ionicons">Ionicons</option>
@@ -188,6 +199,7 @@ function SectionEditor({
                         className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                         dir="ltr"
                         placeholder="https://.../icon.png"
+                        aria-label="PNG URL"
                       />
                     </div>
                     <div>
@@ -198,6 +210,7 @@ function SectionEditor({
                         className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                         dir="ltr"
                         placeholder="https://.../icon-selected.png"
+                        aria-label="PNG Selected URL"
                       />
                     </div>
                     <div />
@@ -212,6 +225,7 @@ function SectionEditor({
                         className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                         dir="ltr"
                         placeholder={item.icon.mode === 'sf' ? 'house' : 'home-variant'}
+                        aria-label="اسم الأيقونة"
                       />
                     </div>
                     <div>
@@ -222,6 +236,7 @@ function SectionEditor({
                         className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
                         dir="ltr"
                         placeholder={item.icon.mode === 'sf' ? 'house.fill' : 'home'}
+                        aria-label="اسم الأيقونة (selected)"
                       />
                     </div>
                     <div />
@@ -318,6 +333,8 @@ const NavigationUI: React.FC = () => {
           <button
             onClick={load}
             className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2"
+            aria-label="تحديث البيانات"
+            title="تحديث البيانات"
           >
             <RefreshCw size={16} />
             تحديث
@@ -355,6 +372,7 @@ const NavigationUI: React.FC = () => {
                 },
               })}
               className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
+              aria-label="حجم الخط"
             />
           </div>
           <div>
@@ -372,6 +390,7 @@ const NavigationUI: React.FC = () => {
                 },
               })}
               className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
+              aria-label="المسافة الرأسية بين الأيقونة والنص"
             />
           </div>
           <div>
@@ -390,6 +409,7 @@ const NavigationUI: React.FC = () => {
                 },
               })}
               className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
+              aria-label="شفافية خلفية التاب المحدد"
             />
           </div>
         </div>

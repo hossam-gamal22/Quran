@@ -236,7 +236,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 
 - Tab routes: Use `router.navigate('/(tabs)/routeName')` — NOT `router.push()` for tab destinations
 - Stack routes: Use `router.push('/routeName')` for modal/stack screens
-- Special Surahs: Navigate to `/special-surah?surah=18` (الكهف), `?surah=36` (يس), `?surah=67` (الملك)
+- Special Surahs: Navigate to `/surah/18` (الكهف), `/surah/36` (يس), `/surah/67` (الملك)
 - Quick Access items are customizable via AsyncStorage key `@quick_access_items`
 
 ## Error Handling
@@ -256,7 +256,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 
 | Route | Purpose |
 |-------|---------|
-| `/special-surah` | Standalone surah reader for الكهف/يس/الملك with QCF fonts |
+
 | `/seerah` | Prophet's Biography — 7 expandable timeline sections |
 | `/daily-dua` | Daily dua display (126 curated duas, deterministic + random refresh) |
 | `/daily-ayah` | Verse of the Day — deterministic daily verse with sharing |
@@ -551,7 +551,7 @@ Settings page organized into 8 sections (in order):
 - All surah links navigate to Mushaf: `router.push('/surah/{number}')`
 - Ayat Al-Kursi: `router.push('/surah/2?ayah=255')`
 - No separate surah pages — unified Mushaf experience with user settings
-- `app/special-surah.tsx` deprecated (can be deleted)
+- `app/special-surah.tsx` deleted — all surahs use `/surah/{number}` Mushaf reader
 - `app/night-reading.tsx` redirects to `/(tabs)/quran`
 
 ## Notifications - Unified System

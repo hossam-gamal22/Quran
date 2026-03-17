@@ -11,8 +11,8 @@ import {
   Switch,
   Platform,
   Alert,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,39 +20,41 @@ import * as Notifications from 'expo-notifications';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { isRTL as checkIsRTL } from '@/lib/i18n';
+import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
 
 // ========================================
 // الثوابت
 // ========================================
 
-const NOTIFICATION_OPTIONS = [
+const getNotificationOptions = () => [
   {
     id: 'prayer',
     icon: 'mosque',
-    title: 'أوقات الصلاة',
-    description: 'تنبيه قبل كل صلاة',
+    title: tOnboarding('prayerTimes'),
+    description: tOnboarding('prayerTimesDesc'),
     color: '#c17f59',
   },
   {
     id: 'azkar',
-    icon: 'hand-heart',
-    title: 'الأذكار',
-    description: 'تذكير بأذكار الصباح والمساء',
+    icon: 'book-open-variant',
+    title: tOnboarding('adhkar'),
+    description: tOnboarding('adhkarDesc'),
     color: '#2f7659',
   },
   {
-    id: 'quran',
-    icon: 'book-open-variant',
-    title: 'ورد القرآن',
-    description: 'تذكير يومي بقراءة القرآن',
-    color: '#3a7ca5',
+    id: 'salawat',
+    icon: 'heart',
+    title: tOnboarding('salawat'),
+    description: tOnboarding('salawatDesc'),
+    color: '#d4a017',
   },
   {
-    id: 'friday',
-    icon: 'calendar-star',
-    title: 'يوم الجمعة',
-    description: 'تذكير بسورة الكهف والصلاة على النبي',
-    color: '#5d4e8c',
+    id: 'dailyVerse',
+    icon: 'book-open-page-variant',
+    title: tOnboarding('dailyVerse'),
+    description: tOnboarding('dailyVerseDesc'),
+    color: '#3a7ca5',
   },
 ];
 
@@ -61,15 +63,17 @@ const NOTIFICATION_OPTIONS = [
 // ========================================
 
 export default function NotificationsScreen() {
-  const { preferences, updatePreferences, goToNextStep, goToPreviousStep } = useOnboarding();
+  const isRTL = checkIsRTL();
+  const notificationOptions = getNotificationOptions();
+  const { preferences, updatePreferences, goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
   
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [enabledOptions, setEnabledOptions] = useState<{ [key: string]: boolean }>({
     prayer: true,
     azkar: true,
-    quran: false,
-    friday: true,
+    salawat: true,
+    dailyVerse: true,
   });
 
   useEffect(() => {
@@ -93,9 +97,9 @@ export default function NotificationsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
         Alert.alert(
-          'صلاحية الإشعارات',
-          'نحتاج صلاحية الإشعارات لإرسال تنبيهات الصلاة والأذكار. يمكنك تفعيلها من إعدادات الجهاز.',
-          [{ text: 'حسناً', style: 'default' }]
+          tOnboarding('notificationPermission'),
+          tOnboarding('notificationPermissionDesc'),
+          [{ text: tOnboarding('ok'), style: 'default' }]
         );
       }
     } catch (error) {
@@ -120,6 +124,8 @@ export default function NotificationsScreen() {
       notificationsEnabled: permissionGranted,
       prayerNotifications: enabledOptions.prayer,
       azkarNotifications: enabledOptions.azkar,
+      salawatReminder: enabledOptions.salawat,
+      dailyVerse: enabledOptions.dailyVerse,
     });
     
     goToNextStep();
@@ -143,20 +149,22 @@ export default function NotificationsScreen() {
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
           {/* Header */}
-          <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+          <Animated.View entering={FadeInDown.duration(500)} style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+              <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.stepText}>الخطوة 3 من 4</Text>
-              <Text style={styles.headerTitle}>الإشعارات</Text>
+              <Text style={styles.stepText}>{tOnboardingStep(5, 5)}</Text>
+              <Text style={styles.headerTitle}>{tOnboarding('notifications')}</Text>
             </View>
-            <View style={styles.headerPlaceholder} />
+            <TouchableOpacity style={styles.skipBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); skipOnboarding(); }}>
+              <Text style={styles.skipBtnText}>{tOnboarding('skip')}</Text>
+            </TouchableOpacity>
           </Animated.View>
 
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
-            <View style={styles.progressBg}>
+            <View style={[styles.progressBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Animated.View 
                 entering={FadeInDown.delay(200).duration(600)}
                 style={[styles.progressFill, { width: '75%' }]} 
@@ -181,11 +189,11 @@ export default function NotificationsScreen() {
 
             {/* العنوان */}
             <Animated.Text entering={FadeInDown.delay(300).duration(500)} style={styles.title}>
-              {permissionGranted ? 'الإشعارات مفعّلة' : 'تفعيل الإشعارات'}
+              {permissionGranted ? tOnboarding('notificationsEnabled') : tOnboarding('enableNotifications')}
             </Animated.Text>
 
             <Animated.Text entering={FadeInDown.delay(400).duration(500)} style={styles.description}>
-              اختر الإشعارات التي تريد استلامها
+              {tOnboarding('chooseNotifications')}
             </Animated.Text>
 
             {/* زر تفعيل الإشعارات */}
@@ -198,28 +206,29 @@ export default function NotificationsScreen() {
                   activeOpacity={0.8}
                 >
                   <MaterialCommunityIcons name="bell-plus" size={24} color="#fff" />
-                  <Text style={styles.enableButtonText}>تفعيل الإشعارات</Text>
+                  <Text style={styles.enableButtonText}>{tOnboarding('enableNotifications')}</Text>
                 </TouchableOpacity>
               </Animated.View>
             )}
 
             {/* خيارات الإشعارات */}
             <Animated.View entering={FadeInDown.delay(600).duration(500)} style={styles.optionsContainer}>
-              {NOTIFICATION_OPTIONS.map((option, index) => (
+              {notificationOptions.map((option, index) => (
                 <Animated.View
                   key={option.id}
                   entering={FadeInDown.delay(600 + index * 80).duration(400)}
                   style={[
                     styles.optionItem,
                     !permissionGranted && styles.optionItemDisabled,
+                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
                   ]}
                 >
                   <View style={styles.optionIcon}>
                     <MaterialCommunityIcons name={option.icon as any} size={24} color={option.color} />
                   </View>
                   <View style={styles.optionContent}>
-                    <Text style={styles.optionTitle}>{option.title}</Text>
-                    <Text style={styles.optionDesc}>{option.description}</Text>
+                    <Text style={[styles.optionTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{option.title}</Text>
+                    <Text style={[styles.optionDesc, { textAlign: isRTL ? 'right' : 'left' }]}>{option.description}</Text>
                   </View>
                   <Switch
                     value={enabledOptions[option.id] && permissionGranted}
@@ -238,7 +247,7 @@ export default function NotificationsScreen() {
             <Animated.View entering={FadeInDown.delay(900).duration(500)}>
               {!permissionGranted && (
                 <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-                  <Text style={styles.skipButtonText}>تخطي هذه الخطوة</Text>
+                  <Text style={styles.skipButtonText}>{tOnboarding('skipStep')}</Text>
                 </TouchableOpacity>
               )}
 
@@ -248,15 +257,16 @@ export default function NotificationsScreen() {
                 activeOpacity={0.8}
               >
               <View
-                style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+                style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
-                  <Text style={styles.continueButtonText}>متابعة</Text>
-                  <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+                  <Text style={styles.continueButtonText}>{tOnboarding('continue')}</Text>
+                  <MaterialCommunityIcons name={isRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
               </View>
               </TouchableOpacity>
 
               {/* مؤشر الصفحات */}
-              <View style={styles.pageIndicator}>
+              <View style={[styles.pageIndicator, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
@@ -302,16 +312,22 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.6)',
   },
   headerTitle: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
-  headerPlaceholder: {
-    width: 44,
+  skipBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  skipBtnText: {
+    fontSize: 15,
+    fontFamily: fontMedium(),
+    color: 'rgba(255,255,255,0.7)',
   },
   progressContainer: {
     paddingHorizontal: 24,
@@ -345,16 +361,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
+    backgroundColor: '#2f7659',
   },
   title: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
     textAlign: 'center',
   },
   description: {
     fontSize: 15,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     marginTop: 8,
@@ -374,7 +391,7 @@ const styles = StyleSheet.create({
   },
   enableButtonText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   optionsContainer: {
@@ -405,12 +422,12 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   optionDesc: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.5)',
   },
   bottomContainer: {
@@ -424,7 +441,7 @@ const styles = StyleSheet.create({
   },
   skipButtonText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.6)',
   },
   continueButton: {
@@ -441,7 +458,7 @@ const styles = StyleSheet.create({
   },
   continueButtonText: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   pageIndicator: {

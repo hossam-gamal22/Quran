@@ -66,7 +66,6 @@ const ICON_MAP: Record<string, string> = {
   "square.and.arrow.up": "share-social-outline",
   
   // Settings
-  "moon.fill": "moon",
   "textformat.size": "text",
   "globe": "globe-outline",
   "number": "keypad-outline",
@@ -106,7 +105,7 @@ export function IconSymbol({ name, size = 24, color = "#000000", style }: IconSy
             name={(ICON_MAP[name] || "information-outline") as any}
             size={size}
             color={color}
-            style={style}
+            style={style as any}
           />
         }
       />
@@ -121,7 +120,7 @@ export function IconSymbol({ name, size = 24, color = "#000000", style }: IconSy
       name={ionIconName as any}
       size={size}
       color={color}
-      style={style}
+      style={style as any}
     />
   );
 }

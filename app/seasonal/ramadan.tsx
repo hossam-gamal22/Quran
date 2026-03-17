@@ -12,8 +12,8 @@ import {
   RefreshControl,
   Dimensions,
   Modal,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,9 +28,15 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { getHijriDate, hijriToGregorian } from '@/lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
 import GlassCard from '@/components/ui/GlassCard';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getLanguage } from '@/lib/i18n';
+import TranslatedText from '@/components/ui/TranslatedText';
+import { useSeasonalCMS } from '@/lib/content-api';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -45,41 +51,44 @@ const RAMADAN_GRADIENT = ['#2f7659', '#1d4a3a'];
 const RAMADAN_DUAS = [
   {
     id: 'iftar',
-    title: 'دعاء الإفطار',
+    titleKey: 'ramadan.iftarDua' as const,
     arabic: 'ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الأَجْرُ إِنْ شَاءَ اللَّهُ',
     translation: 'The thirst has gone, the veins are moistened and the reward is confirmed, if Allah wills.',
   },
   {
     id: 'laylat_qadr',
-    title: 'دعاء ليلة القدر',
+    titleKey: 'ramadan.laylatQadrDua' as const,
     arabic: 'اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي',
     translation: 'O Allah, You are Forgiving and love forgiveness, so forgive me.',
   },
   {
     id: 'suhoor',
-    title: 'دعاء السحور',
+    titleKey: 'ramadan.suhoorDua' as const,
     arabic: 'اللَّهُمَّ إِنِّي أَسْأَلُكَ بِرَحْمَتِكَ الَّتِي وَسِعَتْ كُلَّ شَيْءٍ أَنْ تَغْفِرَ لِي',
     translation: 'O Allah, I ask You by Your mercy which encompasses all things, to forgive me.',
   },
   {
     id: 'quran',
-    title: 'دعاء ختم القرآن',
+    titleKey: 'ramadan.quranCompletionDua' as const,
     arabic: 'اللَّهُمَّ ارْحَمْنِي بِالْقُرْآنِ وَاجْعَلْهُ لِي إِمَامًا وَنُورًا وَهُدًى وَرَحْمَةً',
     translation: 'O Allah, have mercy on me through the Quran, and make it for me a guide, light, guidance and mercy.',
   },
 ];
 
 const DAILY_CHECKLIST = [
-  { id: 'fasting', icon: 'food-off', label: 'الصيام', color: '#2f7659' },
-  { id: 'fajr', icon: 'weather-sunset-up', label: 'صلاة الفجر', color: '#5d4e8c' },
-  { id: 'quran', icon: 'book-open-variant', label: 'قراءة القرآن', color: '#3a7ca5' },
-  { id: 'tarawih', icon: 'mosque', label: 'صلاة التراويح', color: '#c17f59' },
-  { id: 'azkar', icon: 'hand-heart', label: 'الأذكار', color: '#f5a623' },
-  { id: 'sadaqa', icon: 'hand-coin', label: 'الصدقة', color: '#e91e63' },
+  { id: 'fasting', icon: 'food-off', labelKey: 'ramadan.fasting' as const, color: '#2f7659' },
+  { id: 'fajr', icon: 'weather-sunset-up', labelKey: 'ramadan.fajrPrayer' as const, color: '#5d4e8c' },
+  { id: 'quran', icon: 'book-open-variant', labelKey: 'ramadan.quranReading' as const, color: '#3a7ca5' },
+  { id: 'tarawih', icon: 'mosque', labelKey: 'ramadan.tarawih' as const, color: '#c17f59' },
+  { id: 'azkar', icon: 'hand-heart', labelKey: 'ramadan.adhkar' as const, color: '#f5a623' },
+  { id: 'sadaqa', icon: 'hand-coin', labelKey: 'ramadan.charity' as const, color: '#e91e63' },
 ];
 
 const LAST_TEN_NIGHTS = [21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
 const ODD_NIGHTS = [21, 23, 25, 27, 29];
+
+type RamadanDua = typeof RAMADAN_DUAS[number];
+type ChecklistItem = typeof DAILY_CHECKLIST[number];
 
 // ========================================
 // مكونات فرعية
@@ -98,6 +107,8 @@ const DayCalendar: React.FC<DayCalendarProps> = ({
   onDayPress,
   isDarkMode,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   const days = Array.from({ length: 30 }, (_, i) => i + 1);
 
   return (
@@ -131,7 +142,7 @@ const DayCalendar: React.FC<DayCalendarProps> = ({
               <Text
                 style={[
                   styles.calendarDayText,
-                  isDarkMode && styles.textLight,
+                  { color: colors.text },
                   isCompleted && styles.calendarDayTextCompleted,
                   isCurrent && styles.calendarDayTextCurrent,
                   isFuture && styles.calendarDayTextFuture,
@@ -144,30 +155,30 @@ const DayCalendar: React.FC<DayCalendarProps> = ({
                   <MaterialCommunityIcons name="check" size={10} color="#fff" />
                 </View>
               )}
-              {day === 27 && (
+              {ODD_NIGHTS.includes(day) && (
                 <MaterialCommunityIcons
                   name="star"
                   size={10}
                   color="#f5a623"
-                  style={styles.specialStar}
+                  style={[styles.specialStar, isRTL ? { left: 2, right: undefined } : null]}
                 />
               )}
             </TouchableOpacity>
           );
         })}
       </View>
-      <View style={styles.calendarLegend}>
-        <View style={styles.legendItem}>
+      <View style={[styles.calendarLegend, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.legendDot, { backgroundColor: RAMADAN_COLOR }]} />
-          <Text style={[styles.legendText, isDarkMode && styles.textMuted]}>مكتمل</Text>
+          <Text style={[styles.legendText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.completed')}</Text>
         </View>
-        <View style={styles.legendItem}>
+        <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.legendDot, { backgroundColor: '#f5a623' }]} />
-          <Text style={[styles.legendText, isDarkMode && styles.textMuted]}>العشر الأواخر</Text>
+          <Text style={[styles.legendText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.lastTenNights')}</Text>
         </View>
-        <View style={styles.legendItem}>
+        <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.legendDot, { backgroundColor: '#e91e63' }]} />
-          <Text style={[styles.legendText, isDarkMode && styles.textMuted]}>الليالي الوترية</Text>
+          <Text style={[styles.legendText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.oddNights')}</Text>
         </View>
       </View>
     </View>
@@ -189,6 +200,8 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
   isDarkMode,
   index,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInRight.delay(index * 80).duration(400)}>
       <TouchableOpacity
@@ -196,6 +209,7 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
           styles.checklistItem,
           isDarkMode && styles.checklistItemDark,
           isChecked && styles.checklistItemChecked,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -206,8 +220,8 @@ const ChecklistItem: React.FC<ChecklistItemProps> = ({
         <View style={styles.checklistIcon}>
           <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
         </View>
-        <Text style={[styles.checklistLabel, isDarkMode && styles.textLight]}>
-          {item.label}
+        <Text style={[styles.checklistLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+          {t(item.labelKey)}
         </Text>
         <View
           style={[
@@ -230,6 +244,9 @@ interface DuaCardProps {
 }
 
 const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 100).duration(400)}
@@ -246,10 +263,16 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
         <View style={styles.duaIconContainer}>
           <MaterialCommunityIcons name="hands-pray" size={24} color={RAMADAN_COLOR} />
         </View>
-        <Text style={[styles.duaTitle, isDarkMode && styles.textLight]}>{dua.title}</Text>
-        <Text style={[styles.duaPreview, isDarkMode && styles.textMuted]} numberOfLines={2}>
-          {dua.arabic}
-        </Text>
+        <Text style={[styles.duaTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t(dua.titleKey)}</Text>
+        {isArabicLang ? (
+          <Text style={[styles.duaPreview, { color: colors.textLight, textAlign: 'right', writingDirection: 'rtl' }]} numberOfLines={2}>
+            {dua.arabic}
+          </Text>
+        ) : (
+          <TranslatedText style={[styles.duaPreview, { color: colors.textLight }]} numberOfLines={2}>
+            {dua.arabic}
+          </TranslatedText>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -265,14 +288,15 @@ interface StatsCardProps {
 }
 
 const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, unit, color, isDarkMode }) => {
+  const colors = useColors();
   return (
     <View style={[styles.statsCard, isDarkMode && styles.statsCardDark]}>
       <View style={styles.statsIconBg}>
         <MaterialCommunityIcons name={icon as any} size={24} color={color} />
       </View>
-      <Text style={[styles.statsValue, isDarkMode && styles.textLight]}>{value}</Text>
-      <Text style={[styles.statsUnit, isDarkMode && styles.textMuted]}>{unit}</Text>
-      <Text style={[styles.statsLabel, isDarkMode && styles.textMuted]}>{label}</Text>
+      <Text style={[styles.statsValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statsUnit, { color: colors.textLight }]}>{unit}</Text>
+      <Text style={[styles.statsLabel, { color: colors.textLight }]}>{label}</Text>
     </View>
   );
 };
@@ -282,13 +306,20 @@ const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, unit, color, 
 // ========================================
 
 export default function RamadanScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const colors = useColors();
+  const language = getLanguage();
+  const isArabic = language === 'ar';
   const { currentSeason, specialDay, refreshSeasonalData } = useSeasonal();
   const { seasonalProgress, markDayCompleted, updateProgress } = useSeasonalProgress();
 
+  // CMS data with hardcoded fallback
+  const { duas: ramadanDuas, checklist: dailyChecklistItems } = useSeasonalCMS<RamadanDua, ChecklistItem>('ramadan', RAMADAN_DUAS, DAILY_CHECKLIST);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDua, setSelectedDua] = useState<typeof RAMADAN_DUAS[0] | null>(null);
+  const [selectedDua, setSelectedDua] = useState<RamadanDua | null>(null);
   const [dailyChecklist, setDailyChecklist] = useState<{ [key: string]: boolean }>({});
 
   const isRamadanActive = currentSeason?.type === 'ramadan';
@@ -350,7 +381,7 @@ export default function RamadanScreen() {
       }
 
       // التحقق من اكتمال اليوم
-      const allChecked = DAILY_CHECKLIST.every((item) => newState[item.id]);
+      const allChecked = dailyChecklistItems.every((item) => newState[item.id]);
       if (allChecked && !completedDays.includes(currentDay)) {
         markDayCompleted(currentDay);
       }
@@ -360,14 +391,15 @@ export default function RamadanScreen() {
   }, [seasonalProgress, updateProgress, completedDays, currentDay, markDayCompleted]);
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={isDarkMode ? '#11151c' : '#fff'}
       />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: `${RAMADAN_GRADIENT[0]}CC` }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${RAMADAN_GRADIENT[0]}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -375,13 +407,13 @@ export default function RamadanScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>رمضان المبارك</Text>
+          <Text style={styles.headerTitle}>{t('ramadan.blessedRamadan')}</Text>
           {isRamadanActive && (
             <Text style={styles.headerSubtitle}>
-              {currentDay} من 30
+              {currentDay} {t('ramadan.ofThirty')}
             </Text>
           )}
         </View>
@@ -419,11 +451,29 @@ export default function RamadanScreen() {
                 <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
               </View>
               <View
-                style={[styles.specialDayBanner, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
+                style={[styles.specialDayBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
               >
                 <View style={styles.specialDayContent}>
-                  <Text style={styles.specialDayTitle}>{specialDay.nameAr}</Text>
-                  <Text style={styles.specialDayDesc}>{specialDay.description}</Text>
+                  <Text style={[styles.specialDayTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{getLanguage() === 'ar' ? specialDay.nameAr : (specialDay.nameEn || specialDay.nameAr)}</Text>
+                  {isArabic ? (
+                    <Text style={[styles.specialDayDesc, { textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</Text>
+                  ) : (
+                    <TranslatedText style={[styles.specialDayDesc, { textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</TranslatedText>
+                  )}
+                  {specialDay.virtues && specialDay.virtues.length > 0 && (
+                    <View style={{ marginTop: 8, gap: 4 }}>
+                      {specialDay.virtues.map((virtue, idx) => (
+                        <View key={idx} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                          <MaterialCommunityIcons name="check-circle" size={14} color="#f5a623" />
+                          {isArabic ? (
+                            <Text style={{ fontSize: 13, fontFamily: fontRegular(), color: '#555', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</Text>
+                          ) : (
+                            <TranslatedText style={{ fontSize: 13, fontFamily: fontRegular(), color: '#555', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</TranslatedText>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -432,27 +482,27 @@ export default function RamadanScreen() {
 
         {/* الإحصائيات */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>إحصائياتك</Text>
-          <View style={styles.statsGrid}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.yourStats')}</Text>
+          <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <StatsCard
               icon="food-off"
-              label="الصيام"
+              label={t('ramadan.fastingDays')}
               value={stats.fasting}
-              unit="يوم"
+              unit={t('ramadan.dayUnit')}
               color="#2f7659"
               isDarkMode={isDarkMode}
             />
             <StatsCard
               icon="book-open-variant"
-              label="القرآن"
+              label={t('ramadan.quranPages')}
               value={stats.quranPages}
-              unit="صفحة"
+              unit={t('ramadan.pageUnit')}
               color="#3a7ca5"
               isDarkMode={isDarkMode}
             />
             <StatsCard
               icon="percent"
-              label="الختمة"
+              label={t('ramadan.khatmaProgress')}
               value={stats.khatmaProgress}
               unit="%"
               color="#5d4e8c"
@@ -460,9 +510,9 @@ export default function RamadanScreen() {
             />
             <StatsCard
               icon="mosque"
-              label="الصلوات"
+              label={t('ramadan.prayers')}
               value={stats.prayers}
-              unit="صلاة"
+              unit={t('ramadan.prayerUnit')}
               color="#c17f59"
               isDarkMode={isDarkMode}
             />
@@ -471,11 +521,11 @@ export default function RamadanScreen() {
 
         {/* قائمة المهام اليومية */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-            مهام اليوم {currentDay}
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            {t('ramadan.dailyTasks')} {currentDay}
           </Text>
           <View style={[styles.checklistContainer, isDarkMode && styles.checklistContainerDark]}>
-            {DAILY_CHECKLIST.map((item, index) => (
+            {dailyChecklistItems.map((item, index) => (
               <ChecklistItem
                 key={item.id}
                 item={item}
@@ -490,7 +540,7 @@ export default function RamadanScreen() {
 
         {/* تقويم الشهر */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>تقويم رمضان</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.ramadanCalendar')}</Text>
           <View style={[styles.calendarCard, isDarkMode && styles.calendarCardDark]}>
             <DayCalendar
               currentDay={currentDay}
@@ -503,9 +553,9 @@ export default function RamadanScreen() {
 
         {/* أدعية رمضان */}
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>أدعية رمضانية</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.ramadanDuas')}</Text>
           <View style={styles.duasGrid}>
-            {RAMADAN_DUAS.map((dua, index) => (
+            {ramadanDuas.map((dua, index) => (
               <DuaCard
                 key={dua.id}
                 dua={dua}
@@ -519,13 +569,12 @@ export default function RamadanScreen() {
 
         {/* نصائح */}
         <Animated.View entering={FadeInDown.delay(500).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark]}>
+          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#f5a623" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>نصيحة اليوم</Text>
-              <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
-                احرص على قراءة جزء من القرآن يومياً لتختم القرآن في رمضان. 
-                الجزء الواحد يتكون من 20 صفحة تقريباً.
+              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.dailyTip')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {t('ramadan.dailyTipText')}
               </Text>
             </View>
           </View>
@@ -550,32 +599,39 @@ export default function RamadanScreen() {
             entering={FadeIn.duration(300)}
             style={[styles.duaModal, isDarkMode && styles.duaModalDark]}
           >
-            <View style={styles.duaModalHeader}>
-              <Text style={[styles.duaModalTitle, isDarkMode && styles.textLight]}>
-                {selectedDua?.title}
+            <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <Text style={[styles.duaModalTitle, { color: colors.text }]}>
+                {selectedDua ? t(selectedDua.titleKey) : ''}
               </Text>
-              <TouchableOpacity onPress={() => setSelectedDua(null)}>
+              <TouchableOpacity onPress={() => setSelectedDua(null)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons
                   name="close"
                   size={24}
-                  color={isDarkMode ? '#fff' : '#333'}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
-            <Text style={[styles.duaModalArabic, isDarkMode && styles.textLight]}>
-              {selectedDua?.arabic}
-            </Text>
-            <Text style={[styles.duaModalTranslation, isDarkMode && styles.textMuted]}>
+            {isArabic ? (
+              <Text style={[styles.duaModalArabic, { color: colors.text, writingDirection: 'rtl' }]}>
+                {selectedDua?.arabic}
+              </Text>
+            ) : (
+              <TranslatedText style={[styles.duaModalArabic, { color: colors.text }]}>
+                {selectedDua?.arabic || ''}
+              </TranslatedText>
+            )}
+            <Text style={[styles.duaModalTranslation, { color: colors.textLight }]}>
               {selectedDua?.translation}
             </Text>
-            <TouchableOpacity style={styles.duaModalButton}>
+            <TouchableOpacity style={[styles.duaModalButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="content-copy" size={20} color="#fff" />
-              <Text style={styles.duaModalButtonText}>نسخ الدعاء</Text>
+              <Text style={styles.duaModalButtonText}>{t('ramadan.copyDua')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -611,12 +667,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   menuButton: {
@@ -672,19 +728,19 @@ const styles = StyleSheet.create({
   },
   specialDayTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   specialDayDesc: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
 
   // العناوين
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginTop: 20,
     marginBottom: 12,
@@ -717,17 +773,17 @@ const styles = StyleSheet.create({
   },
   statsValue: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   statsUnit: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
   },
   statsLabel: {
     fontSize: 10,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#666',
     marginTop: 4,
   },
@@ -764,7 +820,7 @@ const styles = StyleSheet.create({
   checklistLabel: {
     flex: 1,
     fontSize: 15,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
     marginHorizontal: 12,
   },
@@ -819,7 +875,7 @@ const styles = StyleSheet.create({
   },
   calendarDayText: {
     fontSize: 14,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
   },
   calendarDayTextCompleted: {
@@ -855,7 +911,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   legendDot: {
     width: 10,
@@ -864,7 +920,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 11,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
 
@@ -898,13 +954,13 @@ const styles = StyleSheet.create({
   },
   duaTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 6,
   },
   duaPreview: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 20,
   },
@@ -926,13 +982,13 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginBottom: 4,
   },
   tipText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
   },
@@ -963,12 +1019,12 @@ const styles = StyleSheet.create({
   },
   duaModalTitle: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   duaModalArabic: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     textAlign: 'center',
     lineHeight: 38,
@@ -976,7 +1032,7 @@ const styles = StyleSheet.create({
   },
   duaModalTranslation: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
     lineHeight: 24,
@@ -993,7 +1049,7 @@ const styles = StyleSheet.create({
   },
   duaModalButtonText: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
 

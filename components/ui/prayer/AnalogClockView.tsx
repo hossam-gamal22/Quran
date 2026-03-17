@@ -13,23 +13,26 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { fontBold, fontRegular } from '@/lib/fonts';
 
 import {
   PrayerTimes,
   PrayerName,
   getNextPrayer,
   getTimeRemaining,
-  formatTime12h,
+  formatPrayerTime,
   getPrayerIcon,
 } from '@/lib/prayer-times';
 import { t } from '@/lib/i18n';
 
+import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width } = Dimensions.get('window');
 
 interface AnalogClockViewProps {
   prayerTimes: PrayerTimes | null;
   language?: string;
   isDarkMode?: boolean;
+  show24Hour?: boolean;
 }
 
 const CLOCK_SIZE = Math.min(width * 0.7, 280);
@@ -40,7 +43,9 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   prayerTimes,
   language = 'ar',
   isDarkMode = false,
+  show24Hour = false,
 }) => {
+  const isRTL = useIsRTL();
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -116,15 +121,15 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
     };
   });
 
-  // Arabic numerals for clock
-  const arabicNums = ['١٢', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '١٠', '١١'];
+  // Clock numerals (always English/Western digits)
+  const clockNums = ['12', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'];
   const numberPositions = Array.from({ length: 12 }, (_, i) => {
     const angle = (i * 30 - 90) * (Math.PI / 180);
     const r = RADIUS - 26;
     return {
       x: CENTER + Math.cos(angle) * r,
       y: CENTER + Math.sin(angle) * r + 5,
-      text: arabicNums[i],
+      text: clockNums[i],
     };
   });
 
@@ -175,7 +180,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
             />
           ))}
 
-          {/* Arabic numbers */}
+          {/* Clock numbers */}
           {numberPositions.map((p, i) => (
             <SvgText
               key={i}
@@ -183,7 +188,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
               y={p.y}
               textAnchor="middle"
               fontSize={13}
-              fontFamily="Cairo-Bold"
+              fontFamily={fontBold()}
               fill={textColor}
             >
               {p.text}
@@ -244,7 +249,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
 
       {/* Prayer info below clock */}
       <View style={styles.infoContainer}>
-        <Animated.View style={[styles.iconRow, pulseStyle]}>
+        <Animated.View style={[styles.iconRow, pulseStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons name={prayerIcon as any} size={22} color={accentColor} />
           <Text style={[styles.prayerName, { color: textColor }]}>{prayerName}</Text>
         </Animated.View>
@@ -254,7 +259,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
         </Text>
 
         <Text style={[styles.adhanTime, { color: mutedColor }]}>
-          الأذان {formatTime12h(nextPrayer.time)}
+          {t('prayer.athan')} {formatPrayerTime(nextPrayer.time, show24Hour ?? false)}
         </Text>
       </View>
     </View>
@@ -274,7 +279,7 @@ const styles = StyleSheet.create({
   infoContainer: {
     alignItems: 'center',
     marginTop: 16,
-    gap: 4,
+    gap: 8,
   },
   iconRow: {
     flexDirection: 'row',
@@ -283,16 +288,16 @@ const styles = StyleSheet.create({
   },
   prayerName: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
   },
   countdown: {
     fontSize: 28,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     letterSpacing: 2,
   },
   adhanTime: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
   },
 });
 

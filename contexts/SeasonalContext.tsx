@@ -17,7 +17,9 @@ import {
   getDailySeasonalData,
   getSeasonInfo,
   getSeasonProgress,
+  applySeasonsMetadataOverrides,
 } from '@/lib/seasonal-content';
+import { loadSeasonsMetadata } from '@/lib/content-api';
 import { getHijriDate } from '@/lib/hijri-date';
 
 // ========================================
@@ -229,6 +231,14 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
     try {
       // تحميل الإعدادات
       await loadSettings();
+
+      // Apply CMS metadata overrides before reading seasons
+      try {
+        const meta = await loadSeasonsMetadata();
+        if (meta?.seasons) {
+          applySeasonsMetadataOverrides(meta.seasons);
+        }
+      } catch { /* CMS unavailable — use defaults */ }
 
       // الحصول على الموسم الحالي
       const season = getCurrentSeason();

@@ -15,31 +15,43 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useKhatma } from '../../contexts/KhatmaContext';
 import { useColors } from '../../hooks/use-colors';
+import { useSettings } from '../../contexts/SettingsContext';
 import { KhatmaDuration } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
+import { UniversalHeader } from '@/components/ui';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { t, getDateLocale } from '@/lib/i18n';
 import {
   Spacing,
   BorderRadius,
   FONT_SIZES,
 } from '../../constants/theme';
+import { localizeNumber as toArabicNumber } from '@/lib/format-number';
 
-// ===== HELPER =====
-const toArabicNumber = (num: number): string => {
-  const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return num.toString().split('').map((d) => arabicNumerals[parseInt(d)]).join('');
+const formatTime = (date: Date, rtl: boolean): string => {
+  return date.toLocaleTimeString(getDateLocale(), {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 };
 
-const formatTime = (date: Date): string => {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const period = hours >= 12 ? 'م' : 'ص';
-  const displayHours = hours % 12 || 12;
-  return `${toArabicNumber(displayHours)}:${toArabicNumber(minutes).padStart(2, '٠')} ${period}`;
-};
+const WEEK_DAYS = [
+  { key: 0, nameKey: 'khatma.sun' as const },
+  { key: 1, nameKey: 'khatma.mon' as const },
+  { key: 2, nameKey: 'khatma.tue' as const },
+  { key: 3, nameKey: 'khatma.wed' as const },
+  { key: 4, nameKey: 'khatma.thu' as const },
+  { key: 5, nameKey: 'khatma.fri' as const },
+  { key: 6, nameKey: 'khatma.sat' as const },
+];
 
 export default function NewKhatmaScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { isDarkMode, settings } = useSettings();
+  const isRTL = useIsRTL();
   const { durations, createKhatma } = useKhatma();
 
   // State
@@ -49,6 +61,7 @@ export default function NewKhatmaScreen() {
   const [reminderTime, setReminderTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
 
   // Handle duration selection
   const handleSelectDuration = useCallback((duration: KhatmaDuration) => {
@@ -69,7 +82,7 @@ export default function NewKhatmaScreen() {
   // Handle create khatma
   const handleCreate = useCallback(async () => {
     if (!selectedDuration) {
-      Alert.alert('تنبيه', 'يرجى اختيار مدة الختمة');
+      Alert.alert(t('messages.alert'), t('khatma.selectDurationAlert'));
       return;
     }
 
@@ -87,41 +100,39 @@ export default function NewKhatmaScreen() {
 
       if (khatma) {
         Alert.alert(
-          'تم بنجاح',
-          'تم إنشاء الختمة بنجاح. ابدأ القراءة الآن!',
+          t('messages.success'),
+          t('khatma.khatmaCreatedMsg'),
           [
             {
-              text: 'ابدأ الورد',
+              text: t('khatma.startWird'),
               onPress: () => router.replace('/khatma/wird'),
             },
             {
-              text: 'لاحقاً',
+              text: t('messages.later'),
               onPress: () => router.back(),
             },
           ]
         );
       } else {
-        Alert.alert('خطأ', 'حدث خطأ أثناء إنشاء الختمة');
+        Alert.alert(t('common.error'), t('khatma.createError'));
       }
     } catch (error) {
-      Alert.alert('خطأ', 'حدث خطأ أثناء إنشاء الختمة');
+      Alert.alert(t('common.error'), t('khatma.createError'));
     } finally {
       setIsCreating(false);
     }
   }, [name, selectedDuration, reminderEnabled, reminderTime, createKhatma, router]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-forward" size={24} color={colors.text} />
-        </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: colors.text }]}>ختمة جديدة</Text>
-        
-        <View style={{ width: 40 }} />
-      </View>
+      <UniversalHeader
+        title={t('khatma.newKhatma')}
+        titleColor={colors.text}
+        onBack={() => router.back()}
+        showBack
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -130,7 +141,7 @@ export default function NewKhatmaScreen() {
       >
         {/* Khatma Name */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>اسم الختمة</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.khatmaName')}</Text>
           <TextInput
             style={[
               styles.input,
@@ -140,19 +151,19 @@ export default function NewKhatmaScreen() {
                 borderColor: colors.border,
               },
             ]}
-            placeholder="مثال: ختمة رمضان"
+            placeholder={t('khatma.khatmaNamePlaceholder')}
             placeholderTextColor={colors.textSecondary}
             value={name}
             onChangeText={setName}
-            textAlign="right"
+            textAlign={isRTL ? 'right' : 'left'}
           />
         </View>
 
         {/* Duration Selection */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>مدة الختمة</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
-            اختر المدة المناسبة لك
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.khatmaDuration')}</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+            {t('khatma.chooseDuration')}
           </Text>
 
           <View style={styles.durationsGrid}>
@@ -184,7 +195,7 @@ export default function NewKhatmaScreen() {
                   {duration.nameAr}
                 </Text>
                 <Text style={[styles.durationPages, { color: colors.textSecondary }]}>
-                  {toArabicNumber(duration.pagesPerDay)} صفحة/يوم
+                  {toArabicNumber(duration.pagesPerDay)} {t('khatma.pagesPerDayUnit')}
                 </Text>
                 {selectedDuration?.id === duration.id && (
                   <View style={[styles.selectedCheck, { backgroundColor: colors.primary }]}>
@@ -199,13 +210,13 @@ export default function NewKhatmaScreen() {
         {/* Selected Duration Info */}
         {selectedDuration && (
           <GlassCard style={styles.infoCard}>
-            <View style={styles.infoRow}>
+            <View style={[styles.infoRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.infoItem}>
                 <Ionicons name="calendar-outline" size={24} color={colors.primary} />
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {toArabicNumber(selectedDuration.days)}
                 </Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>يوم</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('khatma.daily')}</Text>
               </View>
 
               <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
@@ -215,15 +226,15 @@ export default function NewKhatmaScreen() {
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {toArabicNumber(selectedDuration.pagesPerDay)}
                 </Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>صفحة/يوم</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('khatma.pagesPerDayUnit')}</Text>
               </View>
 
               <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
 
               <View style={styles.infoItem}>
                 <Ionicons name="book-outline" size={24} color={colors.primary} />
-                <Text style={[styles.infoValue, { color: colors.text }]}>٦٠٤</Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>صفحة</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{toArabicNumber(604)}</Text>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('common.page')}</Text>
               </View>
             </View>
           </GlassCard>
@@ -231,20 +242,20 @@ export default function NewKhatmaScreen() {
 
         {/* Reminder */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>التذكير اليومي</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.dailyReminder')}</Text>
           
           <TouchableOpacity
-            style={[styles.reminderToggle, { backgroundColor: colors.card }]}
+            style={[styles.reminderToggle, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => setReminderEnabled(!reminderEnabled)}
           >
-            <View style={styles.reminderToggleContent}>
+            <View style={[styles.reminderToggleContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Ionicons
                 name={reminderEnabled ? 'notifications' : 'notifications-outline'}
                 size={24}
                 color={reminderEnabled ? colors.primary : colors.textSecondary}
               />
               <Text style={[styles.reminderToggleText, { color: colors.text }]}>
-                تفعيل التذكير
+                {t('khatma.enableReminder')}
               </Text>
             </View>
             <View
@@ -268,17 +279,17 @@ export default function NewKhatmaScreen() {
 
           {reminderEnabled && (
             <TouchableOpacity
-              style={[styles.timeSelector, { backgroundColor: colors.card }]}
+              style={[styles.timeSelector, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               onPress={() => setShowTimePicker(true)}
             >
-              <View style={styles.timeSelectorContent}>
+              <View style={[styles.timeSelectorContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Ionicons name="time-outline" size={24} color={colors.primary} />
                 <Text style={[styles.timeSelectorLabel, { color: colors.text }]}>
-                  وقت التذكير
+                  {t('khatma.reminderTime')}
                 </Text>
               </View>
               <Text style={[styles.timeSelectorValue, { color: colors.primary }]}>
-                {formatTime(reminderTime)}
+                {formatTime(reminderTime, isRTL)}
               </Text>
             </TouchableOpacity>
           )}
@@ -290,21 +301,64 @@ export default function NewKhatmaScreen() {
               is24Hour={false}
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               onChange={handleTimeChange}
+              themeVariant={isDarkMode ? 'dark' : 'light'}
             />
+          )}
+
+          {/* Day selection */}
+          {reminderEnabled && (
+            <View style={{ marginTop: Spacing.md }}>
+              <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginBottom: Spacing.sm }]}>
+                {t('khatma.reminderDays')}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {WEEK_DAYS.map((day) => {
+                  const isSelected = selectedDays.includes(day.key);
+                  return (
+                    <TouchableOpacity
+                      key={day.key}
+                      onPress={() => {
+                        setSelectedDays(prev =>
+                          isSelected
+                            ? prev.filter(d => d !== day.key)
+                            : [...prev, day.key]
+                        );
+                      }}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 20,
+                        backgroundColor: isSelected ? colors.primary : colors.card,
+                        borderWidth: 1,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      }}
+                    >
+                      <Text style={{
+                        fontSize: FONT_SIZES.sm,
+                        fontWeight: '600',
+                        color: isSelected ? '#FFFFFF' : colors.text,
+                      }}>
+                        {t(day.nameKey)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           )}
         </View>
 
         {/* Tips */}
         <GlassCard style={styles.tipsCard}>
-          <View style={styles.tipsHeader}>
+          <View style={[styles.tipsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Ionicons name="bulb-outline" size={20} color={colors.warning} />
-            <Text style={[styles.tipsTitle, { color: colors.text }]}>نصائح</Text>
+            <Text style={[styles.tipsTitle, { color: colors.text }]}>{t('khatma.tips')}</Text>
           </View>
           <Text style={[styles.tipsText, { color: colors.textSecondary }]}>
-            • اختر مدة مناسبة لجدولك اليومي{'\n'}
-            • فعّل التذكير لتحافظ على استمراريتك{'\n'}
-            • يمكنك قراءة أكثر من الورد اليومي{'\n'}
-            • الاستمرارية أهم من الكمية
+            • {t('khatma.tip1')}{`\n`}
+            • {t('khatma.tip2')}{`\n`}
+            • {t('khatma.tip3')}{`\n`}
+            • {t('khatma.tip4')}
           </Text>
         </GlassCard>
 
@@ -319,22 +373,24 @@ export default function NewKhatmaScreen() {
             styles.createButton,
             {
               backgroundColor: selectedDuration ? colors.primary : colors.border,
+              flexDirection: isRTL ? 'row-reverse' : 'row',
             },
           ]}
           onPress={handleCreate}
           disabled={!selectedDuration || isCreating}
         >
           {isCreating ? (
-            <Text style={styles.createButtonText}>جاري الإنشاء...</Text>
+            <Text style={styles.createButtonText}>{t('khatma.creating')}</Text>
           ) : (
             <>
               <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-              <Text style={styles.createButtonText}>ابدأ الختمة</Text>
+              <Text style={styles.createButtonText}>{t('khatma.startKhatma')}</Text>
             </>
           )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -342,23 +398,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '700',
-  },
+
   scrollView: {
     flex: 1,
   },

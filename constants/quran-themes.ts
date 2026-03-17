@@ -9,10 +9,16 @@ export interface QuranTheme {
   background: string;    // لون خلفية الصفحة
   secondary: string;     // لون أرقام الآيات / عناصر الزينة
   highlight: string;     // لون التمييز
+  // Extended fields (optional, backward-compatible)
+  id?: string;           // Unique ID for admin reference
+  name?: Record<string, string>; // Multilingual names { ar: '...', en: '...', ... }
+  iconUrl?: string;      // Firebase Storage icon URL
+  iconStoragePath?: string; // Storage path for icon deletion
+  order?: number;        // Display order
 }
 
 // 17 ثيم من تطبيق Skoon
-export const QURAN_THEMES: QuranTheme[] = [
+let QURAN_THEMES: QuranTheme[] = [
   // 0 — كلاسيك (الافتراضي) ✓ contrast OK
   { primary: '#1A1000', background: '#FFF8F0', secondary: '#6B4E2A', highlight: '#FFC936' },
   // 1 — أخضر طبيعي ✓ contrast OK
@@ -48,6 +54,24 @@ export const QURAN_THEMES: QuranTheme[] = [
   // 16 — لافندر ✓ contrast OK
   { primary: '#000000', background: '#EAF0FE', secondary: '#141822', highlight: '#78C0FF' },
 ];
+
+export { QURAN_THEMES };
+
+/** Override themes with admin-managed data from Firestore */
+export function setQuranThemes(themes: QuranTheme[]) {
+  if (themes.length > 0) QURAN_THEMES = themes;
+}
+
+/** Get the total number of available themes (may change after admin edits) */
+export function getThemeCount(): number {
+  return QURAN_THEMES.length;
+}
+
+/** Get safe theme index — clamp to valid range if theme was deleted */
+export function getSafeThemeIndex(index: number): number {
+  if (index >= 0 && index < QURAN_THEMES.length) return index;
+  return 0;
+}
 
 export const DEFAULT_THEME_INDEX = 0;
 

@@ -1,30 +1,37 @@
 /**
- * Favorites Screen — المفضلة
+ * Favorites Screen — المحفوظات
  * Redesigned with Apple iOS glassmorphism styling and improved contrast
  * حفظ الآيات مع ملاحظات، تصديرها كصور جاهزة للمشاركة
  */
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert, ActivityIndicator, Platform,
-  ScrollView, Share,
+  ScrollView, Share, LayoutAnimation, UIManager,
 } from 'react-native';
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
+// @ts-ignore
+import { useFocusEffect } from '@react-navigation/native';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { getDateLocale } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
-import { GlassCard, GlassSegmentedControl } from '@/components/ui/GlassCard';
+import { BackButton } from '@/components/ui';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { getBookmarks, removeBookmark, Bookmark, addBookmark } from '@/lib/storage';
-import { SURAH_NAMES_AR } from '@/lib/quran-api';
+import { getSurahName } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFavoriteAzkar, removeFromFavorites, Zikr } from '@/lib/azkar-api';
 import {
   getColoredBookmarks,
@@ -33,15 +40,29 @@ import {
   BOOKMARK_COLORS,
   BOOKMARK_COLOR_LABELS,
 } from '@/lib/quran-bookmarks';
+import {
+  getFavorites as getUnifiedFavorites,
+  removeFavorite,
+  FAVORITE_CATEGORIES,
+  type FavoriteItem,
+  type FavoriteType,
+} from '@/lib/favorites-manager';
+import { ALLAH_NAMES, type AllahName } from '@/app/names';
+
+import { useIsRTL } from '@/hooks/use-is-rtl';
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ─── Image Card Themes ───────────────────────────────────────────────────────
 const CARD_THEMES = [
-  { id: 'green',   bg: '#1B6B3A', text: '#ffffff', accent: '#A7F3D0', name: 'أخضر كلاسيك' },
-  { id: 'dark',    bg: '#0F172A', text: '#F1F5F9', accent: '#818CF8', name: 'ليلي داكن' },
-  { id: 'gold',    bg: '#78350F', text: '#FFFBEB', accent: '#FCD34D', name: 'ذهبي ملكي' },
-  { id: 'blue',    bg: '#1E3A5F', text: '#EFF6FF', accent: '#93C5FD', name: 'أزرق سماوي' },
-  { id: 'rose',    bg: '#881337', text: '#FFF1F2', accent: '#FDA4AF', name: 'وردي راقي' },
-  { id: 'teal',    bg: '#134E4A', text: '#F0FDFA', accent: '#5EEAD4', name: 'فيروزي' },
+  { id: 'green',   bg: '#1B6B3A', text: '#ffffff', accent: '#A7F3D0', nameKey: 'favorites.themeGreen' as const },
+  { id: 'dark',    bg: '#0F172A', text: '#F1F5F9', accent: '#818CF8', nameKey: 'favorites.themeDark' as const },
+  { id: 'gold',    bg: '#78350F', text: '#FFFBEB', accent: '#FCD34D', nameKey: 'favorites.themeGold' as const },
+  { id: 'blue',    bg: '#1E3A5F', text: '#EFF6FF', accent: '#93C5FD', nameKey: 'favorites.themeBlue' as const },
+  { id: 'rose',    bg: '#881337', text: '#FFF1F2', accent: '#FDA4AF', nameKey: 'favorites.themePink' as const },
+  { id: 'teal',    bg: '#134E4A', text: '#F0FDFA', accent: '#5EEAD4', nameKey: 'favorites.themeTeal' as const },
 ];
 
 // ─── Image Export Card (rendered off-screen for capture) ─────────────────────
@@ -49,9 +70,10 @@ interface ExportCardProps {
   bookmark: Bookmark;
   theme: typeof CARD_THEMES[0];
   cardRef: React.RefObject<ViewShot>;
+  t: (key: string) => string;
 }
 
-function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
+function ExportCard({ bookmark, theme, cardRef, t }: ExportCardProps) {
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0 }}>
       <View style={{
@@ -104,7 +126,7 @@ function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
           marginBottom: 12,
         }}>
           <Text style={{ color: theme.accent, fontWeight: '800', fontSize: 14 }}>
-            ﴿ {bookmark.surahName} • آية {bookmark.ayahNumber} ﴾
+            ﴿ {bookmark.surahName} • {t('favorites.verse')} {bookmark.ayahNumber} ﴾
           </Text>
         </View>
 
@@ -125,13 +147,41 @@ function ExportCard({ bookmark, theme, cardRef }: ExportCardProps) {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+// Fallback route for favorites without a saved route
+function getFallbackRoute(item: FavoriteItem): string | null {
+  // For types with saved dynamic content, pass the favorite ID so the page can load the exact saved item
+  switch (item.type) {
+    case 'dhikr': {
+      const dhikrId = item.id.replace(/^dhikr_/, '');
+      return `/daily-dhikr?dhikrId=${dhikrId}`;
+    }
+    case 'dua':
+      return `/daily-dua?favId=${encodeURIComponent(item.id)}`;
+    case 'hadith':
+      return `/hadith-of-day?favId=${encodeURIComponent(item.id)}`;
+    case 'quote':
+      return `/quote-of-day?favId=${encodeURIComponent(item.id)}`;
+    case 'ayah':
+      return '/daily-ayah';
+    case 'hadith_sifat':
+      return '/hadith-sifat';
+    case 'companion':
+      return '/companions';
+    default:
+      return null;
+  }
+}
+
 export default function FavoritesScreen() {
   const { isDarkMode, settings, t } = useSettings();
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'quran' | 'bookmarks' | 'azkar'>('quran');
+  const [activeTab, setActiveTab] = useState<'quran' | 'bookmarks' | 'azkar' | 'other'>('quran');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [azkarFavorites, setAzkarFavorites] = useState<Zikr[]>([]);
   const [coloredBookmarks, setColoredBookmarks] = useState<ColoredBookmark[]>([]);
+  const [namesFavorites, setNamesFavorites] = useState<AllahName[]>([]);
+  const [otherFavorites, setOtherFavorites] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBookmark, setSelectedBookmark] = useState<Bookmark | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -141,18 +191,24 @@ export default function FavoritesScreen() {
   const [noteText, setNoteText] = useState('');
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'surah'>('date');
-  const cardRef = useRef<ViewShot>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const cardRef = useRef<ViewShot>(null!);
 
-  // Colors based on dark mode for better contrast
-  const colors = {
-    primary: '#2f7659',
-    foreground: isDarkMode ? '#FFFFFF' : '#1C1C1E',
-    muted: isDarkMode ? '#A1A1AA' : '#6B7280',
-    background: isDarkMode ? '#11151c' : '#f5f5f5',
-    card: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)',
-    cardBorder: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)',
-    accent: isDarkMode ? '#4ADE80' : '#2f7659',
-  };
+  const colors = useColors();
+  // Local overrides for glass card and accent that differ from hook values
+  const cardBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
+  const cardBorder = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
+  const accent = isDarkMode ? '#4ADE80' : '#2f7659';
+
+  const toggleSection = useCallback((key: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const loadBookmarks = useCallback(async () => {
     setLoading(true);
@@ -162,10 +218,23 @@ export default function FavoritesScreen() {
     setAzkarFavorites(favAzkar);
     const colored = await getColoredBookmarks();
     setColoredBookmarks(colored);
+    // Load names favorites
+    try {
+      const savedIds = await AsyncStorage.getItem('allah_names_favorites');
+      if (savedIds) {
+        const ids: number[] = JSON.parse(savedIds);
+        setNamesFavorites(ALLAH_NAMES.filter(n => ids.includes(n.id)));
+      } else {
+        setNamesFavorites([]);
+      }
+    } catch { setNamesFavorites([]); }
+    // Load unified (other) favorites
+    const others = await getUnifiedFavorites();
+    setOtherFavorites(others);
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadBookmarks(); }, [loadBookmarks]);
+  useFocusEffect(useCallback(() => { loadBookmarks(); }, [loadBookmarks]));
 
   const sortedBookmarks = [...bookmarks].sort((a, b) =>
     sortBy === 'date' ? b.createdAt - a.createdAt : a.surahNumber - b.surahNumber
@@ -186,12 +255,12 @@ export default function FavoritesScreen() {
   // Delete bookmark
   const handleDelete = useCallback((bookmark: Bookmark) => {
     Alert.alert(
-      'حذف من المفضلة',
-      `هل تريد حذف آية "${bookmark.surahName}" من المفضلة؟`,
+      t('favorites.deleteConfirm'),
+      `${bookmark.surahName} - ${t('favorites.verse')} ${bookmark.ayahNumber}`,
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'حذف', style: 'destructive',
+          text: t('common.delete'), style: 'destructive',
           onPress: async () => {
             await removeBookmark(bookmark.id);
             if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -234,41 +303,41 @@ export default function FavoritesScreen() {
         const { status } = await MediaLibrary.requestPermissionsAsync();
 
         Alert.alert(
-          'تصدير الآية',
-          'اختر طريقة التصدير:',
+          t('favorites.exportVerse'),
+          t('favorites.chooseDesign'),
           [
             {
-              text: 'حفظ في الاستوديو',
+              text: t('favorites.exportImage'),
               onPress: async () => {
                 if (status === 'granted') {
                   await MediaLibrary.saveToLibraryAsync(uri);
                   if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  Alert.alert('✅ تم الحفظ', 'تم حفظ الصورة في معرض الصور');
+                  Alert.alert('✅', t('favorites.saved'));
                 } else {
-                  Alert.alert('خطأ', 'يلزم إذن الوصول لمعرض الصور');
+                  Alert.alert(t('common.error'), t('favorites.exportFailed'));
                 }
               },
             },
             canShare ? {
-              text: 'مشاركة',
+              text: t('common.share'),
               onPress: async () => {
                 await Sharing.shareAsync(uri, {
                   mimeType: 'image/png',
-                  dialogTitle: `آية من ${selectedBookmark.surahName}`,
+                  dialogTitle: `${t('favorites.verseFrom')} ${selectedBookmark.surahName}`,
                 });
               },
             } : null,
-            { text: 'إلغاء', style: 'cancel' },
+            { text: t('common.cancel'), style: 'cancel' },
           ].filter(Boolean) as any[]
         );
       } else {
         // Web: share text
         await Share.share({
-          message: `${selectedBookmark.ayahText}\n\n﴿ ${selectedBookmark.surahName} • آية ${selectedBookmark.ayahNumber} ﴾\n\nالقرآن الكريم`,
+          message: `${selectedBookmark.ayahText}\n\n﴿ ${selectedBookmark.surahName} • ${t('favorites.verse')} ${selectedBookmark.ayahNumber} ﴾\n\n${t('common.appName')}`,
         });
       }
     } catch (e) {
-      Alert.alert('خطأ', 'تعذر تصدير الصورة. حاول مرة أخرى.');
+      Alert.alert(t('common.error'), t('favorites.exportFailed'));
     } finally {
       setExporting(false);
     }
@@ -277,20 +346,20 @@ export default function FavoritesScreen() {
   // Share as text
   const handleShareText = useCallback(async (bookmark: Bookmark) => {
     await Share.share({
-      message: `${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • آية ${bookmark.ayahNumber} ﴾\n\nالقرآن الكريم 🕌`,
-      title: `آية من ${bookmark.surahName}`,
+      message: `${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • ${t('favorites.verse')} ${bookmark.ayahNumber} ﴾\n\n${t('common.appName')} 🕌`,
+      title: `${t('favorites.verseFrom')} ${bookmark.surahName}`,
     });
-  }, []);
+  }, [t]);
 
   // Remove azkar from favorites
   const handleRemoveAzkar = useCallback((zikr: Zikr) => {
     Alert.alert(
-      'إزالة من المفضلة',
-      'هل تريد إزالة هذا الذكر من المفضلة؟',
+      t('favorites.removeFromFavoritesConfirm'),
+      '',
       [
-        { text: 'إلغاء', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'إزالة', style: 'destructive',
+          text: t('common.remove'), style: 'destructive',
           onPress: async () => {
             await removeFromFavorites(zikr.id);
             if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -304,9 +373,9 @@ export default function FavoritesScreen() {
   // Share azkar as text
   const handleShareAzkar = useCallback(async (zikr: Zikr) => {
     await Share.share({
-      message: `${zikr.arabic}\n\n📿 ${zikr.reference}\n\nعدد التكرار: ${zikr.count}`,
+      message: `${zikr.arabic}\n\n📿 ${zikr.reference}\n\n${t('favorites.repeatCount')}: ${zikr.count}`,
     });
-  }, []);
+  }, [t]);
 
   // Styles with proper glassmorphism and improved contrast
   const s = StyleSheet.create({
@@ -322,7 +391,7 @@ export default function FavoritesScreen() {
       flex: 1,
       textAlign: 'center',
       fontSize: 22,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: colors.foreground,
     },
     // Sort/stats bar
@@ -331,23 +400,22 @@ export default function FavoritesScreen() {
       alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 10,
+      gap: 10,
     },
     countBadge: {
-      backgroundColor: colors.accent + '20',
+      backgroundColor: accent + '20',
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 5,
-      marginLeft: 10,
     },
     countText: {
       fontSize: 13,
-      fontFamily: 'Cairo-Bold',
-      color: colors.accent,
+      fontFamily: fontBold(),
+      color: accent,
     },
     sortBtns: {
       flexDirection: 'row',
-      gap: 6,
-      marginRight: 10,
+      gap: 8,
     },
     flex1: { flex: 1 },
     // Bookmark card with glassmorphism
@@ -358,10 +426,10 @@ export default function FavoritesScreen() {
       overflow: 'hidden',
     },
     cardInner: {
-      backgroundColor: colors.card,
+      backgroundColor: cardBg,
       borderRadius: 20,
       borderWidth: 0.5,
-      borderColor: colors.cardBorder,
+      borderColor: cardBorder,
       overflow: 'hidden',
     },
     cardHeader: {
@@ -373,22 +441,21 @@ export default function FavoritesScreen() {
       gap: 10,
     },
     surahBadge: {
-      backgroundColor: colors.accent + '20',
+      backgroundColor: accent + '20',
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 5,
     },
     surahBadgeText: {
       fontSize: 13,
-      fontFamily: 'Cairo-Bold',
-      color: colors.accent,
+      fontFamily: fontBold(),
+      color: accent,
     },
     dateText: {
       flex: 1,
       fontSize: 12,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
       color: colors.muted,
-      textAlign: 'left',
     },
     iconBtn: {
       padding: 6,
@@ -399,7 +466,6 @@ export default function FavoritesScreen() {
       fontSize: 20,
       fontFamily: 'Amiri-Regular',
       color: colors.foreground,
-      textAlign: 'right',
       lineHeight: 42,
       paddingHorizontal: 16,
       paddingBottom: 12,
@@ -407,23 +473,22 @@ export default function FavoritesScreen() {
     noteBox: {
       marginHorizontal: 16,
       marginBottom: 12,
-      backgroundColor: colors.accent + '12',
+      backgroundColor: accent + '12',
       borderRadius: 12,
       padding: 12,
-      borderLeftWidth: 3,
-      borderLeftColor: colors.accent,
+      borderStartWidth: 3,
+      borderStartColor: accent,
     },
     noteText: {
       fontSize: 13,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
       color: colors.muted,
-      textAlign: 'right',
     },
     // Actions bar
     actionsBar: {
       flexDirection: 'row',
       borderTopWidth: 0.5,
-      borderTopColor: colors.cardBorder,
+      borderTopColor: cardBorder,
     },
     actionBtn: {
       flex: 1,
@@ -431,15 +496,15 @@ export default function FavoritesScreen() {
       alignItems: 'center',
       flexDirection: 'row',
       justifyContent: 'center',
-      gap: 6,
+      gap: 8,
     },
     actionDivider: {
       width: 0.5,
-      backgroundColor: colors.cardBorder,
+      backgroundColor: cardBorder,
     },
     actionText: {
       fontSize: 13,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: fontSemiBold(),
     },
     // Empty state
     emptyWrap: {
@@ -454,13 +519,13 @@ export default function FavoritesScreen() {
     },
     emptyTitle: {
       fontSize: 20,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: colors.foreground,
       marginBottom: 10,
     },
     emptyText: {
       fontSize: 15,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
       color: colors.muted,
       textAlign: 'center',
       lineHeight: 26,
@@ -468,7 +533,7 @@ export default function FavoritesScreen() {
     // Tab bar
     tabBar: {
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 12,
       paddingBottom: 8,
     },
     // Azkar card with glassmorphism
@@ -479,9 +544,9 @@ export default function FavoritesScreen() {
       borderTopRightRadius: 20,
       borderBottomLeftRadius: 0,
       borderBottomRightRadius: 0,
-      backgroundColor: colors.card,
+      backgroundColor: cardBg,
       borderWidth: 0.5,
-      borderColor: colors.cardBorder,
+      borderColor: cardBorder,
       borderBottomWidth: 0,
       overflow: 'hidden',
       padding: 16,
@@ -490,7 +555,6 @@ export default function FavoritesScreen() {
       fontSize: 20,
       fontFamily: 'Amiri-Regular',
       color: colors.foreground,
-      textAlign: 'right',
       lineHeight: 40,
       marginBottom: 12,
     },
@@ -498,23 +562,22 @@ export default function FavoritesScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      gap: 8,
     },
     azkarRef: {
       fontSize: 13,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
       color: colors.muted,
       flex: 1,
-      textAlign: 'right',
     },
     azkarCount: {
       fontSize: 12,
-      fontFamily: 'Cairo-Bold',
-      color: colors.accent,
-      backgroundColor: colors.accent + '18',
+      fontFamily: fontBold(),
+      color: accent,
+      backgroundColor: accent + '18',
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 10,
-      marginLeft: 8,
     },
     // Export modal
     modalWrap: {
@@ -542,7 +605,7 @@ export default function FavoritesScreen() {
     },
     modalTitle: {
       fontSize: 18,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: colors.foreground,
       textAlign: 'center',
       marginBottom: 16,
@@ -565,7 +628,7 @@ export default function FavoritesScreen() {
     },
     themeName: {
       fontSize: 13,
-      fontFamily: 'Cairo-SemiBold',
+      fontFamily: fontSemiBold(),
       color: colors.muted,
       textAlign: 'center',
       marginBottom: 12,
@@ -591,7 +654,7 @@ export default function FavoritesScreen() {
     },
     exportBtnText: {
       fontSize: 15,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: '#fff',
     },
     // Note modal
@@ -612,21 +675,20 @@ export default function FavoritesScreen() {
     },
     noteTitle: {
       fontSize: 18,
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       color: colors.foreground,
-      textAlign: 'right',
       marginBottom: 12,
     },
     noteInput: {
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
       borderWidth: 1,
-      borderColor: colors.cardBorder,
+      borderColor: cardBorder,
       borderRadius: 16,
       padding: 16,
       fontSize: 16,
-      fontFamily: 'Cairo-Regular',
+      fontFamily: fontRegular(),
       color: colors.foreground,
-      textAlign: 'right',
+      textAlign: isRTL ? 'right' : 'left',
       minHeight: 100,
       marginBottom: 16,
     },
@@ -638,7 +700,7 @@ export default function FavoritesScreen() {
     },
     noteSaveBtnText: {
       color: '#fff',
-      fontFamily: 'Cairo-Bold',
+      fontFamily: fontBold(),
       fontSize: 16,
     },
   });
@@ -659,15 +721,15 @@ export default function FavoritesScreen() {
           onPress={() => navigateToAyah(item)}
         >
           {/* Header */}
-          <View style={s.cardHeader}>
+          <View style={[s.cardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity
               style={s.iconBtn}
               onPress={() => handleDelete(item)}
             >
               <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.muted} />
             </TouchableOpacity>
-            <Text style={s.dateText}>
-              {new Date(item.createdAt).toLocaleDateString('ar-EG')}
+            <Text style={[s.dateText, { textAlign: isRTL ? 'right' : 'left' }]}>
+              {new Date(item.createdAt).toLocaleDateString(getDateLocale())}
             </Text>
             <TouchableOpacity 
               style={s.surahBadge}
@@ -678,52 +740,52 @@ export default function FavoritesScreen() {
           </View>
 
           {/* Ayah Text */}
-          <Text style={s.ayahText}>{item.ayahText}</Text>
+          <Text style={[s.ayahText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.ayahText}</Text>
 
           {/* Note */}
           {item.note ? (
             <View style={s.noteBox}>
-              <Text style={s.noteText}>{item.note}</Text>
+              <Text style={[s.noteText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.note}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
 
         {/* Actions - outside TouchableOpacity to prevent gesture conflicts */}
-        <View style={s.actionsBar}>
+        <View style={[s.actionsBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
-            style={s.actionBtn}
+            style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => navigateToAyah(item)}
           >
-            <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={colors.accent} />
-            <Text style={[s.actionText, { color: colors.accent }]}>فتح</Text>
+            <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={accent} />
+            <Text style={[s.actionText, { color: accent }]}>{t('common.open')}</Text>
           </TouchableOpacity>
           <View style={s.actionDivider} />
           <TouchableOpacity
-            style={s.actionBtn}
+            style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => { setSelectedBookmark(item); setShowExportModal(true); }}
           >
-            <MaterialCommunityIcons name="image-outline" size={18} color={colors.accent} />
-            <Text style={[s.actionText, { color: colors.accent }]}>صورة</Text>
+            <MaterialCommunityIcons name="image-outline" size={18} color={accent} />
+            <Text style={[s.actionText, { color: accent }]}>{t('favorites.image')}</Text>
           </TouchableOpacity>
           <View style={s.actionDivider} />
           <TouchableOpacity
-            style={s.actionBtn}
+            style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => handleShareText(item)}
           >
-            <MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.accent} />
-            <Text style={[s.actionText, { color: colors.accent }]}>مشاركة</Text>
+            <MaterialCommunityIcons name="share-variant-outline" size={18} color={accent} />
+            <Text style={[s.actionText, { color: accent }]}>{t('common.share')}</Text>
           </TouchableOpacity>
           <View style={s.actionDivider} />
           <TouchableOpacity
-            style={s.actionBtn}
+            style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => {
               setEditingBookmark(item);
               setNoteText(item.note || '');
               setShowNoteModal(true);
             }}
           >
-            <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.accent} />
-            <Text style={[s.actionText, { color: colors.accent }]}>ملاحظة</Text>
+            <MaterialCommunityIcons name="pencil-outline" size={18} color={accent} />
+            <Text style={[s.actionText, { color: accent }]}>{t('favorites.note')}</Text>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -739,26 +801,26 @@ export default function FavoritesScreen() {
         activeOpacity={0.7}
         onPress={() => navigateToAzkar(item)}
       >
-        <Text style={s.azkarText}>{item.arabic}</Text>
-        <View style={s.azkarMeta}>
+        <Text style={[s.azkarText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.arabic}</Text>
+        <View style={[s.azkarMeta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Text style={s.azkarCount}>×{item.count}</Text>
-          <Text style={s.azkarRef}>{item.reference}</Text>
+          <Text style={[s.azkarRef, { textAlign: isRTL ? 'right' : 'left' }]}>{item.reference}</Text>
         </View>
       </TouchableOpacity>
-      <View style={[s.actionsBar, { marginHorizontal: 16, marginTop: -8, marginBottom: 8, borderRadius: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: colors.card, borderWidth: 0.5, borderColor: colors.cardBorder, borderTopWidth: 0 }]}>
-        <TouchableOpacity style={s.actionBtn} onPress={() => navigateToAzkar(item)}>
-          <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={colors.accent} />
-          <Text style={[s.actionText, { color: colors.accent }]}>فتح</Text>
+      <View style={[s.actionsBar, { marginHorizontal: 16, marginTop: -8, marginBottom: 8, borderRadius: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: cardBg, borderWidth: 0.5, borderColor: cardBorder, borderTopWidth: 0, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <TouchableOpacity style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={() => navigateToAzkar(item)}>
+          <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={accent} />
+          <Text style={[s.actionText, { color: accent }]}>{t('common.open')}</Text>
         </TouchableOpacity>
         <View style={s.actionDivider} />
-        <TouchableOpacity style={s.actionBtn} onPress={() => handleShareAzkar(item)}>
-          <MaterialCommunityIcons name="share-variant-outline" size={18} color={colors.accent} />
-          <Text style={[s.actionText, { color: colors.accent }]}>مشاركة</Text>
+        <TouchableOpacity style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={() => handleShareAzkar(item)}>
+          <MaterialCommunityIcons name="share-variant-outline" size={18} color={accent} />
+          <Text style={[s.actionText, { color: accent }]}>{t('common.share')}</Text>
         </TouchableOpacity>
         <View style={s.actionDivider} />
-        <TouchableOpacity style={s.actionBtn} onPress={() => handleRemoveAzkar(item)}>
+        <TouchableOpacity style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={() => handleRemoveAzkar(item)}>
           <MaterialCommunityIcons name="trash-can-outline" size={18} color="#EF4444" />
-          <Text style={[s.actionText, { color: '#EF4444' }]}>إزالة</Text>
+          <Text style={[s.actionText, { color: '#EF4444' }]}>{t('common.remove')}</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -768,15 +830,14 @@ export default function FavoritesScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
-      style={{ flex: 1, backgroundColor: colors.background }}
+      opacity={settings.display.backgroundOpacity ?? 1}
+      style={{ flex: 1, backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : colors.background }}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <Animated.View entering={FadeIn.duration(400)} style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-            <Ionicons name="chevron-forward" size={26} color={colors.foreground} />
-          </TouchableOpacity>
-          <Text style={s.title}>المفضلة</Text>
+        <Animated.View entering={FadeIn.duration(400)} style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <BackButton />
+          <Text style={s.title}>{t('favorites.title')}</Text>
           <View style={{ width: 34 }} />
         </Animated.View>
 
@@ -784,24 +845,25 @@ export default function FavoritesScreen() {
         <View style={s.tabBar}>
           <NativeTabs
             tabs={[
-              { key: 'quran', label: `القرآن (${bookmarks.length})` },
-              { key: 'bookmarks', label: `الفواصل (${coloredBookmarks.length})` },
-              { key: 'azkar', label: `الأذكار (${azkarFavorites.length})` },
+              { key: 'quran', label: `${t('favorites.quran')} (${bookmarks.length})` },
+              { key: 'bookmarks', label: `${t('favorites.bookmarks')} (${coloredBookmarks.length})` },
+              { key: 'azkar', label: `${t('favorites.azkar')} (${azkarFavorites.length})` },
+              { key: 'other', label: `${t('favorites.other')} (${otherFavorites.length + namesFavorites.length})` },
             ]}
             selected={activeTab}
-            onSelect={(key) => setActiveTab(key as 'quran' | 'bookmarks' | 'azkar')}
+            onSelect={(key) => setActiveTab(key as typeof activeTab)}
             indicatorColor="#2f7659"
           />
         </View>
 
         {activeTab === 'quran' && bookmarks.length > 0 && (
-          <View style={s.statsBar}>
+          <View style={[s.statsBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.flex1} />
             <View style={s.sortBtns}>
               <NativeTabs
                 tabs={[
-                  { key: 'date', label: 'التاريخ' },
-                  { key: 'surah', label: 'السورة' },
+                  { key: 'date', label: t('favorites.sortByDate') },
+                  { key: 'surah', label: t('favorites.sortBySurah') },
                 ]}
                 selected={sortBy}
                 onSelect={(key) => setSortBy(key as 'date' | 'surah')}
@@ -809,7 +871,7 @@ export default function FavoritesScreen() {
               />
             </View>
             <View style={s.countBadge}>
-              <Text style={s.countText}>{bookmarks.length} آية</Text>
+              <Text style={s.countText}>{bookmarks.length} {t('favorites.verse')}</Text>
             </View>
           </View>
         )}
@@ -817,7 +879,7 @@ export default function FavoritesScreen() {
         {/* List */}
         {loading ? (
           <View style={s.emptyWrap}>
-            <ActivityIndicator size="large" color={colors.accent} />
+            <ActivityIndicator size="large" color={accent} />
           </View>
         ) : activeTab === 'quran' ? (
           <FlatList
@@ -829,9 +891,9 @@ export default function FavoritesScreen() {
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <MaterialCommunityIcons name="book-open-variant" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
-                <Text style={s.emptyTitle}>لا توجد آيات محفوظة</Text>
+                <Text style={s.emptyTitle}>{t('favorites.noQuranFavorites')}</Text>
                 <Text style={s.emptyText}>
-                  افتح أي سورة واضغط مطولاً على الآية لحفظها هنا
+                  {t('favorites.addQuranHint')}
                 </Text>
               </View>
             }
@@ -852,12 +914,12 @@ export default function FavoritesScreen() {
                   }}
                   onLongPress={() => {
                     Alert.alert(
-                      'حذف الفاصل',
-                      `هل تريد حذف فاصل "${item.surahName} - آية ${item.ayahNumber}"؟`,
+                      t('favorites.deleteBookmarkConfirm'),
+                      `${item.surahName} - ${t('favorites.verse')} ${item.ayahNumber}`,
                       [
-                        { text: 'إلغاء', style: 'cancel' },
+                        { text: t('common.cancel'), style: 'cancel' },
                         {
-                          text: 'حذف', style: 'destructive',
+                          text: t('common.delete'), style: 'destructive',
                           onPress: async () => {
                             await removeColoredBookmark(item.id);
                             const updated = await getColoredBookmarks();
@@ -868,41 +930,44 @@ export default function FavoritesScreen() {
                     );
                   }}
                   style={{
-                    backgroundColor: colors.card,
+                    backgroundColor: cardBg,
                     borderRadius: 14,
                     padding: 14,
                     marginBottom: 8,
-                    flexDirection: 'row',
+                    flexDirection: isRTL ? 'row-reverse' : 'row',
                     alignItems: 'center',
+                    gap: 10,
                     borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: colors.cardBorder,
-                    borderLeftWidth: 4,
-                    borderLeftColor: BOOKMARK_COLORS[item.color],
+                    borderColor: cardBorder,
+                    borderLeftWidth: isRTL ? 0 : 4,
+                    borderLeftColor: isRTL ? undefined : BOOKMARK_COLORS[item.color],
+                    borderRightWidth: isRTL ? 4 : 0,
+                    borderRightColor: isRTL ? BOOKMARK_COLORS[item.color] : undefined,
                   }}
                 >
-                  <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    <Text style={{ fontFamily: 'Cairo-SemiBold', fontSize: 15, color: colors.foreground, textAlign: 'right' }}>
-                      {item.surahName} - آية {item.ayahNumber}
+                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                    <Text style={{ fontFamily: fontSemiBold(), fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }}>
+                      {item.surahName} - {t('favorites.verse')} {item.ayahNumber}
                     </Text>
-                    <Text style={{ fontFamily: 'Cairo-Regular', fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                      صفحة {item.page} • {BOOKMARK_COLOR_LABELS[item.color]}
+                    <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                      {t('common.page')} {item.page} • {t(BOOKMARK_COLOR_LABELS[item.color])}
                     </Text>
                   </View>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: BOOKMARK_COLORS[item.color], marginLeft: 10 }} />
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: BOOKMARK_COLORS[item.color] }} />
                 </TouchableOpacity>
               </Animated.View>
             )}
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <MaterialCommunityIcons name="bookmark-outline" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
-                <Text style={s.emptyTitle}>لا توجد فواصل</Text>
+                <Text style={s.emptyTitle}>{t('favorites.noBookmarks')}</Text>
                 <Text style={s.emptyText}>
-                  افتح المصحف واضغط مطولاً على أي آية لإضافة فاصل ملون
+                  {t('favorites.addBookmarkHint')}
                 </Text>
               </View>
             }
           />
-        ) : (
+        ) : activeTab === 'azkar' ? (
           <FlatList
             data={azkarFavorites}
             keyExtractor={item => String(item.id)}
@@ -912,13 +977,150 @@ export default function FavoritesScreen() {
             ListEmptyComponent={
               <View style={s.emptyWrap}>
                 <MaterialCommunityIcons name="hands-pray" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
-                <Text style={s.emptyTitle}>لا توجد أذكار محفوظة</Text>
+                <Text style={s.emptyTitle}>{t('favorites.noAzkarFavorites')}</Text>
                 <Text style={s.emptyText}>
-                  افتح أي ذكر واضغط على أيقونة القلب لحفظه هنا
+                  {t('favorites.addAzkarHint')}
                 </Text>
               </View>
             }
           />
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4, paddingHorizontal: 16 }}
+          >
+            {/* أسماء الله الحسنى المحفوظة */}
+            {namesFavorites.length > 0 && (
+              <View style={{ marginBottom: 20 }}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => toggleSection('names')}
+                  style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: collapsedSections.has('names') ? 0 : 10 }}
+                >
+                  <MaterialCommunityIcons
+                    name={collapsedSections.has('names') ? (isRTL ? 'chevron-right' : 'chevron-left') : 'chevron-down'}
+                    size={22}
+                    color={colors.muted}
+                  />
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ fontFamily: fontBold(), fontSize: 16, color: colors.foreground }}>
+                      {t('favorites.namesOfAllah')} ({namesFavorites.length})
+                    </Text>
+                    <MaterialCommunityIcons name="star-crescent" size={20} color={accent} />
+                  </View>
+                </TouchableOpacity>
+                {!collapsedSections.has('names') && namesFavorites.map((item, idx) => (
+                  <Animated.View key={String(item.id)} entering={FadeInDown.delay(idx * 40).duration(300)}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => router.push('/names' as any)}
+                      style={{
+                        backgroundColor: cardBg,
+                        borderRadius: 14,
+                        padding: 16,
+                        marginBottom: 8,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: cardBorder,
+                        alignItems: isRTL ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <Text style={{ fontFamily: fontBold(), fontSize: 22, color: accent, textAlign: isRTL ? 'right' : 'left' }}>
+                        {item.name}
+                      </Text>
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 14, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginTop: 4 }}>
+                        {item.meaning}
+                      </Text>
+                      {item.evidence && (
+                        <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 4 }}>
+                          {item.evidence}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </Animated.View>
+                ))}
+              </View>
+            )}
+            {otherFavorites.length === 0 && namesFavorites.length === 0 ? (
+              <View style={s.emptyWrap}>
+                <MaterialCommunityIcons name="heart-outline" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
+                <Text style={s.emptyTitle}>{t('favorites.noOtherFavorites')}</Text>
+                <Text style={s.emptyText}>
+                  {t('favorites.addOtherHint')}
+                </Text>
+              </View>
+            ) : null}
+            {otherFavorites.length > 0 && (
+              FAVORITE_CATEGORIES
+                .filter(cat => otherFavorites.some(f => cat.types.includes(f.type)))
+                .map(cat => {
+                  const items = otherFavorites.filter(f => cat.types.includes(f.type));
+                  const isCollapsed = collapsedSections.has(cat.key);
+                  return (
+                    <View key={cat.key} style={{ marginBottom: 20 }}>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => toggleSection(cat.key)}
+                        style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: isCollapsed ? 0 : 10 }}
+                      >
+                        <MaterialCommunityIcons
+                          name={isCollapsed ? (isRTL ? 'chevron-right' : 'chevron-left') : 'chevron-down'}
+                          size={22}
+                          color={colors.muted}
+                        />
+                        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ fontFamily: fontBold(), fontSize: 16, color: colors.foreground }}>
+                            {t(cat.labelKey)} ({items.length})
+                          </Text>
+                          <MaterialCommunityIcons name={cat.icon as any} size={20} color={accent} />
+                        </View>
+                      </TouchableOpacity>
+                      {!isCollapsed && items.map((item, idx) => (
+                        <Animated.View key={`${item.type}_${item.id}`} entering={FadeInDown.delay(idx * 30).duration(300)}>
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onLongPress={() => {
+                              Alert.alert(t('common.delete'), t('favorites.removeFromFavoritesConfirm'), [
+                                { text: t('common.cancel'), style: 'cancel' },
+                                {
+                                  text: t('common.delete'), style: 'destructive',
+                                  onPress: async () => {
+                                    await removeFavorite(item.id, item.type);
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    loadBookmarks();
+                                  },
+                                },
+                              ]);
+                            }}
+                            onPress={() => {
+                              const route = item.route || getFallbackRoute(item);
+                              if (route) router.push(route as any);
+                            }}
+                            style={{
+                              backgroundColor: cardBg,
+                              borderRadius: 14,
+                              padding: 14,
+                              marginBottom: 8,
+                              borderWidth: StyleSheet.hairlineWidth,
+                              borderColor: cardBorder,
+                              alignItems: isRTL ? 'flex-end' : 'flex-start',
+                            }}
+                          >
+                            <Text style={{ fontFamily: 'Amiri-Regular', fontSize: 18, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 }}>
+                              {item.arabic}
+                            </Text>
+                            {item.reference && (
+                              <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: accent, marginTop: 6, textAlign: isRTL ? 'right' : 'left' }}>
+                                {item.reference}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        </Animated.View>
+                      ))}
+                    </View>
+                  );
+                })
+            )}
+          </ScrollView>
         )}
 
         {/* ── Export as Image Modal ── */}
@@ -933,12 +1135,12 @@ export default function FavoritesScreen() {
               <MaterialCommunityIcons name="close" size={20} color="#fff" />
             </TouchableOpacity>
 
-            <ScrollView contentContainerStyle={{ alignItems: 'center' }}>
+            <ScrollView contentContainerStyle={{ alignItems: 'center', paddingBottom: 60 }}>
               <View style={s.modalCard}>
-              <Text style={s.modalTitle}>تصدير الآية كصورة</Text>
+              <Text style={s.modalTitle}>{t('favorites.exportImage')}</Text>
 
               {/* Theme Selector */}
-              <Text style={s.themeName}>اختر التصميم</Text>
+              <Text style={s.themeName}>{t('favorites.chooseDesign')}</Text>
               <View style={s.themesRow}>
                 {CARD_THEMES.map(theme => (
                   <TouchableOpacity
@@ -955,7 +1157,7 @@ export default function FavoritesScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={s.themeName}>{selectedTheme.name}</Text>
+              <Text style={s.themeName}>{t(selectedTheme.nameKey)}</Text>
 
               {/* Preview */}
               {selectedBookmark && (
@@ -964,6 +1166,7 @@ export default function FavoritesScreen() {
                     bookmark={selectedBookmark}
                     theme={selectedTheme}
                     cardRef={cardRef}
+                    t={t}
                   />
                 </View>
               )}
@@ -971,7 +1174,7 @@ export default function FavoritesScreen() {
               {/* Export buttons */}
               <View style={s.exportActions}>
                 <TouchableOpacity
-                  style={[s.exportBtn, { backgroundColor: '#1B6B3A' }]}
+                  style={[s.exportBtn, { backgroundColor: '#1B6B3A', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={handleExportImage}
                   disabled={exporting}
                 >
@@ -979,16 +1182,16 @@ export default function FavoritesScreen() {
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <>
                         <MaterialCommunityIcons name="image-outline" size={18} color="#fff" />
-                        <Text style={s.exportBtnText}>حفظ صورة</Text>
+                        <Text style={s.exportBtnText}>{t('favorites.exportImage')}</Text>
                       </>
                   }
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[s.exportBtn, { backgroundColor: '#2563EB' }]}
+                  style={[s.exportBtn, { backgroundColor: '#2563EB', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => selectedBookmark && handleShareText(selectedBookmark)}
                 >
                   <MaterialCommunityIcons name="share-variant-outline" size={18} color="#fff" />
-                  <Text style={s.exportBtnText}>مشاركة نص</Text>
+                  <Text style={s.exportBtnText}>{t('favorites.shareText')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1010,15 +1213,15 @@ export default function FavoritesScreen() {
         >
           <View style={s.noteModalCard}>
             <View style={s.noteHandle} />
-            <Text style={s.noteTitle}>إضافة ملاحظة</Text>
+            <Text style={[s.noteTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('favorites.addNote')}</Text>
             {editingBookmark && (
-              <Text style={{ color: colors.accent, textAlign: 'right', fontSize: 14, marginBottom: 10, fontFamily: 'Cairo-Bold' }}>
-                {editingBookmark.surahName} • آية {editingBookmark.ayahNumber}
+              <Text style={{ color: accent, textAlign: isRTL ? 'right' : 'left', fontSize: 14, marginBottom: 10, fontFamily: fontBold() }}>
+                {editingBookmark.surahName} • {t('favorites.verse')} {editingBookmark.ayahNumber}
               </Text>
             )}
             <TextInput
               style={s.noteInput}
-              placeholder="أضف ملاحظتك هنا..."
+              placeholder={t('favorites.notePlaceholder')}
               placeholderTextColor={colors.muted}
               value={noteText}
               onChangeText={setNoteText}
@@ -1026,7 +1229,7 @@ export default function FavoritesScreen() {
               returnKeyType="done"
             />
             <TouchableOpacity style={s.noteSaveBtn} onPress={handleSaveNote}>
-              <Text style={s.noteSaveBtnText}>حفظ الملاحظة</Text>
+              <Text style={s.noteSaveBtnText}>{t('favorites.saveNote')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

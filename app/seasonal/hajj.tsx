@@ -12,8 +12,8 @@ import {
   RefreshControl,
   Dimensions,
   Modal,
-  I18nManager,
 } from 'react-native';
+import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,6 +26,12 @@ import Animated, {
 
 import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useColors } from '@/hooks/use-colors';
+import { useIsRTL } from '@/hooks/use-is-rtl';
+import { getLanguage } from '@/lib/i18n';
+import TranslatedText from '@/components/ui/TranslatedText';
+import { useSeasonalCMS } from '@/lib/content-api';
 
 const { width } = Dimensions.get('window');
 
@@ -177,6 +183,9 @@ const HAJJ_DUAS = [
   },
 ];
 
+type HajjDuaType = typeof HAJJ_DUAS[number];
+type HajjDayType = typeof HAJJ_DAYS[number];
+
 // ========================================
 // مكونات فرعية
 // ========================================
@@ -198,6 +207,10 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
   isDarkMode,
   index,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const { t } = useSettings();
+  const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
       <TouchableOpacity
@@ -207,6 +220,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           isActive && styles.hajjDayCardActive,
           dayInfo.isSpecial && styles.hajjDayCardSpecial,
           dayInfo.isEid && styles.hajjDayCardEid,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -224,23 +238,27 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
           ]}
         >
           <Text style={styles.dayNumberText}>{dayInfo.day}</Text>
-          <Text style={styles.dayNumberLabel}>ذو الحجة</Text>
+          <Text style={styles.dayNumberLabel}>{t('seasonal.hajj.dhulHijjah')}</Text>
         </View>
 
         {/* المحتوى */}
         <View style={styles.dayContent}>
-          <View style={styles.dayHeader}>
-            <Text style={[styles.dayName, isDarkMode && styles.textLight]}>
-              {dayInfo.name}
-            </Text>
+          <View style={[styles.dayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {isArabicLang ? (
+              <Text style={[styles.dayName, { color: colors.text }]}>{dayInfo.name}</Text>
+            ) : (
+              <Text style={[styles.dayName, { color: colors.text }]}>{dayInfo.nameEn || dayInfo.name}</Text>
+            )}
             {isCompleted && (
               <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
             )}
           </View>
-          <Text style={[styles.dayDescription, isDarkMode && styles.textMuted]}>
-            {dayInfo.description}
-          </Text>
-          <View style={styles.ritualsPreview}>
+          {isArabicLang ? (
+            <Text style={[styles.dayDescription, { color: colors.textLight }]}>{dayInfo.description}</Text>
+          ) : (
+            <TranslatedText style={[styles.dayDescription, { color: colors.textLight }]}>{dayInfo.description}</TranslatedText>
+          )}
+          <View style={[styles.ritualsPreview, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {dayInfo.rituals.slice(0, 3).map((ritual) => (
               <View key={ritual.id} style={styles.ritualBadge}>
                 <MaterialCommunityIcons
@@ -251,7 +269,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
               </View>
             ))}
             {dayInfo.rituals.length > 3 && (
-              <Text style={[styles.moreRituals, isDarkMode && styles.textMuted]}>
+              <Text style={[styles.moreRituals, { color: colors.textLight }]}>
                 +{dayInfo.rituals.length - 3}
               </Text>
             )}
@@ -260,7 +278,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
 
         {/* السهم */}
         <MaterialCommunityIcons
-          name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'}
+          name={isRTL ? 'chevron-left' : 'chevron-right'}
           size={24}
           color={isDarkMode ? '#666' : '#ccc'}
         />
@@ -282,13 +300,15 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
   onDayPress,
   isDarkMode,
 }) => {
+  const colors = useColors();
+  const { t } = useSettings();
   return (
     <View style={[styles.tenDaysContainer, isDarkMode && styles.tenDaysContainerDark]}>
-      <Text style={[styles.tenDaysTitle, isDarkMode && styles.textLight]}>
-        العشر الأوائل من ذي الحجة
+      <Text style={[styles.tenDaysTitle, { color: colors.text }]}>
+        {t('seasonal.hajj.tenDaysTitle')}
       </Text>
-      <Text style={[styles.tenDaysSubtitle, isDarkMode && styles.textMuted]}>
-        ما من أيام العمل الصالح فيها أحب إلى الله من هذه الأيام
+      <Text style={[styles.tenDaysSubtitle, { color: colors.textLight }]}>
+        {t('seasonal.hajj.tenDaysSubtitle')}
       </Text>
       <View style={styles.tenDaysGrid}>
         {FIRST_TEN_DAYS.map((day) => {
@@ -316,7 +336,7 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
               <Text
                 style={[
                   styles.tenDayNumber,
-                  isDarkMode && styles.textLight,
+                  { color: colors.text },
                   (isCompleted || isCurrent || isArafah || isEid) && styles.tenDayNumberActive,
                 ]}
               >
@@ -344,10 +364,13 @@ interface DuaCardProps {
 }
 
 const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View entering={FadeInRight.delay(index * 80).duration(400)}>
       <TouchableOpacity
-        style={[styles.duaCard, isDarkMode && styles.duaCardDark]}
+        style={[styles.duaCard, isDarkMode && styles.duaCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
@@ -358,10 +381,18 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
           <MaterialCommunityIcons name="hands-pray" size={20} color={HAJJ_COLOR} />
         </View>
         <View style={styles.duaContent}>
-          <Text style={[styles.duaTitle, isDarkMode && styles.textLight]}>{dua.title}</Text>
-          <Text style={[styles.duaOccasion, isDarkMode && styles.textMuted]}>{dua.occasion}</Text>
+          {isArabicLang ? (
+            <Text style={[styles.duaTitle, { color: colors.text }]}>{dua.title}</Text>
+          ) : (
+            <TranslatedText style={[styles.duaTitle, { color: colors.text }]}>{dua.title}</TranslatedText>
+          )}
+          {isArabicLang ? (
+            <Text style={[styles.duaOccasion, { color: colors.textLight }]}>{dua.occasion}</Text>
+          ) : (
+            <TranslatedText style={[styles.duaOccasion, { color: colors.textLight }]}>{dua.occasion}</TranslatedText>
+          )}
         </View>
-        <MaterialCommunityIcons name={I18nManager.isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
+        <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -380,6 +411,10 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
   onClose,
   isDarkMode,
 }) => {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const { t } = useSettings();
+  const isArabicLang = getLanguage() === 'ar';
   if (!dayInfo) return null;
 
   return (
@@ -391,15 +426,23 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
         >
           {/* Header */}
           <View
-            style={[styles.ritualModalHeader, { backgroundColor: dayInfo.isSpecial ? 'rgba(218,165,32,0.85)' : `${HAJJ_GRADIENT[0]}CC` }]}
+            style={[styles.ritualModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: dayInfo.isSpecial ? 'rgba(218,165,32,0.85)' : `${HAJJ_GRADIENT[0]}CC` }]}
           >
             <View style={styles.ritualModalDay}>
               <Text style={styles.ritualModalDayNumber}>{dayInfo.day}</Text>
-              <Text style={styles.ritualModalDayLabel}>ذو الحجة</Text>
+              <Text style={styles.ritualModalDayLabel}>{t('seasonal.hajj.dhulHijjah')}</Text>
             </View>
             <View style={styles.ritualModalInfo}>
-              <Text style={styles.ritualModalName}>{dayInfo.name}</Text>
-              <Text style={styles.ritualModalDesc}>{dayInfo.description}</Text>
+              {isArabicLang ? (
+                <Text style={styles.ritualModalName}>{dayInfo.name}</Text>
+              ) : (
+                <Text style={styles.ritualModalName}>{dayInfo.nameEn || dayInfo.name}</Text>
+              )}
+              {isArabicLang ? (
+                <Text style={styles.ritualModalDesc}>{dayInfo.description}</Text>
+              ) : (
+                <TranslatedText style={styles.ritualModalDesc}>{dayInfo.description}</TranslatedText>
+              )}
             </View>
             <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
               <MaterialCommunityIcons name="close" size={24} color="#fff" />
@@ -408,25 +451,29 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
 
           <ScrollView style={styles.ritualModalContent} showsVerticalScrollIndicator={false}>
             {/* المناسك */}
-            <Text style={[styles.ritualSectionTitle, isDarkMode && styles.textLight]}>
-              المناسك والأعمال
+            <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+              {t('seasonal.hajj.ritualsAndDeeds')}
             </Text>
             {dayInfo.rituals.map((ritual, index) => (
               <Animated.View
                 key={ritual.id}
                 entering={FadeInRight.delay(index * 100).duration(400)}
-                style={[styles.ritualItem, isDarkMode && styles.ritualItemDark]}
+                style={[styles.ritualItem, isDarkMode && styles.ritualItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                 <View style={styles.ritualItemIcon}>
                   <MaterialCommunityIcons name={ritual.icon as any} size={24} color={HAJJ_COLOR} />
                 </View>
                 <View style={styles.ritualItemContent}>
-                  <Text style={[styles.ritualItemTitle, isDarkMode && styles.textLight]}>
-                    {ritual.title}
-                  </Text>
-                  <Text style={[styles.ritualItemDesc, isDarkMode && styles.textMuted]}>
-                    {ritual.description}
-                  </Text>
+                  {isArabicLang ? (
+                    <Text style={[styles.ritualItemTitle, { color: colors.text }]}>{ritual.title}</Text>
+                  ) : (
+                    <TranslatedText style={[styles.ritualItemTitle, { color: colors.text }]}>{ritual.title}</TranslatedText>
+                  )}
+                  {isArabicLang ? (
+                    <Text style={[styles.ritualItemDesc, { color: colors.textLight }]}>{ritual.description}</Text>
+                  ) : (
+                    <TranslatedText style={[styles.ritualItemDesc, { color: colors.textLight }]}>{ritual.description}</TranslatedText>
+                  )}
                 </View>
               </Animated.View>
             ))}
@@ -434,8 +481,8 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             {/* الفضائل */}
             {dayInfo.virtues && (
               <>
-                <Text style={[styles.ritualSectionTitle, isDarkMode && styles.textLight]}>
-                  الفضائل
+                <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+                  {t('seasonal.hajj.virtuesSection')}
                 </Text>
                 <View style={styles.virtuesStarWrapper}>
                   <View style={styles.virtuesStarCircle}>
@@ -443,10 +490,12 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
                   </View>
                   <View style={[styles.virtuesCard, isDarkMode && styles.virtuesCardDark]}>
                     {dayInfo.virtues.map((virtue, index) => (
-                      <View key={index} style={styles.virtueItem}>
-                        <Text style={[styles.virtueText, isDarkMode && styles.textMuted]}>
-                          {virtue}
-                        </Text>
+                      <View key={index} style={[styles.virtueItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        {isArabicLang ? (
+                          <Text style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</Text>
+                        ) : (
+                          <TranslatedText style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</TranslatedText>
+                        )}
                       </View>
                     ))}
                   </View>
@@ -457,12 +506,16 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             {/* الأدعية */}
             {dayInfo.duas && (
               <>
-                <Text style={[styles.ritualSectionTitle, isDarkMode && styles.textLight]}>
-                  الأدعية المأثورة
+                <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+                  {t('seasonal.hajj.duasSection')}
                 </Text>
                 {dayInfo.duas.map((dua, index) => (
                   <View key={index} style={[styles.duaBox, isDarkMode && styles.duaBoxDark]}>
-                    <Text style={[styles.duaBoxText, isDarkMode && styles.textLight]}>{dua}</Text>
+                    {isArabicLang ? (
+                      <Text style={[styles.duaBoxText, { color: colors.text }]}>{dua}</Text>
+                    ) : (
+                      <TranslatedText style={[styles.duaBoxText, { color: colors.text }]}>{dua}</TranslatedText>
+                    )}
                   </View>
                 ))}
               </>
@@ -481,14 +534,21 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
 // ========================================
 
 export default function HajjScreen() {
+  const isRTL = useIsRTL();
   const router = useRouter();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings, t } = useSettings();
+  const colors = useColors();
+  const language = getLanguage();
+  const isArabic = language === 'ar';
   const { currentSeason, refreshSeasonalData } = useSeasonal();
   const { seasonalProgress, markDayCompleted } = useSeasonalProgress();
 
+  // CMS data with hardcoded fallback
+  const { duas: hajjDuas } = useSeasonalCMS<HajjDuaType>('hajj', HAJJ_DUAS);
+
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedDay, setSelectedDay] = useState<typeof HAJJ_DAYS[0] | null>(null);
-  const [selectedDua, setSelectedDua] = useState<typeof HAJJ_DUAS[0] | null>(null);
+  const [selectedDay, setSelectedDay] = useState<HajjDayType | null>(null);
+  const [selectedDua, setSelectedDua] = useState<HajjDuaType | null>(null);
 
   const isHajjSeason = currentSeason?.type === 'hajj' || currentSeason?.type === 'dhul_hijjah';
   const currentDay = currentSeason?.currentDay || 1;
@@ -515,14 +575,15 @@ export default function HajjScreen() {
   }, [currentDay, completedDays, markDayCompleted]);
 
   return (
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
+    <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle="light-content"
         backgroundColor={HAJJ_COLOR}
       />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: `${HAJJ_COLOR}CC` }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${HAJJ_COLOR}CC` }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -530,18 +591,18 @@ export default function HajjScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={I18nManager.isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>موسم الحج</Text>
+          <Text style={styles.headerTitle}>{t('seasonal.hajj.title')}</Text>
           <Text style={styles.headerSubtitle}>
-            {isHajjSeason ? `ذو الحجة - اليوم ${currentDay}` : 'ذو الحجة'}
+            {isHajjSeason ? `${t('seasonal.hajj.headerSubtitleWithDay')} ${currentDay}` : t('seasonal.hajj.headerSubtitle')}
           </Text>
         </View>
         <View style={styles.headerPlaceholder} />
 
         {/* زخرفة الكعبة */}
-        <View style={styles.kaabaDecoration}>
+        <View style={[styles.kaabaDecoration, isRTL ? null : { right: 20, left: undefined }]}>
           <MaterialCommunityIcons name="star-crescent" size={80} color="rgba(255,255,255,0.15)" />
         </View>
       </View>
@@ -570,8 +631,8 @@ export default function HajjScreen() {
         </Animated.View>
 
         {/* أيام الحج */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-          مناسك الحج
+        <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+          {t('seasonal.hajj.ritualsSection')}
         </Text>
         {HAJJ_DAYS.map((dayInfo, index) => (
           <HajjDayCard
@@ -586,11 +647,11 @@ export default function HajjScreen() {
         ))}
 
         {/* أدعية الحج */}
-        <Text style={[styles.sectionTitle, isDarkMode && styles.textMuted]}>
-          أدعية الحج
+        <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+          {t('seasonal.hajj.hajjDuasSection')}
         </Text>
         <View style={styles.duasContainer}>
-          {HAJJ_DUAS.map((dua, index) => (
+          {hajjDuas.map((dua, index) => (
             <DuaCard
               key={dua.id}
               dua={dua}
@@ -603,12 +664,12 @@ export default function HajjScreen() {
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark]}>
+          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#DAA520" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>لغير الحاج</Text>
-              <Text style={[styles.tipText, isDarkMode && styles.textMuted]}>
-                صيام يوم عرفة يكفر سنة ماضية وسنة قادمة. أكثر من الذكر والتكبير في هذه الأيام المباركة.
+              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.hajj.tipTitle')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight }]}>
+                {t('seasonal.hajj.tipText')}
               </Text>
             </View>
           </View>
@@ -641,27 +702,34 @@ export default function HajjScreen() {
             entering={FadeIn.duration(300)}
             style={[styles.duaModal, isDarkMode && styles.duaModalDark]}
           >
-            <View style={styles.duaModalHeader}>
-              <Text style={[styles.duaModalTitle, isDarkMode && styles.textLight]}>
-                {selectedDua?.title}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedDua(null)}>
-                <MaterialCommunityIcons name="close" size={24} color={isDarkMode ? '#fff' : '#333'} />
+            <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              {isArabic ? (
+                <Text style={[styles.duaModalTitle, { color: colors.text }]}>{selectedDua?.title}</Text>
+              ) : (
+                <TranslatedText style={[styles.duaModalTitle, { color: colors.text }]}>{selectedDua?.title || ''}</TranslatedText>
+              )}
+              <TouchableOpacity onPress={() => setSelectedDua(null)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
-            <Text style={[styles.duaModalArabic, isDarkMode && styles.textLight]}>
-              {selectedDua?.arabic}
-            </Text>
-            <View style={styles.duaModalOccasion}>
+            {isArabic ? (
+              <Text style={[styles.duaModalArabic, { color: colors.text }]}>{selectedDua?.arabic}</Text>
+            ) : (
+              <TranslatedText style={[styles.duaModalArabic, { color: colors.text }]}>{selectedDua?.arabic || ''}</TranslatedText>
+            )}
+            <View style={[styles.duaModalOccasion, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="clock-outline" size={16} color={HAJJ_COLOR} />
-              <Text style={[styles.duaModalOccasionText, isDarkMode && styles.textMuted]}>
-                {selectedDua?.occasion}
-              </Text>
+              {isArabic ? (
+                <Text style={[styles.duaModalOccasionText, { color: colors.textLight }]}>{selectedDua?.occasion}</Text>
+              ) : (
+                <TranslatedText style={[styles.duaModalOccasionText, { color: colors.textLight }]}>{selectedDua?.occasion || ''}</TranslatedText>
+              )}
             </View>
           </Animated.View>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
+    </BackgroundWrapper>
   );
 }
 
@@ -697,12 +765,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   headerPlaceholder: {
@@ -738,13 +806,13 @@ const styles = StyleSheet.create({
   },
   tenDaysTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     textAlign: 'center',
   },
   tenDaysSubtitle: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     textAlign: 'center',
     marginTop: 4,
@@ -781,7 +849,7 @@ const styles = StyleSheet.create({
   },
   tenDayNumber: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   tenDayNumberActive: {
@@ -791,7 +859,7 @@ const styles = StyleSheet.create({
   // العناوين
   sectionTitle: {
     fontSize: 18,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginTop: 20,
     marginBottom: 12,
@@ -840,12 +908,12 @@ const styles = StyleSheet.create({
   },
   dayNumberText: {
     fontSize: 22,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: HAJJ_COLOR,
   },
   dayNumberLabel: {
     fontSize: 8,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: HAJJ_COLOR,
   },
   dayContent: {
@@ -859,19 +927,19 @@ const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   dayDescription: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 4,
   },
   ritualsPreview: {
     flexDirection: 'row',
     marginTop: 8,
-    gap: 6,
+    gap: 8,
   },
   ritualBadge: {
     width: 28,
@@ -883,7 +951,7 @@ const styles = StyleSheet.create({
   },
   moreRituals: {
     fontSize: 12,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#999',
     alignSelf: 'center',
   },
@@ -916,12 +984,12 @@ const styles = StyleSheet.create({
   },
   duaTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   duaOccasion: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#999',
   },
 
@@ -942,12 +1010,12 @@ const styles = StyleSheet.create({
   },
   tipTitle: {
     fontSize: 14,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   tipText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     lineHeight: 22,
     marginTop: 4,
@@ -985,12 +1053,12 @@ const styles = StyleSheet.create({
   },
   ritualModalDayNumber: {
     fontSize: 24,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   ritualModalDayLabel: {
     fontSize: 9,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   ritualModalInfo: {
@@ -999,12 +1067,12 @@ const styles = StyleSheet.create({
   },
   ritualModalName: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#fff',
   },
   ritualModalDesc: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
   },
   modalCloseButton: {
@@ -1017,10 +1085,11 @@ const styles = StyleSheet.create({
   },
   ritualModalContent: {
     padding: 20,
+    paddingBottom: 60,
   },
   ritualSectionTitle: {
     fontSize: 16,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     marginTop: 16,
     marginBottom: 12,
@@ -1049,12 +1118,12 @@ const styles = StyleSheet.create({
   },
   ritualItemTitle: {
     fontSize: 15,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   ritualItemDesc: {
     fontSize: 12,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     marginTop: 2,
   },
@@ -1088,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   virtueText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
     flex: 1,
   },
@@ -1103,7 +1172,7 @@ const styles = StyleSheet.create({
   },
   duaBoxText: {
     fontSize: 16,
-    fontFamily: 'Cairo-Medium',
+    fontFamily: fontMedium(),
     color: '#333',
     textAlign: 'center',
     lineHeight: 28,
@@ -1138,14 +1207,15 @@ const styles = StyleSheet.create({
   },
   duaModalTitle: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
   },
   duaModalArabic: {
     fontSize: 20,
-    fontFamily: 'Cairo-Bold',
+    fontFamily: fontBold(),
     color: '#333',
     textAlign: 'center',
+    writingDirection: 'rtl',
     lineHeight: 36,
     marginBottom: 16,
   },
@@ -1153,11 +1223,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
   duaModalOccasionText: {
     fontSize: 13,
-    fontFamily: 'Cairo-Regular',
+    fontFamily: fontRegular(),
     color: '#666',
   },
 

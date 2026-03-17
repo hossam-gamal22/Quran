@@ -2,6 +2,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { Platform, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { t } from '@/lib/i18n';
 
 /**
  * نسخ نص إلى الحافظة
@@ -65,7 +66,7 @@ export async function shareText(text: string, title?: string): Promise<boolean> 
     if (Platform.OS === 'web') {
       if (navigator.share) {
         await navigator.share({
-          title: title || 'مشاركة',
+          title: title || t('shareService.shareTitle'),
           text: text,
         });
         return true;
@@ -96,7 +97,7 @@ export async function copyAyah(
 ): Promise<boolean> {
   let text = `﴿ ${ayahText} ﴾`;
   if (includeReference) {
-    text += `\n\n📖 سورة ${surahName} - آية ${ayahNumber}`;
+    text += `\n\n📖 ${t('shareService.surahRef')} ${surahName} - ${t('shareService.ayahRef')} ${ayahNumber}`;
     text += `\n📱 تطبيق روح المسلم`;
   }
   return await copyToClipboard(text);
@@ -115,7 +116,7 @@ export async function copyDhikr(
     text += `\n\n📿 ${category}`;
   }
   if (count) {
-    text += `\n🔢 التكرار: ${count} مرة`;
+    text += `\n🔢 ${t('shareService.repeat')}: ${count} ${t('shareService.time')}`;
   }
   text += `\n📱 تطبيق روح المسلم`;
   return await copyToClipboard(text);
