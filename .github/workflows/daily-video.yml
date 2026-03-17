@@ -29,7 +29,9 @@ jobs:
           node-version: 20
 
       - name: Verify FFmpeg
-        run: ffmpeg -version | head -1
+        run: |
+          ffmpeg -version | head -1
+          which ffprobe && ffprobe -version | head -1 || echo 'ffprobe not in PATH (will use ffmpeg -i instead)'
 
       - name: Install dependencies
         working-directory: scripts

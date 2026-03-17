@@ -84,11 +84,16 @@ function escapeDrawtext(input) {
 }
 
 function getAudioDuration(audioPath) {
+  // Use ffmpeg -i (ffprobe may not be in PATH on some CI runners)
   const raw = execSync(
-    `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${audioPath}"`,
+    `ffmpeg -i "${audioPath}" 2>&1 || true`,
     { encoding: 'utf8', timeout: 10000 }
-  ).trim();
-  return parseFloat(raw);
+  );
+  const match = raw.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+  if (match) {
+    return parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
+  }
+  throw new Error(`Could not parse audio duration from: ${audioPath}`);
 }
 
 function hasDrawtext() {
