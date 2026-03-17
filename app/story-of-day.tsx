@@ -80,13 +80,48 @@ export default function StoryOfDayScreen() {
       try {
         const res = await fetch(DAILY_VIDEO_JSON_URL);
         if (!res.ok) throw new Error('fetch failed');
-        const json: RollingData = await res.json();
-        const dates = Object.keys(json).sort().reverse();
-        const latest = dates[0];
-        if (!cancelled && latest && json[latest]?.videos?.length) {
-          setDayData(json[latest]);
-        } else if (!cancelled) {
-          setError(true);
+        const json = await res.json();
+
+        let resolved: DayData | null = null;
+
+        // Extract date-keyed entries (handles both pure rolling and mixed/legacy formats)
+        const dateKeys = Object.keys(json).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
+
+        if (dateKeys.length > 0) {
+          // Rolling format: pick latest date with non-empty videos
+          const sorted = dateKeys.sort().reverse();
+          for (const dk of sorted) {
+            const entry = json[dk];
+            if (entry?.videos?.length) {
+              resolved = entry as DayData;
+              break;
+            }
+          }
+        }
+
+        // Fallback: legacy flat format { url, ayahText, ... }
+        if (!resolved && json.url && json.ayahText) {
+          resolved = {
+            ayahText: json.ayahText,
+            surahName: json.surahName,
+            surahEnglish: json.surahEnglish,
+            surahNumber: json.surahNumber,
+            ayahNumber: json.ayahNumber,
+            globalAyahNumber: json.globalAyahNumber,
+            generatedAt: json.generatedAt || json.date,
+            videos: [{
+              reciterId: 'ar.alafasy',
+              reciterLabel: 'مشاري العفاسي',
+              reciterLabelEn: 'Mishary Alafasy',
+              url: json.url,
+              duration: json.duration || 0,
+            }],
+          };
+        }
+
+        if (!cancelled) {
+          if (resolved) setDayData(resolved);
+          else setError(true);
         }
       } catch (e) {
         if (!cancelled) setError(true);

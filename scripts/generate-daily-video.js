@@ -332,7 +332,13 @@ function updateRollingJson(ayah, date, videoResults) {
   let existing = {};
   if (fs.existsSync(OUTPUT_JSON)) {
     try {
-      existing = JSON.parse(fs.readFileSync(OUTPUT_JSON, 'utf8'));
+      const raw = JSON.parse(fs.readFileSync(OUTPUT_JSON, 'utf8'));
+      // Migrate: keep only date-keyed entries (YYYY-MM-DD), drop legacy flat keys
+      for (const key of Object.keys(raw)) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+          existing[key] = raw[key];
+        }
+      }
     } catch {
       existing = {};
     }
