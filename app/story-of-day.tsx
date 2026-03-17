@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  ScrollView,
+  Dimensions,
 } from 'react-native';
-import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
+import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
@@ -21,14 +21,17 @@ import { Video, ResizeMode } from 'expo-av';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
-import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { getVerseQcfData } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 
 const DAILY_VIDEO_JSON_URL =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/daily-video.json';
+
+const { width: SCREEN_W } = Dimensions.get('window');
 
 interface DailyVideoData {
   url: string;
@@ -39,6 +42,7 @@ interface DailyVideoData {
   surahNumber: number;
   ayahNumber: number;
   globalAyahNumber: number;
+  duration?: number;
   generatedAt: string;
 }
 
@@ -55,7 +59,12 @@ export default function StoryOfDayScreen() {
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  // Fetch the daily video metadata on mount
+  // QCF font state
+  const [qcfReady, setQcfReady] = useState(false);
+  const [qcfPage, setQcfPage] = useState<number | null>(null);
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[]>([]);
+
+  // Fetch daily video metadata
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -71,10 +80,39 @@ export default function StoryOfDayScreen() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Download video to camera roll
+  // Load QCF page font for the ayah
+  useEffect(() => {
+    if (!data?.surahNumber || !data?.ayahNumber) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const qcfData = getVerseQcfData(data.surahNumber, data.ayahNumber);
+        if (!qcfData || cancelled) return;
+
+        setQcfPage(qcfData.page);
+        setQcfGlyphs(qcfData.glyphs);
+
+        // darkMode=true for white text on dark blurred video
+        if (!isPageFontLoaded(qcfData.page, true)) {
+          await loadPageFont(qcfData.page, true);
+        }
+        if (!cancelled) setQcfReady(true);
+      } catch {
+        if (!cancelled) setQcfReady(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data?.surahNumber, data?.ayahNumber]);
+
   const handleDownload = useCallback(async () => {
     if (!data?.url) return;
     setSaving(true);
@@ -87,27 +125,26 @@ export default function StoryOfDayScreen() {
       if (!perm.granted) return;
       await MediaLibrary.saveToLibraryAsync(download.uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent */
+    } finally {
       setSaving(false);
     }
   }, [data]);
 
-  // Share video
   const handleShare = useCallback(async () => {
     if (!data) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // Download first, then share the file for best UX
       const localPath = `${FileSystem.cacheDirectory}share-video-${Date.now()}.mp4`;
       const download = await FileSystem.downloadAsync(data.url, localPath);
 
       if (download?.uri) {
         if (Platform.OS === 'ios') {
-          const surahLabel = isArabic ? data.surahName : data.surahEnglish;
+          const sl = isArabic ? data.surahName : data.surahEnglish;
           await Share.share({
-            message: `${data.ayahText}\n\n${surahLabel}\n\n${t('storyOfDay.shareText')}`,
+            message: `${data.ayahText}\n\n${sl}\n\n${t('storyOfDay.shareText')}`,
             url: download.uri,
           });
         } else {
@@ -119,26 +156,56 @@ export default function StoryOfDayScreen() {
           }
         }
       }
-    } catch { /* silent */ } finally {
+    } catch {
+      /* silent */
+    } finally {
       setSharing(false);
     }
   }, [data, isArabic]);
 
-  const surahLabel = data
-    ? isArabic ? data.surahName : data.surahEnglish
-    : '';
+  const surahLabel = data ? (isArabic ? data.surahName : data.surahEnglish) : '';
+
+  // Use QCF Mushaf font when ready, otherwise fallback to KFGQPC
+  const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
+  const ayahFontFamily = qcfFontFamily || 'KFGQPCUthmanic';
+  const isQcf = !!qcfFontFamily;
+  const ayahFontSize = isQcf ? 32 : 28;
+  const ayahLineHeight = isQcf ? 64 : 56;
 
   return (
-    <BackgroundWrapper
-      backgroundKey={settings.display.appBackground}
-      backgroundUrl={settings.display.appBackgroundUrl}
-      opacity={settings.display.backgroundOpacity ?? 1}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView style={styles.container}>
-        <UniversalHeader titleColor={colors.text}>
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>
+    <View style={styles.root}>
+      {/* Full-screen video background */}
+      {data?.url && (
+        <Video
+          ref={videoRef}
+          source={{ uri: data.url }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted={false}
+        />
+      )}
+
+      {/* Blur + dim overlay */}
+      {Platform.OS === 'ios' ? (
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
+
+      {/* Content */}
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <UniversalHeader titleColor="#fff">
+          <View
+            style={{
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <Text style={styles.headerTitle} numberOfLines={1}>
               {t('storyOfDay.title')}
             </Text>
             <SectionInfoButton sectionKey="stories" />
@@ -147,137 +214,211 @@ export default function StoryOfDayScreen() {
 
         {loading ? (
           <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#2f7659" />
+            <ActivityIndicator size="large" color="#fff" />
           </View>
         ) : error || !data?.url ? (
           <View style={styles.centered}>
-            <MaterialCommunityIcons name="video-off-outline" size={64} color={colors.muted} />
-            <Text style={[styles.errorText, { color: colors.muted }]}>
-              {t('storyOfDay.loadError')}
-            </Text>
+            <MaterialCommunityIcons
+              name="video-off-outline"
+              size={64}
+              color="rgba(255,255,255,0.5)"
+            />
+            <Text style={styles.errorText}>{t('storyOfDay.loadError')}</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-            {/* Video Player */}
-            <View style={styles.videoCard}>
-              <Video
-                ref={videoRef}
-                source={{ uri: data.url }}
-                style={styles.video}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay
-                isLooping
-                useNativeControls
-              />
+          <View style={styles.contentArea}>
+            {/* Ayah — QCF Mushaf rendering centered */}
+            <View style={styles.ayahContainer}>
+              <Text
+                style={[
+                  styles.ayahText,
+                  {
+                    fontFamily: ayahFontFamily,
+                    fontSize: ayahFontSize,
+                    lineHeight: ayahLineHeight,
+                  },
+                ]}
+                allowFontScaling={false}
+              >
+                {isQcf ? qcfGlyphs.join('') : data.ayahText}
+              </Text>
+
+              <View style={styles.divider} />
+
+              <Text style={styles.surahRef}>
+                {surahLabel} - {data.ayahNumber}
+              </Text>
+
+              <Text style={styles.hintText}>اضغط مطولاً للمزيد</Text>
             </View>
 
-            {/* Ayah Text */}
-            <View style={styles.ayahCard}>
-              <Text style={[styles.ayahText, { color: colors.text }]}>
-                {data.ayahText}
-              </Text>
-              <Text style={[styles.surahLabel, { color: colors.muted }]}>
-                {surahLabel} {data.ayahNumber ? `﴿${data.ayahNumber}﴾` : ''}
-              </Text>
+            {/* Bottom: branding + buttons */}
+            <View style={styles.bottomSection}>
+              <View style={styles.brandingRow}>
+                <Text style={styles.brandingEmoji}>🤲</Text>
+                <Text style={styles.brandingLabel}>روح المسلم</Text>
+              </View>
+
+              <View style={styles.bottomActions}>
+                <TouchableOpacity
+                  onPress={handleDownload}
+                  disabled={saving}
+                  activeOpacity={0.7}
+                  style={styles.actionBtn}
+                >
+                  <BlurView
+                    intensity={Platform.OS === 'ios' ? 50 : 30}
+                    tint="dark"
+                    style={[
+                      styles.glassBtnInner,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    ]}
+                  >
+                    {saving ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <MaterialCommunityIcons name="download" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.btnText}>
+                      {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
+                    </Text>
+                  </BlurView>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleShare}
+                  disabled={sharing}
+                  activeOpacity={0.7}
+                  style={styles.actionBtn}
+                >
+                  <BlurView
+                    intensity={Platform.OS === 'ios' ? 50 : 30}
+                    tint="dark"
+                    style={[
+                      styles.glassBtnInner,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    ]}
+                  >
+                    {sharing ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
+                    )}
+                    <Text style={styles.btnText}>
+                      {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
+                    </Text>
+                  </BlurView>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            {/* Action Buttons */}
-            <TouchableOpacity onPress={handleDownload} disabled={saving} activeOpacity={0.8}>
-              <BlurView
-                intensity={Platform.OS === 'ios' ? 60 : 40}
-                tint="dark"
-                style={[styles.glassBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <MaterialCommunityIcons name="download" size={20} color="#fff" />
-                )}
-                <Text style={styles.btnText}>
-                  {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
-                </Text>
-              </BlurView>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleShare} disabled={sharing} activeOpacity={0.8}>
-              <BlurView
-                intensity={Platform.OS === 'ios' ? 60 : 40}
-                tint="dark"
-                style={[styles.glassBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-              >
-                {sharing ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
-                )}
-                <Text style={styles.btnText}>
-                  {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
-                </Text>
-              </BlurView>
-            </TouchableOpacity>
-          </ScrollView>
+          </View>
         )}
       </SafeAreaView>
-    </BackgroundWrapper>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  content: { padding: 16, paddingBottom: 120 },
-
-  videoCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    aspectRatio: 9 / 16,
+  root: {
+    flex: 1,
     backgroundColor: '#000',
   },
-  video: {
+  container: {
     flex: 1,
   },
-
-  ayahCard: {
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    color: '#fff',
+  },
+  contentArea: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  ayahContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
   },
   ayahText: {
-    fontSize: 20,
-    lineHeight: 38,
     textAlign: 'center',
-    fontFamily: fontSemiBold(),
+    color: '#fff',
     writingDirection: 'rtl',
-    direction: 'rtl',
+    paddingHorizontal: 4,
   },
-  surahLabel: {
-    marginTop: 10,
+  divider: {
+    width: 60,
+    height: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginVertical: 16,
+    borderRadius: 1,
+  },
+  surahRef: {
+    textAlign: 'center',
+    fontFamily: fontBold(),
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.85)',
+    writingDirection: 'rtl',
+  },
+  hintText: {
     textAlign: 'center',
     fontFamily: fontRegular(),
-    fontSize: 14,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.4)',
+    marginTop: 8,
   },
   errorText: {
     fontSize: 16,
     fontFamily: fontRegular(),
     textAlign: 'center',
+    color: 'rgba(255,255,255,0.5)',
   },
-
-  glassBtn: {
-    marginTop: 14,
+  bottomSection: {
+    paddingBottom: 12,
+    gap: 16,
+  },
+  brandingRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  brandingEmoji: {
+    fontSize: 28,
+  },
+  brandingLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 12,
+    fontFamily: fontBold(),
+    textAlign: 'center',
+  },
+  bottomActions: {
+    gap: 10,
+  },
+  actionBtn: {
     borderRadius: 14,
+    overflow: 'hidden',
+  },
+  glassBtnInner: {
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.2)',
   },
   btnText: {
     color: '#fff',
     fontFamily: fontBold(),
-    fontSize: 16,
+    fontSize: 15,
   },
 });
