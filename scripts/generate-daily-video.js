@@ -259,18 +259,48 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
   console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
 
-  // ── Color grading: subtle sharpening + contrast/saturation pop ──
+  const canDraw = hasDrawtext() && fs.existsSync(FONT_PATH);
+  if (!canDraw) console.log('      ⚠️  drawtext/font unavailable — video will have no text overlay');
+
+  // ── Color grading ──
   const colorGrade = 'unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15';
 
-  // No drawtext — the app renders its own QCF text overlay
-  const filterComplex = [
+  // ── Build filter: Ken Burns zoom + color grade + optional text overlays ──
+  let filterComplex =
     `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
-      `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
-      `zoompan=z='min(zoom+0.0015\\,1.5)':` +
-      `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-      `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
-      `${colorGrade}[vout]`,
-  ].join(';');
+    `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
+    `zoompan=z='min(zoom+0.0015\\,1.5)':` +
+    `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
+    `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
+    colorGrade;
+
+  if (canDraw) {
+    const ayahText = escapeDrawtext(ayah.text);
+    const surahText = escapeDrawtext(ayah.surahName);
+    const verseNum = escapeDrawtext(`﴿${ayah.ayahInSurah}﴾`);
+    const brandText = escapeDrawtext('رُوح المسلم');
+    const fontEsc = FONT_PATH.replace(/'/g, "'\\''");
+
+    // Dark overlay on lower half for text readability
+    filterComplex += `,drawbox=x=0:y=ih*0.55:w=iw:h=ih*0.45:color=black@0.45:t=fill`;
+
+    // Ayah text — centered
+    filterComplex += `,drawtext=fontfile='${fontEsc}':text='${ayahText}':fontcolor=white:fontsize=52:x=(w-text_w)/2:y=(h-text_h)/2-60:shadowcolor=black@0.6:shadowx=2:shadowy=2`;
+
+    // Verse number ornament ﴿N﴾
+    filterComplex += `,drawtext=fontfile='${fontEsc}':text='${verseNum}':fontcolor=white@0.85:fontsize=44:x=(w-text_w)/2:y=(h/2)+40:shadowcolor=black@0.5:shadowx=1:shadowy=1`;
+
+    // Divider line
+    filterComplex += `,drawbox=x=(w-120)/2:y=(h/2)+100:w=120:h=2:color=white@0.3:t=fill`;
+
+    // Surah name
+    filterComplex += `,drawtext=fontfile='${fontEsc}':text='${surahText}':fontcolor=white@0.85:fontsize=38:x=(w-text_w)/2:y=(h/2)+120:shadowcolor=black@0.5:shadowx=1:shadowy=1`;
+
+    // Branding at bottom
+    filterComplex += `,drawtext=fontfile='${fontEsc}':text='${brandText}':fontcolor=white@0.55:fontsize=30:x=(w-text_w)/2:y=h-80:shadowcolor=black@0.4:shadowx=1:shadowy=1`;
+  }
+
+  filterComplex += '[vout]';
 
   const cmd = [
     'ffmpeg', '-y',
@@ -291,7 +321,6 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   ].join(' ');
 
   try {
-    // 10-minute timeout per video (slow preset takes longer)
     execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().slice(-1000) : 'no stderr';
