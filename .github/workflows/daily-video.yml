@@ -12,7 +12,7 @@ concurrency:
 jobs:
   generate-video:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     permissions:
       contents: write
@@ -35,7 +35,7 @@ jobs:
         working-directory: scripts
         run: npm install --production
 
-      - name: Generate video
+      - name: Generate videos
         working-directory: scripts
         env:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
@@ -45,8 +45,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/today-video.mp4 data/daily-video.json
+          git add -A
           git diff --cached --quiet && echo "No changes to commit" || {
-            git commit -m "📹 Update daily video — $(date -u +%Y-%m-%d)"
+            git commit -m "Update daily content & cleanup [skip ci]"
             git push origin main
           }
