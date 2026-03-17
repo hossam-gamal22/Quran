@@ -38,6 +38,11 @@ jobs:
         working-directory: scripts
         run: npm install --production
 
+      - name: Verify FFmpeg drawtext
+        run: |
+          echo "Testing drawtext filter..."
+          ffmpeg -f lavfi -i color=c=black:s=100x100:d=1 -vf "drawtext=text='test':fontsize=20:fontcolor=white:x=10:y=10" -frames:v 1 -f null - 2>&1 && echo "✅ drawtext works" || echo "❌ drawtext FAILED"
+
       - name: Generate videos
         working-directory: scripts
         env:
@@ -46,6 +51,7 @@ jobs:
           echo "🔑 PEXELS_API_KEY length: ${#PEXELS_API_KEY}"
           echo "📂 Font file: $(ls -la fonts/KFGQPC-Uthmanic-Script.ttf 2>&1)"
           echo "🔧 FFmpeg: $(ffmpeg -version | head -1)"
+          echo "🔧 FFmpeg filters: $(ffmpeg -filters 2>&1 | grep -i drawtext || echo 'drawtext not in filters list')"
           node generate-daily-video.js
 
       - name: Commit and push

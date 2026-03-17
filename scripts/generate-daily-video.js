@@ -274,13 +274,14 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
   console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
 
-  const canDraw = hasDrawtext() && fs.existsSync(FONT_PATH);
-  if (!canDraw) console.log('      ⚠️  drawtext/font unavailable — video will have no text overlay');
+  const fontExists = fs.existsSync(FONT_PATH);
+  if (!fontExists) console.log('      ⚠️  Font file missing — video will have no text overlay');
+  else console.log('      ✅ Font found — text overlay will be applied');
 
   // ── Color grading ──
   const colorGrade = 'unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15';
 
-  // ── Build filter: Ken Burns zoom + color grade + optional text overlays ──
+  // ── Build filter: Ken Burns zoom + color grade + text overlays ──
   let filterComplex =
     `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
     `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
@@ -289,7 +290,7 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
     `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
     colorGrade;
 
-  if (canDraw) {
+  if (fontExists) {
     const ayahText = escapeDrawtext(ayah.text);
     const surahText = escapeDrawtext(ayah.surahName);
     const verseNum = escapeDrawtext(`﴿${ayah.ayahInSurah}﴾`);
@@ -413,7 +414,6 @@ async function main() {
   // Debug: confirm environment
   console.log(`🔑 PEXELS_API_KEY: ${PEXELS_API_KEY ? 'SET (' + PEXELS_API_KEY.length + ' chars)' : '❌ NOT SET'}`);
   console.log(`📂 Font exists: ${fs.existsSync(FONT_PATH) ? '✅ ' + FONT_PATH : '❌ MISSING'}`);
-  console.log(`🔧 FFmpeg drawtext: ${hasDrawtext() ? '✅ available' : '⚠️ not available'}`);
   console.log('');
 
   const date = todayStr();
