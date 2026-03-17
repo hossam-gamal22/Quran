@@ -28,11 +28,12 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup FFmpeg
-        uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          ffmpeg-version: release
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup FFmpeg with drawtext
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libavfilter-extra
+          echo "FFmpeg version: $(ffmpeg -version | head -1)"
+          echo "Drawtext filter: $(ffmpeg -filters 2>&1 | grep drawtext)"
 
       - name: Install dependencies
         working-directory: scripts
@@ -40,8 +41,8 @@ jobs:
 
       - name: Verify FFmpeg drawtext
         run: |
-          echo "Testing drawtext filter..."
-          ffmpeg -f lavfi -i color=c=black:s=100x100:d=1 -vf "drawtext=text='test':fontsize=20:fontcolor=white:x=10:y=10" -frames:v 1 -f null - 2>&1 && echo "✅ drawtext works" || echo "❌ drawtext FAILED"
+          echo "Testing drawtext filter with actual rendering..."
+          ffmpeg -f lavfi -i color=c=black:s=100x100:d=1 -vf "drawtext=text='test':fontsize=20:fontcolor=white:x=10:y=10" -frames:v 1 -f null - 2>&1 && echo "✅ drawtext works" || { echo "❌ drawtext FAILED"; exit 1; }
 
       - name: Generate videos
         working-directory: scripts

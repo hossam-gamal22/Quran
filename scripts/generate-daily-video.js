@@ -74,9 +74,11 @@ function getDailyAyahNumber() {
 }
 
 function escapeDrawtext(input) {
+  // For filter_complex_script file (not shell), we only need to escape
+  // drawtext-specific chars: colon, single quotes, brackets, percent, backslash
   return input
-    .replace(/\\/g, '\\\\\\\\')
-    .replace(/'/g, "'\\\\\\''")
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "'\\'")
     .replace(/:/g, '\\:')
     .replace(/\[/g, '\\[')
     .replace(/\]/g, '\\]')
@@ -295,7 +297,7 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
     const surahText = escapeDrawtext(ayah.surahName);
     const verseNum = escapeDrawtext(`﴿${ayah.ayahInSurah}﴾`);
     const brandText = escapeDrawtext('رُوح المسلم');
-    const fontEsc = FONT_PATH.replace(/'/g, "'\\''");
+    const fontEsc = FONT_PATH.replace(/\\/g, '/').replace(/'/g, "\\'");
 
     // Dark overlay on lower half for text readability
     filterComplex += `,drawbox=x=0:y=ih*0.55:w=iw:h=ih*0.45:color=black@0.45:t=fill`;
@@ -318,11 +320,15 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
 
   filterComplex += '[vout]';
 
-  const cmd = [
-    'ffmpeg', '-y',
-    '-loop', '1', '-i', `"${imagePath}"`,
-    '-i', `"${audioPath}"`,
-    '-filter_complex', `"${filterComplex}"`,
+  // Write filter to a temp file to avoid shell escaping issues with Arabic text
+  const filterFile = outputPath + '.filter.txt';
+  fs.writeFileSync(filterFile, filterComplex, 'utf8');
+
+  const args = [
+    '-y',
+    '-loop', '1', '-i', imagePath,
+    '-i', audioPath,
+    '-filter_complex_script', filterFile,
     '-map', '[vout]', '-map', '1:a:0',
     '-c:v', 'libx264',
     '-profile:v', VIDEO_PROFILE,
@@ -333,15 +339,24 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
     '-c:a', 'aac', '-b:a', AUDIO_BITRATE,
     '-shortest',
     '-movflags', '+faststart',
-    `"${outputPath}"`,
-  ].join(' ');
+    outputPath,
+  ];
 
   try {
-    execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
+    require('child_process').execFileSync('ffmpeg', args, {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 600000,
+      maxBuffer: 50 * 1024 * 1024,
+    });
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().slice(-1000) : 'no stderr';
+    // Clean up filter file
+    try { fs.unlinkSync(filterFile); } catch {}
     throw new Error(`FFmpeg failed for ${reciter.id}:\n${stderr}`);
   }
+
+  // Clean up filter file
+  try { fs.unlinkSync(filterFile); } catch {}
 
   if (!fs.existsSync(outputPath)) throw new Error(`FFmpeg produced no output for ${reciter.id}`);
 
