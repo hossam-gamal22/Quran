@@ -432,6 +432,10 @@ async function main() {
     console.log(`  📹 ${videoResults.length}/${RECITERS.length} videos generated`);
     console.log(`  📅 Date: ${date}`);
     console.log('══════════════════════════════════════════════════\n');
+
+    if (videoResults.length === 0) {
+      throw new Error('All reciters failed — no videos were generated!');
+    }
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });

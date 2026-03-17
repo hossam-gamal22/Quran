@@ -48,5 +48,6 @@ jobs:
           git add -A
           git diff --cached --quiet && echo "No changes to commit" || {
             git commit -m "Update daily content & cleanup [skip ci]"
+            git pull --rebase origin main
             git push origin main
           }
