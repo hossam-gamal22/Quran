@@ -169,53 +169,76 @@ async function downloadAudio(audioUrl, tmpDir) {
 
 // ─── Stage 4: Compose Video with FFmpeg ──────────────────────────────
 
+/**
+ * Check if ffmpeg has the drawtext filter (requires libfreetype).
+ * Ubuntu CI always has it; macOS Homebrew may not.
+ */
+function hasDrawtext() {
+  try {
+    const out = execSync('ffmpeg -filters 2>&1', { encoding: 'utf8', timeout: 5000 });
+    return /\bdrawtext\b/.test(out);
+  } catch { return false; }
+}
+
 function composeVideo(imagePath, audioPath, ayah, tmpDir) {
   console.log('🎬 Composing video with FFmpeg...');
 
   const outputPath = path.join(tmpDir, 'output.mp4');
+  const totalFrames = VIDEO_DURATION * VIDEO_FPS;
+  const useText = hasDrawtext();
 
-  if (!fs.existsSync(FONT_PATH)) {
+  if (useText && !fs.existsSync(FONT_PATH)) {
     throw new Error(`Font not found at ${FONT_PATH}`);
   }
 
-  const fontEsc = FONT_PATH.replace(/:/g, '\\:').replace(/'/g, "\\'");
-  const ayahText = escapeDrawtext(ayah.text);
-  const refText = escapeDrawtext(`${ayah.surahName} ﴿${ayah.ayahInSurah}﴾`);
-  const totalFrames = VIDEO_DURATION * VIDEO_FPS;
+  let filterComplex;
 
-  // Filter chain:
-  //   1. Scale+crop to 1080x1920
-  //   2. Ken Burns zoom 1.0→1.15 over 15s
-  //   3. Dark overlay bottom 45% for text legibility
-  //   4. Ayah text (Amiri 52px, centered, white)
-  //   5. Surah reference (Amiri 34px, centered)
-  //   6. App branding watermark
-  const filterComplex = [
-    `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
-    `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
-    `zoompan=z='min(zoom+0.0004\\,1.15)':` +
-    `x='iw/2-(iw/zoom/2)':` +
-    `y='ih/2-(ih/zoom/2)':` +
-    `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS}[zoomed]`,
+  if (useText) {
+    // Full filter chain with text overlays (CI / Ubuntu)
+    const fontEsc = FONT_PATH.replace(/:/g, '\\:').replace(/'/g, "\\'");
+    const ayahText = escapeDrawtext(ayah.text);
+    const refText = escapeDrawtext(`${ayah.surahName} ﴿${ayah.ayahInSurah}﴾`);
 
-    `[zoomed]drawbox=x=0:y=ih*0.55:w=iw:h=ih*0.45:color=black@0.55:t=fill[grad]`,
+    filterComplex = [
+      `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
+      `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
+      `zoompan=z='min(zoom+0.0004\\,1.15)':` +
+      `x='iw/2-(iw/zoom/2)':` +
+      `y='ih/2-(ih/zoom/2)':` +
+      `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS}[zoomed]`,
 
-    `[grad]drawtext=fontfile='${fontEsc}':` +
-    `text='${ayahText}':` +
-    `fontcolor=white:fontsize=52:` +
-    `x=(w-text_w)/2:y=h*0.62:` +
-    `line_spacing=16[withAyah]`,
+      `[zoomed]drawbox=x=0:y=ih*0.55:w=iw:h=ih*0.45:color=black@0.55:t=fill[grad]`,
 
-    `[withAyah]drawtext=fontfile='${fontEsc}':` +
-    `text='${refText}':` +
-    `fontcolor=white@0.85:fontsize=34:` +
-    `x=(w-text_w)/2:y=h*0.82[withRef]`,
+      `[grad]drawtext=fontfile='${fontEsc}':` +
+      `text='${ayahText}':` +
+      `fontcolor=white:fontsize=52:` +
+      `x=(w-text_w)/2:y=h*0.62:` +
+      `line_spacing=16[withAyah]`,
 
-    `[withRef]drawtext=fontfile='${fontEsc}':` +
-    `text='${escapeDrawtext('روح المسلم')}':` +
-    `fontcolor=white@0.5:fontsize=24:` +
-    `x=(w-text_w)/2:y=h*0.94[vout]`,
-  ].join(';');
+      `[withAyah]drawtext=fontfile='${fontEsc}':` +
+      `text='${refText}':` +
+      `fontcolor=white@0.85:fontsize=34:` +
+      `x=(w-text_w)/2:y=h*0.82[withRef]`,
+
+      `[withRef]drawtext=fontfile='${fontEsc}':` +
+      `text='${escapeDrawtext('روح المسلم')}':` +
+      `fontcolor=white@0.5:fontsize=24:` +
+      `x=(w-text_w)/2:y=h*0.94[vout]`,
+    ].join(';');
+  } else {
+    // Fallback: no drawtext (macOS without freetype) — image + audio + zoom + dark overlay
+    console.log('   ⚠️  drawtext not available — generating video without text overlay');
+    filterComplex = [
+      `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
+      `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
+      `zoompan=z='min(zoom+0.0004\\,1.15)':` +
+      `x='iw/2-(iw/zoom/2)':` +
+      `y='ih/2-(ih/zoom/2)':` +
+      `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS}[zoomed]`,
+
+      `[zoomed]drawbox=x=0:y=ih*0.55:w=iw:h=ih*0.45:color=black@0.55:t=fill[vout]`,
+    ].join(';');
+  }
 
   const args = [
     'ffmpeg', '-y',
