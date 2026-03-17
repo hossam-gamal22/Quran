@@ -6,7 +6,7 @@
     "surahNumber": 2,
     "ayahNumber": 70,
     "globalAyahNumber": 77,
-    "generatedAt": "2026-03-17T22:35:21.914Z",
+    "generatedAt": "2026-03-17T22:59:02.600Z",
     "videos": [
       {
         "reciterId": "ar.alafasy",
@@ -16,11 +16,25 @@
         "duration": 18.05
       },
       {
+        "reciterId": "ar.abdulsamad",
+        "reciterLabel": "عبدالباسط عبدالصمد",
+        "reciterLabelEn": "Abdul Basit",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-17-abdulsamad.mp4",
+        "duration": 27.87
+      },
+      {
         "reciterId": "ar.abdurrahmaansudais",
         "reciterLabel": "عبدالرحمن السديس",
         "reciterLabelEn": "Abdurrahman As-Sudais",
         "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-17-abdurrahmaansudais.mp4",
         "duration": 13.84
+      },
+      {
+        "reciterId": "ar.mahermuaiqly",
+        "reciterLabel": "ماهر المعيقلي",
+        "reciterLabelEn": "Maher Al Muaiqly",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-17-mahermuaiqly.mp4",
+        "duration": 14.47
       },
       {
         "reciterId": "ar.saoodshuraym",
