@@ -259,71 +259,18 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
   console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
 
-  const useText = hasDrawtext();
-  const fontEsc = FONT_PATH.replace(/:/g, '\\:').replace(/'/g, "\\'");
-
   // ── Color grading: subtle sharpening + contrast/saturation pop ──
-  // unsharp=lx:ly:la  → luma sharpen (5x5 matrix, strength 0.5)
-  // eq=contrast:brightness:saturation → slight boost
   const colorGrade = 'unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15';
 
-  let filterComplex;
-
-  if (useText && fs.existsSync(FONT_PATH)) {
-    const ayahText = escapeDrawtext(ayah.text);
-    const refText = escapeDrawtext(`${ayah.surahName} ﴿${ayah.ayahInSurah}﴾`);
-    const reciterText = escapeDrawtext(reciter.label);
-    const brandText = escapeDrawtext('روح المسلم');
-
-    filterComplex = [
-      // Scale up → crop → Ken Burns zoom → color grade
-      `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
-        `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
-        `zoompan=z='min(zoom+0.0015\\,1.5)':` +
-        `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
-        `${colorGrade}[zoomed]`,
-
-      `[zoomed]drawbox=x=0:y=ih*0.45:w=iw:h=ih*0.55:color=black@0.55:t=fill[grad]`,
-
-      // Ayah text
-      `[grad]drawtext=fontfile='${fontEsc}':` +
-        `text='${ayahText}':` +
-        `fontcolor=white:fontsize=50:` +
-        `x=(w-text_w)/2:y=h*0.52:` +
-        `line_spacing=18[withAyah]`,
-
-      // Surah reference
-      `[withAyah]drawtext=fontfile='${fontEsc}':` +
-        `text='${refText}':` +
-        `fontcolor=white@0.85:fontsize=32:` +
-        `x=(w-text_w)/2:y=h*0.78[withRef]`,
-
-      // Reciter name
-      `[withRef]drawtext=fontfile='${fontEsc}':` +
-        `text='${reciterText}':` +
-        `fontcolor=white@0.7:fontsize=28:` +
-        `x=(w-text_w)/2:y=h*0.85[withReciter]`,
-
-      // App branding
-      `[withReciter]drawtext=fontfile='${fontEsc}':` +
-        `text='${brandText}':` +
-        `fontcolor=white@0.5:fontsize=24:` +
-        `x=(w-text_w)/2:y=h*0.94[vout]`,
-    ].join(';');
-  } else {
-    console.log('      ⚠️  drawtext not available — video without text overlay');
-    filterComplex = [
-      `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
-        `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
-        `zoompan=z='min(zoom+0.0015\\,1.5)':` +
-        `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
-        `${colorGrade}[zoomed]`,
-
-      `[zoomed]drawbox=x=0:y=ih*0.45:w=iw:h=ih*0.55:color=black@0.55:t=fill[vout]`,
-    ].join(';');
-  }
+  // No drawtext — the app renders its own QCF text overlay
+  const filterComplex = [
+    `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
+      `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
+      `zoompan=z='min(zoom+0.0015\\,1.5)':` +
+      `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
+      `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
+      `${colorGrade}[vout]`,
+  ].join(';');
 
   const cmd = [
     'ffmpeg', '-y',
@@ -444,26 +391,41 @@ async function main() {
     // 5. Generate one video per reciter
     const videoResults = [];
 
-    for (const reciter of RECITERS) {
-      console.log(`\n🎬 Generating video for ${reciter.label} (${reciter.id})...`);
-      try {
-        const audioPath = await fetchReciterAudio(ayah.number, reciter.id, tmpDir);
-        const filename = videoFilename(date, reciter.id);
-        const outputPath = path.join(PUBLIC_DIR, filename);
+    for (let ri = 0; ri < RECITERS.length; ri++) {
+      const reciter = RECITERS[ri];
+      console.log(`\n🎬 [${ri + 1}/${RECITERS.length}] Generating video for ${reciter.label} (${reciter.id})...`);
 
-        const duration = composeVideo(imagePath, audioPath, ayah, reciter, outputPath);
+      // Delay between reciters to avoid API rate limiting
+      if (ri > 0) await new Promise((r) => setTimeout(r, 2000));
 
-        videoResults.push({
-          reciterId: reciter.id,
-          reciterLabel: reciter.label,
-          reciterLabelEn: reciter.labelEn,
-          url: videoRawUrl(filename),
-          duration,
-        });
-      } catch (err) {
-        console.error(`   ❌ Failed for ${reciter.id}: ${err.message}`);
-        // Continue with other reciters
+      let success = false;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          if (attempt > 1) {
+            console.log(`   🔄 Retry attempt ${attempt}/3...`);
+            await new Promise((r) => setTimeout(r, 3000));
+          }
+          const audioPath = await fetchReciterAudio(ayah.number, reciter.id, tmpDir);
+          const filename = videoFilename(date, reciter.id);
+          const outputPath = path.join(PUBLIC_DIR, filename);
+
+          const duration = composeVideo(imagePath, audioPath, ayah, reciter, outputPath);
+
+          videoResults.push({
+            reciterId: reciter.id,
+            reciterLabel: reciter.label,
+            reciterLabelEn: reciter.labelEn,
+            url: videoRawUrl(filename),
+            duration,
+          });
+          success = true;
+          break;
+        } catch (err) {
+          console.error(`   ❌ Attempt ${attempt} failed for ${reciter.id}: ${err.message}`);
+          if (err.stack) console.error(err.stack);
+        }
       }
+      if (!success) console.error(`   ⛔ All 3 attempts failed for ${reciter.id}`);
     }
 
     // 6. Update rolling JSON
