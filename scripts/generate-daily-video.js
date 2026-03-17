@@ -24,8 +24,14 @@ const OUTPUT_JSON = path.join(REPO_ROOT, 'data', 'daily-video.json');
 
 const VIDEO_WIDTH = 1080;
 const VIDEO_HEIGHT = 1920;
-const VIDEO_FPS = 25;
+const VIDEO_FPS = 30;
 const ROLLING_DAYS = 7;
+
+// High-quality encoding constants
+const VIDEO_CRF = 18;           // visually lossless
+const VIDEO_PRESET = 'slow';    // better compression / detail retention
+const VIDEO_PROFILE = 'high';   // H.264 High profile
+const AUDIO_BITRATE = '192k';   // crystal-clear recitation
 
 const RECITERS = [
   { id: 'ar.alafasy',             label: 'مشاري العفاسي',        labelEn: 'Mishary Alafasy' },
@@ -214,10 +220,16 @@ async function fetchNatureImage(tmpDir) {
 function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   const duration = getAudioDuration(audioPath);
   const totalFrames = Math.ceil(duration * VIDEO_FPS);
-  console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames)`);
+  console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
+  console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
 
   const useText = hasDrawtext();
   const fontEsc = FONT_PATH.replace(/:/g, '\\:').replace(/'/g, "\\'");
+
+  // ── Color grading: subtle sharpening + contrast/saturation pop ──
+  // unsharp=lx:ly:la  → luma sharpen (5x5 matrix, strength 0.5)
+  // eq=contrast:brightness:saturation → slight boost
+  const colorGrade = 'unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15';
 
   let filterComplex;
 
@@ -228,11 +240,13 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
     const brandText = escapeDrawtext('روح المسلم');
 
     filterComplex = [
+      // Scale up → crop → Ken Burns zoom → color grade
       `[0:v]scale=${VIDEO_WIDTH * 2}:${VIDEO_HEIGHT * 2},` +
         `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
         `zoompan=z='min(zoom+0.0015\\,1.5)':` +
         `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS}[zoomed]`,
+        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
+        `${colorGrade}[zoomed]`,
 
       `[zoomed]drawbox=x=0:y=ih*0.45:w=iw:h=ih*0.55:color=black@0.55:t=fill[grad]`,
 
@@ -268,7 +282,8 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
         `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
         `zoompan=z='min(zoom+0.0015\\,1.5)':` +
         `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
-        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS}[zoomed]`,
+        `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
+        `${colorGrade}[zoomed]`,
 
       `[zoomed]drawbox=x=0:y=ih*0.45:w=iw:h=ih*0.55:color=black@0.55:t=fill[vout]`,
     ].join(';');
@@ -280,15 +295,21 @@ function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
     '-i', `"${audioPath}"`,
     '-filter_complex', `"${filterComplex}"`,
     '-map', '[vout]', '-map', '1:a:0',
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
-    '-c:a', 'aac', '-b:a', '192k',
+    '-c:v', 'libx264',
+    '-profile:v', VIDEO_PROFILE,
+    '-crf', String(VIDEO_CRF),
+    '-preset', VIDEO_PRESET,
+    '-pix_fmt', 'yuv420p',
+    '-r', String(VIDEO_FPS),
+    '-c:a', 'aac', '-b:a', AUDIO_BITRATE,
     '-shortest',
     '-movflags', '+faststart',
     `"${outputPath}"`,
   ].join(' ');
 
   try {
-    execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'], timeout: 300000, maxBuffer: 50 * 1024 * 1024 });
+    // 10-minute timeout per video (slow preset takes longer)
+    execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'], timeout: 600000, maxBuffer: 50 * 1024 * 1024 });
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().slice(-1000) : 'no stderr';
     throw new Error(`FFmpeg failed for ${reciter.id}:\n${stderr}`);
