@@ -7,7 +7,8 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  Dimensions,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +23,8 @@ import { Video, ResizeMode } from 'expo-av';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 import { t } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -30,8 +33,6 @@ import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-fon
 
 const DAILY_VIDEO_JSON_URL =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/daily-video.json';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 interface DailyVideoData {
   url: string;
@@ -50,6 +51,8 @@ export default function StoryOfDayScreen() {
   const isRTL = useIsRTL();
   const { settings } = useSettings();
   const colors = useColors();
+  const { isPremium } = useSubscription();
+  const { appName, logoSource } = useAppIdentity();
   const isArabic = (settings.language || 'ar') === 'ar';
 
   const videoRef = useRef<Video>(null);
@@ -98,7 +101,6 @@ export default function StoryOfDayScreen() {
         setQcfPage(qcfData.page);
         setQcfGlyphs(qcfData.glyphs);
 
-        // darkMode=true for white text on dark blurred video
         if (!isPageFontLoaded(qcfData.page, true)) {
           await loadPageFont(qcfData.page, true);
         }
@@ -165,7 +167,6 @@ export default function StoryOfDayScreen() {
 
   const surahLabel = data ? (isArabic ? data.surahName : data.surahEnglish) : '';
 
-  // Use QCF Mushaf font when ready, otherwise fallback to KFGQPC
   const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
   const ayahFontFamily = qcfFontFamily || 'KFGQPCUthmanic';
   const isQcf = !!qcfFontFamily;
@@ -173,31 +174,9 @@ export default function StoryOfDayScreen() {
   const ayahLineHeight = isQcf ? 64 : 56;
 
   return (
-    <View style={styles.root}>
-      {/* Full-screen video background */}
-      {data?.url && (
-        <Video
-          ref={videoRef}
-          source={{ uri: data.url }}
-          style={StyleSheet.absoluteFill}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay
-          isLooping
-          isMuted={false}
-        />
-      )}
-
-      {/* Blur + dim overlay */}
-      {Platform.OS === 'ios' ? (
-        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-      ) : (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
-      )}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.35)' }]} />
-
-      {/* Content */}
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <UniversalHeader titleColor="#fff">
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <UniversalHeader>
           <View
             style={{
               flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -205,148 +184,213 @@ export default function StoryOfDayScreen() {
               gap: 6,
             }}
           >
-            <Text style={styles.headerTitle} numberOfLines={1}>
+            <Text
+              style={[styles.headerTitle, { color: colors.text }]}
+              numberOfLines={1}
+            >
               {t('storyOfDay.title')}
             </Text>
             <SectionInfoButton sectionKey="stories" />
           </View>
         </UniversalHeader>
 
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color="#fff" />
-          </View>
-        ) : error || !data?.url ? (
-          <View style={styles.centered}>
-            <MaterialCommunityIcons
-              name="video-off-outline"
-              size={64}
-              color="rgba(255,255,255,0.5)"
-            />
-            <Text style={styles.errorText}>{t('storyOfDay.loadError')}</Text>
-          </View>
-        ) : (
-          <View style={styles.contentArea}>
-            {/* Ayah — QCF Mushaf rendering centered */}
-            <View style={styles.ayahContainer}>
-              <Text
-                style={[
-                  styles.ayahText,
-                  {
-                    fontFamily: ayahFontFamily,
-                    fontSize: ayahFontSize,
-                    lineHeight: ayahLineHeight,
-                  },
-                ]}
-                allowFontScaling={false}
-              >
-                {isQcf ? qcfGlyphs.join('') : data.ayahText}
-              </Text>
-
-              <View style={styles.divider} />
-
-              <Text style={styles.surahRef}>
-                {surahLabel} - {data.ayahNumber}
-              </Text>
-
-              <Text style={styles.hintText}>اضغط مطولاً للمزيد</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {loading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
+          ) : error || !data?.url ? (
+            <View style={styles.centered}>
+              <MaterialCommunityIcons
+                name="video-off-outline"
+                size={64}
+                color={colors.muted}
+              />
+              <Text style={[styles.errorText, { color: colors.muted }]}>
+                {t('storyOfDay.loadError')}
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Video Preview Card */}
+              <View style={styles.videoCard}>
+                <Video
+                  ref={videoRef}
+                  source={{ uri: data.url }}
+                  style={styles.videoPlayer}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay
+                  isLooping
+                  isMuted={false}
+                />
 
-            {/* Bottom: branding + buttons */}
-            <View style={styles.bottomSection}>
-              <View style={styles.brandingRow}>
-                <Text style={styles.brandingEmoji}>🤲</Text>
-                <Text style={styles.brandingLabel}>روح المسلم</Text>
+                {/* Dark gradient overlay for text */}
+                <View style={styles.videoOverlay} />
+
+                {/* Ayah text overlay on video */}
+                <View style={styles.videoTextOverlay}>
+                  <Text
+                    style={[
+                      styles.ayahText,
+                      {
+                        fontFamily: ayahFontFamily,
+                        fontSize: ayahFontSize,
+                        lineHeight: ayahLineHeight,
+                      },
+                    ]}
+                    allowFontScaling={false}
+                  >
+                    {isQcf ? qcfGlyphs.join('') : data.ayahText}
+                  </Text>
+
+                  <View style={styles.divider} />
+
+                  <Text style={styles.surahRef}>
+                    {surahLabel} - {data.ayahNumber}
+                  </Text>
+
+                  {/* Branding watermark — free users only */}
+                  {!isPremium && (
+                    <View style={styles.brandingRow}>
+                      <Image
+                        source={logoSource}
+                        style={styles.brandingLogo}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.brandingLabel}>{appName}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
-              <View style={styles.bottomActions}>
+              {/* Action buttons below the card */}
+              <View style={styles.actionsSection}>
                 <TouchableOpacity
                   onPress={handleDownload}
                   disabled={saving}
                   activeOpacity={0.7}
-                  style={styles.actionBtn}
+                  style={[
+                    styles.actionBtn,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                 >
-                  <BlurView
-                    intensity={Platform.OS === 'ios' ? 50 : 30}
-                    tint="dark"
+                  <View
                     style={[
-                      styles.glassBtnInner,
+                      styles.actionBtnInner,
                       { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     ]}
                   >
                     {saving ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <ActivityIndicator color={colors.primary} size="small" />
                     ) : (
-                      <MaterialCommunityIcons name="download" size={20} color="#fff" />
+                      <MaterialCommunityIcons
+                        name="download"
+                        size={20}
+                        color={colors.primary}
+                      />
                     )}
-                    <Text style={styles.btnText}>
-                      {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
+                    <Text style={[styles.btnText, { color: colors.text }]}>
+                      {saving
+                        ? t('common.loading')
+                        : t('storyOfDay.saveVideoWithReciter')}
                     </Text>
-                  </BlurView>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={handleShare}
                   disabled={sharing}
                   activeOpacity={0.7}
-                  style={styles.actionBtn}
+                  style={[
+                    styles.actionBtn,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
                 >
-                  <BlurView
-                    intensity={Platform.OS === 'ios' ? 50 : 30}
-                    tint="dark"
+                  <View
                     style={[
-                      styles.glassBtnInner,
+                      styles.actionBtnInner,
                       { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     ]}
                   >
                     {sharing ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <ActivityIndicator color={colors.primary} size="small" />
                     ) : (
-                      <MaterialCommunityIcons name="share-variant" size={20} color="#fff" />
+                      <MaterialCommunityIcons
+                        name="share-variant"
+                        size={20}
+                        color={colors.primary}
+                      />
                     )}
-                    <Text style={styles.btnText}>
-                      {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
+                    <Text style={[styles.btnText, { color: colors.text }]}>
+                      {sharing
+                        ? t('storyOfDay.sharingInProgress')
+                        : t('common.share')}
                     </Text>
-                  </BlurView>
+                  </View>
                 </TouchableOpacity>
               </View>
-            </View>
-          </View>
-        )}
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
+const CARD_ASPECT = 16 / 9;
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000',
   },
-  container: {
+  safeArea: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    flexGrow: 1,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
+    minHeight: 300,
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#fff',
   },
-  contentArea: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+  errorText: {
+    fontSize: 16,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
   },
-  ayahContainer: {
-    flex: 1,
+
+  // ── Video Preview Card ──
+  videoCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    aspectRatio: 9 / 16,
+    width: '100%',
+    marginTop: 8,
+  },
+  videoPlayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  videoTextOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingHorizontal: 20,
   },
   ayahText: {
     textAlign: 'center',
@@ -358,7 +402,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 1.5,
     backgroundColor: 'rgba(255,255,255,0.25)',
-    marginVertical: 16,
+    marginVertical: 14,
     borderRadius: 1,
   },
   surahRef: {
@@ -368,56 +412,42 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     writingDirection: 'rtl',
   },
-  hintText: {
-    textAlign: 'center',
-    fontFamily: fontRegular(),
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.4)',
-    marginTop: 8,
-  },
-  errorText: {
-    fontSize: 16,
-    fontFamily: fontRegular(),
-    textAlign: 'center',
-    color: 'rgba(255,255,255,0.5)',
-  },
-  bottomSection: {
-    paddingBottom: 12,
-    gap: 16,
-  },
+
+  // ── Branding (free users) ──
   brandingRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
+    marginTop: 20,
   },
-  brandingEmoji: {
-    fontSize: 28,
+  brandingLogo: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
   },
   brandingLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
     fontFamily: fontBold(),
-    textAlign: 'center',
   },
-  bottomActions: {
+
+  // ── Action Buttons ──
+  actionsSection: {
     gap: 10,
+    marginTop: 16,
   },
   actionBtn: {
     borderRadius: 14,
-    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  glassBtnInner: {
+  actionBtnInner: {
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   btnText: {
-    color: '#fff',
     fontFamily: fontBold(),
     fontSize: 15,
   },
