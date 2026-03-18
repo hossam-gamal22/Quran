@@ -253,11 +253,11 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
 
   const surahName = (ayah.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim();
   const badgeText = `${surahName}: ${toArabicNumeral(ayah.ayahInSurah)}`;
-  const badgeFontSize = 28;
+  const badgeFontSize = 38;
   ctx.font = `${badgeFontSize}px "Amiri"`;
   const badgeMetrics = ctx.measureText(badgeText);
-  const badgeWidth = badgeMetrics.width + 64;
-  const badgeHeight = 50;
+  const badgeWidth = badgeMetrics.width + 80;
+  const badgeHeight = 64;
   const badgeX = centerX - badgeWidth / 2;
   const badgeY = textBottomY + 40; // Dynamically below verse text
 
@@ -285,9 +285,9 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   // ── Branding logo (free version) ──
   if (showBranding && fs.existsSync(APP_ICON)) {
     ctx.shadowColor = 'transparent';
-    const logoSize = 120;
+    const logoSize = 180;
     const logoX = centerX - logoSize / 2;
-    const logoY = H - 80 - logoSize;
+    const logoY = H - 100 - logoSize;
     try {
       const logoImg = await loadImage(APP_ICON);
       ctx.globalAlpha = 0.9;
