@@ -41,6 +41,7 @@ interface VideoEntry {
   reciterLabel: string;
   reciterLabelEn: string;
   url: string;
+  premiumUrl?: string;
   duration: number;
 }
 
@@ -252,8 +253,9 @@ export default function StoryOfDayScreen() {
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const downloadUrl = (isPremium && currentVideo.premiumUrl) ? currentVideo.premiumUrl : currentVideo.url;
       const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
+      const download = await FileSystem.downloadAsync(downloadUrl, localPath);
       if (!download?.uri) throw new Error('download failed');
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
@@ -268,15 +270,16 @@ export default function StoryOfDayScreen() {
     } finally {
       setSaving(false);
     }
-  }, [currentVideo]);
+  }, [currentVideo, isPremium]);
 
   const handleShare = useCallback(async () => {
     if (!dayData || !currentVideo) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const shareUrl = (isPremium && currentVideo.premiumUrl) ? currentVideo.premiumUrl : currentVideo.url;
       const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
+      const download = await FileSystem.downloadAsync(shareUrl, localPath);
       if (download?.uri) {
         if (Platform.OS === 'ios') {
           const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
@@ -298,7 +301,7 @@ export default function StoryOfDayScreen() {
     } finally {
       setSharing(false);
     }
-  }, [dayData, currentVideo, isArabic]);
+  }, [dayData, currentVideo, isArabic, isPremium]);
 
   const surahLabel = dayData ? (isArabic ? dayData.surahName : dayData.surahEnglish) : '';
   const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;

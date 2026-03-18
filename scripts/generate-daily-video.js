@@ -2,6 +2,8 @@
 // ─────────────────────────────────────────────────────────────────────
 //  روح المسلم — Automated Daily Video Generator (Multi-Reciter)
 //  Generates 5 "Ayah of the Day" videos (one per reciter) daily.
+//  Each reciter: free (with branding) + premium (without branding).
+//  Uses QCF page fonts for authentic Mushaf calligraphy.
 //  Maintains a rolling 7-day window — old videos auto-deleted.
 //  Runs on GitHub Actions (ubuntu-latest with ffmpeg + @napi-rs/canvas).
 // ─────────────────────────────────────────────────────────────────────
@@ -20,6 +22,8 @@ const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/
 
 const FONT_PATH = path.join(__dirname, 'fonts', 'KFGQPC-Uthmanic-Script.ttf');
 const LOGO_PATH = path.join(__dirname, 'fonts', 'App-icon.png');
+const QCF_FONTS_DIR = path.join(__dirname, 'fonts', 'qcf');
+const DATA_DIR = path.join(__dirname, '..', 'data', 'json');
 const REPO_ROOT = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(REPO_ROOT, 'public');
 const OUTPUT_JSON = path.join(REPO_ROOT, 'data', 'daily-video.json');
@@ -56,10 +60,82 @@ const PHOTO_SEARCH_TERMS = [
   'tropical beach clear water',
 ];
 
+// ─── QCF Data (loaded lazily) ────────────────────────────────────────
+
+let _quranV4 = null;
+let _qcfWords = null;
+let _qcfPageLines = null;
+
+function loadQcfData() {
+  if (_quranV4) return true;
+  try {
+    _quranV4 = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'quran-v4.json'), 'utf8'));
+    _qcfWords = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'qcf-words.json'), 'utf8'));
+    _qcfPageLines = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'qcf-page-lines.json'), 'utf8'));
+    console.log('      📚 QCF data loaded');
+    return true;
+  } catch (e) {
+    console.log('      ⚠️  QCF data not available:', e.message);
+    _quranV4 = [];
+    _qcfWords = {};
+    _qcfPageLines = {};
+    return false;
+  }
+}
+
+/** Port of lib/qcf-page-data.ts getVerseQcfData */
+function getVerseQcfData(surahNumber, ayahNumber) {
+  loadQcfData();
+  const surah = _quranV4.find(s => s.number === surahNumber);
+  if (!surah) return null;
+  const ayah = surah.ayahs.find(a => a.ns === ayahNumber);
+  if (!ayah) return null;
+
+  const page = ayah.p;
+  const glyphs = [];
+
+  const lines = _qcfPageLines[String(page)] || [];
+  for (const line of lines) {
+    if (line.lt !== 'ayah' || !line.fw || !line.lw) continue;
+    for (let id = line.fw; id <= line.lw; id++) {
+      const w = _qcfWords[String(id)];
+      if (w && w.s === surahNumber && w.a === ayahNumber) {
+        glyphs.push(w.t);
+      }
+    }
+  }
+
+  // Check adjacent pages if verse spans boundary
+  if (glyphs.length === 0) {
+    for (const p of [page - 1, page + 1]) {
+      if (p < 1 || p > 604) continue;
+      const pLines = _qcfPageLines[String(p)] || [];
+      for (const line of pLines) {
+        if (line.lt !== 'ayah' || !line.fw || !line.lw) continue;
+        for (let id = line.fw; id <= line.lw; id++) {
+          const w = _qcfWords[String(id)];
+          if (w && w.s === surahNumber && w.a === ayahNumber) {
+            glyphs.push(w.t);
+          }
+        }
+      }
+      if (glyphs.length > 0) return { page: p, glyphs };
+    }
+  }
+
+  return glyphs.length > 0 ? { page, glyphs } : null;
+}
+
+/** Get QCF font path for a page (1-604) */
+function getQcfFontPath(page) {
+  const padded = String(page).padStart(3, '0');
+  return path.join(QCF_FONTS_DIR, `QCF4_tajweed_${padded}.ttf`);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return new Date().toISOString().slice(0, 10);
 }
 
 function daysAgo(n) {
@@ -90,11 +166,12 @@ function getAudioDuration(audioPath) {
   throw new Error(`Could not parse audio duration from: ${audioPath}\nffmpeg output: ${output.slice(0, 500)}`);
 }
 
-/** Build video filename: video-YYYY-MM-DD-reciterID.mp4 */
-function videoFilename(date, reciterId) {
-  // ar.alafasy → alafasy
+/** Build video filename */
+function videoFilename(date, reciterId, premium = false) {
   const short = reciterId.replace(/^ar\./, '');
-  return `video-${date}-${short}.mp4`;
+  return premium
+    ? `video-${date}-${short}-premium.mp4`
+    : `video-${date}-${short}.mp4`;
 }
 
 /** GitHub raw URL for a video file */
@@ -234,10 +311,10 @@ async function fetchNatureImage(tmpDir) {
   }
 }
 
-// ─── Compose Video ───────────────────────────────────────────────────
+// ─── Canvas Overlay ──────────────────────────────────────────────────
 
-/** Register Arabic fonts for canvas rendering */
 let fontsRegistered = false;
+
 function registerFonts() {
   if (fontsRegistered) return;
   const amiriPath = path.join(__dirname, 'fonts', 'Amiri-Regular.ttf');
@@ -246,7 +323,19 @@ function registerFonts() {
   if (fs.existsSync(amiriPath)) GlobalFonts.registerFromPath(amiriPath, 'Amiri');
   if (fs.existsSync(amiriBoldPath)) GlobalFonts.registerFromPath(amiriBoldPath, 'AmiriBold');
   fontsRegistered = true;
-  console.log('      📝 Fonts registered:', GlobalFonts.families.map(f => f.family).join(', '));
+}
+
+/** Register a QCF page font, returns font family name or null */
+function registerQcfFont(page) {
+  const familyName = `QCF4p${page}`;
+  if (GlobalFonts.has(familyName)) return familyName;
+  const fontPath = getQcfFontPath(page);
+  if (fs.existsSync(fontPath)) {
+    GlobalFonts.registerFromPath(fontPath, familyName);
+    console.log(`      📝 Registered QCF font page ${page}`);
+    return familyName;
+  }
+  return null;
 }
 
 /** Word-wrap text for canvas, respecting RTL */
@@ -282,8 +371,13 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** Generate a transparent 1080x1920 PNG with text overlay matching the app UI */
-async function generateOverlayPNG(ayah, outputPath) {
+/**
+ * Generate a transparent 1080×1920 PNG matching the app's in-app display.
+ * @param {object}  ayah         — ayah data
+ * @param {string}  outputPath   — where to write PNG
+ * @param {boolean} showBranding — true for free, false for premium
+ */
+async function generateOverlayPNG(ayah, outputPath, showBranding) {
   registerFonts();
 
   const W = VIDEO_WIDTH;
@@ -291,8 +385,7 @@ async function generateOverlayPNG(ayah, outputPath) {
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
-  // ── Gradient overlay matching app's LinearGradient ──
-  // App uses: colors=['transparent','rgba(0,0,0,0.15)','rgba(0,0,0,0.55)'] locations=[0,0.45,1]
+  // ── Gradient: matches app's LinearGradient ──
   const grad = ctx.createLinearGradient(0, 0, 0, H);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(0.45, 'rgba(0,0,0,0.15)');
@@ -300,17 +393,39 @@ async function generateOverlayPNG(ayah, outputPath) {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // Text setup
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.direction = 'rtl';
 
-  // Choose font — prefer Uthmanic for Quran text, Amiri for labels
-  const quranFont = GlobalFonts.has('QuranFont') ? 'QuranFont' : (GlobalFonts.has('Amiri') ? 'Amiri' : 'sans-serif');
-  const labelFont = GlobalFonts.has('AmiriBold') ? 'AmiriBold' : (GlobalFonts.has('Amiri') ? 'Amiri' : quranFont);
+  // ── Try QCF page font (authentic Mushaf calligraphy) ──
+  const qcfData = getVerseQcfData(ayah.surahNumber, ayah.ayahInSurah);
+  let useQcf = false;
+  let qcfFamily = null;
+  let displayText = ayah.text;
 
-  // ── Ayah text — large, centered, white with shadow ──
-  ctx.font = `52px "${quranFont}"`;
+  if (qcfData && qcfData.glyphs.length > 0) {
+    qcfFamily = registerQcfFont(qcfData.page);
+    if (qcfFamily) {
+      useQcf = true;
+      displayText = qcfData.glyphs.join(' ');
+      console.log(`      ✅ QCF page ${qcfData.page} — ${qcfData.glyphs.length} glyphs`);
+    }
+  }
+  if (!useQcf) {
+    console.log('      ⚠️  QCF unavailable — falling back to KFGQPC Uthmanic');
+  }
+
+  const labelFont = GlobalFonts.has('AmiriBold') ? 'AmiriBold'
+    : GlobalFonts.has('Amiri') ? 'Amiri' : 'sans-serif';
+  const fallbackFont = GlobalFonts.has('QuranFont') ? 'QuranFont'
+    : GlobalFonts.has('Amiri') ? 'Amiri' : 'sans-serif';
+
+  // ── Ayah text ──
+  const ayahFont = useQcf ? qcfFamily : fallbackFont;
+  const fontSize = useQcf ? 64 : 52;
+  const lineHeight = useQcf ? 105 : 84;
+
+  ctx.font = `${fontSize}px "${ayahFont}"`;
   ctx.fillStyle = 'white';
   ctx.shadowColor = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur = 8;
@@ -318,138 +433,109 @@ async function generateOverlayPNG(ayah, outputPath) {
   ctx.shadowOffsetY = 2;
 
   const maxWidth = W - 100;
-  const lines = wrapText(ctx, ayah.text, maxWidth);
-  const lineHeight = 84;
+  const lines = wrapText(ctx, displayText, maxWidth);
   const textBlockHeight = lines.length * lineHeight;
-  // Center the text block vertically (slightly above center like the app)
-  const textCenterY = H * 0.42;
+  const textCenterY = H * 0.40;
   const textStartY = textCenterY - (textBlockHeight / 2) + (lineHeight / 2);
 
   for (let i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], W / 2, textStartY + i * lineHeight);
   }
 
-  // ── Verse end ornament ﴿N﴾ ──
-  const ornamentY = textStartY + textBlockHeight + 20;
-  // Draw decorative circle for verse marker
+  // ── Verse ornament (decorative circle with number) ──
+  const ornamentY = textStartY + textBlockHeight + 30;
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 4;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 1;
 
-  // Ornamental circle border
   const circleR = 32;
   ctx.beginPath();
   ctx.arc(W / 2, ornamentY, circleR, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(255,255,255,0.7)';
   ctx.lineWidth = 2;
   ctx.stroke();
-  // Inner circle
   ctx.beginPath();
   ctx.arc(W / 2, ornamentY, circleR - 4, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(255,255,255,0.4)';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Verse number inside ornament — use Western numerals for label font
   ctx.font = `bold 30px "${labelFont}"`;
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.shadowBlur = 2;
   ctx.fillText(`${ayah.ayahInSurah}`, W / 2, ornamentY + 2);
 
-  // ── Divider line ──
+  // ── Surah pill badge ──
   ctx.shadowBlur = 0;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 0;
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  const dividerY = ornamentY + circleR + 24;
-  ctx.fillRect((W - 80) / 2, dividerY, 80, 2);
 
-  // ── Surah reference pill badge ──
-  // Format: "الحديد: 4" — strip "سورة " prefix if present
-  const surahClean = ayah.surahName.replace(/^سُورَةُ\s*|^سورة\s*/i, '');
+  const surahClean = ayah.surahName.replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim();
   const surahText = `${surahClean}: ${ayah.ayahInSurah}`;
   ctx.font = `bold 28px "${labelFont}"`;
 
-  const pillY = dividerY + 28;
-  const textMetrics = ctx.measureText(surahText);
-  const pillW = textMetrics.width + 50;
+  const pillY = ornamentY + circleR + 30;
+  const tm = ctx.measureText(surahText);
+  const pillW = tm.width + 50;
   const pillH = 48;
   const pillX = (W - pillW) / 2;
 
-  // Pill background
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   roundedRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
   ctx.fill();
-
-  // Pill border
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
   ctx.lineWidth = 1;
   roundedRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
   ctx.stroke();
 
-  // Pill text
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.shadowColor = 'rgba(0,0,0,0.3)';
   ctx.shadowBlur = 2;
-  ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 1;
   ctx.fillText(surahText, W / 2, pillY + pillH / 2 + 1);
 
-  // ── App logo + branding at bottom ──
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
+  // ── Branding (free version only) ──
+  if (showBranding) {
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 
-  let logoLoaded = false;
-  if (fs.existsSync(LOGO_PATH)) {
-    try {
-      const logo = await loadImage(LOGO_PATH);
-      const logoSize = 42;
-      const logoX = (W - logoSize) / 2;
-      const logoY = H - 130;
-      // Draw rounded logo
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
-      ctx.restore();
-      logoLoaded = true;
-    } catch (e) {
-      console.log('      ⚠️  Could not load logo:', e.message);
+    if (fs.existsSync(LOGO_PATH)) {
+      try {
+        const logo = await loadImage(LOGO_PATH);
+        const logoSize = 42;
+        const logoX = (W - logoSize) / 2;
+        const logoY = H - 130;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+        ctx.restore();
+      } catch {}
     }
+
+    ctx.font = `bold 24px "${labelFont}"`;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetY = 1;
+    ctx.fillText('روح المسلم', W / 2, H - 75);
   }
 
-  // Branding text below logo
-  ctx.font = `bold 24px "${labelFont}"`;
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 3;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 1;
-  ctx.fillText('روح المسلم', W / 2, H - (logoLoaded ? 75 : 80));
-
-  // Save PNG
   const buffer = canvas.toBuffer('image/png');
   fs.writeFileSync(outputPath, buffer);
-  console.log('      🎨 Text overlay PNG generated');
 }
 
-async function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
-  const duration = getAudioDuration(audioPath);
-  const totalFrames = Math.ceil(duration * VIDEO_FPS);
-  console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
-  console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
+// ─── Compose Video ───────────────────────────────────────────────────
 
-  // Generate text overlay as transparent PNG
-  const overlayPath = outputPath + '.overlay.png';
-  await generateOverlayPNG(ayah, overlayPath);
-
-  // Color grading
+/**
+ * Encode a single video from image + audio + overlay PNG.
+ */
+function encodeVideo(imagePath, audioPath, overlayPath, outputPath, totalFrames) {
   const colorGrade = 'unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15';
 
-  // Filter: scale to fill (no black bars), Ken Burns zoom, color grade, overlay text PNG
   const filterComplex =
     `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase,` +
     `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
@@ -490,18 +576,47 @@ async function composeVideo(imagePath, audioPath, ayah, reciter, outputPath) {
   } catch (err) {
     const stderr = err.stderr ? err.stderr.toString().slice(-1000) : 'no stderr';
     try { fs.unlinkSync(filterFile); } catch {}
-    try { fs.unlinkSync(overlayPath); } catch {}
-    throw new Error(`FFmpeg failed for ${reciter.id}:\n${stderr}`);
+    throw new Error(`FFmpeg encode failed:\n${stderr}`);
   }
 
-  // Cleanup temp files
   try { fs.unlinkSync(filterFile); } catch {}
-  try { fs.unlinkSync(overlayPath); } catch {}
-
-  if (!fs.existsSync(outputPath)) throw new Error(`FFmpeg produced no output for ${reciter.id}`);
+  if (!fs.existsSync(outputPath)) throw new Error('FFmpeg produced no output');
 
   const sizeMB = (fs.statSync(outputPath).size / (1024 * 1024)).toFixed(2);
-  console.log(`      ✅ ${sizeMB} MB (${duration.toFixed(1)}s)`);
+  console.log(`         ✅ ${sizeMB} MB`);
+}
+
+/**
+ * Generate free + premium videos for one reciter.
+ * Returns the duration in seconds.
+ */
+async function composeVideos(imagePath, audioPath, ayah, reciter, freeOutputPath, premiumOutputPath) {
+  const duration = getAudioDuration(audioPath);
+  const totalFrames = Math.ceil(duration * VIDEO_FPS);
+  console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
+  console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
+
+  // Generate two overlay PNGs (branded + clean)
+  const overlayFree = freeOutputPath + '.overlay.png';
+  const overlayPremium = premiumOutputPath + '.overlay.png';
+
+  console.log('      🎨 Generating overlays...');
+  await generateOverlayPNG(ayah, overlayFree, true);
+  await generateOverlayPNG(ayah, overlayPremium, false);
+  console.log('      🎨 Both overlays ready');
+
+  // Encode free version (with branding)
+  console.log('      📹 Encoding free version...');
+  encodeVideo(imagePath, audioPath, overlayFree, freeOutputPath, totalFrames);
+
+  // Encode premium version (no branding)
+  console.log('      📹 Encoding premium version...');
+  encodeVideo(imagePath, audioPath, overlayPremium, premiumOutputPath, totalFrames);
+
+  // Cleanup overlays
+  try { fs.unlinkSync(overlayFree); } catch {}
+  try { fs.unlinkSync(overlayPremium); } catch {}
+
   return duration;
 }
 
@@ -542,6 +657,7 @@ function updateRollingJson(ayah, date, videoResults) {
       reciterLabel: v.reciterLabel,
       reciterLabelEn: v.reciterLabelEn,
       url: v.url,
+      premiumUrl: v.premiumUrl,
       duration: v.duration,
     })),
   };
@@ -568,7 +684,10 @@ async function main() {
 
   // Debug: confirm environment
   console.log(`🔑 PEXELS_API_KEY: ${PEXELS_API_KEY ? 'SET (' + PEXELS_API_KEY.length + ' chars)' : '❌ NOT SET'}`);
-  console.log(`📂 Font exists: ${fs.existsSync(FONT_PATH) ? '✅ ' + FONT_PATH : '❌ MISSING'}`);
+  console.log(`📂 Uthmanic font: ${fs.existsSync(FONT_PATH) ? '✅' : '❌ MISSING'}`);
+  console.log(`📂 QCF fonts dir: ${fs.existsSync(QCF_FONTS_DIR) ? '✅ (' + fs.readdirSync(QCF_FONTS_DIR).length + ' files)' : '❌ MISSING'}`);
+  console.log(`📂 Logo: ${fs.existsSync(LOGO_PATH) ? '✅' : '❌ MISSING'}`);
+  console.log(`📂 QCF data: ${fs.existsSync(path.join(DATA_DIR, 'qcf-words.json')) ? '✅' : '❌ MISSING'}`);
   console.log('');
 
   const date = todayStr();
@@ -592,9 +711,8 @@ async function main() {
 
     for (let ri = 0; ri < RECITERS.length; ri++) {
       const reciter = RECITERS[ri];
-      console.log(`\n🎬 [${ri + 1}/${RECITERS.length}] Generating video for ${reciter.label} (${reciter.id})...`);
+      console.log(`\n🎬 [${ri + 1}/${RECITERS.length}] ${reciter.label} (${reciter.id})`);
 
-      // Delay between reciters to avoid API rate limiting
       if (ri > 0) await new Promise((r) => setTimeout(r, 2000));
 
       let success = false;
@@ -605,22 +723,25 @@ async function main() {
             await new Promise((r) => setTimeout(r, 3000));
           }
           const audioPath = await fetchReciterAudio(ayah.number, reciter.id, tmpDir);
-          const filename = videoFilename(date, reciter.id);
-          const outputPath = path.join(PUBLIC_DIR, filename);
+          const freeFile = videoFilename(date, reciter.id, false);
+          const premiumFile = videoFilename(date, reciter.id, true);
+          const freePath = path.join(PUBLIC_DIR, freeFile);
+          const premiumPath = path.join(PUBLIC_DIR, premiumFile);
 
-          const duration = await composeVideo(imagePath, audioPath, ayah, reciter, outputPath);
+          const duration = await composeVideos(imagePath, audioPath, ayah, reciter, freePath, premiumPath);
 
           videoResults.push({
             reciterId: reciter.id,
             reciterLabel: reciter.label,
             reciterLabelEn: reciter.labelEn,
-            url: videoRawUrl(filename),
+            url: videoRawUrl(freeFile),
+            premiumUrl: videoRawUrl(premiumFile),
             duration,
           });
           success = true;
           break;
         } catch (err) {
-          console.error(`   ❌ Attempt ${attempt} failed for ${reciter.id}: ${err.message}`);
+          console.error(`   ❌ Attempt ${attempt} failed: ${err.message}`);
           if (err.stack) console.error(err.stack);
         }
       }
@@ -632,7 +753,7 @@ async function main() {
 
     console.log('\n══════════════════════════════════════════════════');
     console.log(`  ✅ Done! ${ayah.surahName} — Ayah ${ayah.ayahInSurah}`);
-    console.log(`  📹 ${videoResults.length}/${RECITERS.length} videos generated`);
+    console.log(`  📹 ${videoResults.length}/${RECITERS.length} reciters (×2 versions each)`);
     console.log(`  📅 Date: ${date}`);
     console.log('══════════════════════════════════════════════════\n');
 
