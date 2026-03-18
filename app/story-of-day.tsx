@@ -19,8 +19,8 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
-import { LinearGradient } from 'expo-linear-gradient';
 import Slider from '@react-native-community/slider';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -33,15 +33,22 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 
+
 const DAILY_VIDEO_JSON_URL =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/daily-video.json';
+
+const UTHMANI_FONT = 'KFGQPCUthmanic';
+const UTHMANI_FALLBACK = 'Amiri';
+
+function toArabicNumeral(n: number): string {
+  return String(n).replace(/\d/g, (d) => '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669'[parseInt(d)]);
+}
 
 interface VideoEntry {
   reciterId: string;
   reciterLabel: string;
   reciterLabelEn: string;
   url: string;
-  premiumUrl?: string;
   duration: number;
 }
 
@@ -70,8 +77,10 @@ export default function StoryOfDayScreen() {
   const { settings } = useSettings();
   const colors = useColors();
   const { isPremium } = useSubscription();
-  const { appName, logoSource } = useAppIdentity();
+
   const isArabic = (settings.language || 'ar') === 'ar';
+
+  const { logoSource } = useAppIdentity();
 
   const videoRef = useRef<Video>(null);
   const reciterScrollRef = useRef<ScrollView>(null);
@@ -81,10 +90,11 @@ export default function StoryOfDayScreen() {
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
-
   const [qcfReady, setQcfReady] = useState(false);
   const [qcfPage, setQcfPage] = useState<number | null>(null);
   const [qcfGlyphs, setQcfGlyphs] = useState<string[]>([]);
+
+
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(true);
@@ -238,6 +248,7 @@ export default function StoryOfDayScreen() {
     return () => { cancelled = true; };
   }, [dayData?.surahNumber, dayData?.ayahNumber]);
 
+
   // Auto-hide controls after 4s
   useEffect(() => {
     resetControlsTimer();
@@ -253,9 +264,8 @@ export default function StoryOfDayScreen() {
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const downloadUrl = (isPremium && currentVideo.premiumUrl) ? currentVideo.premiumUrl : currentVideo.url;
       const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(downloadUrl, localPath);
+      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
       if (!download?.uri) throw new Error('download failed');
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
@@ -270,16 +280,15 @@ export default function StoryOfDayScreen() {
     } finally {
       setSaving(false);
     }
-  }, [currentVideo, isPremium]);
+  }, [currentVideo]);
 
   const handleShare = useCallback(async () => {
     if (!dayData || !currentVideo) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const shareUrl = (isPremium && currentVideo.premiumUrl) ? currentVideo.premiumUrl : currentVideo.url;
       const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(shareUrl, localPath);
+      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
       if (download?.uri) {
         if (Platform.OS === 'ios') {
           const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
@@ -301,14 +310,12 @@ export default function StoryOfDayScreen() {
     } finally {
       setSharing(false);
     }
-  }, [dayData, currentVideo, isArabic, isPremium]);
+  }, [dayData, currentVideo, isArabic]);
 
   const surahLabel = dayData ? (isArabic ? dayData.surahName : dayData.surahEnglish) : '';
+
   const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
-  const ayahFontFamily = qcfFontFamily || 'KFGQPCUthmanic';
   const isQcf = !!qcfFontFamily;
-  const ayahFontSize = isQcf ? 32 : 28;
-  const ayahLineHeight = isQcf ? 64 : 56;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -394,7 +401,8 @@ export default function StoryOfDayScreen() {
                   isMuted={isMuted}
                   onPlaybackStatusUpdate={onPlaybackStatusUpdate}
                 />
-                {/* Subtle gradient for text readability */}
+
+                {/* Gradient for text readability */}
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
                   locations={[0, 0.45, 1]}
@@ -402,25 +410,31 @@ export default function StoryOfDayScreen() {
                   pointerEvents="none"
                 />
 
-                {/* QCF Text overlay — centered, no duplicated verse number */}
-                <View style={styles.videoTextOverlay} pointerEvents="none">
-                  <Text
-                    style={[styles.ayahText, { fontFamily: ayahFontFamily, fontSize: ayahFontSize, lineHeight: ayahLineHeight }]}
-                    allowFontScaling={false}
-                  >
-                    {isQcf ? qcfGlyphs.join('') : dayData.ayahText}
-                  </Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.surahRef}>
-                    {surahLabel}
-                  </Text>
+                {/* Verse overlay — daily-ayah style */}
+                <View style={styles.verseOverlay} pointerEvents="none">
+                  {isQcf && qcfGlyphs.length > 0 ? (
+                    <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                      {qcfGlyphs.join('')}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                      {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
+                    </Text>
+                  )}
+                  {/* Surah reference badge */}
+                  <View style={styles.surahBadge}>
+                    <Text style={styles.surahBadgeText}>
+                      {isArabic
+                        ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
+                        : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
+                    </Text>
+                  </View>
                 </View>
 
-                {/* Branding — bigger, pinned to very bottom */}
+                {/* Branding — free version only */}
                 {!isPremium && (
-                  <View style={styles.brandingRow} pointerEvents="none">
-                    <Image source={logoSource} style={styles.brandingLogo} resizeMode="contain" />
-                    <Text style={styles.brandingLabel}>{appName}</Text>
+                  <View style={styles.brandingArea} pointerEvents="none">
+                    <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
                   </View>
                 )}
 
@@ -558,59 +572,49 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   videoPlayer: { ...StyleSheet.absoluteFillObject },
-  videoTextOverlay: {
+
+  // Verse overlay — daily-ayah style
+  verseOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 28,
   },
-  ayahText: {
+  verseText: {
     textAlign: 'center',
-    color: '#fff',
+    color: '#FFFFFF',
     writingDirection: 'rtl',
-    paddingHorizontal: 4,
-    textShadowColor: 'rgba(0,0,0,0.6)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  divider: {
-    width: 60,
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    marginVertical: 14,
-    borderRadius: 1,
-  },
-  surahRef: {
-    textAlign: 'center',
-    fontFamily: fontBold(),
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.85)',
-    writingDirection: 'rtl',
+    marginBottom: 14,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-
-  // Branding — pinned at very bottom of video
-  brandingRow: {
+  surahBadge: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  surahBadgeText: {
+    color: '#FFFFFF',
+    fontFamily: 'Amiri',
+    fontSize: 13,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  // Branding — pinned at bottom
+  brandingArea: {
     position: 'absolute',
-    bottom: 52,
+    bottom: 16,
     left: 0,
     right: 0,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
   },
-  brandingLogo: { width: 36, height: 36, borderRadius: 8 },
-  brandingLabel: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 16,
-    fontFamily: fontBold(),
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
+  brandLogo: { width: 56, height: 56, borderRadius: 14, opacity: 0.85 },
 
   // Full controls overlay
   controlsOverlay: {
