@@ -44,9 +44,10 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
         run: |
           echo "🔑 PEXELS_API_KEY length: ${#PEXELS_API_KEY}"
-          echo "📂 Font file: $(ls -la fonts/KFGQPC-Uthmanic-Script.ttf 2>&1)"
-          echo "📂 Logo file: $(ls -la fonts/App-icon.png 2>&1)"
-          echo "🔧 FFmpeg: $(ffmpeg -version | head -1)"
+          echo "� FFmpeg: $(ffmpeg -version | head -1)"
+          echo "📂 QCF fonts: $(ls ../assets/fonts/qcf/ | wc -l) files"
+          echo "📂 Amiri font: $(ls -la ../assets/fonts/Amiri-Regular.ttf 2>&1)"
+          echo "📂 App icon: $(ls -la ../assets/images/icons/icon.png 2>&1)"
           node generate-daily-video.js
 
       - name: Commit and push

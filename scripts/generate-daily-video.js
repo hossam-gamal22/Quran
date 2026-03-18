@@ -2,8 +2,8 @@
 // ─────────────────────────────────────────────────────────────────────
 //  روح المسلم — Automated Daily Video Generator (Multi-Reciter)
 //  Generates 5 "Ayah of the Day" videos (one per reciter) daily.
-//  Clean video: background image + recitation audio only (no text overlay).
-//  The app handles all text/verse rendering on top of the video.
+//  Uses QCF Mushaf fonts for beautiful calligraphy, styled like daily-ayah.
+//  Produces free (branded) + premium (clean) versions.
 //  Maintains a rolling 7-day window — old videos auto-deleted.
 //  Runs on GitHub Actions (ubuntu-latest with ffmpeg).
 // ─────────────────────────────────────────────────────────────────────
@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const axios = require('axios');
+const { createCanvas, GlobalFonts, loadImage } = require('@napi-rs/canvas');
 
 // ─── Config ──────────────────────────────────────────────────────────
 
@@ -29,10 +30,21 @@ const VIDEO_FPS = 30;
 const ROLLING_DAYS = 7;
 
 // High-quality encoding constants
-const VIDEO_CRF = 18;           // visually lossless
-const VIDEO_PRESET = 'slow';    // better compression / detail retention
-const VIDEO_PROFILE = 'high';   // H.264 High profile
-const AUDIO_BITRATE = '192k';   // crystal-clear recitation
+const VIDEO_CRF = 18;
+const VIDEO_PRESET = 'slow';
+const VIDEO_PROFILE = 'high';
+const AUDIO_BITRATE = '192k';
+
+// ─── Font paths ──────────────────────────────────────────────────────
+const QCF_FONTS_DIR = path.join(REPO_ROOT, 'assets', 'fonts', 'qcf');
+const AMIRI_FONT = path.join(REPO_ROOT, 'assets', 'fonts', 'Amiri-Regular.ttf');
+const AMIRI_BOLD_FONT = path.join(REPO_ROOT, 'assets', 'fonts', 'Amiri-Bold.ttf');
+const APP_ICON = path.join(REPO_ROOT, 'assets', 'images', 'icons', 'icon.png');
+
+// ─── QCF Data ────────────────────────────────────────────────────────
+const qcfWords = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data', 'json', 'qcf-words.json'), 'utf8'));
+const qcfPageLines = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data', 'json', 'qcf-page-lines.json'), 'utf8'));
+const quranV4 = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data', 'json', 'quran-v4.json'), 'utf8'));
 
 const RECITERS = [
   { id: 'ar.alafasy',             label: 'مشاري العفاسي',        labelEn: 'Mishary Alafasy' },
@@ -58,6 +70,258 @@ const PHOTO_SEARCH_TERMS = [
 
 
 // ─── Helpers ─────────────────────────────────────────────────────────
+
+// Register Amiri font
+if (fs.existsSync(AMIRI_FONT)) GlobalFonts.registerFromPath(AMIRI_FONT, 'Amiri');
+if (fs.existsSync(AMIRI_BOLD_FONT)) GlobalFonts.registerFromPath(AMIRI_BOLD_FONT, 'AmiriBold');
+
+/**
+ * Get QCF glyph data for a verse (mirrors lib/qcf-page-data.ts → getVerseQcfData).
+ */
+function getVerseQcfData(surahNumber, ayahNumber) {
+  const surah = quranV4.find(s => s.number === surahNumber);
+  if (!surah) return null;
+  const ayah = surah.ayahs.find(a => a.ns === ayahNumber);
+  if (!ayah) return null;
+
+  const page = ayah.p;
+  const glyphs = [];
+  const lines = qcfPageLines[String(page)] || [];
+
+  for (const line of lines) {
+    if (line.lt !== 'ayah' || !line.fw || !line.lw) continue;
+    for (let id = line.fw; id <= line.lw; id++) {
+      const w = qcfWords[String(id)];
+      if (w && w.s === surahNumber && w.a === ayahNumber) {
+        glyphs.push(w.t);
+      }
+    }
+  }
+
+  // Check adjacent pages for verse boundary
+  if (glyphs.length === 0) {
+    for (const p of [page - 1, page + 1]) {
+      if (p < 1 || p > 604) continue;
+      const pLines = qcfPageLines[String(p)] || [];
+      for (const line of pLines) {
+        if (line.lt !== 'ayah' || !line.fw || !line.lw) continue;
+        for (let id = line.fw; id <= line.lw; id++) {
+          const w = qcfWords[String(id)];
+          if (w && w.s === surahNumber && w.a === ayahNumber) {
+            glyphs.push(w.t);
+          }
+        }
+      }
+      if (glyphs.length > 0) return { page: p, glyphs };
+    }
+  }
+
+  return glyphs.length > 0 ? { page, glyphs } : null;
+}
+
+/**
+ * Register the QCF4 tajweed font for a specific page.
+ */
+function registerQcfFont(page) {
+  const padded = String(page).padStart(3, '0');
+  const fontPath = path.join(QCF_FONTS_DIR, `QCF4_tajweed_${padded}.ttf`);
+  const familyName = `QCF4p${page}`;
+  if (fs.existsSync(fontPath)) {
+    GlobalFonts.registerFromPath(fontPath, familyName);
+    return familyName;
+  }
+  return null;
+}
+
+function toArabicNumeral(n) {
+  return String(n).replace(/\d/g, (d) => '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669'[parseInt(d)]);
+}
+
+/**
+ * Generate a 1080x1920 transparent PNG text overlay in daily-ayah style.
+ * @param {object} ayah        — verse data
+ * @param {boolean} showBranding — true for free version (includes logo)
+ * @returns {string} path to PNG file
+ */
+async function generateOverlayPNG(ayah, tmpDir, showBranding) {
+  const W = VIDEO_WIDTH;
+  const H = VIDEO_HEIGHT;
+  const canvas = createCanvas(W, H);
+  const ctx = canvas.getContext('2d');
+
+  // Fully transparent base
+  ctx.clearRect(0, 0, W, H);
+
+  // Dark overlay — matches daily-ayah overlay_dark: rgba(0,0,0,0.55)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Get QCF data
+  const qcf = getVerseQcfData(ayah.surahNumber, ayah.ayahInSurah);
+  let qcfFamily = null;
+  let glyphText = '';
+
+  if (qcf && qcf.glyphs.length > 0) {
+    qcfFamily = registerQcfFont(qcf.page);
+    glyphText = qcf.glyphs.join('');
+  }
+
+  // ── Verse text ──
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Text shadow (matches daily-ayah: rgba(0,0,0,0.5), offset (0,1), blur 3)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#FFFFFF';
+
+  const centerX = W / 2;
+  const verseY = H * 0.38;  // Vertically centered in upper portion
+  const maxTextWidth = W - 120; // 60px padding each side
+
+  if (qcfFamily && glyphText) {
+    // QCF Mushaf calligraphy — scale 26px (phone) → ~56px (1080px canvas)
+    const qcfFontSize = 56;
+    ctx.font = `${qcfFontSize}px "${qcfFamily}"`;
+    ctx.direction = 'rtl';
+
+    // Word-wrap QCF glyphs
+    const words = glyphText.split('');
+    const lines = [];
+    let currentLine = '';
+    for (const glyph of words) {
+      const testLine = currentLine + glyph;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxTextWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = glyph;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+
+    const lineHeight = 108; // ~50px lineHeight scaled to 1080px
+    const totalHeight = lines.length * lineHeight;
+    const startY = verseY - totalHeight / 2 + lineHeight / 2;
+
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], centerX, startY + i * lineHeight);
+    }
+  } else {
+    // Fallback: Amiri font with ﴿ ﴾ brackets
+    const fontSize = 52;
+    ctx.font = `${fontSize}px "Amiri"`;
+    ctx.direction = 'rtl';
+
+    const displayText = `\uFD3F ${ayah.text} \uFD3E`;
+    const words = displayText.split(' ');
+    const lines = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? currentLine + ' ' + word : word;
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxTextWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+
+    const lineHeight = 100;
+    const totalHeight = lines.length * lineHeight;
+    const startY = verseY - totalHeight / 2 + lineHeight / 2;
+
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], centerX, startY + i * lineHeight);
+    }
+  }
+
+  // ── Surah badge pill ──
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
+  ctx.shadowBlur = 4;
+
+  const surahName = (ayah.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim();
+  const badgeText = `${surahName}: ${toArabicNumeral(ayah.ayahInSurah)}`;
+  const badgeFontSize = 28;
+  ctx.font = `${badgeFontSize}px "Amiri"`;
+  const badgeMetrics = ctx.measureText(badgeText);
+  const badgeWidth = badgeMetrics.width + 64;
+  const badgeHeight = 50;
+  const badgeX = centerX - badgeWidth / 2;
+  const badgeY = verseY + 200; // Below the verse text
+
+  // Badge background
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+  roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 30);
+  ctx.fill();
+
+  // Badge border
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 2;
+  roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 30);
+  ctx.stroke();
+
+  // Badge text
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+  ctx.shadowBlur = 3;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = `${badgeFontSize}px "Amiri"`;
+  ctx.fillText(badgeText, centerX, badgeY + badgeHeight / 2);
+
+  // ── Branding logo (free version) ──
+  if (showBranding && fs.existsSync(APP_ICON)) {
+    ctx.shadowColor = 'transparent';
+    const logoSize = 120;
+    const logoX = centerX - logoSize / 2;
+    const logoY = H - 80 - logoSize;
+    try {
+      const logoImg = await loadImage(APP_ICON);
+      ctx.globalAlpha = 0.85;
+      // Rounded corners for logo
+      ctx.save();
+      roundRect(ctx, logoX, logoY, logoSize, logoSize, 30);
+      ctx.clip();
+      ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+      ctx.restore();
+      ctx.globalAlpha = 1.0;
+    } catch (e) {
+      console.log(`      ⚠️ Could not render logo: ${e.message}`);
+    }
+  }
+
+  // Save PNG
+  const suffix = showBranding ? 'free' : 'premium';
+  const pngPath = path.join(tmpDir, `overlay-${suffix}.png`);
+  const buffer = canvas.toBuffer('image/png');
+  fs.writeFileSync(pngPath, buffer);
+  return pngPath;
+}
+
+/** Draw a rounded rectangle path */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -92,8 +356,9 @@ function getAudioDuration(audioPath) {
 }
 
 /** Build video filename */
-function videoFilename(date, reciterId) {
+function videoFilename(date, reciterId, variant = 'free') {
   const short = reciterId.replace(/^ar\./, '');
+  if (variant === 'premium') return `video-${date}-${short}-premium.mp4`;
   return `video-${date}-${short}.mp4`;
 }
 
@@ -239,17 +504,18 @@ async function fetchNatureImage(tmpDir) {
 // ─── Compose Video ───────────────────────────────────────────────────
 
 /**
- * Encode a clean video from image + audio (no text overlay).
- * The app renders verse text on top at runtime.
+ * Encode video from image + audio + overlay PNG.
+ * Composites overlay on top of the background with zoompan.
  */
-function encodeVideo(imagePath, audioPath, outputPath, totalFrames) {
+function encodeVideo(imagePath, audioPath, overlayPath, outputPath, totalFrames) {
   const filterComplex =
     `[0:v]scale=${VIDEO_WIDTH}:${VIDEO_HEIGHT}:force_original_aspect_ratio=increase,` +
     `crop=${VIDEO_WIDTH}:${VIDEO_HEIGHT},` +
     `zoompan=z='min(zoom+0.0015\\,1.5)':` +
     `x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':` +
     `d=${totalFrames}:s=${VIDEO_WIDTH}x${VIDEO_HEIGHT}:fps=${VIDEO_FPS},` +
-    `unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15[vout]`;
+    `unsharp=5:5:0.5:5:5:0.0,eq=contrast=1.05:brightness=0.02:saturation=1.15[bg];` +
+    `[bg][2:v]overlay=0:0:format=auto[vout]`;
 
   const filterFile = outputPath + '.filter.txt';
   fs.writeFileSync(filterFile, filterComplex, 'utf8');
@@ -258,6 +524,7 @@ function encodeVideo(imagePath, audioPath, outputPath, totalFrames) {
     '-y',
     '-loop', '1', '-i', imagePath,
     '-i', audioPath,
+    '-i', overlayPath,
     '-filter_complex_script', filterFile,
     '-map', '[vout]', '-map', '1:a:0',
     '-c:v', 'libx264',
@@ -292,16 +559,20 @@ function encodeVideo(imagePath, audioPath, outputPath, totalFrames) {
 }
 
 /**
- * Generate one clean video for a reciter. Returns duration in seconds.
+ * Generate free + premium videos for a reciter.
+ * Returns { duration, freeFile, premiumFile }.
  */
-function composeVideo(imagePath, audioPath, outputPath) {
+function composeVideo(imagePath, audioPath, freeOverlay, premiumOverlay, freeOutputPath, premiumOutputPath) {
   const duration = getAudioDuration(audioPath);
   const totalFrames = Math.ceil(duration * VIDEO_FPS);
   console.log(`      ⏳ Audio: ${duration.toFixed(2)}s (${totalFrames} frames @ ${VIDEO_FPS}fps)`);
   console.log(`      🎬 Encoding: CRF ${VIDEO_CRF}, preset ${VIDEO_PRESET}, profile ${VIDEO_PROFILE}`);
 
-  console.log('      📹 Encoding video...');
-  encodeVideo(imagePath, audioPath, outputPath, totalFrames);
+  console.log('      📹 Encoding free version (with branding)...');
+  encodeVideo(imagePath, audioPath, freeOverlay, freeOutputPath, totalFrames);
+
+  console.log('      📹 Encoding premium version (no branding)...');
+  encodeVideo(imagePath, audioPath, premiumOverlay, premiumOutputPath, totalFrames);
 
   return duration;
 }
@@ -343,6 +614,7 @@ function updateRollingJson(ayah, date, videoResults) {
       reciterLabel: v.reciterLabel,
       reciterLabelEn: v.reciterLabelEn,
       url: v.url,
+      premiumUrl: v.premiumUrl,
       duration: v.duration,
     })),
   };
@@ -383,10 +655,16 @@ async function main() {
     // 3. Fetch background image (shared for all reciters)
     const imagePath = await fetchNatureImage(tmpDir);
 
-    // 4. Ensure public/ exists
+    // 4. Generate text overlay PNGs (free = branded, premium = no logo)
+    console.log('\n🎨 Generating text overlay PNGs...');
+    const freeOverlay = await generateOverlayPNG(ayah, tmpDir, true);
+    const premiumOverlay = await generateOverlayPNG(ayah, tmpDir, false);
+    console.log('   ✅ Overlay PNGs ready');
+
+    // 5. Ensure public/ exists
     if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
 
-    // 5. Generate one video per reciter
+    // 6. Generate free + premium videos per reciter
     const videoResults = [];
 
     for (let ri = 0; ri < RECITERS.length; ri++) {
@@ -403,16 +681,20 @@ async function main() {
             await new Promise((r) => setTimeout(r, 3000));
           }
           const audioPath = await fetchReciterAudio(ayah.number, reciter.id, tmpDir);
-          const videoFile = videoFilename(date, reciter.id);
-          const videoPath = path.join(PUBLIC_DIR, videoFile);
 
-          const duration = composeVideo(imagePath, audioPath, videoPath);
+          const freeFile = videoFilename(date, reciter.id, 'free');
+          const premiumFile = videoFilename(date, reciter.id, 'premium');
+          const freePath = path.join(PUBLIC_DIR, freeFile);
+          const premiumPath = path.join(PUBLIC_DIR, premiumFile);
+
+          const duration = composeVideo(imagePath, audioPath, freeOverlay, premiumOverlay, freePath, premiumPath);
 
           videoResults.push({
             reciterId: reciter.id,
             reciterLabel: reciter.label,
             reciterLabelEn: reciter.labelEn,
-            url: videoRawUrl(videoFile),
+            url: videoRawUrl(freeFile),
+            premiumUrl: videoRawUrl(premiumFile),
             duration,
           });
           success = true;
@@ -425,7 +707,7 @@ async function main() {
       if (!success) console.error(`   ⛔ All 3 attempts failed for ${reciter.id}`);
     }
 
-    // 6. Update rolling JSON
+    // 7. Update rolling JSON
     updateRollingJson(ayah, date, videoResults);
 
     console.log('\n══════════════════════════════════════════════════');

@@ -36,9 +36,6 @@ import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-fon
 const DAILY_VIDEO_JSON_URL =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/daily-video.json';
 
-const UTHMANI_FONT = 'KFGQPCUthmanic';
-const UTHMANI_FALLBACK = 'Amiri';
-
 function toArabicNumeral(n: number): string {
   return String(n).replace(/\d/g, (d) => '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669'[parseInt(d)]);
 }
@@ -228,6 +225,7 @@ export default function StoryOfDayScreen() {
     return () => { cancelled = true; };
   }, []);
 
+  // Load QCF font for verse
   useEffect(() => {
     if (!dayData?.surahNumber || !dayData?.ayahNumber) return;
     let cancelled = false;
@@ -248,7 +246,6 @@ export default function StoryOfDayScreen() {
     return () => { cancelled = true; };
   }, [dayData?.surahNumber, dayData?.ayahNumber]);
 
-
   // Auto-hide controls after 4s
   useEffect(() => {
     resetControlsTimer();
@@ -258,7 +255,7 @@ export default function StoryOfDayScreen() {
   }, []);
 
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
-  // Premium users get premiumUrl on old-format videos (text baked), url on new (clean)
+  // Premium users get premiumUrl (no branding), free users get url (with logo branding)
   const videoUrl = (isPremium && currentVideo?.premiumUrl) ? currentVideo.premiumUrl : currentVideo?.url;
 
   const handleDownload = useCallback(async () => {
@@ -313,8 +310,6 @@ export default function StoryOfDayScreen() {
       setSharing(false);
     }
   }, [dayData, videoUrl, isArabic]);
-
-  const surahLabel = dayData ? (isArabic ? dayData.surahName : dayData.surahEnglish) : '';
 
   const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
   const isQcf = !!qcfFontFamily;
@@ -404,17 +399,17 @@ export default function StoryOfDayScreen() {
                   onPlaybackStatusUpdate={onPlaybackStatusUpdate}
                 />
 
-                {/* Dark overlay + verse text — always rendered by the app (daily-ayah style) */}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} pointerEvents="none" />
+                {/* Dark overlay to fully mask any old baked-in text + daily-ayah style */}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)' }]} pointerEvents="none" />
 
-                {/* Verse overlay — daily-ayah style */}
+                {/* Verse overlay — daily-ayah QCF style */}
                 <View style={styles.verseOverlay} pointerEvents="none">
                   {isQcf && qcfGlyphs.length > 0 ? (
                     <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
                       {qcfGlyphs.join('')}
                     </Text>
                   ) : (
-                    <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                    <Text style={[styles.verseText, { fontFamily: 'Amiri', fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
                       {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
                     </Text>
                   )}
