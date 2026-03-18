@@ -49,6 +49,7 @@ interface VideoEntry {
   reciterLabel: string;
   reciterLabelEn: string;
   url: string;
+  premiumUrl?: string;
   duration: number;
 }
 
@@ -60,6 +61,7 @@ interface DayData {
   ayahNumber: number;
   globalAyahNumber: number;
   generatedAt: string;
+  cleanVideo?: boolean;
   videos: VideoEntry[];
 }
 
@@ -258,14 +260,16 @@ export default function StoryOfDayScreen() {
   }, []);
 
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
+  // Premium users get premiumUrl on old-format videos (text baked), url on new (clean)
+  const videoUrl = (isPremium && currentVideo?.premiumUrl) ? currentVideo.premiumUrl : currentVideo?.url;
 
   const handleDownload = useCallback(async () => {
-    if (!currentVideo?.url) return;
+    if (!videoUrl) return;
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
+      const download = await FileSystem.downloadAsync(videoUrl!, localPath);
       if (!download?.uri) throw new Error('download failed');
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
@@ -280,15 +284,15 @@ export default function StoryOfDayScreen() {
     } finally {
       setSaving(false);
     }
-  }, [currentVideo]);
+  }, [videoUrl]);
 
   const handleShare = useCallback(async () => {
-    if (!dayData || !currentVideo) return;
+    if (!dayData || !videoUrl) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(currentVideo.url, localPath);
+      const download = await FileSystem.downloadAsync(videoUrl, localPath);
       if (download?.uri) {
         if (Platform.OS === 'ios') {
           const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
@@ -310,7 +314,7 @@ export default function StoryOfDayScreen() {
     } finally {
       setSharing(false);
     }
-  }, [dayData, currentVideo, isArabic]);
+  }, [dayData, videoUrl, isArabic]);
 
   const surahLabel = dayData ? (isArabic ? dayData.surahName : dayData.surahEnglish) : '';
 
@@ -393,7 +397,7 @@ export default function StoryOfDayScreen() {
               >
                 <Video
                   ref={videoRef}
-                  source={{ uri: currentVideo.url }}
+                  source={{ uri: videoUrl! }}
                   style={styles.videoPlayer}
                   resizeMode={ResizeMode.COVER}
                   shouldPlay={isPlaying}
@@ -402,40 +406,44 @@ export default function StoryOfDayScreen() {
                   onPlaybackStatusUpdate={onPlaybackStatusUpdate}
                 />
 
-                {/* Gradient for text readability */}
-                <LinearGradient
-                  colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
-                  locations={[0, 0.45, 1]}
-                  style={StyleSheet.absoluteFillObject}
-                  pointerEvents="none"
-                />
+                {/* Gradient + overlay only for clean (new-format) videos */}
+                {dayData?.cleanVideo && (
+                  <>
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
+                      locations={[0, 0.45, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                      pointerEvents="none"
+                    />
 
-                {/* Verse overlay — daily-ayah style */}
-                <View style={styles.verseOverlay} pointerEvents="none">
-                  {isQcf && qcfGlyphs.length > 0 ? (
-                    <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                      {qcfGlyphs.join('')}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                      {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
-                    </Text>
-                  )}
-                  {/* Surah reference badge */}
-                  <View style={styles.surahBadge}>
-                    <Text style={styles.surahBadgeText}>
-                      {isArabic
-                        ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
-                        : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
-                    </Text>
-                  </View>
-                </View>
+                    {/* Verse overlay — daily-ayah style */}
+                    <View style={styles.verseOverlay} pointerEvents="none">
+                      {isQcf && qcfGlyphs.length > 0 ? (
+                        <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                          {qcfGlyphs.join('')}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                          {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
+                        </Text>
+                      )}
+                      {/* Surah reference badge */}
+                      <View style={styles.surahBadge}>
+                        <Text style={styles.surahBadgeText}>
+                          {isArabic
+                            ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
+                            : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
+                        </Text>
+                      </View>
+                    </View>
 
-                {/* Branding — free version only */}
-                {!isPremium && (
-                  <View style={styles.brandingArea} pointerEvents="none">
-                    <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
-                  </View>
+                    {/* Branding — free version only */}
+                    {!isPremium && (
+                      <View style={styles.brandingArea} pointerEvents="none">
+                        <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
+                      </View>
+                    )}
+                  </>
                 )}
 
                 {/* Full controls overlay */}
