@@ -39,7 +39,7 @@ const AUDIO_BITRATE = '192k';
 const QCF_FONTS_DIR = path.join(REPO_ROOT, 'assets', 'fonts', 'qcf');
 const AMIRI_FONT = path.join(REPO_ROOT, 'assets', 'fonts', 'Amiri-Regular.ttf');
 const AMIRI_BOLD_FONT = path.join(REPO_ROOT, 'assets', 'fonts', 'Amiri-Bold.ttf');
-const APP_ICON = path.join(REPO_ROOT, 'assets', 'images', 'icons', 'icon.png');
+const APP_ICON = path.join(REPO_ROOT, 'assets', 'images', 'icons', 'App-icon.png');
 
 // ─── QCF Data ────────────────────────────────────────────────────────
 const qcfWords = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data', 'json', 'qcf-words.json'), 'utf8'));
@@ -178,12 +178,13 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   ctx.fillStyle = '#FFFFFF';
 
   const centerX = W / 2;
-  const verseY = H * 0.38;  // Vertically centered in upper portion
+  const verseY = H * 0.45;  // Vertically centered
   const maxTextWidth = W - 120; // 60px padding each side
+  let textBottomY = verseY; // Track where text ends for badge positioning
 
   if (qcfFamily && glyphText) {
-    // QCF Mushaf calligraphy — scale 26px (phone) → ~56px (1080px canvas)
-    const qcfFontSize = 56;
+    // QCF Mushaf calligraphy — larger for video
+    const qcfFontSize = 72;
     ctx.font = `${qcfFontSize}px "${qcfFamily}"`;
     ctx.direction = 'rtl';
 
@@ -203,16 +204,17 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     }
     if (currentLine) lines.push(currentLine);
 
-    const lineHeight = 108; // ~50px lineHeight scaled to 1080px
+    const lineHeight = 130;
     const totalHeight = lines.length * lineHeight;
     const startY = verseY - totalHeight / 2 + lineHeight / 2;
 
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], centerX, startY + i * lineHeight);
     }
+    textBottomY = startY + (lines.length - 1) * lineHeight + lineHeight / 2;
   } else {
-    // Fallback: Amiri font with ﴿ ﴾ brackets
-    const fontSize = 52;
+    // Fallback: Amiri font with ﴿ ﴾ brackets — larger for video
+    const fontSize = 68;
     ctx.font = `${fontSize}px "Amiri"`;
     ctx.direction = 'rtl';
 
@@ -233,13 +235,14 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     }
     if (currentLine) lines.push(currentLine);
 
-    const lineHeight = 100;
+    const lineHeight = 120;
     const totalHeight = lines.length * lineHeight;
     const startY = verseY - totalHeight / 2 + lineHeight / 2;
 
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], centerX, startY + i * lineHeight);
     }
+    textBottomY = startY + (lines.length - 1) * lineHeight + lineHeight / 2;
   }
 
   // ── Surah badge pill ──
@@ -256,7 +259,7 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   const badgeWidth = badgeMetrics.width + 64;
   const badgeHeight = 50;
   const badgeX = centerX - badgeWidth / 2;
-  const badgeY = verseY + 200; // Below the verse text
+  const badgeY = textBottomY + 40; // Dynamically below verse text
 
   // Badge background
   ctx.shadowColor = 'transparent';
@@ -287,13 +290,8 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     const logoY = H - 80 - logoSize;
     try {
       const logoImg = await loadImage(APP_ICON);
-      ctx.globalAlpha = 0.85;
-      // Rounded corners for logo
-      ctx.save();
-      roundRect(ctx, logoX, logoY, logoSize, logoSize, 30);
-      ctx.clip();
+      ctx.globalAlpha = 0.9;
       ctx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
-      ctx.restore();
       ctx.globalAlpha = 1.0;
     } catch (e) {
       console.log(`      ⚠️ Could not render logo: ${e.message}`);

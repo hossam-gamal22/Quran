@@ -399,36 +399,7 @@ export default function StoryOfDayScreen() {
                   onPlaybackStatusUpdate={onPlaybackStatusUpdate}
                 />
 
-                {/* Dark overlay to fully mask any old baked-in text + daily-ayah style */}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)' }]} pointerEvents="none" />
-
-                {/* Verse overlay — daily-ayah QCF style */}
-                <View style={styles.verseOverlay} pointerEvents="none">
-                  {isQcf && qcfGlyphs.length > 0 ? (
-                    <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                      {qcfGlyphs.join('')}
-                    </Text>
-                  ) : (
-                    <Text style={[styles.verseText, { fontFamily: 'Amiri', fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                      {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
-                    </Text>
-                  )}
-                  {/* Surah reference badge */}
-                  <View style={styles.surahBadge}>
-                    <Text style={styles.surahBadgeText}>
-                      {isArabic
-                        ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
-                        : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Branding — free version only */}
-                {!isPremium && (
-                  <View style={styles.brandingArea} pointerEvents="none">
-                    <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
-                  </View>
-                )}
+                {/* Text + branding are now baked into the video by the generation script */}
 
                 {/* Full controls overlay */}
                 {showControls && (
