@@ -338,7 +338,6 @@ function updateRollingJson(ayah, date, videoResults) {
     ayahNumber: ayah.ayahInSurah,
     globalAyahNumber: ayah.number,
     generatedAt: new Date().toISOString(),
-    cleanVideo: true,
     videos: videoResults.map((v) => ({
       reciterId: v.reciterId,
       reciterLabel: v.reciterLabel,

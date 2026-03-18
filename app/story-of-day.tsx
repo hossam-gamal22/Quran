@@ -20,7 +20,6 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import Slider from '@react-native-community/slider';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -61,7 +60,6 @@ interface DayData {
   ayahNumber: number;
   globalAyahNumber: number;
   generatedAt: string;
-  cleanVideo?: boolean;
   videos: VideoEntry[];
 }
 
@@ -406,44 +404,35 @@ export default function StoryOfDayScreen() {
                   onPlaybackStatusUpdate={onPlaybackStatusUpdate}
                 />
 
-                {/* Gradient + overlay only for clean (new-format) videos */}
-                {dayData?.cleanVideo && (
-                  <>
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
-                      locations={[0, 0.45, 1]}
-                      style={StyleSheet.absoluteFillObject}
-                      pointerEvents="none"
-                    />
+                {/* Dark overlay + verse text — always rendered by the app (daily-ayah style) */}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} pointerEvents="none" />
 
-                    {/* Verse overlay — daily-ayah style */}
-                    <View style={styles.verseOverlay} pointerEvents="none">
-                      {isQcf && qcfGlyphs.length > 0 ? (
-                        <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                          {qcfGlyphs.join('')}
-                        </Text>
-                      ) : (
-                        <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
-                          {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
-                        </Text>
-                      )}
-                      {/* Surah reference badge */}
-                      <View style={styles.surahBadge}>
-                        <Text style={styles.surahBadgeText}>
-                          {isArabic
-                            ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
-                            : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
-                        </Text>
-                      </View>
-                    </View>
+                {/* Verse overlay — daily-ayah style */}
+                <View style={styles.verseOverlay} pointerEvents="none">
+                  {isQcf && qcfGlyphs.length > 0 ? (
+                    <Text style={[styles.verseText, { fontFamily: qcfFontFamily!, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                      {qcfGlyphs.join('')}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.verseText, { fontFamily: UTHMANI_FONT, fontSize: 26, lineHeight: 50 }]} allowFontScaling={false}>
+                      {'\uFD3F'} {dayData?.ayahText} {'\uFD3E'}
+                    </Text>
+                  )}
+                  {/* Surah reference badge */}
+                  <View style={styles.surahBadge}>
+                    <Text style={styles.surahBadgeText}>
+                      {isArabic
+                        ? `${(dayData?.surahName || '').replace(/^سُورَةُ\s*|^سورة\s*/i, '').trim()}: ${toArabicNumeral(dayData?.ayahNumber || 0)}`
+                        : `${dayData?.surahEnglish}: ${dayData?.ayahNumber}`}
+                    </Text>
+                  </View>
+                </View>
 
-                    {/* Branding — free version only */}
-                    {!isPremium && (
-                      <View style={styles.brandingArea} pointerEvents="none">
-                        <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
-                      </View>
-                    )}
-                  </>
+                {/* Branding — free version only */}
+                {!isPremium && (
+                  <View style={styles.brandingArea} pointerEvents="none">
+                    <Image source={logoSource} style={styles.brandLogo} resizeMode="contain" />
+                  </View>
                 )}
 
                 {/* Full controls overlay */}
