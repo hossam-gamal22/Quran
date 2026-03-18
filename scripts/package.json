@@ -7,6 +7,7 @@
     "generate": "node generate-daily-video.js"
   },
   "dependencies": {
-    "axios": "^1.7.9"
+    "axios": "^1.7.9",
+    "@napi-rs/canvas": "^0.1.65"
   }
 }
