@@ -223,7 +223,7 @@ export function transliterateReference(reference: string, language: string): str
   result = result.replace(/،/g, ',');
 
   // Replace Arabic connector "و" (and) with " & "
-  result = result.replace(/\s*و(?=\s)/g, ' &');
+  result = result.replace(/\s*و(?=\s|[A-Z])/g, ' & ');
 
   // Convert Arabic-Indic numerals to Western for non-Arabic/Urdu languages
   if (language !== 'ur') {

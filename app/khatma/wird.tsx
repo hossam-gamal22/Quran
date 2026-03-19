@@ -38,6 +38,7 @@ export default function WirdScreen() {
     getActiveKhatmaStats,
     completeTodayWird,
     recordProgress,
+    resetKhatma,
   } = useKhatma();
 
   const [isCompleting, setIsCompleting] = useState(false);
@@ -101,6 +102,25 @@ export default function WirdScreen() {
     await recordProgress(pages);
   }, [recordProgress]);
 
+  // Handle reset khatma
+  const handleResetKhatma = useCallback(() => {
+    Alert.alert(
+      t('khatma.resetKhatma'),
+      t('khatma.confirmResetKhatma'),
+      [
+        { text: t('common.no'), style: 'cancel' },
+        {
+          text: t('common.yes'),
+          style: 'destructive',
+          onPress: async () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            await resetKhatma();
+          },
+        },
+      ]
+    );
+  }, [resetKhatma, t]);
+
   // Handle open Quran at page
   const handleOpenPage = useCallback((pageNumber: number) => {
     // Navigate to Quran page (you'll need to implement this route)
@@ -149,10 +169,17 @@ export default function WirdScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onPress={handleResetKhatma}
+          >
+            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            <Text style={styles.startButtonText}>{t('khatma.resetKhatma')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.startButton, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 8 }]}
             onPress={() => router.push('/khatma/new')}
           >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-            <Text style={styles.startButtonText}>{t('khatma.startNewKhatma')}</Text>
+            <Ionicons name="add" size={20} color={colors.text} />
+            <Text style={[styles.startButtonText, { color: colors.text }]}>{t('khatma.startNewKhatma')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

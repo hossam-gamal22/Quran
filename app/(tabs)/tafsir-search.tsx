@@ -3,7 +3,7 @@
  * البحث في تفاسير القرآن الكريم
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, Modal, ScrollView,
@@ -14,8 +14,9 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { t } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
-import { NativeTabs } from '@/components/ui/NativeTabs';
-import { getSurahName, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS } from '@/lib/quran-api';
+import { getSurahName, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS, SURAH_NAMES_AR, SURAH_NAMES_EN, fetchSurahTranslation } from '@/lib/quran-api';
+import { getCachedSurah } from '@/lib/quran-cache';
+import tafsirMuyassarData from '@/data/json/tafsir-muyassar.json';
 import * as Haptics from 'expo-haptics';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -49,7 +50,19 @@ function HighlightText({ text, query, color }: { text: string; query: string; co
     </Text>
   );
 }
-
+function findSurahByName(query: string, lang: 'ar' | 'en'): number | null {
+  const normalized = query.trim().replace(/^سورة\s+/i, '').replace(/^surah\s+/i, '');
+  const names = lang === 'ar' ? SURAH_NAMES_AR : SURAH_NAMES_EN;
+  // Exact match first
+  for (const [num, name] of Object.entries(names)) {
+    if (name === normalized) return parseInt(num);
+  }
+  // Partial match
+  for (const [num, name] of Object.entries(names)) {
+    if (name.includes(normalized) || normalized.includes(name)) return parseInt(num);
+  }
+  return null;
+}
 export default function TafsirSearchScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
@@ -64,20 +77,79 @@ export default function TafsirSearchScreen() {
   const [resultCount, setResultCount] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const [surahTafsirResult, setSurahTafsirResult] = useState<{
+    surahNumber: number;
+    surahName: string;
+    ayahs: Array<{ numberInSurah: number; arabicText: string; tafsirText: string }>;
+  } | null>(null);
+  const [loadingSurah, setLoadingSurah] = useState(false);
 
   const editionForLang = searchLang === 'ar' ? 'quran-uthmani' : 'en.sahih';
   const englishEditions = TRANSLATION_EDITIONS.filter(e => e.language === 'en');
   const allModalEditions = [...TAFSIR_EDITIONS, ...englishEditions];
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getEditionDisplayName = (ed: { name: string; nameEn?: string }) => {
     return searchLang === 'ar' ? ed.name : (ed.nameEn || ed.name);
   };
+
+  const loadSurahTafsir = useCallback(async (surahNumber: number, edition: string) => {
+    setLoadingSurah(true);
+    try {
+      const surah = await getCachedSurah(surahNumber);
+      if (!surah) { setLoadingSurah(false); return; }
+
+      let tafsirTexts: string[] = [];
+
+      if (edition === 'ar.muyassar') {
+        const localTafsir = (tafsirMuyassarData as any)[String(surahNumber)];
+        if (localTafsir && Array.isArray(localTafsir)) {
+          tafsirTexts = localTafsir.map((item: any) => item.text || '');
+        }
+      } else {
+        try {
+          const result = await fetchSurahTranslation(surahNumber, edition);
+          tafsirTexts = result.ayahs.map((a: any) => a.text);
+        } catch {
+          tafsirTexts = surah.ayahs.map(() => t('tafsirSearch.loadError'));
+        }
+      }
+
+      const ayahs = surah.ayahs.map((ayah, index) => ({
+        numberInSurah: ayah.numberInSurah,
+        arabicText: ayah.text,
+        tafsirText: tafsirTexts[index] || '',
+      }));
+
+      setSurahTafsirResult({
+        surahNumber,
+        surahName: getSurahName(surahNumber),
+        ayahs,
+      });
+    } catch (error) {
+      console.error('Error loading surah tafsir:', error);
+    } finally {
+      setLoadingSurah(false);
+    }
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim() || query.trim().length < 2) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLoading(true);
     setHasSearched(true);
+    setSurahTafsirResult(null);
+
+    // Check if query is a surah name
+    const surahNum = findSurahByName(query.trim(), searchLang);
+    if (surahNum) {
+      setResults([]);
+      setResultCount(0);
+      setLoading(false);
+      await loadSurahTafsir(surahNum, selectedEdition);
+      return;
+    }
+
     try {
       const res = await searchQuran(query.trim(), editionForLang, 'all');
       setResults(res.matches || []);
@@ -88,7 +160,27 @@ export default function TafsirSearchScreen() {
     } finally {
       setLoading(false);
     }
-  }, [query, editionForLang]);
+  }, [query, editionForLang, searchLang, selectedEdition, loadSurahTafsir]);
+
+  // Live search: debounced as user types
+  useEffect(() => {
+    if (!query.trim() || query.trim().length < 2) {
+      if (!query.trim()) {
+        setResults([]);
+        setSurahTafsirResult(null);
+        setHasSearched(false);
+        setResultCount(0);
+      }
+      return;
+    }
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      handleSearch();
+    }, 400);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [query, handleSearch]);
 
   const handleOpenTafsir = useCallback(async (surahNum: number, ayahNum: number) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -167,15 +259,15 @@ export default function TafsirSearchScreen() {
     langBtnText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     langBtnTextActive: { color: '#fff' },
     // Tafsir edition chips
-    editionRow: { flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 10 },
+    editionRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
     editionChip: {
       paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
       backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
     },
     editionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    editionChipText: { fontSize: 12, fontWeight: '700', color: colors.muted },
+    editionChipText: { fontSize: 12, fontWeight: '700', color: colors.foreground },
     editionChipTextActive: { color: '#fff' },
-    editionLabel: { fontSize: 12, color: colors.muted, paddingHorizontal: 16, paddingBottom: 6, textAlign: isRTL ? 'right' : 'left' },
+    editionLabel: { fontSize: 12, color: colors.muted, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2, textAlign: isRTL ? 'right' : 'left' },
     // Results
     resultCount: { fontSize: 13, color: colors.muted, textAlign: isRTL ? 'right' : 'left', paddingHorizontal: 16, paddingVertical: 8 },
     resultCard: {
@@ -239,7 +331,7 @@ export default function TafsirSearchScreen() {
           <View style={[s.searchRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.inputWrap}>
               {query.length > 0 && (
-                <TouchableOpacity style={s.clearBtn} onPress={() => { setQuery(''); setResults([]); setHasSearched(false); }}>
+                <TouchableOpacity style={s.clearBtn} onPress={() => { setQuery(''); setResults([]); setHasSearched(false); setSurahTafsirResult(null); }}>
                   <MaterialCommunityIcons name="close-circle" size={18} color={colors.muted} />
                 </TouchableOpacity>
               )}
@@ -260,38 +352,80 @@ export default function TafsirSearchScreen() {
             </TouchableOpacity>
           </View>
           {/* Lang toggle */}
-          <View style={s.langRow}>
-            <NativeTabs
-              tabs={[
-                { key: 'ar', label: t('tafsirSearch.arabicLang') },
-                { key: 'en', label: 'English' },
-              ]}
-              selected={searchLang}
-              onSelect={(key) => setSearchLang(key as 'ar' | 'en')}
-              indicatorColor="#2f7659"
-            />
+          <View style={[s.langRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {(['ar', 'en'] as const).map(lang => (
+              <TouchableOpacity
+                key={lang}
+                style={[s.langBtn, searchLang === lang && s.langBtnActive]}
+                onPress={() => setSearchLang(lang)}
+              >
+                <Text style={[s.langBtnText, searchLang === lang && s.langBtnTextActive]}>
+                  {lang === 'ar' ? t('tafsirSearch.arabicLang') : 'English'}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
         {/* Tafsir Edition Selector */}
         <Text style={s.editionLabel}>{t('quran.showTafsirBy')}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.editionRow} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
+        <View style={[s.editionRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {TAFSIR_EDITIONS.map(ed => (
             <TouchableOpacity
               key={ed.identifier}
-              style={[s.editionChip, selectedEdition === ed.identifier && s.editionChipActive, isRTL && { transform: [{ scaleX: -1 }] }]}
-              onPress={() => setSelectedEdition(ed.identifier)}
+              style={[s.editionChip, selectedEdition === ed.identifier && s.editionChipActive]}
+              onPress={() => {
+                setSelectedEdition(ed.identifier);
+                if (surahTafsirResult) {
+                  loadSurahTafsir(surahTafsirResult.surahNumber, ed.identifier);
+                }
+              }}
             >
               <Text style={[s.editionChipText, selectedEdition === ed.identifier && s.editionChipTextActive]}>
                 {getEditionDisplayName(ed)}
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* Results */}
-        {loading ? (
+        {loading || loadingSurah ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
+        ) : surahTafsirResult ? (
+          <>
+            <Text style={s.resultCount}>
+              {surahTafsirResult.surahName} — {surahTafsirResult.ayahs.length} {t('quran.ayahs')}
+            </Text>
+            <FlatList
+              data={surahTafsirResult.ayahs}
+              keyExtractor={item => `surah_${item.numberInSurah}`}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[s.resultCard, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}
+                  onPress={() => handleOpenTafsir(surahTafsirResult.surahNumber, item.numberInSurah)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={[s.surahBadge, { backgroundColor: colors.primary + '18' }]}>
+                      <Text style={[s.surahBadgeText, { color: colors.primary }]}>
+                        {t('quran.ayah')} {item.numberInSurah}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[s.resultText, { color: colors.foreground, fontSize: 18, lineHeight: 36 }]}>
+                    {item.arabicText}
+                  </Text>
+                  {item.tafsirText ? (
+                    <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 24, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={3}>
+                      {item.tafsirText}
+                    </Text>
+                  ) : null}
+                </TouchableOpacity>
+              )}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 40 }}
+            />
+          </>
         ) : (
           <>
             {hasSearched && (

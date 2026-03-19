@@ -21,6 +21,7 @@ export interface Khatma {
   createdAt: string;
   reminderTime: string | null; // "HH:mm" format
   reminderEnabled: boolean;
+  readPages: number[]; // Unique page numbers (1-604) that have been read
 }
 
 export interface DailyProgress {
@@ -134,6 +135,7 @@ export const createKhatma = async (
       createdAt: now.toISOString(),
       reminderTime,
       reminderEnabled: reminderTime !== null,
+      readPages: [],
     };
 
     const khatmas = await getAllKhatmas();
@@ -247,7 +249,81 @@ export const getActiveKhatma = async (): Promise<Khatma | null> => {
 };
 
 /**
- * Record daily progress
+ * Ensure readPages array exists (backward compat for old khatmas)
+ */
+const ensureReadPages = (khatma: Khatma): number[] => {
+  if (!khatma.readPages) {
+    // Migrate: if currentPage > 1, assume pages 1..(currentPage-1) were read
+    const pages: number[] = [];
+    for (let i = 1; i < khatma.currentPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }
+  return [...khatma.readPages];
+};
+
+/**
+ * Record reading specific page numbers (Set-based, no duplicates)
+ */
+export const recordPageRead = async (
+  khatmaId: string,
+  pageNumbers: number[]
+): Promise<Khatma | null> => {
+  try {
+    const khatma = await getKhatma(khatmaId);
+    if (!khatma || khatma.isCompleted) return khatma;
+
+    const readSet = new Set(ensureReadPages(khatma));
+    let newPagesCount = 0;
+
+    for (const page of pageNumbers) {
+      if (page >= 1 && page <= TOTAL_QURAN_PAGES && !readSet.has(page)) {
+        readSet.add(page);
+        newPagesCount++;
+      }
+    }
+
+    // No new pages were added — nothing to update
+    if (newPagesCount === 0) return khatma;
+
+    khatma.readPages = Array.from(readSet).sort((a, b) => a - b);
+    khatma.currentPage = khatma.readPages.length + 1; // next unread page position
+    if (khatma.currentPage > TOTAL_QURAN_PAGES) {
+      khatma.currentPage = TOTAL_QURAN_PAGES;
+    }
+    khatma.lastReadDate = getTodayDateString();
+
+    // Update daily progress
+    const today = getTodayDateString();
+    const todayProgress = khatma.dailyProgress.find((p) => p.date === today);
+    if (todayProgress) {
+      todayProgress.pagesRead += newPagesCount;
+      todayProgress.completed = todayProgress.pagesRead >= khatma.pagesPerDay;
+    } else {
+      khatma.dailyProgress.push({
+        date: today,
+        pagesRead: newPagesCount,
+        completed: newPagesCount >= khatma.pagesPerDay,
+      });
+      khatma.completedDays++;
+    }
+
+    // Check if khatma is completed (all 604 pages read)
+    if (khatma.readPages.length >= TOTAL_QURAN_PAGES) {
+      khatma.isCompleted = true;
+    }
+
+    await updateKhatma(khatma);
+    return khatma;
+  } catch (error) {
+    console.error('Error recording page read:', error);
+    return null;
+  }
+};
+
+/**
+ * Record daily progress (legacy wrapper — converts page count to page numbers)
  */
 export const recordDailyProgress = async (
   khatmaId: string,
@@ -255,41 +331,21 @@ export const recordDailyProgress = async (
 ): Promise<Khatma | null> => {
   try {
     const khatma = await getKhatma(khatmaId);
-    if (!khatma) return null;
+    if (!khatma || khatma.isCompleted) return khatma;
 
-    const today = getTodayDateString();
-    
-    // Check if already recorded today
-    const todayProgress = khatma.dailyProgress.find((p) => p.date === today);
-    
-    if (todayProgress) {
-      // Update existing progress
-      todayProgress.pagesRead += pagesRead;
-      todayProgress.completed = todayProgress.pagesRead >= khatma.pagesPerDay;
-    } else {
-      // Add new progress
-      khatma.dailyProgress.push({
-        date: today,
-        pagesRead,
-        completed: pagesRead >= khatma.pagesPerDay,
-      });
-      khatma.completedDays++;
+    const readSet = new Set(ensureReadPages(khatma));
+
+    // Find the next N unread pages
+    const pagesToMark: number[] = [];
+    for (let p = 1; p <= TOTAL_QURAN_PAGES && pagesToMark.length < pagesRead; p++) {
+      if (!readSet.has(p)) {
+        pagesToMark.push(p);
+      }
     }
 
-    // Update current page
-    khatma.currentPage = Math.min(
-      khatma.currentPage + pagesRead,
-      TOTAL_QURAN_PAGES
-    );
-    khatma.lastReadDate = today;
+    if (pagesToMark.length === 0) return khatma;
 
-    // Check if khatma is completed
-    if (khatma.currentPage >= TOTAL_QURAN_PAGES) {
-      khatma.isCompleted = true;
-    }
-
-    await updateKhatma(khatma);
-    return khatma;
+    return await recordPageRead(khatmaId, pagesToMark);
   } catch (error) {
     console.error('Error recording progress:', error);
     return null;
@@ -322,12 +378,21 @@ export const getTodayWird = (khatma: Khatma): {
 } => {
   const today = getTodayDateString();
   const todayProgress = khatma.dailyProgress.find((p) => p.date === today);
-  
+  const readSet = new Set(ensureReadPages(khatma));
+
+  // Find the first unread page as start
+  let startPage = 1;
+  for (let p = 1; p <= TOTAL_QURAN_PAGES; p++) {
+    if (!readSet.has(p)) {
+      startPage = p;
+      break;
+    }
+  }
+
   const pagesReadToday = todayProgress?.pagesRead || 0;
-  const startPage = khatma.currentPage;
   const endPage = Math.min(startPage + khatma.pagesPerDay - 1, TOTAL_QURAN_PAGES);
   const pagesRemaining = Math.max(khatma.pagesPerDay - pagesReadToday, 0);
-  
+
   return {
     startPage,
     endPage,
@@ -351,8 +416,9 @@ export const getKhatmaStats = (khatma: Khatma): {
   const today = getTodayDateString();
   const daysElapsed = getDaysDifference(khatma.startDate, today);
   const daysRemaining = Math.max(khatma.durationDays - daysElapsed, 0);
-  
-  const pagesRead = khatma.currentPage - 1;
+
+  const readPages = ensureReadPages(khatma);
+  const pagesRead = readPages.length;
   const pagesRemaining = TOTAL_QURAN_PAGES - pagesRead;
   const progressPercentage = Math.round((pagesRead / TOTAL_QURAN_PAGES) * 100);
   
@@ -496,6 +562,39 @@ export const getPageSurah = (pageNumber: number): string => {
   }
   
   return surahName;
+};
+
+/**
+ * Reset a khatma (start new cycle — clears readPages, keeps settings)
+ */
+export const resetKhatma = async (khatmaId: string): Promise<Khatma | null> => {
+  try {
+    const khatma = await getKhatma(khatmaId);
+    if (!khatma) return null;
+
+    const now = new Date();
+    khatma.readPages = [];
+    khatma.currentPage = 1;
+    khatma.completedDays = 0;
+    khatma.dailyProgress = [];
+    khatma.isCompleted = false;
+    khatma.lastReadDate = null;
+    khatma.startDate = getTodayDateString();
+    khatma.endDate = calculateEndDate(now, khatma.durationDays);
+
+    await updateKhatma(khatma);
+
+    // Re-schedule reminder if enabled
+    if (khatma.reminderEnabled && khatma.reminderTime) {
+      const { scheduleKhatmaReminder } = require('../lib/khatma-notifications');
+      await scheduleKhatmaReminder(khatma);
+    }
+
+    return khatma;
+  } catch (error) {
+    console.error('Error resetting khatma:', error);
+    return null;
+  }
 };
 
 /**

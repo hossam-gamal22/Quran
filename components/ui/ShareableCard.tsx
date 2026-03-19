@@ -1,5 +1,5 @@
 // components/ui/ShareableCard.tsx
-// بطاقة قابلة للمشاركة كصورة أو نص
+// بطاقة قابلة للمشاركة كصورة أو نص — مع دعم خط المصحف QCF
 
 import React, { useRef, useState, useEffect } from 'react';
 import {
@@ -11,6 +11,8 @@ import {
   Alert,
   Image,
   ImageBackground,
+  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import ViewShot from 'react-native-view-shot';
@@ -22,9 +24,15 @@ import { shareText, shareImage, copyText } from '@/lib/share-service';
 import { t } from '@/lib/i18n';
 import { getAppName } from '@/constants/app';
 import { CARD_COLORS as THEME_CARD_COLORS } from '@/constants/theme';
+import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useAppIdentity } from '@/hooks/use-app-identity';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+
+const basmalaImg = require('@/assets/images/quran/basmala.png');
+
 interface ShareableCardProps {
   arabicText: string;
   title?: string;
@@ -33,6 +41,10 @@ interface ShareableCardProps {
   translation?: string;
   onClose?: () => void;
   visible: boolean;
+  /** QCF rendering — pass surahNumber, ayahNumber, page to render with Mushaf font */
+  surahNumber?: number;
+  ayahNumber?: number;
+  page?: number;
 }
 
 const CARD_COLORS = THEME_CARD_COLORS;
@@ -55,14 +67,44 @@ export function ShareableCard({
   translation,
   onClose,
   visible,
+  surahNumber,
+  ayahNumber,
+  page,
 }: ShareableCardProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const { logoSource } = useAppIdentity();
+  const { isPremium } = useSubscription();
   const viewShotRef = useRef<ViewShot>(null);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedBackground, setSelectedBackground] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<'color' | 'image'>('color');
+
+  // QCF font state
+  const hasQcfData = !!(surahNumber && ayahNumber && page);
+  const [qcfFontLoaded, setQcfFontLoaded] = useState(false);
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
+  const [qcfPage, setQcfPage] = useState<number>(page ?? 0);
+
+  // Load QCF font when modal opens and QCF data is available
+  useEffect(() => {
+    if (!visible || !hasQcfData) return;
+    const verseData = getVerseQcfData(surahNumber!, ayahNumber!);
+    if (!verseData) return;
+    setQcfGlyphs(verseData.glyphs);
+    setQcfPage(verseData.page);
+    if (isPageFontLoaded(verseData.page, false)) {
+      setQcfFontLoaded(true);
+      return;
+    }
+    loadPageFont(verseData.page, false)
+      .then(() => setQcfFontLoaded(true))
+      .catch(() => setQcfFontLoaded(false));
+  }, [visible, hasQcfData, surahNumber, ayahNumber]);
+
+  const qcfFontFamily = qcfPage ? getPageFontFamily(qcfPage, false) : '';
+  const CARD_WIDTH = Dimensions.get('window').width - 40; // viewShot marginHorizontal: 20
+  const qcfFontSize = qcfPage ? getQcfFontSize(qcfPage, CARD_WIDTH - 56, 0) : 22;
 
   // Load saved preferences
   useEffect(() => {
@@ -130,6 +172,53 @@ export function ShareableCard({
     setBackgroundMode('image');
   };
 
+  // Shared card content — uses QCF when available, falls back to plain Arabic
+  const useQcf = hasQcfData && qcfFontLoaded && qcfGlyphs && qcfGlyphs.length > 0;
+
+  const renderCardContent = () => (
+    <>
+      {/* Basmala image when QCF mode */}
+      {useQcf && (
+        <Image
+          source={basmalaImg}
+          style={styles.basmalaImage}
+          resizeMode="contain"
+          tintColor="rgba(255,255,255,0.7)"
+        />
+      )}
+      {title ? <Text style={styles.cardTitle}>{title}</Text> : null}
+      {useQcf ? (
+        qcfFontLoaded ? (
+          <Text
+            style={[styles.cardArabicQcf, {
+              fontFamily: qcfFontFamily,
+              fontSize: qcfFontSize,
+              lineHeight: qcfFontSize * 1.85,
+            }]}
+            allowFontScaling={false}
+          >
+            {qcfGlyphs!.join('')}
+          </Text>
+        ) : (
+          <ActivityIndicator size="small" color="#fff" style={{ marginVertical: 20 }} />
+        )
+      ) : (
+        <Text style={styles.cardArabic}>{arabicText}</Text>
+      )}
+      {translation ? <Text style={styles.cardTranslation}>{translation}</Text> : null}
+      {reference ? <Text style={styles.cardReference}>{reference}</Text> : null}
+      {!isPremium && (
+        <View style={styles.logoWatermarkRow}>
+          <Image
+            source={logoSource}
+            style={styles.logoWatermark}
+            resizeMode="contain"
+          />
+        </View>
+      )}
+    </>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -176,32 +265,12 @@ export function ShareableCard({
             {backgroundMode === 'image' ? (
               <ImageBackground source={selectedImage} style={styles.card} imageStyle={{ borderRadius: 20 }}>
                 <View style={styles.imageOverlay} />
-                {title ? <Text style={styles.cardTitle}>{title}</Text> : null}
-                <Text style={styles.cardArabic}>{arabicText}</Text>
-                {translation ? <Text style={styles.cardTranslation}>{translation}</Text> : null}
-                {reference ? <Text style={styles.cardReference}>{reference}</Text> : null}
-                <View style={styles.logoWatermarkRow}>
-                  <Image
-                    source={logoSource}
-                    style={styles.logoWatermark}
-                    resizeMode="contain"
-                  />
-                </View>
+                {renderCardContent()}
               </ImageBackground>
             ) : (
               <View style={[styles.card, { backgroundColor: selectedCardColor }]}> 
                 <View style={[StyleSheet.absoluteFill, styles.colorOverlay]} />
-                {title ? <Text style={styles.cardTitle}>{title}</Text> : null}
-                <Text style={styles.cardArabic}>{arabicText}</Text>
-                {translation ? <Text style={styles.cardTranslation}>{translation}</Text> : null}
-                {reference ? <Text style={styles.cardReference}>{reference}</Text> : null}
-                <View style={styles.logoWatermarkRow}>
-                  <Image
-                    source={logoSource}
-                    style={styles.logoWatermark}
-                    resizeMode="contain"
-                  />
-                </View>
+                {renderCardContent()}
               </View>
             )}
           </ViewShot>
@@ -334,6 +403,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     lineHeight: 38,
+  },
+  cardArabicQcf: {
+    color: '#fff',
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    paddingHorizontal: 4,
+  },
+  basmalaImage: {
+    width: '60%',
+    height: 24,
+    marginBottom: 12,
+    opacity: 0.8,
   },
   cardTranslation: {
     fontSize: 14,

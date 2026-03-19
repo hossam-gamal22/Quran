@@ -105,7 +105,7 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
 
             {/* شريط التقدم */}
             <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarBg, isRTL && { transform: [{ scaleX: -1 }] }]}>
                 <Animated.View
                   style={[styles.progressBarFill, { width: `${progress}%` }]}
                 />

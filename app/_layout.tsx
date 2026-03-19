@@ -172,6 +172,15 @@ const SplashGate = ({ fontsReady }: { fontsReady: boolean }) => {
 // double-reversal: Yoga flips row→RTL, then row-reverse flips it back to LTR.
 // Instead, all RTL layout is handled manually via useIsRTL() hook.
 const RTLWrapper = ({ children }: { children: React.ReactNode }) => {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center' }}>
+        <View style={{ flex: 1, width: '100%', maxWidth: 480 } as any}>
+          {children}
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={{ flex: 1 }}>
       {children}

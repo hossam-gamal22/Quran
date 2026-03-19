@@ -4,14 +4,14 @@
  * حفظ الآيات مع ملاحظات، تصديرها كصور جاهزة للمشاركة
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert, ActivityIndicator, Platform,
-  ScrollView, Share, LayoutAnimation, UIManager,
+  ScrollView, Share, LayoutAnimation, UIManager, Image, Dimensions,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -33,13 +33,7 @@ import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFavoriteAzkar, removeFromFavorites, Zikr } from '@/lib/azkar-api';
-import {
-  getColoredBookmarks,
-  removeColoredBookmark,
-  type ColoredBookmark,
-  BOOKMARK_COLORS,
-  BOOKMARK_COLOR_LABELS,
-} from '@/lib/quran-bookmarks';
+
 import {
   getFavorites as getUnifiedFavorites,
   removeFavorite,
@@ -50,6 +44,12 @@ import {
 import { ALLAH_NAMES, type AllahName } from '@/app/names';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useAppIdentity } from '@/hooks/use-app-identity';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
+
+const basmalaImg = require('@/assets/images/quran/basmala.png');
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -71,13 +71,41 @@ interface ExportCardProps {
   theme: typeof CARD_THEMES[0];
   cardRef: React.RefObject<ViewShot>;
   t: (key: string) => string;
+  logoSource?: any;
+  isPremium?: boolean;
 }
 
-function ExportCard({ bookmark, theme, cardRef, t }: ExportCardProps) {
+function ExportCard({ bookmark, theme, cardRef, t, logoSource, isPremium }: ExportCardProps) {
+  const CARD_WIDTH = 360;
+  const [qcfReady, setQcfReady] = useState(false);
+  const [qcfGlyphs, setQcfGlyphs] = useState<string[] | null>(null);
+  const [qcfPage, setQcfPage] = useState<number>(0);
+  const isPageBookmark = bookmark.id.startsWith('page_');
+
+  // Load QCF font for verse bookmarks
+  useEffect(() => {
+    if (isPageBookmark || !bookmark.surahNumber || !bookmark.ayahNumber) return;
+    const verseData = getVerseQcfData(bookmark.surahNumber, bookmark.ayahNumber);
+    if (!verseData) return;
+    setQcfGlyphs(verseData.glyphs);
+    setQcfPage(verseData.page);
+    if (isPageFontLoaded(verseData.page, false)) {
+      setQcfReady(true);
+      return;
+    }
+    loadPageFont(verseData.page, false)
+      .then(() => setQcfReady(true))
+      .catch(() => setQcfReady(false));
+  }, [bookmark.surahNumber, bookmark.ayahNumber, isPageBookmark]);
+
+  const qcfFontFamily = qcfPage ? getPageFontFamily(qcfPage, false) : '';
+  const qcfFontSize = qcfPage ? getQcfFontSize(qcfPage, CARD_WIDTH - 56, 0) : 22;
+  const useQcf = qcfReady && qcfGlyphs && qcfGlyphs.length > 0;
+
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0 }}>
       <View style={{
-        width: 360,
+        width: CARD_WIDTH,
         backgroundColor: theme.bg,
         borderRadius: 20,
         padding: 28,
@@ -85,32 +113,47 @@ function ExportCard({ bookmark, theme, cardRef, t }: ExportCardProps) {
         borderWidth: 0.5,
         borderColor: 'rgba(255,255,255,0.08)',
       }}>
-        {/* Top ornament */}
-        <Text style={{ fontSize: 28, marginBottom: 16, opacity: 0.8 }}>☽</Text>
-
-        {/* Bismillah */}
-        <Text style={{
-          fontSize: 16, color: theme.accent, fontWeight: '700',
-          marginBottom: 18, opacity: 0.9, letterSpacing: 1,
-        }}>
-          بسم الله الرحمن الرحيم
-        </Text>
+        {/* Basmala image */}
+        <Image
+          source={basmalaImg}
+          style={{ width: CARD_WIDTH * 0.55, height: 24, marginBottom: 16, opacity: 0.7 }}
+          resizeMode="contain"
+          tintColor={theme.accent}
+        />
 
         {/* Divider */}
         <View style={{ width: 60, height: 2, backgroundColor: theme.accent, opacity: 0.5, marginBottom: 20, borderRadius: 1 }} />
 
-        {/* Arabic text */}
-        <Text style={{
-          fontSize: 22,
-          color: theme.text,
-          textAlign: 'center',
-          lineHeight: 42,
-          fontWeight: '600',
-          marginBottom: 20,
-          paddingHorizontal: 8,
-        }}>
-          {bookmark.ayahText}
-        </Text>
+        {/* Arabic text — QCF or fallback */}
+        {useQcf ? (
+          <Text
+            style={{
+              fontFamily: qcfFontFamily,
+              fontSize: qcfFontSize,
+              lineHeight: qcfFontSize * 1.85,
+              color: theme.text,
+              textAlign: 'center',
+              writingDirection: 'rtl',
+              marginBottom: 20,
+              paddingHorizontal: 4,
+            }}
+            allowFontScaling={false}
+          >
+            {qcfGlyphs!.join('')}
+          </Text>
+        ) : (
+          <Text style={{
+            fontSize: 22,
+            color: theme.text,
+            textAlign: 'center',
+            lineHeight: 42,
+            fontWeight: '600',
+            marginBottom: 20,
+            paddingHorizontal: 8,
+          }}>
+            {bookmark.ayahText}
+          </Text>
+        )}
 
         {/* Divider */}
         <View style={{ width: 60, height: 2, backgroundColor: theme.accent, opacity: 0.5, marginBottom: 16, borderRadius: 1 }} />
@@ -126,7 +169,7 @@ function ExportCard({ bookmark, theme, cardRef, t }: ExportCardProps) {
           marginBottom: 12,
         }}>
           <Text style={{ color: theme.accent, fontWeight: '800', fontSize: 14 }}>
-            ﴿ {bookmark.surahName} • {t('favorites.verse')} {bookmark.ayahNumber} ﴾
+            ﴿ {bookmark.surahName} • {isPageBookmark ? t('quran.page') : t('favorites.verse')} {bookmark.ayahNumber} ﴾
           </Text>
         </View>
 
@@ -137,10 +180,14 @@ function ExportCard({ bookmark, theme, cardRef, t }: ExportCardProps) {
           </Text>
         ) : null}
 
-        {/* Bottom watermark */}
-        <Text style={{ color: theme.accent, opacity: 0.45, fontSize: 10, marginTop: 18 }}>
-          القرآن الكريم
-        </Text>
+        {/* Bottom branding — hidden for premium */}
+        {!isPremium && logoSource && (
+          <Image
+            source={logoSource}
+            style={{ width: 40, height: 40, borderRadius: 10, opacity: 0.8, marginTop: 18 }}
+            resizeMode="contain"
+          />
+        )}
       </View>
     </ViewShot>
   );
@@ -175,11 +222,13 @@ function getFallbackRoute(item: FavoriteItem): string | null {
 export default function FavoritesScreen() {
   const { isDarkMode, settings, t } = useSettings();
   const isRTL = useIsRTL();
+  const { logoSource } = useAppIdentity();
+  const { isPremium } = useSubscription();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'quran' | 'bookmarks' | 'azkar' | 'other'>('quran');
+  const [activeTab, setActiveTab] = useState<'quran' | 'azkar' | 'other'>('quran');
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [azkarFavorites, setAzkarFavorites] = useState<Zikr[]>([]);
-  const [coloredBookmarks, setColoredBookmarks] = useState<ColoredBookmark[]>([]);
+
   const [namesFavorites, setNamesFavorites] = useState<AllahName[]>([]);
   const [otherFavorites, setOtherFavorites] = useState<FavoriteItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,6 +244,7 @@ export default function FavoritesScreen() {
   const cardRef = useRef<ViewShot>(null!);
 
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   // Local overrides for glass card and accent that differ from hook values
   const cardBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
   const cardBorder = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
@@ -216,8 +266,7 @@ export default function FavoritesScreen() {
     setBookmarks(bms);
     const favAzkar = await getFavoriteAzkar();
     setAzkarFavorites(favAzkar);
-    const colored = await getColoredBookmarks();
-    setColoredBookmarks(colored);
+
     // Load names favorites
     try {
       const savedIds = await AsyncStorage.getItem('allah_names_favorites');
@@ -240,10 +289,15 @@ export default function FavoritesScreen() {
     sortBy === 'date' ? b.createdAt - a.createdAt : a.surahNumber - b.surahNumber
   );
 
-  // Navigate to Quran ayah
+  // Navigate to Quran ayah or page
   const navigateToAyah = useCallback((bookmark: Bookmark) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/surah/${bookmark.surahNumber}?ayah=${bookmark.ayahNumber}`);
+    // Detect page bookmark by ID pattern
+    if (bookmark.id.startsWith('page_')) {
+      router.push(`/surah/${bookmark.surahNumber}?page=${bookmark.ayahNumber}`);
+    } else {
+      router.push(`/surah/${bookmark.surahNumber}?ayah=${bookmark.ayahNumber}`);
+    }
   }, [router]);
 
   // Navigate to Azkar category
@@ -254,9 +308,10 @@ export default function FavoritesScreen() {
 
   // Delete bookmark
   const handleDelete = useCallback((bookmark: Bookmark) => {
+    const label = bookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse');
     Alert.alert(
       t('favorites.deleteConfirm'),
-      `${bookmark.surahName} - ${t('favorites.verse')} ${bookmark.ayahNumber}`,
+      `${bookmark.surahName} - ${label} ${bookmark.ayahNumber}`,
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -269,7 +324,7 @@ export default function FavoritesScreen() {
         },
       ]
     );
-  }, [loadBookmarks]);
+  }, [loadBookmarks, t]);
 
   // Save note
   const handleSaveNote = useCallback(async () => {
@@ -332,8 +387,9 @@ export default function FavoritesScreen() {
         );
       } else {
         // Web: share text
+        const label = selectedBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse');
         await Share.share({
-          message: `${selectedBookmark.ayahText}\n\n﴿ ${selectedBookmark.surahName} • ${t('favorites.verse')} ${selectedBookmark.ayahNumber} ﴾\n\n${t('common.appName')}`,
+          message: `${selectedBookmark.ayahText}\n\n﻿ ﴿ ${selectedBookmark.surahName} • ${label} ${selectedBookmark.ayahNumber} ﴾\n\n${t('common.appName')}`,
         });
       }
     } catch (e) {
@@ -345,8 +401,9 @@ export default function FavoritesScreen() {
 
   // Share as text
   const handleShareText = useCallback(async (bookmark: Bookmark) => {
+    const label = bookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse');
     await Share.share({
-      message: `${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • ${t('favorites.verse')} ${bookmark.ayahNumber} ﴾\n\n${t('common.appName')} 🕌`,
+      message: `${bookmark.ayahText}\n\n﴿ ${bookmark.surahName} • ${label} ${bookmark.ayahNumber} ﴾\n\n${t('common.appName')} 🕌`,
       title: `${t('favorites.verseFrom')} ${bookmark.surahName}`,
     });
   }, [t]);
@@ -586,10 +643,11 @@ export default function FavoritesScreen() {
       justifyContent: 'center',
       alignItems: 'center',
       padding: 16,
+      paddingTop: insets.top + 16,
     },
     modalClose: {
       position: 'absolute',
-      top: 50,
+      top: insets.top + 10,
       right: 20,
       zIndex: 10,
       backgroundColor: 'rgba(255,255,255,0.2)',
@@ -735,7 +793,9 @@ export default function FavoritesScreen() {
               style={s.surahBadge}
               onPress={() => navigateToAyah(item)}
             >
-              <Text style={s.surahBadgeText}>{item.surahName} • {item.ayahNumber}</Text>
+              <Text style={s.surahBadgeText}>
+                {item.surahName} • {item.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} {item.ayahNumber}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -762,7 +822,15 @@ export default function FavoritesScreen() {
           <View style={s.actionDivider} />
           <TouchableOpacity
             style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={() => { setSelectedBookmark(item); setShowExportModal(true); }}
+            onPress={() => {
+              if (item.id.startsWith('page_')) {
+                // Page bookmarks → navigate to Mushaf and auto-share as screenshot
+                router.push(`/surah/${item.surahNumber}?page=${item.ayahNumber}&autoShare=true`);
+              } else {
+                setSelectedBookmark(item);
+                setShowExportModal(true);
+              }
+            }}
           >
             <MaterialCommunityIcons name="image-outline" size={18} color={accent} />
             <Text style={[s.actionText, { color: accent }]}>{t('favorites.image')}</Text>
@@ -846,7 +914,6 @@ export default function FavoritesScreen() {
           <NativeTabs
             tabs={[
               { key: 'quran', label: `${t('favorites.quran')} (${bookmarks.length})` },
-              { key: 'bookmarks', label: `${t('favorites.bookmarks')} (${coloredBookmarks.length})` },
               { key: 'azkar', label: `${t('favorites.azkar')} (${azkarFavorites.length})` },
               { key: 'other', label: `${t('favorites.other')} (${otherFavorites.length + namesFavorites.length})` },
             ]}
@@ -894,75 +961,6 @@ export default function FavoritesScreen() {
                 <Text style={s.emptyTitle}>{t('favorites.noQuranFavorites')}</Text>
                 <Text style={s.emptyText}>
                   {t('favorites.addQuranHint')}
-                </Text>
-              </View>
-            }
-          />
-        ) : activeTab === 'bookmarks' ? (
-          <FlatList
-            data={coloredBookmarks}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 100, paddingTop: 4, paddingHorizontal: 16 }}
-            renderItem={({ item, index }) => (
-              <Animated.View entering={FadeInDown.delay(index * 40).duration(300)}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push(`/surah/${item.surahNumber}?ayah=${item.ayahNumber}`);
-                  }}
-                  onLongPress={() => {
-                    Alert.alert(
-                      t('favorites.deleteBookmarkConfirm'),
-                      `${item.surahName} - ${t('favorites.verse')} ${item.ayahNumber}`,
-                      [
-                        { text: t('common.cancel'), style: 'cancel' },
-                        {
-                          text: t('common.delete'), style: 'destructive',
-                          onPress: async () => {
-                            await removeColoredBookmark(item.id);
-                            const updated = await getColoredBookmarks();
-                            setColoredBookmarks(updated);
-                          },
-                        },
-                      ]
-                    );
-                  }}
-                  style={{
-                    backgroundColor: cardBg,
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: 8,
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
-                    alignItems: 'center',
-                    gap: 10,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: cardBorder,
-                    borderLeftWidth: isRTL ? 0 : 4,
-                    borderLeftColor: isRTL ? undefined : BOOKMARK_COLORS[item.color],
-                    borderRightWidth: isRTL ? 4 : 0,
-                    borderRightColor: isRTL ? BOOKMARK_COLORS[item.color] : undefined,
-                  }}
-                >
-                  <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={{ fontFamily: fontSemiBold(), fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }}>
-                      {item.surahName} - {t('favorites.verse')} {item.ayahNumber}
-                    </Text>
-                    <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.muted, marginTop: 2 }}>
-                      {t('common.page')} {item.page} • {t(BOOKMARK_COLOR_LABELS[item.color])}
-                    </Text>
-                  </View>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: BOOKMARK_COLORS[item.color] }} />
-                </TouchableOpacity>
-              </Animated.View>
-            )}
-            ListEmptyComponent={
-              <View style={s.emptyWrap}>
-                <MaterialCommunityIcons name="bookmark-outline" size={52} color={colors.muted} style={{ marginBottom: 20 }} />
-                <Text style={s.emptyTitle}>{t('favorites.noBookmarks')}</Text>
-                <Text style={s.emptyText}>
-                  {t('favorites.addBookmarkHint')}
                 </Text>
               </View>
             }
@@ -1167,6 +1165,8 @@ export default function FavoritesScreen() {
                     theme={selectedTheme}
                     cardRef={cardRef}
                     t={t}
+                    logoSource={logoSource}
+                    isPremium={isPremium}
                   />
                 </View>
               )}
@@ -1216,7 +1216,7 @@ export default function FavoritesScreen() {
             <Text style={[s.noteTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('favorites.addNote')}</Text>
             {editingBookmark && (
               <Text style={{ color: accent, textAlign: isRTL ? 'right' : 'left', fontSize: 14, marginBottom: 10, fontFamily: fontBold() }}>
-                {editingBookmark.surahName} • {t('favorites.verse')} {editingBookmark.ayahNumber}
+                {editingBookmark.surahName} • {editingBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} {editingBookmark.ayahNumber}
               </Text>
             )}
             <TextInput

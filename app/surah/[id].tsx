@@ -70,7 +70,7 @@ function getTargetAyahBg(themeIndex: number): string {
   const b = parseInt(hex.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, 0.40)`;
 }
-import { setLastRead, addBookmark, removeBookmark, isBookmarked } from '@/lib/storage';
+import { setLastRead, addBookmark, removeBookmark, getBookmarks } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
 import { ShareableCard } from '@/components/ui/ShareableCard';
 import { shareImage } from '@/lib/share-service';
@@ -78,6 +78,7 @@ import {
   buildPageBlocks,
   getJuzForPage,
   getFirstSurahOnPage,
+  getFirstAyahOnPage,
   getSurahStartPage,
   getSurahData,
   getQcfFontSize,
@@ -289,17 +290,17 @@ const MushafPage = React.memo(function MushafPage({
   // Dynamic font scaling: only boost very sparse pages, avoid cramping dense ones
   const contentLineCount = blocks.filter(b => b.type === 'ayah' || b.type === 'basmallah').length;
   const dynamicBoost = contentLineCount <= 5 ? 3 : contentLineCount <= 7 ? 1 : 0;
-  const fontSize = getQcfFontSize(page, width - 16, fontSizeAdjust + dynamicBoost);
+  const fontSize = getQcfFontSize(page, width - 32, fontSizeAdjust + dynamicBoost);
 
   // Use a tighter line height for dense pages to prevent overflow
   const lineHeight = contentLineCount >= 14
-    ? fontSize * 1.55
+    ? fontSize * 1.65
     : contentLineCount >= 11
-      ? fontSize * 1.6
-      : fontSize * 1.7;
+      ? fontSize * 1.75
+      : fontSize * 1.9;
 
-  // Add a small top padding when using QCF per-page fonts to avoid glyph clipping
-  const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.08) : 0;
+  // Add top/bottom padding when using QCF per-page fonts to avoid glyph clipping (letters like ك، ل، ط)
+  const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.18) : 0;
 
   // Font loading state
   if (!fontLoaded && !fontError) {
@@ -333,17 +334,20 @@ const MushafPage = React.memo(function MushafPage({
 
   return (
     <ScrollView
-      style={{ width }}
+      style={{ width, flex: 1 }}
       contentContainerStyle={{
         flexGrow: 1,
         justifyContent: 'flex-start',
         paddingTop: 12,
         paddingBottom: 44,
-        paddingHorizontal: 8,
+        paddingHorizontal: 16,
         minHeight: MIN_PAGE_HEIGHT,
       }}
       showsVerticalScrollIndicator={false}
       bounces={false}
+      nestedScrollEnabled
+      directionalLockEnabled
+      scrollEventThrottle={16}
     >
       {blocks.map((block, i) => {
         if (block.type === 'surah_name') {
@@ -380,9 +384,10 @@ const MushafPage = React.memo(function MushafPage({
                   fontSize,
                   textAlign: 'center',
                   lineHeight,
+                  letterSpacing: 0,
                   writingDirection: 'rtl',
                   paddingTop: extraTopPadding,
-                  paddingBottom: extraTopPadding > 0 ? 2 : 0,
+                  paddingBottom: extraTopPadding > 0 ? Math.ceil(fontSize * 0.1) : 0,
                 }}
                 allowFontScaling={false}
               >
@@ -591,8 +596,8 @@ const gh = StyleSheet.create({
 // ══════════════════════════════════════════════
 
 export default function SurahScreen() {
-  const { id, ayah: targetAyahParam, page: targetPageParam } =
-    useLocalSearchParams<{ id: string; ayah?: string; page?: string }>();
+  const { id, ayah: targetAyahParam, page: targetPageParam, autoShare: autoShareParam } =
+    useLocalSearchParams<{ id: string; ayah?: string; page?: string; autoShare?: string }>();
   const surahNumber = parseInt(id || '1');
   const targetAyah = targetAyahParam ? parseInt(targetAyahParam) : undefined;
 
@@ -650,7 +655,44 @@ export default function SurahScreen() {
   const flatListRef = useRef<FlatList>(null);
   const pageViewShotRef = useRef<ViewShot>(null);
   const trackedPagesRef = useRef<Set<number>>(new Set());
+  const trackedPagesLoadedRef = useRef(false);
+  const pendingPagesRef = useRef<number[]>([]);
   const { addPagesRead } = useQuranTracker();
+  const TRACKED_PAGES_KEY = '@quran_tracked_pages_khatma';
+
+  // Load already-tracked pages for current khatma on mount
+  useEffect(() => {
+    const loadTrackedPages = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(TRACKED_PAGES_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.pages)) {
+            trackedPagesRef.current = new Set(parsed.pages);
+          }
+        }
+      } catch {}
+      trackedPagesLoadedRef.current = true;
+      // Process any pages that were visited before load finished
+      for (const page of pendingPagesRef.current) {
+        if (!trackedPagesRef.current.has(page)) {
+          trackedPagesRef.current.add(page);
+          addPagesRead(1).catch(() => {});
+        }
+      }
+      pendingPagesRef.current = [];
+      // Persist after processing pending
+      if (trackedPagesRef.current.size >= 604) {
+        trackedPagesRef.current = new Set();
+        AsyncStorage.setItem(TRACKED_PAGES_KEY, JSON.stringify({ pages: [] })).catch(() => {});
+      } else {
+        AsyncStorage.setItem(TRACKED_PAGES_KEY, JSON.stringify({
+          pages: Array.from(trackedPagesRef.current),
+        })).catch(() => {});
+      }
+    };
+    loadTrackedPages();
+  }, []);
 
   // Initial page
   const initialPage = useMemo(() => {
@@ -704,7 +746,7 @@ export default function SurahScreen() {
   const [showAyahMenu, setShowAyahMenu] = useState(false);
   const [selectedAyah, setSelectedAyah] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [showShareCard, setShowShareCard] = useState(false);
-  const [shareData, setShareData] = useState<{ text: string; title: string; reference: string } | null>(null);
+  const [shareData, setShareData] = useState<{ text: string; title: string; reference: string; surahNumber?: number; ayahNumber?: number; page?: number } | null>(null);
 
   // Tafsir
   const [showTafsir, setShowTafsir] = useState(false);
@@ -750,27 +792,53 @@ export default function SurahScreen() {
 
   // ── Page favorites (heart icon in header) ──
   const [isPageFavorited, setIsPageFavorited] = useState(false);
+  const pageFirstAyah = useMemo(() => getFirstAyahOnPage(currentPage), [currentPage]);
+
   useEffect(() => {
-    isBookmarked(surahNumber, 1).then(setIsPageFavorited);
-  }, [surahNumber]);
+    // Check for page bookmark with ID pattern: page_{pageNumber}
+    getBookmarks().then(bms => {
+      const pageId = `page_${currentPage}`;
+      setIsPageFavorited(bms.some(b => b.id === pageId));
+    });
+  }, [currentPage]);
 
   const handleToggleFavorite = useCallback(async () => {
-    const surahData = getSurahData(surahNumber);
-    const firstAyahText = surahData?.ayahs?.[0]?.t || '';
+    const pageId = `page_${currentPage}`;
     if (isPageFavorited) {
-      await removeBookmark(`${surahNumber}_1`);
+      await removeBookmark(pageId);
       setIsPageFavorited(false);
     } else {
-      await addBookmark({
-        surahNumber,
-        ayahNumber: 1,
-        surahName: getSurahName(surahNumber),
-        ayahText: firstAyahText,
-      });
+      // Collect all ayah texts on this page
+      const blocks = buildPageBlocks(currentPage);
+      const seen = new Set<string>();
+      const ayahTexts: string[] = [];
+      for (const block of blocks) {
+        if (block.type !== 'ayah' || !block.segments) continue;
+        for (const seg of block.segments) {
+          const key = `${seg.surah}:${seg.ayah}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const sd = getSurahData(seg.surah);
+          const ad = sd?.ayahs?.find((a: any) => a.ns === seg.ayah);
+          if (ad?.t) ayahTexts.push(ad.t);
+        }
+      }
+      // Use page-based bookmark ID pattern and store page number in ayahNumber
+      const bms = await getBookmarks();
+      const filtered = bms.filter(b => b.id !== pageId);
+      const newBookmark = {
+        id: pageId,
+        surahNumber: pageFirstAyah.surah,
+        ayahNumber: currentPage, // store page number
+        surahName: getSurahName(pageFirstAyah.surah),
+        ayahText: ayahTexts.join(' '),
+        createdAt: Date.now(),
+      };
+      await AsyncStorage.setItem('@quran_bookmarks', JSON.stringify([newBookmark, ...filtered]));
       setIsPageFavorited(true);
     }
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [isPageFavorited, surahNumber]);
+  }, [isPageFavorited, currentPage, pageFirstAyah]);
 
   // Currently playing ayah key for highlighting
   const playingAyahKey = useMemo(() => {
@@ -861,10 +929,29 @@ export default function SurahScreen() {
     if (surah) {
       setLastRead({ surahNumber: surah.number, ayahNumber: 1, surahName: getSurahName(surah.number) });
     }
-    // Track page read for worship stats
-    if (!trackedPagesRef.current.has(currentPage)) {
+    // Track page read for worship stats (unique per khatma)
+    if (!trackedPagesLoadedRef.current) {
+      // Storage hasn't loaded yet — queue this page for later check
+      if (!pendingPagesRef.current.includes(currentPage)) {
+        pendingPagesRef.current.push(currentPage);
+      }
+    } else if (!trackedPagesRef.current.has(currentPage)) {
       trackedPagesRef.current.add(currentPage);
       addPagesRead(1).catch(() => {});
+      
+      // Check if khatma is complete (604 pages)
+      if (trackedPagesRef.current.size >= 604) {
+        // Reset for next khatma
+        trackedPagesRef.current = new Set();
+        AsyncStorage.setItem(TRACKED_PAGES_KEY, JSON.stringify({
+          pages: [],
+        })).catch(() => {});
+      } else {
+        // Persist tracked pages for current khatma
+        AsyncStorage.setItem(TRACKED_PAGES_KEY, JSON.stringify({
+          pages: Array.from(trackedPagesRef.current),
+        })).catch(() => {});
+      }
     }
   }, [currentPage]);
 
@@ -875,8 +962,8 @@ export default function SurahScreen() {
 
   const handlePlayPage = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const sn = getFirstSurahOnPage(currentPage);
-    playAyah(sn, 1, true);
+    const { surah, ayah } = getFirstAyahOnPage(currentPage);
+    playAyah(surah, ayah, true);
   }, [currentPage, playAyah]);
 
   const handleAyahLongPress = useCallback((surah: number, ayah: number, page: number) => {
@@ -926,6 +1013,9 @@ export default function SurahScreen() {
         text: ayahData.t,
         title: getSurahName(selectedAyah.surah),
         reference: `${getSurahName(selectedAyah.surah)} - ${t('quran.ayah')} ${selectedAyah.ayah}`,
+        surahNumber: selectedAyah.surah,
+        ayahNumber: selectedAyah.ayah,
+        page: ayahData.p,
       });
       setShowAyahMenu(false);
       setShowShareCard(true);
@@ -952,6 +1042,25 @@ export default function SurahScreen() {
 
   // Watermark for share — rendered off-screen, never visible to user
   const shareViewShotRef = useRef<ViewShot>(null);
+  const autoShareTriggeredRef = useRef(false);
+
+  // Auto-share: when navigated with ?autoShare=true, capture and share the page after font loads
+  useEffect(() => {
+    if (autoShareParam !== 'true' || autoShareTriggeredRef.current) return;
+    // Wait for the off-screen page font to load before capturing
+    const checkAndShare = async () => {
+      const page = currentPage;
+      if (!isPageFontLoaded(page, forceLightText ?? isDarkMode)) {
+        try { await loadPageFont(page, forceLightText ?? isDarkMode); } catch { return; }
+      }
+      // Small delay to ensure ViewShot has rendered the MushafPage
+      setTimeout(async () => {
+        autoShareTriggeredRef.current = true;
+        await handleSharePage();
+      }, 600);
+    };
+    checkAndShare();
+  }, [autoShareParam, currentPage, handleSharePage, forceLightText, isDarkMode]);
 
   const jumpToPage = useCallback((page: number) => {
     const idx = Math.max(0, Math.min(page - 1, TOTAL_PAGES - 1));
@@ -1045,6 +1154,8 @@ export default function SurahScreen() {
               maxToRenderPerBatch={2}
               initialNumToRender={3}
               removeClippedSubviews={Platform.OS !== 'web'}
+              directionalLockEnabled
+              disableIntervalMomentum
             />
           </View>
 
@@ -1076,7 +1187,7 @@ export default function SurahScreen() {
                     {/* Tappable left area (title + chevron) — collapses panel */}
                     <Pressable
                       onPress={() => setTafsirMinimized(true)}
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 6 }}
+                      style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 6 }}
                     >
                       <MaterialCommunityIcons name="book-open-page-variant-outline" size={18} color={goldenColor} />
                       <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: goldenColor, flex: 1 }}>
@@ -1160,8 +1271,8 @@ export default function SurahScreen() {
     >
       <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }} style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: themeBgColor }} collapsable={false}>
-          <ImageBackground source={bgSource} style={{ flex: 1 }} resizeMode="cover">
-            {/* Render current page for capture */}
+          <ImageBackground source={bgSource} style={{ flex: 1, paddingTop: 80, paddingBottom: 80 }} resizeMode="cover">
+            {/* Render current page for capture — empty bookmarkMap to remove highlights */}
             <MushafPage
               page={currentPage}
               themeIndex={themeIndex}
@@ -1169,7 +1280,7 @@ export default function SurahScreen() {
               fontSizeAdjust={fontSizeAdjust}
               forceLightText={forceLightText}
               useCdnImage={settings.display.quranUseCdnPages}
-              bookmarkMap={bookmarkMap}
+              bookmarkMap={{}}
               playingAyahKey={null}
               highlightAyahKey={null}
             />
@@ -1675,6 +1786,9 @@ export default function SurahScreen() {
               arabicText={shareData.text}
               title={shareData.title}
               reference={shareData.reference}
+              surahNumber={shareData.surahNumber}
+              ayahNumber={shareData.ayahNumber}
+              page={shareData.page}
               onClose={() => setShowShareCard(false)}
             />
           )}
@@ -1709,7 +1823,7 @@ const s = StyleSheet.create({
   // Share watermark (visible in captures)
   shareWatermark: {
     position: 'absolute',
-    bottom: 8,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: 'row-reverse',

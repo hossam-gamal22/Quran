@@ -48,12 +48,6 @@ const AYAH_COUNTS: number[] = [
   123,111,43,52,99,128,
 ];
 
-// Juz groupings (surah ranges)
-const JUZ_GROUPS = [
-  { juz: 1, surahs: [1,2], label: 'الجزء الأول' },
-  { juz: 2, surahs: [2], label: 'الجزء الثاني' },
-  { juz: 3, surahs: [2,3], label: 'الجزء الثالث' },
-];
 
 export default function KhatmScreen() {
   const colors = useColors();
@@ -305,7 +299,7 @@ export default function KhatmScreen() {
             <Text style={s.modalTitle}>{t('khatma.newKhatma')}</Text>
             <TextInput
               style={s.input}
-              placeholder={`ختمة ${new Date().toLocaleDateString(getDateLocale())}`}
+              placeholder={`${t('khatma.defaultName')} ${new Date().toLocaleDateString(getDateLocale())}`}
               placeholderTextColor={colors.muted}
               value={newKhatmName}
               onChangeText={setNewKhatmName}

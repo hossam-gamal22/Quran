@@ -323,7 +323,7 @@ export default function PrayerScreen() {
       console.error('Error fetching location:', err);
       const stored = await getStoredLocation();
       if (stored) return stored;
-      return { latitude: 21.4225, longitude: 39.8262, city: language === 'ar' ? 'مكة المكرمة' : 'Makkah', country: language === 'ar' ? 'السعودية' : 'Saudi Arabia' };
+      return { latitude: 21.4225, longitude: 39.8262, city: t('prayer.defaultCity'), country: t('prayer.defaultCountry') };
     }
   };
 

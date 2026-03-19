@@ -24,6 +24,7 @@ const PRESERVED_KEYS = [
   '@favorites',
   '@khatma_data',
   '@worship_data',
+  '@quran_tracked_pages_khatma',
 ];
 
 const PRESERVED_PREFIXES = [

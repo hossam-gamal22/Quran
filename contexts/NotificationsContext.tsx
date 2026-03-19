@@ -144,6 +144,22 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
             console.warn('Failed to play ayah audio from notification:', e);
           }
         }
+        // Play first ayah audio when Kahf Friday reminder arrives in foreground
+        if (data?.type === 'kahf' && data?.ayahAudioUrl) {
+          try {
+            const { sound } = await Audio.Sound.createAsync(
+              { uri: String(data.ayahAudioUrl) },
+              { shouldPlay: true }
+            );
+            sound.setOnPlaybackStatusUpdate((status) => {
+              if (status.isLoaded && status.didJustFinish) {
+                sound.unloadAsync();
+              }
+            });
+          } catch (e) {
+            console.warn('Failed to play Kahf ayah audio from notification:', e);
+          }
+        }
       }
     );
 
@@ -194,6 +210,27 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
           }
         } else if (data?.contentType === 'surah' && data?.surah) {
           router.push(`/surah/${data.surah}` as any);
+        }
+      } else if (data?.type === 'kahf') {
+        // Open Surah Al-Kahf in Mushaf reader
+        router.push('/surah/18' as any);
+        // Play first ayah audio after navigation
+        if (data?.ayahAudioUrl) {
+          setTimeout(async () => {
+            try {
+              const { sound } = await Audio.Sound.createAsync(
+                { uri: String(data.ayahAudioUrl) },
+                { shouldPlay: true }
+              );
+              sound.setOnPlaybackStatusUpdate((status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                  sound.unloadAsync();
+                }
+              });
+            } catch (e) {
+              console.warn('Failed to play Kahf ayah audio:', e);
+            }
+          }, 1500);
         }
       }
     });

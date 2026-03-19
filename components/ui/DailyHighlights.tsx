@@ -49,7 +49,8 @@ function getTodayDateString(): string {
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CIRCLE_SIZE = Math.round(SCREEN_WIDTH * 0.17);
+const WEB_MAX_WIDTH = Platform.OS === 'web' ? Math.min(SCREEN_WIDTH, 480) : SCREEN_WIDTH;
+const CIRCLE_SIZE = Math.round(WEB_MAX_WIDTH * 0.17);
 const RING_SIZE = CIRCLE_SIZE + 6;
 const ITEM_WIDTH = RING_SIZE + 8 + 14; // itemWrapper width + gap
 
@@ -66,9 +67,10 @@ interface DailyHighlight {
 interface DailyHighlightsProps {
   onStoryPress?: (storyId: string) => void;
   showReorderButton?: boolean;
+  onNextPrayerPress?: () => void;
 }
 
-const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton }) => {
+const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton, onNextPrayerPress }) => {
   const router = useRouter();
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
@@ -203,6 +205,10 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
 
   const handlePress = (highlight: DailyHighlight) => {
     onStoryPress?.(highlight.id);
+    if (highlight.id === 'next-prayer' && onNextPrayerPress) {
+      onNextPrayerPress();
+      return;
+    }
     if (highlight.htmlContent) {
       // Open HTML content in in-app webview
       router.push({ pathname: '/webview', params: { html: highlight.htmlContent, title: highlight.title } } as any);
@@ -353,7 +359,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={arrowColor} />
+          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 
@@ -445,7 +451,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           activeOpacity={0.6}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={arrowColor} />
+          <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={arrowColor} />
         </TouchableOpacity>
       )}
 

@@ -264,7 +264,7 @@ export default function TasbihScreen() {
   const [totalCount, setTotalCount] = useState(0);
   const [rounds, setRounds] = useState(0);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
-  const [autoAdvance, setAutoAdvance] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
   const [showTasbihList, setShowTasbihList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -351,7 +351,7 @@ export default function TasbihScreen() {
         const p = JSON.parse(settingsRaw);
         setVibrationEnabled(p.vibrationEnabled ?? true);
         setShowVirtue(p.showVirtue ?? false);
-        setAutoAdvance(p.autoAdvance ?? false);
+        setAutoAdvance(p.autoAdvance ?? true);
         setShowTranslation(p.showTranslation ?? false);
       }
       if (customRaw) setCustomTasbihat(JSON.parse(customRaw));
@@ -380,7 +380,7 @@ export default function TasbihScreen() {
             const p = JSON.parse(progressRaw);
             if (p.totalCount > 0 && p.selectedId) {
               const found = PRESET_TASBIHAT.find(t => t.id === p.selectedId);
-              const name = found ? found.text : 'تسبيح';
+              const name = found ? found.text : t('tabs.tasbih');
               dailyHistory[lastDate] = { [name]: p.totalCount };
             }
           } catch {}
@@ -628,7 +628,7 @@ export default function TasbihScreen() {
         {/* Header */}
         <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Right side in RTL: stats + tasbih list */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity onPress={() => setShowStatsModal(true)} style={s.headerBtn}>
               <MaterialCommunityIcons name="chart-bar" size={22} color={C.text} />
             </TouchableOpacity>
@@ -642,7 +642,7 @@ export default function TasbihScreen() {
             <SectionInfoButton sectionKey="tasbih" />
           </View>
           {/* Left side in RTL: settings + add custom */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
               <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
             </TouchableOpacity>

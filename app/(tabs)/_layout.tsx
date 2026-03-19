@@ -1,10 +1,10 @@
 // app/(tabs)/_layout.tsx
-// Native system tabs for iOS/Android behavior — icons + text labels
+// Bottom tabs using @react-navigation/bottom-tabs via expo-router Tabs
 // Tab order adapts to RTL/LTR: Home on the leading edge (left in LTR, right in RTL)
 
 import React from 'react';
-import { Platform, View } from 'react-native';
-import { NativeTabs, Label, Icon, VectorIcon } from 'expo-router/unstable-native-tabs';
+import { Platform } from 'react-native';
+import { Tabs } from 'expo-router';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -49,10 +49,6 @@ export default function TabsLayout() {
 
   const hasBg = settings?.display?.appBackground && settings.display.appBackground !== 'none';
 
-  const selectedStyle = { color: activeColor, fontFamily: fontSemiBold(), fontSize: LABEL_SIZE + 1 };
-
-  const isNative = Platform.OS !== 'web';
-
   // When a background is active, make tab bar transparent so the background shows through
   const tabBarBg = hasBg
     ? 'transparent'
@@ -62,25 +58,54 @@ export default function TabsLayout() {
   const tabOrder = isRTLMode ? RTL_ORDER : LTR_ORDER;
   const orderedTabs = tabOrder.map(name => TAB_CONFIG.find(tab => tab.name === name)!);
 
+  // All tab names for hiding unordered ones
+  const allTabNames = TAB_CONFIG.map(t => t.name);
+  // Extra route files in (tabs)/ that should be hidden from tab bar
+  const HIDDEN_ROUTES = [
+    'azkar', 'favorites', 'hijri-calendar', 'khatm',
+    'notifications-center', 'qibla', 'quran-search',
+    'recitations', 'tafsir-search', 'tasbih-placeholder', 'wird',
+  ];
+
   const tabs = (
-    <NativeTabs
+    <Tabs
       key={isRTLMode ? 'rtl' : 'ltr'}
-      disableTransparentOnScrollEdge
-      tintColor={activeColor}
-      labelStyle={{
-        fontFamily: fontMedium(),
-        fontSize: LABEL_SIZE,
-        color: inactiveColor,
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
+        tabBarLabelStyle: {
+          fontFamily: fontMedium(),
+          fontSize: LABEL_SIZE,
+        },
+        tabBarActiveBackgroundColor: undefined,
+        tabBarStyle: {
+          backgroundColor: tabBarBg,
+          borderTopColor: Platform.OS === 'ios' ? undefined : 'transparent',
+        },
       }}
-      backgroundColor={tabBarBg}
     >
       {orderedTabs.map((tab) => (
-        <NativeTabs.Trigger key={tab.name} name={tab.name} options={{ selectedLabelStyle: selectedStyle }}>
-          {isNative && <Icon src={<VectorIcon family={MaterialCommunityIcons} name={tab.iconName} />} />}
-          <Label>{resolveLabel(tab.labelKey)}</Label>
-        </NativeTabs.Trigger>
+        <Tabs.Screen
+          key={tab.name}
+          name={tab.name}
+          options={{
+            title: resolveLabel(tab.labelKey),
+            tabBarLabelStyle: {
+              fontFamily: fontMedium(),
+              fontSize: LABEL_SIZE,
+            },
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons name={tab.iconName} size={size} color={color} />
+            ),
+          }}
+        />
       ))}
-    </NativeTabs>
+      {/* Hide extra route files in (tabs) that aren't main tabs */}
+      {HIDDEN_ROUTES.map(name => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      ))}
+    </Tabs>
   );
 
   // Wrap in BackgroundWrapper when a background is active so img extends behind tab bar

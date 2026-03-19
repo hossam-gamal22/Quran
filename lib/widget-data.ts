@@ -263,8 +263,12 @@ export const preparePrayerWidgetData = async (
   const allPrayers = prayersList.map(prayer => {
     const time = prayerTimes?.[prayer as keyof PrayerTimes] as string || '--:--';
     const prayerDate = new Date();
-    const [hours, minutes] = time.split(':').map(Number);
-    prayerDate.setHours(hours, minutes, 0, 0);
+    const parts = time.split(':').map(Number);
+    const hours = parts[0] ?? 0;
+    const minutes = parts[1] ?? 0;
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      prayerDate.setHours(hours, minutes, 0, 0);
+    }
     
     return {
       name: prayerNames[prayer]?.en || prayer,

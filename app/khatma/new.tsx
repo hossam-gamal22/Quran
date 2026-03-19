@@ -311,7 +311,7 @@ export default function NewKhatmaScreen() {
               <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, marginBottom: Spacing.sm }]}>
                 {t('khatma.reminderDays')}
               </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: 8 }}>
                 {WEEK_DAYS.map((day) => {
                   const isSelected = selectedDays.includes(day.key);
                   return (

@@ -775,26 +775,76 @@
     {
       "id": 33,
       "category": "after_prayer",
-      "arabic": "سُبْحَانَ اللَّهِ (33) وَالْحَمْدُ لِلَّهِ (33) وَاللَّهُ أَكْبَرُ (33) لاَ إِلَـهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
-      "transliteration": "Subhanal-lah (33), Alhamdulillah (33), Allahu Akbar (33). La ilaha illal-lahu wahdahu la shareeka lah, lahul-mulku wa lahul-hamd, wa huwa 'ala kulli shay'in qadeer.",
+      "arabic": "سُبْحَانَ اللَّهِ",
+      "transliteration": "Subhanal-lah",
       "translations": {
-        "ar": "التسبيح بعد الصلاة",
-        "en": "How perfect Allah is (33 times), All praise is for Allah (33 times), Allah is the greatest (33 times). None has the right to be worshipped except Allah, alone, without partner, to Him belongs all sovereignty and praise and He is over all things omnipotent.",
-        "fr": "Gloire à Allah (33), Louange à Allah (33), Allah est le plus grand (33). Nul ne mérite d'être adoré sauf Allah.",
-        "de": "Gepriesen sei Allah (33), Alles Lob gebührt Allah (33), Allah ist der Größte (33). Keiner hat das Recht angebetet zu werden außer Allah.",
-        "hi": "अल्लाह पाक है (33), अल्लाह की तारीफ है (33), अल्लाह सबसे बड़ा है (33)।",
-        "id": "Maha Suci Allah (33), Segala puji bagi Allah (33), Allah Maha Besar (33).",
-        "ms": "Maha Suci Allah (33), Segala puji bagi Allah (33), Allah Maha Besar (33).",
-        "tr": "Allah'ı tesbih ederim (33), Allah'a hamd ederim (33), Allah en büyüktür (33).",
-        "ur": "اللہ پاک ہے (33)، اللہ کی تعریف ہے (33)، اللہ سب سے بڑا ہے (33)۔",
-        "bn": "আল্লাহ পবিত্র (33), আল্লাহর প্রশংসা (33), আল্লাহ মহান (33)।",
-        "es": "Glorificado sea Allah (33), Alabado sea Allah (33), Allah es el más grande (33).",
-        "ru": "Пречист Аллах (33), Хвала Аллаху (33), Аллах велик (33)."
+        "ar": "التسبيح",
+        "en": "How perfect Allah is",
+        "fr": "Gloire à Allah",
+        "de": "Gepriesen sei Allah",
+        "hi": "अल्लाह पाक है",
+        "id": "Maha Suci Allah",
+        "ms": "Maha Suci Allah",
+        "tr": "Allah'ı tesbih ederim",
+        "ur": "اللہ پاک ہے",
+        "bn": "আল্লাহ পবিত্র",
+        "es": "Glorificado sea Allah",
+        "ru": "Пречист Аллах"
       },
-      "count": 1,
+      "count": 33,
       "reference": "مسلم 1/418",
       "benefit": "من سبح الله في دبر كل صلاة ثلاثاً وثلاثين... غُفرت له خطاياه وإن كانت مثل زبد البحر",
-      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n63.mp3",
+      "audio": "",
+      "subcategory": "general"
+    },
+    {
+      "id": 331,
+      "category": "after_prayer",
+      "arabic": "الْحَمْدُ لِلَّهِ",
+      "transliteration": "Alhamdulillah",
+      "translations": {
+        "ar": "التحميد",
+        "en": "All praise is for Allah",
+        "fr": "Louange à Allah",
+        "de": "Alles Lob gebührt Allah",
+        "hi": "अल्लाह की तारीफ है",
+        "id": "Segala puji bagi Allah",
+        "ms": "Segala puji bagi Allah",
+        "tr": "Allah'a hamd ederim",
+        "ur": "اللہ کی تعریف ہے",
+        "bn": "আল্লাহর প্রশংসা",
+        "es": "Alabado sea Allah",
+        "ru": "Хвала Аллаху"
+      },
+      "count": 33,
+      "reference": "مسلم 1/418",
+      "benefit": "من سبح الله في دبر كل صلاة ثلاثاً وثلاثين... غُفرت له خطاياه وإن كانت مثل زبد البحر",
+      "audio": "",
+      "subcategory": "general"
+    },
+    {
+      "id": 332,
+      "category": "after_prayer",
+      "arabic": "اللَّهُ أَكْبَرُ",
+      "transliteration": "Allahu Akbar",
+      "translations": {
+        "ar": "التكبير",
+        "en": "Allah is the greatest",
+        "fr": "Allah est le plus grand",
+        "de": "Allah ist der Größte",
+        "hi": "अल्लाह सबसे बड़ा है",
+        "id": "Allah Maha Besar",
+        "ms": "Allah Maha Besar",
+        "tr": "Allah en büyüktür",
+        "ur": "اللہ سب سے بڑا ہے",
+        "bn": "আল্লাহ মহান",
+        "es": "Allah es el más grande",
+        "ru": "Аллах велик"
+      },
+      "count": 33,
+      "reference": "مسلم 1/418",
+      "benefit": "من سبح الله في دبر كل صلاة ثلاثاً وثلاثين... غُفرت له خطاياه وإن كانت مثل زبد البحر",
+      "audio": "",
       "subcategory": "general"
     },
     {
@@ -1406,126 +1456,189 @@
       "subcategory": "general"
     },
     {
-      "id": 47,
-      "hisnNumber": 65,
+      "id": 48,
+      "hisnNumber": 66,
       "category": "after_prayer",
-      "arabic": "سُبْحَانَ اللَّهِ، وَالْحَمْدُ لِلَّهِ، وَاللَّهُ أَكْبَرُ (ثَلاَثاً وَثَلاَثِينَ) لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
-      "transliteration": "SubhanAllah, wal-hamdulillah, wallahu akbar (33x each), La ilaha illallahu wahdahu la sharika lahu...",
+      "arabic": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ۝ قُلْ هُوَ اللَّهُ أَحَدٌ ﴿١﴾ اللَّهُ الصَّمَدُ ﴿٢﴾ لَمْ يَلِدْ وَلَمْ يُولَدْ ﴿٣﴾ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ ﴿٤﴾",
+      "transliteration": "Bismillahir-Rahmanir-Rahim. Qul huwa Allahu ahad. Allahus-samad. Lam yalid wa lam yulad. Wa lam yakun lahu kufuwan ahad.",
       "translations": {
         "ar": {
-          "text": "سبحان الله والحمد لله والله أكبر (33 مرة) ثم لا إله إلا الله...",
+          "text": "سورة الإخلاص بعد كل صلاة",
           "verified": true
         },
         "en": {
-          "text": "Glory be to Allah, praise be to Allah, Allah is the Greatest (33 each). There is no god but Allah alone...",
+          "text": "Say: He is Allah, the One. Allah, the Eternal Refuge. He neither begets nor is born. Nor is there to Him any equivalent.",
           "verified": true
         },
         "fr": {
-          "text": "Gloire à Allah, Louange à Allah, Allah est le Plus Grand (33 fois chacun). Il n'y a de divinité qu'Allah...",
+          "text": "Dis: Il est Allah, Unique. Allah, Le Seul à être imploré. Il n'a jamais engendré, n'a pas été engendré non plus. Et nul n'est égal à Lui.",
           "verified": true
         },
         "de": {
-          "text": "Gepriesen sei Allah, Lob sei Allah, Allah ist der Größte (je 33 mal). Es gibt keinen Gott außer Allah...",
+          "text": "Sprich: Er ist Allah, ein Einziger. Allah, der Absolute. Er zeugt nicht und ist nicht gezeugt worden. Und Ihm ebenbürtig ist keiner.",
           "verified": true
         },
         "tr": {
-          "text": "Sübhanallah, Elhamdülillah, Allahu Ekber (33'er kez). Allah'tan başka ilâh yoktur...",
+          "text": "De ki: O, Allah'tır, birdir. Allah Samed'dir. O doğurmamış ve doğmamıştır. Hiçbir şey O'nun dengi değildir.",
           "verified": true
         },
         "ur": {
-          "text": "سبحان اللہ، الحمد للہ، اللہ اکبر (33 بار)۔ اللہ کے سوا کوئی معبود نہیں...",
+          "text": "کہو: وہ اللہ ہے، اکیلا۔ اللہ بے نیاز ہے۔ نہ اس سے کوئی پیدا ہوا نہ وہ پیدا ہوا۔ اور کوئی اس کا ہمسر نہیں۔",
           "verified": true
         },
         "id": {
-          "text": "Subhanallah, Alhamdulillah, Allahu Akbar (33 kali). Tiada Tuhan selain Allah...",
+          "text": "Katakanlah: Dialah Allah, Yang Maha Esa. Allah tempat bergantung. Tidak beranak dan tidak diperanakkan. Dan tidak ada yang setara dengan-Nya.",
           "verified": true
         },
         "ms": {
-          "text": "Subhanallah, Alhamdulillah, Allahu Akbar (33 kali). Tiada Tuhan selain Allah...",
+          "text": "Katakanlah: Dialah Allah, Yang Maha Esa. Allah tempat bergantung. Tidak beranak dan tidak diperanakkan. Dan tidak ada yang setara dengan-Nya.",
           "verified": true
         },
         "bn": {
-          "text": "সুবহানাল্লাহ, আলহামদুলিল্লাহ, আল্লাহু আকবার (৩৩ বার)। আল্লাহ ছাড়া কোনো ইলাহ নেই...",
+          "text": "বলুন: তিনি আল্লাহ, এক। আল্লাহ অমুখাপেক্ষী। তিনি কাউকে জন্ম দেননি এবং তাকেও জন্ম দেয়া হয়নি। তাঁর সমতুল্য কেউ নেই।",
           "verified": true
         },
         "hi": {
-          "text": "सुब्हानअल्लाह, अल्हम्दुलिल्लाह, अल्लाहु अकबर (33 बार)। अल्लाह के सिवा कोई इलाह नहीं...",
+          "text": "कहो: वह अल्लाह एक है। अल्लाह बेनियाज़ है। न उसने किसी को जना न वह जना गया। और कोई उसका हमसर नहीं।",
           "verified": true
         },
         "es": {
-          "text": "Gloria a Allah, Alabado sea Allah, Allah es el Más Grande (33 cada uno). No hay dios sino Allah...",
+          "text": "Di: Él es Allah, Uno. Allah es el Eterno. No engendró ni fue engendrado. Y no hay nadie igual a Él.",
           "verified": true
         },
         "ru": {
-          "text": "Субханаллах, Альхамдулиллях, Аллаху Акбар (по 33 раза). Нет божества, кроме Аллаха...",
+          "text": "Скажи: Он - Аллах, Единый. Аллах - Вечный. Он не родил и не был рожден. И нет никого равного Ему.",
           "verified": true
         }
       },
       "count": 1,
-      "reference": "مسلم",
-      "benefit": "غُفرت خطاياه وإن كانت مثل زبد البحر",
-      "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n65.mp3",
+      "reference": "",
+      "benefit": "حماية وتحصين",
+      "audio": "",
       "audioSource": "Archive.org",
       "subcategory": "general"
     },
     {
-      "id": 48,
+      "id": 481,
       "hisnNumber": 66,
       "category": "after_prayer",
-      "arabic": "بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ ۝ قُلْ هُوَ اللَّهُ أَحَدٌ... قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ... قُلْ أَعُوذُ بِرَبِّ النَّاسِ...",
-      "transliteration": "Bismillahir-Rahmanir-Rahim. Qul huwa Allahu ahad... Qul a'udhu bi rabbil-falaq... Qul a'udhu bi rabbin-nas...",
+      "arabic": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ۝ قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ ﴿١﴾ مِن شَرِّ مَا خَلَقَ ﴿٢﴾ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ﴿٣﴾ وَمِن شَرِّ النَّفَّاثَاتِ فِي الْعُقَدِ ﴿٤﴾ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ﴿٥﴾",
+      "transliteration": "Bismillahir-Rahmanir-Rahim. Qul a'udhu bi rabbil-falaq. Min sharri ma khalaq. Wa min sharri ghasiqin idha waqab. Wa min sharrin-naffathati fil-'uqad. Wa min sharri hasidin idha hasad.",
       "translations": {
         "ar": {
-          "text": "المعوذات بعد كل صلاة - مرة واحدة، وبعد المغرب والفجر ثلاث مرات",
+          "text": "سورة الفلق بعد كل صلاة",
           "verified": true
         },
         "en": {
-          "text": "Recite Al-Ikhlas, Al-Falaq, An-Nas after each prayer (once, or 3 times after Maghrib and Fajr)",
+          "text": "Say: I seek refuge in the Lord of daybreak. From the evil of that which He created. And from the evil of darkness when it settles. And from the evil of the blowers in knots. And from the evil of an envier when he envies.",
           "verified": true
         },
         "fr": {
-          "text": "Réciter Al-Ikhlas, Al-Falaq, An-Nas après chaque prière",
+          "text": "Dis: Je cherche refuge auprès du Seigneur de l'aube naissante. Contre le mal des êtres qu'Il a créés. Contre le mal de l'obscurité. Contre le mal de celles qui soufflent sur les nœuds. Et contre le mal de l'envieux.",
           "verified": true
         },
         "de": {
-          "text": "Al-Ikhlas, Al-Falaq, An-Nas nach jedem Gebet rezitieren",
+          "text": "Sprich: Ich nehme Zuflucht beim Herrn der Morgendämmerung. Vor dem Übel dessen, was Er erschaffen hat. Vor dem Übel der Dunkelheit. Vor dem Übel der Knotenbläserinnen. Und vor dem Übel des Neiders.",
           "verified": true
         },
         "tr": {
-          "text": "Her namazdan sonra İhlas, Felak, Nas surelerini oku",
+          "text": "De ki: Sabahın Rabbine sığınırım. Yarattığı şeylerin şerrinden. Karanlığın şerrinden. Düğümlere üfleyenlerin şerrinden. Ve haset edenin şerrinden.",
           "verified": true
         },
         "ur": {
-          "text": "ہر نماز کے بعد سورہ اخلاص، فلق، ناس پڑھیں",
+          "text": "کہو: میں صبح کے رب کی پناہ لیتا ہوں۔ اس کی بنائی ہوئی چیزوں کے شر سے۔ اندھیرے کے شر سے۔ گانٹھوں میں پھونکنے والیوں کے شر سے۔ اور حسد کرنے والے کے شر سے۔",
           "verified": true
         },
         "id": {
-          "text": "Membaca Al-Ikhlas, Al-Falaq, An-Nas setelah setiap shalat",
+          "text": "Katakanlah: Aku berlindung kepada Tuhan yang menguasai subuh. Dari kejahatan makhluk-Nya. Dari kejahatan malam yang gelap. Dari kejahatan peniup pada buhul-buhul. Dari kejahatan pendengki bila ia dengki.",
           "verified": true
         },
         "ms": {
-          "text": "Membaca Al-Ikhlas, Al-Falaq, An-Nas selepas setiap solat",
+          "text": "Katakanlah: Aku berlindung kepada Tuhan yang menguasai subuh. Dari kejahatan makhluk-Nya. Dari kejahatan malam yang gelap. Dari kejahatan peniup pada buhul-buhul. Dari kejahatan pendengki bila ia dengki.",
           "verified": true
         },
         "bn": {
-          "text": "প্রতি নামাজের পর সূরা ইখলাস, ফালাক, নাস পড়ুন",
+          "text": "বলুন: আমি আশ্রয় চাই ভোরের রবের কাছে। তাঁর সৃষ্টির অনিষ্ট থেকে। অন্ধকার রাতের অনিষ্ট থেকে। গিঁটে ফুঁক দেয়াদের অনিষ্ট থেকে। এবং হিংসুকের অনিষ্ট থেকে।",
           "verified": true
         },
         "hi": {
-          "text": "हर नमाज़ के बाद सूरह इख़लास, फलक़, नास पढ़ें",
+          "text": "कहो: मैं सुबह के रब की पनाह लेता हूं। उसकी बनाई चीज़ों के शर से। अंधेरे के शर से। गांठों में फूंकने वालियों के शर से। और हसद करने वाले के शर से।",
           "verified": true
         },
         "es": {
-          "text": "Recitar Al-Ikhlas, Al-Falaq, An-Nas después de cada oración",
+          "text": "Di: Me refugio en el Señor del amanecer. Del mal de lo que ha creado. Del mal de la oscuridad cuando se extiende. Del mal de las que soplan en los nudos. Y del mal del envidioso cuando envidia.",
           "verified": true
         },
         "ru": {
-          "text": "Читать Аль-Ихлас, Аль-Фаляк, Ан-Нас после каждой молитвы",
+          "text": "Скажи: Прибегаю к защите Господа рассвета. От зла того, что Он сотворил. От зла мрака. От зла дующих на узлы. И от зла завистника, когда он завидует.",
           "verified": true
         }
       },
       "count": 1,
-      "reference": "أبو داود والنسائي",
+      "reference": "",
+      "benefit": "حماية وتحصين",
+      "audio": "",
+      "audioSource": "Archive.org",
+      "subcategory": "general"
+    },
+    {
+      "id": 482,
+      "hisnNumber": 66,
+      "category": "after_prayer",
+      "arabic": "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ ۝ قُلْ أَعُوذُ بِرَبِّ النَّاسِ ﴿١﴾ مَلِكِ النَّاسِ ﴿٢﴾ إِلَٰهِ النَّاسِ ﴿٣﴾ مِن شَرِّ الْوَسْوَاسِ الْخَنَّاسِ ﴿٤﴾ الَّذِي يُوَسْوِسُ فِي صُدُورِ النَّاسِ ﴿٥﴾ مِنَ الْجِنَّةِ وَالنَّاسِ ﴿٦﴾",
+      "transliteration": "Bismillahir-Rahmanir-Rahim. Qul a'udhu bi rabbin-nas. Malikin-nas. Ilahin-nas. Min sharril-waswaasil-khannas. Alladhi yuwaswisu fi sudurin-nas. Minal-jinnati wan-nas.",
+      "translations": {
+        "ar": {
+          "text": "سورة الناس بعد كل صلاة",
+          "verified": true
+        },
+        "en": {
+          "text": "Say: I seek refuge in the Lord of mankind. The King of mankind. The God of mankind. From the evil of the retreating whisperer. Who whispers in the breasts of mankind. From among the jinn and mankind.",
+          "verified": true
+        },
+        "fr": {
+          "text": "Dis: Je cherche refuge auprès du Seigneur des hommes. Le Souverain des hommes. Dieu des hommes. Contre le mal du tentateur furtif. Qui souffle le mal dans les poitrines des hommes. Qu'il soit djinn ou humain.",
+          "verified": true
+        },
+        "de": {
+          "text": "Sprich: Ich nehme Zuflucht beim Herrn der Menschen. Dem König der Menschen. Dem Gott der Menschen. Vor dem Übel des Einflüsterers. Der in die Herzen der Menschen flüstert. Sei es Dschinn oder Mensch.",
+          "verified": true
+        },
+        "tr": {
+          "text": "De ki: İnsanların Rabbine sığınırım. İnsanların Melikine. İnsanların İlahına. Sinsi vesvesecinin şerrinden. O ki insanların göğüslerine fısıldar. Cinlerden ve insanlardan.",
+          "verified": true
+        },
+        "ur": {
+          "text": "کہو: میں لوگوں کے رب کی پناہ لیتا ہوں۔ لوگوں کے بادشاہ کی۔ لوگوں کے معبود کی۔ چھپ کر وسوسہ ڈالنے والے کے شر سے۔ جو لوگوں کے سینوں میں وسوسہ ڈالتا ہے۔ جن اور انس میں سے۔",
+          "verified": true
+        },
+        "id": {
+          "text": "Katakanlah: Aku berlindung kepada Tuhannya manusia. Rajanya manusia. Sembahan manusia. Dari kejahatan bisikan yang tersembunyi. Yang membisikkan dalam dada manusia. Dari jin dan manusia.",
+          "verified": true
+        },
+        "ms": {
+          "text": "Katakanlah: Aku berlindung kepada Tuhannya manusia. Rajanya manusia. Tuhan manusia. Dari kejahatan bisikan yang tersembunyi. Yang membisikkan dalam dada manusia. Dari jin dan manusia.",
+          "verified": true
+        },
+        "bn": {
+          "text": "বলুন: আমি আশ্রয় চাই মানুষের রবের কাছে। মানুষের বাদশাহের কাছে। মানুষের ইলাহের কাছে। গোপন কুমন্ত্রণাদাতার অনিষ্ট থেকে। যে মানুষের বুকে কুমন্ত্রণা দেয়। জিন ও মানুষ থেকে।",
+          "verified": true
+        },
+        "hi": {
+          "text": "कहो: मैं लोगों के रब की पनाह लेता हूं। लोगों के बादशाह की। लोगों के माबूद की। छिपकर वसवसा डालने वाले के शर से। जो लोगों के सीनों में वसवसा डालता है। जिन्न और इंसानों में से।",
+          "verified": true
+        },
+        "es": {
+          "text": "Di: Me refugio en el Señor de los hombres. El Rey de los hombres. El Dios de los hombres. Del mal del susurrador furtivo. Que susurra en los pechos de los hombres. De entre los genios y los hombres.",
+          "verified": true
+        },
+        "ru": {
+          "text": "Скажи: Прибегаю к защите Господа людей. Царя людей. Бога людей. От зла наущателя скрывающегося. Который наущает в груди людей. Из джиннов и людей.",
+          "verified": true
+        }
+      },
+      "count": 1,
+      "reference": "",
       "benefit": "حماية وتحصين",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n66.mp3",
       "audioSource": "Archive.org",
@@ -1535,70 +1648,110 @@
       "id": 49,
       "hisnNumber": 67,
       "category": "after_prayer",
-      "arabic": "اللّهُ لاَ إِلَـهَ إِلاَّ هُوَ الْحَيُّ الْقَيُّومُ لاَ تَأْخُذُهُ سِنَةٌ وَلاَ نَوْمٌ...",
-      "transliteration": "Allahu la ilaha illa huwal-Hayyul-Qayyum...",
+      "arabic": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ ۚ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ ۗ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ ۚ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ ۖ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ ۚ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ ۖ وَلَا يَئُودُهُ حِفْظُهُمَا ۚ وَهُوَ الْعَلِيُّ الْعَظِيمُ ﴿٢٥٥﴾",
+      "transliteration": "Allahu la ilaha illa huwal-Hayyul-Qayyum, la ta'khudhuhu sinatun wa la nawm, lahu ma fis-samawati wa ma fil-ard, man dhal-ladhi yashfa'u 'indahu illa bi-idhnih, ya'lamu ma bayna aydihim wa ma khalfahum, wa la yuhituna bi shay'in min 'ilmihi illa bima sha', wasi'a kursiyyuhus-samawati wal-ard, wa la ya'uduhu hifdhuhuma, wa huwal-'Aliyyul-'Adhim",
       "translations": {
         "ar": {
-          "text": "آية الكرسي بعد كل صلاة",
+          "text": "آية الكرسي - أعظم آية في كتاب الله",
           "verified": true
         },
         "en": {
-          "text": "Ayat Al-Kursi after each prayer",
+          "text": "Allah - there is no deity except Him, the Ever-Living, the Sustainer of existence. Neither drowsiness overtakes Him nor sleep. To Him belongs whatever is in the heavens and whatever is on the earth. Who is it that can intercede with Him except by His permission? He knows what is before them and what will be after them, and they encompass not a thing of His knowledge except for what He wills. His Throne extends over the heavens and the earth, and their preservation tires Him not. And He is the Most High, the Most Great.",
           "verified": true
         },
         "fr": {
-          "text": "Ayat Al-Kursi après chaque prière",
+          "text": "Allah! Point de divinité à part Lui, le Vivant, Celui qui subsiste par lui-même. Ni somnolence ni sommeil ne Le saisissent. A lui appartient tout ce qui est dans les cieux et sur la terre. Qui peut intercéder auprès de Lui sans Sa permission? Il connaît leur passé et leur futur. Et ils n'embrassent de Sa science que ce qu'Il veut. Son Trône déborde les cieux et la terre. Et leur garde ne Lui coûte aucune peine. Et Il est le Très Haut, le Très Grand.",
           "verified": true
         },
         "de": {
-          "text": "Ayat Al-Kursi nach jedem Gebet",
+          "text": "Allah - es gibt keinen Gott außer Ihm, dem Lebendigen, dem Beständigen. Ihn überkommt weder Schlummer noch Schlaf. Ihm gehört, was in den Himmeln und was auf der Erde ist. Wer ist es, der bei Ihm Fürsprache einlegen könnte außer mit Seiner Erlaubnis? Er weiß, was vor ihnen und was hinter ihnen liegt. Und sie umfassen nichts von Seinem Wissen, außer dem, was Er will. Sein Thron umfasst die Himmel und die Erde. Und ihre Bewahrung ermüdet Ihn nicht. Er ist der Erhabene, der Gewaltige.",
           "verified": true
         },
         "tr": {
-          "text": "Her namazdan sonra Ayete'l-Kürsi",
+          "text": "Allah, O'ndan başka ilâh yoktur. O, Hayy ve Kayyûm'dur. O'nu ne uyuklama ne de uyku tutmaz. Göklerde ve yerde ne varsa O'nundur. O'nun izni olmadan katında kim şefaat edebilir? O, kullarının önlerindekini ve arkalarındakini bilir. Onlar O'nun ilminden ancak dilediği kadarını kavrayabilirler. O'nun Kürsü'sü gökleri ve yeri kaplamıştır. Bunları korumak O'na zor gelmez. O, yücedir, büyüktür.",
           "verified": true
         },
         "ur": {
-          "text": "ہر نماز کے بعد آیت الکرسی",
+          "text": "اللہ جس کے سوا کوئی معبود نہیں، زندہ ہے، سب کا تھامنے والا۔ نہ اسے اونگھ آتی ہے نہ نیند۔ جو کچھ آسمانوں میں ہے اور جو کچھ زمین میں ہے سب اسی کا ہے۔ کون ہے جو اس کی اجازت کے بغیر سفارش کرے؟ وہ جانتا ہے جو ان کے آگے ہے اور جو ان کے پیچھے ہے۔ وہ اس کے علم میں سے کچھ نہیں پا سکتے مگر جتنا وہ چاہے۔ اس کی کرسی نے آسمانوں اور زمین کو گھیر رکھا ہے۔ ان کی حفاظت اسے نہیں تھکاتی۔ وہ بلند مرتبہ اور عظیم ہے۔",
           "verified": true
         },
         "id": {
-          "text": "Ayat Kursi setelah setiap shalat",
+          "text": "Allah, tidak ada Tuhan selain Dia yang hidup kekal lagi terus menerus mengurus makhluk-Nya. Dia tidak mengantuk dan tidak tidur. Kepunyaan-Nya segala apa yang di langit dan di bumi. Tiada yang dapat memberi syafaat di sisi-Nya tanpa izin-Nya. Dia mengetahui apa-apa yang di hadapan mereka dan di belakang mereka. Dan mereka tidak mengetahui sesuatu dari ilmu-Nya melainkan apa yang dikehendaki-Nya. Kursi-Nya meliputi langit dan bumi. Dan Dia tidak merasa berat memelihara keduanya. Dia Maha Tinggi lagi Maha Besar.",
           "verified": true
         },
         "ms": {
-          "text": "Ayat Kursi selepas setiap solat",
+          "text": "Allah, tiada Tuhan melainkan Dia, Yang Hidup kekal, Yang mentadbir. Dia tidak mengantuk dan tidak tidur. Milik-Nya segala yang di langit dan di bumi. Siapa yang dapat memberi syafaat tanpa izin-Nya? Dia mengetahui apa yang ada di hadapan mereka dan di belakang mereka. Dan mereka tidak mengetahui sedikitpun ilmu-Nya kecuali apa yang dikehendaki-Nya. Kursi-Nya meliputi langit dan bumi. Dan Dia tidak merasa berat memelihara keduanya. Dia Maha Tinggi lagi Maha Besar.",
           "verified": true
         },
         "bn": {
-          "text": "প্রতি নামাজের পর আয়াতুল কুরসী",
+          "text": "আল্লাহ - তিনি ব্যতীত কোনো উপাস্য নেই। তিনি চিরঞ্জীব, সর্বসত্তার ধারক। তাঁকে তন্দ্রা বা নিদ্রা স্পর্শ করে না। আকাশ ও পৃথিবীতে যা কিছু আছে সব তাঁরই। কে আছে যে তাঁর অনুমতি ছাড়া সুপারিশ করবে? তিনি জানেন তাদের সামনে ও পেছনে যা আছে। তারা তাঁর জ্ঞানের কিছুই আয়ত্ত করতে পারে না, তবে তিনি যা চান তা ছাড়া। তাঁর কুরসী আকাশমণ্ডলী ও পৃথিবী পরিব্যাপ্ত। উভয়ের রক্ষণাবেক্ষণ তাঁকে ক্লান্ত করে না। তিনি সর্বোচ্চ, মহান।",
           "verified": true
         },
         "hi": {
-          "text": "हर नमाज़ के बाद आयतुल कुर्सी",
+          "text": "अल्लाह - उसके सिवा कोई माबूद नहीं। वह ज़िंदा है, सबको संभालने वाला। न उसे ऊंघ आती है न नींद। जो कुछ आसमानों में है और जो कुछ ज़मीन में है सब उसी का है। कौन है जो उसकी इजाज़त के बिना सिफारिश करे? वह जानता है जो उनके आगे है और जो उनके पीछे है। वे उसके इल्म में से कुछ नहीं पा सकते मगर जितना वह चाहे। उसकी कुर्सी ने आसमानों और ज़मीन को घेर रखा है। उनकी हिफाज़त उसे नहीं थकाती। वह बुलंद और अज़ीम है।",
           "verified": true
         },
         "es": {
-          "text": "Ayat Al-Kursi después de cada oración",
+          "text": "Allah, no hay dios sino Él, el Viviente, el Sustentador. No Le afecta somnolencia ni sueño. A Él pertenece cuanto hay en los cielos y en la tierra. ¿Quién puede interceder ante Él sin Su permiso? Conoce lo que hay delante y detrás de ellos. Y no abarcan nada de Su conocimiento sino lo que Él quiere. Su Trono abarca los cielos y la tierra. Y su custodia no Le fatiga. Él es el Altísimo, el Grandioso.",
           "verified": true
         },
         "ru": {
-          "text": "Аят Аль-Курси после каждой молитвы",
+          "text": "Аллах - нет божества, кроме Него, Живого, Вечного. Его не объемлет ни дремота, ни сон. Ему принадлежит то, что на небесах и на земле. Кто станет заступаться перед Ним без Его дозволения? Он знает их будущее и прошлое. Они постигают из Его знания только то, что Он пожелает. Его Престол объемлет небеса и землю, и не тяготит Его оберегание их. Он - Возвышенный, Великий.",
           "verified": true
         }
       },
       "count": 1,
-      "reference": "النسائي وابن السني",
+      "reference": "",
       "benefit": "لم يمنعه من دخول الجنة إلا أن يموت",
       "audio": "https://archive.org/download/HisnulMuslimAudio_201510/n67.mp3",
       "audioSource": "Archive.org",
       "subcategory": "general"
     },
     {
+      "id": 256,
+      "category": "after_prayer",
+      "arabic": "اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ",
+      "transliteration": "Allahumma a'inni 'ala dhikrika wa shukrika wa husni 'ibadatik",
+      "translations": {
+        "ar": {
+          "text": "اللهم أعني على ذكرك وشكرك وحسن عبادتك",
+          "verified": true
+        },
+        "en": {
+          "text": "O Allah, help me to remember You, to give thanks to You, and to worship You in the best way",
+          "verified": true
+        }
+      },
+      "count": 1,
+      "reference": "أبو داود والنسائي",
+      "benefit": "أوصى به النبي ﷺ معاذ بن جبل أن يقولها دبر كل صلاة",
+      "subcategory": "general"
+    },
+    {
+      "id": 257,
+      "category": "after_prayer",
+      "arabic": "اللَّهُمَّ قِنِي عَذَابَكَ يَوْمَ تَبْعَثُ عِبَادَكَ",
+      "transliteration": "Allahumma qini 'adhabaka yawma tab'athu 'ibadak",
+      "translations": {
+        "ar": {
+          "text": "اللهم قني عذابك يوم تبعث عبادك",
+          "verified": true
+        },
+        "en": {
+          "text": "O Allah, save me from Your punishment the day You resurrect Your servants",
+          "verified": true
+        }
+      },
+      "count": 1,
+      "reference": "مسلم",
+      "benefit": "دعاء عظيم للوقاية من عذاب يوم القيامة",
+      "subcategory": "general"
+    },
+    {
       "id": 50,
       "hisnNumber": 68,
       "category": "after_prayer",
-      "arabic": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ (عَشْرَ مَرَّاتٍ بَعْدَ صَلاَةِ الْمَغْرِبِ وَالصُّبْحِ)",
+      "arabic": "لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
       "transliteration": "La ilaha illallahu wahdahu la sharika lahu, lahul-mulku wa lahul-hamdu yuhyi wa yumitu wa huwa 'ala kulli shay'in qadir (10x)",
       "translations": {
         "ar": {

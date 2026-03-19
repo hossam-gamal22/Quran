@@ -454,11 +454,11 @@ export default function RamadanScreen() {
                 style={[styles.specialDayBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: 'rgba(245,166,35,0.15)' }]}
               >
                 <View style={styles.specialDayContent}>
-                  <Text style={[styles.specialDayTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{getLanguage() === 'ar' ? specialDay.nameAr : (specialDay.nameEn || specialDay.nameAr)}</Text>
+                  <Text style={[styles.specialDayTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{getLanguage() === 'ar' ? specialDay.nameAr : (specialDay.nameEn || specialDay.nameAr)}</Text>
                   {isArabic ? (
-                    <Text style={[styles.specialDayDesc, { textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</Text>
+                    <Text style={[styles.specialDayDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</Text>
                   ) : (
-                    <TranslatedText style={[styles.specialDayDesc, { textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</TranslatedText>
+                    <TranslatedText style={[styles.specialDayDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{specialDay.description}</TranslatedText>
                   )}
                   {specialDay.virtues && specialDay.virtues.length > 0 && (
                     <View style={{ marginTop: 8, gap: 4 }}>
@@ -466,9 +466,9 @@ export default function RamadanScreen() {
                         <View key={idx} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                           <MaterialCommunityIcons name="check-circle" size={14} color="#f5a623" />
                           {isArabic ? (
-                            <Text style={{ fontSize: 13, fontFamily: fontRegular(), color: '#555', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</Text>
+                            <Text style={{ fontSize: 13, fontFamily: fontRegular(), color: colors.textLight, flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</Text>
                           ) : (
-                            <TranslatedText style={{ fontSize: 13, fontFamily: fontRegular(), color: '#555', flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</TranslatedText>
+                            <TranslatedText style={{ fontSize: 13, fontFamily: fontRegular(), color: colors.textLight, flex: 1, textAlign: isRTL ? 'right' : 'left' }}>{virtue}</TranslatedText>
                           )}
                         </View>
                       ))}

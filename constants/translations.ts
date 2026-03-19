@@ -291,6 +291,7 @@ export interface TranslationKeys {
     lastPage: string;
     loadingQuran: string;
     longPressToGoToVerse: string;
+    longPressHint: string;
     mushafBackground: string;
     noBookmarkFound: string;
     yellowGroup: string;
@@ -404,8 +405,9 @@ export interface TranslationKeys {
     completedTodayMessage: string;
     dhikrNumber: string;
     duaNumber: string;
+    startingOver: string;
   };
-  
+
   // الصلاة
   prayer: {
     title: string;
@@ -501,8 +503,10 @@ export interface TranslationKeys {
     showSunrise: string;
     viewClock: string;
     viewList: string;
-  
+
     hourFormat24: string;
+    defaultCity: string;
+    defaultCountry: string;
   };
   
   // التسبيح
@@ -698,6 +702,8 @@ export interface TranslationKeys {
     totalWird: string;
     wirdCompletedMsg: string;
     yesCompleted: string;
+    resetKhatma: string;
+    confirmResetKhatma: string;
   
     fri: string;
     mon: string;
@@ -818,6 +824,7 @@ export interface TranslationKeys {
     kahfTitle: string;
     kahfBody: string;
     kahfReminderTime: string;
+    kahfDesc: string;
     fridayReminder: string;
     everyFriday: string;
     surahKahf: string;
@@ -1778,6 +1785,7 @@ export interface TranslationKeys {
     tafsirBtn: string;
     title: string;
     tryDifferentWords: string;
+    loadError: string;
   };
   errorBoundary: {
     contactSupport: string;
@@ -1874,6 +1882,14 @@ export interface TranslationKeys {
     adjustTitle: string;
     noAdjustment: string;
   };
+  hijriCalendar: {
+    estimatedDate: string;
+    officialConfirmed: string;
+    userAdjustment: string;
+    waitingAnnouncement: string;
+    countryLabel: string;
+    sourceLabel: string;
+  };
   hajj: {
     duaWord: string;
     duasWord: string;
@@ -1924,6 +1940,7 @@ export interface TranslationKeys {
     consecutiveDays: string;
     currentStreak: string;
     dailyAverage: string;
+    dailyAzkar: string;
     dailyGoal: string;
     dailyPages: string;
     dailySummary: string;
@@ -1944,8 +1961,10 @@ export interface TranslationKeys {
     fastingType: string;
     firstKhatma: string;
     fourPages: string;
+    fourPagesTime: string;
     historicalFajrTimes: string;
     fullJuz: string;
+    fullJuzTime: string;
     juzNumber: string;
     khatmaNumber: string;
     last30Days: string;
@@ -1962,6 +1981,7 @@ export interface TranslationKeys {
     notificationSoundDesc: string;
     onTime: string;
     onePage: string;
+    onePageTime: string;
     pages: string;
     prayerLoggingReminder: string;
     prayerLoggingReminderDesc: string;
@@ -1992,6 +2012,7 @@ export interface TranslationKeys {
     tapToRecordFasting: string;
     tapToSelectStatus: string;
     tenPages: string;
+    tenPagesTime: string;
     thisWeek: string;
     tip: string;
     tipOfDay: string;
@@ -2006,6 +2027,7 @@ export interface TranslationKeys {
     totalDays: string;
     totalPages: string;
     twoPages: string;
+    twoPagesTime: string;
     voluntary: string;
     voluntaryDesc: string;
     vow: string;
@@ -2448,10 +2470,10 @@ const ar: TranslationKeys = {
     knowAllah: 'معرفة الله',
     prayerTimesLabel: 'مواقيت الصلاة',
     prophetsStories: 'قصص الأنبياء',
-    quranBookmarks: 'علامات المصحف',
+    quranBookmarks: 'إشارات المصحف',
     quranSurahsSection: 'سور وآيات قرآنية',
     rosary: 'المسبحة',
-    selectedDuas: 'أدعية مختارة',
+    selectedDuas: 'أدعية من السنة',
     storiesSection: 'القصص',
     tasbihLog: 'سجل التسبيح',
     tasbihSection: 'تسبيح واستغفار',
@@ -2471,7 +2493,7 @@ const ar: TranslationKeys = {
     searchPlaceholder: 'ابحث عن آية أو سورة...',
     searchResults: 'نتائج البحث',
     noResults: 'لا توجد نتائج',
-    bookmarks: 'الإشارات المرجعية',
+    bookmarks: 'إشارات المصحف',
     lastRead: 'آخر قراءة',
     continueReading: 'متابعة القراءة',
     noBookmarks: 'لا توجد إشارات مرجعية',
@@ -2497,7 +2519,7 @@ const ar: TranslationKeys = {
     goToJuz: 'انتقل للجزء',
     autoTafsir: 'التفسير التلقائي',
     autoTafsirDesc: 'عرض التفسير تلقائياً',
-    bookmark: 'إشارة مرجعية',
+    bookmark: 'إشارات المصحف',
     bookmarkGuide: 'دليل الإشارات',
     bookmarkHint: 'اضغط مطولاً على الآية لإضافة إشارة',
     cardStyle: 'نمط البطاقة',
@@ -2520,6 +2542,7 @@ const ar: TranslationKeys = {
     lastPage: 'آخر صفحة',
     loadingQuran: 'جاري تحميل القرآن...',
     longPressToGoToVerse: 'اضغط مطولاً للانتقال إلى الآية',
+    longPressHint: 'اضغط مطولاً على الآية للمزيد',
     mushafBackground: 'خلفية المصحف',
     noBookmarkFound: 'لا توجد إشارة مرجعية',
     yellowGroup: 'المجموعة الصفراء',
@@ -2622,7 +2645,7 @@ const ar: TranslationKeys = {
     protectionAdhkar: 'أذكار الحماية',
     reading: 'القراءة',
     repeatCount: 'عدد التكرار',
-    selectedDuas: 'أدعية مختارة',
+    selectedDuas: 'أدعية من السنة',
     tapForNewDua: 'اضغط لدعاء جديد',
     translationOptional: 'الترجمة (اختياري)',
     willRenewOnTime: 'سيتجدد في وقته',
@@ -2631,6 +2654,7 @@ const ar: TranslationKeys = {
     completedTodayMessage: 'لقد أتممت أذكار اليوم، بارك الله فيك',
     dhikrNumber: 'ذكر {num}',
     duaNumber: 'دعاء {num}',
+    startingOver: 'بدأت من جديد',
   },
   prayer: {
     title: 'أوقات الصلاة',
@@ -2696,7 +2720,7 @@ const ar: TranslationKeys = {
     displayOptions: 'خيارات العرض',
     enableLiveActivity: 'تفعيل النشاط المباشر',
     imsak: 'الإمساك',
-    liveActivities: 'الأنشطة المباشرة',
+    liveActivities: 'الأنشطة الحية',
     liveActivityNotSupported: 'غير مدعوم',
     methodEgyptian: 'الهيئة المصرية',
     methodEgyptianDesc: 'الهيئة العامة المصرية للمساحة',
@@ -2728,6 +2752,8 @@ const ar: TranslationKeys = {
     viewList: 'عرض القائمة',
   
     hourFormat24: 'تنسيق 24 ساعة',
+    defaultCity: 'مكة المكرمة',
+    defaultCountry: 'السعودية',
   },
   tasbih: {
     title: 'المسبحة',
@@ -2921,6 +2947,8 @@ const ar: TranslationKeys = {
     totalWird: 'إجمالي الورد',
     wirdCompletedMsg: 'تم إكمال الورد',
     yesCompleted: 'نعم، تم إكماله',
+    resetKhatma: 'إعادة تعيين الختمة',
+    confirmResetKhatma: 'سيتم حذف تقدمك الحالي والبدء من جديد. هل أنت متأكد؟',
   
     fri: 'الجمعة',
     mon: 'الاثنين',
@@ -3035,10 +3063,11 @@ const ar: TranslationKeys = {
     adhanPrayer: 'أذان الصلاة',
     adhanError: 'خطأ في الأذان',
     adhanErrorDesc: 'فشل تشغيل الأذان',
-    kahfFriday: 'الكهف يوم الجمعة',
+    kahfFriday: 'سورة الكهف - يوم الجمعة',
     kahfTitle: 'تذكير بسورة الكهف',
     kahfBody: 'قراءة سورة الكهف يوم الجمعة مستحبة',
     kahfReminderTime: 'وقت تذكير الكهف',
+    kahfDesc: 'تذكير أسبوعي بقراءة سورة الكهف',
     fridayReminder: 'تذكير يوم الجمعة',
     everyFriday: 'كل يوم جمعة',
     surahKahf: 'سورة الكهف',
@@ -3129,7 +3158,7 @@ const ar: TranslationKeys = {
     months: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
     hijriMonths: ['محرم', 'صفر', 'ربيع الأول', 'ربيع الثاني', 'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'],
     weekDays: ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
-    weekDaysShort: ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'],
+    weekDaysShort: ['أح', 'اث', 'ثل', 'أر', 'خم', 'جم', 'سب'],
     events: 'المناسبات',
     islamicEvents: 'المناسبات الإسلامية',
     noEvents: 'لا توجد مناسبات',
@@ -3453,8 +3482,8 @@ const ar: TranslationKeys = {
     tarawih: 'صلاة التراويح',
   },
   liveActivities: {
-    title: 'الأنشطة المباشرة',
-    enable: 'تفعيل الأنشطة المباشرة',
+    title: 'الأنشطة الحية',
+    enable: 'تفعيل الأنشطة الحية',
     description: 'عرض مواقيت الصلاة على الشاشة المقفلة',
     notSupported: 'غير مدعوم على هذا الجهاز',
     styleTitle: 'نمط العرض',
@@ -3621,7 +3650,7 @@ const ar: TranslationKeys = {
     addOtherHint: 'أضف عناصر أخرى من المحفوظات',
     addQuranHint: 'أضف آيات من القرآن',
     azkar: 'الأذكار',
-    bookmarks: 'الإشارات المرجعية',
+    bookmarks: 'إشارات المصحف',
     chooseDesign: 'اختر التصميم',
     deleteBookmarkConfirm: 'هل تريد حذف هذه الإشارة؟',
     deleteConfirm: 'هل تريد حذف هذا العنصر؟',
@@ -3983,6 +4012,7 @@ const ar: TranslationKeys = {
     tafsirBtn: 'التفسير',
     title: 'بحث التفسير',
     tryDifferentWords: 'جرب كلمات مختلفة',
+    loadError: 'تعذر تحميل التفسير',
   },
   errorBoundary: {
     contactSupport: 'تواصل مع الدعم',
@@ -4079,6 +4109,14 @@ const ar: TranslationKeys = {
     adjustTitle: 'تعديل التاريخ الهجري',
     noAdjustment: 'بدون تعديل',
   },
+  hijriCalendar: {
+    estimatedDate: 'التاريخ تقديري — قد يختلف عن الإعلان الرسمي',
+    officialConfirmed: '✓ رسمي',
+    userAdjustment: 'تعديل التاريخ الهجري',
+    waitingAnnouncement: 'في انتظار الإعلان الرسمي',
+    countryLabel: 'الدولة',
+    sourceLabel: 'المصدر',
+  },
   hajj: {
     duaWord: 'دعاء',
     duasWord: 'أدعية',
@@ -4130,6 +4168,7 @@ const ar: TranslationKeys = {
     consecutiveDays: 'أيام متتالية',
     currentStreak: 'السلسلة الحالية',
     dailyAverage: 'المعدل اليومي',
+    dailyAzkar: 'الأذكار اليومية',
     dailyGoal: 'الهدف اليومي',
     dailyPages: 'الصفحات اليومية',
     dailySummary: 'الملخص اليومي',
@@ -4150,8 +4189,10 @@ const ar: TranslationKeys = {
     fastingType: 'نوع الصيام',
     firstKhatma: 'الختمة الأولى',
     fourPages: '4 صفحات',
+    fourPagesTime: '~٢٠ دقيقة',
     historicalFajrTimes: 'مواقيت الفجر',
     fullJuz: 'جزء كامل',
+    fullJuzTime: '~٦٠ دقيقة',
     juzNumber: 'رقم الجزء',
     khatmaNumber: 'رقم الختمة',
     last30Days: 'آخر ٣٠ يوم',
@@ -4168,6 +4209,7 @@ const ar: TranslationKeys = {
     notificationSoundDesc: 'اختر صوت الإشعار المفضل',
     onTime: 'في الوقت',
     onePage: 'صفحة واحدة',
+    onePageTime: '~٥ دقائق',
     pages: 'صفحات',
     prayerLoggingReminder: 'تذكير تسجيل الصلاة',
     prayerLoggingReminderDesc: 'تذكير بتسجيل الصلوات اليومية',
@@ -4198,6 +4240,7 @@ const ar: TranslationKeys = {
     tapToRecordFasting: 'اضغط لتسجيل الصيام',
     tapToSelectStatus: 'اضغط لتحديد الحالة',
     tenPages: '10 صفحات',
+    tenPagesTime: '~٥٠ دقيقة',
     thisWeek: 'هذا الأسبوع',
     tip: 'نصيحة',
     tipOfDay: 'نصيحة اليوم',
@@ -4212,6 +4255,7 @@ const ar: TranslationKeys = {
     totalDays: 'إجمالي الأيام',
     totalPages: 'إجمالي الصفحات',
     twoPages: 'صفحتان',
+    twoPagesTime: '~١٠ دقائق',
     voluntary: 'تطوع',
     voluntaryDesc: 'صيام تطوعي لوجه الله',
     vow: 'نذر',
@@ -4642,7 +4686,7 @@ const en: TranslationKeys = {
     quranBookmarks: 'Quran Bookmarks',
     quranSurahsSection: 'Quran Surahs & Verses',
     rosary: 'Rosary',
-    selectedDuas: 'Selected Duas',
+    selectedDuas: 'Duas from the Sunnah',
     storiesSection: 'Stories',
     tasbihLog: 'Tasbih Log',
     tasbihSection: 'Tasbih & Istighfar',
@@ -4711,6 +4755,7 @@ const en: TranslationKeys = {
     lastPage: 'Last Page',
     loadingQuran: 'Loading Quran...',
     longPressToGoToVerse: 'Long press to go to verse',
+    longPressHint: 'Long press verse for more',
     mushafBackground: 'Mushaf Background',
     noBookmarkFound: 'No bookmark found',
     yellowGroup: 'Yellow Group',
@@ -4813,7 +4858,7 @@ const en: TranslationKeys = {
     protectionAdhkar: 'Protection Adhkar',
     reading: 'Reading',
     repeatCount: 'Repeat Count',
-    selectedDuas: 'Selected Duas',
+    selectedDuas: 'Duas from the Sunnah',
     tapForNewDua: 'Tap for new dua',
     translationOptional: 'Translation (optional)',
     willRenewOnTime: 'Will renew on time',
@@ -4822,6 +4867,7 @@ const en: TranslationKeys = {
     completedTodayMessage: 'You have completed today\'s adhkar, may Allah bless you',
     dhikrNumber: 'Dhikr {num}',
     duaNumber: 'Dua {num}',
+    startingOver: 'Starting over',
   },
   prayer: {
     title: 'Prayer Times',
@@ -4919,6 +4965,8 @@ const en: TranslationKeys = {
     viewList: 'View List',
   
     hourFormat24: '24-Hour Format',
+    defaultCity: 'Makkah',
+    defaultCountry: 'Saudi Arabia',
   },
   tasbih: {
     title: 'Tasbih',
@@ -5112,7 +5160,9 @@ const en: TranslationKeys = {
     totalWird: 'Total Wird',
     wirdCompletedMsg: 'Wird completed',
     yesCompleted: 'Yes, completed',
-  
+    resetKhatma: 'Reset Khatma',
+    confirmResetKhatma: 'Your current progress will be deleted and you will start over. Are you sure?',
+
     fri: 'Fri',
     mon: 'Mon',
     sat: 'Sat',
@@ -5226,10 +5276,11 @@ const en: TranslationKeys = {
     adhanPrayer: 'Prayer Adhan',
     adhanError: 'Adhan Error',
     adhanErrorDesc: 'Failed to play adhan',
-    kahfFriday: 'Kahf on Friday',
+    kahfFriday: 'Surah Al-Kahf - Friday',
     kahfTitle: 'Surah Kahf Reminder',
     kahfBody: 'Reading Surah Kahf on Friday is recommended',
     kahfReminderTime: 'Kahf Reminder Time',
+    kahfDesc: 'Weekly Surah Al-Kahf reading reminder',
     fridayReminder: 'Friday Reminder',
     everyFriday: 'Every Friday',
     surahKahf: 'Surah Kahf',
@@ -6174,6 +6225,7 @@ const en: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Tafsir Search',
     tryDifferentWords: 'Try different words',
+    loadError: 'Failed to load tafsir',
   },
   errorBoundary: {
     contactSupport: 'Contact Support',
@@ -6270,6 +6322,14 @@ const en: TranslationKeys = {
     adjustTitle: 'Hijri Date Adjustment',
     noAdjustment: 'No Adjustment',
   },
+  hijriCalendar: {
+    estimatedDate: 'Estimated date — may differ from official announcement',
+    officialConfirmed: '✓ Official',
+    userAdjustment: 'Hijri Date Adjustment',
+    waitingAnnouncement: 'Awaiting official announcement',
+    countryLabel: 'Country',
+    sourceLabel: 'Source',
+  },
   hajj: {
     duaWord: 'Dua',
     duasWord: 'Duas',
@@ -6321,6 +6381,7 @@ const en: TranslationKeys = {
     consecutiveDays: 'Consecutive Days',
     currentStreak: 'Current Streak',
     dailyAverage: 'Daily Average',
+    dailyAzkar: 'Daily Azkar',
     dailyGoal: 'Daily Goal',
     dailyPages: 'Daily Pages',
     dailySummary: 'Daily Summary',
@@ -6341,8 +6402,10 @@ const en: TranslationKeys = {
     fastingType: 'Fasting Type',
     firstKhatma: 'First Khatma',
     fourPages: '4 Pages',
+    fourPagesTime: '~20 minutes',
     historicalFajrTimes: 'Fajr Times',
     fullJuz: 'Full Juz',
+    fullJuzTime: '~60 minutes',
     juzNumber: 'Juz Number',
     khatmaNumber: 'Khatma Number',
     last30Days: 'Last 30 Days',
@@ -6359,6 +6422,7 @@ const en: TranslationKeys = {
     notificationSoundDesc: 'Choose your preferred notification sound',
     onTime: 'On Time',
     onePage: '1 Page',
+    onePageTime: '~5 minutes',
     pages: 'Pages',
     prayerLoggingReminder: 'Prayer Logging Reminder',
     prayerLoggingReminderDesc: 'Reminder to log daily prayers',
@@ -6389,6 +6453,7 @@ const en: TranslationKeys = {
     tapToRecordFasting: 'Tap to Record Fasting',
     tapToSelectStatus: 'Tap to Select Status',
     tenPages: '10 Pages',
+    tenPagesTime: '~50 minutes',
     thisWeek: 'This Week',
     tip: 'Tip',
     tipOfDay: 'Tip of the Day',
@@ -6403,6 +6468,7 @@ const en: TranslationKeys = {
     totalDays: 'Total Days',
     totalPages: 'Total Pages',
     twoPages: '2 Pages',
+    twoPagesTime: '~10 minutes',
     voluntary: 'Voluntary',
     voluntaryDesc: 'Voluntary fasting for the sake of Allah',
     vow: 'Vow',
@@ -6834,7 +6900,7 @@ const fr: TranslationKeys = {
     quranBookmarks: 'Signets du Coran',
     quranSurahsSection: 'Sourates et Versets du Coran',
     rosary: 'Chapelet',
-    selectedDuas: 'Duas sélectionnées',
+    selectedDuas: 'Duas de la Sunna',
     storiesSection: 'Histoires',
     tasbihLog: 'Journal du Tasbih',
     tasbihSection: 'Tasbih et Istighfar',
@@ -6903,6 +6969,7 @@ const fr: TranslationKeys = {
     lastPage: 'Dernière page',
     loadingQuran: 'Chargement du Coran...',
     longPressToGoToVerse: 'Appuyez longuement pour aller au verset',
+    longPressHint: 'Appuyez longuement pour plus',
     mushafBackground: 'Arrière-plan du Mushaf',
     noBookmarkFound: 'Aucun favori trouvé',
     yellowGroup: 'Groupe jaune',
@@ -7005,7 +7072,7 @@ const fr: TranslationKeys = {
     protectionAdhkar: 'Adhkar de protection',
     reading: 'Lecture',
     repeatCount: 'Répétitions',
-    selectedDuas: 'Invocations sélectionnées',
+    selectedDuas: 'Duas de la Sunna',
     tapForNewDua: 'Appuyez pour une nouvelle invocation',
     translationOptional: 'Traduction (facultatif)',
     willRenewOnTime: 'Se renouvellera à l\'heure',
@@ -7014,6 +7081,7 @@ const fr: TranslationKeys = {
     completedTodayMessage: 'Vous avez terminé les adhkar d\'aujourd\'hui, qu\'Allah vous bénisse',
     dhikrNumber: 'Dhikr {num}',
     duaNumber: 'Dua {num}',
+    startingOver: 'Recommencer',
   },
   prayer: {
     title: 'Heures de Prière',
@@ -7111,6 +7179,8 @@ const fr: TranslationKeys = {
     lastThirdMessage: 'Vous êtes dans le dernier tiers de la nuit — un temps de prière',
   
     hourFormat24: 'Format 24 heures',
+    defaultCity: 'La Mecque',
+    defaultCountry: 'Arabie saoudite',
   },
   tasbih: {
     title: 'Tasbih',
@@ -7304,7 +7374,9 @@ const fr: TranslationKeys = {
     totalWird: 'Wird total',
     wirdCompletedMsg: 'Wird terminé',
     yesCompleted: 'Oui, terminé',
-  
+    resetKhatma: 'Réinitialiser la Khatma',
+    confirmResetKhatma: 'Votre progression actuelle sera supprimée et vous recommencerez. Êtes-vous sûr ?',
+
     fri: 'Ven',
     mon: 'Lun',
     sat: 'Sam',
@@ -7418,10 +7490,11 @@ const fr: TranslationKeys = {
     adhanPrayer: 'Adhan de prière',
     adhanError: 'Erreur d\'adhan',
     adhanErrorDesc: 'Échec de la lecture de l\'adhan',
-    kahfFriday: 'Sourate Al-Kahf le vendredi',
+    kahfFriday: 'Sourate Al-Kahf - Vendredi',
     kahfTitle: 'Rappel de la sourate Al-Kahf',
     kahfBody: 'La lecture de la sourate Al-Kahf le vendredi est recommandée',
     kahfReminderTime: 'Heure du rappel de la sourate Al-Kahf',
+    kahfDesc: 'Rappel hebdomadaire de lecture de la Sourate Al-Kahf',
     fridayReminder: 'Rappel du vendredi',
     everyFriday: 'Chaque vendredi',
     surahKahf: 'Sourate Al-Kahf',
@@ -8366,6 +8439,7 @@ const fr: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Recherche dans le tafsir',
     tryDifferentWords: 'Essayez d\'autres mots',
+    loadError: 'Impossible de charger le tafsir',
   },
   errorBoundary: {
     contactSupport: 'Contacter le support',
@@ -8462,6 +8536,14 @@ const fr: TranslationKeys = {
     adjustTitle: 'Ajustement de la date hijri',
     noAdjustment: 'Pas d\'ajustement',
   },
+  hijriCalendar: {
+    estimatedDate: 'Date estim\u00e9e \u2014 peut diff\u00e9rer de l\'annonce officielle',
+    officialConfirmed: '✓ Officiel',
+    userAdjustment: 'Ajustement de date hijri',
+    waitingAnnouncement: 'En attente d\'annonce officielle',
+    countryLabel: 'Pays',
+    sourceLabel: 'Source',
+  },
   hajj: {
     duaWord: 'Invocation',
     duasWord: 'Invocations',
@@ -8513,6 +8595,7 @@ const fr: TranslationKeys = {
     consecutiveDays: 'Jours consécutifs',
     currentStreak: 'Série actuelle',
     dailyAverage: 'Moyenne quotidienne',
+    dailyAzkar: 'Adhkar quotidiens',
     dailyGoal: 'Objectif quotidien',
     dailyPages: 'Pages quotidiennes',
     dailySummary: 'Résumé quotidien',
@@ -8533,8 +8616,10 @@ const fr: TranslationKeys = {
     fastingType: 'Type de jeûne',
     firstKhatma: 'Première Khatma',
     fourPages: '4 Pages',
+    fourPagesTime: '~20 minutes',
     historicalFajrTimes: 'Horaires du Fajr',
     fullJuz: 'Juz complet',
+    fullJuzTime: '~60 minutes',
     juzNumber: 'Numéro du Juz',
     khatmaNumber: 'Numéro de Khatma',
     last30Days: '30 derniers jours',
@@ -8551,6 +8636,7 @@ const fr: TranslationKeys = {
     notificationSoundDesc: 'Choisissez votre son de notification préféré',
     onTime: 'À l\'heure',
     onePage: '1 Page',
+    onePageTime: '~5 minutes',
     pages: 'Pages',
     prayerLoggingReminder: 'Rappel d\'enregistrement de prière',
     prayerLoggingReminderDesc: 'Rappel pour enregistrer les prières quotidiennes',
@@ -8581,6 +8667,7 @@ const fr: TranslationKeys = {
     tapToRecordFasting: 'Appuyez pour enregistrer le jeûne',
     tapToSelectStatus: 'Appuyez pour sélectionner le statut',
     tenPages: '10 Pages',
+    tenPagesTime: '~50 minutes',
     thisWeek: 'Cette semaine',
     tip: 'Conseil',
     tipOfDay: 'Conseil du jour',
@@ -8595,6 +8682,7 @@ const fr: TranslationKeys = {
     totalDays: 'Total des jours',
     totalPages: 'Total des pages',
     twoPages: '2 Pages',
+    twoPagesTime: '~10 minutes',
     voluntary: 'Volontaire',
     voluntaryDesc: 'Jeûne volontaire pour Allah',
     vow: 'Vœu',
@@ -9027,7 +9115,7 @@ const de: TranslationKeys = {
     quranBookmarks: 'Quran-Lesezeichen',
     quranSurahsSection: 'Quran-Suren und Verse',
     rosary: 'Gebetskette',
-    selectedDuas: 'Ausgewählte Duas',
+    selectedDuas: 'Duas aus der Sunna',
     storiesSection: 'Geschichten',
     tasbihLog: 'Tasbih-Protokoll',
     tasbihSection: 'Tasbih und Istighfar',
@@ -9096,6 +9184,7 @@ const de: TranslationKeys = {
     lastPage: 'Letzte Seite',
     loadingQuran: 'Koran wird geladen...',
     longPressToGoToVerse: 'Lange drücken um zum Vers zu gehen',
+    longPressHint: 'Lange drücken für mehr',
     mushafBackground: 'Mushaf-Hintergrund',
     noBookmarkFound: 'Kein Lesezeichen gefunden',
     yellowGroup: 'Gelbe Gruppe',
@@ -9198,7 +9287,7 @@ const de: TranslationKeys = {
     protectionAdhkar: 'Schutz-Adhkar',
     reading: 'Lesen',
     repeatCount: 'Wiederholungen',
-    selectedDuas: 'Ausgewählte Bittgebete',
+    selectedDuas: 'Duas aus der Sunna',
     tapForNewDua: 'Für neues Bittgebet tippen',
     translationOptional: 'Übersetzung (optional)',
     willRenewOnTime: 'Wird rechtzeitig erneuert',
@@ -9207,6 +9296,7 @@ const de: TranslationKeys = {
     completedTodayMessage: 'Sie haben die heutigen Adhkar abgeschlossen, möge Allah Sie segnen',
     dhikrNumber: 'Dhikr {num}',
     duaNumber: 'Dua {num}',
+    startingOver: 'Von vorne beginnen',
   },
   prayer: {
     title: 'Gebetszeiten',
@@ -9304,6 +9394,8 @@ const de: TranslationKeys = {
     lastThirdMessage: 'Sie befinden sich im letzten Drittel der Nacht — eine Zeit für Gebete',
   
     hourFormat24: '24-Stunden-Format',
+    defaultCity: 'Mekka',
+    defaultCountry: 'Saudi-Arabien',
   },
   tasbih: {
     title: 'Tasbih',
@@ -9497,7 +9589,9 @@ const de: TranslationKeys = {
     totalWird: 'Gesamtes Wird',
     wirdCompletedMsg: 'Wird abgeschlossen',
     yesCompleted: 'Ja, abgeschlossen',
-  
+    resetKhatma: 'Khatma zurücksetzen',
+    confirmResetKhatma: 'Ihr aktueller Fortschritt wird gelöscht und Sie beginnen von vorne. Sind Sie sicher?',
+
     fri: 'Fr',
     mon: 'Mo',
     sat: 'Sa',
@@ -9611,10 +9705,11 @@ const de: TranslationKeys = {
     adhanPrayer: 'Gebets-Adhan',
     adhanError: 'Adhan-Fehler',
     adhanErrorDesc: 'Adhan konnte nicht abgespielt werden',
-    kahfFriday: 'Sure Al-Kahf am Freitag',
+    kahfFriday: 'Sure Al-Kahf - Freitag',
     kahfTitle: 'Erinnerung an Sure Al-Kahf',
     kahfBody: 'Das Lesen der Sure Al-Kahf am Freitag wird empfohlen',
     kahfReminderTime: 'Erinnerungszeit für Sure Al-Kahf',
+    kahfDesc: 'Wöchentliche Erinnerung an Sure Al-Kahf',
     fridayReminder: 'Freitags-Erinnerung',
     everyFriday: 'Jeden Freitag',
     surahKahf: 'Sure Al-Kahf',
@@ -10559,6 +10654,7 @@ const de: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Tafsir-Suche',
     tryDifferentWords: 'Versuchen Sie andere Wörter',
+    loadError: 'Tafsir konnte nicht geladen werden',
   },
   errorBoundary: {
     contactSupport: 'Support kontaktieren',
@@ -10655,6 +10751,14 @@ const de: TranslationKeys = {
     adjustTitle: 'Hijri-Datumsanpassung',
     noAdjustment: 'Keine Anpassung',
   },
+  hijriCalendar: {
+    estimatedDate: 'Gesch\u00e4tztes Datum \u2014 kann von der offiziellen Ank\u00fcndigung abweichen',
+    officialConfirmed: '✓ Offiziell',
+    userAdjustment: 'Hijri-Datumsanpassung',
+    waitingAnnouncement: 'Warten auf offizielle Ank\u00fcndigung',
+    countryLabel: 'Land',
+    sourceLabel: 'Quelle',
+  },
   hajj: {
     duaWord: 'Bittgebet',
     duasWord: 'Bittgebete',
@@ -10706,6 +10810,7 @@ const de: TranslationKeys = {
     consecutiveDays: 'Aufeinanderfolgende Tage',
     currentStreak: 'Aktuelle Serie',
     dailyAverage: 'Tagesdurchschnitt',
+    dailyAzkar: 'Tägliche Adhkar',
     dailyGoal: 'Tagesziel',
     dailyPages: 'Tägliche Seiten',
     dailySummary: 'Tageszusammenfassung',
@@ -10726,8 +10831,10 @@ const de: TranslationKeys = {
     fastingType: 'Fastenart',
     firstKhatma: 'Erste Khatma',
     fourPages: '4 Seiten',
+    fourPagesTime: '~20 Minuten',
     historicalFajrTimes: 'Fajr-Zeiten',
     fullJuz: 'Vollständiger Juz',
+    fullJuzTime: '~60 Minuten',
     juzNumber: 'Juz-Nummer',
     khatmaNumber: 'Khatma-Nummer',
     last30Days: 'Letzte 30 Tage',
@@ -10744,6 +10851,7 @@ const de: TranslationKeys = {
     notificationSoundDesc: 'Wählen Sie Ihren bevorzugten Benachrichtigungston',
     onTime: 'Pünktlich',
     onePage: '1 Seite',
+    onePageTime: '~5 Minuten',
     pages: 'Seiten',
     prayerLoggingReminder: 'Gebetsprotokoll-Erinnerung',
     prayerLoggingReminderDesc: 'Erinnerung, tägliche Gebete zu protokollieren',
@@ -10774,6 +10882,7 @@ const de: TranslationKeys = {
     tapToRecordFasting: 'Tippen zum Fasten aufzeichnen',
     tapToSelectStatus: 'Tippen zum Status auswählen',
     tenPages: '10 Seiten',
+    tenPagesTime: '~50 Minuten',
     thisWeek: 'Diese Woche',
     tip: 'Tipp',
     tipOfDay: 'Tipp des Tages',
@@ -10788,6 +10897,7 @@ const de: TranslationKeys = {
     totalDays: 'Gesamttage',
     totalPages: 'Gesamtseiten',
     twoPages: '2 Seiten',
+    twoPagesTime: '~10 Minuten',
     voluntary: 'Freiwillig',
     voluntaryDesc: 'Freiwilliges Fasten für Allah',
     vow: 'Gelübde',
@@ -11220,7 +11330,7 @@ const tr: TranslationKeys = {
     quranBookmarks: 'Kur\'an Yer İmleri',
     quranSurahsSection: 'Kur\'an Sureleri ve Ayetler',
     rosary: 'Tesbih',
-    selectedDuas: 'Seçilmiş Dualar',
+    selectedDuas: 'Sünnetten Dualar',
     storiesSection: 'Hikayeler',
     tasbihLog: 'Tesbih Kaydı',
     tasbihSection: 'Tesbih ve İstiğfar',
@@ -11289,6 +11399,7 @@ const tr: TranslationKeys = {
     lastPage: 'Son Sayfa',
     loadingQuran: 'Kur\'an yükleniyor...',
     longPressToGoToVerse: 'Ayete gitmek için uzun basın',
+    longPressHint: 'Daha fazlası için uzun basın',
     mushafBackground: 'Mushaf Arka Planı',
     noBookmarkFound: 'Yer imi bulunamadı',
     yellowGroup: 'Sarı Grup',
@@ -11391,7 +11502,7 @@ const tr: TranslationKeys = {
     protectionAdhkar: 'Koruma Zikirleri',
     reading: 'Okunuyor',
     repeatCount: 'Tekrar Sayısı',
-    selectedDuas: 'Seçilen Dualar',
+    selectedDuas: 'Sünnetten Dualar',
     tapForNewDua: 'Yeni dua için dokun',
     translationOptional: 'Çeviri (isteğe bağlı)',
     willRenewOnTime: 'Zamanında yenilenecek',
@@ -11400,6 +11511,7 @@ const tr: TranslationKeys = {
     completedTodayMessage: 'Bugünkü zikirleri tamamladınız, Allah mübarek kılsın',
     dhikrNumber: 'Zikir {num}',
     duaNumber: 'Dua {num}',
+    startingOver: 'Baştan başlanıyor',
   },
   prayer: {
     title: 'Namaz Saatleri',
@@ -11497,6 +11609,8 @@ const tr: TranslationKeys = {
     lastThirdMessage: 'Gecenin son üçte birinde bulunuyorsunuz — dua vakti',
   
     hourFormat24: '24 Saat Formatı',
+    defaultCity: 'Mekke',
+    defaultCountry: 'Suudi Arabistan',
   },
   tasbih: {
     title: 'Tesbih',
@@ -11690,7 +11804,9 @@ const tr: TranslationKeys = {
     totalWird: 'Toplam Vird',
     wirdCompletedMsg: 'Vird tamamlandı',
     yesCompleted: 'Evet, tamamlandı',
-  
+    resetKhatma: 'Hatimi Sıfırla',
+    confirmResetKhatma: 'Mevcut ilerlemeniz silinecek ve baştan başlayacaksınız. Emin misiniz?',
+
     fri: 'Cum',
     mon: 'Pzt',
     sat: 'Cmt',
@@ -11804,10 +11920,11 @@ const tr: TranslationKeys = {
     adhanPrayer: 'Namaz Ezanı',
     adhanError: 'Ezan Hatası',
     adhanErrorDesc: 'Ezan çalınamadı',
-    kahfFriday: 'Cuma Kehf Suresi',
+    kahfFriday: 'Kehf Suresi - Cuma',
     kahfTitle: 'Kehf Suresi Hatırlatması',
     kahfBody: 'Cuma günü Kehf Suresi okuması tavsiye edilir',
     kahfReminderTime: 'Kehf Hatırlatma Vakti',
+    kahfDesc: 'Haftalık Kehf Suresi okuma hatırlatması',
     fridayReminder: 'Cuma Hatırlatması',
     everyFriday: 'Her Cuma',
     surahKahf: 'Kehf Suresi',
@@ -12752,6 +12869,7 @@ const tr: TranslationKeys = {
     tafsirBtn: 'Tefsir',
     title: 'Tefsir Araması',
     tryDifferentWords: 'Farklı kelimeler deneyin',
+    loadError: 'Tefsir yüklenemedi',
   },
   errorBoundary: {
     contactSupport: 'Destek ile İletişim',
@@ -12848,6 +12966,14 @@ const tr: TranslationKeys = {
     adjustTitle: 'Hicri Tarih Ayarı',
     noAdjustment: 'Ayarlama Yok',
   },
+  hijriCalendar: {
+    estimatedDate: 'Tahmini tarih \u2014 resmi duyurudan farkl\u0131 olabilir',
+    officialConfirmed: '✓ Resmi',
+    userAdjustment: 'Hicri Tarih Ayar\u0131',
+    waitingAnnouncement: 'Resmi duyuru bekleniyor',
+    countryLabel: '\u00dclke',
+    sourceLabel: 'Kaynak',
+  },
   hajj: {
     duaWord: 'Dua',
     duasWord: 'Dualar',
@@ -12899,6 +13025,7 @@ const tr: TranslationKeys = {
     consecutiveDays: 'Ardışık Günler',
     currentStreak: 'Mevcut Seri',
     dailyAverage: 'Günlük Ortalama',
+    dailyAzkar: 'Günlük Zikirler',
     dailyGoal: 'Günlük Hedef',
     dailyPages: 'Günlük Sayfalar',
     dailySummary: 'Günlük Özet',
@@ -12919,8 +13046,10 @@ const tr: TranslationKeys = {
     fastingType: 'Oruç Türü',
     firstKhatma: 'İlk Hatim',
     fourPages: '4 Sayfa',
+    fourPagesTime: '~20 dakika',
     historicalFajrTimes: 'Fecir Vakitleri',
     fullJuz: 'Tam Cüz',
+    fullJuzTime: '~60 dakika',
     juzNumber: 'Cüz Numarası',
     khatmaNumber: 'Hatim Numarası',
     last30Days: 'Son 30 Gün',
@@ -12937,6 +13066,7 @@ const tr: TranslationKeys = {
     notificationSoundDesc: 'Tercih ettiğiniz bildirim sesini seçin',
     onTime: 'Zamanında',
     onePage: '1 Sayfa',
+    onePageTime: '~5 dakika',
     pages: 'Sayfalar',
     prayerLoggingReminder: 'Namaz Kayıt Hatırlatıcısı',
     prayerLoggingReminderDesc: 'Günlük namazları kaydetmek için hatırlatma',
@@ -12967,6 +13097,7 @@ const tr: TranslationKeys = {
     tapToRecordFasting: 'Oruç kaydetmek için dokunun',
     tapToSelectStatus: 'Durum seçmek için dokunun',
     tenPages: '10 Sayfa',
+    tenPagesTime: '~50 dakika',
     thisWeek: 'Bu Hafta',
     tip: 'İpucu',
     tipOfDay: 'Günün İpucu',
@@ -12981,6 +13112,7 @@ const tr: TranslationKeys = {
     totalDays: 'Toplam Günler',
     totalPages: 'Toplam Sayfalar',
     twoPages: '2 Sayfa',
+    twoPagesTime: '~10 dakika',
     voluntary: 'Nafile',
     voluntaryDesc: 'Allah rızası için nafile oruç',
     vow: 'Adak',
@@ -13413,7 +13545,7 @@ const es: TranslationKeys = {
     quranBookmarks: 'Marcadores del Corán',
     quranSurahsSection: 'Suras y Versículos del Corán',
     rosary: 'Rosario',
-    selectedDuas: 'Duas seleccionadas',
+    selectedDuas: 'Duás de la Sunna',
     storiesSection: 'Historias',
     tasbihLog: 'Registro de Tasbih',
     tasbihSection: 'Tasbih e Istighfar',
@@ -13482,6 +13614,7 @@ const es: TranslationKeys = {
     lastPage: 'Última página',
     loadingQuran: 'Cargando el Corán...',
     longPressToGoToVerse: 'Mantenga pulsado para ir al versículo',
+    longPressHint: 'Mantenga pulsado para más',
     mushafBackground: 'Fondo del Mushaf',
     noBookmarkFound: 'No se encontraron marcadores',
     yellowGroup: 'Grupo amarillo',
@@ -13584,7 +13717,7 @@ const es: TranslationKeys = {
     protectionAdhkar: 'Adhkar de protección',
     reading: 'Lectura',
     repeatCount: 'Repeticiones',
-    selectedDuas: 'Súplicas seleccionadas',
+    selectedDuas: 'Duás de la Sunna',
     tapForNewDua: 'Toque para nueva súplica',
     translationOptional: 'Traducción (opcional)',
     willRenewOnTime: 'Se renovará a tiempo',
@@ -13593,6 +13726,7 @@ const es: TranslationKeys = {
     completedTodayMessage: 'Has completado los adhkar de hoy, que Allah te bendiga',
     dhikrNumber: 'Dhikr {num}',
     duaNumber: 'Dua {num}',
+    startingOver: 'Empezando de nuevo',
   },
   prayer: {
     title: 'Horarios de Oración',
@@ -13690,6 +13824,8 @@ const es: TranslationKeys = {
     lastThirdMessage: 'Estás en el último tercio de la noche — tiempo de oración',
   
     hourFormat24: 'Formato 24 horas',
+    defaultCity: 'La Meca',
+    defaultCountry: 'Arabia Saudita',
   },
   tasbih: {
     title: 'Tasbih',
@@ -13883,7 +14019,9 @@ const es: TranslationKeys = {
     totalWird: 'Wird total',
     wirdCompletedMsg: 'Wird completado',
     yesCompleted: 'Sí, completado',
-  
+    resetKhatma: 'Reiniciar Khatma',
+    confirmResetKhatma: 'Tu progreso actual se eliminará y comenzarás de nuevo. ¿Estás seguro?',
+
     fri: 'Vie',
     mon: 'Lun',
     sat: 'Sáb',
@@ -13997,10 +14135,11 @@ const es: TranslationKeys = {
     adhanPrayer: 'Adhan de oración',
     adhanError: 'Error de adhan',
     adhanErrorDesc: 'Error al reproducir el adhan',
-    kahfFriday: 'Sura Al-Kahf los viernes',
+    kahfFriday: 'Sura Al-Kahf - Viernes',
     kahfTitle: 'Recordatorio de la Sura Al-Kahf',
     kahfBody: 'Se recomienda leer la Sura Al-Kahf los viernes',
     kahfReminderTime: 'Hora del recordatorio de la Sura Al-Kahf',
+    kahfDesc: 'Recordatorio semanal de lectura de la Sura Al-Kahf',
     fridayReminder: 'Recordatorio del viernes',
     everyFriday: 'Cada viernes',
     surahKahf: 'Sura Al-Kahf',
@@ -14945,6 +15084,7 @@ const es: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Búsqueda de tafsir',
     tryDifferentWords: 'Intente otras palabras',
+    loadError: 'Error al cargar el tafsir',
   },
   errorBoundary: {
     contactSupport: 'Contactar soporte',
@@ -15041,6 +15181,14 @@ const es: TranslationKeys = {
     adjustTitle: 'Ajuste de fecha hijri',
     noAdjustment: 'Sin ajuste',
   },
+  hijriCalendar: {
+    estimatedDate: 'Fecha estimada \u2014 puede diferir del anuncio oficial',
+    officialConfirmed: '✓ Oficial',
+    userAdjustment: 'Ajuste de fecha Hijri',
+    waitingAnnouncement: 'Esperando anuncio oficial',
+    countryLabel: 'Pa\u00eds',
+    sourceLabel: 'Fuente',
+  },
   hajj: {
     duaWord: 'Súplica',
     duasWord: 'Súplicas',
@@ -15092,6 +15240,7 @@ const es: TranslationKeys = {
     consecutiveDays: 'Días consecutivos',
     currentStreak: 'Racha actual',
     dailyAverage: 'Promedio diario',
+    dailyAzkar: 'Adhkar diarios',
     dailyGoal: 'Meta diaria',
     dailyPages: 'Páginas diarias',
     dailySummary: 'Resumen diario',
@@ -15112,8 +15261,10 @@ const es: TranslationKeys = {
     fastingType: 'Tipo de ayuno',
     firstKhatma: 'Primera Khatma',
     fourPages: '4 Páginas',
+    fourPagesTime: '~20 minutos',
     historicalFajrTimes: 'Horarios del Fajr',
     fullJuz: 'Juz completo',
+    fullJuzTime: '~60 minutos',
     juzNumber: 'Número de Juz',
     khatmaNumber: 'Número de Khatma',
     last30Days: 'Últimos 30 días',
@@ -15130,6 +15281,7 @@ const es: TranslationKeys = {
     notificationSoundDesc: 'Elige tu sonido de notificación preferido',
     onTime: 'A tiempo',
     onePage: '1 Página',
+    onePageTime: '~5 minutos',
     pages: 'Páginas',
     prayerLoggingReminder: 'Recordatorio de registro de oración',
     prayerLoggingReminderDesc: 'Recordatorio para registrar las oraciones diarias',
@@ -15160,6 +15312,7 @@ const es: TranslationKeys = {
     tapToRecordFasting: 'Toca para registrar el ayuno',
     tapToSelectStatus: 'Toca para seleccionar estado',
     tenPages: '10 Páginas',
+    tenPagesTime: '~50 minutos',
     thisWeek: 'Esta semana',
     tip: 'Consejo',
     tipOfDay: 'Consejo del día',
@@ -15174,6 +15327,7 @@ const es: TranslationKeys = {
     totalDays: 'Total de días',
     totalPages: 'Total de páginas',
     twoPages: '2 Páginas',
+    twoPagesTime: '~10 minutos',
     voluntary: 'Voluntario',
     voluntaryDesc: 'Ayuno voluntario por Allah',
     vow: 'Voto',
@@ -15605,7 +15759,7 @@ const ur: TranslationKeys = {
     quranBookmarks: 'قرآن بُک مارکس',
     quranSurahsSection: 'قرآنی سورتیں اور آیات',
     rosary: 'تسبیح',
-    selectedDuas: 'منتخب دعائیں',
+    selectedDuas: 'سنت سے دعائیں',
     storiesSection: 'کہانیاں',
     tasbihLog: 'تسبیح لاگ',
     tasbihSection: 'تسبیح اور استغفار',
@@ -15674,6 +15828,7 @@ const ur: TranslationKeys = {
     lastPage: 'آخری صفحہ',
     loadingQuran: 'قرآن لوڈ ہو رہا...',
     longPressToGoToVerse: 'آیت پر جانے کے لیے دیر تک دبائیں',
+    longPressHint: 'مزید کے لیے دیر تک دبائیں',
     mushafBackground: 'مصحف بیک گراؤنڈ',
     noBookmarkFound: 'بک مارک نہیں ملا',
     yellowGroup: 'پیلا گروپ',
@@ -15776,7 +15931,7 @@ const ur: TranslationKeys = {
     protectionAdhkar: 'حفاظت کے اذکار',
     reading: 'پڑھا جا رہا ہے',
     repeatCount: 'تکرار',
-    selectedDuas: 'منتخب دعائیں',
+    selectedDuas: 'سنت سے دعائیں',
     tapForNewDua: 'نئی دعا کے لیے دبائیں',
     translationOptional: 'ترجمہ (اختیاری)',
     willRenewOnTime: 'وقت پر تجدید ہوگا',
@@ -15785,6 +15940,7 @@ const ur: TranslationKeys = {
     completedTodayMessage: 'آپ نے آج کے اذکار مکمل کر لیے، اللہ آپ کو برکت دے',
     dhikrNumber: 'ذکر {num}',
     duaNumber: 'دعا {num}',
+    startingOver: 'دوبارہ شروع',
   },
   prayer: {
     title: 'نماز کے اوقات',
@@ -15882,6 +16038,8 @@ const ur: TranslationKeys = {
     lastThirdMessage: 'آپ رات کے آخری تہائی میں ہیں — دعا کا وقت',
   
     hourFormat24: '24 گھنٹے کی شکل',
+    defaultCity: 'مکہ مکرمہ',
+    defaultCountry: 'سعودی عرب',
   },
   tasbih: {
     title: 'تسبیح',
@@ -16075,7 +16233,9 @@ const ur: TranslationKeys = {
     totalWird: 'کل ورد',
     wirdCompletedMsg: 'ورد مکمل',
     yesCompleted: 'ہاں، مکمل',
-  
+    resetKhatma: 'ختم دوبارہ شروع کریں',
+    confirmResetKhatma: 'آپ کی موجودہ پیشرفت حذف ہو جائے گی اور آپ دوبارہ شروع کریں گے۔ کیا آپ کو یقین ہے؟',
+
     fri: 'جمعہ',
     mon: 'پیر',
     sat: 'ہفتہ',
@@ -16189,10 +16349,11 @@ const ur: TranslationKeys = {
     adhanPrayer: 'نماز کا اذان',
     adhanError: 'اذان خرابی',
     adhanErrorDesc: 'اذان چلانے میں خرابی',
-    kahfFriday: 'جمعہ کو سورۃ الکہف',
+    kahfFriday: 'سورۃ الکہف - جمعہ',
     kahfTitle: 'سورۃ الکہف یاددہانی',
     kahfBody: 'جمعہ کو سورۃ الکہف پڑھنا مستحب ہے',
     kahfReminderTime: 'سورۃ الکہف یاددہانی وقت',
+    kahfDesc: 'ہفتہ وار سورۃ الکہف پڑھنے کی یاددہانی',
     fridayReminder: 'جمعہ یاددہانی',
     everyFriday: 'ہر جمعہ',
     surahKahf: 'سورۃ الکہف',
@@ -16283,7 +16444,7 @@ const ur: TranslationKeys = {
     months: ['جنوری', 'فروری', 'مارچ', 'اپریل', 'مئی', 'جون', 'جولائی', 'اگست', 'ستمبر', 'اکتوبر', 'نومبر', 'دسمبر'],
     hijriMonths: ['محرم', 'صفر', 'ربیع الاول', 'ربیع الثانی', 'جمادی الاول', 'جمادی الثانی', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذوالقعدہ', 'ذوالحجہ'],
     weekDays: ['اتوار', 'پیر', 'منگل', 'بدھ', 'جمعرات', 'جمعہ', 'ہفتہ'],
-    weekDaysShort: ['اتو', 'پیر', 'منگ', 'بدھ', 'جمع', 'جمع', 'ہفت'],
+    weekDaysShort: ['ات', 'پی', 'من', 'بد', 'جم', 'جم', 'ہف'],
     events: 'تقریبات',
     islamicEvents: 'اسلامی تقریبات',
     noEvents: 'کوئی تقریب نہیں',
@@ -17137,6 +17298,7 @@ const ur: TranslationKeys = {
     tafsirBtn: 'تفسیر',
     title: 'تفسیر تلاش',
     tryDifferentWords: 'مختلف الفاظ آزمائیں',
+    loadError: 'تفسیر لوڈ نہیں ہو سکی',
   },
   errorBoundary: {
     contactSupport: 'سپورٹ سے رابطہ',
@@ -17233,6 +17395,14 @@ const ur: TranslationKeys = {
     adjustTitle: 'ہجری تاریخ کی ایڈجسٹمنٹ',
     noAdjustment: 'کوئی ایڈجسٹمنٹ نہیں',
   },
+  hijriCalendar: {
+    estimatedDate: 'تخمینی تاریخ — سرکاری اعلان سے مختلف ہو سکتی ہے',
+    officialConfirmed: '✓ سرکاری',
+    userAdjustment: 'ہجری تاریخ ایڈجسٹمنٹ',
+    waitingAnnouncement: 'سرکاری اعلان کا انتظار',
+    countryLabel: 'ملک',
+    sourceLabel: 'ذریعہ',
+  },
   hajj: {
     duaWord: 'دعا',
     duasWord: 'دعائیں',
@@ -17284,6 +17454,7 @@ const ur: TranslationKeys = {
     consecutiveDays: 'متواتر دن',
     currentStreak: 'موجودہ سلسلہ',
     dailyAverage: 'روزانہ اوسط',
+    dailyAzkar: 'روزانہ اذکار',
     dailyGoal: 'روزانہ ہدف',
     dailyPages: 'روزانہ صفحات',
     dailySummary: 'روزانہ خلاصہ',
@@ -17304,8 +17475,10 @@ const ur: TranslationKeys = {
     fastingType: 'روزے کی قسم',
     firstKhatma: 'پہلا ختم',
     fourPages: '4 صفحات',
+    fourPagesTime: '~۲۰ منٹ',
     historicalFajrTimes: 'فجر کے اوقات',
     fullJuz: 'مکمل پارہ',
+    fullJuzTime: '~۶۰ منٹ',
     juzNumber: 'پارہ نمبر',
     khatmaNumber: 'ختم نمبر',
     last30Days: 'آخری ۳۰ دن',
@@ -17322,6 +17495,7 @@ const ur: TranslationKeys = {
     notificationSoundDesc: 'اپنی پسندیدہ نوٹیفکیشن آواز منتخب کریں',
     onTime: 'وقت پر',
     onePage: '1 صفحہ',
+    onePageTime: '~۵ منٹ',
     pages: 'صفحات',
     prayerLoggingReminder: 'نماز ریکارڈ کی یاددہانی',
     prayerLoggingReminderDesc: 'روزانہ نمازیں ریکارڈ کرنے کی یاددہانی',
@@ -17352,6 +17526,7 @@ const ur: TranslationKeys = {
     tapToRecordFasting: 'روزہ ریکارڈ کرنے کے لیے ٹیپ کریں',
     tapToSelectStatus: 'حالت منتخب کرنے کے لیے ٹیپ کریں',
     tenPages: '10 صفحات',
+    tenPagesTime: '~۵۰ منٹ',
     thisWeek: 'اس ہفتے',
     tip: 'نصیحت',
     tipOfDay: 'آج کی نصیحت',
@@ -17366,6 +17541,7 @@ const ur: TranslationKeys = {
     totalDays: 'کل دن',
     totalPages: 'کل صفحات',
     twoPages: '2 صفحات',
+    twoPagesTime: '~۱۰ منٹ',
     voluntary: 'نفلی',
     voluntaryDesc: 'الله کی رضا کے لیے نفلی روزہ',
     vow: 'نذر',
@@ -17798,7 +17974,7 @@ const id: TranslationKeys = {
     quranBookmarks: 'Penanda Al-Quran',
     quranSurahsSection: 'Surah & Ayat Al-Quran',
     rosary: 'Tasbih',
-    selectedDuas: 'Doa Pilihan',
+    selectedDuas: 'Doa dari Sunnah',
     storiesSection: 'Kisah',
     tasbihLog: 'Catatan Tasbih',
     tasbihSection: 'Tasbih & Istighfar',
@@ -17867,6 +18043,7 @@ const id: TranslationKeys = {
     lastPage: 'Halaman Terakhir',
     loadingQuran: 'Memuat Al-Quran...',
     longPressToGoToVerse: 'Tekan lama untuk ke ayat',
+    longPressHint: 'Tekan lama untuk lainnya',
     mushafBackground: 'Latar Mushaf',
     noBookmarkFound: 'Bookmark tidak ditemukan',
     yellowGroup: 'Grup Kuning',
@@ -17969,7 +18146,7 @@ const id: TranslationKeys = {
     protectionAdhkar: 'Dzikir Perlindungan',
     reading: 'Membaca',
     repeatCount: 'Pengulangan',
-    selectedDuas: 'Doa Terpilih',
+    selectedDuas: 'Doa dari Sunnah',
     tapForNewDua: 'Ketuk untuk doa baru',
     translationOptional: 'Terjemahan (opsional)',
     willRenewOnTime: 'Akan diperbarui tepat waktu',
@@ -17978,6 +18155,7 @@ const id: TranslationKeys = {
     completedTodayMessage: 'Anda telah menyelesaikan dzikir hari ini, semoga Allah memberkahi Anda',
     dhikrNumber: 'Dzikir {num}',
     duaNumber: 'Doa {num}',
+    startingOver: 'Mulai dari awal',
   },
   prayer: {
     title: 'Waktu Shalat',
@@ -18075,6 +18253,8 @@ const id: TranslationKeys = {
     lastThirdMessage: 'Anda berada di sepertiga malam terakhir — waktu berdoa',
   
     hourFormat24: 'Format 24 Jam',
+    defaultCity: 'Mekkah',
+    defaultCountry: 'Arab Saudi',
   },
   tasbih: {
     title: 'Tasbih',
@@ -18268,7 +18448,9 @@ const id: TranslationKeys = {
     totalWird: 'Total Wird',
     wirdCompletedMsg: 'Wird selesai',
     yesCompleted: 'Ya, selesai',
-  
+    resetKhatma: 'Atur Ulang Khatam',
+    confirmResetKhatma: 'Kemajuan Anda saat ini akan dihapus dan Anda akan memulai dari awal. Apakah Anda yakin?',
+
     fri: 'Jum',
     mon: 'Sen',
     sat: 'Sab',
@@ -18382,10 +18564,11 @@ const id: TranslationKeys = {
     adhanPrayer: 'Adzan Shalat',
     adhanError: 'Kesalahan Adzan',
     adhanErrorDesc: 'Gagal memutar adzan',
-    kahfFriday: 'Al-Kahfi Jumat',
+    kahfFriday: 'Surah Al-Kahfi - Jumat',
     kahfTitle: 'Pengingat Surah Al-Kahfi',
     kahfBody: 'Membaca Surah Al-Kahfi di hari Jumat sangat dianjurkan',
     kahfReminderTime: 'Waktu Pengingat Al-Kahfi',
+    kahfDesc: 'Pengingat mingguan membaca Surah Al-Kahfi',
     fridayReminder: 'Pengingat Jumat',
     everyFriday: 'Setiap Jumat',
     surahKahf: 'Surah Al-Kahfi',
@@ -19330,6 +19513,7 @@ const id: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Pencarian Tafsir',
     tryDifferentWords: 'Coba kata lain',
+    loadError: 'Gagal memuat tafsir',
   },
   errorBoundary: {
     contactSupport: 'Hubungi Dukungan',
@@ -19426,6 +19610,14 @@ const id: TranslationKeys = {
     adjustTitle: 'Penyesuaian Tanggal Hijriah',
     noAdjustment: 'Tanpa Penyesuaian',
   },
+  hijriCalendar: {
+    estimatedDate: 'Tanggal perkiraan — mungkin berbeda dari pengumuman resmi',
+    officialConfirmed: '✓ Resmi',
+    userAdjustment: 'Penyesuaian Tanggal Hijriah',
+    waitingAnnouncement: 'Menunggu pengumuman resmi',
+    countryLabel: 'Negara',
+    sourceLabel: 'Sumber',
+  },
   hajj: {
     duaWord: 'Doa',
     duasWord: 'Doa-doa',
@@ -19477,6 +19669,7 @@ const id: TranslationKeys = {
     consecutiveDays: 'Hari Berturut-turut',
     currentStreak: 'Rekor Saat Ini',
     dailyAverage: 'Rata-rata Harian',
+    dailyAzkar: 'Dzikir Harian',
     dailyGoal: 'Target Harian',
     dailyPages: 'Halaman Harian',
     dailySummary: 'Ringkasan Harian',
@@ -19497,8 +19690,10 @@ const id: TranslationKeys = {
     fastingType: 'Jenis Puasa',
     firstKhatma: 'Khatam Pertama',
     fourPages: '4 Halaman',
+    fourPagesTime: '~20 menit',
     historicalFajrTimes: 'Waktu Subuh',
     fullJuz: 'Juz Lengkap',
+    fullJuzTime: '~60 menit',
     juzNumber: 'Nomor Juz',
     khatmaNumber: 'Nomor Khatam',
     last30Days: '30 Hari Terakhir',
@@ -19515,6 +19710,7 @@ const id: TranslationKeys = {
     notificationSoundDesc: 'Pilih nada notifikasi pilihan Anda',
     onTime: 'Tepat Waktu',
     onePage: '1 Halaman',
+    onePageTime: '~5 menit',
     pages: 'Halaman',
     prayerLoggingReminder: 'Pengingat Pencatatan Sholat',
     prayerLoggingReminderDesc: 'Pengingat untuk mencatat sholat harian',
@@ -19545,6 +19741,7 @@ const id: TranslationKeys = {
     tapToRecordFasting: 'Ketuk untuk mencatat puasa',
     tapToSelectStatus: 'Ketuk untuk memilih status',
     tenPages: '10 Halaman',
+    tenPagesTime: '~50 menit',
     thisWeek: 'Minggu Ini',
     tip: 'Tips',
     tipOfDay: 'Tips Hari Ini',
@@ -19559,6 +19756,7 @@ const id: TranslationKeys = {
     totalDays: 'Total Hari',
     totalPages: 'Total Halaman',
     twoPages: '2 Halaman',
+    twoPagesTime: '~10 menit',
     voluntary: 'Sukarela',
     voluntaryDesc: 'Puasa sunnah karena Allah',
     vow: 'Nadzar',
@@ -19991,7 +20189,7 @@ const ms: TranslationKeys = {
     quranBookmarks: 'Penanda Al-Quran',
     quranSurahsSection: 'Surah & Ayat Al-Quran',
     rosary: 'Tasbih',
-    selectedDuas: 'Doa Pilihan',
+    selectedDuas: 'Doa dari Sunnah',
     storiesSection: 'Kisah',
     tasbihLog: 'Log Tasbih',
     tasbihSection: 'Tasbih & Istighfar',
@@ -20060,6 +20258,7 @@ const ms: TranslationKeys = {
     lastPage: 'Halaman Terakhir',
     loadingQuran: 'Memuatkan Al-Quran...',
     longPressToGoToVerse: 'Tekan lama untuk ke ayat',
+    longPressHint: 'Tekan lama untuk lagi',
     mushafBackground: 'Latar Mushaf',
     noBookmarkFound: 'Tandabuku tidak dijumpai',
     yellowGroup: 'Kumpulan Kuning',
@@ -20162,7 +20361,7 @@ const ms: TranslationKeys = {
     protectionAdhkar: 'Zikir Perlindungan',
     reading: 'Membaca',
     repeatCount: 'Ulangan',
-    selectedDuas: 'Doa Terpilih',
+    selectedDuas: 'Doa dari Sunnah',
     tapForNewDua: 'Ketik untuk doa baru',
     translationOptional: 'Terjemahan (pilihan)',
     willRenewOnTime: 'Akan diperbaharui tepat masa',
@@ -20171,6 +20370,7 @@ const ms: TranslationKeys = {
     completedTodayMessage: 'Anda telah menyelesaikan zikir hari ini, semoga Allah memberkati anda',
     dhikrNumber: 'Zikir {num}',
     duaNumber: 'Doa {num}',
+    startingOver: 'Bermula semula',
   },
   prayer: {
     title: 'Waktu Solat',
@@ -20268,6 +20468,8 @@ const ms: TranslationKeys = {
     lastThirdMessage: 'Anda berada di sepertiga malam terakhir — waktu berdoa',
   
     hourFormat24: 'Format 24 Jam',
+    defaultCity: 'Makkah',
+    defaultCountry: 'Arab Saudi',
   },
   tasbih: {
     title: 'Tasbih',
@@ -20461,7 +20663,9 @@ const ms: TranslationKeys = {
     totalWird: 'Jumlah Wird',
     wirdCompletedMsg: 'Wird selesai',
     yesCompleted: 'Ya, selesai',
-  
+    resetKhatma: 'Tetapkan Semula Khatam',
+    confirmResetKhatma: 'Kemajuan semasa anda akan dipadamkan dan anda akan bermula semula. Adakah anda pasti?',
+
     fri: 'Jum',
     mon: 'Isn',
     sat: 'Sab',
@@ -20575,10 +20779,11 @@ const ms: TranslationKeys = {
     adhanPrayer: 'Azan Solat',
     adhanError: 'Ralat Azan',
     adhanErrorDesc: 'Gagal memainkan azan',
-    kahfFriday: 'Al-Kahfi Jumaat',
+    kahfFriday: 'Surah Al-Kahfi - Jumaat',
     kahfTitle: 'Peringatan Surah Al-Kahfi',
     kahfBody: 'Membaca Surah Al-Kahfi pada hari Jumaat sangat digalakkan',
     kahfReminderTime: 'Masa Peringatan Al-Kahfi',
+    kahfDesc: 'Peringatan mingguan membaca Surah Al-Kahfi',
     fridayReminder: 'Peringatan Jumaat',
     everyFriday: 'Setiap Jumaat',
     surahKahf: 'Surah Al-Kahfi',
@@ -21523,6 +21728,7 @@ const ms: TranslationKeys = {
     tafsirBtn: 'Tafsir',
     title: 'Carian Tafsir',
     tryDifferentWords: 'Cuba perkataan lain',
+    loadError: 'Gagal memuatkan tafsir',
   },
   errorBoundary: {
     contactSupport: 'Hubungi Sokongan',
@@ -21619,6 +21825,14 @@ const ms: TranslationKeys = {
     adjustTitle: 'Pelarasan Tarikh Hijrah',
     noAdjustment: 'Tanpa Pelarasan',
   },
+  hijriCalendar: {
+    estimatedDate: 'Tarikh anggaran — mungkin berbeza dari pengumuman rasmi',
+    officialConfirmed: '✓ Rasmi',
+    userAdjustment: 'Pelarasan Tarikh Hijri',
+    waitingAnnouncement: 'Menunggu pengumuman rasmi',
+    countryLabel: 'Negara',
+    sourceLabel: 'Sumber',
+  },
   hajj: {
     duaWord: 'Doa',
     duasWord: 'Doa-doa',
@@ -21670,6 +21884,7 @@ const ms: TranslationKeys = {
     consecutiveDays: 'Hari Berturut-turut',
     currentStreak: 'Rekod Semasa',
     dailyAverage: 'Purata Harian',
+    dailyAzkar: 'Zikir Harian',
     dailyGoal: 'Sasaran Harian',
     dailyPages: 'Halaman Harian',
     dailySummary: 'Ringkasan Harian',
@@ -21690,8 +21905,10 @@ const ms: TranslationKeys = {
     fastingType: 'Jenis Puasa',
     firstKhatma: 'Khatam Pertama',
     fourPages: '4 Halaman',
+    fourPagesTime: '~20 minit',
     historicalFajrTimes: 'Waktu Subuh',
     fullJuz: 'Juzuk Lengkap',
+    fullJuzTime: '~60 minit',
     juzNumber: 'Nombor Juzuk',
     khatmaNumber: 'Nombor Khatam',
     last30Days: '30 Hari Terakhir',
@@ -21708,6 +21925,7 @@ const ms: TranslationKeys = {
     notificationSoundDesc: 'Pilih bunyi pemberitahuan pilihan anda',
     onTime: 'Tepat Masa',
     onePage: '1 Halaman',
+    onePageTime: '~5 minit',
     pages: 'Halaman',
     prayerLoggingReminder: 'Peringatan Catatan Solat',
     prayerLoggingReminderDesc: 'Peringatan untuk merekod solat harian',
@@ -21738,6 +21956,7 @@ const ms: TranslationKeys = {
     tapToRecordFasting: 'Ketik untuk merekod puasa',
     tapToSelectStatus: 'Ketik untuk memilih status',
     tenPages: '10 Halaman',
+    tenPagesTime: '~50 minit',
     thisWeek: 'Minggu Ini',
     tip: 'Petua',
     tipOfDay: 'Tip Hari Ini',
@@ -21752,6 +21971,7 @@ const ms: TranslationKeys = {
     totalDays: 'Jumlah Hari',
     totalPages: 'Jumlah Halaman',
     twoPages: '2 Halaman',
+    twoPagesTime: '~10 minit',
     voluntary: 'Sukarela',
     voluntaryDesc: 'Puasa sunat kerana Allah',
     vow: 'Nazar',
@@ -22183,7 +22403,7 @@ const hi: TranslationKeys = {
     quranBookmarks: 'कुरान बुकमार्क्स',
     quranSurahsSection: 'कुरान सूरतें और आयतें',
     rosary: 'तस्बीह',
-    selectedDuas: 'चुनी हुई दुआएँ',
+    selectedDuas: 'सुन्नत से दुआएँ',
     storiesSection: 'कहानियाँ',
     tasbihLog: 'तस्बीह लॉग',
     tasbihSection: 'तस्बीह और इस्तिग़फ़ार',
@@ -22252,6 +22472,7 @@ const hi: TranslationKeys = {
     lastPage: 'आख़िरी पेज',
     loadingQuran: 'क़ुरआन लोड हो रहा...',
     longPressToGoToVerse: 'आयत पर जाने के लिए लंबा दबाएँ',
+    longPressHint: 'अधिक के लिए लंबा दबाएँ',
     mushafBackground: 'मुसहफ़ पृष्ठभूमि',
     noBookmarkFound: 'कोई बुकमार्क नहीं',
     yellowGroup: 'पीला समूह',
@@ -22354,7 +22575,7 @@ const hi: TranslationKeys = {
     protectionAdhkar: 'सुरक्षा के अज़कार',
     reading: 'पढ़ा जा रहा',
     repeatCount: 'दोहराव',
-    selectedDuas: 'चयनित दुआएँ',
+    selectedDuas: 'सुन्नत से दुआएँ',
     tapForNewDua: 'नई दुआ के लिए टैप करें',
     translationOptional: 'अनुवाद (वैकल्पिक)',
     willRenewOnTime: 'समय पर नवीन होगा',
@@ -22363,6 +22584,7 @@ const hi: TranslationKeys = {
     completedTodayMessage: 'आपने आज के अज़कार पूरे कर लिए, अल्लाह आपको बरकत दे',
     dhikrNumber: 'ज़िक्र {num}',
     duaNumber: 'दुआ {num}',
+    startingOver: 'फिर से शुरू',
   },
   prayer: {
     title: 'नमाज़ के समय',
@@ -22460,6 +22682,8 @@ const hi: TranslationKeys = {
     lastThirdMessage: 'आप रात के आख़िरी तिहाई में हैं — दुआ का समय',
   
     hourFormat24: '24 घंटे का प्रारूप',
+    defaultCity: 'मक्का',
+    defaultCountry: 'सऊदी अरब',
   },
   tasbih: {
     title: 'तसबीह',
@@ -22653,7 +22877,9 @@ const hi: TranslationKeys = {
     totalWird: 'कुल विर्द',
     wirdCompletedMsg: 'विर्द पूर्ण',
     yesCompleted: 'हाँ, पूर्ण',
-  
+    resetKhatma: 'खत्म रीसेट करें',
+    confirmResetKhatma: 'आपकी वर्तमान प्रगति हटा दी जाएगी और आप फिर से शुरू करेंगे। क्या आप निश्चित हैं?',
+
     fri: 'शुक्र',
     mon: 'सोम',
     sat: 'शनि',
@@ -22767,10 +22993,11 @@ const hi: TranslationKeys = {
     adhanPrayer: 'नमाज़ की अज़ान',
     adhanError: 'अज़ान त्रुटि',
     adhanErrorDesc: 'अज़ान चलाने में त्रुटि',
-    kahfFriday: 'जुमे को सूरतुल कहफ़',
+    kahfFriday: 'सूरतुल कहफ़ - जुमा',
     kahfTitle: 'सूरतुल कहफ़ अनुस्मारक',
     kahfBody: 'जुमे को सूरतुल कहफ़ पढ़ना मुस्तहब है',
     kahfReminderTime: 'कहफ़ अनुस्मारक समय',
+    kahfDesc: 'साप्ताहिक सूरतुल कहफ़ पढ़ने का अनुस्मारक',
     fridayReminder: 'शुक्रवार अनुस्मारक',
     everyFriday: 'हर शुक्रवार',
     surahKahf: 'सूरतुल कहफ़',
@@ -23716,6 +23943,7 @@ const hi: TranslationKeys = {
     tafsirBtn: 'तफ़सीर',
     title: 'तफ़सीर खोज',
     tryDifferentWords: 'अन्य शब्द आज़माएँ',
+    loadError: 'तफ़सीर लोड नहीं हो सकी',
   },
   errorBoundary: {
     contactSupport: 'सपोर्ट से संपर्क',
@@ -23812,6 +24040,14 @@ const hi: TranslationKeys = {
     adjustTitle: 'हिजरी तिथि समायोजन',
     noAdjustment: 'कोई समायोजन नहीं',
   },
+  hijriCalendar: {
+    estimatedDate: 'अनुमानित तिथि — आधिकारिक घोषणा से भिन्न हो सकती है',
+    officialConfirmed: '✓ आधिकारिक',
+    userAdjustment: 'हिजरी तिथि समायोजन',
+    waitingAnnouncement: 'आधिकारिक घोषणा की प्रतीक्षा',
+    countryLabel: 'देश',
+    sourceLabel: 'स्रोत',
+  },
   hajj: {
     duaWord: 'दुआ',
     duasWord: 'दुआएँ',
@@ -23863,6 +24099,7 @@ const hi: TranslationKeys = {
     consecutiveDays: 'लगातार दिन',
     currentStreak: 'वर्तमान लगातार',
     dailyAverage: 'दैनिक औसत',
+    dailyAzkar: 'दैनिक अज़कार',
     dailyGoal: 'दैनिक लक्ष्य',
     dailyPages: 'दैनिक पृष्ठ',
     dailySummary: 'दैनिक सारांश',
@@ -23883,8 +24120,10 @@ const hi: TranslationKeys = {
     fastingType: 'रोज़े का प्रकार',
     firstKhatma: 'पहला खतम',
     fourPages: '4 पृष्ठ',
+    fourPagesTime: '~20 मिनट',
     historicalFajrTimes: 'फज्र के समय',
     fullJuz: 'पूरा पारा',
+    fullJuzTime: '~60 मिनट',
     juzNumber: 'पारा नंबर',
     khatmaNumber: 'खतम नंबर',
     last30Days: 'पिछले 30 दिन',
@@ -23901,6 +24140,7 @@ const hi: TranslationKeys = {
     notificationSoundDesc: 'अपनी पसंदीदा अधिसूचना ध्वनि चुनें',
     onTime: 'समय पर',
     onePage: '1 पृष्ठ',
+    onePageTime: '~5 मिनट',
     pages: 'पृष्ठ',
     prayerLoggingReminder: 'नमाज़ रिकॉर्ड अनुस्मारक',
     prayerLoggingReminderDesc: 'दैनिक नमाज़ रिकॉर्ड करने का अनुस्मारक',
@@ -23931,6 +24171,7 @@ const hi: TranslationKeys = {
     tapToRecordFasting: 'रोज़ा रिकॉर्ड करने के लिए टैप करें',
     tapToSelectStatus: 'स्थिति चुनने के लिए टैप करें',
     tenPages: '10 पृष्ठ',
+    tenPagesTime: '~50 मिनट',
     thisWeek: 'यह सप्ताह',
     tip: 'सुझाव',
     tipOfDay: 'आज का सुझाव',
@@ -23945,6 +24186,7 @@ const hi: TranslationKeys = {
     totalDays: 'कुल दिन',
     totalPages: 'कुल पृष्ठ',
     twoPages: '2 पृष्ठ',
+    twoPagesTime: '~10 मिनट',
     voluntary: 'नफ़्ल',
     voluntaryDesc: 'अल्लाह के लिए नफ्ल रोज़ा',
     vow: 'नज़र',
@@ -24377,7 +24619,7 @@ const bn: TranslationKeys = {
     quranBookmarks: 'কুরআন বুকমার্ক',
     quranSurahsSection: 'কুরআন সূরা ও আয়াত',
     rosary: 'তাসবিহ',
-    selectedDuas: 'নির্বাচিত দোয়া',
+    selectedDuas: 'সুন্নাহ থেকে দোয়া',
     storiesSection: 'কাহিনী',
     tasbihLog: 'তাসবিহ লগ',
     tasbihSection: 'তাসবিহ ও ইস্তিগফার',
@@ -24446,6 +24688,7 @@ const bn: TranslationKeys = {
     lastPage: 'শেষ পৃষ্ঠা',
     loadingQuran: 'কুরআন লোড হচ্ছে...',
     longPressToGoToVerse: 'আয়াতে যেতে দীর্ঘ চাপ দিন',
+    longPressHint: 'আরও জানতে দীর্ঘ চাপুন',
     mushafBackground: 'মুসহাফ ব্যাকগ্রাউন্ড',
     noBookmarkFound: 'কোনো বুকমার্ক পাওয়া যায়নি',
     yellowGroup: 'হলুদ গোষ্ঠী',
@@ -24548,7 +24791,7 @@ const bn: TranslationKeys = {
     protectionAdhkar: 'সুরক্ষার আযকার',
     reading: 'পড়া হচ্ছে',
     repeatCount: 'পুনরাবৃত্তি',
-    selectedDuas: 'নির্বাচিত দোয়া',
+    selectedDuas: 'সুন্নাহ থেকে দোয়া',
     tapForNewDua: 'নতুন দোয়ার জন্য ট্যাপ করুন',
     translationOptional: 'অনুবাদ (ঐচ্ছিক)',
     willRenewOnTime: 'সময়মত নবায়ন হবে',
@@ -24557,6 +24800,7 @@ const bn: TranslationKeys = {
     completedTodayMessage: 'আপনি আজকের আযকার সম্পন্ন করেছেন, আল্লাহ আপনাকে বরকত দিন',
     dhikrNumber: 'যিকির {num}',
     duaNumber: 'দোয়া {num}',
+    startingOver: 'আবার শুরু',
   },
   prayer: {
     title: 'নামাজের সময়',
@@ -24654,6 +24898,8 @@ const bn: TranslationKeys = {
     lastThirdMessage: 'আপনি রাতের শেষ তৃতীয়াংশে — দোয়ার সময়',
   
     hourFormat24: '২৪ ঘণ্টা ফরম্যাট',
+    defaultCity: 'মক্কা',
+    defaultCountry: 'সৌদি আরব',
   },
   tasbih: {
     title: 'তাসবীহ',
@@ -24847,7 +25093,9 @@ const bn: TranslationKeys = {
     totalWird: 'মোট উইর্দ',
     wirdCompletedMsg: 'উইর্দ সম্পন্ন',
     yesCompleted: 'হ্যাঁ, সম্পন্ন',
-  
+    resetKhatma: 'খতম রিসেট করুন',
+    confirmResetKhatma: 'আপনার বর্তমান অগ্রগতি মুছে ফেলা হবে এবং আপনি আবার শুরু করবেন। আপনি কি নিশ্চিত?',
+
     fri: 'শুক্র',
     mon: 'সোম',
     sat: 'শনি',
@@ -24961,10 +25209,11 @@ const bn: TranslationKeys = {
     adhanPrayer: 'নামাজের আযান',
     adhanError: 'আযান ত্রুটি',
     adhanErrorDesc: 'আযান চালাতে ব্যর্থ',
-    kahfFriday: 'জুমায় সূরা কাহফ',
+    kahfFriday: 'সূরা কাহফ - জুমা',
     kahfTitle: 'সূরা কাহফ রিমাইন্ডার',
     kahfBody: 'জুমাবারে সূরা কাহফ পড়া মুস্তাহাব',
     kahfReminderTime: 'কাহফ রিমাইন্ডার সময়',
+    kahfDesc: 'সাপ্তাহিক সূরা কাহফ পড়ার রিমাইন্ডার',
     fridayReminder: 'শুক্রবার রিমাইন্ডার',
     everyFriday: 'প্রতি শুক্রবার',
     surahKahf: 'সূরা কাহফ',
@@ -25909,6 +26158,7 @@ const bn: TranslationKeys = {
     tafsirBtn: 'তাফসীর',
     title: 'তাফসীর অনুসন্ধান',
     tryDifferentWords: 'অন্য শব্দ চেষ্টা করুন',
+    loadError: 'তাফসীর লোড করা যায়নি',
   },
   errorBoundary: {
     contactSupport: 'সাপোর্টে যোগাযোগ',
@@ -26005,6 +26255,14 @@ const bn: TranslationKeys = {
     adjustTitle: 'হিজরি তারিখ সমন্বয়',
     noAdjustment: 'কোনো সমন্বয় নেই',
   },
+  hijriCalendar: {
+    estimatedDate: 'আনুমানিক তারিখ — সরকারি ঘোষণা থেকে আলাদা হতে পারে',
+    officialConfirmed: '✓ সরকারি',
+    userAdjustment: 'হিজরি তারিখ সমন্বয়',
+    waitingAnnouncement: 'সরকারি ঘোষণার অপেক্ষায়',
+    countryLabel: 'দেশ',
+    sourceLabel: 'উৎস',
+  },
   hajj: {
     duaWord: 'দোয়া',
     duasWord: 'দোয়াসমূহ',
@@ -26056,6 +26314,7 @@ const bn: TranslationKeys = {
     consecutiveDays: 'পরপর দিন',
     currentStreak: 'বর্তমান ধারাবাহিকতা',
     dailyAverage: 'দৈনিক গড়',
+    dailyAzkar: 'দৈনিক আযকার',
     dailyGoal: 'দৈনিক লক্ষ্য',
     dailyPages: 'দৈনিক পৃষ্ঠা',
     dailySummary: 'দৈনিক সারসংক্ষেপ',
@@ -26076,8 +26335,10 @@ const bn: TranslationKeys = {
     fastingType: 'রোযার ধরন',
     firstKhatma: 'প্রথম খতম',
     fourPages: '৪ পৃষ্ঠা',
+    fourPagesTime: '~২০ মিনিট',
     historicalFajrTimes: 'ফজরের সময়',
     fullJuz: 'সম্পূর্ণ পারা',
+    fullJuzTime: '~৬০ মিনিট',
     juzNumber: 'পারা নম্বর',
     khatmaNumber: 'খতম নম্বর',
     last30Days: 'শেষ ৩০ দিন',
@@ -26094,6 +26355,7 @@ const bn: TranslationKeys = {
     notificationSoundDesc: 'আপনার পছন্দের নোটিফিকেশন শব্দ বেছে নিন',
     onTime: 'সময়মতো',
     onePage: '১ পৃষ্ঠা',
+    onePageTime: '~৫ মিনিট',
     pages: 'পৃষ্ঠা',
     prayerLoggingReminder: 'নামাজ রেকর্ড স্মরণ',
     prayerLoggingReminderDesc: 'দৈনিক নামাজ রেকর্ড করার স্মরণ',
@@ -26124,6 +26386,7 @@ const bn: TranslationKeys = {
     tapToRecordFasting: 'রোযা রেকর্ড করতে ট্যাপ করুন',
     tapToSelectStatus: 'স্ট্যাটাস নির্বাচন করতে ট্যাপ করুন',
     tenPages: '১০ পৃষ্ঠা',
+    tenPagesTime: '~৫০ মিনিট',
     thisWeek: 'এই সপ্তাহ',
     tip: 'পরামর্শ',
     tipOfDay: 'আজকের পরামর্শ',
@@ -26138,6 +26401,7 @@ const bn: TranslationKeys = {
     totalDays: 'মোট দিন',
     totalPages: 'মোট পৃষ্ঠা',
     twoPages: '২ পৃষ্ঠা',
+    twoPagesTime: '~১০ মিনিট',
     voluntary: 'নফল',
     voluntaryDesc: 'আল্লাহর সন্তুষ্টির জন্য নফল রোজা',
     vow: 'মানত',
@@ -26570,7 +26834,7 @@ const ru: TranslationKeys = {
     quranBookmarks: 'Закладки Корана',
     quranSurahsSection: 'Суры и аяты Корана',
     rosary: 'Тасбих',
-    selectedDuas: 'Избранные дуа',
+    selectedDuas: 'Дуа из Сунны',
     storiesSection: 'Истории',
     tasbihLog: 'Журнал тасбиха',
     tasbihSection: 'Тасбих и истигфар',
@@ -26639,6 +26903,7 @@ const ru: TranslationKeys = {
     lastPage: 'Последняя страница',
     loadingQuran: 'Загрузка Корана...',
     longPressToGoToVerse: 'Удерживайте для перехода к аяту',
+    longPressHint: 'Удерживайте для подробностей',
     mushafBackground: 'Фон мусхафа',
     noBookmarkFound: 'Закладки не найдены',
     yellowGroup: 'Жёлтая группа',
@@ -26741,7 +27006,7 @@ const ru: TranslationKeys = {
     protectionAdhkar: 'Защитные азкары',
     reading: 'Чтение',
     repeatCount: 'Повторений',
-    selectedDuas: 'Выбранные дуа',
+    selectedDuas: 'Дуа из Сунны',
     tapForNewDua: 'Нажмите для новой дуа',
     translationOptional: 'Перевод (необязательно)',
     willRenewOnTime: 'Обновится вовремя',
@@ -26750,6 +27015,7 @@ const ru: TranslationKeys = {
     completedTodayMessage: 'Вы завершили сегодняшние азкар, да благословит вас Аллах',
     dhikrNumber: 'Зикр {num}',
     duaNumber: 'Дуа {num}',
+    startingOver: 'Начинаем сначала',
   },
   prayer: {
     title: 'Время намаза',
@@ -26847,6 +27113,8 @@ const ru: TranslationKeys = {
     lastThirdMessage: 'Вы в последней трети ночи — время для молитв',
   
     hourFormat24: '24-часовой формат',
+    defaultCity: 'Мекка',
+    defaultCountry: 'Саудовская Аравия',
   },
   tasbih: {
     title: 'Тасбих',
@@ -27039,7 +27307,9 @@ const ru: TranslationKeys = {
     totalWird: 'Общий вирд',
     wirdCompletedMsg: 'Вирд завершён',
     yesCompleted: 'Да, завершено',
-  
+    resetKhatma: 'Сбросить хатм',
+    confirmResetKhatma: 'Ваш текущий прогресс будет удалён и вы начнёте заново. Вы уверены?',
+
     fri: 'Пт',
     mon: 'Пн',
     sat: 'Сб',
@@ -27153,10 +27423,11 @@ const ru: TranslationKeys = {
     adhanPrayer: 'Азан молитвы',
     adhanError: 'Ошибка азана',
     adhanErrorDesc: 'Не удалось воспроизвести азан',
-    kahfFriday: 'Сура Аль-Кахф в пятницу',
+    kahfFriday: 'Сура Аль-Кахф - Пятница',
     kahfTitle: 'Напоминание суры Аль-Кахф',
     kahfBody: 'Чтение суры Аль-Кахф в пятницу рекомендуется',
     kahfReminderTime: 'Время напоминания Аль-Кахф',
+    kahfDesc: 'Еженедельное напоминание о чтении Суры Аль-Кахф',
     fridayReminder: 'Пятничное напоминание',
     everyFriday: 'Каждую пятницу',
     surahKahf: 'Сура Аль-Кахф',
@@ -28101,6 +28372,7 @@ const ru: TranslationKeys = {
     tafsirBtn: 'Тафсир',
     title: 'Поиск тафсира',
     tryDifferentWords: 'Попробуйте другие слова',
+    loadError: 'Не удалось загрузить тафсир',
   },
   errorBoundary: {
     contactSupport: 'Связаться с поддержкой',
@@ -28197,6 +28469,14 @@ const ru: TranslationKeys = {
     adjustTitle: 'Настройка даты хиджри',
     noAdjustment: 'Без корректировки',
   },
+  hijriCalendar: {
+    estimatedDate: 'Расчётная дата — может отличаться от официального объявления',
+    officialConfirmed: '✓ Официально',
+    userAdjustment: 'Корректировка даты хиджры',
+    waitingAnnouncement: 'Ожидание официального объявления',
+    countryLabel: 'Страна',
+    sourceLabel: 'Источник',
+  },
   hajj: {
     duaWord: 'Дуа',
     duasWord: 'Дуа',
@@ -28248,6 +28528,7 @@ const ru: TranslationKeys = {
     consecutiveDays: 'Подряд дней',
     currentStreak: 'Текущая серия',
     dailyAverage: 'Среднее за день',
+    dailyAzkar: 'Ежедневные азкары',
     dailyGoal: 'Ежедневная цель',
     dailyPages: 'Ежедневные страницы',
     dailySummary: 'Ежедневная сводка',
@@ -28268,8 +28549,10 @@ const ru: TranslationKeys = {
     fastingType: 'Тип поста',
     firstKhatma: 'Первый хатм',
     fourPages: '4 страницы',
+    fourPagesTime: '~20 минут',
     historicalFajrTimes: 'Время Фаджра',
     fullJuz: 'Полный джуз',
+    fullJuzTime: '~60 минут',
     juzNumber: 'Номер джуза',
     khatmaNumber: 'Номер хатма',
     last30Days: 'Последние 30 дней',
@@ -28286,6 +28569,7 @@ const ru: TranslationKeys = {
     notificationSoundDesc: 'Выберите предпочитаемый звук уведомления',
     onTime: 'Вовремя',
     onePage: '1 страница',
+    onePageTime: '~5 минут',
     pages: 'Страницы',
     prayerLoggingReminder: 'Напоминание о записи молитвы',
     prayerLoggingReminderDesc: 'Напоминание записать ежедневные молитвы',
@@ -28316,6 +28600,7 @@ const ru: TranslationKeys = {
     tapToRecordFasting: 'Нажмите для записи поста',
     tapToSelectStatus: 'Нажмите для выбора статуса',
     tenPages: '10 страниц',
+    tenPagesTime: '~50 минут',
     thisWeek: 'На этой неделе',
     tip: 'Совет',
     tipOfDay: 'Совет дня',
@@ -28330,6 +28615,7 @@ const ru: TranslationKeys = {
     totalDays: 'Всего дней',
     totalPages: 'Всего страниц',
     twoPages: '2 страницы',
+    twoPagesTime: '~10 минут',
     voluntary: 'Добровольный',
     voluntaryDesc: 'Добровольный пост ради Аллаха',
     vow: 'Обет',

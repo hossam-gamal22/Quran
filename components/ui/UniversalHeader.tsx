@@ -42,14 +42,6 @@ export function UniversalHeader({
   const colors = useColors();
   const isRTL = useIsRTL();
 
-  // Use the max of left/right widths to balance the header
-  // BackButton is 44px wide, each action is 40px wide
-  const leftWidth = showBack ? 44 : 0;
-  const rightWidth = rightActions.length > 0
-    ? rightActions.length * 40 + (rightActions.length - 1) * 4
-    : 0;
-  const balanceWidth = Math.max(leftWidth, rightWidth);
-
   return (
     <View
       style={[
@@ -58,8 +50,8 @@ export function UniversalHeader({
         style,
       ]}
     >
-      {/* Left side (back button in LTR, right side in RTL) */}
-      <View style={[s.side, { width: balanceWidth }]}>
+      {/* Back button — fixed width, always at the edge */}
+      <View style={s.backSide}>
         {showBack && (
           <BackButton
             onPress={onBack}
@@ -81,12 +73,10 @@ export function UniversalHeader({
         )}
       </View>
 
-      {/* Right side (action buttons) */}
+      {/* Action buttons — natural width, at the opposite edge */}
       <View
         style={[
-          s.side,
-          { width: balanceWidth },
-          s.actionsContainer,
+          s.actionsSide,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
@@ -112,11 +102,11 @@ export function UniversalHeader({
 const s = StyleSheet.create({
   header: {
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  side: {
+  backSide: {
+    width: 44,
     justifyContent: 'center',
   },
   center: {
@@ -127,9 +117,8 @@ const s = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 20,
   },
-  actionsContainer: {
+  actionsSide: {
     alignItems: 'center',
-    justifyContent: 'flex-end',
     gap: 4,
   },
   actionBtn: {

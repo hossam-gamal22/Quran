@@ -3,7 +3,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/config/firebase';
-import { collection, getDocs, doc, getDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import type {
   RadioStation,
   RadioCategory,
@@ -232,12 +232,11 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
   try {
     const q = query(
       collection(db, 'admin_radio_stations'),
-      where('isHidden', '==', false),
-      orderBy('order', 'asc')
+      where('isHidden', '==', false)
     );
     const snapshot = await getDocs(q);
 
-    return snapshot.docs.map((d) => {
+    const stations = snapshot.docs.map((d) => {
       const data = d.data() as AdminRadioStation;
       return {
         id: `admin_${d.id}`,
@@ -257,6 +256,9 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
         isOnline: true,
       };
     });
+
+    // Sort client-side instead of using Firestore orderBy (avoids composite index requirement)
+    return stations.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   } catch (error) {
     console.warn('[RadioService] Firestore fetch failed:', error);
     return [];

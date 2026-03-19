@@ -403,6 +403,7 @@ export default function WorshipTrackerScreen() {
               icon="hand-heart"
               color="#3a7ca5"
               index={3}
+              onPress={() => navigateTo('azkar')}
               isDarkMode={isDarkMode}
             />
           </ScrollView>
@@ -476,6 +477,17 @@ export default function WorshipTrackerScreen() {
               status={`${todayQuran?.pagesRead ?? 0} ${t('worship.dailyPages')}`}
               index={2}
               onPress={() => navigateTo('quran')}
+              isDarkMode={isDarkMode}
+            />
+            <TrackerCard
+              title={t('worship.azkarTracker')}
+              description={t('worship.dailyAzkar')}
+              icon="hand-heart"
+              colors={['#3a7ca5', '#2a5a7a']}
+              progress={stats?.azkar?.completionRate ?? 0}
+              status={`${stats?.azkar?.completionRate ?? 0}%`}
+              index={3}
+              onPress={() => navigateTo('azkar')}
               isDarkMode={isDarkMode}
             />
           </View>

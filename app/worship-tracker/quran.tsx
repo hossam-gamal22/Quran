@@ -1,7 +1,7 @@
 // app/worship-tracker/quran.tsx
 // صفحة متتبع القرآن - روح المسلم
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -209,6 +209,7 @@ const GoalCard: React.FC<GoalCardProps> = ({
 
 export default function QuranTrackerScreen() {
   const isRTL = useIsRTL();
+  const goalsScrollRef = useRef<ScrollView>(null);
   const router = useRouter();
   const {
     todayQuran,
@@ -377,10 +378,16 @@ export default function QuranTrackerScreen() {
             {t('worship.dailyGoal')}
           </Text>
           <ScrollView
+            ref={goalsScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[styles.goalsContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             style={{ overflow: 'visible' }}
+            onContentSizeChange={() => {
+              if (isRTL) {
+                goalsScrollRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
           >
             {READING_GOALS.map((goal, index) => (
               <GoalCard

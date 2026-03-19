@@ -17,6 +17,8 @@ import {
   setActiveKhatma as setActiveKhatmaStorage,
   completeTodayWird as completeTodayWirdStorage,
   recordDailyProgress as recordProgressStorage,
+  recordPageRead as recordPageReadStorage,
+  resetKhatma as resetKhatmaStorage,
   getTodayWird,
   getKhatmaStats,
   getKhatma,
@@ -45,6 +47,8 @@ interface KhatmaContextType {
   setActiveKhatma: (id: string) => Promise<boolean>;
   completeTodayWird: () => Promise<boolean>;
   recordProgress: (pages: number) => Promise<boolean>;
+  recordPageRead: (pageNumbers: number[]) => Promise<boolean>;
+  resetKhatma: () => Promise<boolean>;
   refreshKhatmas: () => Promise<void>;
   updateKhatmaReminder: (khatmaId: string, reminderTime: string | null, enabled: boolean) => Promise<boolean>;
   
@@ -183,6 +187,35 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     [activeKhatma, refreshKhatmas]
   );
 
+  const recordPageRead = useCallback(
+    async (pageNumbers: number[]) => {
+      if (!activeKhatma) return false;
+
+      const updated = await recordPageReadStorage(activeKhatma.id, pageNumbers);
+      if (updated) {
+        if (updated.isCompleted) {
+          await sendKhatmaCompletionNotification(updated.name);
+          await cancelKhatmaReminder(updated.id);
+        }
+        await refreshKhatmas();
+        return true;
+      }
+      return false;
+    },
+    [activeKhatma, refreshKhatmas]
+  );
+
+  const handleResetKhatma = useCallback(async () => {
+    if (!activeKhatma) return false;
+
+    const updated = await resetKhatmaStorage(activeKhatma.id);
+    if (updated) {
+      await refreshKhatmas();
+      return true;
+    }
+    return false;
+  }, [activeKhatma, refreshKhatmas]);
+
   const handleUpdateKhatmaReminder = useCallback(
     async (khatmaId: string, reminderTime: string | null, enabled: boolean) => {
       try {
@@ -227,6 +260,8 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     setActiveKhatma,
     completeTodayWird,
     recordProgress,
+    recordPageRead,
+    resetKhatma: handleResetKhatma,
     refreshKhatmas,
     updateKhatmaReminder: handleUpdateKhatmaReminder,
     getTodayWirdInfo,

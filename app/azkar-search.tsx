@@ -340,7 +340,7 @@ export default function AzkarSearchScreen() {
         {benefit ? (
           <View style={[styles.benefitBox, { backgroundColor: (cat?.color || '#10B981') + '12', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Ionicons name="star" size={14} color={cat?.color || '#10B981'} />
-            <Text style={[styles.benefitText, { color: cat?.color || '#10B981' }]}>
+            <Text style={[styles.benefitText, { color: cat?.color || '#10B981', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {benefit}
             </Text>
           </View>

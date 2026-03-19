@@ -7,7 +7,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
-  ScrollView, Alert, Platform, Animated, Share, Dimensions,
+  ScrollView, Alert, Platform, Animated, Share, Dimensions, Image,
 } from 'react-native';
 import { fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -219,23 +219,19 @@ export default function DailyAyahVideoScreen() {
   const language = getLanguage();
   const isArabic = language === 'ar';
 
-  const bgLabelMap: Record<string, string> = {
-    ocean: t('home.bgOcean'),
-    sky: t('home.bgSky'),
-    nature: t('home.bgNature'),
-    desert: t('home.bgDesert'),
-    mosque: t('home.bgMosque'),
-    solid: t('home.bgColors'),
-  };
-
   const today = new Date();
-  const dayIndex = today.getDay();
-  const weekIndex = Math.floor(today.getDate() / 7);
+  const startOfYear = new Date(today.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
 
-  const [selectedAyahIdx, setSelectedAyahIdx] = useState(dayIndex % DAILY_AYAHS.length);
-  const [selectedCat, setSelectedCat] = useState(BG_CATEGORIES[dayIndex % BG_CATEGORIES.length]);
-  const [selectedBgIdx, setSelectedBgIdx] = useState(weekIndex % 3);
-  const [selectedCardStyle, setSelectedCardStyle] = useState(CARD_STYLES[dayIndex % CARD_STYLES.length]);
+  const ayahIdx = dayOfYear % DAILY_AYAHS.length;
+  // Nature category (index 2) as default
+  const natureCat = BG_CATEGORIES.find(c => c.id === 'nature') || BG_CATEGORIES[2];
+  const [selectedCat, setSelectedCat] = useState(natureCat);
+  const [selectedBgIdx, setSelectedBgIdx] = useState(dayOfYear % natureCat.images.length);
+  // Always use dark overlay — no green/colored tints
+  const selectedCardStyle = CARD_STYLES[0];
+  // Full-page background image (blurred nature)
+  const pageBgUrl = natureCat.images[dayOfYear % natureCat.images.length];
   const [showTranslation, setShowTranslation] = useState(!isArabic);
   const isEnglish = language === 'en';
   const [showTafsir, setShowTafsir] = useState(false);
@@ -248,7 +244,7 @@ export default function DailyAyahVideoScreen() {
   const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
 
-  const currentAyah = overrideAyah || DAILY_AYAHS[selectedAyahIdx];
+  const currentAyah = overrideAyah || DAILY_AYAHS[ayahIdx];
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `ayah_${currentAyah.surah}_${currentAyah.ayah}`,
@@ -424,6 +420,14 @@ export default function DailyAyahVideoScreen() {
     <>
     <Stack.Screen options={{ headerShown: false }} />
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
+      {/* Full-page blurred nature background */}
+      <Image
+        source={{ uri: pageBgUrl }}
+        style={StyleSheet.absoluteFill}
+        blurRadius={Platform.OS === 'ios' ? 20 : 15}
+        resizeMode="cover"
+      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.80)' }]} />
       {/* Header */}
       <UniversalHeader
         style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
@@ -439,98 +443,6 @@ export default function DailyAyahVideoScreen() {
       </UniversalHeader>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-
-        {/* Background category selector */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-          <Text style={s.sectionLabel}>{t('quran.imageBackground')}</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
-          {BG_CATEGORIES.map(cat => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[s.chip, selectedCat.id === cat.id && s.chipActive, isRTL && { transform: [{ scaleX: -1 }] }]}
-              onPress={() => { setSelectedCat(cat); setSelectedBgIdx(0); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-            >
-              <Text style={[s.chipText, selectedCat.id === cat.id && s.chipTextActive]}>{bgLabelMap[cat.id] || cat.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* BG image variant picker */}
-        {selectedCat.id === 'solid' ? (
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', flexWrap: 'wrap', gap: Spacing.sm, paddingHorizontal: 16, marginTop: 10 }}>
-            {selectedCat.images.map((color, i) => (
-              <TouchableOpacity
-                key={i}
-                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: color, borderWidth: selectedBgIdx === i ? 2.5 : 1, borderColor: selectedBgIdx === i ? colors.primary : 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
-                onPress={() => { setSelectedBgIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-              >
-                {selectedBgIdx === i && <MaterialCommunityIcons name="check" size={18} color="#fff" />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        ) : (
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm, paddingHorizontal: 16, marginTop: 10 }}>
-            {selectedCat.images.map((_, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[s.chip, { paddingHorizontal: 10 }, selectedBgIdx === i && s.chipActive]}
-                onPress={() => { setSelectedBgIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-              >
-                <Text style={[s.chipText, selectedBgIdx === i && s.chipTextActive]}>#{i + 1}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Ayah selector */}
-        <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <Text style={s.sectionLabel}>{t('quran.chooseVerse')}</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.hScroll} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}>
-          {DAILY_AYAHS.map((a, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[s.chip, selectedAyahIdx === i && s.chipActive, { maxWidth: 160 }, isRTL && { transform: [{ scaleX: -1 }] }]}
-              onPress={() => { setSelectedAyahIdx(i); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-            >
-              <Text style={[s.chipText, selectedAyahIdx === i && s.chipTextActive]} numberOfLines={1}>{isArabic ? a.ref : transliterateReference(a.ref, language)}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Card style */}
-        <View style={{ paddingHorizontal: 16, marginTop: 14 }}>
-          <Text style={s.sectionLabel}>{t('quran.cardStyle')}</Text>
-        </View>
-        <View style={[s.styleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {CARD_STYLES.map((cs, i) => (
-            <TouchableOpacity
-              key={cs.id}
-              style={[s.styleCircle, { backgroundColor: cs.overlayColor.replace('rgba', 'rgb').replace(/,[^,)]+\)/, ')'), borderColor: selectedCardStyle.id === cs.id ? colors.primary : colors.border }]}
-              onPress={() => { setSelectedCardStyle(cs); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-            >
-              {selectedCardStyle.id === cs.id && <Text style={{ fontSize: 14, color: '#fff', textAlign: 'center' }}>✓</Text>}
-            </TouchableOpacity>
-          ))}
-          <View style={{ flex: 1 }} />
-          {/* Translation toggle — only for non-Arabic users */}
-          {!isArabic && (
-            <TouchableOpacity
-              style={[s.chip, showTranslation && s.chipActive]}
-              onPress={() => setShowTranslation(v => !v)}
-            >
-              <Text style={[s.chipText, showTranslation && s.chipTextActive]}>{t('azkar.translation')}</Text>
-            </TouchableOpacity>
-          )}
-          {/* Tafsir toggle */}
-          <TouchableOpacity
-            style={[s.chip, showTafsir && s.chipActive]}
-            onPress={() => { setShowTafsir(v => !v); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
-          >
-              <Text style={[s.chipText, showTafsir && s.chipTextActive]}>{t('quran.tafsir')}</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Preview Card */}
         <Animated.View style={[s.cardWrap, { transform: [{ scale: pulseAnim }] }]}>
@@ -643,6 +555,26 @@ export default function DailyAyahVideoScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* Tafsir toggle button — at bottom */}
+        <View style={{ paddingHorizontal: 16, marginTop: 16, flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm }}>
+          <TouchableOpacity
+            style={[s.chip, showTafsir && s.chipActive, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }]}
+            onPress={() => { setShowTafsir(v => !v); if (Platform.OS !== 'web') Haptics.selectionAsync(); }}
+          >
+            <MaterialCommunityIcons name="book-open-page-variant" size={16} color={showTafsir ? '#fff' : colors.textLight} />
+            <Text style={[s.chipText, showTafsir && s.chipTextActive]}>{t('quran.tafsir')}</Text>
+          </TouchableOpacity>
+          {!isArabic && (
+            <TouchableOpacity
+              style={[s.chip, showTranslation && s.chipActive, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }]}
+              onPress={() => setShowTranslation(v => !v)}
+            >
+              <MaterialCommunityIcons name="translate" size={16} color={showTranslation ? '#fff' : colors.textLight} />
+              <Text style={[s.chipText, showTranslation && s.chipTextActive]}>{t('azkar.translation')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
       </ScrollView>
     </ScreenContainer>

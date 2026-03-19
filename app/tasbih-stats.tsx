@@ -21,8 +21,8 @@ import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 const GREEN = '#2f7659';
-const DAILY_STATS_KEY = '@tasbih_daily_stats';
-const TYPE_STATS_KEY = '@tasbih_type_stats';
+const DAILY_STATS_KEY = 'tasbih_daily_stats';
+const TYPE_STATS_KEY = 'tasbih_type_stats';
 
 function getTodayISO(): string {
   const d = new Date();

@@ -19,6 +19,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getDateLocale, tArray } from '@/lib/i18n';
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from '@/lib/admin-data-api';
+import { getDayNames } from '@/constants/dayNames';
 
 // ─── Islamic Events ───────────────────────────────────────────────────────────
 // We will generate the events inside the component to support translations
@@ -80,9 +81,7 @@ export default function HijriCalendarScreen() {
   ];
 
   const daysArr = tArray('calendar.weekDays');
-  const ARABIC_DAYS = daysArr.length > 0 ? daysArr : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const daysShortArr = tArray('calendar.weekDaysShort');
-  const ARABIC_DAYS_SHORT = daysShortArr.length > 0 ? daysShortArr : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const ARABIC_DAYS = daysArr.length > 0 ? daysArr : getDayNames(settings.language || 'ar');
   
   const ISLAMIC_EVENTS: IslamicEvent[] = [
     { month: 1, day: 1,   name: t('calendar.newYear'), icon: 'weather-night', description: t('calendar.newYearDesc'), color: '#1B6B3A' },
@@ -276,7 +275,8 @@ export default function HijriCalendarScreen() {
       backgroundColor: colors.primary + '10', borderRadius: 12, padding: 10, gap: 10,
     },
     eventIcon: { fontSize: 20 },
-    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, flex: 1, textAlign: isRTL ? 'right' : 'left' },
+    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    eventDesc: { fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 18 },
     // Section title
     sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginTop: 8, marginBottom: 6, textAlign: isRTL ? 'right' : 'left' },
     // Upcoming events
@@ -287,6 +287,7 @@ export default function HijriCalendarScreen() {
     upcomingIcon: { fontSize: 22 },
     upcomingInfo: { flex: 1 },
     upcomingName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    upcomingDesc: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 1, lineHeight: 18 },
     upcomingDate: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
     upcomingDiff: {
       backgroundColor: colors.primary, borderRadius: 16,
@@ -404,8 +405,8 @@ export default function HijriCalendarScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Weekday headers */}
         <View style={s.weekRow}>
-          {ARABIC_DAYS_SHORT.map((d, idx) => (
-            <Text key={d} style={[s.weekDay, idx === 5 && { color: colors.primary }]}>{d}</Text>
+          {ARABIC_DAYS.map((d, idx) => (
+            <Text key={d} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.weekDay, idx === 5 && { color: colors.primary }]}>{d}</Text>
           ))}
         </View>
 
@@ -425,7 +426,7 @@ export default function HijriCalendarScreen() {
           {selectedEvents.map(ev => (
             <TouchableOpacity key={ev.name} style={[s.eventItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: ev.color + '12' }]} onPress={() => setSelectedEvent(ev)}>
               <MaterialCommunityIcons name={ev.icon as any} size={20} color={ev.color || colors.primary} />
-              <Text style={[s.eventName, { color: ev.color }]}>{ev.name}</Text>
+              <Text style={[s.eventName, { color: ev.color, flex: 1, textAlign: isRTL ? 'right' : 'left' }]}>{ev.name}</Text>
               <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={14} color={ev.color} />
             </TouchableOpacity>
           ))}
@@ -480,7 +481,6 @@ export default function HijriCalendarScreen() {
             {selectedEvent && (<>
               <MaterialCommunityIcons name={selectedEvent.icon as any} size={48} color={selectedEvent.color || colors.primary} style={{ textAlign: 'center', marginBottom: 8 }} />
               <Text style={[s.modalTitle, { color: selectedEvent.color }]}>{selectedEvent.name}</Text>
-              <Text style={s.modalDesc}>{selectedEvent.description}</Text>
               <Text style={s.modalDate}>
                 {selectedEvent.day} {HIJRI_MONTHS[selectedEvent.month - 1]}
               </Text>

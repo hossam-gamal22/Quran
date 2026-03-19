@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { Colors, Spacing, BorderRadius } from '../../constants/theme';
+import { Spacing, BorderRadius } from '../../constants/theme';
 import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
+import { useColors } from '@/hooks/use-colors';
 
 interface AudioPlayerProps {
   audioUrl?: string;
@@ -28,6 +30,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onError,
 }) => {
   const isRTL = useIsRTL();
+  const globalAudio = useGlobalAudio();
+  const colors = useColors();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -51,6 +55,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
     try {
       setIsLoading(true);
+      // Stop any other global audio source first
+      if (globalAudio.state.isPlaying) {
+        await globalAudio.stop();
+      }
       const { sound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }
@@ -128,12 +136,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   return (
     <View style={styles.container}>
       <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <MaterialCommunityIcons name="music" size={20} color={Colors.primary} />
+        <MaterialCommunityIcons name="music" size={20} color={colors.primary} />
         <View style={[styles.headerText]}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
             {title}
           </Text>
-          <Text style={styles.reciter}>{reciterName}</Text>
+          <Text style={[styles.reciter, { color: colors.textLight }]}>{reciterName}</Text>
         </View>
       </View>
 
@@ -152,7 +160,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       </View>
 
       <View style={[styles.controls, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <Text style={styles.time}>{formatTime(position)}</Text>
+        <Text style={[styles.time, { color: colors.textLight }]}>{formatTime(position)}</Text>
 
         <TouchableOpacity
           onPress={togglePlayPause}
@@ -160,17 +168,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           style={[styles.playButton, isLoading && styles.disabled]}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <MaterialCommunityIcons
               name={isPlaying ? 'pause-circle' : 'play-circle'}
               size={40}
-              color={Colors.primary}
+              color={colors.primary}
             />
           )}
         </TouchableOpacity>
 
-        <Text style={styles.time}>{formatTime(duration)}</Text>
+        <Text style={[styles.time, { color: colors.textLight }]}>{formatTime(duration)}</Text>
       </View>
     </View>
   );
@@ -195,11 +203,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.text,
   },
   reciter: {
     fontSize: 12,
-    color: Colors.textSecondary,
     marginTop: Spacing.xs,
   },
   progressContainer: {
@@ -211,7 +217,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: Colors.primary,
+    backgroundColor: '#2f7659',
     borderRadius: 2,
   },
   controls: {
@@ -227,7 +233,6 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 12,
-    color: Colors.textSecondary,
     minWidth: 45,
     textAlign: 'center',
   },

@@ -118,6 +118,8 @@ export interface NotificationSettings {
   azkarDays?: number[];
   dailyVerseDays?: number[];
   customReminderDays?: number[];
+  // Friday Surah Al-Kahf reminder (auto 2h after Jummah Dhuhr)
+  kahfReminder?: boolean;
 }
 
 export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7' | 'dynamic';
@@ -276,6 +278,8 @@ const defaultNotifications: NotificationSettings = {
   wakeupAzkar: false,
   wakeupAzkarTime: '05:30',
   afterPrayerAzkar: false,
+  // Friday Surah Al-Kahf reminder
+  kahfReminder: true,
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -628,6 +632,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       worshipDailySummaryTime: n.worshipDailySummaryTime,
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
+      kahfReminder: n.kahfReminder,
     });
   }, [settings]);
 

@@ -43,6 +43,7 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
+import { stripVerseNumbers } from '@/lib/basmala-utils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -127,10 +128,15 @@ export default function RuqyaScreen() {
       const newIndex = currentIndex + 1;
       setCurrentIndex(newIndex);
       flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-      
+
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
+    } else {
+      // Loop back to start
+      setCurrentIndex(0);
+      flatListRef.current?.scrollToIndex({ index: 0, animated: true });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
@@ -280,15 +286,29 @@ export default function RuqyaScreen() {
 
 
             {/* النص الرئيسي — Arabic for Arabic users, translation for others */}
-            {isArabic ? (
-              <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
-                {item.arabic}
-              </Text>
-            ) : (
-              <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {getZikrTranslation(item, language) || item.arabic}
-              </Text>
-            )}
+            {(() => {
+              const hasVerseBrackets = item.arabic?.includes('﴿') || item.arabic?.includes('﴾');
+              const quranStyle = hasVerseBrackets ? {
+                fontFamily: 'KFGQPCUthmanic',
+                fontSize: 30,
+                lineHeight: 62,
+                letterSpacing: 0,
+                textAlign: 'center' as const,
+                writingDirection: 'rtl' as const,
+                paddingTop: 6,
+                paddingBottom: 4,
+              } : {};
+              const displayText = hasVerseBrackets ? stripVerseNumbers(item.arabic) : item.arabic;
+              return isArabic ? (
+                <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }, quranStyle]}>
+                  {displayText}
+                </Text>
+              ) : (
+                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }, quranStyle]}>
+                  {getZikrTranslation(item, language) || displayText}
+                </Text>
+              );
+            })()}
 
             {/* النطق */}
             {showTransliteration && item.transliteration && (
@@ -367,7 +387,7 @@ export default function RuqyaScreen() {
             style={[styles.listItemArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}
             numberOfLines={2}
           >
-            {item.arabic}
+            {(item.arabic?.includes('﴿') || item.arabic?.includes('﴾')) ? stripVerseNumbers(item.arabic) : item.arabic}
           </Text>
           <Text style={[styles.listItemReference, { color: colors.textLight }]}>
             {transliterateReference(item.reference, language)}
@@ -416,7 +436,7 @@ export default function RuqyaScreen() {
             <BackButton color={darkMode ? '#F9FAFB' : '#1F2937'} />
             
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                 {t('azkar.ruqya')}
               </Text>
               <SectionInfoButton sectionKey="ruqya" />
@@ -435,7 +455,7 @@ export default function RuqyaScreen() {
           {/* Progress */}
           {viewMode === 'single' && (
             <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <View style={[styles.progressBarBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.progressBarBg, isRTL && { transform: [{ scaleX: -1 }] }]}>
                 <View
                   style={[
                     styles.progressBarFill,
@@ -460,11 +480,9 @@ export default function RuqyaScreen() {
               keyExtractor={item => item.id.toString()}
               horizontal
               pagingEnabled
-              inverted={isRTL}
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={(e) => {
-                const offsetIndex = Math.round(e.nativeEvent.contentOffset.x / width);
-                const index = isRTL ? (ruqyaList.length - 1 - offsetIndex) : offsetIndex;
+                const index = Math.round(e.nativeEvent.contentOffset.x / width);
                 setCurrentIndex(index);
               }}
               initialScrollIndex={currentIndex}
@@ -506,13 +524,12 @@ export default function RuqyaScreen() {
 
               <TouchableOpacity
                 onPress={goToNext}
-                disabled={currentIndex === ruqyaList.length - 1}
-                style={[styles.navButton, currentIndex === ruqyaList.length - 1 && styles.navButtonDisabled]}
+                style={styles.navButton}
               >
                 <Ionicons
                   name={isRTL ? 'chevron-back' : 'chevron-forward'}
                   size={28}
-                  color={currentIndex === ruqyaList.length - 1 ? '#9CA3AF' : '#6366F1'}
+                  color={'#6366F1'}
                 />
               </TouchableOpacity>
             </View>

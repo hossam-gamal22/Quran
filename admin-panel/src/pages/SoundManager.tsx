@@ -452,6 +452,7 @@ export default function SoundManager() {
               multiple
               onChange={handleUpload}
               className="hidden"
+              aria-label="اختر ملفات صوتية لتحميلها"
             />
 
             {/* Search */}

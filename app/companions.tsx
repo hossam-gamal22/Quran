@@ -14,7 +14,7 @@ import {
   Share,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
@@ -944,10 +944,24 @@ export default function CompanionsScreen() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
+  const { id: companionIdParam } = useLocalSearchParams<{ id?: string }>();
+
   // CMS data with hardcoded fallback
   const { companions: allCompanions } = useCompanionsContent(COMPANIONS, CATEGORIES);
 
   const filteredCompanions = allCompanions.filter(c => c.category === activeCategory);
+
+  // Auto-select companion from URL param (e.g., from favorites navigation)
+  useEffect(() => {
+    if (companionIdParam && allCompanions.length > 0 && !selectedCompanion) {
+      const found = allCompanions.find(c => c.id === companionIdParam);
+      if (found) {
+        setActiveCategory(found.category);
+        setSelectedCompanion(found);
+        isFavorited(`companion_${found.id}`, 'companion').then(setCompanionFav);
+      }
+    }
+  }, [companionIdParam, allCompanions]);
 
   const handleCategoryChange = useCallback((key: CategoryKey) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1017,7 +1031,7 @@ export default function CompanionsScreen() {
       title: getCompanionName(selectedCompanion),
       subtitle: selectedCompanion.brief,
       arabic: selectedCompanion.story?.[0] || selectedCompanion.brief,
-      route: '/companions',
+      route: `/companions?id=${selectedCompanion.id}`,
     });
     setCompanionFav(nowSaved);
   }, [selectedCompanion]);

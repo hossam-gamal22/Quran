@@ -1,7 +1,7 @@
 // app/worship-tracker/prayer.tsx
 // صفحة متتبع الصلاة - روح المسلم
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -232,7 +232,7 @@ const WeekDay: React.FC<WeekDayProps> = ({
 }) => {
   const colors = useColors();
   const isRTL = useIsRTL();
-  const dayName = getTranslations().calendar.weekDaysShort[date.getDay()];
+  const dayName = getTranslations().calendar.weekDays[date.getDay()];
   const dayNumber = date.getDate();
 
   const getPrayedCount = () => {
@@ -295,6 +295,7 @@ const WeekDay: React.FC<WeekDayProps> = ({
 
 export default function PrayerTrackerScreen() {
   const isRTL = useIsRTL();
+  const weekScrollRef = useRef<ScrollView>(null);
   const router = useRouter();
   const {
     todayPrayer,
@@ -506,9 +507,15 @@ export default function PrayerTrackerScreen() {
             {t('worship.thisWeek')}
           </Text>
           <ScrollView
+            ref={weekScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[styles.weekContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            onContentSizeChange={() => {
+              if (isRTL) {
+                weekScrollRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
           >
             {weekDates.map((date, index) => (
               <WeekDay
@@ -631,7 +638,7 @@ export default function PrayerTrackerScreen() {
                     >
                       <View style={[styles.fajrDateCol, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <Text style={[styles.fajrDayName, { color: colors.textLight }]}>
-                          {getTranslations().calendar.weekDaysShort[dateObj.getDay()]}
+                          {getTranslations().calendar.weekDays[dateObj.getDay()]}
                         </Text>
                         <Text style={[styles.fajrDate, { color: colors.text }]}>
                           {dateObj.getDate()}/{dateObj.getMonth() + 1}

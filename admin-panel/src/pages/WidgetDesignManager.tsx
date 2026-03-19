@@ -355,7 +355,7 @@ const WidgetDesignManager: React.FC = () => {
                 className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
                 title={meta?.nameAr}
                 aria-label={`${isExpanded ? 'طي' : 'فتح'} ${meta?.nameAr}`}
-                aria-expanded={isExpanded}
+                {...{'aria-expanded': String(!!isExpanded)}}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{meta?.icon}</span>
@@ -371,9 +371,9 @@ const WidgetDesignManager: React.FC = () => {
                 <div className="flex items-center gap-3">
                   {/* Color preview dots */}
                   <div className="flex gap-1">
-                    <div className="w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: widget.config.colors.accent }} />
-                    <div className="w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: widget.config.colors.text }} />
-                    <div className="w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: widget.config.colors.background }} />
+                    <div className="w-4 h-4 rounded-full border border-gray-300" {...{style: {backgroundColor: widget.config.colors.accent}}} />
+                    <div className="w-4 h-4 rounded-full border border-gray-300" {...{style: {backgroundColor: widget.config.colors.text}}} />
+                    <div className="w-4 h-4 rounded-full border border-gray-300" {...{style: {backgroundColor: widget.config.colors.background}}} />
                   </div>
                   {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
                 </div>

@@ -68,6 +68,8 @@ import { transliterateReference } from '@/lib/source-transliteration';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
 import { Image as ExpoImage } from 'expo-image';
+import { BasmalaHeader } from '@/components/BasmalaHeader';
+import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
 import { searchPhotos, type Photo } from '@/lib/api/pexels';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -206,6 +208,10 @@ export default function CategoryAzkarScreen() {
   const [shareTargetZikr, setShareTargetZikr] = useState<Zikr | CustomDhikr | null>(null);
   const brandedRef = useRef<BrandedCaptureHandle>(null);
 
+  // Toast for loop-back
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // الأنيميشن
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -246,6 +252,7 @@ export default function CategoryAzkarScreen() {
       }
 
       setCategoryInfo(catInfo);
+
       setAllAzkar(categoryAzkar);
 
       // For after_prayer, filter by subcategory; otherwise show all
@@ -523,13 +530,26 @@ export default function CategoryAzkarScreen() {
     if (currentIndex < azkar.length - 1) {
       setCurrentIndex(prev => prev + 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      
+
       // تحديث أنيميشن التقدم
       Animated.timing(progressAnim, {
         toValue: (currentIndex + 2) / azkar.length,
         duration: 300,
         useNativeDriver: false,
       }).start();
+    } else {
+      // Loop back to start — بدأت من جديد
+      setCurrentIndex(0);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      Animated.timing(progressAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setToastMsg(t('azkar.startingOver'));
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+      toastTimer.current = setTimeout(() => setToastMsg(null), 2000);
     }
   };
 
@@ -537,7 +557,7 @@ export default function CategoryAzkarScreen() {
     if (currentIndex > 0) {
       setCurrentIndex(prev => prev - 1);
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-      
+
       Animated.timing(progressAnim, {
         toValue: currentIndex / azkar.length,
         duration: 300,
@@ -1284,23 +1304,51 @@ export default function CategoryAzkarScreen() {
 
                     {/* النص الرئيسي */}
                     {/* Main dhikr text: Arabic for Arabic users, translation for others */}
-                    {isArabic ? (
-                      <Text style={[
-                        styles.arabicText,
-                        { color: darkMode ? '#F9FAFB' : '#1F2937' },
-                        currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
-                      ]}>
-                        {currentZikr.arabic}
-                      </Text>
-                    ) : (
-                      <Text style={[
-                        styles.arabicText,
-                        { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
-                        currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
-                      ]}>
-                        {getZikrTranslation(currentZikr, language)}
-                      </Text>
-                    )}
+                    {/* Use Uthmanic font for Quran content (detected by verse brackets or known IDs) */}
+                    {(() => {
+                      const knownQuranIds = [48, 481, 482, 49];
+                      const hasVerseBrackets = currentZikr.arabic?.includes('﴿') || currentZikr.arabic?.includes('﴾');
+                      const isQuranSurah = knownQuranIds.includes(currentZikr.id) || hasVerseBrackets;
+                      const { stripped, hadBasmala } = stripBasmalaPrefix(currentZikr.arabic);
+                      const rawDisplay = hadBasmala ? stripped : currentZikr.arabic;
+                      const displayText = isQuranSurah ? stripVerseNumbers(rawDisplay) : rawDisplay;
+                      const quranFontStyle = isQuranSurah ? {
+                        fontFamily: 'KFGQPCUthmanic',
+                        fontSize: 30,
+                        lineHeight: 62,
+                        letterSpacing: 0,
+                        textAlign: 'center' as const,
+                        writingDirection: 'rtl' as const,
+                        paddingTop: 6,
+                        paddingBottom: 4,
+                      } : {};
+                      return (
+                        <>
+                          {hadBasmala && (
+                            <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} />
+                          )}
+                          {isArabic ? (
+                            <Text style={[
+                              styles.arabicText,
+                              { color: darkMode ? '#F9FAFB' : '#1F2937' },
+                              currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                              quranFontStyle,
+                            ]}>
+                              {displayText}
+                            </Text>
+                          ) : (
+                            <Text style={[
+                              styles.arabicText,
+                              { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+                              currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                              quranFontStyle,
+                            ]}>
+                              {getZikrTranslation(currentZikr, language)}
+                            </Text>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* النطق */}
                     {showTransliteration && currentZikr.transliteration && (
@@ -1323,7 +1371,7 @@ export default function CategoryAzkarScreen() {
                           <MaterialCommunityIcons name="star" size={16} color={categoryInfo.color} />
                         </View>
                         <View style={[styles.benefitContainer, { backgroundColor: categoryInfo.color + '15' }]}> 
-                          <Text style={[styles.benefitText, { color: categoryInfo.color }]}> 
+                          <Text style={[styles.benefitText, { color: categoryInfo.color, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}> 
                             {getZikrBenefit(currentZikr, language) || ''}
                           </Text>
                         </View>
@@ -1422,13 +1470,12 @@ export default function CategoryAzkarScreen() {
 
               <TouchableOpacity
                 onPress={goToNext}
-                disabled={currentIndex === azkar.length - 1}
-                style={[styles.navButton, currentIndex === azkar.length - 1 && styles.navButtonDisabled]}
+                style={styles.navButton}
               >
                 <MaterialCommunityIcons
                   name={isRTL ? 'chevron-left' : 'chevron-right'}
                   size={28}
-                  color={currentIndex === azkar.length - 1 ? '#9CA3AF' : categoryInfo.color}
+                  color={categoryInfo.color}
                 />
               </TouchableOpacity>
             </View>
@@ -1445,8 +1492,14 @@ export default function CategoryAzkarScreen() {
               const zCount = counts[zikr.id] || 0;
               const zDone = zCount >= zikr.count;
               const isExpanded = expandedItems.has(zikr.id);
+              const { stripped: rawListText, hadBasmala: listItemHasBasmala } = stripBasmalaPrefix(zikr.arabic);
+              const isQuranItem = [48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾');
+              const listDisplayText = isQuranItem ? stripVerseNumbers(rawListText) : rawListText;
               return (
                 <View key={zikr.id} style={{ marginBottom: 10 }}>
+                  {listItemHasBasmala && (
+                    <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} style={{ marginBottom: 4 }} />
+                  )}
                   <GlassCard intensity={40} style={[
                     styles.zikrCardGlass,
                     { padding: 0 },
@@ -1474,10 +1527,11 @@ export default function CategoryAzkarScreen() {
                           styles.arabicText,
                           { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 18, marginBottom: 0, flex: 1, textAlign: isArabic ? 'right' : (isRTL ? 'right' : 'left'), writingDirection: isArabic ? 'rtl' : (isRTL ? 'rtl' : 'ltr') },
                           currentlyPlayingZikrId === zikr.id && { color: categoryInfo.color },
+                          ([48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾')) && { fontFamily: 'KFGQPCUthmanic', fontSize: 22, lineHeight: 44 },
                         ]}
                         numberOfLines={isExpanded ? undefined : 2}
                       >
-                        {isArabic ? zikr.arabic : getZikrTranslation(zikr, language)}
+                        {isArabic ? listDisplayText : getZikrTranslation(zikr, language)}
                       </Text>
                       <View style={[styles.listCollapseRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={[styles.listMiniCount, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}>
@@ -1518,7 +1572,7 @@ export default function CategoryAzkarScreen() {
                         {zikr.benefit && (
                           <View style={[styles.listBenefitBox, { backgroundColor: categoryInfo.color + '12', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                             <MaterialCommunityIcons name="star" size={14} color={categoryInfo.color} />
-                            <Text style={[styles.benefitText, { color: categoryInfo.color, fontSize: 13 }]}>
+                            <Text style={[styles.benefitText, { color: categoryInfo.color, fontSize: 13, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                               {getZikrBenefit(zikr, language) || ''}
                             </Text>
                           </View>
@@ -1614,6 +1668,15 @@ export default function CategoryAzkarScreen() {
         <BannerAdComponent screen="azkar" />
         <View style={{ height: insets.bottom }} />
       </BackgroundWrapper>
+
+      {/* Toast overlay for loop-back */}
+      {toastMsg && (
+        <View style={styles.toastContainer} pointerEvents="none">
+          <View style={[styles.toastBox, { backgroundColor: darkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.7)' }]}>
+            <Text style={styles.toastText}>{toastMsg}</Text>
+          </View>
+        </View>
+      )}
 
       {/* بوب أب اكتمال الأذكار */}
       <Modal
@@ -2186,5 +2249,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
     height: 0,
     overflow: 'hidden',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  toastBox: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

@@ -155,7 +155,7 @@ function AndroidMaterialTabs({
         style={[
           m3Styles.segmentRow,
           {
-            flexDirection: 'row',
+            flexDirection: isRTL ? 'row-reverse' : 'row',
             borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)',
             backgroundColor: isDark ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.92)',
           },

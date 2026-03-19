@@ -1,5 +1,5 @@
 // lib/duas-api.ts
-// أدعية مختارة — Firestore مع 3-tier cache — روح المسلم
+// أدعية من السنة — Firestore مع 3-tier cache — روح المسلم
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';

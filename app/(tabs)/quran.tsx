@@ -455,21 +455,8 @@ export default function QuranScreen() {
   }, [lastReadSurah, lastReadPage, openSurah, router]);
 
   const openBookmarkPage = useCallback(() => {
-    if (firstBookmarkPage) {
-      const surah = getFirstSurahOnPage(firstBookmarkPage);
-      router.push(`/surah/${surah}?page=${firstBookmarkPage}`);
-      return;
-    }
-
-    Alert.alert(
-      t('quran.noBookmarkFound'),
-      t('quran.bookmarkGuide'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('quran.openFavorites'), onPress: () => router.push('/all-favorites' as any) },
-      ]
-    );
-  }, [firstBookmarkPage, router]);
+    router.push('/quran-bookmarks' as any);
+  }, [router]);
 
   const onSurahPress = useCallback(
     async (surahNumber: number) => {
@@ -810,7 +797,7 @@ export default function QuranScreen() {
         {/* الهيدر */}
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Right side in RTL: worship tracker + favorites + radio */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
             <TouchableOpacity
               style={styles.headerBtn}
               onPress={() => router.push('/radio' as any)}
@@ -825,7 +812,7 @@ export default function QuranScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerBtn}
-              onPress={() => router.push('/all-favorites' as any)}
+              onPress={openBookmarkPage}
             >
               <MaterialCommunityIcons name="bookmark-outline" size={22} color={colors.text} />
             </TouchableOpacity>
@@ -839,7 +826,7 @@ export default function QuranScreen() {
           </View>
 
           {/* Left side in RTL: settings */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
             <TouchableOpacity
               style={styles.headerBtn}
               onPress={() => setShowSettings(true)}
@@ -971,7 +958,7 @@ export default function QuranScreen() {
               <GlassActionButton
                 icon="bookmark-outline"
                 label={t('quran.bookmark')}
-                onPress={() => router.push('/all-favorites' as any)}
+                onPress={openBookmarkPage}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
                 accentColor="#D97706"

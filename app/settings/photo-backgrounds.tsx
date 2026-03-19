@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UniversalHeader } from '@/components/ui';
 import { t } from '@/lib/i18n';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -51,7 +52,9 @@ type ViewMode = 'saved' | 'browse';
 export default function PhotoBackgroundsScreen() {
   const { isDarkMode, settings, updateDisplay } = useSettings();
   const isRTL = useIsRTL();
+  const categoryTabsScrollRef = useRef<ScrollView>(null);
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { isPremium } = useSubscription();
   const router = useRouter();
   const { showAd } = useInterstitialAd();
@@ -289,10 +292,16 @@ export default function PhotoBackgroundsScreen() {
           <>
             {/* Category tabs */}
             <ScrollView
+              ref={categoryTabsScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.categoryTabs, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               style={styles.categoryTabsContainer}
+              onContentSizeChange={() => {
+                if (isRTL) {
+                  categoryTabsScrollRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
             >
               {categories.map(cat => {
                 const isActive = cat.id === selectedCategory.id;
@@ -436,7 +445,7 @@ export default function PhotoBackgroundsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.closePreviewBtn, isRTL ? { right: 20, left: undefined } : null]}
+                style={[styles.closePreviewBtn, { top: insets.top + 10 }, isRTL ? { right: 20, left: undefined } : null]}
                 onPress={() => setPreviewPhoto(null)}
               >
                 <MaterialCommunityIcons name="close" size={26} color="#fff" />
@@ -486,7 +495,7 @@ export default function PhotoBackgroundsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.closePreviewBtn, isRTL ? { right: 20, left: undefined } : null]}
+                style={[styles.closePreviewBtn, { top: insets.top + 10 }, isRTL ? { right: 20, left: undefined } : null]}
                 onPress={() => setPreviewSaved(null)}
               >
                 <MaterialCommunityIcons name="close" size={26} color="#fff" />
@@ -588,7 +597,6 @@ const styles = StyleSheet.create({
   },
   closePreviewBtn: {
     position: 'absolute',
-    top: 60,
     left: 20,
     width: 44,
     height: 44,

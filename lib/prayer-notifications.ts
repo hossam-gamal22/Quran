@@ -53,14 +53,6 @@ const PRAYER_KEY_TO_API: Record<PrayerKey, string> = {
   isha: 'Isha',
 };
 
-const PRAYER_NAMES_AR: Record<PrayerKey, string> = {
-  fajr: 'الفجر',
-  sunrise: 'الشروق',
-  dhuhr: 'الظهر',
-  asr: 'العصر',
-  maghrib: 'المغرب',
-  isha: 'العشاء',
-};
 
 // مدة التنبيه المسبق بالدقائق
 export const ADHAN_ADVANCE_MINUTES = 0;
@@ -161,17 +153,17 @@ export async function schedulePrayerNotifications(
       if (!timeStr) continue;
 
       const triggerDate = prayerTimeToDate(timeStr, notifSettings.advanceMinutes);
-      const arabicName = PRAYER_NAMES_AR[prayerKey] || prayerKey;
+      const prayerName = t(`prayer.${prayerKey}`);
       const emoji = PRAYER_EMOJIS[prayerKey];
       const message = notifSettings.advanceMinutes > 0
-        ? `${t('notificationSounds.minutesBefore').replace('{count}', String(notifSettings.advanceMinutes))} ${t(`prayer.${prayerKey}`)} (${timeStr})`
+        ? `${t('notificationSounds.minutesBefore').replace('{count}', String(notifSettings.advanceMinutes))} ${prayerName} (${timeStr})`
         : getPrayerMessage(prayerKey);
 
       try {
         const id = await Notifications.scheduleNotificationAsync({
           identifier: `prayer_${prayerKey}`,
           content: {
-            title: `${emoji} ${arabicName}`,
+            title: `${emoji} ${prayerName}`,
             body: message,
             data: { prayer: prayerKey, time: timeStr },
             sound: 'default',

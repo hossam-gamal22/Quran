@@ -186,6 +186,13 @@ const NOTIFICATION_CATEGORIES: NotificationCategoryDef[] = [
     titleKey: 'notificationSounds.customNotification',
     subtitleKey: 'notificationSounds.customNotificationDesc',
   },
+  {
+    id: 'kahf',
+    icon: 'book-open-variant',
+    iconColor: '#1a6b4a',
+    titleKey: 'settings.kahfFriday',
+    subtitleKey: 'settings.kahfBody',
+  },
 ];
 
 // ========================================
@@ -262,7 +269,7 @@ const sendTestNotification = async (title: string, body: string, soundType?: str
     await Notifications.scheduleNotificationAsync({
       identifier: 'test_scheduled',
       content: {
-        title: '⏰ ' + title,
+        title: title,
         body: t('notificationSounds.testScheduledBody'),
         sound: true,
         data: { type: 'test_scheduled', soundType: soundType || 'default', ...extraData },
@@ -477,6 +484,7 @@ export default function NotificationsScreen() {
       case 'azkar': return settings.notifications.morningAzkar || settings.notifications.eveningAzkar || settings.notifications.sleepAzkar || settings.notifications.wakeupAzkar || settings.notifications.afterPrayerAzkar;
       case 'dailyVerse': return settings.notifications.dailyVerse;
       case 'customReminder': return settings.notifications.customReminder ?? false;
+      case 'kahf': return settings.notifications.kahfReminder ?? false;
       default: return false;
     }
   };
@@ -504,6 +512,9 @@ export default function NotificationsScreen() {
         break;
       case 'customReminder':
         updateNotifications({ customReminder: value });
+        break;
+      case 'kahf':
+        updateNotifications({ kahfReminder: value });
         break;
     }
   };
@@ -595,6 +606,8 @@ export default function NotificationsScreen() {
         return { title: t('notificationSounds.testVerseTitle'), body: t('notificationSounds.testVerseBody') };
       case 'customReminder':
         return { title: t('notificationSounds.testCustomTitle'), body: settings.notifications.customReminderTitle || t('notificationSounds.testCustomBody') };
+      case 'kahf':
+        return { title: t('settings.kahfTitle'), body: t('settings.kahfBody') };
       default:
         return { title: t('notificationSounds.testDefaultTitle'), body: t('notificationSounds.testDefaultBody') };
     }
@@ -1493,7 +1506,7 @@ export default function NotificationsScreen() {
             placeholderTextColor={isDarkMode ? '#666' : '#999'}
             value={customTitle}
             onChangeText={(text) => updateNotifications({ customReminderTitle: text })}
-            textAlign="right"
+            textAlign={isRTL ? 'right' : 'left'}
           />
         </View>
 
@@ -1747,11 +1760,20 @@ export default function NotificationsScreen() {
     );
   };
 
+  const renderKahfExpanded = () => {
+    return (
+      <View style={styles.expandedContent}>
+        {renderTestAndCloseButtons('kahf')}
+      </View>
+    );
+  };
+
   const renderExpandedContent = (categoryId: string) => {
     switch (categoryId) {
       case 'prayer': return renderPrayerExpanded();
       case 'azkar': return renderAzkarExpanded();
       case 'customReminder': return renderCustomReminderExpanded();
+      case 'kahf': return renderKahfExpanded();
       default: return renderSimpleExpanded(categoryId);
     }
   };
@@ -1782,7 +1804,7 @@ export default function NotificationsScreen() {
         >
           <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.notifications')}</Text>
+        <Text style={[styles.headerTitle, isDarkMode && styles.textLight]}>{t('settings.prayerAndAzkarAlerts')}</Text>
         <View style={styles.headerPlaceholder} />
       </Animated.View>
 

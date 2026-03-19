@@ -32,6 +32,7 @@ class AudioPlayerManager {
   private continuousPlay: boolean = true;
   private surahAyahsCount: number = 0;
   private playingFullSurah: boolean = false;
+  private loadingId: number = 0;
   private surahOffsets: Map<string, number[]> = new Map();
   private offsetPoller: number | null = null;
 
@@ -74,6 +75,7 @@ class AudioPlayerManager {
     try {
       if (!suppressLoading) this.updateState({ isLoading: true });
       this.continuousPlay = continuous;
+      const myLoadId = ++this.loadingId;
 
       // get surah info
       const surah = await getCachedSurah(surahNumber);
@@ -82,6 +84,8 @@ class AudioPlayerManager {
       // stop current sound FIRST — stop() resets playingFullSurah to false,
       // so we must set it again afterwards.
       await this.stop();
+      // Abort if a newer playAyah call was made while we were loading
+      if (myLoadId !== this.loadingId) return;
       this.playingFullSurah = !!continuous;
 
       let audioUrl: string;
@@ -122,11 +126,13 @@ class AudioPlayerManager {
       }
 
       console.log('[audio-player] creating sound url=', audioUrl, 'playingFullSurah=', this.playingFullSurah);
+      // If full surah mode and starting from a specific ayah, don't auto-play — seek first
+      const needsSeek = this.playingFullSurah && ayahNumber > 1;
       let sound: Audio.Sound;
       try {
         ({ sound } = await Audio.Sound.createAsync(
           { uri: audioUrl },
-          { shouldPlay: true },
+          { shouldPlay: !needsSeek },
           this.onPlaybackStatusUpdate.bind(this)
         ));
       } catch (urlError) {
@@ -137,7 +143,7 @@ class AudioPlayerManager {
           console.warn('[audio-player] CDN URL failed, retrying with fallback:', fallbackUrl);
           ({ sound } = await Audio.Sound.createAsync(
             { uri: fallbackUrl },
-            { shouldPlay: true },
+            { shouldPlay: !needsSeek },
             this.onPlaybackStatusUpdate.bind(this)
           ));
         } else {
@@ -150,7 +156,7 @@ class AudioPlayerManager {
         isPlaying: true,
         isLoading: false,
         currentSurah: surahNumber,
-        currentAyah: this.playingFullSurah ? 1 : ayahNumber,
+        currentAyah: ayahNumber,
         reciterIdentifier,
         playingFullSurah: this.playingFullSurah,
       });
@@ -159,6 +165,20 @@ class AudioPlayerManager {
 
       if (this.playingFullSurah) {
         this.startOffsetPoller(reciterIdentifier, surahNumber);
+        // Seek to specific ayah position if not starting from beginning
+        if (ayahNumber > 1) {
+          const key = `${reciterIdentifier}:${surahNumber}`;
+          const offsets = this.surahOffsets.get(key);
+          if (offsets && offsets.length >= ayahNumber) {
+            const seekPosition = offsets[ayahNumber - 1];
+            if (seekPosition > 0) {
+              await this.sound?.setPositionAsync(seekPosition);
+              console.log('[audio-player] seeked to ayah', ayahNumber, 'at', seekPosition, 'ms');
+            }
+          }
+          // Now start playback after seeking
+          await this.sound?.playAsync();
+        }
       }
     } catch (error) {
       console.error('Error playing ayah:', error);
@@ -282,6 +302,9 @@ class AudioPlayerManager {
 
   // Fetch per-ayah start timestamps (ms) for a surah from QuranCDN in a single API call.
   // Returns { offsets, audioUrl } — audioUrl is the CDN file that matches these timestamps.
+  // Cache audio URLs from QuranCDN alongside offsets so they stay in sync
+  private surahAudioUrls = new Map<string, string>();
+
   private async fetchSurahTimestamps(
     reciterIdentifier: string,
     surahNumber: number,
@@ -291,22 +314,23 @@ class AudioPlayerManager {
 
     const key = `${reciterIdentifier}:${surahNumber}`;
     if (this.surahOffsets.has(key)) {
-      return { offsets: this.surahOffsets.get(key)!, audioUrl: null };
+      return { offsets: this.surahOffsets.get(key)!, audioUrl: this.surahAudioUrls.get(key) || null };
     }
 
     const url = `https://api.qurancdn.com/api/qdc/audio/reciters/${reciterId}/audio_files?chapter_number=${surahNumber}&segments=true`;
     const res = await fetch(url);
+    if (!res.ok) return { offsets: [], audioUrl: null };
     const data = await res.json();
 
     const file = data.audio_files?.[0];
     if (!file?.verse_timings?.length) return { offsets: [], audioUrl: null };
 
     const offsets: number[] = file.verse_timings.map((t: any) => t.timestamp_from as number);
-    // We don't rely on file_name from QuranCDN — the URL format is inconsistent
-    // across reciters. Instead we always use getSurahAudioUrl (quranicaudio.com)
-    // which is the same source QuranCDN timestamps reference.
+    // Use the audio_url from QuranCDN so timestamps and audio file are always in sync
+    const cdnAudioUrl: string | null = file.audio_url || null;
     this.surahOffsets.set(key, offsets);
-    return { offsets, audioUrl: null };
+    if (cdnAudioUrl) this.surahAudioUrls.set(key, cdnAudioUrl);
+    return { offsets, audioUrl: cdnAudioUrl };
   }
 
   private startOffsetPoller(reciterIdentifier: string, surahNumber: number) {

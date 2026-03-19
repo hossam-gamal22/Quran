@@ -381,9 +381,21 @@ export function gregorianToHijri(date: Date = new Date()): HijriDate {
     Math.floor(j / 16) * Math.floor((15238 * j) / 43) +
     29;
 
-  const hijriYear = 30 * n + j - 30;
-  const hijriMonth = Math.floor((24 * (l3 - 1)) / 709);
-  const hijriDay = l3 - Math.floor((709 * hijriMonth) / 24);
+  let hijriYear = 30 * n + j - 30;
+  let hijriMonth = Math.floor((24 * (l3 - 1)) / 709);
+  let hijriDay = l3 - Math.floor((709 * hijriMonth) / 24);
+
+  // الخطوة 3: تصحيح تجاوز عدد أيام الشهر
+  // الخوارزمية الجدولية قد تنتج يوم 31 لشهر أقصاه 30 أو 29
+  const maxDays = getHijriMonthDays(hijriYear, hijriMonth);
+  if (hijriDay > maxDays) {
+    hijriDay = hijriDay - maxDays;
+    hijriMonth += 1;
+    if (hijriMonth > 12) {
+      hijriMonth = 1;
+      hijriYear += 1;
+    }
+  }
 
   return {
     day: hijriDay,

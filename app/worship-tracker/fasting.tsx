@@ -613,8 +613,8 @@ export default function FastingTrackerScreen() {
             </View>
             
             <View style={styles.calendarWeekHeader}>
-              {getTranslations().calendar.weekDaysShort.map((day: string, i: number) => (
-                <Text key={i} style={[styles.calendarWeekDay, { color: colors.textLight }]}>
+              {getTranslations().calendar.weekDays.map((day: string, i: number) => (
+                <Text key={i} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.calendarWeekDay, { color: colors.textLight }]}>
                   {day}
                 </Text>
               ))}

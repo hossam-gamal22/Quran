@@ -3,11 +3,10 @@
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/icons/splash-icon_en.png",
       "resizeMode": "contain",

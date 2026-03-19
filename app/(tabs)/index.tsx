@@ -1,7 +1,7 @@
 // app/(tabs)/index.tsx
 // الصفحة الرئيسية - الأذكار - روح المسلم
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -68,7 +68,7 @@ const AZKAR_CATEGORIES = [
 
 const QUICK_ACCESS = [
   { id: 'qibla', nameKey: 'home.qibla', icon: 'compass', color: '#5856D6' },
-  { id: 'favorites', nameKey: 'home.favorites', icon: 'bookmark', color: '#FF3B30' },
+  { id: 'favorites', nameKey: 'home.favorites', icon: 'heart', color: '#FF6B6B' },
   { id: 'ayat_kursi', nameKey: 'home.ayatKursi', icon: 'shield-star', color: '#DAA520' },
   { id: 'surah_kahf', nameKey: 'home.surahKahf', icon: 'book-open-page-variant', color: '#3a7ca5' },
   { id: 'surah_yasin', nameKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#5d4e8c' },
@@ -514,6 +514,7 @@ export default function HomeScreen() {
   const { isDarkMode, settings, t } = useSettings();
   const colors = useColors();
   const isRTL = useIsRTL();
+  const quickAccessScrollRef = useRef<ScrollView>(null);
   const { currentSeason, dailyData } = useSeasonal();
   const features = useFeatures();
 
@@ -636,12 +637,31 @@ export default function HomeScreen() {
   const [cachedPrayerTimes, setCachedPrayerTimes] = useState<PrayerTimes | null>(null);
   const [nextPrayerCountdown, setNextPrayerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
 
-  // Load cached prayer times
+  // Load cached prayer times — try cache first, fallback to fetch
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    getCachedPrayerTimes(today).then(times => {
-      if (times) setCachedPrayerTimes(times);
-    });
+    const loadPrayerTimes = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const cached = await getCachedPrayerTimes(today);
+        if (cached) {
+          setCachedPrayerTimes(cached);
+          return;
+        }
+        // No cache — try to fetch using saved location
+        const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes } = await import('@/lib/prayer-times');
+        const loc = await getStoredLocation();
+        if (loc) {
+          const response = await fetchPrayerTimes(loc);
+          if (response) {
+            const times = parsePrayerTimes(response);
+            setCachedPrayerTimes(times);
+          }
+        }
+      } catch (e) {
+        console.log('[Home] Failed to load prayer times:', e);
+      }
+    };
+    loadPrayerTimes();
   }, []);
 
   // Countdown timer for next prayer modal
@@ -994,17 +1014,23 @@ export default function HomeScreen() {
 
         {/* Daily Highlights */}
         <CollapsibleSection title={t('home.highlights')} icon="star-circle" sectionId="highlights" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
-          <DailyHighlights showReorderButton />
+          <DailyHighlights showReorderButton onNextPrayerPress={() => setShowNextPrayerModal(true)} />
         </CollapsibleSection>
 
         {/* الوصول السريع */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <CollapsibleSection title={t('home.quickAccess')} icon="lightning-bolt" sectionId="quickAccess" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>
           <ScrollView
+            ref={quickAccessScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={[styles.quickAccessContainer, isRTL && { flexDirection: 'row-reverse' }]}
             style={{ overflow: 'visible' }}
+            onContentSizeChange={() => {
+              if (isRTL) {
+                quickAccessScrollRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
           >
             {filteredQuickAccess.map((item, index) => (
               <Animated.View key={item.id}>
@@ -1219,7 +1245,7 @@ export default function HomeScreen() {
                       value={modalSearch}
                       onChangeText={setModalSearch}
                       autoCorrect={false}
-                      textAlign="right"
+                      textAlign={isRTL ? 'right' : 'left'}
                     />
                     {modalSearch.length > 0 && (
                       <TouchableOpacity onPress={() => setModalSearch('')}>
@@ -1321,7 +1347,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={[styles.surahSearchContainer, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <MaterialCommunityIcons name="magnify" size={20} color={isDarkMode ? '#aaa' : '#888'} />
-                    <TextInput style={[styles.surahSearchInput, { color: colors.text }]} placeholder={t('home.searchSurah')} placeholderTextColor={isDarkMode ? '#666' : '#aaa'} value={surahSearch} onChangeText={setSurahSearch} autoCorrect={false} textAlign="right" />
+                    <TextInput style={[styles.surahSearchInput, { color: colors.text }]} placeholder={t('home.searchSurah')} placeholderTextColor={isDarkMode ? '#666' : '#aaa'} value={surahSearch} onChangeText={setSurahSearch} autoCorrect={false} textAlign={isRTL ? 'right' : 'left'} />
                   </View>
                   <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
                     {filteredSurahs.map(surah => {
@@ -1443,9 +1469,19 @@ export default function HomeScreen() {
                       )}
                     </>
                   ) : (
-                    <Text style={[styles.nextPrayerTime, { color: colors.textLight }]}>
-                      {t('home.noPrayerData')}
-                    </Text>
+                    <>
+                      <Text style={[styles.nextPrayerTime, { color: colors.textLight }]}>
+                        {t('home.noPrayerData')}
+                      </Text>
+                      <TouchableOpacity
+                        style={{ backgroundColor: '#0D9488', borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12, marginTop: 16 }}
+                        onPress={() => { setShowNextPrayerModal(false); router.navigate('/(tabs)/prayer'); }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textAlign: 'center' }}>
+                          {t('prayer.title')}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
                   )}
 
                   {/* Enable notification toggle */}

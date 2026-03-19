@@ -172,7 +172,7 @@ const ROUTE_OPTIONS = [
   { value: '/radio', label: 'إذاعة القرآن' },
   { value: '/hadith-of-day', label: 'حديث اليوم' },
   { value: '/quote-of-day', label: 'اقتباس اليوم' },
-  { value: '/quran-bookmarks', label: 'علامات القرآن' },
+  { value: '/quran-bookmarks', label: 'إشارات المصحف' },
   { value: '/all-favorites', label: 'المحفوظات' },
   { value: '/subscription', label: 'الاشتراك' },
 ];
@@ -817,8 +817,7 @@ function HighlightRow({
                   }`}
                   aria-label="Toggle visibility"
                   title="Toggle visibility"
-                  role="switch"
-                  aria-checked={item.isVisible ? 'true' : 'false'}
+                  {...{role: 'switch', 'aria-checked': String(item.isVisible)}}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isVisible ? 'right-0.5' : 'right-[22px]'
@@ -840,8 +839,7 @@ function HighlightRow({
                   }`}
                   aria-label="Toggle pin to top"
                   title="Toggle pin to top"
-                  role="switch"
-                  aria-checked={item.isPinned ? 'true' : 'false'}
+                  {...{role: 'switch', 'aria-checked': String(item.isPinned)}}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isPinned ? 'right-0.5' : 'right-[22px]'

@@ -305,6 +305,134 @@ Android Native Adv:    ca-app-pub-3645278220050673/5595568144
 
 ---
 
+---
+
+## 📊 SESSION 3 — NEW BUGS (2026-03-19)
+
+| # | Issue Title | Status | Date |
+| --- | --- | --- | --- |
+| 12 | Bookmark navigation → Quran Bookmarks | ✅ Fixed | 2026-03-19 |
+| 13 | Khatma Set-based page tracking + reset | ✅ Fixed | 2026-03-19 |
+| 14 | Hijri calendar weekday truncation + back button | ✅ Fixed | 2026-03-19 |
+| 15 | Azkar/Ruqya next button loops to first | ✅ Fixed | 2026-03-19 |
+| 16 | Quran font (KFGQPCUthmanic) for bracketed verses | ✅ Fixed | 2026-03-19 |
+| 17 | Mushaf nested scroll + text spacing | ✅ Fixed | 2026-03-19 |
+| 18 | AudioPlayer stops GlobalAudio before playing | ✅ Fixed | 2026-03-19 |
+| 19 | "أدعية مختارة" → "أدعية من السنة" (all 12 langs) | ✅ Fixed | 2026-03-19 |
+| 20 | Azkar worship tracking (already implemented) | ✅ Verified | 2026-03-19 |
+| 21 | Hijri calendar back button (merged with #14) | ✅ Fixed | 2026-03-19 |
+| 22 | Surah heart/favorite (already correct) | ✅ Verified | 2026-03-19 |
+| 23 | Mushaf text line height + padding | ✅ Fixed | 2026-03-19 |
+
+### Bug #12 — Bookmark Navigation → Quran Bookmarks
+- **Files changed:**
+  - `app/(tabs)/quran.tsx` — Changed 2 `router.push('/all-favorites')` calls to `openBookmarkPage` (routes to `/quran-bookmarks`)
+  - `constants/translations.ts` — Updated Arabic values for `home.quranBookmarks`, `quran.bookmarks`, `quran.bookmark`, `favorites.bookmarks` to "إشارات المصحف"
+  - `admin-panel/src/pages/HighlightsManager.tsx` — Label changed from 'علامات القرآن' to 'إشارات المصحف'
+
+### Bug #13 — Khatma Set-Based Page Tracking + Reset
+- **Files changed:**
+  - `lib/khatma-storage.ts` — Major rewrite: added `readPages: number[]` to Khatma interface, Set-based `recordPageRead()`, `resetKhatma()`, updated `getKhatmaStats()` and `getTodayWird()`
+  - `contexts/KhatmaContext.tsx` — Added `recordPageRead` and `resetKhatma` to context
+  - `app/khatma/wird.tsx` — Added reset button on completion screen with Alert confirmation
+  - `constants/translations.ts` — Added `resetKhatma` and `confirmResetKhatma` in all 12 languages
+
+### Bug #14 — Hijri Calendar Weekday Truncation + Back Button
+- **Files changed:**
+  - `app/hijri.tsx` — Changed `weekdaysFull` to `weekDaysShort`, updated fontSize 11→12, added `showBack` and `onBack` to UniversalHeader
+
+### Bug #15 — Azkar/Ruqya Next Button Loops
+- **Files changed:**
+  - `app/azkar/[category].tsx` — `goToNext()` loops to index 0 at end; removed disabled state from next button
+  - `app/ruqya.tsx` — Same looping fix
+
+### Bug #16 — Quran Font for Bracketed Verses
+- **Files changed:**
+  - `app/azkar/[category].tsx` — Added `﴿`/`﴾` bracket detection for KFGQPCUthmanic font
+  - `app/ruqya.tsx` — Same bracket detection logic
+
+### Bug #17 — Mushaf Nested Scroll
+- **Files changed:**
+  - `app/surah/[id].tsx` — Added `nestedScrollEnabled` to inner ScrollView in MushafPage
+
+### Bug #18 — AudioPlayer Stops GlobalAudio
+- **Files changed:**
+  - `components/ui/AudioPlayer.tsx` — Added `useGlobalAudio` hook; calls `globalAudio.stop()` before creating new Audio.Sound
+
+### Bug #19 — "أدعية مختارة" → "أدعية من السنة"
+- **Files changed:**
+  - `constants/translations.ts` — Updated all 24 `selectedDuas` values across 12 languages
+  - `lib/duas-api.ts` — Updated comment
+
+### Bug #20 — Azkar Worship Tracking
+- **Status:** Already fully implemented in `app/worship-tracker/azkar.tsx`
+
+### Bug #21 — Hijri Back Button (merged with #14)
+
+### Bug #22 — Surah Heart/Favorite
+- **Status:** Already correctly implemented — `handleToggleFavorite` collects all ayah texts on page
+
+### Bug #23 — Mushaf Text Line Height + Padding
+- **Files changed:**
+  - `app/surah/[id].tsx` — Added `letterSpacing: 0`, increased line heights (1.55→1.65, 1.6→1.75, 1.7→1.9), increased horizontal padding 8→16px, adjusted font size calc
+
+---
+
+## 📊 SESSION 4 — COMPREHENSIVE APP AUDIT (2026-03-19)
+
+| # | Issue Title | Status | Date |
+| --- | --- | --- | --- |
+| 24 | Hijri calendar hardcoded هـ/م suffixes | ✅ Fixed | 2026-03-19 |
+| 25 | Seasonal pages hardcoded text colors | ✅ Fixed | 2026-03-19 |
+| 26 | AudioPlayer hardcoded theme colors | ✅ Fixed | 2026-03-19 |
+| 27 | Azkar/Ruqya loop-back UX (toast + haptics) | ✅ Fixed | 2026-03-19 |
+| 28 | Story-of-day hardcoded Arabic alert | ✅ Fixed | 2026-03-19 |
+| 29 | Onboarding language RTL flexDirection | ✅ Fixed | 2026-03-19 |
+| 30 | Audio race condition on rapid play calls | ✅ Fixed | 2026-03-19 |
+| 31 | Widget data NaN guard for time parsing | ✅ Fixed | 2026-03-19 |
+| 32 | Missing azkar.startingOver translations (12 langs) | ✅ Fixed | 2026-03-19 |
+
+### Fix #24 — Hijri Calendar Hardcoded هـ/م Suffixes
+- **Files changed:**
+  - `app/hijri.tsx` — Replaced hardcoded `هـ` suffix with i18n-aware `ahSuffix` variable; removed hardcoded `م` from 3 Gregorian date displays; removed unused imports (`hijriToGregorian`, `CELL_SIZE`); removed hardcoded `color: '#555'` from `infoText` style
+
+### Fix #25 — Seasonal Pages Hardcoded Text Colors
+- **Files changed:**
+  - `app/seasonal/ramadan.tsx` — Added `{ color: colors.text }` to specialDayTitle; `{ color: colors.textLight }` to specialDayDesc and virtue text
+  - `app/seasonal/ashura.tsx` — Added theme-aware colors to fastingDayNumberText and fastingDayNumberLabel
+
+### Fix #26 — AudioPlayer Hardcoded Theme Colors
+- **Files changed:**
+  - `components/ui/AudioPlayer.tsx` — Replaced static `Colors.primary/text/textSecondary` with `useColors()` hook; applied inline `colors.text`, `colors.textLight`, `colors.primary`; removed hardcoded values from StyleSheet
+
+### Fix #27 — Azkar/Ruqya Loop-Back UX
+- **Files changed:**
+  - `app/azkar/[category].tsx` — Added toast state + haptic feedback on loop-back; toast overlay UI component
+  - `app/ruqya.tsx` — Added haptic feedback on loop-back
+  - `constants/translations.ts` — Added `azkar.startingOver` translations to all 12 languages
+
+### Fix #28 — Story-of-Day Hardcoded Arabic Alert
+- **Files changed:**
+  - `app/story-of-day.tsx` — Fixed hardcoded Arabic alert → `t('storyOfDay.videoWithAudioSaved')`
+
+### Fix #29 — Onboarding Language RTL flexDirection
+- **Files changed:**
+  - `app/onboarding/language.tsx` — Changed hardcoded `flexDirection: 'row-reverse'` → conditional `isRTL ? 'row-reverse' : 'row'`; changed hardcoded `alignItems: 'flex-end'` → conditional
+
+### Fix #30 — Audio Race Condition
+- **Files changed:**
+  - `lib/audio-player.ts` — Added `loadingId` counter to prevent race condition on rapid play calls; added fetch response check for API calls
+
+### Fix #31 — Widget Data NaN Guard
+- **Files changed:**
+  - `lib/widget-data.ts` — Added NaN guard for time string parsing in `preparePrayerWidgetData()`
+
+### Fix #32 — Missing azkar.startingOver Translations
+- **Files changed:**
+  - `constants/translations.ts` — Added `startingOver: string` to azkar interface; added translations in all 12 languages
+
+---
+
 ## 🔒 PERMANENT RULES — COPILOT MUST FOLLOW THESE IN EVERY SESSION
 
 ```text

@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { schedulePrayerNotifications } from './prayer-notifications';
 import { fetchTafsir, getSurahName } from './quran-api';
 import { getAyahAudioUrl } from './quran-cache';
+import { fetchPrayerTimesByCoords } from './prayer-api';
+import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
 import { t } from './i18n';
 
@@ -161,40 +163,6 @@ export async function scheduleWirdNotifications(
   });
 }
 
-// ─── Schedule Kahf Friday ─────────────────────────────────────────────────────
-export async function scheduleKahfNotification(
-  settings: AllNotificationSettings
-): Promise<void> {
-  // Cancel existing kahf notification
-  try {
-    await Notifications.cancelScheduledNotificationAsync('kahf_friday');
-  } catch {}
-
-  if (!settings.kahfEnabled) return;
-  const hasPermission = await requestNotifPermission();
-  if (!hasPermission) return;
-
-  const { hour, minute } = parseTime(settings.kahfTime);
-
-  // weekday: 6 = Friday in expo-notifications (1=Sunday...7=Saturday)
-  await Notifications.scheduleNotificationAsync({
-    identifier: 'kahf_friday',
-    content: {
-      title: t('settings.kahfTitle'),
-      body: t('settings.kahfBody'),
-      sound: 'default',
-      data: { type: 'kahf' },
-      ...(Platform.OS === 'android' && { channelId: 'general' }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-      weekday: 6, // Friday
-      hour,
-      minute,
-    },
-  });
-}
-
 // ─── Schedule Daily Ayah ──────────────────────────────────────────────────────
 const DAILY_AYAHS = [
   { text: 'فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ﴿الشرح: ٥﴾', surah: 94, ayah: 5 },
@@ -244,7 +212,6 @@ export async function scheduleAllNotifications(
 ): Promise<void> {
   await Promise.all([
     scheduleWirdNotifications(settings),
-    scheduleKahfNotification(settings),
     scheduleDailyAyahNotification(settings),
   ]);
 }
@@ -322,6 +289,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   worshipDailySummaryTime?: string;
   worshipStreakAlerts?: boolean;
   worshipWeeklyReport?: boolean;
+  // Friday Surah Al-Kahf reminder
+  kahfReminder?: boolean;
 }): Promise<void> {
   try {
     if (!notifSettings.enabled) {
@@ -500,7 +469,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       let notifBody = ayahData.text;
       try {
         const tafsirResult = await fetchTafsir(ayahData.surah, ayahData.ayah, 'ar.muyassar');
-        if (tafsirResult.tafsirText && tafsirResult.tafsirText !== 'تعذر تحميل التفسير') {
+        if (tafsirResult.tafsirText && tafsirResult.tafsirText !== t('tafsirSearch.loadError')) {
           const shortTafsir = tafsirResult.tafsirText.length > 120
             ? tafsirResult.tafsirText.slice(0, 120) + '...'
             : tafsirResult.tafsirText;
@@ -732,6 +701,61 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       });
     } else {
       try { await Notifications.cancelScheduledNotificationAsync('worship_weekly_report'); } catch {}
+    }
+
+    // 10) Schedule Friday Surah Al-Kahf reminder (2 hours after Jummah Dhuhr)
+    try { await Notifications.cancelScheduledNotificationAsync('kahf_friday'); } catch {}
+    if (notifSettings.kahfReminder) {
+      let kahfHour = 14; // fallback: 2:00 PM
+      let kahfMinute = 0;
+      try {
+        const location = await getPrayerLocation();
+        if (location) {
+          const appSettings = await getSettings();
+          const prayerData = await fetchPrayerTimesByCoords(
+            location.latitude,
+            location.longitude,
+            appSettings.calculationMethod,
+          );
+          const dhuhrStr = prayerData.timings.Dhuhr;
+          if (dhuhrStr) {
+            const cleaned = dhuhrStr.replace(/\s*\([^)]*\)\s*/, '').trim();
+            const [dH, dM] = cleaned.split(':').map(Number);
+            // Add 2 hours to Dhuhr time
+            kahfHour = dH + 2;
+            kahfMinute = dM;
+            if (kahfHour >= 24) kahfHour -= 24;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch Dhuhr for Kahf reminder, using fallback 14:00:', e);
+      }
+
+      // First ayah of Surah Al-Kahf (global ayah number = 2141)
+      const KAHF_FIRST_AYAH_GLOBAL = 2141;
+      const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'kahf_friday',
+        content: {
+          title: t('settings.kahfTitle'),
+          body: t('settings.kahfBody'),
+          sound: notifSettings.sound ? 'default' : undefined,
+          data: {
+            type: 'kahf',
+            soundType: 'general_reminder',
+            ayahAudioUrl: kahfAyahAudioUrl,
+          },
+          ...(Platform.OS === 'android' && { channelId: 'general' }),
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: 6, // Friday
+          hour: kahfHour,
+          minute: kahfMinute,
+        },
+      });
+      console.log(`🔔 Scheduled Kahf Friday reminder at ${kahfHour}:${String(kahfMinute).padStart(2, '0')} (Dhuhr+2h)`);
     }
 
     console.log('✅ All notifications scheduled from settings');

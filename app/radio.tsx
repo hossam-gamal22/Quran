@@ -32,6 +32,7 @@ import {
   toggleRadioFavorite,
   isRadioFavorite,
 } from '@/services/radioService';
+import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 
 const ACCENT = '#22C55E';
 
@@ -51,6 +52,9 @@ export default function RadioScreen() {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [showSearch, setShowSearch] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
+
+  // Interstitial ad — show after 20s of radio playback (every channel open)
+  const adTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Animation for search bar
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -111,11 +115,29 @@ export default function RadioScreen() {
   const handlePlayStation = useCallback(async (station: RadioStation) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
+      // Stopping — clear the ad timer
+      if (adTimerRef.current) {
+        clearTimeout(adTimerRef.current);
+        adTimerRef.current = null;
+      }
       await stopRadio();
     } else {
+      // Starting a new station — schedule interstitial after 20s
+      if (adTimerRef.current) clearTimeout(adTimerRef.current);
+      adTimerRef.current = setTimeout(() => {
+        showInterstitial();
+        adTimerRef.current = null;
+      }, 20_000);
       await playRadio(station);
     }
   }, [radioState, playRadio, stopRadio]);
+
+  // Cleanup ad timer on unmount
+  useEffect(() => {
+    return () => {
+      if (adTimerRef.current) clearTimeout(adTimerRef.current);
+    };
+  }, []);
 
   // Filter stations based on tab
   const filteredStations = useMemo(() => {
@@ -217,7 +239,7 @@ export default function RadioScreen() {
                 </View>
               )}
               {!playing && item.category && (
-                <Text style={[styles.categoryBadgeText, { color: colors.textLight }]} numberOfLines={1}>
+                <Text style={[styles.categoryBadgeText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                   {getCategoryLabel(item.category)}
                 </Text>
               )}
@@ -326,10 +348,10 @@ export default function RadioScreen() {
             )}
           </View>
           <View style={[styles.nowPlayingInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-            <Text style={[styles.nowPlayingLabel, { color: ACCENT }]} numberOfLines={1}>
+            <Text style={[styles.nowPlayingLabel, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
               {t('radio.nowPlaying')}
             </Text>
-            <Text style={[styles.nowPlayingName, { color: colors.text }]} numberOfLines={1}>
+            <Text style={[styles.nowPlayingName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
               {radioState.currentStation.name}
             </Text>
           </View>

@@ -110,7 +110,7 @@ export default function HajjScreen() {
           <MaterialCommunityIcons name="mosque" size={36} color={ACCENT} />
           <View style={s.heroTextWrap}>
             <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
-              {activeTab === 'rituals' ? t('hajjUmrah.hajjGuide') : t('hajjUmrah.hajjUmrahDuas')}
+              {activeTab === 'rituals' ? t('hajjUmrah.hajjGuide') : t('hajjUmrah.hajjDuas')}
             </Text>
             <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
               {activeTab === 'rituals'

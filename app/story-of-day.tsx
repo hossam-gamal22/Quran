@@ -273,7 +273,7 @@ export default function StoryOfDayScreen() {
       }
       await MediaLibrary.saveToLibraryAsync(download.uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('✅', 'تم تحميل فيديو اليوم بنجاح');
+      Alert.alert(t('common.success'), t('storyOfDay.videoWithAudioSaved'));
     } catch (e) {
       Alert.alert('', t('storyOfDay.videoSaveError'));
     } finally {

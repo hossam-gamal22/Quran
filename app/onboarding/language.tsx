@@ -97,7 +97,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
   return (
     <Animated.View entering={FadeInRight.delay(index * 50).duration(400)}>
       <TouchableOpacity
-        style={[styles.languageItem, isSelected && styles.languageItemSelected]}
+        style={[styles.languageItem, isSelected && styles.languageItemSelected, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onSelect();
@@ -105,7 +105,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         activeOpacity={0.7}
       >
         <Image source={language.flagIcon} style={styles.flag} resizeMode="contain" />
-        <View style={styles.languageInfo}>
+        <View style={[styles.languageInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
           <Text style={[styles.languageName, isSelected && styles.languageNameSelected, { textAlign: isRTL ? 'right' : 'left' }]}>
             {language.name}
           </Text>
@@ -318,7 +318,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   languageItem: {
-    flexDirection: 'row-reverse',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
@@ -339,7 +338,6 @@ const styles = StyleSheet.create({
   },
   languageInfo: {
     flex: 1,
-    alignItems: 'flex-end',
   },
   languageName: {
     fontSize: 17,

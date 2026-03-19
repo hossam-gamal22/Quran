@@ -500,7 +500,7 @@ export default function BackupScreen() {
       />
 
       {/* Header */}
-      <UniversalHeader title={t('settings.backupSection')} />
+      <UniversalHeader title={t('settings.backupRestore')} />
 
       <ScrollView
         style={styles.scrollView}

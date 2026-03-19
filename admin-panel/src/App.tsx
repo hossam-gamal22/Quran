@@ -77,6 +77,7 @@ import Rewards from './pages/Rewards';
 import TranslationOverrides from './pages/TranslationOverrides';
 import ContentManager from './pages/ContentManager';
 import RadioManager from './pages/RadioManager';
+import HijriOverrides from './pages/HijriOverrides';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar ====================
@@ -97,6 +98,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/quran-themes', icon: Fingerprint, label: 'ثيمات القرآن' },
     { path: '/tasbih-presets', icon: Repeat, label: 'التسبيحات' },
     { path: '/islamic-events', icon: CalendarDays, label: 'المناسبات' },
+    { path: '/hijri-overrides', icon: Globe, label: 'تعديلات الهجري' },
     { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
     { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
     { path: '/users', icon: Users, label: 'المستخدمين' },
@@ -236,6 +238,7 @@ const App: React.FC = () => {
               <Route path="/quran-themes" element={<QuranThemesManager />} />
               <Route path="/tasbih-presets" element={<TasbihPresetsManager />} />
               <Route path="/islamic-events" element={<IslamicEventsManager />} />
+              <Route path="/hijri-overrides" element={<HijriOverrides />} />
               <Route path="/seasonal" element={<Seasonal />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/users" element={<UsersPage />} />

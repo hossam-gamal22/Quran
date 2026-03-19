@@ -265,6 +265,18 @@ export function getFirstSurahOnPage(page: number): number {
   return 1;
 }
 
+/** Get the first (surah, ayah) pair on a page */
+export function getFirstAyahOnPage(page: number): { surah: number; ayah: number } {
+  const lines = getPageLines(page);
+  for (const line of lines) {
+    if (line.lt === 'ayah' && line.fw) {
+      const w = words[String(line.fw)];
+      if (w) return { surah: w.s, ayah: w.a };
+    }
+  }
+  return { surah: getFirstSurahOnPage(page), ayah: 1 };
+}
+
 /** Get the page number where a surah starts */
 export function getSurahStartPage(surahNumber: number): number {
   const surah = surahs.find(s => s.number === surahNumber);

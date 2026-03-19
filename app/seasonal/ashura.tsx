@@ -157,6 +157,7 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
           <Text
             style={[
               styles.fastingDayNumberText,
+              { color: colors.text },
               (day.isMain || isFasted) && styles.fastingDayNumberTextLight,
             ]}
           >
@@ -165,6 +166,7 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
           <Text
             style={[
               styles.fastingDayNumberLabel,
+              { color: colors.textLight },
               (day.isMain || isFasted) && styles.fastingDayNumberTextLight,
             ]}
           >

@@ -367,7 +367,7 @@ export default function SettingsScreen() {
         </SettingSection>
 
         {/* 6. عن التطبيق (About) */}
-        <SettingSection title={t('settings.aboutApp')} index={6} colors={colors}>
+        <SettingSection title={t('settings.about')} index={6} colors={colors}>
           <SettingItem
             icon="information"
             iconColor="#5d4e8c"
