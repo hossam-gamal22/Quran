@@ -669,7 +669,7 @@ const ContentPage: React.FC = () => {
                     label="ترجمة تلقائية"
                     fieldName="translations"
                     contentType={formData.type === 'ayah' ? 'quran' : formData.type === 'hadith' ? 'hadith' : 'adhkar'}
-                    arabicText={formData.arabic}
+                    arabicText={formData.textAr}
                     initialValues={formData.translations}
                     onSave={(translations) => setFormData({
                       ...formData,

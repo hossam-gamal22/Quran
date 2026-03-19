@@ -817,7 +817,8 @@ function HighlightRow({
                   }`}
                   aria-label="Toggle visibility"
                   title="Toggle visibility"
-                  {...{role: 'switch', 'aria-checked': String(item.isVisible)}}
+                  role="switch"
+                  aria-checked={item.isVisible ? 'true' : 'false'}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isVisible ? 'right-0.5' : 'right-[22px]'
@@ -839,7 +840,8 @@ function HighlightRow({
                   }`}
                   aria-label="Toggle pin to top"
                   title="Toggle pin to top"
-                  {...{role: 'switch', 'aria-checked': String(item.isPinned)}}
+                  role="switch"
+                  aria-checked={item.isPinned ? 'true' : 'false'}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isPinned ? 'right-0.5' : 'right-[22px]'

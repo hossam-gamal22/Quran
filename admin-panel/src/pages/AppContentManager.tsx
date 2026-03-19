@@ -41,7 +41,7 @@ interface AppContentItem {
   key: string;
   type: 'text' | 'icon';
   screen: string;
-  translations: Record<LangCode, string>;
+  translations: Record<string, string>;
   iconUrl?: string;
   updatedAt: Date;
 }
@@ -239,7 +239,7 @@ const AppContentManager: React.FC = () => {
                 initialValues={localItem.translations}
                 onSave={(translations) => {
                   Object.entries(translations).forEach(([code, text]) => {
-                    if (text) updateTranslation(code, text);
+                    if (text) updateTranslation(code as LangCode, text);
                   });
                 }}
               />

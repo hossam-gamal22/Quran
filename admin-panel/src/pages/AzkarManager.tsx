@@ -645,7 +645,6 @@ const AzkarManager: React.FC = () => {
                           >
                             <VolumeX className="w-4 h-4" />
                           </button>
-                          </button>
                         </>
                       ) : (
                         <label className="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors cursor-pointer" title="رفع صوت" aria-label="رفع صوت">
@@ -909,7 +908,7 @@ const AzkarManager: React.FC = () => {
                 <div>
                   <h3 className="text-emerald-400 font-medium mb-2">الفائدة</h3>
                   <p className="text-amber-300 bg-slate-900 p-4 rounded-xl">
-                    {selectedZikr.benefit}
+                    {typeof selectedZikr.benefit === 'string' ? selectedZikr.benefit : selectedZikr.benefit?.ar || ''}
                   </p>
                 </div>
               )}

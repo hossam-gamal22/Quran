@@ -589,7 +589,7 @@ const SplashScreensPage: React.FC = () => {
                               ? 'border-white scale-110'
                               : 'border-transparent'
                           }`}
-                          css={{ backgroundColor: color }}
+                          style={{ backgroundColor: color }}
                           aria-label={`اختيار اللون ${color}`}
                           title={color}
                         />
@@ -617,7 +617,7 @@ const SplashScreensPage: React.FC = () => {
                               ? 'border-white scale-110'
                               : 'border-transparent'
                           }`}
-                          css={{ background: `linear-gradient(135deg, ${gradient.join(', ')})` }}
+                          style={{ background: `linear-gradient(135deg, ${gradient.join(', ')})` }}
                           aria-label={`اختيار تدرج ${gradient[0]} إلى ${gradient[1]}`}
                           title={`${gradient[0]} → ${gradient[1]}`}
                         />

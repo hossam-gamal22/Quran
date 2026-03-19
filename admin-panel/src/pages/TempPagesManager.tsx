@@ -396,7 +396,7 @@ const TempPagesManager: React.FC = () => {
                 initialValues={{ ar: editing.titles?.ar ?? editing.title, en: editing.titles?.en ?? editing.titleEn ?? '' }}
                 onSave={(translations) => {
                   const updatedTitles: MultiLangText = { ar: editing.titles?.ar ?? editing.title ?? '', en: translations.en || editing.titles?.en || editing.titleEn || '' };
-                  LANGUAGES.forEach(l => { if (translations[l.code]) updatedTitles[l.code] = translations[l.code]; });
+                  LANGUAGES.forEach(l => { if ((translations as Record<string, string>)[l.code]) updatedTitles[l.code] = (translations as Record<string, string>)[l.code]; });
                   setEditing({ ...editing, titleEn: translations.en || editing.titleEn, titles: updatedTitles, titleTranslations: translations });
                 }}
               />

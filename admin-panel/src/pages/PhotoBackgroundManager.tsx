@@ -84,7 +84,7 @@ const DEFAULT_CATEGORIES: CategoryConfig[] = [
   { id: 'flowers', name_ar: 'زهور', is_active: true, order_index: 7 },
 ];
 
-const PEXELS_API_KEY = import.meta.env?.VITE_PEXELS_API_KEY || '';
+const PEXELS_API_KEY = (import.meta as any).env?.VITE_PEXELS_API_KEY || '';
 
 // ========================================
 // المكون الرئيسي

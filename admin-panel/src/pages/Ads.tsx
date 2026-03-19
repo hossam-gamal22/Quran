@@ -236,17 +236,17 @@ export default function Ads() {
     const slots = { ...(settings.adSlots || {}) };
     if (!slots[key]) return;
     if (field === 'enabled') {
-      slots[key] = { ...slots[key], enabled: value };
+      slots[key] = { ...slots[key], enabled: value as boolean };
     } else if (field === 'type') {
-      slots[key] = { ...slots[key], type: value };
+      slots[key] = { ...slots[key], type: value as 'banner' | 'interstitial' };
     } else if (field === 'label') {
-      slots[key] = { ...slots[key], label: value };
+      slots[key] = { ...slots[key], label: value as string };
     } else if (field === 'position') {
-      slots[key] = { ...slots[key], position: value };
+      slots[key] = { ...slots[key], position: value as 'bottom' | 'top' };
     } else if (field === 'adUnitId.android') {
-      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, android: value } };
+      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, android: value as string } };
     } else if (field === 'adUnitId.ios') {
-      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, ios: value } };
+      slots[key] = { ...slots[key], adUnitId: { ...slots[key].adUnitId, ios: value as string } };
     }
     setSettings({ ...settings, adSlots: slots });
   };
