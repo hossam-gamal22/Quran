@@ -23,6 +23,7 @@ import {
   Globe,
   Volume2,
   Image as ImageIcon,
+  Map,
   Shield,
   Trophy,
   Timer,
@@ -78,6 +79,7 @@ import TranslationOverrides from './pages/TranslationOverrides';
 import ContentManager from './pages/ContentManager';
 import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
+import RouteGuide from './pages/RouteGuide';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar ====================
@@ -121,6 +123,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
     { path: '/temp-pages', icon: Timer, label: 'صفحات مؤقتة' },
     { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
     { path: '/onboarding', icon: UserPlus, label: 'شاشات التأهيل' },
+    { path: '/route-guide', icon: Map, label: 'دليل المسارات' },
     { path: '/settings', icon: Settings, label: 'الإعدادات' },
   ];
 
@@ -262,6 +265,7 @@ const App: React.FC = () => {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />
+              <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

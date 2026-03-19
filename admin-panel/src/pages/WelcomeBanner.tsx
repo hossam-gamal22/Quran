@@ -69,18 +69,33 @@ const ICON_OPTIONS = [
 ];
 
 const ROUTE_OPTIONS = [
+  { value: '/(tabs)', label: 'الرئيسية' },
+  { value: '/(tabs)/quran', label: 'القرآن' },
+  { value: '/(tabs)/prayer', label: 'الصلاة' },
+  { value: '/(tabs)/tasbih', label: 'التسبيح' },
   { value: '/seasonal/ramadan', label: 'صفحة رمضان' },
-  { value: '/(tabs)/prayer', label: 'مواقيت الصلاة' },
-  { value: '/(tabs)/quran', label: 'القرآن الكريم' },
   { value: '/azkar/morning', label: 'أذكار الصباح' },
   { value: '/azkar/evening', label: 'أذكار المساء' },
+  { value: '/azkar/sleep', label: 'أذكار النوم' },
+  { value: '/azkar/wakeup', label: 'أذكار الاستيقاظ' },
   { value: '/names', label: 'أسماء الله الحسنى' },
   { value: '/hajj-umrah', label: 'الحج والعمرة' },
-  { value: '/story-of-day', label: 'فيديو اليوم' },
+  { value: '/hajj', label: 'مناسك الحج' },
+  { value: '/umrah', label: 'مناسك العمرة' },
+  { value: '/daily-ayah', label: 'آية اليوم' },
+  { value: '/daily-dua', label: 'دعاء اليوم' },
+  { value: '/daily-dhikr', label: 'ذكر اليوم' },
+  { value: '/hadith-of-day', label: 'حديث اليوم' },
+  { value: '/story-of-day', label: 'قصة اليوم' },
   { value: '/hijri', label: 'التقويم الهجري' },
   { value: '/khatma', label: 'ختمة القرآن' },
   { value: '/worship-tracker', label: 'تتبع العبادات' },
   { value: '/ruqya', label: 'الرقية الشرعية' },
+  { value: '/seerah', label: 'السيرة النبوية' },
+  { value: '/companions', label: 'قصص الصحابة' },
+  { value: '/radio', label: 'إذاعة القرآن' },
+  { value: '/all-favorites', label: 'المحفوظات' },
+  { value: '/subscription', label: 'الاشتراك' },
 ];
 
 const COLOR_PRESETS = [

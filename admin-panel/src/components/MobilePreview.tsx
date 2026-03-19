@@ -1,5 +1,6 @@
 // admin-panel/src/components/MobilePreview.tsx
 // معاينة التطبيق مع بيانات حقيقية من Firebase
+// يعكس الشكل الفعلي للتطبيق: Glass morphism + RTL + 5 tabs
 
 import React, { useState, useEffect } from 'react';
 import { Smartphone, X, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
@@ -25,25 +26,21 @@ async function fetchPreviewData(): Promise<Omit<PreviewData, 'loading' | 'error'
     welcomeBanner: null,
   };
 
-  // Fetch home page config
   try {
     const homeDoc = await getDoc(doc(db, 'appConfig', 'homePageConfig'));
     if (homeDoc.exists()) results.homeConfig = homeDoc.data();
   } catch (e) { console.log('Preview: homePageConfig fetch error', e); }
 
-  // Fetch welcome banner
   try {
     const bannerDoc = await getDoc(doc(db, 'appConfig', 'welcomeBanner'));
     if (bannerDoc.exists()) results.welcomeBanner = bannerDoc.data();
   } catch (e) { console.log('Preview: welcomeBanner fetch error', e); }
 
-  // Fetch azkar categories
   try {
     const azkarSnap = await getDocs(query(collection(db, 'azkar'), limit(10)));
     results.azkarCategories = azkarSnap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) { console.log('Preview: azkar fetch error', e); }
 
-  // Fetch app content items
   try {
     const contentSnap = await getDocs(query(collection(db, 'appContent'), limit(20)));
     results.appContent = contentSnap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -52,175 +49,266 @@ async function fetchPreviewData(): Promise<Omit<PreviewData, 'loading' | 'error'
   return results;
 }
 
+// ==================== Glass Card ====================
+function GlassCard({ children, className = '', theme }: { children: React.ReactNode; className?: string; theme: 'light' | 'dark' }) {
+  const bg = theme === 'dark'
+    ? 'rgba(255,255,255,0.08)'
+    : 'rgba(255,255,255,0.55)';
+  return (
+    <div
+      className={`rounded-2xl backdrop-blur-md ${className}`}
+      style={{
+        background: bg,
+        border: `0.5px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.3)'}`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 // ==================== Screen Renderers ====================
 
 function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
-  const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
-  const secondaryText = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
-
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
   const banner = data.welcomeBanner;
-  const homeConfig = data.homeConfig;
+
+  const quickAccess = [
+    { icon: '🌅', label: 'الصباح', color: '#2f7659' },
+    { icon: '🌆', label: 'المساء', color: '#1e40af' },
+    { icon: '😴', label: 'النوم', color: '#5b21b6' },
+  ];
+
+  const sections = data.homeConfig?.sections?.filter((s: any) => s.visible !== false) || [
+    { id: 'azkar', title: '📿 أذكار', items: ['أذكار الصباح', 'أذكار المساء', 'أذكار النوم'] },
+    { id: 'quran', title: '📖 قرآن', items: ['سورة الكهف', 'سورة يس', 'آية اليوم'] },
+  ];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Welcome Banner */}
       {banner?.enabled !== false && (
-        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-4 rounded-2xl text-white">
-          <p className="text-sm opacity-90">{banner?.greeting || 'السلام عليكم'}</p>
-          <p className="font-bold mt-1">{banner?.message || 'مرحباً بكم في روح المسلم'}</p>
+        <div
+          className="p-4 rounded-2xl text-white relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${banner?.color || '#2f7659'}, ${banner?.color || '#2f7659'}dd)` }}
+        >
+          <p className="text-xs opacity-80">{banner?.greeting || 'السلام عليكم'}</p>
+          <p className="font-bold text-sm mt-1">{banner?.message || 'مرحباً بكم في روح المسلم'}</p>
         </div>
       )}
 
-      {/* Quick Access */}
-      <div className="grid grid-cols-3 gap-2">
-        {(homeConfig?.quickAccess || [
-          { icon: '🌅', label: 'الصباح' },
-          { icon: '🌆', label: 'المساء' },
-          { icon: '😴', label: 'النوم' },
-        ]).slice(0, 6).map((item: any, i: number) => (
-          <div key={i} className={`${cardBg} p-3 rounded-xl text-center shadow-sm`}>
-            <span className="text-2xl">{item.icon || '📿'}</span>
-            <p className={`text-xs mt-1 ${secondaryText}`}>{item.label || item.title || ''}</p>
-          </div>
+      {/* Quick Access — grid */}
+      <div className="flex gap-2">
+        {quickAccess.map((item, i) => (
+          <GlassCard key={i} theme={theme} className="flex-1 p-3 text-center">
+            <span className="text-xl block">{item.icon}</span>
+            <p className="text-[10px] mt-1" style={{ color: secondaryColor }}>{item.label}</p>
+          </GlassCard>
         ))}
       </div>
 
-      {/* Sections from homeConfig */}
-      {homeConfig?.sections?.filter((s: any) => s.visible !== false).slice(0, 3).map((section: any, i: number) => (
-        <div key={i} className={`${cardBg} p-4 rounded-xl shadow-sm`}>
-          <h3 className={`font-bold mb-2 ${textColor}`}>{section.title || section.id}</h3>
-          <p className={`text-sm ${secondaryText}`}>{section.subtitle || 'محتوى القسم'}</p>
-        </div>
-      )) || (
-        <div className={`${cardBg} p-4 rounded-xl shadow-sm`}>
-          <h3 className={`font-bold mb-2 ${textColor}`}>لم يتم تحميل الأقسام</h3>
-          <p className={`text-sm ${secondaryText}`}>اضغط تحديث لتحميل البيانات</p>
-        </div>
-      )}
+      {/* Sections */}
+      {sections.slice(0, 3).map((section: any, i: number) => (
+        <GlassCard key={i} theme={theme} className="p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px]" style={{ color: secondaryColor }}>▾</span>
+            <h3 className="font-bold text-xs" style={{ color: textColor }}>{section.title || section.id}</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(section.items || ['عنصر ١', 'عنصر ٢']).slice(0, 4).map((item: any, j: number) => (
+              <div
+                key={j}
+                className="rounded-xl p-2 text-center"
+                style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}
+              >
+                <p className="text-[9px]" style={{ color: secondaryColor }}>{typeof item === 'string' ? item : item.title || ''}</p>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      ))}
     </div>
   );
 }
 
-function AzkarScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
-  const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
-  const secondaryText = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
-
-  const categories = data.azkarCategories.length > 0
-    ? data.azkarCategories
-    : [
-      { id: '1', name: 'أذكار الصباح', count: 27 },
-      { id: '2', name: 'أذكار المساء', count: 24 },
-      { id: '3', name: 'أذكار النوم', count: 15 },
-    ];
+function QuranScreen({ theme }: { theme: 'light' | 'dark' }) {
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
 
   return (
     <div className="space-y-3">
-      <h2 className={`font-bold text-lg ${textColor}`}>الأذكار</h2>
-      {categories.slice(0, 5).map((cat: any, i: number) => (
-        <div key={cat.id || i} className={`${cardBg} p-4 rounded-xl shadow-sm`}>
+      {/* Quran Search */}
+      <GlassCard theme={theme} className="p-3 flex items-center gap-2">
+        <span className="text-xs" style={{ color: secondaryColor }}>🔍</span>
+        <span className="text-xs" style={{ color: secondaryColor }}>ابحث في القرآن...</span>
+      </GlassCard>
+
+      {/* Last Read */}
+      <GlassCard theme={theme} className="p-3">
+        <p className="text-[10px] mb-1" style={{ color: secondaryColor }}>آخر قراءة</p>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px]" style={{ color: '#22C55E' }}>الصفحة ٤٥</span>
+          <p className="font-bold text-xs" style={{ color: textColor }}>سورة البقرة</p>
+        </div>
+      </GlassCard>
+
+      {/* Surah List */}
+      {['الفاتحة', 'البقرة', 'آل عمران', 'النساء', 'المائدة', 'الأنعام'].map((name, i) => (
+        <GlassCard key={i} theme={theme} className="p-3">
           <div className="flex items-center justify-between">
-            <div>
-              <p className={`font-semibold ${textColor}`}>{cat.name || cat.title || cat.category || `ذكر ${i + 1}`}</p>
-              {cat.count && <p className={`text-xs ${secondaryText}`}>{cat.count} ذكر</p>}
-            </div>
-            <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center">
-              <span className="text-emerald-500 text-sm">📿</span>
+            <span className="text-[10px]" style={{ color: secondaryColor }}>
+              {i === 0 ? '٧' : i === 1 ? '٢٨٦' : i === 2 ? '٢٠٠' : i === 3 ? '١٧٦' : i === 4 ? '١٢٠' : '١٦٥'} آية
+            </span>
+            <div className="flex items-center gap-2">
+              <div>
+                <p className="font-bold text-xs text-left" style={{ color: textColor }}>{name}</p>
+                <p className="text-[9px] text-left" style={{ color: secondaryColor }}>
+                  {i < 2 ? 'مدنية' : 'مدنية'}
+                </p>
+              </div>
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}
+              >
+                {i + 1}
+              </div>
             </div>
           </div>
-        </div>
+        </GlassCard>
       ))}
     </div>
   );
 }
 
-function ContentScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
-  const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
-  const secondaryText = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
-
-  const items = data.appContent.length > 0
-    ? data.appContent
-    : [
-      { id: '1', title_ar: 'آية اليوم', icon: '📖' },
-      { id: '2', title_ar: 'حديث اليوم', icon: '📜' },
-      { id: '3', title_ar: 'حكمة اليوم', icon: '💡' },
-    ];
+function TasbihScreen({ theme }: { theme: 'light' | 'dark' }) {
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
 
   return (
-    <div className="space-y-3">
-      <h2 className={`font-bold text-lg ${textColor}`}>المحتوى</h2>
-      {items.slice(0, 8).map((item: any, i: number) => (
-        <div key={item.id || i} className={`${cardBg} p-3 rounded-xl shadow-sm flex items-center gap-3`}>
-          {item.iconUrl ? (
-            <img src={item.iconUrl} className="w-10 h-10 rounded-lg object-cover" alt="" />
-          ) : (
-            <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center text-lg">
-              {item.icon || '📄'}
-            </div>
-          )}
-          <div>
-            <p className={`font-semibold text-sm ${textColor}`}>{item.title_ar || item.title || item.label || ''}</p>
-            {item.subtitle_ar && <p className={`text-xs ${secondaryText}`}>{item.subtitle_ar}</p>}
-          </div>
-        </div>
-      ))}
+    <div className="space-y-3 flex flex-col items-center">
+      {/* Tasbih Name */}
+      <p className="font-bold text-sm" style={{ color: textColor }}>سبحان الله</p>
+      <p className="text-[10px]" style={{ color: secondaryColor }}>٣٣ مرة</p>
+
+      {/* Counter Ring */}
+      <div className="relative w-32 h-32 flex items-center justify-center my-2">
+        <svg width="128" height="128" viewBox="0 0 128 128">
+          <circle cx="64" cy="64" r="56" fill="none" stroke={theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'} strokeWidth="6" />
+          <circle
+            cx="64" cy="64" r="56" fill="none"
+            stroke="#22C55E"
+            strokeWidth="6"
+            strokeDasharray={`${2 * Math.PI * 56 * 0.45} ${2 * Math.PI * 56}`}
+            strokeLinecap="round"
+            transform="rotate(-90 64 64)"
+          />
+        </svg>
+        <span className="absolute text-3xl font-bold" style={{ color: textColor }}>١٥</span>
+      </div>
+
+      {/* Tap Button */}
+      <div
+        className="w-20 h-20 rounded-full flex items-center justify-center"
+        style={{ background: 'rgba(34,197,94,0.2)', border: '2px solid #22C55E' }}
+      >
+        <span className="text-2xl" style={{ color: '#22C55E' }}>📿</span>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center gap-4 mt-2">
+        <span className="text-xs" style={{ color: secondaryColor }}>→</span>
+        <span className="text-xs font-bold" style={{ color: '#22C55E' }}>١ / ٤</span>
+        <span className="text-xs" style={{ color: secondaryColor }}>←</span>
+      </div>
     </div>
   );
 }
 
 function PrayerScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
-  const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
-  const secondaryText = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
+
+  const prayers = [
+    { name: 'الفجر', time: '٤:٥٢', active: false },
+    { name: 'الشروق', time: '٦:١٥', active: false },
+    { name: 'الظهر', time: '١٢:٠٨', active: false },
+    { name: 'العصر', time: '٣:٤٥', active: true },
+    { name: 'المغرب', time: '٦:٣٢', active: false },
+    { name: 'العشاء', time: '٧:٥٥', active: false },
+  ];
 
   return (
     <div className="space-y-3">
-      <h2 className={`font-bold text-lg ${textColor}`}>مواقيت الصلاة</h2>
-      <div className={`${cardBg} p-4 rounded-xl shadow-sm text-center`}>
-        <p className={`text-sm ${secondaryText}`}>الصلاة القادمة</p>
-        <p className="text-3xl font-bold text-emerald-500 mt-2">المغرب</p>
-        <p className={`text-sm ${secondaryText} mt-1`}>يُحسب بناءً على موقعك</p>
-      </div>
-      {['الفجر', 'الشروق', 'الظهر', 'العصر', 'المغرب', 'العشاء'].map((prayer, i) => (
-        <div key={i} className={`${cardBg} p-3 rounded-xl shadow-sm flex items-center justify-between`}>
-          <span className={textColor}>{prayer}</span>
-          <span className={secondaryText}>--:--</span>
-        </div>
+      {/* Next Prayer Card */}
+      <GlassCard theme={theme} className="p-4 text-center">
+        <p className="text-[10px]" style={{ color: secondaryColor }}>الصلاة القادمة</p>
+        <p className="text-lg font-bold mt-1" style={{ color: '#22C55E' }}>العصر</p>
+        <p className="text-xl font-bold mt-1" style={{ color: textColor, fontFamily: 'monospace' }}>٠٢:١٥:٣٣</p>
+        <p className="text-[10px] mt-1" style={{ color: secondaryColor }}>٣:٤٥ م</p>
+      </GlassCard>
+
+      {/* Prayer List */}
+      {prayers.map((prayer, i) => (
+        <GlassCard key={i} theme={theme} className="p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-5 h-5 rounded-full flex items-center justify-center"
+                style={{
+                  background: prayer.active ? 'rgba(34,197,94,0.2)' : 'transparent',
+                  border: `1.5px solid ${prayer.active ? '#22C55E' : (theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)')}`
+                }}
+              >
+                {prayer.active && <span className="text-[8px]" style={{ color: '#22C55E' }}>🔔</span>}
+              </div>
+              <span className="text-xs" style={{ color: secondaryColor }}>{prayer.time}</span>
+            </div>
+            <span className={`text-xs font-semibold ${prayer.active ? '' : ''}`} style={{ color: prayer.active ? '#22C55E' : textColor }}>
+              {prayer.name}
+            </span>
+          </div>
+        </GlassCard>
       ))}
     </div>
   );
 }
 
 function SettingsScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
-  const cardBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
 
-  const items = [
-    { icon: '🌙', name: 'الوضع الداكن', toggle: true },
-    { icon: '🔔', name: 'الإشعارات', toggle: true },
-    { icon: '🌍', name: 'اللغة', value: 'العربية' },
-    { icon: '⭐', name: 'قيّم التطبيق' },
-    { icon: '📤', name: 'مشاركة التطبيق' },
-    { icon: '👑', name: 'الاشتراك' },
+  const sections = [
+    { title: 'العرض', items: [{ icon: '🌍', name: 'اللغة', value: 'العربية' }, { icon: '🎨', name: 'إعدادات العرض' }] },
+    { title: 'الإشعارات', items: [{ icon: '🔔', name: 'الإشعارات', toggle: true }] },
+    { title: 'الودجات', items: [{ icon: '📱', name: 'إعدادات الودجات' }] },
+    { title: 'أخرى', items: [{ icon: '💾', name: 'النسخ الاحتياطي' }, { icon: '📤', name: 'مشاركة التطبيق' }, { icon: 'ℹ️', name: 'عن التطبيق' }] },
   ];
 
   return (
     <div className="space-y-3">
-      <h2 className={`font-bold text-lg ${textColor}`}>الإعدادات</h2>
-      {items.map((item, i) => (
-        <div key={i} className={`${cardBg} p-3 rounded-xl shadow-sm flex items-center justify-between`}>
-          <div className="flex items-center gap-3">
-            <span className="text-xl">{item.icon}</span>
-            <span className={textColor}>{item.name}</span>
-          </div>
-          {item.toggle && (
-            <div className="w-12 h-6 bg-emerald-500 rounded-full p-1">
-              <div className="w-4 h-4 bg-white rounded-full mr-auto" />
-            </div>
-          )}
-          {item.value && <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{item.value}</span>}
+      {sections.map((section, si) => (
+        <div key={si}>
+          <p className="text-[10px] font-bold mb-1.5 pr-1" style={{ color: '#22C55E' }}>{section.title}</p>
+          <GlassCard theme={theme} className="divide-y" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+            {section.items.map((item: any, i: number) => (
+              <div key={i} className="p-3 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {item.toggle && (
+                    <div className="w-8 h-4 rounded-full p-0.5" style={{ background: '#22C55E' }}>
+                      <div className="w-3 h-3 bg-white rounded-full" style={{ marginRight: 'auto' }} />
+                    </div>
+                  )}
+                  {item.value && <span className="text-[10px]" style={{ color: secondaryColor }}>{item.value}</span>}
+                  {!item.toggle && !item.value && <span className="text-[10px]" style={{ color: secondaryColor }}>›</span>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{ color: textColor }}>{item.name}</span>
+                  <span className="text-sm">{item.icon}</span>
+                </div>
+              </div>
+            ))}
+          </GlassCard>
         </div>
       ))}
     </div>
@@ -228,9 +316,18 @@ function SettingsScreen({ theme }: { theme: 'light' | 'dark' }) {
 }
 
 // ==================== Main Component ====================
+// Tab config matching actual app: Home, Quran, Tasbih, Prayer, Settings
+const PREVIEW_SCREENS = [
+  { id: 'home', name: 'الرئيسية', icon: '🏠' },
+  { id: 'quran', name: 'القرآن', icon: '📖' },
+  { id: 'tasbih', name: 'التسبيح', icon: '📿' },
+  { id: 'prayer', name: 'الصلاة', icon: '🕌' },
+  { id: 'settings', name: 'الإعدادات', icon: '⚙️' },
+];
+
 const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [device, setDevice] = useState<'iphone' | 'android'>('iphone');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentScreen, setCurrentScreen] = useState('home');
   const [rotation, setRotation] = useState(0);
   const [data, setData] = useState<PreviewData>({
@@ -258,16 +355,11 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 
   if (!isOpen) return null;
 
-  const screens = [
-    { id: 'home', name: 'الرئيسية', icon: '🏠' },
-    { id: 'azkar', name: 'الأذكار', icon: '📿' },
-    { id: 'content', name: 'المحتوى', icon: '📄' },
-    { id: 'prayer', name: 'الصلاة', icon: '🕌' },
-    { id: 'settings', name: 'الإعدادات', icon: '⚙️' },
-  ];
-
-  const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50';
-  const textColor = theme === 'dark' ? 'text-white' : 'text-gray-800';
+  // Theme colors matching actual app
+  const bgColor = theme === 'dark' ? '#0f1724' : '#f9fafb';
+  const headerBg = theme === 'dark' ? 'rgba(15,23,36,0.85)' : 'rgba(255,255,255,0.85)';
+  const tabBarBg = theme === 'dark' ? 'rgba(16,22,33,0.95)' : 'rgba(255,255,255,0.95)';
+  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -279,7 +371,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <h2 className="text-lg font-bold text-white">معاينة التطبيق</h2>
             <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">بيانات حقيقية</span>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
+          <button onClick={onClose} title="إغلاق" className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -335,9 +427,10 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <select
               value={currentScreen}
               onChange={(e) => setCurrentScreen(e.target.value)}
+              title="اختر الشاشة"
               className="bg-slate-700 text-white px-3 py-1.5 rounded-lg text-sm border-none"
             >
-              {screens.map(s => (
+              {PREVIEW_SCREENS.map(s => (
                 <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
               ))}
             </select>
@@ -374,37 +467,42 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <div 
               className={`w-full h-full overflow-hidden ${
                 device === 'iphone' ? 'rounded-[40px]' : 'rounded-[24px]'
-              } ${bgColor}`}
+              }`}
+              style={{ background: bgColor }}
             >
+              {/* Notch */}
               {device === 'iphone' && (
                 <div className="absolute top-5 left-1/2 -translate-x-1/2 w-[120px] h-[35px] bg-black rounded-[20px] z-20" />
               )}
 
               {/* Status Bar */}
-              <div className={`flex items-center justify-between px-8 pt-4 pb-2 ${textColor}`}>
+              <div className="flex items-center justify-between px-8 pt-4 pb-2" style={{ color: textColor }}>
                 <span className="text-xs font-semibold">9:41</span>
                 <div className="flex items-center gap-1">
-                  <div className="w-6 h-3 border-2 border-current rounded-sm">
-                    <div className="w-4 h-full bg-current rounded-sm" />
+                  <div className="w-6 h-3 border-2 rounded-sm" style={{ borderColor: textColor }}>
+                    <div className="w-4 h-full rounded-sm" style={{ background: textColor }} />
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col h-full" dir="rtl">
-                {/* App Header */}
-                <div className="bg-emerald-600 px-4 py-4 flex items-center justify-between">
-                  <h1 className="text-white text-lg font-bold">روح المسلم</h1>
-                  <div className="text-white/80 text-xs">
+              <div className="flex flex-col h-[calc(100%-40px)]" dir="rtl">
+                {/* App Header — Glass style */}
+                <div
+                  className="px-4 py-3 flex items-center justify-between backdrop-blur-md"
+                  style={{ background: headerBg }}
+                >
+                  <div className="text-[10px] opacity-70" style={{ color: '#22C55E' }}>
                     {data.loading ? '...' : 'بيانات حقيقية ✓'}
                   </div>
+                  <h1 className="text-sm font-bold" style={{ color: textColor }}>روح المسلم</h1>
                 </div>
 
                 {/* Screen Content */}
-                <div className={`flex-1 p-4 overflow-auto ${bgColor}`} style={{ maxHeight: '400px' }}>
+                <div className="flex-1 p-3 overflow-auto" style={{ maxHeight: '420px' }}>
                   {data.loading ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                       <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                      <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <p className="text-sm" style={{ color: theme === 'dark' ? '#9ca3af' : '#6b7280' }}>
                         جاري تحميل البيانات من Firebase...
                       </p>
                     </div>
@@ -418,36 +516,49 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                   ) : (
                     <>
                       {currentScreen === 'home' && <HomeScreen data={data} theme={theme} />}
-                      {currentScreen === 'azkar' && <AzkarScreen data={data} theme={theme} />}
-                      {currentScreen === 'content' && <ContentScreen data={data} theme={theme} />}
+                      {currentScreen === 'quran' && <QuranScreen theme={theme} />}
+                      {currentScreen === 'tasbih' && <TasbihScreen theme={theme} />}
                       {currentScreen === 'prayer' && <PrayerScreen theme={theme} />}
                       {currentScreen === 'settings' && <SettingsScreen theme={theme} />}
                     </>
                   )}
                 </div>
 
-                {/* Tab Bar */}
-                <div className={`${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t px-2 py-2 flex items-center justify-around`}>
-                  {screens.map((screen) => (
+                {/* Tab Bar — matching actual app */}
+                <div
+                  className="border-t px-2 py-2 flex items-center justify-around backdrop-blur-md"
+                  style={{
+                    background: tabBarBg,
+                    borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                  }}
+                >
+                  {/* RTL order: Settings(left) → Prayer → Tasbih → Quran → Home(right) */}
+                  {[...PREVIEW_SCREENS].reverse().map((screen) => (
                     <button
                       key={screen.id}
                       onClick={() => setCurrentScreen(screen.id)}
-                      className={`flex flex-col items-center p-2 rounded-xl transition-colors ${
-                        currentScreen === screen.id 
-                          ? 'text-emerald-500' 
-                          : theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                      }`}
+                      className="flex flex-col items-center p-1.5 rounded-xl transition-colors"
                     >
-                      <span className="text-xl">{screen.icon}</span>
-                      <span className="text-[10px] mt-1">{screen.name}</span>
+                      <span className="text-lg">{screen.icon}</span>
+                      <span
+                        className="text-[9px] mt-0.5 font-medium"
+                        style={{
+                          color: currentScreen === screen.id ? '#22C55E' : (theme === 'dark' ? '#6B7280' : '#9CA3AF'),
+                        }}
+                      >
+                        {screen.name}
+                      </span>
                     </button>
                   ))}
                 </div>
 
                 {/* Home Indicator */}
                 {device === 'iphone' && (
-                  <div className="flex justify-center pb-2">
-                    <div className={`w-32 h-1 ${theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'} rounded-full`} />
+                  <div className="flex justify-center pb-2" style={{ background: tabBarBg }}>
+                    <div
+                      className="w-32 h-1 rounded-full"
+                      style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }}
+                    />
                   </div>
                 )}
               </div>
@@ -455,6 +566,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
           </div>
         </div>
 
+        {/* Footer */}
         <div className="p-4 border-t border-slate-700 flex items-center justify-between text-sm">
           <div className="text-slate-400">
             {device === 'iphone' ? 'iPhone 14 Pro' : 'Samsung Galaxy S23'} • {theme === 'light' ? 'الوضع الفاتح' : 'الوضع الداكن'}
