@@ -49,6 +49,7 @@ import {
   UserStats
 } from '../services/pushNotifications';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 
 // ========================================
 // الأنواع
@@ -1014,13 +1015,31 @@ const NotificationsPage: React.FC = () => {
 
               {/* زر نسخ العربي لكل اللغات */}
               <div className="flex items-center justify-between">
-                <button
-                  onClick={copyFromArabic}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 transition-colors"
-                >
-                  <Copy size={16} />
-                  نسخ العربي لكل اللغات
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={copyFromArabic}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-slate-300 transition-colors"
+                  >
+                    <Copy size={16} />
+                    نسخ العربي لكل اللغات
+                  </button>
+                  <TranslateButton
+                    sourceText={translations.ar?.title || ''}
+                    sourceLang="ar"
+                    contentType="notification"
+                    compact
+                    onTranslated={(t) => {
+                      const updated = { ...translations };
+                      Object.entries(t).forEach(([code, text]) => {
+                        const lang = code as SupportedLanguage;
+                        if (lang !== 'ar') {
+                          updated[lang] = { ...updated[lang], title: text, body: updated[lang]?.body || '' };
+                        }
+                      });
+                      setTranslations(updated);
+                    }}
+                  />
+                </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Globe size={16} className="text-purple-400" />
                   <span className="text-slate-400">
@@ -1135,8 +1154,14 @@ const NotificationsPage: React.FC = () => {
               <div>
                 <label className="block text-sm text-slate-400 mb-2">فتح صفحة عند النقر (اختياري)</label>
                 <select
-                  value={actionUrl}
-                  onChange={e => setActionUrl(e.target.value)}
+                  value={actionUrl.startsWith('/') && !APP_SCREENS.some(s => s.value === actionUrl) && !tempPages.some(tp => `/temp-page/${tp.id}` === actionUrl) ? '__custom__' : actionUrl}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setActionUrl('/');
+                    } else {
+                      setActionUrl(e.target.value);
+                    }
+                  }}
                   title="فتح صفحة عند النقر"
                   aria-label="فتح صفحة عند النقر"
                   className="w-full bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
@@ -1152,7 +1177,24 @@ const NotificationsPage: React.FC = () => {
                       ))}
                     </optgroup>
                   )}
+                  <option value="__custom__">✏️ رابط مخصص...</option>
                 </select>
+                {(actionUrl.startsWith('/') && !APP_SCREENS.some(s => s.value === actionUrl) && !tempPages.some(tp => `/temp-page/${tp.id}` === actionUrl)) && (
+                  <input
+                    type="text"
+                    value={actionUrl}
+                    onChange={e => {
+                      let val = e.target.value;
+                      if (val && !val.startsWith('/')) val = '/' + val;
+                      setActionUrl(val);
+                    }}
+                    placeholder="/surah/2?ayah=255"
+                    dir="ltr"
+                    className="w-full mt-2 bg-slate-700 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white font-mono text-sm"
+                    title="أدخل رابط الصفحة"
+                    aria-label="أدخل رابط الصفحة"
+                  />
+                )}
               </div>
 
               {/* الجدولة والصورة */}

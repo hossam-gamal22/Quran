@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, RefreshCw, Play, Square, Search, FileJson, X, Upload, Edit2, Save, Plus, Trash2, Music, Volume2, VolumeX, Copy } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 import { db, storage } from '../firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -1008,6 +1009,16 @@ const AzkarManager: React.FC = () => {
                 <label className="text-slate-300 text-sm block mb-1">الفائدة</label>
                 <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} dir="rtl" value={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')} onChange={e => setEditingZikr({ ...editingZikr, benefit: e.target.value })} aria-label="الفائدة" placeholder="فائدة الذكر" />
               </div>
+
+              {/* Translate benefit to all languages */}
+              <TranslateButton
+                sourceText={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')}
+                sourceLang="ar"
+                contentType="adhkar"
+                compact
+                label="🌐 ترجمة الفائدة"
+                onTranslated={(translations) => setEditingZikr({ ...editingZikr, benefit: translations })}
+              />
               {/* Audio Section */}
               <div>
                 <label className="text-slate-300 text-sm block mb-2">الصوت</label>

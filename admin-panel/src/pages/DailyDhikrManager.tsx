@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { Pencil, Trash2, Plus, Power, Search } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 
 interface DailyDhikrItem {
   id: string;
@@ -252,6 +253,14 @@ export default function DailyDhikrManager() {
               arabicText={formArabic}
               initialValues={formTranslations}
               onSave={(translations) => setFormTranslations(prev => ({ ...prev, ...translations }))}
+            />
+            <TranslateButton
+              sourceText={formArabic}
+              sourceLang="ar"
+              contentType="adhkar"
+              compact
+              label="🌐 ترجمة سريعة لكل اللغات"
+              onTranslated={(translations) => setFormTranslations(prev => ({ ...prev, ...translations }))}
             />
 
             <div className="flex items-center gap-3">

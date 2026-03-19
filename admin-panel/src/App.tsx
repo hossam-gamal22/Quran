@@ -1,6 +1,6 @@
 // admin-panel/src/App.tsx
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -36,7 +36,8 @@ import {
   UserPlus,
   Heart,
   Languages,
-  Radio
+  Radio,
+  ChevronDown,
 } from 'lucide-react';
 
 // استيراد الصفحات
@@ -80,52 +81,234 @@ import ContentManager from './pages/ContentManager';
 import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
 import RouteGuide from './pages/RouteGuide';
+import BrandingManager from './pages/BrandingManager';
 import MobilePreview from './components/MobilePreview';
 
+// ==================== Sidebar Groups ====================
+interface NavItem { path: string; icon: React.FC<{ className?: string }>; label: string }
+interface NavGroup { id: string; label: string; icon: React.FC<{ className?: string }>; items: NavItem[] }
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    id: 'home',
+    label: 'الصفحة الرئيسية',
+    icon: LayoutDashboard,
+    items: [
+      { path: '/home-page', icon: LayoutDashboard, label: 'إدارة الرئيسية' },
+      { path: '/welcome-banner', icon: Megaphone, label: 'الرسالة الترحيبية' },
+      { path: '/highlights', icon: Sparkles, label: 'الهايلايتس' },
+    ],
+  },
+  {
+    id: 'content',
+    label: 'المحتوى',
+    icon: FileText,
+    items: [
+      { path: '/content', icon: FileText, label: 'المحتوى العام' },
+      { path: '/daily-content', icon: CalendarHeart, label: 'المحتوى اليومي' },
+      { path: '/content-manager', icon: BookOpen, label: 'المحتوى الديني' },
+      { path: '/quotes', icon: Quote, label: 'الحكم والأقوال' },
+      { path: '/temp-pages', icon: Timer, label: 'صفحات مؤقتة' },
+    ],
+  },
+  {
+    id: 'adhkar',
+    label: 'الأذكار والأدعية',
+    icon: Heart,
+    items: [
+      { path: '/azkar', icon: BookOpen, label: 'إدارة الأذكار' },
+      { path: '/daily-dhikr', icon: BookOpen, label: 'الأذكار اليومية' },
+      { path: '/duas', icon: Heart, label: 'الأدعية المختارة' },
+      { path: '/tasbih-presets', icon: Repeat, label: 'التسبيحات' },
+    ],
+  },
+  {
+    id: 'appearance',
+    label: 'المظهر والتصميم',
+    icon: Palette,
+    items: [
+      { path: '/themes', icon: Palette, label: 'الثيمات' },
+      { path: '/quran-themes', icon: Fingerprint, label: 'ثيمات القرآن' },
+      { path: '/backgrounds', icon: ImageIcon, label: 'الخلفيات' },
+      { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
+      { path: '/widget-designs', icon: Smartphone, label: 'تصميمات الودجات' },
+    ],
+  },
+  {
+    id: 'calendar',
+    label: 'التقويم والمواسم',
+    icon: Calendar,
+    items: [
+      { path: '/islamic-events', icon: CalendarDays, label: 'المناسبات الإسلامية' },
+      { path: '/hijri-overrides', icon: Globe, label: 'تعديلات الهجري' },
+      { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
+    ],
+  },
+  {
+    id: 'media',
+    label: 'الوسائط',
+    icon: Volume2,
+    items: [
+      { path: '/sounds', icon: Volume2, label: 'الأصوات' },
+      { path: '/radio', icon: Radio, label: 'الراديو' },
+    ],
+  },
+  {
+    id: 'notifications',
+    label: 'الإشعارات',
+    icon: Bell,
+    items: [
+      { path: '/notifications', icon: Bell, label: 'إدارة الإشعارات' },
+    ],
+  },
+  {
+    id: 'users',
+    label: 'المستخدمين والتحليلات',
+    icon: Users,
+    items: [
+      { path: '/users', icon: Users, label: 'المستخدمين' },
+      { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
+      { path: '/rewards', icon: Trophy, label: 'المكافآت' },
+      { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
+    ],
+  },
+  {
+    id: 'monetization',
+    label: 'الإعلانات والأسعار',
+    icon: DollarSign,
+    items: [
+      { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
+      { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
+    ],
+  },
+  {
+    id: 'localization',
+    label: 'الترجمة والتوطين',
+    icon: Languages,
+    items: [
+      { path: '/app-content', icon: Globe, label: 'محتوى التطبيق' },
+      { path: '/translations', icon: Languages, label: 'إدارة الترجمات' },
+    ],
+  },
+  {
+    id: 'app-settings',
+    label: 'إعدادات التطبيق',
+    icon: Settings,
+    items: [
+      { path: '/branding', icon: Fingerprint, label: 'هوية التطبيق' },
+      { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
+      { path: '/splash-screens', icon: Sparkles, label: 'شاشات البداية' },
+      { path: '/onboarding', icon: UserPlus, label: 'شاشات التأهيل' },
+      { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
+      { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
+    ],
+  },
+  {
+    id: 'developer',
+    label: 'أدوات المطور',
+    icon: LayoutGrid,
+    items: [
+      { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
+      { path: '/pdf-templates', icon: FileText, label: 'قوالب PDF' },
+      { path: '/route-guide', icon: Map, label: 'دليل المسارات' },
+    ],
+  },
+];
+
 // ==================== Sidebar ====================
+const SidebarGroupItem: React.FC<{
+  group: NavGroup;
+  isOpen: boolean;
+  onToggle: () => void;
+  onNavClick: () => void;
+}> = ({ group, isOpen, onToggle, onNavClick }) => {
+  const location = useLocation();
+  const isActive = group.items.some(item => item.path === location.pathname);
+
+  // Single-item groups render as direct link
+  if (group.items.length === 1) {
+    const item = group.items[0];
+    return (
+      <NavLink
+        to={item.path}
+        onClick={onNavClick}
+        className={({ isActive: active }) =>
+          `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm ${
+            active
+              ? 'bg-emerald-500 text-white'
+              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          }`
+        }
+      >
+        <group.icon className="w-4 h-4" />
+        <span>{group.label}</span>
+      </NavLink>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm ${
+          isActive && !isOpen
+            ? 'bg-emerald-500/20 text-emerald-400'
+            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <group.icon className="w-4 h-4" />
+          <span>{group.label}</span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="mr-4 mt-0.5 space-y-0.5 border-r border-slate-700/50 pr-2">
+          {group.items.map(item => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              onClick={onNavClick}
+              className={({ isActive: active }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs ${
+                  active
+                    ? 'bg-emerald-500 text-white'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="w-3.5 h-3.5" />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
-  const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'لوحة التحكم' },
-    { path: '/welcome-banner', icon: Megaphone, label: 'الرسالة الترحيبية' },
-    { path: '/highlights', icon: Sparkles, label: 'الهايلايتس' },
-    { path: '/splash-screens', icon: Sparkles, label: 'شاشات البداية' },
-    { path: '/content', icon: FileText, label: 'المحتوى' },
-    { path: '/daily-content', icon: CalendarHeart, label: 'المحتوى اليومي' },
-    { path: '/daily-dhikr', icon: BookOpen, label: 'الأذكار اليومية' },
-    { path: '/quotes', icon: Quote, label: 'إدارة الحكم' },
-    { path: '/azkar', icon: BookOpen, label: 'إدارة الأذكار' },
-    { path: '/duas', icon: Heart, label: 'الأدعية المختارة' },
-    { path: '/notifications', icon: Bell, label: 'الإشعارات' },
-    { path: '/themes', icon: Palette, label: 'الثيمات' },
-    { path: '/quran-themes', icon: Fingerprint, label: 'ثيمات القرآن' },
-    { path: '/tasbih-presets', icon: Repeat, label: 'التسبيحات' },
-    { path: '/islamic-events', icon: CalendarDays, label: 'المناسبات' },
-    { path: '/hijri-overrides', icon: Globe, label: 'تعديلات الهجري' },
-    { path: '/seasonal', icon: Calendar, label: 'المحتوى الموسمي' },
-    { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
-    { path: '/users', icon: Users, label: 'المستخدمين' },
-    { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
-    { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
-    { path: '/rewards', icon: Trophy, label: 'المكافآت' },
-    { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
-    { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
-    { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
-    { path: '/app-content', icon: Globe, label: 'محتوى التطبيق' },
-    { path: '/translations', icon: Languages, label: 'إدارة الترجمات' },
-    { path: '/content-manager', icon: BookOpen, label: 'إدارة المحتوى الديني' },
-    { path: '/home-page', icon: LayoutDashboard, label: 'إدارة الرئيسية' },
-    { path: '/sounds', icon: Volume2, label: 'إدارة الأصوات' },
-    { path: '/radio', icon: Radio, label: 'إدارة الراديو' },
-    { path: '/backgrounds', icon: ImageIcon, label: 'إدارة الخلفيات' },
-    { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
-    { path: '/widget-designs', icon: Smartphone, label: 'تصميمات الودجات' },
-    { path: '/pdf-templates', icon: FileText, label: 'قوالب PDF' },
-    { path: '/temp-pages', icon: Timer, label: 'صفحات مؤقتة' },
-    { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
-    { path: '/onboarding', icon: UserPlus, label: 'شاشات التأهيل' },
-    { path: '/route-guide', icon: Map, label: 'دليل المسارات' },
-    { path: '/settings', icon: Settings, label: 'الإعدادات' },
-  ];
+  const location = useLocation();
+  // Auto-open the group that contains the current route
+  const getActiveGroupId = () => {
+    for (const g of NAV_GROUPS) {
+      if (g.items.some(i => i.path === location.pathname)) return g.id;
+    }
+    return '';
+  };
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const active = getActiveGroupId();
+    return active ? new Set([active]) : new Set<string>();
+  });
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -139,7 +322,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
         }`}
         dir="rtl"
       >
-        <div className="p-6 border-b border-slate-700">
+        <div className="p-5 border-b border-slate-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
@@ -156,23 +339,34 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
           </div>
         </div>
 
-        <nav className="p-4 space-y-1 max-h-[calc(100vh-180px)] overflow-y-auto">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  isActive
-                    ? 'bg-emerald-500 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`
-              }
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </NavLink>
+        <nav className="p-3 space-y-0.5 max-h-[calc(100vh-160px)] overflow-y-auto">
+          {/* Dashboard — always at top */}
+          <NavLink
+            to="/"
+            end
+            onClick={onClose}
+            className={({ isActive: active }) =>
+              `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm ${
+                active
+                  ? 'bg-emerald-500 text-white'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`
+            }
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>لوحة التحكم</span>
+          </NavLink>
+
+          <div className="border-t border-slate-800 my-2" />
+
+          {NAV_GROUPS.map(group => (
+            <SidebarGroupItem
+              key={group.id}
+              group={group}
+              isOpen={openGroups.has(group.id)}
+              onToggle={() => toggleGroup(group.id)}
+              onNavClick={onClose}
+            />
           ))}
         </nav>
 
@@ -262,6 +456,7 @@ const App: React.FC = () => {
               <Route path="/temp-pages" element={<TempPagesManager />} />
               <Route path="/sdui" element={<SDUIManager />} />
               <Route path="/onboarding" element={<OnboardingManager />} />
+              <Route path="/branding" element={<BrandingManager />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />

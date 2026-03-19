@@ -54,6 +54,7 @@ import {
 } from '@/lib/azkar-api';
 import { fetchSelectedDuas, getDailySelectedDuas, duaToZikr } from '@/lib/duas-api';
 import { markAzkarCompleted, getTodayDate, DailyAzkarRecord } from '@/lib/worship-storage';
+import { trackAzkarRead } from '@/lib/firebase-analytics';
 import { t } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio, type AudioTrack } from '@/contexts/GlobalAudioContext';
@@ -500,6 +501,11 @@ export default function CategoryAzkarScreen() {
 
     // إذا اكتمل العداد
     if (newCount >= zikr.count) {
+      // تسجيل إحصائيات القراءة في Firebase
+      if (category) {
+        trackAzkarRead(zikr.id, category, settings.language).catch(() => {});
+      }
+
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {

@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   ToggleLeft,
   ToggleRight,
+  Zap,
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -55,6 +56,17 @@ interface DailyContentConfig {
   verseCustomText: string;
 }
 
+interface QuickAccessItem {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  icon: string;
+  color: string;
+  enabled: boolean;
+  order: number;
+  route?: string;
+}
+
 interface ThemeConfig {
   primary: string;
   accent: string;
@@ -75,6 +87,9 @@ interface HomePageConfig {
   sections: {
     items: HomeSection[];
   };
+  quickAccess: {
+    items: QuickAccessItem[];
+  };
   dailyContent: DailyContentConfig;
   theme: ThemeConfig;
   updatedAt?: string;
@@ -84,25 +99,59 @@ interface HomePageConfig {
 
 const FIRESTORE_DOC = 'appConfig/homePageConfig';
 
+// يجب أن تتطابق مع builtInHighlights في DailyHighlights.tsx
 const DEFAULT_HIGHLIGHTS: HomeHighlightItem[] = [
-  { id: 'hijri', name: 'التاريخ الهجري', icon: '📅', enabled: true, order: 0, builtIn: true },
-  { id: 'morning_azkar', name: 'أذكار الصباح', icon: '🌅', enabled: true, order: 1, builtIn: true },
-  { id: 'evening_azkar', name: 'أذكار المساء', icon: '🌆', enabled: true, order: 2, builtIn: true },
-  { id: 'daily_ayah', name: 'آية اليوم', icon: '📖', enabled: true, order: 3, builtIn: true },
-  { id: 'story_of_day', name: 'فيديو اليوم', icon: '▶️', enabled: true, order: 4, builtIn: true },
-  { id: 'prayer_times', name: 'مواقيت الصلاة', icon: '🕌', enabled: true, order: 5, builtIn: true },
-  { id: 'tasbih', name: 'التسبيح', icon: '📿', enabled: true, order: 6, builtIn: true },
-  { id: 'qibla', name: 'القبلة', icon: '🧭', enabled: true, order: 7, builtIn: true },
+  { id: 'hijri-date', name: 'التاريخ الهجري', icon: '📅', enabled: true, order: 0, builtIn: true },
+  { id: 'radio', name: 'إذاعة القرآن', icon: '📻', enabled: true, order: 1, builtIn: true },
+  { id: 'azkar-adhkar', name: 'ذكر اليوم', icon: '🤲', enabled: true, order: 2, builtIn: true },
+  { id: 'daily-dua', name: 'دعاء اليوم', icon: '📖', enabled: true, order: 3, builtIn: true },
+  { id: 'daily-ayah', name: 'آية اليوم', icon: '📗', enabled: true, order: 4, builtIn: true },
+  { id: 'daily-story', name: 'فيديو اليوم', icon: '▶️', enabled: true, order: 5, builtIn: true },
+  { id: 'next-prayer', name: 'الصلاة القادمة', icon: '🕌', enabled: true, order: 6, builtIn: true },
 ];
 
+// يجب أن تتطابق مع MODAL_CATEGORIES في index.tsx + الأقسام الثابتة
 const DEFAULT_SECTIONS: HomeSection[] = [
-  { id: 'welcome_banner', name: 'الرسالة الترحيبية', titleAr: 'رمضان مبارك', titleEn: 'Ramadan Mubarak', enabled: true, order: 0 },
+  { id: 'welcome_banner', name: 'الرسالة الترحيبية', titleAr: '', titleEn: '', enabled: true, order: 0 },
   { id: 'highlights', name: 'الهايلايتس', titleAr: '', titleEn: '', enabled: true, order: 1 },
   { id: 'quick_access', name: 'الوصول السريع', titleAr: 'الوصول السريع', titleEn: 'Quick Access', enabled: true, order: 2 },
-  { id: 'azkar', name: 'الأذكار', titleAr: 'الأذكار', titleEn: 'Azkar', enabled: true, order: 3 },
-  { id: 'duas', name: 'الأدعية والرقية', titleAr: 'الأدعية والرقية', titleEn: 'Duas & Ruqyah', enabled: true, order: 4 },
-  { id: 'worship', name: 'العبادات', titleAr: 'العبادات', titleEn: 'Worship', enabled: true, order: 5 },
-  { id: 'ads', name: 'الإعلانات', titleAr: '', titleEn: '', enabled: true, order: 6 },
+  { id: 'cat_azkar', name: '📿 الأذكار', titleAr: 'الأذكار', titleEn: 'Azkar', enabled: true, order: 3 },
+  { id: 'cat_stories', name: '📖 القصص', titleAr: 'القصص', titleEn: 'Stories', enabled: true, order: 4 },
+  { id: 'cat_hajj', name: '🕋 الحج والعمرة', titleAr: 'مناسك الحج والعمرة', titleEn: 'Hajj & Umrah', enabled: true, order: 5 },
+  { id: 'cat_quran', name: '📗 سور وآيات قرآنية', titleAr: 'سور وآيات قرآنية', titleEn: 'Quran Surahs & Verses', enabled: true, order: 6 },
+  { id: 'cat_duas', name: '🤲 أدعية وأحاديث', titleAr: 'أدعية وأحاديث', titleEn: 'Duas & Hadith', enabled: true, order: 7 },
+  { id: 'cat_worship', name: '🕌 عبادات', titleAr: 'عبادات', titleEn: 'Worship', enabled: true, order: 8 },
+  { id: 'cat_tasbih', name: '📿 تسبيح واستغفار', titleAr: 'تسبيح واستغفار', titleEn: 'Tasbih & Istighfar', enabled: true, order: 9 },
+  { id: 'cat_marifat', name: '✨ معرفة الله', titleAr: 'معرفة الله', titleEn: 'Know Allah', enabled: true, order: 10 },
+  { id: 'ads', name: '📢 الإعلانات', titleAr: '', titleEn: '', enabled: true, order: 11 },
+];
+
+const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
+  { id: 'qibla', nameAr: 'القبلة', nameEn: 'Qibla', icon: 'compass', color: '#5856D6', enabled: true, order: 0, route: '' },
+  { id: 'favorites', nameAr: 'المحفوظات', nameEn: 'Favorites', icon: 'heart', color: '#FF6B6B', enabled: true, order: 1, route: '' },
+  { id: 'ayat_kursi', nameAr: 'آية الكرسي', nameEn: 'Ayat Al-Kursi', icon: 'shield-star', color: '#DAA520', enabled: true, order: 2, route: '' },
+  { id: 'surah_kahf', nameAr: 'سورة الكهف', nameEn: 'Al-Kahf', icon: 'book-open-page-variant', color: '#3a7ca5', enabled: true, order: 3, route: '' },
+  { id: 'surah_yasin', nameAr: 'سورة يس', nameEn: 'Yasin', icon: 'book-open-page-variant', color: '#5d4e8c', enabled: true, order: 4, route: '' },
+  { id: 'surah_mulk', nameAr: 'سورة الملك', nameEn: 'Al-Mulk', icon: 'book-open-page-variant', color: '#0D9488', enabled: true, order: 5, route: '' },
+  { id: 'names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#c17f59', enabled: true, order: 6, route: '' },
+  { id: 'tasbih', nameAr: 'التسبيح', nameEn: 'Tasbih', icon: 'counter', color: '#2f7659', enabled: true, order: 7, route: '' },
+  { id: 'salawat', nameAr: 'الصلاة على النبي', nameEn: 'Salawat', icon: 'star-crescent', color: '#e91e63', enabled: true, order: 8, route: '' },
+  { id: 'istighfar', nameAr: 'الاستغفار', nameEn: 'Istighfar', icon: 'heart', color: '#8B5CF6', enabled: true, order: 9, route: '' },
+  { id: 'hajj', nameAr: 'الحج والعمرة', nameEn: 'Hajj & Umrah', icon: 'star-crescent', color: '#0D9488', enabled: true, order: 10, route: '' },
+  { id: 'seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#6366F1', enabled: true, order: 11, route: '' },
+  { id: 'benefit_azkar', nameAr: 'فضل الأذكار', nameEn: 'Azkar Benefits', icon: 'information', color: '#f5a623', enabled: true, order: 12, route: '' },
+  { id: 'radio', nameAr: 'إذاعة القرآن', nameEn: 'Quran Radio', icon: 'radio', color: '#22C55E', enabled: true, order: 13, route: '' },
+  // صفحات إضافية يمكن إضافتها للوصول السريع
+  { id: 'page_browse_tafsir', nameAr: 'استعراض التفسير', nameEn: 'Browse Tafsir', icon: 'book-search', color: '#3a7ca5', enabled: false, order: 14, route: '/browse-tafsir' },
+  { id: 'page_hijri', nameAr: 'التقويم الهجري', nameEn: 'Hijri Calendar', icon: 'calendar-month', color: '#0D9488', enabled: false, order: 15, route: '/hijri' },
+  { id: 'page_widget_settings', nameAr: 'إعدادات الودجات', nameEn: 'Widget Settings', icon: 'widgets', color: '#6366F1', enabled: false, order: 16, route: '/widget-settings' },
+  { id: 'page_daily_dua', nameAr: 'دعاء اليوم', nameEn: 'Daily Dua', icon: 'hands-pray', color: '#c17f59', enabled: false, order: 17, route: '/daily-dua' },
+  { id: 'page_ruqya', nameAr: 'الرقية الشرعية', nameEn: 'Ruqya', icon: 'shield-check', color: '#e91e63', enabled: false, order: 18, route: '/ruqya' },
+  { id: 'page_companions', nameAr: 'قصص الصحابة', nameEn: 'Companions', icon: 'account-group', color: '#2f7659', enabled: false, order: 19, route: '/companions' },
+  { id: 'page_quran_bookmarks', nameAr: 'إشارات المصحف', nameEn: 'Quran Bookmarks', icon: 'bookmark', color: '#4CAF50', enabled: false, order: 20, route: '/quran-bookmarks' },
+  { id: 'page_worship_tracker', nameAr: 'تتبع العبادات', nameEn: 'Worship Tracker', icon: 'chart-line', color: '#2f7659', enabled: false, order: 21, route: '/worship-tracker' },
+  { id: 'page_seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#2f7659', enabled: false, order: 22, route: '/seerah' },
+  { id: 'page_names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#DAA520', enabled: false, order: 23, route: '/names' },
 ];
 
 const DEFAULT_DAILY_CONTENT: DailyContentConfig = {
@@ -130,6 +179,7 @@ const DEFAULT_THEME: ThemeConfig = {
 const DEFAULT_CONFIG: HomePageConfig = {
   highlights: { items: DEFAULT_HIGHLIGHTS },
   sections: { items: DEFAULT_SECTIONS },
+  quickAccess: { items: DEFAULT_QUICK_ACCESS },
   dailyContent: DEFAULT_DAILY_CONTENT,
   theme: DEFAULT_THEME,
 };
@@ -151,7 +201,7 @@ const COLOR_PRESETS = [
 
 // ==================== Component ====================
 
-type ActiveTab = 'sections' | 'highlights' | 'daily' | 'theme';
+type ActiveTab = 'sections' | 'highlights' | 'quick_access' | 'daily' | 'theme';
 
 export default function HomePageManager() {
   const [config, setConfig] = useState<HomePageConfig>(DEFAULT_CONFIG);
@@ -178,6 +228,11 @@ export default function HomePageManager() {
               items: data.sections?.items?.length
                 ? data.sections.items.map((s, i) => ({ ...DEFAULT_SECTIONS.find(d => d.id === s.id) || {}, ...s, order: s.order ?? i }))
                 : DEFAULT_SECTIONS,
+            },
+            quickAccess: {
+              items: data.quickAccess?.items?.length
+                ? data.quickAccess.items.map((q, i) => ({ ...DEFAULT_QUICK_ACCESS.find(d => d.id === q.id) || {}, ...q, order: q.order ?? i }))
+                : DEFAULT_QUICK_ACCESS,
             },
             dailyContent: { ...DEFAULT_DAILY_CONTENT, ...data.dailyContent },
             theme: { ...DEFAULT_THEME, ...data.theme },
@@ -266,6 +321,24 @@ export default function HomePageManager() {
     }));
   };
 
+  // ==================== Quick Access Helpers ====================
+
+  const updateQuickAccess = <K extends keyof QuickAccessItem>(id: string, key: K, value: QuickAccessItem[K]) => {
+    setConfig(prev => ({
+      ...prev,
+      quickAccess: {
+        items: prev.quickAccess.items.map(q => q.id === id ? { ...q, [key]: value } : q),
+      },
+    }));
+  };
+
+  const moveQuickAccess = (id: string, direction: 'up' | 'down') => {
+    setConfig(prev => ({
+      ...prev,
+      quickAccess: { items: moveItem(prev.quickAccess.items, id, direction) },
+    }));
+  };
+
   const updateDailyContent = <K extends keyof DailyContentConfig>(key: K, value: DailyContentConfig[K]) => {
     setConfig(prev => ({
       ...prev,
@@ -293,12 +366,14 @@ export default function HomePageManager() {
   const tabs: { key: ActiveTab; label: string; icon: React.ReactNode }[] = [
     { key: 'sections', label: 'أقسام الصفحة', icon: <Layers className="w-4 h-4" /> },
     { key: 'highlights', label: 'الهايلايتس', icon: <Star className="w-4 h-4" /> },
+    { key: 'quick_access', label: 'الوصول السريع', icon: <Zap className="w-4 h-4" /> },
     { key: 'daily', label: 'المحتوى اليومي', icon: <BookOpen className="w-4 h-4" /> },
     { key: 'theme', label: 'المظهر والألوان', icon: <Palette className="w-4 h-4" /> },
   ];
 
   const sortedHighlights = [...config.highlights.items].sort((a, b) => a.order - b.order);
   const sortedSections = [...config.sections.items].sort((a, b) => a.order - b.order);
+  const sortedQuickAccess = [...config.quickAccess.items].sort((a, b) => a.order - b.order);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -538,6 +613,91 @@ export default function HomePageManager() {
                   {/* Toggle */}
                   <button
                     onClick={() => updateHighlight(item.id, 'enabled', !item.enabled)}
+                    className="flex-shrink-0"
+                    aria-label={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
+                    title={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
+                  >
+                    {item.enabled ? (
+                      <Eye className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <EyeOff className="w-5 h-5 text-slate-500" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Quick Access ==================== */}
+      {activeTab === 'quick_access' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4">
+            <p className="text-slate-400 text-sm">
+              تحكم بترتيب وظهور عناصر الوصول السريع في الصفحة الرئيسية. يمكنك تفعيل أو تعطيل أي عنصر وتغيير ترتيبه.
+            </p>
+          </div>
+
+          {/* List */}
+          <div className="space-y-3">
+            {sortedQuickAccess.map((item, index) => (
+              <div
+                key={item.id}
+                className={`bg-slate-800 rounded-2xl border transition-all ${
+                  item.enabled ? 'border-slate-700' : 'border-slate-800 opacity-60'
+                }`}
+              >
+                <div className="flex items-center gap-4 p-4">
+                  {/* Reorder */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => moveQuickAccess(item.id, 'up')}
+                      disabled={index === 0}
+                      className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأعلى"
+                      title="تحريك لأعلى"
+                    >
+                      <ArrowUp className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => moveQuickAccess(item.id, 'down')}
+                      disabled={index === sortedQuickAccess.length - 1}
+                      className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
+                      aria-label="تحريك لأسفل"
+                      title="تحريك لأسفل"
+                    >
+                      <ArrowDown className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Color dot */}
+                  <Styled
+                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    css={{ backgroundColor: item.color }}
+                  >
+                    {index + 1}
+                  </Styled>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium">{item.nameAr}</p>
+                    <p className="text-xs text-slate-500">{item.nameEn} · {item.icon}</p>
+                  </div>
+
+                  {/* Color picker */}
+                  <input
+                    type="color"
+                    value={item.color}
+                    onChange={(e) => updateQuickAccess(item.id, 'color', e.target.value)}
+                    className="w-8 h-8 rounded-lg border border-slate-600 cursor-pointer flex-shrink-0"
+                    aria-label="لون العنصر"
+                    title="لون العنصر"
+                  />
+
+                  {/* Toggle */}
+                  <button
+                    onClick={() => updateQuickAccess(item.id, 'enabled', !item.enabled)}
                     className="flex-shrink-0"
                     aria-label={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
                     title={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}

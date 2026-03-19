@@ -8,6 +8,7 @@ import {
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 
 type ContentTab = 'ayah' | 'hadith' | 'quote' | 'story';
 
@@ -163,6 +164,14 @@ const DailyContentManager: React.FC = () => {
               initialValues={d.translations as Record<string, string>}
               onSave={(translations) => updateField('translations', translations)}
             />
+            <TranslateButton
+              sourceText={d.arabic || ''}
+              sourceLang="ar"
+              contentType="hadith"
+              compact
+              label="🌐 ترجمة سريعة"
+              onTranslated={(translations) => updateField('translations', { ...(d.translations as Record<string, string>), ...translations })}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الراوي</label>
@@ -197,6 +206,14 @@ const DailyContentManager: React.FC = () => {
               initialValues={d.translations as Record<string, string>}
               onSave={(translations) => updateField('translations', translations)}
             />
+            <TranslateButton
+              sourceText={d.arabic || ''}
+              sourceLang="ar"
+              contentType="ui"
+              compact
+              label="🌐 ترجمة سريعة"
+              onTranslated={(translations) => updateField('translations', { ...(d.translations as Record<string, string>), ...translations })}
+            />
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">المؤلف / القائل</label>
@@ -214,18 +231,37 @@ const DailyContentManager: React.FC = () => {
         const d = data as StoryOverride;
         return (
           <div className="space-y-4">
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <label className="text-emerald-400 text-sm font-medium block mb-2">🎬 رابط الفيديو الرئيسي</label>
+              <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-3 border border-slate-700 font-mono text-sm" dir="ltr"
+                value={(d.videoUrls || [])[0] || ''}
+                onChange={e => {
+                  const rest = (d.videoUrls || []).slice(1);
+                  const val = e.target.value.trim();
+                  updateField('videoUrls', val ? [val, ...rest] : rest);
+                }}
+                placeholder="https://example.com/video.mp4"
+                aria-label="رابط الفيديو الرئيسي" />
+              <p className="text-slate-500 text-xs mt-1">ألصق رابط الفيديو مباشرة هنا (MP4, YouTube, etc.)</p>
+            </div>
             <div>
-              <label className="text-slate-300 text-sm block mb-1">نص الآية (للستوري)</label>
+              <label className="text-slate-300 text-sm block mb-1">نص الآية (للستوري) — اختياري</label>
               <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} value={d.ayahText || ''} onChange={e => updateField('ayahText', e.target.value)} placeholder="نص الآية بالعربية" dir="rtl" aria-label="نص الآية للستوري" />
             </div>
             <div>
-              <label className="text-slate-300 text-sm block mb-1">اسم السورة</label>
+              <label className="text-slate-300 text-sm block mb-1">اسم السورة — اختياري</label>
               <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.surahName || ''} onChange={e => updateField('surahName', e.target.value)} placeholder="مثال: البقرة" dir="rtl" aria-label="اسم السورة" />
             </div>
-            <div>
-              <label className="text-slate-300 text-sm block mb-1">روابط الفيديو (فاصل: سطر جديد)</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 font-mono text-sm" rows={4} value={(d.videoUrls || []).join('\n')} onChange={e => updateField('videoUrls', e.target.value.split('\n').filter(Boolean))} placeholder="URL per line" aria-label="روابط الفيديو" />
-            </div>
+            <details className="group">
+              <summary className="text-slate-400 text-xs cursor-pointer hover:text-slate-300">روابط فيديو إضافية (متقدم)</summary>
+              <div className="mt-2">
+                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 font-mono text-sm" rows={3} value={(d.videoUrls || []).slice(1).join('\n')} onChange={e => {
+                  const first = (d.videoUrls || [])[0] || '';
+                  const rest = e.target.value.split('\n').filter(Boolean);
+                  updateField('videoUrls', first ? [first, ...rest] : rest);
+                }} placeholder="رابط إضافي في كل سطر" aria-label="روابط فيديو إضافية" />
+              </div>
+            </details>
           </div>
         );
       }

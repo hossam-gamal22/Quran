@@ -39,6 +39,7 @@ import { APP_CONFIG } from '../../constants/app';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
+import { trackTasbih } from '@/lib/firebase-analytics';
 import { fetchTasbihPresets } from '@/lib/admin-data-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -495,6 +496,10 @@ export default function TasbihScreen() {
       setRounds(r => r + 1);
       setTotalCount(newTotal);
       saveProgress(0, newTotal, rounds + 1);
+
+      // تسجيل إحصائيات التسبيح في Firebase
+      trackTasbih(selectedTasbih.target, selectedTasbih.text, rounds + 1).catch(() => {});
+
       const newCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
       setCompletedTasbihat(newCompleted);
       AsyncStorage.setItem(STORAGE_KEYS.completedToday, JSON.stringify({

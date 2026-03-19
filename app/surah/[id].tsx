@@ -108,6 +108,7 @@ import {
 } from '@/lib/quran-bookmarks';
 import tafsirData from '@/data/json/tafsir-muyassar.json';
 import { fetchSurahTranslation, TRANSLATION_EDITIONS, getSurahName } from '@/lib/quran-api';
+import { trackQuranPage } from '@/lib/firebase-analytics';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 // ══════════════════════════════════════════════
@@ -938,6 +939,10 @@ export default function SurahScreen() {
     } else if (!trackedPagesRef.current.has(currentPage)) {
       trackedPagesRef.current.add(currentPage);
       addPagesRead(1).catch(() => {});
+      
+      // تسجيل إحصائيات القراءة في Firebase
+      const sn2 = getFirstSurahOnPage(currentPage);
+      trackQuranPage(sn2, getSurahName(sn2) || '').catch(() => {});
       
       // Check if khatma is complete (604 pages)
       if (trackedPagesRef.current.size >= 604) {

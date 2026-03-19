@@ -9,7 +9,9 @@ import {
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
+import TranslateButton from '../components/TranslateButton';
 
 // ─── Types ──────────────────────────────────────────────────
 interface QuranTheme {
@@ -182,10 +184,12 @@ const QuranThemesManager: React.FC = () => {
       if (theme.iconStoragePath) {
         try { await deleteObject(ref(storage, theme.iconStoragePath)); } catch { /* ok */ }
       }
-      const ext = file.name.split('.').pop() || 'png';
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
       const storagePath = `theme-icons/${theme.id}.${ext}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const iconUrl = await getDownloadURL(storageRef);
       setThemes(prev => prev.map((t, i) =>
         i === selectedIdx ? { ...t, iconUrl, iconStoragePath: storagePath } : t
@@ -391,9 +395,22 @@ const QuranThemesManager: React.FC = () => {
 
               {/* Multilingual Names */}
               <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
-                <label className="text-slate-300 text-sm block mb-3">
+                <label className="text-slate-300 text-sm block mb-2">
                   <Palette size={14} className="inline mr-1" /> أسماء الثيم
                 </label>
+                <div className="mb-3">
+                  <TranslateButton
+                    sourceText={selected.name?.ar || selected.name?.en || ''}
+                    sourceLang={selected.name?.ar ? 'ar' : 'en'}
+                    contentType="ui"
+                    compact
+                    onTranslated={(translations) => {
+                      Object.entries(translations).forEach(([code, text]) => {
+                        updateName(code, text);
+                      });
+                    }}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   {SUPPORTED_LANGUAGES.map(lang => (
                     <div key={lang.code} className="flex items-center gap-2">

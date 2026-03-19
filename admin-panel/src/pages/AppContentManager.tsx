@@ -8,12 +8,14 @@ import {
   Smartphone,
 } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 import { db, storage } from '../firebase';
 import {
   collection, getDocs, doc, setDoc, updateDoc, deleteDoc,
   query, orderBy, writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 
 // ========================================
 // Types
@@ -155,8 +157,11 @@ const AppContentManager: React.FC = () => {
   // Upload icon
   const handleIconUpload = async (file: File, item: AppContentItem) => {
     try {
-      const storageRef = ref(storage, `app-content/icons/${item.key}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
+      const storageRef = ref(storage, `app-content/icons/${item.key}_${Date.now()}.${ext}`);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const url = await getDownloadURL(storageRef);
       const updated = { ...item, iconUrl: url };
       setEditingItem(updated);
@@ -243,6 +248,21 @@ const AppContentManager: React.FC = () => {
                   });
                 }}
               />
+
+              <div className="mt-2">
+                <TranslateButton
+                  sourceText={localItem.translations.ar || ''}
+                  sourceLang="ar"
+                  contentType="ui"
+                  compact
+                  label="🌐 ترجمة سريعة لكل اللغات"
+                  onTranslated={(translations) => {
+                    Object.entries(translations).forEach(([code, text]) => {
+                      if (text) updateTranslation(code as LangCode, text);
+                    });
+                  }}
+                />
+              </div>
 
               <div className="space-y-3 mt-4">
                 {SUPPORTED_LANGUAGES.map(lang => (

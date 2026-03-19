@@ -42,6 +42,7 @@ import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getTranslations, getDateLocale } from '@/lib/i18n';
+import { trackPrayer } from '@/lib/firebase-analytics';
 
 const { width } = Dimensions.get('window');
 
@@ -406,6 +407,11 @@ export default function PrayerTrackerScreen() {
 
   // تغيير حالة الصلاة — يدعم اليوم الحالي والأيام السابقة
   const handleStatusChange = async (prayer: PrayerName, status: PrayerStatus) => {
+    // تسجيل إحصائيات الصلاة في Firebase عند تسجيل صلاة
+    if (status === 'prayed' || status === 'late') {
+      trackPrayer(prayer, status === 'prayed').catch(() => {});
+    }
+
     if (isSelectedToday) {
       // حفظ الحالة مع وقت الصلاة المُجدول
       const scheduledTime = prayerTimes ? prayerTimes[prayer as keyof PrayerTimes] : undefined;

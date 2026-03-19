@@ -4,11 +4,9 @@
     "module": "esnext",
     "strict": true,
     "forceConsistentCasingInFileNames": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./*"
+        "${configDir}/*"
       ]
     }
   },

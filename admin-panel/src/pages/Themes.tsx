@@ -40,6 +40,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
 
 // ========================================
@@ -338,8 +339,11 @@ const ThemesPage: React.FC = () => {
 
   const handleBgImageUpload = async (file: File, bgId: string, field: 'thumbnailUrl' | 'fullUrl') => {
     try {
-      const storageRef = ref(storage, `backgrounds/${bgId}_${field}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
+      const storageRef = ref(storage, `backgrounds/${bgId}_${field}_${Date.now()}.${ext}`);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const url = await getDownloadURL(storageRef);
       updateBackground(bgId, { [field]: url });
     } catch (error) {

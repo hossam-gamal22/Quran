@@ -32,6 +32,7 @@ import {
   uploadBytes,
   getDownloadURL,
 } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 
 // ========================================
 // الأنواع
@@ -110,10 +111,13 @@ const BackgroundManager: React.FC = () => {
     try {
       setUploading(true);
       const timestamp = Date.now();
-      const filename = `background_${timestamp}.${file.name.split('.').pop()}`;
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
+      const filename = `background_${timestamp}.${ext}`;
 
       const storageRef = ref(storage, `backgrounds/${filename}`);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const downloadUrl = await getDownloadURL(storageRef);
 
       const newBg: Omit<BackgroundItem, 'id'> = {

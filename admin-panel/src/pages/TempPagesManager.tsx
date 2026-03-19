@@ -4,9 +4,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus, Edit2, Trash2, Eye, Clock, CheckCircle, X, Calendar, Globe, Copy,
-  ChevronDown, ChevronUp, Link, Layout,
+  ChevronDown, ChevronUp, Link, Layout, Upload, FileCode,
 } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 import { Styled } from '../components/Styled';
 import { db } from '../firebase';
 import {
@@ -369,6 +370,26 @@ const TempPagesManager: React.FC = () => {
                     >
                       نسخ العربي لكل اللغات
                     </button>
+                    <TranslateButton
+                      sourceText={editing.titles?.ar ?? editing.title ?? ''}
+                      sourceLang="ar"
+                      contentType="ui"
+                      compact
+                      onTranslated={(translations) => {
+                        setEditing(prev => {
+                          if (!prev) return prev;
+                          return {
+                            ...prev,
+                            titles: {
+                              ...prev.titles,
+                              ar: prev.titles?.ar ?? prev.title ?? '',
+                              en: translations.en || prev.titles?.en || prev.titleEn || '',
+                              ...translations,
+                            },
+                          };
+                        });
+                      }}
+                    />
                     <div className="grid grid-cols-2 gap-3">
                       {LANGUAGES.filter(l => l.code !== 'ar' && l.code !== 'en').map(lang => (
                         <div key={lang.code}>
@@ -539,7 +560,29 @@ const TempPagesManager: React.FC = () => {
               {/* محتوى HTML — عربي وانجليزي جنباً إلى جنب */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm block">محتوى HTML (عربي) *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-300 text-sm block">محتوى HTML (عربي) *</label>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-xs cursor-pointer hover:bg-emerald-600/30 transition-colors">
+                      <Upload size={14} />
+                      رفع ملف HTML
+                      <input
+                        type="file"
+                        accept=".html,.htm"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            const content = ev.target?.result as string;
+                            if (content) setEditing({ ...editing, htmlContent: content });
+                          };
+                          reader.readAsText(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
                   <textarea
                     title="محتوى HTML عربي"
                     aria-label="محتوى HTML (عربي)"
@@ -561,7 +604,29 @@ const TempPagesManager: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-slate-300 text-sm block">HTML Content (English)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-300 text-sm block">HTML Content (English)</label>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-xs cursor-pointer hover:bg-emerald-600/30 transition-colors">
+                      <Upload size={14} />
+                      Upload HTML
+                      <input
+                        type="file"
+                        accept=".html,.htm"
+                        className="hidden"
+                        onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = ev => {
+                            const content = ev.target?.result as string;
+                            if (content) setEditing({ ...editing, htmlContentEn: content });
+                          };
+                          reader.readAsText(file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  </div>
                   <textarea
                     title="HTML Content English"
                     aria-label="HTML Content (English)"

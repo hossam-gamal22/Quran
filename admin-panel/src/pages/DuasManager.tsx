@@ -9,6 +9,7 @@ import {
 import { db, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 
 interface SelectedDua {
   id: string;
@@ -291,6 +292,17 @@ export default function DuasManager() {
                 initialValues={formTranslations}
                 onSave={(translations) => setFormTranslations(prev => ({ ...prev, ...translations }))}
               />
+
+              <div className="mt-2">
+                <TranslateButton
+                  sourceText={formArabic}
+                  sourceLang="ar"
+                  contentType="adhkar"
+                  compact
+                  label="🌍 ترجمة سريعة لكل اللغات"
+                  onTranslated={(translations) => setFormTranslations(prev => ({ ...prev, ...translations }))}
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-2 mt-4">
                 {LANGUAGES.filter(l => l !== 'ar').map(lang => (

@@ -28,6 +28,7 @@ import {
   Bell,
   Gift,
   Sparkles,
+  FileCode,
 } from 'lucide-react';
 import { Styled } from '../components/Styled';
 
@@ -54,6 +55,10 @@ interface SplashScreen {
   subtitleEn?: string;
   sourceAr?: string;
   sourceEn?: string;
+  
+  // محتوى HTML مخصص
+  htmlContent?: string;
+  htmlContentEn?: string;
   
   // التصميم
   backgroundColor: string;
@@ -548,6 +553,105 @@ const SplashScreensPage: React.FC = () => {
                       placeholder="سُبْحَانَ اللَّهِ وَبِحَمْدِهِ..."
                     />
                   </div>
+
+                  {/* محتوى HTML مخصص */}
+                  {formData.type === 'custom' && (
+                    <div className="space-y-3 p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                      <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                        <FileCode size={16} />
+                        محتوى HTML مخصص (اختياري)
+                      </div>
+                      <p className="text-xs text-gray-500">رفع ملف HTML خارجي لعرضه كشاشة بداية بدلاً من النص العادي</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-gray-400 text-xs">HTML (عربي)</label>
+                            <label className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded text-xs cursor-pointer hover:bg-emerald-600/30 transition-colors">
+                              <Upload size={12} />
+                              رفع ملف
+                              <input
+                                type="file"
+                                accept=".html,.htm"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = ev => {
+                                    const content = ev.target?.result as string;
+                                    if (content) setFormData({ ...formData, htmlContent: content });
+                                  };
+                                  reader.readAsText(file);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                          <textarea
+                            value={formData.htmlContent || ''}
+                            onChange={e => setFormData({ ...formData, htmlContent: e.target.value })}
+                            rows={5}
+                            dir="ltr"
+                            aria-label="محتوى HTML عربي"
+                            className="w-full bg-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-xs"
+                            placeholder="<div dir='rtl'>...</div>"
+                          />
+                          {formData.htmlContent && (
+                            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                              <iframe srcDoc={formData.htmlContent} className="w-full h-32" title="preview-ar" sandbox="allow-same-origin" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-gray-400 text-xs">HTML (English)</label>
+                            <label className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded text-xs cursor-pointer hover:bg-emerald-600/30 transition-colors">
+                              <Upload size={12} />
+                              Upload
+                              <input
+                                type="file"
+                                accept=".html,.htm"
+                                className="hidden"
+                                onChange={e => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = ev => {
+                                    const content = ev.target?.result as string;
+                                    if (content) setFormData({ ...formData, htmlContentEn: content });
+                                  };
+                                  reader.readAsText(file);
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                          <textarea
+                            value={formData.htmlContentEn || ''}
+                            onChange={e => setFormData({ ...formData, htmlContentEn: e.target.value })}
+                            rows={5}
+                            dir="ltr"
+                            aria-label="HTML Content English"
+                            className="w-full bg-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-xs"
+                            placeholder="<div dir='ltr'>...</div>"
+                          />
+                          {formData.htmlContentEn && (
+                            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                              <iframe srcDoc={formData.htmlContentEn} className="w-full h-32" title="preview-en" sandbox="allow-same-origin" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {formData.htmlContent && (
+                        <button
+                          onClick={() => setFormData({ ...formData, htmlContent: undefined, htmlContentEn: undefined })}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        >
+                          ✕ إزالة محتوى HTML
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* العنوان الفرعي */}
                   <div>

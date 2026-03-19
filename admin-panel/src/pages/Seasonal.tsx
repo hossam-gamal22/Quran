@@ -32,6 +32,7 @@ import {
 import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import AutoTranslateField from '../components/AutoTranslateField';
+import TranslateButton from '../components/TranslateButton';
 import { Styled } from '../components/Styled';
 
 // ==================== الأنواع ====================
@@ -638,6 +639,21 @@ const Seasonal: React.FC = () => {
                       dir="ltr"
                     />
                   </div>
+
+                  {/* Translate title to all languages */}
+                  <TranslateButton
+                    sourceText={editingContent.titleAr}
+                    sourceLang="ar"
+                    contentType="ui"
+                    label="🌍 ترجمة العنوان لكل اللغات"
+                    onTranslated={(translations) => {
+                      setEditingContent({
+                        ...editingContent,
+                        titleEn: translations.en || editingContent.titleEn,
+                        translations: { ...editingContent.translations, ...translations },
+                      });
+                    }}
+                  />
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">المحتوى (عربي)</label>

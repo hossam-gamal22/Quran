@@ -30,7 +30,9 @@ import {
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
+import TranslateButton from '../components/TranslateButton';
 
 const FIRESTORE_DOC = 'config/app-settings';
 
@@ -297,7 +299,7 @@ function MultiLangInput({
         ))}
       </div>
 
-      {/* Copy Arabic to all */}
+      {/* Copy Arabic to all + Translate */}
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={copyArabicToAll}
@@ -306,6 +308,13 @@ function MultiLangInput({
           <Copy className="w-3 h-3" />
           🌐 نسخ العربي لكل اللغات
         </button>
+        <TranslateButton
+          sourceText={values.ar || values.en || ''}
+          sourceLang={values.ar ? 'ar' : 'en'}
+          contentType="ui"
+          compact
+          onTranslated={(translations) => onChange({ ...values, ...translations })}
+        />
       </div>
 
       {/* Other languages expandable */}
@@ -455,9 +464,11 @@ export default function HighlightsManager() {
   const handleIconUpload = async (id: string, file: File) => {
     setUploadingId(id);
     try {
-      const ext = file.name.split('.').pop() || 'png';
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
       const storageRef = ref(storage, `highlights/icons/${id}.${ext}`);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const url = await getDownloadURL(storageRef);
       updateHighlight(id, 'imageUrl', url);
     } catch (err) {

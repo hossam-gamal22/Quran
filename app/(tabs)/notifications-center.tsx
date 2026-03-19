@@ -28,7 +28,6 @@ import {
   cancelAllCustomNotifications,
   requestNotifPermission,
   scheduleWirdNotifications,
-  scheduleKahfNotification,
   scheduleDailyAyahNotification,
 } from '@/lib/notifications-manager';
 

@@ -14,6 +14,7 @@ import {
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { convertToPng } from '../utils/imageUpload';
 
 // ─── Types (mirror lib/content-api.ts) ──────────────────────────────────
 
@@ -215,10 +216,13 @@ function IconUploadField({
 
     setUploading(true);
     try {
-      const fileName = `icon_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const pngBlob = await convertToPng(file);
+      const isSvg = file.type === 'image/svg+xml';
+      const ext = isSvg ? 'svg' : 'png';
+      const fileName = `icon_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '')}.${ext}`;
       const storagePath = `${CONTENT_ICON_STORAGE_PATH}/${fileName}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, file);
+      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
       const url = await getDownloadURL(storageRef);
       onUpload(url, storagePath);
     } catch (err) {
