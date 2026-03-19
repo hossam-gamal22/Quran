@@ -69,3 +69,8 @@ scripts/fonts/.DS_Store
 
 # Local Netlify folder
 .netlify
+
+# Keystore & Credentials - DO NOT COMMIT
+*.jks
+*.keystore
+credentials.json
