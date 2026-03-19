@@ -50,7 +50,7 @@ async function fetchPreviewData(): Promise<Omit<PreviewData, 'loading' | 'error'
 }
 
 // ==================== Glass Card ====================
-function GlassCard({ children, className = '', theme }: { children: React.ReactNode; className?: string; theme: 'light' | 'dark' }) {
+function GlassCard({ children, className = '', theme, style }: { children: React.ReactNode; className?: string; theme: 'light' | 'dark'; style?: React.CSSProperties }) {
   const bg = theme === 'dark'
     ? 'rgba(255,255,255,0.08)'
     : 'rgba(255,255,255,0.55)';
@@ -60,6 +60,7 @@ function GlassCard({ children, className = '', theme }: { children: React.ReactN
       style={{
         background: bg,
         border: `0.5px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.3)'}`,
+        ...style,
       }}
     >
       {children}
