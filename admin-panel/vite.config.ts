@@ -10,4 +10,11 @@ export default defineConfig({
       '@app-lib': path.resolve(__dirname, '../lib'),
     },
   },
+  esbuild: {
+    tsconfigRaw: {
+      compilerOptions: {
+        jsx: 'react-jsx',
+      },
+    },
+  },
 })
