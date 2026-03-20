@@ -28,7 +28,7 @@ import { KhatmaProvider } from '@/contexts/KhatmaContext';
 import { WorshipProvider } from '@/contexts/WorshipContext';
 import { SeasonalProvider } from '@/contexts/SeasonalContext';
 import { ThemeConfigProvider } from '@/contexts/ThemeConfigContext';
-import { OnboardingProvider } from '@/contexts/OnboardingContext';
+import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
 import { AdsProvider } from '@/lib/ads-context';
@@ -45,7 +45,7 @@ import {
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
 import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext';
-import { usePathname } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { initTranslationOverrides } from '@/lib/auto-translate';
@@ -186,6 +186,22 @@ const RTLWrapper = ({ children }: { children: React.ReactNode }) => {
       {children}
     </View>
   );
+};
+
+// Redirects first-time users to the onboarding flow
+const OnboardingGate = () => {
+  const { isLoading, isOnboardingComplete } = useOnboarding();
+  const router = useRouter();
+  const redirected = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && !isOnboardingComplete && !redirected.current) {
+      redirected.current = true;
+      router.replace('/onboarding');
+    }
+  }, [isLoading, isOnboardingComplete]);
+
+  return null;
 };
 
 export default function RootLayout() {
@@ -467,6 +483,7 @@ export default function RootLayout() {
                       <WorshipProvider>
                         <SeasonalProvider>
                           <OnboardingProvider>
+                        <OnboardingGate />
                         <StatusBar style="auto" />
                         <OfflineModal />
                         <Stack

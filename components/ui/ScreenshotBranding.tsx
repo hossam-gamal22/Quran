@@ -112,9 +112,9 @@ export function ScreenshotBranding() {
     }
   }, [isPremium]);
 
-  // Listen for screenshots
+  // Listen for screenshots (iOS only — Android triggers a system notification when saving to gallery)
   useEffect(() => {
-    if (isPremium) return;
+    if (isPremium || Platform.OS === 'android') return;
 
     let subscription: { remove: () => void } | null = null;
 

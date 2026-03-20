@@ -117,21 +117,25 @@ export default function RadioScreen() {
 
   const handlePlayStation = useCallback(async (station: RadioStation) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
-      // Stopping — clear the ad timer
-      if (adTimerRef.current) {
-        clearTimeout(adTimerRef.current);
-        adTimerRef.current = null;
+    try {
+      if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
+        // Stopping — clear the ad timer
+        if (adTimerRef.current) {
+          clearTimeout(adTimerRef.current);
+          adTimerRef.current = null;
+        }
+        await stopRadio();
+      } else {
+        // Starting a new station — schedule interstitial after 20s
+        if (adTimerRef.current) clearTimeout(adTimerRef.current);
+        adTimerRef.current = setTimeout(() => {
+          try { showInterstitial(); } catch {}
+          adTimerRef.current = null;
+        }, 20_000);
+        await playRadio(station);
       }
-      await stopRadio();
-    } else {
-      // Starting a new station — schedule interstitial after 20s
-      if (adTimerRef.current) clearTimeout(adTimerRef.current);
-      adTimerRef.current = setTimeout(() => {
-        showInterstitial();
-        adTimerRef.current = null;
-      }, 20_000);
-      await playRadio(station);
+    } catch (e) {
+      console.warn('Radio playback error:', e);
     }
   }, [radioState, playRadio, stopRadio]);
 

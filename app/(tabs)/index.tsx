@@ -36,7 +36,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { useColors } from '@/hooks/use-colors';
-import { fetchAppConfig, WelcomeBannerConfig, fetchHomePageConfig, type HomePageConfig } from '@/lib/app-config-api';
+import { fetchAppConfig, WelcomeBannerConfig, MultiLangText, fetchHomePageConfig, type HomePageConfig } from '@/lib/app-config-api';
 import { useFeatures } from '@/hooks/use-feature-enabled';
 import DailyHighlights from '@/components/ui/DailyHighlights';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -796,6 +796,16 @@ export default function HomeScreen() {
     .filter(item => selectedQuickAccessIds.includes(item.id))
     .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
 
+  // Resolve multi-lang banner text with fallback: titles[lang] → titles.en → title
+  const resolveBannerText = useCallback((banner: WelcomeBannerConfig, field: 'title' | 'subtitle') => {
+    const lang = (settings.language || 'ar') as keyof MultiLangText;
+    const multiField = field === 'title' ? banner.titles : banner.subtitles;
+    if (multiField) {
+      return multiField[lang] || multiField.en || banner[field];
+    }
+    return banner[field];
+  }, [settings.language]);
+
   // Welcome banner from Firestore
   const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>({
     enabled: true,
@@ -975,8 +985,8 @@ export default function HomeScreen() {
                   <View style={styles.seasonCardOverlay}>
                     <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <View style={styles.seasonInfo}>
-                        <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{welcomeBanner.title}</Text>
-                        <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{welcomeBanner.subtitle}</Text>
+                        <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
+                        <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
                       </View>
                       <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'heart') as any} size={36} color="#fff" />
                     </View>
@@ -988,8 +998,8 @@ export default function HomeScreen() {
                 >
                   <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <View style={styles.seasonInfo}>
-                      <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{welcomeBanner.title}</Text>
-                      <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{welcomeBanner.subtitle}</Text>
+                      <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
+                      <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
                     </View>
                     <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'heart') as any} size={36} color="#fff" />
                   </View>

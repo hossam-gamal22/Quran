@@ -1,5 +1,5 @@
 // components/ads/BannerAd.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useAds } from '@/lib/ads-context';
 import { AdScreenKey } from '@/lib/ads-config';
@@ -27,6 +27,7 @@ interface BannerAdComponentProps {
 
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey }) => {
   const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
+  const [adLoaded, setAdLoaded] = useState(false);
 
   if (!GoogleBannerAd || Platform.OS === 'web') return null;
 
@@ -37,12 +38,13 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { display: adLoaded ? 'flex' : 'none' }]}>
         <GoogleBannerAd
           unitId={slotUnitId}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-          onAdFailedToLoad={(error: any) => console.log('Banner slot failed:', error)}
+          onAdLoaded={() => setAdLoaded(true)}
+          onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner slot failed:', error); }}
         />
       </View>
     );
@@ -55,12 +57,13 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { display: adLoaded ? 'flex' : 'none' }]}>
       <GoogleBannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
-        onAdFailedToLoad={(error: any) => console.log('Banner failed:', error)}
+        onAdLoaded={() => setAdLoaded(true)}
+        onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner failed:', error); }}
       />
     </View>
   );

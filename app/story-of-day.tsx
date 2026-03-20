@@ -10,6 +10,7 @@ import {
   Image,
   ScrollView,
   Alert,
+  AppState,
 } from 'react-native';
 import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +27,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAppIdentity } from '@/hooks/use-app-identity';
+import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { t } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -74,6 +76,12 @@ export default function StoryOfDayScreen() {
   const { settings } = useSettings();
   const colors = useColors();
   const { isPremium } = useSubscription();
+  const { stop: stopGlobalAudio } = useGlobalAudio();
+
+  // Stop any other audio when video page opens
+  useEffect(() => {
+    stopGlobalAudio();
+  }, []);
 
   const isArabic = (settings.language || 'ar') === 'ar';
 
@@ -251,6 +259,22 @@ export default function StoryOfDayScreen() {
     resetControlsTimer();
     return () => {
       if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
+    };
+  }, []);
+
+  // Cleanup video on unmount + pause when app goes to background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && videoRef.current) {
+        videoRef.current.pauseAsync().catch(() => {});
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (videoRef.current) {
+        videoRef.current.stopAsync().catch(() => {});
+        videoRef.current.unloadAsync().catch(() => {});
+      }
     };
   }, []);
 

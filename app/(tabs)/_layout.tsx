@@ -81,7 +81,9 @@ export default function TabsLayout() {
         tabBarActiveBackgroundColor: undefined,
         tabBarStyle: {
           backgroundColor: tabBarBg,
-          borderTopColor: Platform.OS === 'ios' ? undefined : 'transparent',
+          borderTopColor: Platform.OS === 'ios' ? undefined : '#1f3020',
+          borderTopWidth: Platform.OS === 'ios' ? undefined : 1,
+          elevation: Platform.OS === 'ios' ? undefined : 8,
         },
       }}
     >

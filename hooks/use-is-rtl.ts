@@ -1,11 +1,10 @@
-import { useSettings } from '@/contexts/SettingsContext';
-import { isRTL } from '@/lib/i18n';
+import { I18nManager } from 'react-native';
 
 /**
- * هوك للتحقق من اتجاه RTL بناءً على لغة التطبيق
- * بديل لـ I18nManager.isRTL اللي مش بيشتغل صح في Expo Go
+ * هوك للتحقق من اتجاه RTL بناءً على I18nManager
+ * يتم ضبط I18nManager.forceRTL عند بدء التطبيق وعند تغيير اللغة
+ * في lib/i18n.ts و contexts/SettingsContext.tsx
  */
 export function useIsRTL(): boolean {
-  const { settings } = useSettings();
-  return isRTL(settings?.language);
+  return I18nManager.isRTL;
 }

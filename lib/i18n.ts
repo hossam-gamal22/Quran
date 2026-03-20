@@ -5,6 +5,7 @@
 import { translations, Language, TranslationKeys } from '@/constants/translations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRemoteTranslation } from '@/lib/remote-translations';
+import { I18nManager } from 'react-native';
 
 // ==================== المتغيرات ====================
 
@@ -22,6 +23,14 @@ export const loadSavedLanguage = async (): Promise<Language> => {
   } catch (error) {
     console.error('Error loading language:', error);
   }
+
+  // Set I18nManager RTL based on app's saved language (not system language)
+  const shouldBeRTL = ['ar', 'ur', 'fa'].includes(currentLanguage);
+  if (I18nManager.isRTL !== shouldBeRTL) {
+    I18nManager.allowRTL(shouldBeRTL);
+    I18nManager.forceRTL(shouldBeRTL);
+  }
+
   return currentLanguage;
 };
 

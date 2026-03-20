@@ -22,6 +22,8 @@ export interface WelcomeBannerConfig {
   enabled: boolean;
   title: string;
   subtitle: string;
+  titles?: MultiLangText;
+  subtitles?: MultiLangText;
   icon: string;
   color: string;
   route: string;

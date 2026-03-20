@@ -11,7 +11,7 @@ import React, {
   ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName, Alert } from 'react-native';
+import { Appearance, ColorSchemeName, Alert, I18nManager } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { scheduleNotificationsFromSettings } from '@/lib/notifications-manager';
@@ -446,9 +446,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         // تحديث اللغة في نظام الترجمة
         await setI18nLanguage(loadedSettings.language);
         
-        // RTL is handled manually via useIsRTL() hook throughout the app.
-        // We do NOT call I18nManager.forceRTL() because it conflicts with
-        // the manual flexDirection: 'row-reverse' patterns (causes double-reversal).
+        // Set I18nManager RTL based on loaded app language
+        const shouldBeRTL = isRTL(loadedSettings.language);
+        if (I18nManager.isRTL !== shouldBeRTL) {
+          I18nManager.allowRTL(shouldBeRTL);
+          I18nManager.forceRTL(shouldBeRTL);
+        }
 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
@@ -543,8 +546,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     // تحديث نظام الترجمة
     await setI18nLanguage(language);
     
-    // RTL is handled manually via useIsRTL() hook throughout the app.
-    // We do NOT call I18nManager.forceRTL() to avoid double-reversal.
+    // Set I18nManager RTL direction based on app language
+    const shouldBeRTL = isRTL(language);
+    if (I18nManager.isRTL !== shouldBeRTL) {
+      I18nManager.allowRTL(shouldBeRTL);
+      I18nManager.forceRTL(shouldBeRTL);
+    }
     
     // حفظ الإعدادات
     const newSettings = { ...settings, language };

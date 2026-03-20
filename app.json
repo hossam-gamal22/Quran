@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/images/icons/splash-icon_en.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0a0a"
+      "backgroundColor": "#0a0f1a"
     },
     "ios": {
       "supportsTablet": true,
@@ -37,8 +37,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icons/android-icon-foreground.png",
         "backgroundImage": "./assets/images/icons/android-icon-background.png",
-        "monochromeImage": "./assets/images/icons/android-icon-monochrome.png",
-        "backgroundColor": "#0a0a0a"
+        "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
       "versionCode": 1,

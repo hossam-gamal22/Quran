@@ -159,7 +159,7 @@ export default function SubscriptionScreen() {
                   {getPlanLabel(plan)}
                 </Text>
                 <Text style={[styles.planPrice, { color: isSelected ? ACCENT : colors.text }]}>
-                  {product?.price || '---'}
+                  {product?.price || getPlanLabel(plan)}
                 </Text>
                 {plan === 'yearly' && product && (
                   <Text style={[styles.planNote, { color: colors.textLight }]}>
