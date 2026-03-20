@@ -1,7 +1,8 @@
 // components/ui/SplashVideoOverlay.tsx
-// Plays a language-specific splash video on first launch / fresh install
+// Plays a language-specific splash video:
+//   - On first launch (fresh install)
+//   - When app is reopened after 30+ minutes in background
 // Arabic users see Splash-ar.mp4, others see splash.mp4
-// Shows only ONCE — subsequent launches skip directly to app
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -19,7 +20,10 @@ import { fontSemiBold } from '@/lib/fonts';
 import { isRTL, getLanguage } from '@/lib/i18n';
 
 const { width, height } = Dimensions.get('window');
-const SPLASH_VIDEO_SEEN_KEY = '@splash_video_seen_v1';
+
+const FIRST_LAUNCH_KEY = '@app_launched_ever';
+const LAST_BACKGROUND_KEY = '@app_last_background_time';
+const ABSENCE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
 // Video sources — require at module level for bundler
 const VIDEO_AR = require('@/assets/videos/Splash-ar.mp4');
@@ -30,12 +34,21 @@ export function SplashVideoOverlay() {
   const [checkDone, setCheckDone] = useState(false);
   const videoRef = useRef<Video>(null);
 
-  // Check if user has already seen the splash video
+  // Show video on first launch OR after 30+ minutes of absence
   useEffect(() => {
-    const checkSeen = async () => {
+    const checkShouldShow = async () => {
       try {
-        const seen = await AsyncStorage.getItem(SPLASH_VIDEO_SEEN_KEY);
-        if (!seen) {
+        const [launchedEver, lastBgTime] = await Promise.all([
+          AsyncStorage.getItem(FIRST_LAUNCH_KEY),
+          AsyncStorage.getItem(LAST_BACKGROUND_KEY),
+        ]);
+
+        const isFirstLaunch = !launchedEver;
+        const longAbsence = lastBgTime
+          ? Date.now() - parseInt(lastBgTime, 10) > ABSENCE_THRESHOLD_MS
+          : false;
+
+        if (isFirstLaunch || longAbsence) {
           setVisible(true);
         }
       } catch {
@@ -43,12 +56,12 @@ export function SplashVideoOverlay() {
       }
       setCheckDone(true);
     };
-    checkSeen();
+    checkShouldShow();
   }, []);
 
   const dismiss = useCallback(async () => {
     try {
-      await AsyncStorage.setItem(SPLASH_VIDEO_SEEN_KEY, 'true');
+      await AsyncStorage.setItem(FIRST_LAUNCH_KEY, 'true');
     } catch {}
     // Stop video before hiding
     try {

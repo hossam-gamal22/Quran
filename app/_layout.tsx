@@ -20,6 +20,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
 import { languageInitPromise, getLanguage } from '@/lib/i18n';
 import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Contexts
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -356,6 +357,7 @@ export default function RootLayout() {
         syncWidgetDataToNative().catch(() => {});
       } else if (nextAppState === 'background') {
         syncLocalStats().catch(() => {});
+        AsyncStorage.setItem('@app_last_background_time', Date.now().toString()).catch(() => {});
       }
     };
     
