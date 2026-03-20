@@ -447,11 +447,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         await setI18nLanguage(loadedSettings.language);
         
         // Set I18nManager RTL based on loaded app language
+        // Always call unconditionally — do not read I18nManager.isRTL (stale device locale)
         const shouldBeRTL = isRTL(loadedSettings.language);
-        if (I18nManager.isRTL !== shouldBeRTL) {
-          I18nManager.allowRTL(shouldBeRTL);
-          I18nManager.forceRTL(shouldBeRTL);
-        }
+        I18nManager.allowRTL(shouldBeRTL);
+        I18nManager.forceRTL(shouldBeRTL);
 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
@@ -547,11 +546,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     await setI18nLanguage(language);
     
     // Set I18nManager RTL direction based on app language
+    // Always call unconditionally — do not read I18nManager.isRTL (stale device locale)
     const shouldBeRTL = isRTL(language);
-    if (I18nManager.isRTL !== shouldBeRTL) {
-      I18nManager.allowRTL(shouldBeRTL);
-      I18nManager.forceRTL(shouldBeRTL);
-    }
+    I18nManager.allowRTL(shouldBeRTL);
+    I18nManager.forceRTL(shouldBeRTL);
     
     // حفظ الإعدادات
     const newSettings = { ...settings, language };

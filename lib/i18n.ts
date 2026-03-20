@@ -25,11 +25,11 @@ export const loadSavedLanguage = async (): Promise<Language> => {
   }
 
   // Set I18nManager RTL based on app's saved language (not system language)
+  // Always call unconditionally — reading I18nManager.isRTL caches the stale
+  // device-locale value and prevents forceRTL from taking effect on next launch.
   const shouldBeRTL = ['ar', 'ur', 'fa'].includes(currentLanguage);
-  if (I18nManager.isRTL !== shouldBeRTL) {
-    I18nManager.allowRTL(shouldBeRTL);
-    I18nManager.forceRTL(shouldBeRTL);
-  }
+  I18nManager.allowRTL(shouldBeRTL);
+  I18nManager.forceRTL(shouldBeRTL);
 
   return currentLanguage;
 };
