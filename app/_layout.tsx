@@ -94,6 +94,21 @@ if (Platform.OS !== 'web') {
   }
 }
 
+// Register Android widget task handler at module scope
+// Only in native/dev builds on Android
+if (Platform.OS === 'android') {
+  try {
+    const _ExpoConstants = require('expo-constants').default;
+    if (_ExpoConstants.executionEnvironment !== 'storeClient') {
+      const { registerWidgetTaskHandler } = require('react-native-android-widget');
+      const { widgetTaskHandler } = require('@/lib/android-widget-task-handler');
+      registerWidgetTaskHandler(widgetTaskHandler);
+    }
+  } catch {
+    // react-native-android-widget not available in Expo Go
+  }
+}
+
 // Set global default font and force Western numerals for all Text components
 function westernizeChildren(children: any): any {
   if (typeof children === 'string') return toWesternDigits(children);

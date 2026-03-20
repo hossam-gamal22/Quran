@@ -16,6 +16,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.rooh.almuslim",
       "buildNumber": "1",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.roohmuslim.app"]
+      },
       "infoPlist": {
         "LSApplicationQueriesSchemes": ["whatsapp"],
         "GADApplicationIdentifier": "ca-app-pub-3645278220050673~7902167287",
@@ -107,7 +110,109 @@
           "androidAppId": "ca-app-pub-3645278220050673~7902167287",
           "iosAppId": "ca-app-pub-3645278220050673~7902167287"
         }
-      ]
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./assets/fonts/Amiri-Regular.ttf",
+            "./assets/fonts/Amiri-Bold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "PrayerTimesSmall",
+              "label": "الصلاة القادمة",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "عرض الصلاة القادمة والعد التنازلي",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "PrayerTimesMedium",
+              "label": "مواقيت الصلاة",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "عرض جميع مواقيت الصلاة",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "DailyVerseSmall",
+              "label": "آية اليوم",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "آية من القرآن الكريم يوميًا",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "DailyVerseMedium",
+              "label": "آية اليوم",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "آية من القرآن الكريم مع اسم السورة",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "DailyDhikrSmall",
+              "label": "ذكر اليوم",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "ذكر يومي للتذكير",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "DailyDhikrMedium",
+              "label": "ذكر اليوم",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "ذكر اليوم مع المصدر",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "AzkarProgressSmall",
+              "label": "الأذكار اليومية",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "تتبع أذكار الصباح والمساء",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "AzkarProgressMedium",
+              "label": "الأذكار اليومية",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "تقدم أذكار الصباح والمساء",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "HijriDateSmall",
+              "label": "التاريخ الهجري",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "description": "عرض التاريخ الهجري",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            },
+            {
+              "name": "HijriDateMedium",
+              "label": "التاريخ الهجري",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "description": "التاريخ الهجري والميلادي",
+              "updatePeriodMillis": 1800000,
+              "previewImage": "./assets/images/icons/icon.png"
+            }
+          ]
+        }
+      ],
+      "./plugins/with-ios-widgets"
     ],
     "experiments": {
       "typedRoutes": true

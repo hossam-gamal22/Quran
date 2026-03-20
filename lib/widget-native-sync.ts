@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { getLocalizedHijriDate } from './hijri-date';
 import { getDateLocale } from './i18n';
+import { updateWidgetData } from './widget-data-bridge';
 
 // ========================================
 // Types matching native widget entries
@@ -122,34 +123,24 @@ function getCurrentHijriData(): HijriWidgetNativeData {
 /**
  * Sync all widget data to native storage.
  * Call this on app launch and periodically.
+ * Delegates to the unified widget-data-bridge which writes to:
+ * - iOS: UserDefaults via App Group (SharedGroupPreferences)
+ * - Android: AsyncStorage (react-native-android-widget reads via task handler)
  */
 export async function syncWidgetDataToNative(): Promise<void> {
+  // 1. Sync legacy per-type data to AsyncStorage (for in-app gallery previews)
   const ayah = getTodayAyah();
   const azkar = getCurrentDhikr();
   const hijri = getCurrentHijriData();
 
-  // Save to AsyncStorage (accessible from RN and in-app previews)
   await Promise.all([
     AsyncStorage.setItem(ASYNC_KEYS.ayah, JSON.stringify(ayah)),
     AsyncStorage.setItem(ASYNC_KEYS.azkar, JSON.stringify(azkar)),
     AsyncStorage.setItem(ASYNC_KEYS.hijri, JSON.stringify(hijri)),
   ]);
 
-  // For native widgets:
-  // iOS uses UserDefaults with App Group suite → requires native bridge
-  // Android uses SharedPreferences → requires native bridge
-  // The actual native bridge call will be added when expo-widgets
-  // or a custom native module is integrated. For now, data is in AsyncStorage
-  // and native widgets read from the shared container written by widget-data.ts.
-
-  if (Platform.OS === 'ios') {
-    // iOS: Data is written to shared App Group container via widget-data.ts
-    // Native WidgetKit reads from UserDefaults(suiteName: "group.com.roohmuslim.app")
-    console.log('[Widget Sync] iOS data prepared for WidgetKit');
-  } else if (Platform.OS === 'android') {
-    // Android: Data is available via SharedPreferences bridge
-    console.log('[Widget Sync] Android data prepared for Glance widgets');
-  }
+  // 2. Sync unified SharedWidgetData to native shared storage
+  await updateWidgetData();
 }
 
 /**
