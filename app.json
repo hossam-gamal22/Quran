@@ -8,9 +8,9 @@
     "scheme": "rooh-almuslim",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/icons/splash-icon_en.png",
+      "image": "./assets/images/icons/App-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0f1a"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
