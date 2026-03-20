@@ -52,7 +52,9 @@
         "ACCESS_COARSE_LOCATION",
         "SCHEDULE_EXACT_ALARM",
         "USE_EXACT_ALARM",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "googleServicesFile": "./google-services.json",
       "intentFilters": [

@@ -52,7 +52,19 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     case 'WIDGET_ADDED':
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
-      const data = await loadWidgetData();
+      let data = await loadWidgetData();
+
+      // If no data yet (widget added before app opened), try to sync
+      if (!data) {
+        try {
+          const { syncWidgetDataToNative } = require('./widget-native-sync');
+          await syncWidgetDataToNative();
+          data = await loadWidgetData();
+        } catch {
+          // sync failed — will show placeholder
+        }
+      }
+
       const WidgetComponent = WIDGET_MAP[widgetName];
 
       if (!WidgetComponent || !data) {

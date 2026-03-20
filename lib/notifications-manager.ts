@@ -13,6 +13,7 @@ import { getAyahAudioUrl } from './quran-cache';
 import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
+import { getOrCreateSoundChannel } from './push-notifications';
 import { t } from './i18n';
 
 // ─── Custom Sound File Map ───────────────────────────────────────────────────
@@ -334,6 +335,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       minute: number,
       days?: number[],
       channelId: string = 'general',
+      soundType?: string,
     ) => {
       // Cancel existing (base + per-day variants)
       for (const d of ALL_DAYS) {
@@ -341,10 +343,13 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       }
       try { await Notifications.cancelScheduledNotificationAsync(baseId); } catch {}
 
+      // Create dynamic Android channel for user-selected sound
+      const resolvedChannelId = await getOrCreateSoundChannel(channelId, soundType);
+
       // channelId must be in content (not trigger) for Android
       const contentWithChannel: Notifications.NotificationContentInput = {
         ...content,
-        ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
       };
 
@@ -423,6 +428,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         morning.minute,
         notifSettings.azkarDays,
         'azkar',
+        notifSettings.azkarSoundType,
       );
     }
 
@@ -441,6 +447,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         evening.minute,
         notifSettings.azkarDays,
         'azkar',
+        notifSettings.azkarSoundType,
       );
     }
 
@@ -459,6 +466,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         sleep.minute,
         notifSettings.azkarDays,
         'azkar',
+        notifSettings.azkarSoundType,
       );
     }
 
@@ -477,6 +485,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         wakeup.minute,
         notifSettings.azkarDays,
         'azkar',
+        notifSettings.azkarSoundType,
       );
     }
 
@@ -513,6 +522,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         dailyTime.minute,
         notifSettings.dailyVerseDays,
         'daily-ayah',
+        notifSettings.dailyVerseSoundType,
       );
     } else {
       // Cancel all daily_ayah variants
@@ -537,6 +547,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         salawatTime.minute,
         notifSettings.salawatDays,
         'general',
+        notifSettings.salawatSoundType,
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -560,6 +571,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         tasbihTime.minute,
         notifSettings.tasbihDays,
         'general',
+        notifSettings.tasbihSoundType,
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -583,6 +595,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         istighfarTime.minute,
         notifSettings.istighfarDays,
         'general',
+        notifSettings.istighfarSoundType,
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -643,6 +656,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         customTime.minute,
         notifSettings.customReminderDays,
         'general',
+        notifSettings.customReminderSoundType,
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -674,6 +688,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         quranTime.minute,
         convertedDays,
         'general',
+        notifSettings.quranReminderSoundType,
       );
     } else {
       for (const d of [1, 2, 3, 4, 5, 6, 7]) {

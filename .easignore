@@ -1,0 +1,26 @@
+# Development files
+admin-panel/
+server/
+.claude/
+design/
+docs/
+scripts/
+
+# Documentation
+*.md
+
+# Environment files
+.env
+.env.*
+
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+
+# Build artifacts
+.expo/
+node_modules/.cache/

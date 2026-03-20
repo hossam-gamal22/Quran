@@ -337,3 +337,17 @@ export const getSlotsForScreen = (
     })
     .map(([key, slot]) => ({ key, slot }));
 };
+
+// ==================== Global Ad Cooldown ====================
+// Prevents ANY ad type from showing within 2 minutes of another ad
+
+let _globalLastAdTime = 0;
+const GLOBAL_AD_COOLDOWN = 120_000; // 2 minutes between any ad types
+
+export function canShowGlobalAd(): boolean {
+  return Date.now() - _globalLastAdTime >= GLOBAL_AD_COOLDOWN;
+}
+
+export function recordGlobalAdShown(): void {
+  _globalLastAdTime = Date.now();
+}

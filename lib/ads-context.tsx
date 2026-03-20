@@ -1,6 +1,6 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { fetchAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen } from './ads-config';
+import { fetchAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 
 interface AdsContextType {
@@ -61,6 +61,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const recordInterstitialShown = useCallback(() => {
     setSessionAdsShown(prev => prev + 1);
     setLastAdTime(Date.now());
+    recordGlobalAdShown();
   }, []);
 
   const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
@@ -84,6 +85,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const canShowInterstitial = useCallback((): boolean => {
     if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
+    if (!canShowGlobalAd()) return false;
 
     if (config.delayFirstAd) {
       const secondsSinceStart = (Date.now() - appStartTime) / 1000;

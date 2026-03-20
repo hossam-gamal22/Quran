@@ -22,7 +22,11 @@ let adConfig: Awaited<ReturnType<typeof fetchAdsConfig>> | null = null;
 let adInstance: any = null;
 let adReady = false;
 let lastAdShownTime = 0;
-const MIN_AD_INTERVAL = 60_000; // 60 seconds between app-open ads
+let appOpenCount = 0;
+const MIN_AD_INTERVAL = 420_000; // 7 minutes between app-open ads
+const MIN_OPENS_BEFORE_AD = 3; // skip first 3 background→active transitions
+const SESSION_GRACE_PERIOD = 30_000; // no ads in first 30s after launch
+const sessionStartTime = Date.now();
 
 export const loadAppOpenAd = async (): Promise<void> => {
   if (!AppOpenAdClass || Platform.OS === 'web') return;
@@ -60,12 +64,26 @@ export const loadAppOpenAd = async (): Promise<void> => {
 };
 
 export const showAppOpenAd = async (): Promise<boolean> => {
+  appOpenCount++;
+
   if (!adReady || !adInstance || !adConfig?.enabled || !adConfig.showAdOnAppOpen) {
     return false;
   }
 
-  // Enforce minimum interval
+  // Skip first N background→active transitions
+  if (appOpenCount <= MIN_OPENS_BEFORE_AD) return false;
+
+  // Grace period after initial app launch
+  if (Date.now() - sessionStartTime < SESSION_GRACE_PERIOD) return false;
+
+  // Enforce minimum interval between ads
   if (Date.now() - lastAdShownTime < MIN_AD_INTERVAL) return false;
+
+  // Global ad cooldown check
+  try {
+    const { canShowGlobalAd } = require('./ads-config');
+    if (!canShowGlobalAd()) return false;
+  } catch {}
 
   // Skip for premium users
   try {
@@ -75,6 +93,11 @@ export const showAppOpenAd = async (): Promise<boolean> => {
 
   try {
     await adInstance.show();
+    // Record in global ad cooldown
+    try {
+      const { recordGlobalAdShown } = require('./ads-config');
+      recordGlobalAdShown();
+    } catch {}
     return true;
   } catch {
     return false;

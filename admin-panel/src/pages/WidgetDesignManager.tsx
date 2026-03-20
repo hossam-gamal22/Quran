@@ -355,7 +355,7 @@ const WidgetDesignManager: React.FC = () => {
                 className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
                 title={meta?.nameAr}
                 aria-label={`${isExpanded ? 'طي' : 'فتح'} ${meta?.nameAr}`}
-                aria-expanded={isExpanded ? 'true' : 'false'}
+                aria-expanded={isExpanded}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{meta?.icon}</span>

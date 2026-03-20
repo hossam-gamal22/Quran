@@ -30,6 +30,7 @@ import { getLanguage, t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { safeIcon } from '@/lib/safe-icon';
+import { getCachedPrayerTimes, getNextPrayer } from '@/lib/prayer-times';
 const STORY_CACHE_KEY = 'story_of_day_cache';
 const HIGHLIGHTS_ORDER_KEY = '@highlights_order';
 const STORY_THUMBNAIL_KEY = '@story_thumbnail_cache';
@@ -86,6 +87,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
   const [highlightOrder, setHighlightOrder] = useState<string[]>([]);
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [tempOrder, setTempOrder] = useState<string[]>([]);
+  const [nextPrayerTitle, setNextPrayerTitle] = useState<string>('');
 
   const storyBgColor = STORY_COLORS[getDayOfYear() % STORY_COLORS.length];
 
@@ -139,6 +141,27 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     };
     load();
     return () => { mounted = false; };
+  }, []);
+
+  // Fetch next prayer name for highlights
+  useEffect(() => {
+    let mounted = true;
+    const loadNextPrayer = async () => {
+      try {
+        const todayStr = getTodayDateString();
+        const times = await getCachedPrayerTimes(todayStr);
+        if (!times || !mounted) return;
+        const next = getNextPrayer(times);
+        if (next && mounted) {
+          const prayerLabel = t(`prayer.${next.name}`) || next.name;
+          setNextPrayerTitle(`${prayerLabel} — ${next.time}`);
+        }
+      } catch { /* silent */ }
+    };
+    loadNextPrayer();
+    // Refresh every minute for accurate "next prayer"
+    const interval = setInterval(loadNextPrayer, 60_000);
+    return () => { mounted = false; clearInterval(interval); };
   }, []);
 
   // Subscribe to real-time admin highlights + fetch temp pages
@@ -274,7 +297,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     },
     {
       id: 'next-prayer',
-      title: t('prayer.nextPrayer'),
+      title: nextPrayerTitle || t('prayer.nextPrayer'),
       icon: 'mosque',
       color: '#7c2d12',
       route: '/(tabs)/prayer',

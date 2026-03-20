@@ -54,15 +54,18 @@ export function OfflineModal() {
       setIsOffline(offline);
 
       if (!offline) {
-        // Connection restored — suppress any future triggers this session
         connectionRestored.current = true;
         setVisible(false);
+      } else {
+        // Reset suppression flags when going offline again
+        connectionRestored.current = false;
+        dismissed.current = false;
       }
     });
     return () => unsubscribe();
   }, []);
 
-  // Show modal on launch if offline (once per session)
+  // Show modal when offline (re-triggerable after connection cycle)
   useEffect(() => {
     if (isOffline && !dismissed.current && !connectionRestored.current) {
       setVisible(true);

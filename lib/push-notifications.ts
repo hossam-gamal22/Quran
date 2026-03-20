@@ -132,6 +132,44 @@ const setupAndroidChannels = async (): Promise<void> => {
   });
 };
 
+/**
+ * Create or get a dynamic Android notification channel for a specific sound.
+ * Android channels are immutable after creation — so we create one per sound type.
+ * Returns the channelId to use when scheduling the notification.
+ */
+export const getOrCreateSoundChannel = async (
+  baseChannel: string,
+  soundType?: string,
+): Promise<string> => {
+  if (Platform.OS !== 'android') return baseChannel;
+  if (!soundType || soundType === 'default' || soundType === 'general_reminder') return baseChannel;
+
+  const channelId = `${baseChannel}_${soundType}`;
+  const soundFile = `${soundType}.mp3`;
+
+  // Channel names for user display
+  const channelNames: Record<string, string> = {
+    'prayer-times': t('notifications.prayerTimesChannel'),
+    azkar: t('notifications.azkarChannel'),
+    'daily-ayah': t('notifications.dailyVerseChannel'),
+    general: t('notifications.generalChannel'),
+  };
+
+  try {
+    await Notifications.setNotificationChannelAsync(channelId, {
+      name: `${channelNames[baseChannel] || baseChannel} (${soundType})`,
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: soundFile,
+      vibrationPattern: [0, 250, 250, 250],
+    });
+  } catch (e) {
+    console.warn(`Failed to create channel ${channelId}:`, e);
+    return baseChannel; // fallback to default channel
+  }
+
+  return channelId;
+};
+
 // ==================== FCM Token Functions ====================
 
 export const getFCMToken = async (): Promise<string | null> => {

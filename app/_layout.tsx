@@ -138,7 +138,7 @@ if (origTextRender) {
 }
 
 // Run an async operation with a timeout — never throws, always resolves
-const INIT_TIMEOUT = 10000; // 10 seconds max per operation
+const INIT_TIMEOUT = 5000; // 5 seconds max per operation
 const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = INIT_TIMEOUT) => {
   try {
     await Promise.race([
@@ -274,7 +274,7 @@ export default function RootLayout() {
         setAppReady(true);
         await hideSplash();
       }
-    }, 12000);
+    }, 6000);
     return () => clearTimeout(safetyTimer);
   }, []);
 
@@ -285,50 +285,49 @@ export default function RootLayout() {
     const initFirebase = async () => {
       if (__DEV__) console.log('🔥 Initializing Firebase services...');
 
+      // Cache check must run first (sequential)
       await initWithTimeout(
         () => checkAndClearCacheOnUpdate().then(() => {}),
         'Cache check',
-        5000
+        3000
       );
 
-      await initWithTimeout(
-        () => initTranslationOverrides(),
-        'Translation overrides',
-        5000
-      );
-
-      await initWithTimeout(
-        () => initRemoteTranslations(getLanguage() as any),
-        'Remote translations',
-        5000
-      );
-
-      await initWithTimeout(
-        () => initializeGlobalStats(),
-        'Global stats init',
-        8000
-      );
-
-      await initWithTimeout(
-        () => registerUser().then(() => {}),
-        'User registration',
-        8000
-      );
-
-      await initWithTimeout(
-        () => trackAppOpen(),
-        'Track app open',
-        5000
-      );
-
-      await initWithTimeout(
-        async () => {
-          const themes = await fetchQuranThemes(QURAN_THEMES);
-          setQuranThemes(themes);
-        },
-        'Quran themes sync',
-        5000
-      );
+      // Run remaining Firebase inits in parallel for faster startup
+      await Promise.all([
+        initWithTimeout(
+          () => initTranslationOverrides(),
+          'Translation overrides',
+          3000
+        ),
+        initWithTimeout(
+          () => initRemoteTranslations(getLanguage() as any),
+          'Remote translations',
+          3000
+        ),
+        initWithTimeout(
+          () => initializeGlobalStats(),
+          'Global stats init',
+          3000
+        ),
+        initWithTimeout(
+          () => registerUser().then(() => {}),
+          'User registration',
+          3000
+        ),
+        initWithTimeout(
+          () => trackAppOpen(),
+          'Track app open',
+          3000
+        ),
+        initWithTimeout(
+          async () => {
+            const themes = await fetchQuranThemes(QURAN_THEMES);
+            setQuranThemes(themes);
+          },
+          'Quran themes sync',
+          3000
+        ),
+      ]);
 
       if (__DEV__) console.log('✅ Firebase initialization sequence complete');
     };
@@ -488,15 +487,16 @@ export default function RootLayout() {
     // forceRTL already called in loadSavedLanguage(), just need restart
     I18nManager.allowRTL(shouldBeRTL);
     I18nManager.forceRTL(shouldBeRTL);
-    if (!__DEV__) {
+    try {
+      const Updates = require('expo-updates');
+      Updates.reloadAsync();
+    } catch {
+      // expo-updates not available — try dev reload
       try {
-        const Updates = require('expo-updates');
-        Updates.reloadAsync();
-      } catch {
-        // expo-updates not available
-      }
+        const { DevSettings } = require('react-native');
+        DevSettings.reload();
+      } catch {}
     }
-    // In dev, the next reload will apply the direction
     return null;
   }
 
