@@ -120,6 +120,11 @@ let currentState: RadioPlaybackState = {
   volume: 1,
 };
 
+// Auto-retry config for Android stream failures
+let _retryCount = 0;
+const MAX_AUTO_RETRIES = 2;
+let _retryTimer: ReturnType<typeof setTimeout> | null = null;
+
 const listeners = new Set<RadioPlayerListener>();
 
 function notifyListeners() {
@@ -158,6 +163,20 @@ function registerPlayerEvents() {
 
   TP.addEventListener(_Event.PlaybackError, (event: any) => {
     console.error('[RadioPlayer] Playback error:', event);
+
+    // On Android, auto-retry on stream connection errors (HTTP blocked, timeout, etc.)
+    if (Platform.OS === 'android' && _retryCount < MAX_AUTO_RETRIES && currentState.currentStation) {
+      _retryCount++;
+      console.log(`[RadioPlayer] Auto-retry ${_retryCount}/${MAX_AUTO_RETRIES}`);
+      updateState({ status: 'buffering', errorMessage: undefined });
+      if (_retryTimer) clearTimeout(_retryTimer);
+      _retryTimer = setTimeout(() => {
+        const station = currentState.currentStation;
+        if (station) radioPlayer.play(station);
+      }, 1500);
+      return;
+    }
+
     updateState({
       status: 'error',
       errorMessage: event.message || 'Stream playback error',
@@ -193,6 +212,10 @@ export const radioPlayer = {
       console.warn('[RadioPlayer] Not supported on web');
       return;
     }
+
+    // Reset retry counter on new play attempt
+    _retryCount = 0;
+    if (_retryTimer) { clearTimeout(_retryTimer); _retryTimer = null; }
 
     updateState({
       status: 'loading',

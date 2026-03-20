@@ -44,6 +44,9 @@ export default function RadioScreen() {
   const { state: audioState, playRadio, stopRadio } = useGlobalAudio();
   const radioState = audioState.radioState;
 
+  // Detect playback error state for Android error display
+  const isPlaybackError = radioState.status === 'error';
+
   const [stations, setStations] = useState<RadioStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -322,8 +325,33 @@ export default function RadioScreen() {
         />
       </View>
 
+      {/* Playback Error Banner */}
+      {isPlaybackError && radioState.currentStation && (
+        <View style={[styles.errorBanner, {
+          backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+          borderColor: isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+        }]}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+          <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <Text style={[styles.errorBannerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+              {radioState.currentStation.name}
+            </Text>
+            <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+              {radioState.errorMessage || t('radio.connectionError')}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => playRadio(radioState.currentStation!)}
+            style={[styles.retryBannerBtn, { backgroundColor: '#EF4444' }]}
+          >
+            <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
+          </Pressable>
+        </View>
+      )}
+
       {/* Now Playing Mini Bar */}
-      {radioState.currentStation && radioState.status !== 'idle' && (
+      {radioState.currentStation && radioState.status !== 'idle' && radioState.status !== 'error' && (
         <Pressable
           onPress={() => {
             if (radioState.currentStation) handlePlayStation(radioState.currentStation);
@@ -596,5 +624,34 @@ const styles = StyleSheet.create({
   },
   favButton: {
     padding: 4,
+  },
+  errorBanner: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    gap: 10,
+  },
+  errorBannerInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  errorBannerTitle: {
+    fontSize: FONT_SIZES.md,
+    fontFamily: fontSemiBold(),
+  },
+  errorBannerMsg: {
+    fontSize: FONT_SIZES.sm,
+    fontFamily: fontRegular(),
+  },
+  retryBannerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
