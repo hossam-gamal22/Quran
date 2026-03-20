@@ -38,7 +38,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <View style={[styles.container, { display: adLoaded ? 'flex' : 'none' }]}>
+      <View style={[styles.container, !adLoaded && styles.hidden]}>
         <GoogleBannerAd
           unitId={slotUnitId}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -57,7 +57,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <View style={[styles.container, { display: adLoaded ? 'flex' : 'none' }]}>
+    <View style={[styles.container, !adLoaded && styles.hidden]}>
       <GoogleBannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -73,6 +73,10 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  hidden: {
+    height: 0,
+    overflow: 'hidden',
   },
 });
 
