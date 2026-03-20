@@ -122,6 +122,8 @@ export interface AdminRadioStation {
   order: number;
   /** Whether hidden from users */
   isHidden: boolean;
+  /** Whether active/visible (admin panel field) */
+  isActive?: boolean;
   /** Whether featured/pinned */
   isFeatured: boolean;
   /** Added by admin UID */

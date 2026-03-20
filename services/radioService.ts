@@ -240,7 +240,7 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
   try {
     const q = query(
       collection(db, 'admin_radio_stations'),
-      where('isHidden', '==', false)
+      where('isActive', '==', true)
     );
     const snapshot = await getDocs(q);
 
@@ -259,7 +259,7 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
         imageUrl: data.imageUrl,
         tags: data.tags,
         order: data.order,
-        isHidden: false,
+        isHidden: data.isHidden ?? false,
         isFeatured: data.isFeatured,
         isOnline: true,
       };
@@ -357,7 +357,7 @@ export async function getRadioConfig(): Promise<RadioConfig | null> {
       return parsed;
     }
 
-    const docRef = doc(db, 'admin_settings', 'radio_config');
+    const docRef = doc(db, 'appConfig', 'radioConfig');
     const snap = await getDoc(docRef);
     if (snap.exists()) {
       const config = snap.data() as RadioConfig;
