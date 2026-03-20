@@ -796,12 +796,23 @@ export default function HomeScreen() {
     .filter(item => selectedQuickAccessIds.includes(item.id))
     .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
 
-  // Resolve multi-lang banner text with fallback: titles[lang] → titles.en → title
+  // Resolve multi-lang banner text with fallback: titles[lang] → titles.en → t() seasonal key → title
   const resolveBannerText = useCallback((banner: WelcomeBannerConfig, field: 'title' | 'subtitle') => {
     const lang = (settings.language || 'ar') as keyof MultiLangText;
     const multiField = field === 'title' ? banner.titles : banner.subtitles;
     if (multiField) {
-      return multiField[lang] || multiField.en || banner[field];
+      const resolved = multiField[lang] || multiField.en;
+      if (resolved) return resolved;
+    }
+    // If current language is Arabic, return the Arabic field directly
+    if (lang === 'ar') return banner[field];
+    // For non-Arabic languages without multi-lang data, try translation keys
+    const text = banner[field] || '';
+    if (text.includes('\u0639\u064a\u062f') || text.includes('\u0645\u0628\u0627\u0631\u0643')) {
+      return t(field === 'title' ? 'seasonal.eid.title' : 'seasonal.eid.subtitle');
+    }
+    if (text.includes('\u0631\u0645\u0636\u0627\u0646')) {
+      return t(field === 'title' ? 'seasonal.ramadan.title' : 'seasonal.ramadan.subtitle');
     }
     return banner[field];
   }, [settings.language]);
@@ -809,8 +820,8 @@ export default function HomeScreen() {
   // Welcome banner from Firestore
   const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>({
     enabled: true,
-    title: t('ramadan.blessedRamadan'),
-    subtitle: t('ramadan.dailyTasks'),
+    title: t('seasonal.ramadan.title'),
+    subtitle: t('seasonal.ramadan.subtitle'),
     icon: 'heart',
     color: '#2f7659',
     route: '/worship-tracker',
@@ -823,6 +834,20 @@ export default function HomeScreen() {
     }).catch(() => {});
     return () => { mounted = false; };
   }, []);
+
+  // Keep default banner in sync with language changes
+  useEffect(() => {
+    setWelcomeBanner(prev => {
+      if (prev && !prev.titles && !prev.subtitles) {
+        return {
+          ...prev,
+          title: t('seasonal.ramadan.title'),
+          subtitle: t('seasonal.ramadan.subtitle'),
+        };
+      }
+      return prev;
+    });
+  }, [settings.language]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);

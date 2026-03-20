@@ -1715,6 +1715,15 @@ export interface TranslationKeys {
       tipTitle: string;
       tipText: string;
     };
+    eid: {
+      title: string;
+      subtitle: string;
+    };
+    ramadan: {
+      title: string;
+      subtitle: string;
+    };
+    defaultGreeting: string;
   };
   quranReminder: {
     deselectAll: string;
@@ -3942,6 +3951,15 @@ const ar: TranslationKeys = {
       tipTitle: 'نصيحة',
       tipText: 'أكثر من الذكر والدعاء والاستغفار في هذه الأيام المباركة',
     },
+    eid: {
+      title: 'عيد مبارك 🤝',
+      subtitle: 'كل عام وأنتم بخير',
+    },
+    ramadan: {
+      title: 'رمضان كريم 🌙',
+      subtitle: 'أعاده الله علينا وعليكم باليمن والبركات',
+    },
+    defaultGreeting: 'السلام عليكم',
   },
   quranReminder: {
     deselectAll: 'إلغاء تحديد الكل',
@@ -6155,6 +6173,15 @@ const en: TranslationKeys = {
       tipTitle: 'Tip',
       tipText: 'Increase in remembrance, supplication, and seeking forgiveness during these blessed days',
     },
+    eid: {
+      title: 'Eid Mubarak 🤝',
+      subtitle: 'May you always be well',
+    },
+    ramadan: {
+      title: 'Ramadan Kareem 🌙',
+      subtitle: 'May Allah bless us during this holy month',
+    },
+    defaultGreeting: 'Peace be upon you',
   },
   quranReminder: {
     deselectAll: 'Deselect All',
@@ -8369,6 +8396,15 @@ const fr: TranslationKeys = {
       tipTitle: 'Conseil',
       tipText: 'Multipliez le dhikr, les invocations et le repentir durant ces jours bénis',
     },
+    eid: {
+      title: 'Aïd Moubarak 🤝',
+      subtitle: 'Que vous soyez toujours en bonne santé',
+    },
+    ramadan: {
+      title: 'Ramadan Karim 🌙',
+      subtitle: 'Qu\'Allah nous bénisse durant ce mois sacré',
+    },
+    defaultGreeting: 'Paix sur vous',
   },
   quranReminder: {
     deselectAll: 'Tout désélectionner',
@@ -10584,6 +10620,15 @@ const de: TranslationKeys = {
       tipTitle: 'Tipp',
       tipText: 'Vermehren Sie Dhikr, Bittgebete und Reue in diesen gesegneten Tagen',
     },
+    eid: {
+      title: 'Eid Mubarak 🤝',
+      subtitle: 'Mögen Sie immer gesund sein',
+    },
+    ramadan: {
+      title: 'Ramadan Karim 🌙',
+      subtitle: 'Möge Allah uns in diesem heiligen Monat segnen',
+    },
+    defaultGreeting: 'Friede sei mit euch',
   },
   quranReminder: {
     deselectAll: 'Alles abwählen',
@@ -12799,6 +12844,15 @@ const tr: TranslationKeys = {
       tipTitle: 'İpucu',
       tipText: 'Bu mübarek günlerde zikir, dua ve istiğfarı çoğaltın',
     },
+    eid: {
+      title: 'Bayramınız Mübarek 🤝',
+      subtitle: 'Her zaman hayırlara vesile olsun',
+    },
+    ramadan: {
+      title: 'Ramazan-ı Şerif 🌙',
+      subtitle: 'Allah bu mübarek ayda bizi bereketlendirsin',
+    },
+    defaultGreeting: 'Selam olsun',
   },
   quranReminder: {
     deselectAll: 'Tümünü Kaldır',
@@ -15014,6 +15068,15 @@ const es: TranslationKeys = {
       tipTitle: 'Consejo',
       tipText: 'Aumenta el dhikr, las súplicas y el arrepentimiento en estos días benditos',
     },
+    eid: {
+      title: 'Eid Mubarak 🤝',
+      subtitle: 'Que siempre esté bien',
+    },
+    ramadan: {
+      title: 'Ramadán Karim 🌙',
+      subtitle: 'Que Allah nos bendiga durante este mes sagrado',
+    },
+    defaultGreeting: 'La paz sea con vosotros',
   },
   quranReminder: {
     deselectAll: 'Deseleccionar todo',
@@ -17228,6 +17291,15 @@ const ur: TranslationKeys = {
       tipTitle: 'نصیحت',
       tipText: 'ان مبارک دنوں میں ذکر، دعا اور استغفار کثرت سے کریں',
     },
+    eid: {
+      title: 'عید مبارک 🤝',
+      subtitle: 'ہمیشہ خوش رہیں',
+    },
+    ramadan: {
+      title: 'رمضان کریم 🌙',
+      subtitle: 'اللہ تعالیٰ ہمیں اس مبارک مہینے میں برکت عطا فرمائے',
+    },
+    defaultGreeting: 'السلام علیکم',
   },
   quranReminder: {
     deselectAll: 'سب غیر منتخب',
@@ -19443,6 +19515,15 @@ const id: TranslationKeys = {
       tipTitle: 'Tips',
       tipText: 'Perbanyak dzikir, doa, dan istighfar di hari-hari yang diberkahi ini',
     },
+    eid: {
+      title: 'Selamat Hari Raya 🤝',
+      subtitle: 'Semoga selalu sehat',
+    },
+    ramadan: {
+      title: 'Ramadhan Karim 🌙',
+      subtitle: 'Semoga Allah memberkahi kita di bulan suci ini',
+    },
+    defaultGreeting: 'Assalamualaikum',
   },
   quranReminder: {
     deselectAll: 'Hapus Semua Pilihan',
@@ -21658,6 +21739,15 @@ const ms: TranslationKeys = {
       tipTitle: 'Petua',
       tipText: 'Perbanyak zikir, doa, dan istighfar di hari-hari yang diberkati ini',
     },
+    eid: {
+      title: 'Selamat Hari Raya 🤝',
+      subtitle: 'Semoga sentiasa sihat',
+    },
+    ramadan: {
+      title: 'Ramadhan Karim 🌙',
+      subtitle: 'Semoga Allah memberkati kita di bulan yang mulia ini',
+    },
+    defaultGreeting: 'Assalamualaikum',
   },
   quranReminder: {
     deselectAll: 'Nyahpilih Semua',
@@ -23873,6 +23963,15 @@ const hi: TranslationKeys = {
       tipTitle: 'सलाह',
       tipText: 'इन मुबारक दिनों में ज़िक्र, दुआ और इस्तिग़फ़ार कसरत से करें',
     },
+    eid: {
+      title: 'ईद मुबारक 🤝',
+      subtitle: 'सदा स्वस्थ रहें',
+    },
+    ramadan: {
+      title: 'रमज़ान करीम 🌙',
+      subtitle: 'इस पवित्र महीने में अल्लाह हमें बरकत दे',
+    },
+    defaultGreeting: 'अस्सलामु अलैकुम',
   },
   quranReminder: {
     deselectAll: 'सभी अचयनित',
@@ -26088,6 +26187,15 @@ const bn: TranslationKeys = {
       tipTitle: 'পরামর্শ',
       tipText: 'এই বরকতময় দিনগুলোতে জিকির, দোয়া ও ইস্তিগফার বেশি বেশি করুন',
     },
+    eid: {
+      title: 'ঈদ মোবারক 🤝',
+      subtitle: 'সর্বদা সুস্থ থাকুন',
+    },
+    ramadan: {
+      title: 'রমজান করিম 🌙',
+      subtitle: 'এই পবিত্র মাসে আল্লাহ আমাদের বরকত দিন',
+    },
+    defaultGreeting: 'আসসালামু আলাইকুম',
   },
   quranReminder: {
     deselectAll: 'সব অনির্বাচন',
@@ -28302,6 +28410,15 @@ const ru: TranslationKeys = {
       tipTitle: 'Совет',
       tipText: 'Увеличьте поминание, мольбы и покаяние в эти благословенные дни',
     },
+    eid: {
+      title: 'Ид Мубарак 🤝',
+      subtitle: 'Пусть вам всегда будет хорошо',
+    },
+    ramadan: {
+      title: 'Рамадан Карим 🌙',
+      subtitle: 'Да благословит нас Аллах в этот священный месяц',
+    },
+    defaultGreeting: 'Мир вам',
   },
   quranReminder: {
     deselectAll: 'Снять все',

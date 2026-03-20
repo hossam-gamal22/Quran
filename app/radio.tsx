@@ -127,12 +127,15 @@ function RadioScreen() {
   const handlePlayStation = useCallback(async (station: RadioStation) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      setError(null);
+      console.log('[Radio] handlePlayStation:', station.name, station.streamUrl);
       if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
         // Stopping — clear the ad timer
         if (adTimerRef.current) {
           clearTimeout(adTimerRef.current);
           adTimerRef.current = null;
         }
+        console.log('[Radio] Stopping current station');
         await stopRadio();
       } else {
         // Starting a new station — schedule interstitial after 20s
@@ -141,10 +144,12 @@ function RadioScreen() {
           try { showInterstitial(); } catch {}
           adTimerRef.current = null;
         }, 20_000);
+        console.log('[Radio] Starting playback for:', station.name);
         await playRadio(station);
+        console.log('[Radio] playRadio call completed');
       }
     } catch (e: any) {
-      console.warn('Radio playback error:', e);
+      console.error('[Radio] handlePlayStation error:', e);
       setError(e?.message || t('radio.connectionError'));
     }
   }, [radioState, playRadio, stopRadio]);
@@ -338,6 +343,28 @@ function RadioScreen() {
           indicatorColor={ACCENT}
         />
       </View>
+
+      {/* General Error Display */}
+      {error && !isPlaybackError && (
+        <View style={[styles.errorBanner, {
+          backgroundColor: isDarkMode ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.08)',
+          borderColor: isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
+        }]}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+          <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <Text style={[styles.errorBannerMsg, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+              {error}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => setError(null)}
+            hitSlop={12}
+          >
+            <MaterialCommunityIcons name="close" size={20} color={colors.textLight} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Playback Error Banner */}
       {isPlaybackError && radioState.currentStation && (

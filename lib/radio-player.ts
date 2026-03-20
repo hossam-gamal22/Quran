@@ -223,6 +223,13 @@ export const radioPlayer = {
       errorMessage: undefined,
     });
 
+    // Safety: reject early if neither TrackPlayer nor expo-av available
+    if (!_isExpoGo && !getTrackPlayer()) {
+      console.error('[RadioPlayer] No audio engine available');
+      updateState({ status: 'error', errorMessage: 'Audio player not available on this device' });
+      return;
+    }
+
     // Use expo-av fallback in Expo Go
     if (_isExpoGo) {
       try {

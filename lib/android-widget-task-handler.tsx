@@ -45,45 +45,56 @@ const WIDGET_MAP: Record<string, React.FC<{ data: SharedWidgetData }>> = {
 };
 
 export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
-  const widgetInfo = props.widgetInfo;
+  const { widgetInfo, widgetAction, renderWidget } = props;
   const widgetName = widgetInfo.widgetName;
 
-  const data = await loadWidgetData();
-  const WidgetComponent = WIDGET_MAP[widgetName];
+  switch (widgetAction) {
+    case 'WIDGET_ADDED':
+    case 'WIDGET_UPDATE':
+    case 'WIDGET_RESIZED': {
+      const data = await loadWidgetData();
+      const WidgetComponent = WIDGET_MAP[widgetName];
 
-  if (!WidgetComponent || !data) {
-    // Return a simple loading/error widget
-    const { FlexWidget, TextWidget } = require('react-native-android-widget');
-    return (
-      <FlexWidget
-        style={{
-          height: 'match_parent',
-          width: 'match_parent',
-          justifyContent: 'center',
-          alignItems: 'center',
-          backgroundColor: '#0a0f0d',
-          borderRadius: 16,
-        }}
-      >
-        <TextWidget
-          text="روح المسلم"
-          style={{
-            fontSize: 16,
-            color: '#22c55e',
-            fontFamily: 'Amiri',
-          }}
-        />
-        <TextWidget
-          text="افتح التطبيق لتحميل البيانات"
-          style={{
-            fontSize: 12,
-            color: '#9ca3af',
-            fontFamily: 'Amiri',
-          }}
-        />
-      </FlexWidget>
-    );
+      if (!WidgetComponent || !data) {
+        const { FlexWidget, TextWidget } = require('react-native-android-widget');
+        renderWidget(
+          <FlexWidget
+            style={{
+              height: 'match_parent',
+              width: 'match_parent',
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: '#0a0f0d',
+              borderRadius: 16,
+            }}
+          >
+            <TextWidget
+              text="روح المسلم"
+              style={{
+                fontSize: 16,
+                color: '#22c55e',
+                fontFamily: 'Amiri',
+              }}
+            />
+            <TextWidget
+              text="افتح التطبيق لتحميل البيانات"
+              style={{
+                fontSize: 12,
+                color: '#9ca3af',
+                fontFamily: 'Amiri',
+              }}
+            />
+          </FlexWidget>
+        );
+        return;
+      }
+
+      renderWidget(<WidgetComponent data={data} />);
+      return;
+    }
+    case 'WIDGET_DELETED':
+    case 'WIDGET_CLICK':
+    default:
+      return;
   }
-
-  return <WidgetComponent data={data} />;
 }

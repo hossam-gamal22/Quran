@@ -94,7 +94,17 @@
           "icon": "./assets/images/icons/notification-icon.png",
           "color": "#22c55e",
           "androidMode": "default",
-          "androidCollapsedTitle": "روح المسلم"
+          "androidCollapsedTitle": "روح المسلم",
+          "sounds": [
+            "./assets/sounds/notifications/general_reminder.mp3",
+            "./assets/sounds/notifications/salawat.mp3",
+            "./assets/sounds/notifications/istighfar.mp3",
+            "./assets/sounds/notifications/tasbih.mp3",
+            "./assets/sounds/notifications/subhanallah.mp3",
+            "./assets/sounds/notifications/alhamdulillah.mp3",
+            "./assets/sounds/notifications/morning_adhkar.mp3",
+            "./assets/sounds/notifications/evening_adhkar.mp3"
+          ]
         }
       ],
       [

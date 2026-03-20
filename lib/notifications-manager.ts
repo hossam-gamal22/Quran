@@ -15,6 +15,30 @@ import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
 import { t } from './i18n';
 
+// ─── Custom Sound File Map ───────────────────────────────────────────────────
+// Maps soundType keys to the filenames registered in app.json expo-notifications sounds
+const CUSTOM_SOUND_FILES: Record<string, string> = {
+  general_reminder: 'general_reminder.mp3',
+  salawat: 'salawat.mp3',
+  istighfar: 'istighfar.mp3',
+  tasbih: 'tasbih.mp3',
+  subhanallah: 'subhanallah.mp3',
+  alhamdulillah: 'alhamdulillah.mp3',
+  morning_adhkar: 'morning_adhkar.mp3',
+  evening_adhkar: 'evening_adhkar.mp3',
+};
+
+/**
+ * Resolve a soundType (from notification data) to the native sound filename
+ * that expo-notifications can play in the background.
+ */
+function resolveNotificationSound(soundType?: string, soundEnabled?: boolean): string | undefined {
+  if (!soundEnabled) return undefined;
+  if (!soundType || soundType === 'default') return 'default';
+  if (soundType === 'silent') return undefined;
+  return CUSTOM_SOUND_FILES[soundType] || 'default';
+}
+
 // ─── Keys ────────────────────────────────────────────────────────────────────
 const KEYS = {
   ALL_NOTIF: '@notif_settings_v2',

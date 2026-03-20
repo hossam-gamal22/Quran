@@ -516,11 +516,15 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isP
   return (
     <View style={gh.wrapper} collapsable={false}>
       <BlurView
-        intensity={Platform.OS === 'ios' ? 60 : 40}
+        intensity={Platform.OS === 'ios' ? 80 : 40}
         tint={isLightBg ? 'light' : 'dark'}
         style={gh.blur}
       >
-        <View style={gh.inner}>
+        <View style={[gh.inner, {
+          backgroundColor: isLightBg
+            ? 'rgba(255,255,255,0.4)'
+            : 'rgba(30,30,32,0.55)',
+        }]}>
           {/* Left: tafsir toggle + play + heart (save page) + share */}
           <View style={gh.left}>
             <TouchableOpacity hitSlop={8} onPress={onTafsir}>
@@ -571,10 +575,9 @@ const gh = StyleSheet.create({
   wrapper: {
     zIndex: 10,
     height: 48,
-    overflow: 'hidden',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
-    ...Platform.select({ android: { elevation: 5 } }),
+    ...Platform.select({ android: { elevation: 3 } }),
   },
   blur: {
     borderBottomLeftRadius: 16,
@@ -586,6 +589,8 @@ const gh = StyleSheet.create({
     alignItems: 'center',
     height: 48,
     paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: 'rgba(255,255,255,0.15)',
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 70, justifyContent: 'flex-end' },

@@ -235,21 +235,26 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   }, [playAzkarAtIndex, quranState.isPlaying]);
 
   const playRadio = useCallback(async (station: RadioStation) => {
-    // Stop Quran if playing
-    if (quranState.isPlaying) {
-      audioPlayer.stop();
+    try {
+      // Stop Quran if playing
+      if (quranState.isPlaying) {
+        audioPlayer.stop();
+      }
+      // Stop Azkar if playing
+      if (sourceRef.current === 'azkar') {
+        try { await cleanupAzkar(); } catch {}
+        setAzkarPlaying(false);
+        setAzkarLoading(false);
+        azkarQueue.current = [];
+        setQueueLength(0);
+      }
+      setSource('radio');
+      setSourceRoute(undefined);
+      await radioPlayer.play(station);
+    } catch (error) {
+      console.error('[GlobalAudio] playRadio error:', error);
+      throw error;
     }
-    // Stop Azkar if playing
-    if (sourceRef.current === 'azkar') {
-      await cleanupAzkar();
-      setAzkarPlaying(false);
-      setAzkarLoading(false);
-      azkarQueue.current = [];
-      setQueueLength(0);
-    }
-    setSource('radio');
-    setSourceRoute(undefined);
-    await radioPlayer.play(station);
   }, [quranState.isPlaying, cleanupAzkar]);
 
   const stopRadio = useCallback(async () => {

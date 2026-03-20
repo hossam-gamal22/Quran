@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, Platform, View, Text, TextInput } from 'react-native';
+import { AppState, AppStateStatus, Platform, View, Text, TextInput, I18nManager } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
 import { useSettings } from '@/contexts/SettingsContext';
 
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
-import { languageInitPromise, getLanguage } from '@/lib/i18n';
+import { languageInitPromise, getLanguage, isRTL as appIsRTL } from '@/lib/i18n';
 import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
 
 // Contexts
@@ -475,6 +475,28 @@ export default function RootLayout() {
   // This prevents t() calls from returning Arabic on first render
   // when the user's language is different.
   if (!languageReady || (!appReady && !fontsLoaded)) {
+    return null;
+  }
+
+  // ═══ RTL Mismatch Guard ═══
+  // I18nManager.isRTL reflects the device locale at native bridge initialization.
+  // If it doesn't match the app's saved language direction, forceRTL() was already
+  // called (persisted to disk) by loadSavedLanguage() — we just need to reload
+  // so the native bridge picks up the new value.
+  const shouldBeRTL = appIsRTL();
+  if (I18nManager.isRTL !== shouldBeRTL) {
+    // forceRTL already called in loadSavedLanguage(), just need restart
+    I18nManager.allowRTL(shouldBeRTL);
+    I18nManager.forceRTL(shouldBeRTL);
+    if (!__DEV__) {
+      try {
+        const Updates = require('expo-updates');
+        Updates.reloadAsync();
+      } catch {
+        // expo-updates not available
+      }
+    }
+    // In dev, the next reload will apply the direction
     return null;
   }
 
