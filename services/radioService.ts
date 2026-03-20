@@ -1,5 +1,5 @@
 // services/radioService.ts
-// Fetches radio stations from multiple sources, merges, deduplicates, and caches
+// Fetches radio stations from Firestore, caches locally, and provides search/favorites
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/config/firebase';
@@ -8,9 +8,6 @@ import type {
   RadioStation,
   RadioCategory,
   RadioConfig,
-  Mp3QuranRadiosResponse,
-  Mp3QuranRadio,
-  RadioBrowserStation,
   AdminRadioStation,
   RadioFavorite,
 } from '@/types/radio';
@@ -22,10 +19,6 @@ const CACHE_TS_KEY = '@radio_stations_cache_ts';
 const CONFIG_CACHE_KEY = '@radio_config_cache';
 const FAVORITES_KEY = '@radio_favorites';
 const DEFAULT_CACHE_TTL = 60; // minutes
-
-const MP3QURAN_API = 'https://www.mp3quran.net/api/v3/radios?language=ar';
-const RADIO_BROWSER_API = 'https://de1.api.radio-browser.info/json/stations/bytag/quran?limit=100&order=votes&reverse=true&hidebroken=true';
-const RADIO_BROWSER_ISLAMIC_API = 'https://de1.api.radio-browser.info/json/stations/bytag/islamic?limit=50&order=votes&reverse=true&hidebroken=true';
 
 // ==================== Helpers ====================
 
@@ -84,160 +77,9 @@ const ARABIC_COUNTRY_MAP: Record<string, string> = {
   'المغرب': 'MA',
 };
 
-// ==================== Curated Stations ====================
+// ==================== Firestore Fetcher ====================
 
-const CURATED_STATIONS: RadioStation[] = [
-  {
-    id: 'curated_eg_cairo_quran',
-    name: 'إذاعة القرآن الكريم من القاهرة',
-    nameTranslations: {
-      ar: 'إذاعة القرآن الكريم من القاهرة',
-      en: 'Holy Quran Radio Cairo — FM 98.2',
-      fr: 'Radio Sainte Coran du Caire — FM 98.2',
-      tr: 'Kahire Kutsal Kuran Radyosu — FM 98.2',
-      id: 'Radio Quran Suci Kairo — FM 98.2',
-      ms: 'Radio Al-Quran Kaherah — FM 98.2',
-      ur: 'قاہرہ قرآن کریم ریڈیو — ایف ایم 98.2',
-      bn: 'কায়রো পবিত্র কুরআন রেডিও — এফএম 98.2',
-      ru: 'Радио Корана Каир — FM 98.2',
-      es: 'Radio Sagrado Corán de El Cairo — FM 98.2',
-    },
-    streamUrl: 'https://stream.radiojar.com/8s5u5tpdtwzuv',
-    source: 'curated',
-    sourceId: 'eg_cairo_quran',
-    category: 'quran',
-    country: 'EG',
-    language: 'ar',
-    isFeatured: true,
-    isOnline: true,
-    order: -1,
-  },
-  {
-    id: 'curated_saudi_quran',
-    name: 'إذاعة القرآن الكريم - السعودية',
-    nameTranslations: { en: 'Saudi Quran Radio', fr: 'Radio Coran Saoudienne', tr: 'Suudi Kuran Radyosu' },
-    streamUrl: 'https://stream.radiojar.com/0tpy1h0kxtzuv',
-    source: 'curated',
-    sourceId: 'saudi_quran',
-    category: 'quran',
-    country: 'SA',
-    language: 'ar',
-    isFeatured: true,
-    isOnline: true,
-    order: 0,
-  },
-  {
-    id: 'curated_makkah_live',
-    name: 'إذاعة الحرم المكي',
-    nameTranslations: { en: 'Makkah Live', fr: 'La Mecque en direct', tr: 'Mekke Canlı' },
-    streamUrl: 'https://backup.qurango.net/radio/mix',
-    source: 'curated',
-    sourceId: 'makkah_live',
-    category: 'quran',
-    country: 'SA',
-    language: 'ar',
-    isFeatured: true,
-    isOnline: true,
-    order: 1,
-  },
-];
-
-// ==================== Category Mapping ====================
-
-function inferCategory(station: { name: string; tags?: string }): RadioCategory {
-  const name = station.name.toLowerCase();
-  const tags = (station.tags || '').toLowerCase();
-  const combined = `${name} ${tags}`;
-
-  if (combined.includes('تفسير') || combined.includes('tafsir') || combined.includes('tafseer')) return 'tafsir';
-  if (combined.includes('ترجمة') || combined.includes('translation')) return 'translation';
-  if (combined.includes('أذكار') || combined.includes('athkar') || combined.includes('adhkar')) return 'adhkar';
-  if (combined.includes('سيرة') || combined.includes('seerah') || combined.includes('siyra')) return 'seerah';
-  if (combined.includes('صحيح') || combined.includes('حديث') || combined.includes('hadith') || combined.includes('riyad')) return 'hadith';
-  if (combined.includes('رقية') || combined.includes('ruqyah') || combined.includes('roqiah')) return 'ruqyah';
-  if (combined.includes('أطفال') || combined.includes('kids') || combined.includes('children')) return 'kids';
-  if (combined.includes('قرآن') || combined.includes('quran') || combined.includes('إذاعة')) return 'reciter';
-
-  return 'islamic';
-}
-
-// ==================== Source Fetchers ====================
-
-async function fetchMp3Quran(): Promise<RadioStation[]> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const res = await fetch(MP3QURAN_API, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!res.ok) return [];
-
-    const data: Mp3QuranRadiosResponse = await res.json();
-
-    return (data.radios || []).map((r: Mp3QuranRadio) => ({
-      id: `mp3quran_${r.id}`,
-      name: r.name.trim(),
-      streamUrl: ensureHttps(r.url),
-      source: 'mp3quran' as const,
-      sourceId: String(r.id),
-      category: inferCategory({ name: r.name }),
-      language: 'ar',
-      isOnline: true,
-      lastChecked: r.recent_date,
-    }));
-  } catch (error) {
-    console.warn('[RadioService] mp3quran fetch failed:', error);
-    return [];
-  }
-}
-
-async function fetchRadioBrowser(): Promise<RadioStation[]> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    const [quranRes, islamicRes] = await Promise.all([
-      fetch(RADIO_BROWSER_API, { signal: controller.signal }),
-      fetch(RADIO_BROWSER_ISLAMIC_API, { signal: controller.signal }),
-    ]);
-    clearTimeout(timeout);
-
-    const quranData: RadioBrowserStation[] = quranRes.ok ? await quranRes.json() : [];
-    const islamicData: RadioBrowserStation[] = islamicRes.ok ? await islamicRes.json() : [];
-
-    // Deduplicate by stationuuid
-    const seen = new Set<string>();
-    const allStations = [...quranData, ...islamicData].filter((s) => {
-      if (seen.has(s.stationuuid)) return false;
-      seen.add(s.stationuuid);
-      return s.lastcheckok === 1;
-    });
-
-    return allStations.map((s) => ({
-      id: `rb_${s.stationuuid}`,
-      name: s.name.trim(),
-      streamUrl: ensureHttps(s.url_resolved || s.url),
-      streamUrlResolved: s.url_resolved ? ensureHttps(s.url_resolved) : undefined,
-      source: 'radio_browser' as const,
-      sourceId: s.stationuuid,
-      category: inferCategory({ name: s.name, tags: s.tags }),
-      country: s.countrycode || undefined,
-      language: s.language || undefined,
-      imageUrl: s.favicon || undefined,
-      codec: s.codec || undefined,
-      bitrate: s.bitrate || undefined,
-      tags: s.tags ? s.tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
-      isOnline: s.lastcheckok === 1,
-      votes: s.votes,
-    }));
-  } catch (error) {
-    console.warn('[RadioService] radio-browser fetch failed:', error);
-    return [];
-  }
-}
-
-async function fetchAdminStations(): Promise<RadioStation[]> {
+async function fetchFirestoreStations(): Promise<RadioStation[]> {
   try {
     const q = query(
       collection(db, 'admin_radio_stations'),
@@ -274,35 +116,7 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
   }
 }
 
-// ==================== Merge & Deduplicate ====================
-
-function deduplicateStations(stations: RadioStation[]): RadioStation[] {
-  const seen = new Map<string, RadioStation>();
-
-  for (const station of stations) {
-    // Normalize URL for dedup
-    const urlKey = station.streamUrl
-      .replace(/^https?:\/\//, '')
-      .replace(/\/$/, '')
-      .toLowerCase();
-
-    const nameKey = station.name.trim().toLowerCase();
-    const key = `${urlKey}__${nameKey}`;
-
-    if (!seen.has(key)) {
-      seen.set(key, station);
-    } else {
-      // Prefer admin > curated > mp3quran > radio_browser
-      const existing = seen.get(key)!;
-      const priority: Record<string, number> = { admin: 4, curated: 3, mp3quran: 2, radio_browser: 1 };
-      if ((priority[station.source] || 0) > (priority[existing.source] || 0)) {
-        seen.set(key, { ...station, imageUrl: station.imageUrl || existing.imageUrl });
-      }
-    }
-  }
-
-  return Array.from(seen.values());
-}
+// ==================== Sort ====================
 
 function sortStations(stations: RadioStation[]): RadioStation[] {
   return stations.sort((a, b) => {
@@ -311,9 +125,7 @@ function sortStations(stations: RadioStation[]): RadioStation[] {
     if (!a.isFeatured && b.isFeatured) return 1;
     // Then by order
     if ((a.order ?? 999) !== (b.order ?? 999)) return (a.order ?? 999) - (b.order ?? 999);
-    // Then by source priority
-    const pr: Record<string, number> = { admin: 0, curated: 1, mp3quran: 2, radio_browser: 3 };
-    return (pr[a.source] ?? 9) - (pr[b.source] ?? 9);
+    return 0;
   });
 }
 
@@ -380,32 +192,20 @@ export async function fetchAllStations(forceRefresh = false): Promise<RadioStati
 
   const config = await getRadioConfig();
 
-  // Fetch from all sources in parallel
-  const [mp3quranStations, radioBrowserStations, adminStations] = await Promise.all([
-    config?.showMp3Quran !== false ? fetchMp3Quran() : Promise.resolve([]),
-    config?.showRadioBrowser !== false ? fetchRadioBrowser() : Promise.resolve([]),
-    fetchAdminStations(),
-  ]);
-
-  // Merge: admin first, then curated, then external
-  const allStations = [
-    ...adminStations,
-    ...CURATED_STATIONS,
-    ...mp3quranStations,
-    ...radioBrowserStations,
-  ];
+  // Fetch all stations from Firestore
+  const stations = await fetchFirestoreStations();
 
   // Apply admin config: hide stations
   const hiddenIds = new Set(config?.hiddenStationIds || []);
-  const filtered = allStations.filter((s) => !hiddenIds.has(s.id) && !s.isHidden);
+  const filtered = stations.filter((s) => !hiddenIds.has(s.id) && !s.isHidden);
 
-  // Deduplicate and sort
-  const merged = sortStations(deduplicateStations(filtered));
+  // Sort
+  const sorted = sortStations(filtered);
 
   // Cache the result
-  await setCachedStations(merged);
+  await setCachedStations(sorted);
 
-  return merged;
+  return sorted;
 }
 
 export function filterByCategory(stations: RadioStation[], category: RadioCategory): RadioStation[] {
