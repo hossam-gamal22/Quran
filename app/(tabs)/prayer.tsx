@@ -106,7 +106,7 @@ export default function PrayerScreen() {
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
   const colors = useColors();
   const isRTL = useIsRTL();
-  const { appName, iconSource } = useAppIdentity();
+  const { appName, iconSource, logoSource } = useAppIdentity();
   const { config } = useAppConfig();
   const language = settings?.language || 'ar';
   const router = useRouter();
@@ -618,20 +618,20 @@ export default function PrayerScreen() {
                           {/* Thumbnail preview */}
                           {style.key === 'widget' && (
                             <View style={styles.thumbWidgetContainer}>
-                              <View style={styles.thumbWidgetCard}>
+                              <View style={[styles.thumbWidgetCard, { backgroundColor: isDarkMode ? '#1A1A2E' : 'rgba(0,0,0,0.06)' }]}>
                                 <View style={[styles.thumbWidgetRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                                   {/* Logo on left */}
                                   <View style={styles.thumbWidgetLogoSide}>
                                     <Image
-                                      source={iconSource}
+                                      source={logoSource}
                                       style={styles.thumbWidgetLogo}
                                     />
                                     <Text style={styles.thumbWidgetAppName}>{appName}</Text>
                                   </View>
                                   {/* Countdown on right */}
                                   <View style={styles.thumbWidgetCountdownSide}>
-                                    <Text style={styles.thumbWidgetCountdown}>03:13</Text>
-                                    <Text style={styles.thumbWidgetPrayerLabel}>{t('prayer.dhuhr')}</Text>
+                                    <Text style={[styles.thumbWidgetCountdown, { color: isDarkMode ? '#e0e0e0' : '#333' }]}>03:13</Text>
+                                    <Text style={[styles.thumbWidgetPrayerLabel, { color: isDarkMode ? '#aaa' : '#666' }]}>{t('prayer.dhuhr')}</Text>
                                   </View>
                                 </View>
                               </View>
@@ -925,20 +925,20 @@ const styles = StyleSheet.create({
   clockStyleActiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#2ECC71', marginTop: 2 },
   // Widget thumbnail — miniature of RectangleWidgetView
   thumbWidgetContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
-  thumbWidgetCard: { width: CLOCK_THUMB_SIZE - 4, height: CLOCK_THUMB_SIZE - 16, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.15)', justifyContent: 'center', paddingHorizontal: 4 },
+  thumbWidgetCard: { width: CLOCK_THUMB_SIZE - 4, height: CLOCK_THUMB_SIZE - 16, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 4 },
   thumbWidgetRow: { alignItems: 'center', justifyContent: 'space-between' },
   thumbWidgetLogoSide: { alignItems: 'center', gap: 1 },
   thumbWidgetLogo: { width: 18, height: 18, borderRadius: 5 },
   thumbWidgetAppName: { fontSize: 4, fontFamily: fontSemiBold(), color: '#0f987f' },
   thumbWidgetCountdownSide: { alignItems: 'center' },
-  thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), color: '#e0e0e0', letterSpacing: 0.5 },
-  thumbWidgetPrayerLabel: { fontSize: 5, fontFamily: fontSemiBold(), color: '#aaa' },
+  thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), letterSpacing: 0.5 },
+  thumbWidgetPrayerLabel: { fontSize: 5, fontFamily: fontSemiBold() },
   // Analog thumbnail
   thumbAnalogContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'visible' },
   // Digital thumbnail
   thumbDigitalContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
-  thumbDigitalTime: { fontSize: 14, fontFamily: fontBold(), color: '#333', letterSpacing: 1 },
-  thumbDigitalLabel: { fontSize: 7, fontFamily: fontSemiBold(), color: '#666', marginTop: -2 },
+  thumbDigitalTime: { fontSize: 14, fontFamily: fontBold(), letterSpacing: 1 },
+  thumbDigitalLabel: { fontSize: 7, fontFamily: fontSemiBold(), marginTop: -2 },
   thumbDigitalSeparator: { width: 20, height: 1, backgroundColor: 'rgba(47,118,89,0.4)', marginVertical: 2 },
   thumbDigitalCountdown: { fontSize: 9, fontFamily: fontBold(), color: '#555' },
 });
