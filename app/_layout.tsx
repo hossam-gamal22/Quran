@@ -14,13 +14,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { OfflineModal } from '@/components/ui/OfflineBanner';
 import { MaintenanceGuard } from '@/components/ui/MaintenanceGuard';
 import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
-import { SplashVideoOverlay } from '@/components/ui/SplashVideoOverlay';
 import { useSettings } from '@/contexts/SettingsContext';
 
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
 import { languageInitPromise, getLanguage } from '@/lib/i18n';
 import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Contexts
 import { SettingsProvider } from '@/contexts/SettingsContext';
@@ -357,7 +355,6 @@ export default function RootLayout() {
         syncWidgetDataToNative().catch(() => {});
       } else if (nextAppState === 'background') {
         syncLocalStats().catch(() => {});
-        AsyncStorage.setItem('@app_last_background_time', Date.now().toString()).catch(() => {});
       }
     };
     
@@ -540,7 +537,6 @@ export default function RootLayout() {
                         </Stack>
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
                         <DynamicSplashOverlay />
-                        <SplashVideoOverlay />
                         <ScreenshotBranding />
                           </OnboardingProvider>
                         </SeasonalProvider>
