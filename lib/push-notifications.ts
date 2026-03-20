@@ -92,7 +92,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: t('notifications.prayerTimesChannel'),
     description: t('notifications.prayerTimesDesc'),
     importance: Notifications.AndroidImportance.HIGH,
-    sound: 'default',
+    sound: 'general_reminder.mp3',
     vibrationPattern: [0, 250, 250, 250],
     lightColor: '#10B981',
   });
@@ -101,8 +101,9 @@ const setupAndroidChannels = async (): Promise<void> => {
   await Notifications.setNotificationChannelAsync('azkar', {
     name: t('notifications.azkarChannel'),
     description: t('notifications.azkarDesc'),
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'default',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'general_reminder.mp3',
+    vibrationPattern: [0, 250, 250, 250],
   });
 
   // Daily Ayah Channel
@@ -110,7 +111,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: t('notifications.dailyVerseChannel'),
     description: t('notifications.dailyVerseDesc'),
     importance: Notifications.AndroidImportance.HIGH,
-    sound: 'default',
+    sound: 'general_reminder.mp3',
     vibrationPattern: [0, 250, 250, 250],
   });
 
@@ -119,7 +120,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: t('notifications.generalChannel'),
     description: t('notifications.generalDesc'),
     importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'default',
+    sound: 'general_reminder.mp3',
   });
 
   // Seasonal Content Channel
@@ -127,6 +128,7 @@ const setupAndroidChannels = async (): Promise<void> => {
     name: t('notifications.seasonalChannel'),
     description: t('notifications.seasonalChannelDesc'),
     importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'general_reminder.mp3',
   });
 };
 

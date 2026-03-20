@@ -158,7 +158,7 @@ export async function scheduleWirdNotifications(
     content: {
       title: t('settings.morningWirdTitle'),
       body: t('settings.morningWirdBody'),
-      sound: 'default',
+      sound: resolveNotificationSound('general_reminder', true),
       data: { type: 'wird', period: 'morning' },
       ...(Platform.OS === 'android' && { channelId: 'azkar' }),
     },
@@ -175,7 +175,7 @@ export async function scheduleWirdNotifications(
     content: {
       title: t('settings.eveningWirdTitle'),
       body: t('settings.eveningWirdBody'),
-      sound: 'default',
+      sound: resolveNotificationSound('general_reminder', true),
       data: { type: 'wird', period: 'evening' },
       ...(Platform.OS === 'android' && { channelId: 'azkar' }),
     },
@@ -218,7 +218,7 @@ export async function scheduleDailyAyahNotification(
     content: {
       title: t('settings.dailyAyahTitle'),
       body: ayahData.text,
-      sound: 'default',
+      sound: resolveNotificationSound('general_reminder', true),
       data: { type: 'daily_ayah' },
       ...(Platform.OS === 'android' && { channelId: 'daily-ayah' }),
     },
@@ -416,7 +416,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.morningWirdTitle'),
           body: t('settings.morningWirdBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'wird', period: 'morning', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
         morning.hour,
@@ -434,7 +434,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.eveningWirdTitle'),
           body: t('settings.eveningWirdBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'wird', period: 'evening', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
         evening.hour,
@@ -452,7 +452,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.sleepAzkarTitle'),
           body: t('settings.sleepAzkarBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'wird', period: 'sleep', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
         sleep.hour,
@@ -470,7 +470,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.wakeupAzkarTitle'),
           body: t('settings.wakeupAzkarBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'wird', period: 'wakeup', soundType: notifSettings.azkarSoundType || 'general_reminder' },
         },
         wakeup.hour,
@@ -506,7 +506,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.dailyAyahTitle'),
           body: notifBody,
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.dailyVerseSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'daily_ayah', soundType: notifSettings.dailyVerseSoundType || 'general_reminder' },
         },
         dailyTime.hour,
@@ -530,7 +530,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.salawatTitle'),
           body: t('settings.salawatBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.salawatSoundType || 'salawat', notifSettings.sound),
           data: { type: 'salawat', soundType: notifSettings.salawatSoundType || 'salawat' },
         },
         salawatTime.hour,
@@ -553,7 +553,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.tasbihReminderTitle'),
           body: t('settings.tasbihReminderBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.tasbihSoundType || 'tasbih', notifSettings.sound),
           data: { type: 'tasbih', soundType: notifSettings.tasbihSoundType || 'tasbih' },
         },
         tasbihTime.hour,
@@ -576,7 +576,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.istighfarTitle'),
           body: t('settings.istighfarBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.istighfarSoundType || 'istighfar', notifSettings.sound),
           data: { type: 'istighfar', soundType: notifSettings.istighfarSoundType || 'istighfar' },
         },
         istighfarTime.hour,
@@ -629,7 +629,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title,
           body,
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(soundType, notifSettings.sound),
           data: { 
             type: 'custom', 
             soundType,
@@ -667,7 +667,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.quranReadingNotifTitle'),
           body: t('settings.quranReadingNotifBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound(notifSettings.quranReminderSoundType || 'general_reminder', notifSettings.sound),
           data: { type: 'quran_reading', soundType: notifSettings.quranReminderSoundType || 'general_reminder' },
         },
         quranTime.hour,
@@ -691,7 +691,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: t('settings.worshipDailySummaryTitle'),
           body: t('settings.worshipDailySummaryBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound('general_reminder', notifSettings.sound),
           data: { type: 'worship_summary' },
         },
         summaryTime.hour,
@@ -712,7 +712,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         content: {
           title: t('settings.worshipWeeklyReportTitle'),
           body: t('settings.worshipWeeklyReportBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound('general_reminder', notifSettings.sound),
           data: { type: 'worship_weekly' },
           ...(Platform.OS === 'android' && { channelId: 'general' }),
         },
@@ -764,7 +764,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         content: {
           title: t('settings.kahfTitle'),
           body: t('settings.kahfBody'),
-          sound: notifSettings.sound ? 'default' : undefined,
+          sound: resolveNotificationSound('general_reminder', notifSettings.sound),
           data: {
             type: 'kahf',
             soundType: 'general_reminder',

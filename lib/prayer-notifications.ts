@@ -76,7 +76,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#1B6B3A',
-      sound: 'default',
+      sound: 'general_reminder.mp3',
     });
   }
 
@@ -166,7 +166,7 @@ export async function schedulePrayerNotifications(
             title: `${emoji} ${prayerName}`,
             body: message,
             data: { prayer: prayerKey, time: timeStr },
-            sound: 'default',
+            sound: 'general_reminder.mp3',
             priority: Notifications.AndroidNotificationPriority.HIGH,
             ...(Platform.OS === 'android' && { channelId: 'prayer-times' }),
           },

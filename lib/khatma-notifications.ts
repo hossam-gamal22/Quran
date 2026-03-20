@@ -46,7 +46,7 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#2f7659',
-        sound: 'default',
+        sound: 'general_reminder.mp3',
       });
     }
 
@@ -119,7 +119,7 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
           type: 'khatma_reminder', 
           khatmaId: khatma.id,
         },
-        sound: 'default',
+        sound: 'general_reminder.mp3',
         priority: Notifications.AndroidNotificationPriority.HIGH,
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
@@ -199,7 +199,7 @@ export const sendTestKhatmaNotification = async (): Promise<void> => {
       content: {
         title: `📖 ${t('notifications.testTitle')}`,
         body: t('notifications.testBody'),
-        sound: 'default',
+        sound: 'general_reminder.mp3',
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate
@@ -219,7 +219,7 @@ export const sendKhatmaCompletionNotification = async (khatmaName: string): Prom
       content: {
         title: `🎉 ${t('notifications.khatmaComplete')}`,
         body: `${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`,
-        sound: 'default',
+        sound: 'general_reminder.mp3',
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate
@@ -239,7 +239,7 @@ export const sendWirdCompletionNotification = async (): Promise<void> => {
       content: {
         title: `✅ ${t('notifications.wellDone')}`,
         body: t('khatma.wirdCompletedMsg'),
-        sound: 'default',
+        sound: 'general_reminder.mp3',
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate
