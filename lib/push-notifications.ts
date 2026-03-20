@@ -109,14 +109,17 @@ const setupAndroidChannels = async (): Promise<void> => {
   await Notifications.setNotificationChannelAsync('daily-ayah', {
     name: t('notifications.dailyVerseChannel'),
     description: t('notifications.dailyVerseDesc'),
-    importance: Notifications.AndroidImportance.DEFAULT,
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 250, 250, 250],
   });
 
   // General Updates Channel
   await Notifications.setNotificationChannelAsync('general', {
     name: t('notifications.generalChannel'),
     description: t('notifications.generalDesc'),
-    importance: Notifications.AndroidImportance.LOW,
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'default',
   });
 
   // Seasonal Content Channel

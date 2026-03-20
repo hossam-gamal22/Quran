@@ -148,7 +148,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     ayat_universe: true,
     hadith_sifat: true,
   },
-  showAdOnAppOpen: false,
+  showAdOnAppOpen: true,
   showAdOnQiblaStyleChange: true,
   interstitialMode: 'pages',
   interstitialFrequency: 5,

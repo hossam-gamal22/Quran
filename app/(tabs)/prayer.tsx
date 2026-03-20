@@ -640,7 +640,7 @@ export default function PrayerScreen() {
                           {style.key === 'analog' && (
                             <View style={styles.thumbAnalogContainer}>
                               <Svg width={CLOCK_THUMB_SIZE - 20} height={CLOCK_THUMB_SIZE - 20} viewBox="0 0 100 100">
-                                <Circle cx="50" cy="50" r="45" stroke={isDarkMode ? '#555' : '#ccc'} strokeWidth="2" fill="none" />
+                                <Circle cx="50" cy="50" r="45" stroke={isDarkMode ? '#888' : '#ccc'} strokeWidth="2" fill="transparent" />
                                 {/* Hour markers */}
                                 {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle) => (
                                   <Line
@@ -934,7 +934,7 @@ const styles = StyleSheet.create({
   thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), color: '#e0e0e0', letterSpacing: 0.5 },
   thumbWidgetPrayerLabel: { fontSize: 5, fontFamily: fontSemiBold(), color: '#aaa' },
   // Analog thumbnail
-  thumbAnalogContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
+  thumbAnalogContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent', overflow: 'visible' },
   // Digital thumbnail
   thumbDigitalContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
   thumbDigitalTime: { fontSize: 14, fontFamily: fontBold(), color: '#333', letterSpacing: 1 },
