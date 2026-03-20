@@ -27,6 +27,14 @@ const MP3QURAN_API = 'https://www.mp3quran.net/api/v3/radios?language=ar';
 const RADIO_BROWSER_API = 'https://de1.api.radio-browser.info/json/stations/bytag/quran?limit=100&order=votes&reverse=true&hidebroken=true';
 const RADIO_BROWSER_ISLAMIC_API = 'https://de1.api.radio-browser.info/json/stations/bytag/islamic?limit=50&order=votes&reverse=true&hidebroken=true';
 
+// ==================== Helpers ====================
+
+/** Upgrade http:// to https:// — Android 9+ blocks cleartext HTTP by default */
+function ensureHttps(url: string): string {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
 // ==================== Stream Fallback URLs ====================
 
 const STREAM_FALLBACKS: Record<string, string[]> = {
@@ -169,7 +177,7 @@ async function fetchMp3Quran(): Promise<RadioStation[]> {
     return (data.radios || []).map((r: Mp3QuranRadio) => ({
       id: `mp3quran_${r.id}`,
       name: r.name.trim(),
-      streamUrl: r.url,
+      streamUrl: ensureHttps(r.url),
       source: 'mp3quran' as const,
       sourceId: String(r.id),
       category: inferCategory({ name: r.name }),
@@ -208,8 +216,8 @@ async function fetchRadioBrowser(): Promise<RadioStation[]> {
     return allStations.map((s) => ({
       id: `rb_${s.stationuuid}`,
       name: s.name.trim(),
-      streamUrl: s.url_resolved || s.url,
-      streamUrlResolved: s.url_resolved,
+      streamUrl: ensureHttps(s.url_resolved || s.url),
+      streamUrlResolved: s.url_resolved ? ensureHttps(s.url_resolved) : undefined,
       source: 'radio_browser' as const,
       sourceId: s.stationuuid,
       category: inferCategory({ name: s.name, tags: s.tags }),

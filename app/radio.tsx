@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader, GlassCard, NativeTabs } from '@/components/ui';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -36,7 +37,15 @@ import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 
 const ACCENT = '#22C55E';
 
-export default function RadioScreen() {
+export default function RadioScreenWrapper() {
+  return (
+    <ErrorBoundary>
+      <RadioScreen />
+    </ErrorBoundary>
+  );
+}
+
+function RadioScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
   const { isDarkMode } = useSettings();
@@ -134,8 +143,9 @@ export default function RadioScreen() {
         }, 20_000);
         await playRadio(station);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Radio playback error:', e);
+      setError(e?.message || t('radio.connectionError'));
     }
   }, [radioState, playRadio, stopRadio]);
 

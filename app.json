@@ -45,6 +45,7 @@
       "package": "com.rooh.almuslim",
       "versionCode": 1,
       "permissions": [
+        "INTERNET",
         "VIBRATE",
         "RECEIVE_BOOT_COMPLETED",
         "ACCESS_FINE_LOCATION",

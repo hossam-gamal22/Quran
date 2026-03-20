@@ -252,6 +252,27 @@ export const radioPlayer = {
 
     registerPlayerEvents();
 
+    // Playback timeout — if no state change within 15s, surface error
+    let playbackStarted = false;
+    const playbackTimeout = setTimeout(() => {
+      if (!playbackStarted && currentState.status === 'loading') {
+        console.warn('[RadioPlayer] Playback timeout — no response after 15s');
+        updateState({
+          status: 'error',
+          errorMessage: 'Stream connection timed out',
+        });
+      }
+    }, 15_000);
+
+    // Mark started when state changes from loading
+    const unsub = radioPlayer.subscribe((s) => {
+      if (s.status !== 'loading') {
+        playbackStarted = true;
+        clearTimeout(playbackTimeout);
+        unsub();
+      }
+    });
+
     try {
       await TP.reset();
 
@@ -268,6 +289,8 @@ export const radioPlayer = {
 
       await TP.play();
     } catch (error) {
+      clearTimeout(playbackTimeout);
+      unsub();
       console.error('[RadioPlayer] Failed to play station:', error);
       updateState({
         status: 'error',
