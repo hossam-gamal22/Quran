@@ -514,7 +514,7 @@ interface GlassHeaderProps {
 
 function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isPageFavorited, currentPage, onTafsir, onPlay, onBack, onToggleFavorite, onShare }: GlassHeaderProps) {
   return (
-    <View style={gh.wrapper}>
+    <View style={gh.wrapper} collapsable={false}>
       <BlurView
         intensity={Platform.OS === 'ios' ? 60 : 40}
         tint={isLightBg ? 'light' : 'dark'}
@@ -570,9 +570,11 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isP
 const gh = StyleSheet.create({
   wrapper: {
     zIndex: 10,
+    height: 48,
     overflow: 'hidden',
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
+    ...Platform.select({ android: { elevation: 5 } }),
   },
   blur: {
     borderBottomLeftRadius: 16,
@@ -1326,7 +1328,9 @@ export default function SurahScreen() {
           )}
 
           {/* ═══ MUSHAF PAGES ═══ */}
-          {pageContent}
+          <View style={{ flex: 1, overflow: 'hidden' }}>
+            {pageContent}
+          </View>
 
           {/* ═══ TARGET AYAH INDICATOR ═══ */}
           {targetAyah && highlightAyahKey && (
