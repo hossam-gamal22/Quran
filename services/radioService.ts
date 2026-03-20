@@ -48,10 +48,11 @@ export async function resolveStreamUrl(
   primaryUrl: string,
   timeoutMs = 5000
 ): Promise<string> {
-  const fallbacks = STREAM_FALLBACKS[primaryUrl];
-  if (!fallbacks || fallbacks.length === 0) return primaryUrl;
+  const safeUrl = ensureHttps(primaryUrl);
+  const fallbacks = STREAM_FALLBACKS[safeUrl];
+  if (!fallbacks || fallbacks.length === 0) return safeUrl;
 
-  const urls = [primaryUrl, ...fallbacks];
+  const urls = [safeUrl, ...fallbacks];
   for (const url of urls) {
     try {
       const controller = new AbortController();
@@ -63,7 +64,7 @@ export async function resolveStreamUrl(
       continue;
     }
   }
-  return primaryUrl;
+  return safeUrl;
 }
 
 // ==================== Arabic Country Name Mapping ====================
@@ -250,7 +251,7 @@ async function fetchAdminStations(): Promise<RadioStation[]> {
         id: `admin_${d.id}`,
         name: data.name,
         nameTranslations: data.nameTranslations,
-        streamUrl: data.streamUrl,
+        streamUrl: ensureHttps(data.streamUrl),
         source: 'admin' as const,
         sourceId: d.id,
         category: data.category,

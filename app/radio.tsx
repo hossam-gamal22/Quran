@@ -127,7 +127,6 @@ function RadioScreen() {
   const handlePlayStation = useCallback(async (station: RadioStation) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      setError(null);
       console.log('[Radio] handlePlayStation:', station.name, station.streamUrl);
       if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
         // Stopping — clear the ad timer
@@ -149,8 +148,10 @@ function RadioScreen() {
         console.log('[Radio] playRadio call completed');
       }
     } catch (e: any) {
+      // Don't set component-level error — playback errors are handled by
+      // radioState.status === 'error' and the playback error banner UI.
+      // Setting error here would hide the entire station list.
       console.error('[Radio] handlePlayStation error:', e);
-      setError(e?.message || t('radio.connectionError'));
     }
   }, [radioState, playRadio, stopRadio]);
 
