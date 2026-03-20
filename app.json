@@ -51,6 +51,7 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS"
       ],
       "googleServicesFile": "./google-services.json",
@@ -64,6 +65,11 @@
           "category": ["DEFAULT", "BROWSABLE"]
         }
       ]
+    },
+    "notification": {
+      "icon": "./assets/images/icons/notification-icon.png",
+      "color": "#22c55e",
+      "androidMode": "default"
     },
     "web": {
       "bundler": "metro",
@@ -86,7 +92,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icons/notification-icon.png",
-          "color": "#10B981",
+          "color": "#22c55e",
           "androidMode": "default",
           "androidCollapsedTitle": "روح المسلم"
         }

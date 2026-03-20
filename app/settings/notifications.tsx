@@ -233,6 +233,7 @@ const springLayoutAnimation = () => {
 // ========================================
 
 const sendTestNotification = async (title: string, body: string, soundType?: string, extraData?: Record<string, any>) => {
+  if (!__DEV__) return;
   try {
     // 1) Immediate notification
     await Notifications.scheduleNotificationAsync({
@@ -1387,6 +1388,7 @@ export default function NotificationsScreen() {
 
     return (
       <View style={[styles.actionButtonsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        {__DEV__ && (
         <TouchableOpacity
           style={[styles.testButton, isDarkMode && styles.testButtonDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={() => {
@@ -1399,6 +1401,7 @@ export default function NotificationsScreen() {
             {t('notificationSounds.testNotification')}
           </Text>
         </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.closeButton, isDarkMode && styles.closeButtonDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}

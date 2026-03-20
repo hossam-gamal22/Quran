@@ -124,10 +124,9 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: hours,
         minute: minutes,
-        repeats: true,
       },
     });
 
@@ -191,6 +190,7 @@ export const cancelAllKhatmaReminders = async (): Promise<void> => {
 
 // ===== SEND IMMEDIATE NOTIFICATION (FOR TESTING) =====
 export const sendTestKhatmaNotification = async (): Promise<void> => {
+  if (!__DEV__) return;
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
