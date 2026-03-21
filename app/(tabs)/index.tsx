@@ -939,20 +939,21 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let mounted = true;
-    // 1) Load from AsyncStorage cache instantly (no flash)
-    AsyncStorage.getItem('remote_app_config').then(cached => {
-      if (!mounted) return;
-      if (cached) {
-        try {
-          const cfg = JSON.parse(cached);
-          if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
-        } catch {}
-      }
-    });
-    // 2) Then fetch from Firebase (updates if changed)
+    // Fetch fresh config from Firebase first to avoid stale image flash
     fetchAppConfig().then(cfg => {
       if (mounted && cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
-    }).catch(() => {});
+    }).catch(() => {
+      // Fallback to AsyncStorage cache only if Firebase fails
+      AsyncStorage.getItem('remote_app_config').then(cached => {
+        if (!mounted) return;
+        if (cached) {
+          try {
+            const cfg = JSON.parse(cached);
+            if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+          } catch {}
+        }
+      });
+    });
     return () => { mounted = false; };
   }, []);
 
@@ -1106,11 +1107,13 @@ export default function HomeScreen() {
                 const bannerBg = (!isRTLLang && welcomeBanner.backgroundImageNonAr) ? welcomeBanner.backgroundImageNonAr : welcomeBanner.backgroundImage;
                 
                 return welcomeBanner.displayMode === 'image_only' && bannerBg ? (
-                  <Image
-                    source={{ uri: bannerBg }}
-                    style={styles.seasonCardImage}
-                    resizeMode="cover"
-                  />
+                  <View style={[styles.seasonCardImage, { backgroundColor: `${welcomeBanner.color}22`, overflow: 'hidden' }]}>
+                    <Image
+                      source={{ uri: bannerBg }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 ) : welcomeBanner.displayMode === 'text_image' && bannerBg ? (
                   <ImageBackground
                     source={{ uri: bannerBg }}
@@ -1823,7 +1826,7 @@ const styles = StyleSheet.create({
   },
   seasonCardImage: {
     borderRadius: 20,
-    height: 120,
+    aspectRatio: 3.5,
     marginBottom: 20,
     width: '100%',
   },

@@ -28,7 +28,6 @@ import {
   Trophy,
   Timer,
   CalendarHeart,
-  Quote,
   Fingerprint,
   CalendarDays,
   Repeat,
@@ -99,12 +98,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
 
 // استيراد الصفحات
 import Dashboard from './pages/Dashboard';
-import Content from './pages/Content';
 import Notifications from './pages/Notifications';
 import SettingsPage from './pages/Settings';
 import Seasonal from './pages/Seasonal';
 import Analytics from './pages/Analytics';
-import SplashScreens from './pages/SplashScreens';
 import AzkarManager from './pages/AzkarManager';
 import UsersPage from './pages/Users';
 import Subscriptions from './pages/Subscriptions';
@@ -120,7 +117,6 @@ import BundledSoundsManager from './pages/BundledSoundsManager';
 import TempPagesManager from './pages/TempPagesManager';
 import DailyContentManager from './pages/DailyContentManager';
 import DailyDhikrManager from './pages/DailyDhikrManager';
-import QuotesManager from './pages/QuotesManager';
 import QuranThemesManager from './pages/QuranThemesManager';
 import TasbihPresetsManager from './pages/TasbihPresetsManager';
 import IslamicEventsManager from './pages/IslamicEventsManager';
@@ -135,7 +131,6 @@ import ContentManager from './pages/ContentManager';
 import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
 import RouteGuide from './pages/RouteGuide';
-import BrandingManager from './pages/BrandingManager';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -158,10 +153,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'المحتوى',
     icon: FileText,
     items: [
-      { path: '/content', icon: FileText, label: 'المحتوى العام' },
       { path: '/daily-content', icon: CalendarHeart, label: 'المحتوى اليومي' },
       { path: '/content-manager', icon: BookOpen, label: 'المحتوى الديني' },
-      { path: '/quotes', icon: Quote, label: 'الحكم والأقوال' },
       { path: '/temp-pages', icon: Timer, label: 'صفحات مؤقتة' },
     ],
   },
@@ -246,9 +239,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'إعدادات التطبيق',
     icon: Settings,
     items: [
-      { path: '/branding', icon: Fingerprint, label: 'هوية التطبيق' },
       { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
-      { path: '/splash-screens', icon: Sparkles, label: 'شاشات البداية' },
       { path: '/onboarding', icon: UserPlus, label: 'شاشات التأهيل' },
       { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
@@ -474,11 +465,10 @@ const App: React.FC = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/welcome-banner" element={<WelcomeBanner />} />
               <Route path="/highlights" element={<HighlightsManager />} />
-              <Route path="/splash-screens" element={<SplashScreens />} />
-              <Route path="/content" element={<Content />} />
+
               <Route path="/daily-content" element={<DailyContentManager />} />
               <Route path="/daily-dhikr" element={<DailyDhikrManager />} />
-              <Route path="/quotes" element={<QuotesManager />} />
+
               <Route path="/azkar" element={<AzkarManager />} />
               <Route path="/duas" element={<DuasManager />} />
               <Route path="/notifications" element={<Notifications />} />
@@ -504,7 +494,7 @@ const App: React.FC = () => {
               <Route path="/temp-pages" element={<TempPagesManager />} />
               <Route path="/sdui" element={<SDUIManager />} />
               <Route path="/onboarding" element={<OnboardingManager />} />
-              <Route path="/branding" element={<BrandingManager />} />
+
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />
