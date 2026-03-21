@@ -136,16 +136,18 @@ const Dashboard: React.FC = () => {
         const activitySnapshot = await getDocs(
           query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(5))
         );
-        activityData = activitySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            type: data.type || 'user',
-            description: data.description || '',
-            time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
-            country: data.country,
-          };
-        });
+        activityData = activitySnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              type: data.type || 'user',
+              description: data.description || '',
+              time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
+              country: data.country,
+            };
+          })
+          .filter(item => item.description.trim().length > 0);
       } catch (e) {
         console.log('Activity collection not found or empty');
       }
@@ -329,21 +331,25 @@ const Dashboard: React.FC = () => {
         <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
           <h2 className="text-lg font-bold text-white mb-4">النشاط الأخير</h2>
           <div className="space-y-3">
-            {activity.map(item => (
-              <div key={item.id} className="flex items-start gap-3 py-2 border-b border-slate-700/50 last:border-0">
-                <div className="mt-1">
-                  {item.type === 'user' && <Users className="w-4 h-4 text-blue-400" />}
-                  {item.type === 'azkar' && <Moon className="w-4 h-4 text-purple-400" />}
-                  {item.type === 'quran' && <BookOpen className="w-4 h-4 text-emerald-400" />}
-                  {item.type === 'info' && <AlertCircle className="w-4 h-4 text-amber-400" />}
+            {activity.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">لا يوجد نشاط حالي</p>
+            ) : (
+              activity.map(item => (
+                <div key={item.id} className="flex items-start gap-3 py-2 border-b border-slate-700/50 last:border-0">
+                  <div className="mt-1">
+                    {item.type === 'user' && <Users className="w-4 h-4 text-blue-400" />}
+                    {item.type === 'azkar' && <Moon className="w-4 h-4 text-purple-400" />}
+                    {item.type === 'quran' && <BookOpen className="w-4 h-4 text-emerald-400" />}
+                    {item.type === 'info' && <AlertCircle className="w-4 h-4 text-amber-400" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-300">{item.description}</p>
+                    <p className="text-xs text-slate-500 mt-1">{item.time}</p>
+                  </div>
+                  {item.country && <span className="text-lg">{item.country}</span>}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-slate-300">{item.description}</p>
-                  <p className="text-xs text-slate-500 mt-1">{item.time}</p>
-                </div>
-                {item.country && <span className="text-lg">{item.country}</span>}
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
