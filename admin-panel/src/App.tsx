@@ -102,7 +102,6 @@ import Dashboard from './pages/Dashboard';
 import Content from './pages/Content';
 import Notifications from './pages/Notifications';
 import SettingsPage from './pages/Settings';
-import Themes from './pages/Themes';
 import Seasonal from './pages/Seasonal';
 import Analytics from './pages/Analytics';
 import SplashScreens from './pages/SplashScreens';
@@ -118,9 +117,6 @@ import AppContentManager from './pages/AppContentManager';
 import HomePageManager from './pages/HomePageManager';
 import SoundManager from './pages/SoundManager';
 import BundledSoundsManager from './pages/BundledSoundsManager';
-import BackgroundManager from './pages/BackgroundManager';
-import PhotoBackgroundManager from './pages/PhotoBackgroundManager';
-import WidgetDesignManager from './pages/WidgetDesignManager';
 import TempPagesManager from './pages/TempPagesManager';
 import DailyContentManager from './pages/DailyContentManager';
 import DailyDhikrManager from './pages/DailyDhikrManager';
@@ -181,15 +177,11 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    id: 'appearance',
-    label: 'المظهر والتصميم',
-    icon: Palette,
+    id: 'quran-themes',
+    label: 'ثيمات القرآن',
+    icon: Fingerprint,
     items: [
-      { path: '/themes', icon: Palette, label: 'الثيمات' },
       { path: '/quran-themes', icon: Fingerprint, label: 'ثيمات القرآن' },
-      { path: '/backgrounds', icon: ImageIcon, label: 'الخلفيات' },
-      { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
-      { path: '/widget-designs', icon: Smartphone, label: 'تصميمات الودجات' },
     ],
   },
   {
@@ -490,7 +482,6 @@ const App: React.FC = () => {
               <Route path="/azkar" element={<AzkarManager />} />
               <Route path="/duas" element={<DuasManager />} />
               <Route path="/notifications" element={<Notifications />} />
-              <Route path="/themes" element={<Themes />} />
               <Route path="/quran-themes" element={<QuranThemesManager />} />
               <Route path="/tasbih-presets" element={<TasbihPresetsManager />} />
               <Route path="/islamic-events" element={<IslamicEventsManager />} />
@@ -509,9 +500,6 @@ const App: React.FC = () => {
               <Route path="/sounds" element={<SoundManager />} />
               <Route path="/bundled-sounds" element={<BundledSoundsManager />} />
               <Route path="/radio" element={<RadioManager />} />
-              <Route path="/backgrounds" element={<BackgroundManager />} />
-              <Route path="/photo-backgrounds" element={<PhotoBackgroundManager />} />
-              <Route path="/widget-designs" element={<WidgetDesignManager />} />
               <Route path="/pdf-templates" element={<PdfTemplatesManager />} />
               <Route path="/temp-pages" element={<TempPagesManager />} />
               <Route path="/sdui" element={<SDUIManager />} />
