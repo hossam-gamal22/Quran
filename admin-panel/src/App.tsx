@@ -1,5 +1,5 @@
 // admin-panel/src/App.tsx
-import React, { useState } from 'react';
+import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -38,7 +38,64 @@ import {
   Languages,
   Radio,
   ChevronDown,
+  Music,
+  AlertTriangle,
 } from 'lucide-react';
+
+// ==================== Error Boundary ====================
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: ErrorInfo | null;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.setState({ errorInfo });
+    console.error('App Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6" dir="rtl">
+          <div className="bg-slate-800 rounded-2xl p-8 max-w-2xl w-full border border-red-500/50">
+            <div className="flex items-center gap-3 mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+              <h1 className="text-xl font-bold text-white">حدث خطأ في التطبيق</h1>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 mb-4 overflow-auto max-h-60">
+              <p className="text-red-400 font-mono text-sm whitespace-pre-wrap">
+                {this.state.error?.toString()}
+              </p>
+              {this.state.errorInfo && (
+                <p className="text-slate-500 font-mono text-xs mt-2 whitespace-pre-wrap">
+                  {this.state.errorInfo.componentStack}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-xl hover:bg-emerald-700 transition-colors"
+            >
+              إعادة تحميل الصفحة
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // استيراد الصفحات
 import Dashboard from './pages/Dashboard';
@@ -60,6 +117,7 @@ import NavigationUI from './pages/NavigationUI';
 import AppContentManager from './pages/AppContentManager';
 import HomePageManager from './pages/HomePageManager';
 import SoundManager from './pages/SoundManager';
+import BundledSoundsManager from './pages/BundledSoundsManager';
 import BackgroundManager from './pages/BackgroundManager';
 import PhotoBackgroundManager from './pages/PhotoBackgroundManager';
 import WidgetDesignManager from './pages/WidgetDesignManager';
@@ -149,7 +207,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'الوسائط',
     icon: Volume2,
     items: [
-      { path: '/sounds', icon: Volume2, label: 'الأصوات' },
+      { path: '/sounds', icon: Volume2, label: 'إعدادات الأصوات' },
+      { path: '/bundled-sounds', icon: Music, label: 'أصوات الإشعارات' },
       { path: '/radio', icon: Radio, label: 'الراديو' },
     ],
   },
@@ -448,6 +507,7 @@ const App: React.FC = () => {
               <Route path="/app-content" element={<AppContentManager />} />
               <Route path="/home-page" element={<HomePageManager />} />
               <Route path="/sounds" element={<SoundManager />} />
+              <Route path="/bundled-sounds" element={<BundledSoundsManager />} />
               <Route path="/radio" element={<RadioManager />} />
               <Route path="/backgrounds" element={<BackgroundManager />} />
               <Route path="/photo-backgrounds" element={<PhotoBackgroundManager />} />
@@ -480,4 +540,11 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+// تصدير التطبيق مع Error Boundary
+const AppWithErrorBoundary: React.FC = () => (
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
+
+export default AppWithErrorBoundary;
