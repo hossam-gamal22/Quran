@@ -2,6 +2,7 @@
 // إدارة الصفحة الرئيسية - تحكم كامل
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Save,
   RefreshCw,
@@ -17,11 +18,10 @@ import {
   BookOpen,
   Star,
   Settings2,
-  Type,
-  Image as ImageIcon,
   ToggleLeft,
   ToggleRight,
   Zap,
+  ExternalLink,
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -67,19 +67,6 @@ interface QuickAccessItem {
   route?: string;
 }
 
-interface ThemeConfig {
-  primary: string;
-  accent: string;
-  background: string;
-  cardBackground: string;
-  textPrimary: string;
-  textSecondary: string;
-  headerGradientStart: string;
-  headerGradientEnd: string;
-  backgroundImageUrl: string;
-  appIconUrl: string;
-}
-
 interface HomePageConfig {
   highlights: {
     items: HomeHighlightItem[];
@@ -91,7 +78,6 @@ interface HomePageConfig {
     items: QuickAccessItem[];
   };
   dailyContent: DailyContentConfig;
-  theme: ThemeConfig;
   updatedAt?: string;
 }
 
@@ -163,45 +149,16 @@ const DEFAULT_DAILY_CONTENT: DailyContentConfig = {
   verseCustomText: '',
 };
 
-const DEFAULT_THEME: ThemeConfig = {
-  primary: '#1B4332',
-  accent: '#2f7659',
-  background: '#f5f5f5',
-  cardBackground: '#ffffff',
-  textPrimary: '#333333',
-  textSecondary: '#888888',
-  headerGradientStart: '#1B4332',
-  headerGradientEnd: '#2f7659',
-  backgroundImageUrl: '',
-  appIconUrl: '',
-};
-
 const DEFAULT_CONFIG: HomePageConfig = {
   highlights: { items: DEFAULT_HIGHLIGHTS },
   sections: { items: DEFAULT_SECTIONS },
   quickAccess: { items: DEFAULT_QUICK_ACCESS },
   dailyContent: DEFAULT_DAILY_CONTENT,
-  theme: DEFAULT_THEME,
 };
-
-// ==================== Color Presets ====================
-
-const COLOR_PRESETS = [
-  { value: '#1B4332', label: 'أخضر داكن' },
-  { value: '#2f7659', label: 'أخضر' },
-  { value: '#0D9488', label: 'تركوازي' },
-  { value: '#1e40af', label: 'أزرق' },
-  { value: '#5b21b6', label: 'بنفسجي' },
-  { value: '#be123c', label: 'أحمر' },
-  { value: '#DAA520', label: 'ذهبي' },
-  { value: '#7c2d12', label: 'بني' },
-  { value: '#e91e63', label: 'وردي' },
-  { value: '#333333', label: 'رمادي داكن' },
-];
 
 // ==================== Component ====================
 
-type ActiveTab = 'sections' | 'highlights' | 'quick_access' | 'daily' | 'theme';
+type ActiveTab = 'sections' | 'highlights' | 'quick_access' | 'daily';
 
 export default function HomePageManager() {
   const [config, setConfig] = useState<HomePageConfig>(DEFAULT_CONFIG);
@@ -235,7 +192,6 @@ export default function HomePageManager() {
                 : DEFAULT_QUICK_ACCESS,
             },
             dailyContent: { ...DEFAULT_DAILY_CONTENT, ...data.dailyContent },
-            theme: { ...DEFAULT_THEME, ...data.theme },
           });
         }
       } catch (err) {
@@ -346,13 +302,6 @@ export default function HomePageManager() {
     }));
   };
 
-  const updateTheme = (key: keyof ThemeConfig, value: string) => {
-    setConfig(prev => ({
-      ...prev,
-      theme: { ...prev.theme, [key]: value },
-    }));
-  };
-
   // ==================== Render ====================
 
   if (isLoading) {
@@ -368,7 +317,6 @@ export default function HomePageManager() {
     { key: 'highlights', label: 'الهايلايتس', icon: <Star className="w-4 h-4" /> },
     { key: 'quick_access', label: 'الوصول السريع', icon: <Zap className="w-4 h-4" /> },
     { key: 'daily', label: 'المحتوى اليومي', icon: <BookOpen className="w-4 h-4" /> },
-    { key: 'theme', label: 'المظهر والألوان', icon: <Palette className="w-4 h-4" /> },
   ];
 
   const sortedHighlights = [...config.highlights.items].sort((a, b) => a.order - b.order);
@@ -635,82 +583,108 @@ export default function HomePageManager() {
         <div className="space-y-4">
           <div className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4">
             <p className="text-slate-400 text-sm">
-              تحكم بترتيب وظهور عناصر الوصول السريع في الصفحة الرئيسية. يمكنك تفعيل أو تعطيل أي عنصر وتغيير ترتيبه.
+              تحكم بترتيب وظهور عناصر الوصول السريع في الصفحة الرئيسية. اضغط على العنصر لتفعيله/تعطيله.
             </p>
           </div>
 
-          {/* List */}
-          <div className="space-y-3">
+          {/* Grid like mobile app */}
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3">
             {sortedQuickAccess.map((item, index) => (
               <div
                 key={item.id}
-                className={`bg-slate-800 rounded-2xl border transition-all ${
-                  item.enabled ? 'border-slate-700' : 'border-slate-800 opacity-60'
+                className={`relative group cursor-pointer transition-all ${
+                  item.enabled ? '' : 'opacity-40'
                 }`}
               >
-                <div className="flex items-center gap-4 p-4">
-                  {/* Reorder */}
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => moveQuickAccess(item.id, 'up')}
-                      disabled={index === 0}
-                      className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
-                      aria-label="تحريك لأعلى"
-                      title="تحريك لأعلى"
-                    >
-                      <ArrowUp className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => moveQuickAccess(item.id, 'down')}
-                      disabled={index === sortedQuickAccess.length - 1}
-                      className="text-slate-500 hover:text-white disabled:opacity-20 transition-colors"
-                      aria-label="تحريك لأسفل"
-                      title="تحريك لأسفل"
-                    >
-                      <ArrowDown className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Color dot */}
-                  <Styled
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    css={{ backgroundColor: item.color }}
-                  >
+                {/* Card */}
+                <div
+                  onClick={() => updateQuickAccess(item.id, 'enabled', !item.enabled)}
+                  className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all hover:scale-105 ${
+                    item.enabled 
+                      ? 'bg-slate-800 border-emerald-500/50 shadow-lg shadow-emerald-500/10' 
+                      : 'bg-slate-900 border-slate-700'
+                  }`}
+                >
+                  {/* Order badge */}
+                  <div className="absolute -top-2 -right-2 w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center text-[10px] text-white font-bold">
                     {index + 1}
-                  </Styled>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium">{item.nameAr}</p>
-                    <p className="text-xs text-slate-500">{item.nameEn} · {item.icon}</p>
                   </div>
 
-                  {/* Color picker */}
-                  <input
-                    type="color"
-                    value={item.color}
-                    onChange={(e) => updateQuickAccess(item.id, 'color', e.target.value)}
-                    className="w-8 h-8 rounded-lg border border-slate-600 cursor-pointer flex-shrink-0"
-                    aria-label="لون العنصر"
-                    title="لون العنصر"
-                  />
-
-                  {/* Toggle */}
-                  <button
-                    onClick={() => updateQuickAccess(item.id, 'enabled', !item.enabled)}
-                    className="flex-shrink-0"
-                    aria-label={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
-                    title={item.enabled ? 'إخفاء العنصر' : 'إظهار العنصر'}
+                  {/* Icon circle */}
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center mb-2"
+                    style={{ backgroundColor: item.color + '30' }}
                   >
-                    {item.enabled ? (
-                      <Eye className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                      <EyeOff className="w-5 h-5 text-slate-500" />
-                    )}
+                    <span className="text-2xl" style={{ color: item.color }}>
+                      {item.icon === 'compass' && '🧭'}
+                      {item.icon === 'heart' && '❤️'}
+                      {item.icon === 'shield-star' && '⭐'}
+                      {item.icon === 'book-open-page-variant' && '📖'}
+                      {item.icon === 'star-crescent' && '☪️'}
+                      {item.icon === 'counter' && '📿'}
+                      {item.icon === 'information' && 'ℹ️'}
+                      {item.icon === 'radio' && '📻'}
+                      {item.icon === 'book-account' && '📚'}
+                      {!['compass', 'heart', 'shield-star', 'book-open-page-variant', 'star-crescent', 'counter', 'information', 'radio', 'book-account'].includes(item.icon) && '●'}
+                    </span>
+                  </div>
+
+                  {/* Name */}
+                  <p className="text-white text-xs font-medium text-center leading-tight line-clamp-2">
+                    {item.nameAr}
+                  </p>
+
+                  {/* Status indicator */}
+                  <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${item.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                </div>
+
+                {/* Reorder buttons - show on hover */}
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'up'); }}
+                    disabled={index === 0}
+                    className="p-1 bg-slate-700 rounded-md text-white hover:bg-slate-600 disabled:opacity-30"
+                    title="تحريك لليمين"
+                  >
+                    <ArrowUp className="w-3 h-3 rotate-90" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'down'); }}
+                    disabled={index === sortedQuickAccess.length - 1}
+                    className="p-1 bg-slate-700 rounded-md text-white hover:bg-slate-600 disabled:opacity-30"
+                    title="تحريك لليسار"
+                  >
+                    <ArrowDown className="w-3 h-3 -rotate-90" />
                   </button>
                 </div>
+
+                {/* Color picker on right-click or long press */}
+                <input
+                  type="color"
+                  value={item.color}
+                  onChange={(e) => updateQuickAccess(item.id, 'color', e.target.value)}
+                  className="absolute bottom-0 right-0 w-4 h-4 rounded-full border-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="تغيير اللون"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </div>
             ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center justify-center gap-6 text-xs text-slate-500 pt-2">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span>مفعّل</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-slate-600" />
+              <span>معطّل</span>
+            </div>
+            <div className="flex items-center gap-1 text-slate-400">
+              <span>💡</span>
+              <span>اضغط لتفعيل/تعطيل · مرر على العنصر لإعادة الترتيب</span>
+            </div>
           </div>
         </div>
       )}
@@ -919,199 +893,6 @@ export default function HomePageManager() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================== Theme & Appearance ==================== */}
-      {activeTab === 'theme' && (
-        <div className="space-y-6">
-          {/* Colors */}
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-            <div className="p-5 border-b border-slate-700">
-              <h3 className="text-white font-semibold text-lg flex items-center gap-2">
-                <Palette className="w-5 h-5 text-emerald-400" />
-                الألوان الرئيسية
-              </h3>
-            </div>
-            <div className="p-5 space-y-5">
-              {([
-                { key: 'primary' as const, label: 'اللون الأساسي', desc: 'لون التطبيق الرئيسي (الهيدر، الأزرار)' },
-                { key: 'accent' as const, label: 'لون التأكيد', desc: 'لون ثانوي للعناصر التفاعلية' },
-                { key: 'background' as const, label: 'لون الخلفية', desc: 'خلفية الشاشات الرئيسية' },
-                { key: 'cardBackground' as const, label: 'لون البطاقات', desc: 'خلفية البطاقات والأقسام' },
-                { key: 'textPrimary' as const, label: 'لون النص الأساسي', desc: 'لون النصوص الرئيسية' },
-                { key: 'textSecondary' as const, label: 'لون النص الثانوي', desc: 'لون النصوص الفرعية' },
-                { key: 'headerGradientStart' as const, label: 'تدرج الهيدر (بداية)', desc: 'بداية تدرج لون الهيدر' },
-                { key: 'headerGradientEnd' as const, label: 'تدرج الهيدر (نهاية)', desc: 'نهاية تدرج لون الهيدر' },
-              ]).map(({ key, label, desc }) => (
-                <div key={key} className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <p className="text-white text-sm font-medium">{label}</p>
-                    <p className="text-slate-500 text-xs">{desc}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Color presets */}
-                    <div className="flex gap-1">
-                      {COLOR_PRESETS.slice(0, 6).map(c => (
-                        <Styled
-                          as="button"
-                          key={c.value}
-                          onClick={() => updateTheme(key, c.value)}
-                          className={`w-6 h-6 rounded-full transition-all ${
-                            config.theme[key] === c.value ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-800' : ''
-                          }`}
-                          css={{ backgroundColor: c.value }}
-                          aria-label={c.label}
-                          title={c.label}
-                        />
-                      ))}
-                    </div>
-                    <input
-                      type="color"
-                      value={config.theme[key]}
-                      onChange={(e) => updateTheme(key, e.target.value)}
-                      className="w-8 h-8 rounded-lg border border-slate-600 cursor-pointer"
-                      aria-label={`${label} - اختيار لون`}
-                    />
-                    <input
-                      type="text"
-                      value={config.theme[key]}
-                      onChange={(e) => updateTheme(key, e.target.value)}
-                      className="bg-slate-700 text-white rounded-lg px-3 py-1.5 w-28 border border-slate-600 text-sm font-mono focus:border-emerald-500 focus:outline-none"
-                      aria-label={`${label} - كود اللون`}
-                      placeholder="#000000"
-                      dir="ltr"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Images & Icons */}
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-            <div className="p-5 border-b border-slate-700">
-              <h3 className="text-white font-semibold text-lg flex items-center gap-2">
-                <ImageIcon className="w-5 h-5 text-emerald-400" />
-                الصور والأيقونات
-              </h3>
-            </div>
-            <div className="p-5 space-y-5">
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">رابط صورة الخلفية</label>
-                <input
-                  type="text"
-                  value={config.theme.backgroundImageUrl}
-                  onChange={(e) => updateTheme('backgroundImageUrl', e.target.value)}
-                  className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
-                  placeholder="https://example.com/background.jpg"
-                  aria-label="رابط صورة الخلفية"
-                  dir="ltr"
-                />
-                {config.theme.backgroundImageUrl && (
-                  <div className="mt-3 flex items-center gap-3">
-                    <img
-                      src={config.theme.backgroundImageUrl}
-                      alt="Background preview"
-                      className="w-20 h-20 rounded-xl object-cover border border-slate-600"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                    <button
-                      onClick={() => updateTheme('backgroundImageUrl', '')}
-                      className="text-xs text-red-400 hover:text-red-300"
-                    >
-                      إزالة
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">رابط أيقونة التطبيق</label>
-                <input
-                  type="text"
-                  value={config.theme.appIconUrl}
-                  onChange={(e) => updateTheme('appIconUrl', e.target.value)}
-                  className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
-                  placeholder="https://example.com/icon.png"
-                  aria-label="رابط أيقونة التطبيق"
-                  dir="ltr"
-                />
-                {config.theme.appIconUrl && (
-                  <div className="mt-3 flex items-center gap-3">
-                    <img
-                      src={config.theme.appIconUrl}
-                      alt="App icon preview"
-                      className="w-16 h-16 rounded-2xl object-cover border border-slate-600"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                    <button
-                      onClick={() => updateTheme('appIconUrl', '')}
-                      className="text-xs text-red-400 hover:text-red-300"
-                    >
-                      إزالة
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Theme Preview */}
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-            <div className="p-5 border-b border-slate-700">
-              <h3 className="text-white font-semibold text-lg">معاينة الألوان</h3>
-            </div>
-            <div className="p-5">
-              <Styled
-                className="rounded-2xl p-6 space-y-4"
-                css={{ backgroundColor: config.theme.background }}
-              >
-                {/* Header preview */}
-                <Styled
-                  className="rounded-xl p-4 flex items-center justify-between"
-                  css={{
-                    background: `linear-gradient(135deg, ${config.theme.headerGradientStart}, ${config.theme.headerGradientEnd})`,
-                  }}
-                >
-                  <span className="text-white font-bold text-lg">روح المسلم</span>
-                  <span className="text-white/80 text-sm">٣ رمضان ١٤٤٧</span>
-                </Styled>
-
-                {/* Card preview */}
-                <Styled
-                  className="rounded-xl p-4"
-                  css={{ backgroundColor: config.theme.cardBackground }}
-                >
-                  <Styled as="p" css={{ color: config.theme.textPrimary }} className="font-bold">عنوان البطاقة</Styled>
-                  <Styled as="p" css={{ color: config.theme.textSecondary }} className="text-sm mt-1">نص ثانوي توضيحي</Styled>
-                  <Styled
-                    as="button"
-                    className="mt-3 px-4 py-2 rounded-lg text-white text-sm"
-                    css={{ backgroundColor: config.theme.accent }}
-                  >
-                    زر التفاعل
-                  </Styled>
-                </Styled>
-
-                {/* Accent elements */}
-                <div className="flex gap-3">
-                  <Styled
-                    className="flex-1 rounded-xl p-3 text-center text-white text-sm font-medium"
-                    css={{ backgroundColor: config.theme.primary }}
-                  >
-                    اللون الأساسي
-                  </Styled>
-                  <Styled
-                    className="flex-1 rounded-xl p-3 text-center text-white text-sm font-medium"
-                    css={{ backgroundColor: config.theme.accent }}
-                  >
-                    لون التأكيد
-                  </Styled>
-                </div>
-              </Styled>
             </div>
           </div>
         </div>
