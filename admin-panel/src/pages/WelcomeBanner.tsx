@@ -1,7 +1,7 @@
 // admin-panel/src/pages/WelcomeBanner.tsx
 // إدارة الرسالة الترحيبية - روح المسلم
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Save,
   Eye,
@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Image,
   Layout,
-  Upload,
   MessageSquare,
   ChevronDown,
   ChevronUp,
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { uploadImage } from '../utils/imageUpload';
+
 import { Styled } from '../components/Styled';
 import TranslateButton from '../components/TranslateButton';
 
@@ -171,10 +170,6 @@ const COLOR_PRESETS = [
 const FIRESTORE_DOC = 'config/app-settings';
 
 // ========================================
-// ضغط الصور قبل الرفع
-// ========================================
-
-// ========================================
 // المكون الرئيسي
 // ========================================
 
@@ -184,81 +179,19 @@ export default function WelcomeBanner() {
   const [isLoading, setIsLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [customRoute, setCustomRoute] = useState('');
-  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
-  const [isUploadingBgAr, setIsUploadingBgAr] = useState(false);
-  const [isUploadingBgNonAr, setIsUploadingBgNonAr] = useState(false);
+
   const [showOtherLangs, setShowOtherLangs] = useState(false);
   const [showOtherTitleLangs, setShowOtherTitleLangs] = useState(false);
   const [showOtherSubtitleLangs, setShowOtherSubtitleLangs] = useState(false);
-  const iconInputRef = useRef<HTMLInputElement>(null);
-  const bgArInputRef = useRef<HTMLInputElement>(null);
-  const bgNonArInputRef = useRef<HTMLInputElement>(null);
 
-  // تحويل رابط Google Drive إلى رابط مباشر
-  const convertDriveLink = (url: string): string => {
-    // Extract file ID from various Google Drive URL formats
-    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch) {
-      // Use lh3.googleusercontent.com proxy which works reliably
-      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
-    }
-    return url;
-  };
 
   // Handle URL input - warn about Google Drive links
   const handleImageUrlChange = (field: 'backgroundImage' | 'backgroundImageNonAr', value: string) => {
     if (value.includes('drive.google.com')) {
-      alert('⚠️ روابط Google Drive لا تعمل بشكل موثوق!\n\nيرجى رفع الصورة مباشرة باستخدام زر "رفع" أو استخدام رابط صورة مباشر من:\n• Imgur (imgur.com)\n• imgbb (imgbb.com)\n• أي CDN للصور');
+      alert('⚠️ روابط Google Drive لا تعمل!\n\nاستخدم رابط صورة مباشر من:\n• Imgur (imgur.com)\n• imgbb (imgbb.com)\n• أي CDN للصور');
       return;
     }
     updateBanner(field, value);
-  };
-
-  // رفع صورة خلفية (مع ضغط تلقائي)
-  const handleBgImageUpload = async (file: File, field: 'backgroundImage' | 'backgroundImageNonAr') => {
-    if (!file) return;
-    const setUploading = field === 'backgroundImage' ? setIsUploadingBgAr : setIsUploadingBgNonAr;
-    setUploading(true);
-    try {
-      const folder = field === 'backgroundImage' ? 'ar' : 'non-ar';
-      
-      // Add timeout to prevent hanging
-      const uploadPromise = uploadImage(file, {
-        storagePath: `welcome-banner/backgrounds/${folder}`,
-        maxWidth: 1200,
-      });
-      
-      const timeoutPromise = new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('انتهت مهلة الرفع - جرب صورة أصغر')), 30000)
-      );
-      
-      const result = await Promise.race([uploadPromise, timeoutPromise]);
-      updateBanner(field, result.url);
-    } catch (err) {
-      console.error('Error uploading background:', err);
-      const message = err instanceof Error ? err.message : 'خطأ غير معروف';
-      alert(`فشل رفع الصورة: ${message}\n\nتأكد من:\n• حجم الصورة أقل من 5MB\n• الاتصال بالإنترنت مستقر`);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // رفع أيقونة مخصصة (مع ضغط تلقائي)
-  const handleIconUpload = async (file: File) => {
-    if (!file) return;
-    setIsUploadingIcon(true);
-    try {
-      const result = await uploadImage(file, {
-        storagePath: 'welcome-banner/icons',
-        maxWidth: 512,
-      });
-      setBanner(prev => ({ ...prev, customIconUrl: result.url, icon: '__custom__' }));
-    } catch (err) {
-      console.error('Error uploading icon:', err);
-      alert('فشل رفع الأيقونة. تأكد من أن الملف صورة صالحة.');
-    } finally {
-      setIsUploadingIcon(false);
-    }
   };
 
   // تحديث عنوان بلغة معينة
@@ -566,23 +499,7 @@ export default function WelcomeBanner() {
                     aria-label="رابط صورة الخلفية للعربية"
                     dir="ltr"
                   />
-                  <label className={`flex items-center gap-2 px-4 py-3 rounded-xl border cursor-pointer transition-all whitespace-nowrap ${
-                    isUploadingBgAr ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400' : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
-                  }`}>
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm">{isUploadingBgAr ? 'جاري الرفع...' : 'رفع'}</span>
-                    <input
-                      ref={bgArInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) handleBgImageUpload(file, 'backgroundImage');
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+
                   {banner.backgroundImage && (
                     <button onClick={() => updateBanner('backgroundImage', '')} className="p-3 rounded-xl border border-slate-600 bg-slate-700 text-red-400 hover:bg-red-500/10" title="إزالة">
                       <X className="w-4 h-4" />
@@ -627,23 +544,7 @@ export default function WelcomeBanner() {
                     aria-label="رابط صورة الخلفية لغير العربية"
                     dir="ltr"
                   />
-                  <label className={`flex items-center gap-2 px-4 py-3 rounded-xl border cursor-pointer transition-all whitespace-nowrap ${
-                    isUploadingBgNonAr ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400' : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
-                  }`}>
-                    <Upload className="w-4 h-4" />
-                    <span className="text-sm">{isUploadingBgNonAr ? 'جاري الرفع...' : 'رفع'}</span>
-                    <input
-                      ref={bgNonArInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) handleBgImageUpload(file, 'backgroundImageNonAr');
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
+
                   {banner.backgroundImageNonAr && (
                     <button onClick={() => updateBanner('backgroundImageNonAr', '')} className="p-3 rounded-xl border border-slate-600 bg-slate-700 text-red-400 hover:bg-red-500/10" title="إزالة">
                       <X className="w-4 h-4" />
@@ -672,7 +573,7 @@ export default function WelcomeBanner() {
                 )}
               </div>
 
-              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 800×200 أو نسبة 4:1 — استخدم زر "رفع" (مفضل) أو رابط صورة مباشر. ⚠️ روابط Google Drive لا تعمل!</p>
+              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 1200×343 أو نسبة 3.5:1 — استخدم رابط صورة مباشر من Imgur أو imgbb. ⚠️ روابط Google Drive لا تعمل!</p>
             </div>
           )}
 
@@ -848,25 +749,14 @@ export default function WelcomeBanner() {
                 )}
               </div>
               <div className="flex items-center gap-3">
-                <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
-                  banner.customIconUrl
-                    ? 'border-emerald-500 bg-emerald-500/20 text-emerald-400'
-                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
-                }`}>
-                  <Upload className="w-4 h-4" />
-                  <span className="text-sm">{isUploadingIcon ? 'جاري الرفع...' : 'رفع أيقونة'}</span>
-                  <input
-                    ref={iconInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (file) handleIconUpload(file);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
+                <input
+                  type="text"
+                  value={banner.customIconUrl || ''}
+                  onChange={(e) => setBanner(prev => ({ ...prev, customIconUrl: e.target.value, icon: e.target.value ? '__custom__' : 'moon-waning-crescent' }))}
+                  className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
+                  placeholder="رابط صورة الأيقونة (Imgur, imgbb, etc.)"
+                  dir="ltr"
+                />
                 {banner.customIconUrl && (
                   <img src={banner.customIconUrl} alt="icon" className="w-10 h-10 rounded-lg object-contain border border-slate-600 bg-slate-700 p-1" />
                 )}

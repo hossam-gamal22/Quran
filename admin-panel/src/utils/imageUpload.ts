@@ -97,6 +97,19 @@ export interface UploadImageOptions {
   previousStoragePath?: string;
 }
 
+// ─── Convert blob to base64 data URL ─────────────────────
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// Max size for base64 fallback (700KB image → ~933KB base64, safe for 1MB Firestore doc)
+const MAX_BASE64_FILE_SIZE = 700 * 1024;
+
 export async function uploadImage(
   file: File,
   options: UploadImageOptions,
@@ -119,16 +132,31 @@ export async function uploadImage(
 
   console.log('[Upload] Processed:', `${(blob.size / 1024).toFixed(1)}KB`, ext, contentType);
 
-  const fileName = `${Date.now()}.${ext}`;
-  const fullPath = `${storagePath}/${fileName}`;
+  // Try Firebase Storage first
+  try {
+    const fileName = `${Date.now()}.${ext}`;
+    const fullPath = `${storagePath}/${fileName}`;
+    const storageRef = ref(storage, fullPath);
 
-  const storageRef = ref(storage, fullPath);
+    console.log('[Upload] Uploading to Firebase Storage:', fullPath);
+    await uploadBytes(storageRef, blob, { contentType });
+    console.log('[Upload] Getting download URL...');
+    const url = await getDownloadURL(storageRef);
 
-  console.log('[Upload] Uploading to:', fullPath);
-  await uploadBytes(storageRef, blob, { contentType });
-  console.log('[Upload] Getting download URL...');
-  const url = await getDownloadURL(storageRef);
+    console.log('[Upload] Firebase Storage success:', url.substring(0, 80) + '...');
+    return { url, storagePath: fullPath };
+  } catch (storageError) {
+    console.warn('[Upload] Firebase Storage failed, using base64 fallback:', storageError);
+  }
 
-  console.log('[Upload] Success:', url.substring(0, 80) + '...');
-  return { url, storagePath: fullPath };
+  // Fallback: convert to base64 data URL (stored directly in Firestore)
+  if (blob.size > MAX_BASE64_FILE_SIZE) {
+    throw new Error(`الصورة كبيرة جداً (${(blob.size / 1024).toFixed(0)}KB). الحد الأقصى ${(MAX_BASE64_FILE_SIZE / 1024).toFixed(0)}KB عند عدم توفر Firebase Storage.`);
+  }
+
+  console.log('[Upload] Converting to base64...');
+  const dataUrl = await blobToBase64(blob);
+  console.log('[Upload] Base64 success:', `${(dataUrl.length / 1024).toFixed(1)}KB`);
+
+  return { url: dataUrl, storagePath: '' };
 }
