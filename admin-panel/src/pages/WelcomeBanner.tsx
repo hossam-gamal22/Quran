@@ -205,10 +205,13 @@ export default function WelcomeBanner() {
     return url;
   };
 
-  // Handle URL input with auto Drive link conversion
+  // Handle URL input - warn about Google Drive links
   const handleImageUrlChange = (field: 'backgroundImage' | 'backgroundImageNonAr', value: string) => {
-    const converted = value.includes('drive.google.com') ? convertDriveLink(value) : value;
-    updateBanner(field, converted);
+    if (value.includes('drive.google.com')) {
+      alert('⚠️ روابط Google Drive لا تعمل بشكل موثوق!\n\nيرجى رفع الصورة مباشرة باستخدام زر "رفع" أو استخدام رابط صورة مباشر من:\n• Imgur (imgur.com)\n• imgbb (imgbb.com)\n• أي CDN للصور');
+      return;
+    }
+    updateBanner(field, value);
   };
 
   // رفع صورة خلفية (مع ضغط تلقائي)
@@ -218,14 +221,23 @@ export default function WelcomeBanner() {
     setUploading(true);
     try {
       const folder = field === 'backgroundImage' ? 'ar' : 'non-ar';
-      const result = await uploadImage(file, {
+      
+      // Add timeout to prevent hanging
+      const uploadPromise = uploadImage(file, {
         storagePath: `welcome-banner/backgrounds/${folder}`,
         maxWidth: 1200,
       });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('انتهت مهلة الرفع - جرب صورة أصغر')), 30000)
+      );
+      
+      const result = await Promise.race([uploadPromise, timeoutPromise]);
       updateBanner(field, result.url);
     } catch (err) {
       console.error('Error uploading background:', err);
-      alert('فشل رفع الصورة. تأكد من أن الملف صورة صالحة.');
+      const message = err instanceof Error ? err.message : 'خطأ غير معروف';
+      alert(`فشل رفع الصورة: ${message}\n\nتأكد من:\n• حجم الصورة أقل من 5MB\n• الاتصال بالإنترنت مستقر`);
     } finally {
       setUploading(false);
     }
@@ -660,7 +672,7 @@ export default function WelcomeBanner() {
                 )}
               </div>
 
-              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 800×200 أو نسبة 4:1 — يدعم رفع مباشر (مفضل) أو لصق رابط Google Drive</p>
+              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 800×200 أو نسبة 4:1 — استخدم زر "رفع" (مفضل) أو رابط صورة مباشر. ⚠️ روابط Google Drive لا تعمل!</p>
             </div>
           )}
 
