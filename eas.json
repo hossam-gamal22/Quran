@@ -6,33 +6,23 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:assembleDebug"
-      },
-      "ios": {
-        "simulator": true
-      },
-      "env": {
-        "APP_ENV": "development"
-      },
-      "channel": "development"
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "APP_ENV": "preview"
-      },
-      "channel": "preview"
+      }
     },
     "production": {
+      "distribution": "store",
       "autoIncrement": true,
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "credentialsSource": "remote"
+      },
+      "ios": {
+        "credentialsSource": "remote"
       },
       "env": {
         "APP_ENV": "production"
@@ -44,11 +34,7 @@
     "production": {
       "android": {
         "serviceAccountKeyPath": "./play-store-key.json",
-        "track": "production"
-      },
-      "ios": {
-        "appleId": "your-apple-id@email.com",
-        "ascAppId": "your-app-store-connect-app-id"
+        "track": "internal"
       }
     }
   }
