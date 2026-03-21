@@ -81,7 +81,10 @@ function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark
     { icon: '😴', label: 'النوم', color: '#5b21b6' },
   ];
 
-  const sections = data.homeConfig?.sections?.filter((s: any) => s.visible !== false) || [
+  const rawSections = Array.isArray(data.homeConfig?.sections)
+    ? data.homeConfig.sections
+    : data.homeConfig?.sections?.items;
+  const sections = rawSections?.filter((s: any) => s.visible !== false) || [
     { id: 'azkar', title: '📿 أذكار', items: ['أذكار الصباح', 'أذكار المساء', 'أذكار النوم'] },
     { id: 'quran', title: '📖 قرآن', items: ['سورة الكهف', 'سورة يس', 'آية اليوم'] },
   ];
