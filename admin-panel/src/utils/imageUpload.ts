@@ -2,8 +2,8 @@
  * Shared image upload utility for the admin panel.
  *
  * - Accepts any image format (jpg, jpeg, webp, svg, heic, gif, bmp, etc.)
- * - Automatically converts to PNG before uploading
- * - Compresses / resizes to keep file size reasonable
+ * - Small images (< 500KB) upload directly without conversion
+ * - Large images get resized and compressed to JPEG
  * - Uploads to Firebase Storage and returns the download URL
  */
 
@@ -12,22 +12,35 @@ import { storage } from '../firebase';
 
 // ─── Config ──────────────────────────────────────────────
 const MAX_IMAGE_WIDTH = 1200;
-const IMAGE_QUALITY = 0.92; // PNG is lossless, but canvas quality affects pre-processing
+const JPEG_QUALITY = 0.85;
+const SKIP_CONVERSION_THRESHOLD = 500 * 1024; // 500KB - skip conversion for small files
 
-// ─── Convert any image file → PNG Blob ───────────────────
-export function convertToPng(file: File, maxWidth = MAX_IMAGE_WIDTH): Promise<Blob> {
+// ─── Web-friendly formats that don't need conversion ─────
+const WEB_FRIENDLY_FORMATS = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'];
+
+// ─── Process image (resize if needed, compress to JPEG) ──
+export function processImage(file: File, maxWidth = MAX_IMAGE_WIDTH): Promise<{ blob: Blob; ext: string; contentType: string }> {
   return new Promise((resolve, reject) => {
-    // SVGs: keep as-is (they're already lightweight and vector)
+    // SVGs: keep as-is (vector, lightweight)
     if (file.type === 'image/svg+xml') {
-      resolve(file);
+      resolve({ blob: file, ext: 'svg', contentType: 'image/svg+xml' });
       return;
     }
 
+    // Small web-friendly files: upload directly without conversion
+    if (file.size < SKIP_CONVERSION_THRESHOLD && WEB_FRIENDLY_FORMATS.includes(file.type)) {
+      const ext = file.type === 'image/png' ? 'png' : file.type === 'image/gif' ? 'gif' : file.type === 'image/webp' ? 'webp' : 'jpg';
+      resolve({ blob: file, ext, contentType: file.type });
+      return;
+    }
+
+    // Non-image files: pass through
     if (!file.type.startsWith('image/')) {
-      resolve(file);
+      resolve({ blob: file, ext: 'bin', contentType: file.type });
       return;
     }
 
+    // Large images or non-web formats: resize and compress to JPEG
     const img = new window.Image();
     const url = URL.createObjectURL(file);
 
@@ -46,28 +59,33 @@ export function convertToPng(file: File, maxWidth = MAX_IMAGE_WIDTH): Promise<Bl
 
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        resolve(file);
+        resolve({ blob: file, ext: 'jpg', contentType: file.type });
         return;
       }
 
       ctx.drawImage(img, 0, 0, width, height);
+      
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : resolve(file)),
-        'image/png',
-        IMAGE_QUALITY,
+        (blob) => blob ? resolve({ blob, ext: 'jpg', contentType: 'image/jpeg' }) : resolve({ blob: file, ext: 'jpg', contentType: file.type }),
+        'image/jpeg',
+        JPEG_QUALITY,
       );
     };
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('Failed to load image for conversion'));
+      reject(new Error('Failed to load image for processing'));
     };
 
     img.src = url;
   });
 }
 
-// ─── Upload image (auto-convert to PNG) ──────────────────
+// Legacy alias for backward compatibility
+export const convertToPng = (file: File, maxWidth?: number) => 
+  processImage(file, maxWidth).then(r => r.blob);
+
+// ─── Upload image (smart processing) ─────────────────────
 export interface UploadImageOptions {
   /** Firebase Storage folder path, e.g. "highlights/icons" */
   storagePath: string;
@@ -83,7 +101,7 @@ export async function uploadImage(
   file: File,
   options: UploadImageOptions,
 ): Promise<{ url: string; storagePath: string }> {
-  const { storagePath, maxWidth, previousUrl, previousStoragePath } = options;
+  const { storagePath, maxWidth, previousStoragePath } = options;
 
   // Delete previous file if provided
   if (previousStoragePath) {
@@ -92,28 +110,17 @@ export async function uploadImage(
     } catch {
       // File may not exist — that's fine
     }
-  } else if (previousUrl) {
-    try {
-      const oldRef = ref(storage, previousUrl);
-      await deleteObject(oldRef);
-    } catch {
-      // ok
-    }
   }
 
-  // Convert to PNG
-  const pngBlob = await convertToPng(file, maxWidth ?? MAX_IMAGE_WIDTH);
+  // Process image (skip conversion for small web-friendly files)
+  const { blob, ext, contentType } = await processImage(file, maxWidth ?? MAX_IMAGE_WIDTH);
 
-  // Determine extension (SVG stays .svg, everything else becomes .png)
-  const isSvg = file.type === 'image/svg+xml';
-  const ext = isSvg ? 'svg' : 'png';
   const fileName = `${Date.now()}.${ext}`;
   const fullPath = `${storagePath}/${fileName}`;
 
   const storageRef = ref(storage, fullPath);
-  const contentType = isSvg ? 'image/svg+xml' : 'image/png';
 
-  await uploadBytes(storageRef, pngBlob, { contentType });
+  await uploadBytes(storageRef, blob, { contentType });
   const url = await getDownloadURL(storageRef);
 
   return { url, storagePath: fullPath };
