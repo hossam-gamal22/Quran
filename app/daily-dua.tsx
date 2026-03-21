@@ -33,6 +33,7 @@ import { getFavorites } from '@/lib/favorites-manager';
 import { transliterateReference } from '@/lib/source-transliteration';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
 const ACCENT = '#7c3aed';
 
@@ -42,6 +43,9 @@ export default function DailyDuaScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+
+  // Block all ads during dua reading
+  useSacredContext('dua_reading');
 
   const params = useLocalSearchParams<{ favId?: string }>();
   const [dua, setDua] = useState<DailyDua>(() => getDuaOfTheDay());

@@ -1,15 +1,15 @@
 // components/widgets/android/AzkarProgressSmallWidget.tsx
-// 2×2 widget: Morning/Evening azkar completion rings
+// 2×2 widget: Morning/Evening azkar completion
 
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
-  const morningPct = azkar.morningCompleted ? '✅' : '○';
-  const eveningPct = azkar.eveningCompleted ? '✅' : '○';
+  const morningIcon = azkar.morningCompleted ? '✅' : '○';
+  const eveningIcon = azkar.eveningCompleted ? '✅' : '○';
 
   return (
     <FlexWidget
@@ -17,10 +17,10 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.azkar,
+        borderRadius: 20,
         padding: 12,
       }}
       clickAction="OPEN_APP"
@@ -30,56 +30,66 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
         text="🤲 الأذكار"
         style={{
           fontSize: 14,
-          color: COLORS.green,
+          color: COLORS.tealLight,
           fontFamily: FONT.amiriBold,
-          marginBottom: 8,
         }}
       />
 
-      {/* Morning */}
-      <FlexWidget
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 4,
-        }}
-      >
-        <TextWidget
-          text={morningPct}
-          style={{ fontSize: 14, marginRight: 6 }}
-        />
-        <TextWidget
-          text="أذكار الصباح"
+      <FlexWidget style={{ flexDirection: 'column', alignItems: 'center' }}>
+        {/* Morning */}
+        <FlexWidget
           style={{
-            fontSize: 13,
-            color: azkar.morningCompleted ? COLORS.green : COLORS.grayLight,
-            fontFamily: FONT.amiri,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 6,
           }}
-        />
+        >
+          <TextWidget
+            text={morningIcon}
+            style={{ fontSize: 14, marginRight: 6 }}
+          />
+          <TextWidget
+            text="أذكار الصباح"
+            style={{
+              fontSize: 13,
+              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
+              fontFamily: FONT.amiri,
+            }}
+          />
+        </FlexWidget>
+
+        {/* Evening */}
+        <FlexWidget
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <TextWidget
+            text={eveningIcon}
+            style={{ fontSize: 14, marginRight: 6 }}
+          />
+          <TextWidget
+            text="أذكار المساء"
+            style={{
+              fontSize: 13,
+              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
+              fontFamily: FONT.amiri,
+            }}
+          />
+        </FlexWidget>
       </FlexWidget>
 
-      {/* Evening */}
-      <FlexWidget
+      <TextWidget
+        text={BRANDING.name}
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
+          fontSize: BRANDING.fontSize,
+          color: BRANDING.color,
+          fontFamily: FONT.amiri,
         }}
-      >
-        <TextWidget
-          text={eveningPct}
-          style={{ fontSize: 14, marginRight: 6 }}
-        />
-        <TextWidget
-          text="أذكار المساء"
-          style={{
-            fontSize: 13,
-            color: azkar.eveningCompleted ? COLORS.green : COLORS.grayLight,
-            fontFamily: FONT.amiri,
-          }}
-        />
-      </FlexWidget>
+      />
     </FlexWidget>
   );
 }

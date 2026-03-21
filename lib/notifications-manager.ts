@@ -8,13 +8,15 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { schedulePrayerNotifications } from './prayer-notifications';
-import { fetchTafsir, getSurahName } from './quran-api';
+import { fetchTafsir } from './quran-api';
 import { getAyahAudioUrl } from './quran-cache';
 import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
 import { getOrCreateSoundChannel } from './push-notifications';
 import { t } from './i18n';
+import { dirText } from './notification-text-direction';
+import { getNotificationSoundValueSync } from './notification-sound-installer';
 
 // ─── Custom Sound File Map ───────────────────────────────────────────────────
 // Maps soundType keys to the filenames registered in app.json expo-notifications sounds
@@ -27,17 +29,62 @@ const CUSTOM_SOUND_FILES: Record<string, string> = {
   alhamdulillah: 'alhamdulillah.mp3',
   morning_adhkar: 'morning_adhkar.mp3',
   evening_adhkar: 'evening_adhkar.mp3',
+  // Adhan sounds (registered in app.json expo-notifications plugin)
+  makkah: 'makkah.mp3',
+  madinah: 'madinah.mp3',
+  alaqsa: 'alaqsa.mp3',
+  mishary: 'mishary.mp3',
+  abdulbasit: 'abdulbasit.mp3',
+  sudais: 'sudais.mp3',
+  egypt: 'egypt.mp3',
+  dosari: 'dosari.mp3',
+  ajman: 'ajman.mp3',
+  ali_mulla: 'ali_mulla.mp3',
+  naqshbandi: 'naqshbandi.mp3',
+  sharif: 'sharif.mp3',
+  mansoor_zahrani: 'mansoor_zahrani.mp3',
+  haramain: 'haramain.mp3',
 };
 
 /**
- * Resolve a soundType (from notification data) to the native sound filename
- * that expo-notifications can play in the background.
+ * Resolve a soundType (from notification data) to the native sound value.
+ * 
+ * CRITICAL for background/closed notifications:
+ * - iOS: 'default' = system sound, 'filename.mp3' = custom sound, false = silent
+ * - Android: Sound is controlled by notification channel, content.sound is secondary
+ * - Return false for truly silent notifications
+ * 
+ * Resolution order:
+ * 1. Check installed custom sounds (downloaded from Firebase)
+ * 2. Fall back to bundled sounds (from CUSTOM_SOUND_FILES)
+ * 3. Fall back to 'default' system sound
  */
-function resolveNotificationSound(soundType?: string, soundEnabled?: boolean): string | undefined {
-  if (!soundEnabled) return undefined;
+function resolveNotificationSound(soundType?: string, soundEnabled?: boolean): string | false {
+  // Silent notification - return false for no sound
+  if (soundEnabled === false || soundType === 'silent') {
+    return false;
+  }
+  
+  // Default system sound - expo-notifications handles 'default' correctly
   if (!soundType || soundType === 'default') return 'default';
-  if (soundType === 'silent') return undefined;
-  return CUSTOM_SOUND_FILES[soundType] || 'default';
+  
+  // First check for installed custom sounds (downloaded from Firebase)
+  // getNotificationSoundValueSync returns the platform-appropriate filename if installed
+  const customSoundValue = getNotificationSoundValueSync(soundType);
+  if (customSoundValue) {
+    console.log(`[notifications-manager] Using custom installed sound for ${soundType}: ${customSoundValue}`);
+    return customSoundValue;
+  }
+  
+  // Look up bundled sound file from registered sounds
+  const file = CUSTOM_SOUND_FILES[soundType];
+  if (!file) return 'default'; // Fallback if custom sound not found
+  
+  // Android raw resources are referenced WITHOUT .mp3 extension
+  if (Platform.OS === 'android') return file.replace(/\.mp3$/, '');
+  
+  // iOS: return filename with extension (must match app.json sounds exactly)
+  return file;
 }
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
@@ -114,9 +161,34 @@ export async function saveAllNotifSettings(
   await AsyncStorage.setItem(KEYS.ALL_NOTIF, JSON.stringify(updated));
 }
 
+// ─── Admin Notification Defaults ─────────────────────────────────────────────
+/**
+ * Fetches admin-configured notification schedule defaults from Firestore.
+ * Used when initializing notification settings for new users.
+ * Returns null if no admin config exists or on error.
+ */
+export async function fetchAdminNotificationDefaults(): Promise<Record<string, { enabled: boolean; time: string; days: number[]; soundId: string }> | null> {
+  try {
+    const { getDoc, doc } = await import('firebase/firestore');
+    const { db } = await import('../config/firebase');
+    const snap = await getDoc(doc(db, 'appConfig/notificationSchedule'));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const CACHE_KEY = '@admin_notif_schedule';
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    return data as Record<string, { enabled: boolean; time: string; days: number[]; soundId: string }>;
+  } catch {
+    try {
+      const cached = await AsyncStorage.getItem('@admin_notif_schedule');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  }
+}
+
 // ─── Permission ───────────────────────────────────────────────────────────────
 export async function requestNotifPermission(): Promise<boolean> {
-  if (!Device.isDevice) return false;
+  if (Platform.OS === 'web') return false;
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
@@ -135,7 +207,8 @@ function parseTime(timeStr: string): { hour: number; minute: number } {
 
 // ─── Schedule Wird Daily ─────────────────────────────────────────────────────
 export async function scheduleWirdNotifications(
-  settings: AllNotificationSettings
+  settings: AllNotificationSettings,
+  soundType: string = 'general_reminder'
 ): Promise<void> {
   // Cancel existing wird notifications
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
@@ -153,15 +226,18 @@ export async function scheduleWirdNotifications(
   const morning = parseTime(settings.wirdMorningTime);
   const evening = parseTime(settings.wirdEveningTime);
 
+  // Get dynamic channel for the user's selected sound
+  const resolvedChannelId = await getOrCreateSoundChannel('reminders', soundType);
+
   // Morning wird
   await Notifications.scheduleNotificationAsync({
     identifier: 'wird_morning',
     content: {
-      title: t('settings.morningWirdTitle'),
-      body: t('settings.morningWirdBody'),
-      sound: resolveNotificationSound('general_reminder', true),
-      data: { type: 'wird', period: 'morning' },
-      ...(Platform.OS === 'android' && { channelId: 'azkar' }),
+      title: dirText(t('settings.morningWirdTitle')),
+      body: dirText(t('settings.morningWirdBody')),
+      sound: resolveNotificationSound(soundType, true),
+      data: { type: 'wird', period: 'morning', soundType },
+      ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -174,11 +250,11 @@ export async function scheduleWirdNotifications(
   await Notifications.scheduleNotificationAsync({
     identifier: 'wird_evening',
     content: {
-      title: t('settings.eveningWirdTitle'),
-      body: t('settings.eveningWirdBody'),
-      sound: resolveNotificationSound('general_reminder', true),
-      data: { type: 'wird', period: 'evening' },
-      ...(Platform.OS === 'android' && { channelId: 'azkar' }),
+      title: dirText(t('settings.eveningWirdTitle')),
+      body: dirText(t('settings.eveningWirdBody')),
+      sound: resolveNotificationSound(soundType, true),
+      data: { type: 'wird', period: 'evening', soundType },
+      ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -200,7 +276,8 @@ const DAILY_AYAHS = [
 ];
 
 export async function scheduleDailyAyahNotification(
-  settings: AllNotificationSettings
+  settings: AllNotificationSettings,
+  soundType: string = 'general_reminder'
 ): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync('daily_ayah');
@@ -214,14 +291,17 @@ export async function scheduleDailyAyahNotification(
   const dayIndex = new Date().getDay();
   const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
 
+  // Get dynamic channel for the user's selected sound
+  const resolvedChannelId = await getOrCreateSoundChannel('daily-ayah', soundType);
+
   await Notifications.scheduleNotificationAsync({
     identifier: 'daily_ayah',
     content: {
-      title: t('settings.dailyAyahTitle'),
-      body: ayahData.text,
-      sound: resolveNotificationSound('general_reminder', true),
-      data: { type: 'daily_ayah' },
-      ...(Platform.OS === 'android' && { channelId: 'daily-ayah' }),
+      title: dirText(t('settings.dailyAyahTitle')),
+      body: dirText(ayahData.text),
+      sound: resolveNotificationSound(soundType, true),
+      data: { type: 'daily_ayah', soundType },
+      ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -233,11 +313,12 @@ export async function scheduleDailyAyahNotification(
 
 // ─── Schedule All ─────────────────────────────────────────────────────────────
 export async function scheduleAllNotifications(
-  settings: AllNotificationSettings
+  settings: AllNotificationSettings,
+  soundType: string = 'general_reminder'
 ): Promise<void> {
   await Promise.all([
-    scheduleWirdNotifications(settings),
-    scheduleDailyAyahNotification(settings),
+    scheduleWirdNotifications(settings, soundType),
+    scheduleDailyAyahNotification(settings, soundType),
   ]);
 }
 
@@ -276,6 +357,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   dailyVerseTime: string;
   sound: boolean;
   vibration: boolean;
+  // Sound type selections
+  soundType?: string;
+  adhanSoundType?: string;
   // Per-category sound types for foreground playback
   azkarSoundType?: string;
   dailyVerseSoundType?: string;
@@ -346,10 +430,18 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       // Create dynamic Android channel for user-selected sound
       const resolvedChannelId = await getOrCreateSoundChannel(channelId, soundType);
 
+      // Apply directional mark for correct RTL/LTR rendering
+      const dirContent = {
+        ...content,
+        ...(content.title && { title: dirText(String(content.title)) }),
+        ...(content.body && { body: dirText(String(content.body)) }),
+      };
+
       // channelId must be in content (not trigger) for Android
       const contentWithChannel: Notifications.NotificationContentInput = {
-        ...content,
+        ...dirContent,
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
+        ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.HIGH }),
         ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
       };
 
@@ -382,7 +474,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             });
           }
         }
-        console.log(`🔔 Scheduled ${baseId} at ${hour}:${String(minute).padStart(2,'0')} (channel: ${channelId})`);
+        console.log(`🔔 Scheduled ${baseId} at ${hour}:${String(minute).padStart(2,'0')} (channel: ${resolvedChannelId})`);
       } catch (err) {
         console.error(`❌ Failed to schedule ${baseId}:`, err);
       }
@@ -401,6 +493,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       },
       advanceMinutes: notifSettings.prayerReminder ? notifSettings.reminderMinutes : 0,
       adhanSound: notifSettings.sound,
+      adhanSoundType: notifSettings.adhanSoundType,
+      soundType: notifSettings.soundType,
     };
     await schedulePrayerNotifications(prayerSettings);
 
@@ -428,7 +522,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         morning.minute,
         notifSettings.azkarDays,
         'azkar',
-        notifSettings.azkarSoundType,
+        notifSettings.azkarSoundType || 'general_reminder',
       );
     }
 
@@ -447,7 +541,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         evening.minute,
         notifSettings.azkarDays,
         'azkar',
-        notifSettings.azkarSoundType,
+        notifSettings.azkarSoundType || 'general_reminder',
       );
     }
 
@@ -466,7 +560,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         sleep.minute,
         notifSettings.azkarDays,
         'azkar',
-        notifSettings.azkarSoundType,
+        notifSettings.azkarSoundType || 'general_reminder',
       );
     }
 
@@ -485,7 +579,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         wakeup.minute,
         notifSettings.azkarDays,
         'azkar',
-        notifSettings.azkarSoundType,
+        notifSettings.azkarSoundType || 'general_reminder',
       );
     }
 
@@ -522,7 +616,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         dailyTime.minute,
         notifSettings.dailyVerseDays,
         'daily-ayah',
-        notifSettings.dailyVerseSoundType,
+        notifSettings.dailyVerseSoundType || 'general_reminder',
       );
     } else {
       // Cancel all daily_ayah variants
@@ -547,7 +641,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         salawatTime.minute,
         notifSettings.salawatDays,
         'general',
-        notifSettings.salawatSoundType,
+        notifSettings.salawatSoundType || 'salawat',
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -571,7 +665,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         tasbihTime.minute,
         notifSettings.tasbihDays,
         'general',
-        notifSettings.tasbihSoundType,
+        notifSettings.tasbihSoundType || 'tasbih',
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -595,7 +689,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         istighfarTime.minute,
         notifSettings.istighfarDays,
         'general',
-        notifSettings.istighfarSoundType,
+        notifSettings.istighfarSoundType || 'istighfar',
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -611,26 +705,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       let title = t('settings.alertTitle');
       let body = notifSettings.customReminderTitle || t('settings.customReminderDefault');
       let soundType = notifSettings.customReminderSoundType || 'default';
-      let ayahAudioUrl: string | undefined;
       
       // Build content based on type
-      if (notifSettings.customReminderContentType === 'ayah' && notifSettings.customReminderSurah && notifSettings.customReminderAyah) {
-        const reciter = notifSettings.customReminderReciter || 'ar.alafasy';
-        // حساب رقم الآية الكلي
-        const ayahCounts = [7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,45,33,27,57,29,19,18,12,11,82,8,11,98,5,8,8,19,5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6,4,4];
-        let totalAyahs = 0;
-        for (let i = 0; i < notifSettings.customReminderSurah - 1; i++) {
-          totalAyahs += ayahCounts[i];
-        }
-        const globalAyah = totalAyahs + notifSettings.customReminderAyah;
-        ayahAudioUrl = getAyahAudioUrl(reciter, globalAyah);
-        title = t('settings.verseReminder');
-        const surahName = getSurahName(notifSettings.customReminderSurah);
-        if (!notifSettings.customReminderTitle) {
-          body = `${surahName} - ${t('quran.ayah')} ${notifSettings.customReminderAyah}`;
-        }
-        soundType = 'ayah_audio';
-      } else if (notifSettings.customReminderContentType === 'surah' && notifSettings.customReminderSurah) {
+      if (notifSettings.customReminderContentType === 'surah' && notifSettings.customReminderSurah) {
         title = t('settings.surahReminder');
         if (!notifSettings.customReminderTitle) {
           body = `${t('settings.surahReadingTime')} ${notifSettings.customReminderSurah}`;
@@ -646,9 +723,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           data: { 
             type: 'custom', 
             soundType,
-            ...(ayahAudioUrl && { ayahAudioUrl }),
             ...(notifSettings.customReminderSurah && { surah: notifSettings.customReminderSurah }),
-            ...(notifSettings.customReminderAyah && { ayah: notifSettings.customReminderAyah }),
             contentType: notifSettings.customReminderContentType || 'text',
           },
         },
@@ -656,7 +731,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         customTime.minute,
         notifSettings.customReminderDays,
         'general',
-        notifSettings.customReminderSoundType,
+        notifSettings.customReminderSoundType || 'general_reminder',
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -688,7 +763,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         quranTime.minute,
         convertedDays,
         'general',
-        notifSettings.quranReminderSoundType,
+        notifSettings.quranReminderSoundType || 'general_reminder',
       );
     } else {
       for (const d of [1, 2, 3, 4, 5, 6, 7]) {
@@ -725,8 +800,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       await Notifications.scheduleNotificationAsync({
         identifier: 'worship_weekly_report',
         content: {
-          title: t('settings.worshipWeeklyReportTitle'),
-          body: t('settings.worshipWeeklyReportBody'),
+          title: dirText(t('settings.worshipWeeklyReportTitle')),
+          body: dirText(t('settings.worshipWeeklyReportBody')),
           sound: resolveNotificationSound('general_reminder', notifSettings.sound),
           data: { type: 'worship_weekly' },
           ...(Platform.OS === 'android' && { channelId: 'general' }),
@@ -770,20 +845,24 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         console.warn('Failed to fetch Dhuhr for Kahf reminder, using fallback 14:00:', e);
       }
 
-      // First ayah of Surah Al-Kahf (global ayah number = 2141)
+      // First ayah of Surah Al-Kahf (18:1) - Arabic text for notification body
+      const KAHF_FIRST_AYAH_TEXT = 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ';
       const KAHF_FIRST_AYAH_GLOBAL = 2141;
       const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
 
       await Notifications.scheduleNotificationAsync({
         identifier: 'kahf_friday',
         content: {
-          title: t('settings.kahfTitle'),
-          body: t('settings.kahfBody'),
+          title: dirText(t('settings.kahfTitle')),
+          body: dirText(`${t('settings.kahfBody')}\n\n﴿ ${KAHF_FIRST_AYAH_TEXT} ﴾`),
           sound: resolveNotificationSound('general_reminder', notifSettings.sound),
           data: {
             type: 'kahf',
             soundType: 'general_reminder',
             ayahAudioUrl: kahfAyahAudioUrl,
+            ayahText: KAHF_FIRST_AYAH_TEXT,
+            surah: 18,
+            ayah: 1,
           },
           ...(Platform.OS === 'android' && { channelId: 'general' }),
         },

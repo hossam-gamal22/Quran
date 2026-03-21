@@ -288,7 +288,7 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
         <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subMap[action.id] || action.subtitle}</Text>
       </View>
       {isCompleted && (
-        <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
+        <MaterialCommunityIcons name="check-circle" size={24} color="#22C55E" />
       )}
     </TouchableOpacity>
   );
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     backgroundColor: ASHURA_COLOR,
   },
   fastingDayNumberFasted: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   fastingDayNumberText: {
     fontSize: 20,
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   recommendedBadge: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -649,8 +649,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fastingCheckboxChecked: {
-    backgroundColor: '#2f7659',
-    borderColor: '#2f7659',
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
   },
 
   // الفضائل
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionIconCompleted: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   actionContent: {
     flex: 1,

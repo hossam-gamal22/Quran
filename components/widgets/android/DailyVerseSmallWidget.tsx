@@ -4,11 +4,10 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
   const { verse } = data;
-  // Truncate to ~60 chars for small widget
   const truncated = verse.arabic.length > 60
     ? verse.arabic.substring(0, 60) + '…'
     : verse.arabic;
@@ -19,19 +18,22 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.verse,
+        borderRadius: 20,
         padding: 12,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://daily-ayah' }}
     >
+      {/* Icon */}
       <TextWidget
         text="📖"
-        style={{ fontSize: 20 }}
+        style={{ fontSize: 22 }}
       />
+
+      {/* Verse text */}
       <TextWidget
         text={truncated}
         style={{
@@ -44,13 +46,25 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
         maxLines={3}
         truncate="END"
       />
+
+      {/* Surah name */}
       <TextWidget
         text={verse.surahName}
         style={{
           fontSize: 11,
           color: COLORS.gold,
           fontFamily: FONT.amiri,
-          marginTop: 6,
+          marginTop: 4,
+        }}
+      />
+
+      {/* Branding */}
+      <TextWidget
+        text={BRANDING.name}
+        style={{
+          fontSize: BRANDING.fontSize,
+          color: BRANDING.color,
+          fontFamily: FONT.amiri,
         }}
       />
     </FlexWidget>

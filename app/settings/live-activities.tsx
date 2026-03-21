@@ -112,7 +112,7 @@ export default function LiveActivitiesSettingsScreen() {
               >
                 <GlassCard style={[styles.styleCard, isActive && { borderColor: '#22C55E', borderWidth: 2 }]}>
                   <View style={[styles.styleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[styles.styleIcon, { backgroundColor: isActive ? 'rgba(34,197,94,0.15)' : 'rgba(120,120,128,0.12)' }]}>
+                    <View style={[styles.styleIcon, { backgroundColor: isActive ? 'rgba(34,197,94,0.15)' : 'rgba(34, 197, 94, 0.08)' }]}>
                       <MaterialCommunityIcons
                         name={(STYLE_ICONS[s.id] || 'clock-outline') as any}
                         size={24}

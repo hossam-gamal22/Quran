@@ -177,7 +177,7 @@ export default function AyatUniverseScreen() {
                   </Text>
                   <View style={[styles.verseActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? '#2a2a3e' : '#f5f5f5' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         goToSurah(verse);
@@ -187,7 +187,7 @@ export default function AyatUniverseScreen() {
                       <Text style={[styles.actionBtnText, { color: themeInfo?.color || '#3a7ca5' }]}>{t('ayatUniverse.readInMushaf')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? '#2a2a3e' : '#f5f5f5' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         shareVerse(verse);
@@ -203,7 +203,6 @@ export default function AyatUniverseScreen() {
         })}
 
         <BannerAdComponent screen="ayat_universe" />
-        <View style={{ height: 100 }} />
       </ScrollView>
     </ScreenContainer>
   );

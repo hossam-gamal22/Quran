@@ -39,7 +39,7 @@ const { width, height } = Dimensions.get('window');
 
 const DEFAULT_FEATURES = [
   { icon: 'book-open-variant', labelKey: 'featureQuran', color: '#3a7ca5' },
-  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#2f7659' },
+  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#22C55E' },
   { icon: 'mosque', labelKey: 'featurePrayer', color: '#c17f59' },
   { icon: 'compass', labelKey: 'featureQibla', color: '#5d4e8c' },
 ];
@@ -122,7 +122,7 @@ export default function WelcomeScreen() {
           {/* الشعار */}
           <Animated.View entering={FadeIn.duration(800)} style={styles.logoContainer}>
             <View
-              style={[styles.logoGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+              style={[styles.logoGradient, { backgroundColor: 'rgba(6,79,47,0.85)' }]}
             >
               <Image source={logoSource} style={{ width: 80, height: 80, borderRadius: 20 }} />
             </View>
@@ -169,7 +169,7 @@ export default function WelcomeScreen() {
               activeOpacity={0.8}
             >
               <View
-                style={[styles.primaryButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={[styles.primaryButtonGradient, { backgroundColor: 'rgba(6,79,47,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                 <Text style={styles.primaryButtonText}>{t('onboarding.getStarted')}</Text>
                 <MaterialCommunityIcons name={isRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
     marginTop: 12,
     lineHeight: 24,
@@ -338,6 +338,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
 });

@@ -209,7 +209,7 @@ body{
   color:#e8f0ed;
 }
 .header{
-  background:linear-gradient(160deg,#052e23 0%,#0b513f 40%,#0f987f 100%);
+  background:linear-gradient(160deg,#052e23 0%,#0b513f 40%,#22C55E 100%);
   padding:20px 16px 14px;text-align:center;position:relative;overflow:hidden;
   border-bottom:2px solid rgba(201,168,76,0.4);
 }
@@ -231,7 +231,7 @@ body{
 .section:nth-child(even) .section-title{color:#e8c66a;border-bottom-color:rgba(232,198,106,0.2);}
 .section-desc{color:rgba(232,240,237,0.8);}
 .steps-label{color:#4eecc4;}
-.step-num{background:#0f987f;box-shadow:0 2px 6px rgba(15,152,127,0.3);}
+.step-num{background:#22C55E;box-shadow:0 2px 6px rgba(15,152,127,0.3);}
 .step-text{color:rgba(232,240,237,0.85);}
 .section:nth-child(even) .step-num{background:#b8941f;}
 
@@ -244,7 +244,7 @@ body{
 
 .hadith-quote{
   background:rgba(15,152,127,0.08);border:1px solid rgba(15,152,127,0.2);
-  border-right:4px solid #0f987f;color:#e8f0ed;
+  border-right:4px solid #22C55E;color:#e8f0ed;
 }
 .hadith-reference{color:#4eecc4;}
 
@@ -253,11 +253,11 @@ body{
 p{color:rgba(232,240,237,0.85);}
 h2{color:#4eecc4;border-bottom:2px solid rgba(78,236,196,0.2);}
 .decorative-divider{color:#c9a84c;}
-.decorative-divider::before,.decorative-divider::after{background:linear-gradient(90deg,transparent,#0f987f 30%,#c9a84c 50%,#0f987f 70%,transparent);}
+.decorative-divider::before,.decorative-divider::after{background:linear-gradient(90deg,transparent,#22C55E 30%,#c9a84c 50%,#22C55E 70%,transparent);}
 
 .footer{
   text-align:center;padding:14px 16px;
-  background:linear-gradient(160deg,#052e23 0%,#0b513f 50%,#0f987f 100%);
+  background:linear-gradient(160deg,#052e23 0%,#0b513f 50%,#22C55E 100%);
   position:relative;overflow:hidden;
 }
 .footer::before{content:'';position:absolute;top:0;left:8%;right:8%;height:3px;background:linear-gradient(90deg,transparent,#c9a84c 30%,#fbbf24 50%,#c9a84c 70%,transparent);border-radius:3px;}

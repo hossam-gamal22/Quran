@@ -26,7 +26,7 @@ export default function WebViewScreen() {
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#2f7659" />
+            <ActivityIndicator size="large" color="#22C55E" />
           </View>
         )}
       />

@@ -116,7 +116,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
             <MaterialCommunityIcons
               name="loading"
               size={40}
-              color={isDarkMode ? '#fff' : '#2f7659'}
+              color={isDarkMode ? '#fff' : '#22C55E'}
             />
             <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
               {t('common.loading')}
@@ -135,7 +135,7 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
       <View
         style={[styles.gradient, { backgroundColor: isDarkMode 
           ? 'rgba(30,30,30,0.85)' 
-          : 'rgba(47,118,89,0.85)'
+          : 'rgba(6,79,47,0.85)'
         }]}
       >
         <Animated.View style={[styles.glowEffect, glowAnimatedStyle]}>

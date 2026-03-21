@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   FlatList,
   Modal,
   Animated,
@@ -14,6 +13,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -1072,10 +1072,10 @@ export default function AllahNamesScreen() {
       opacity={settings.display.backgroundOpacity ?? 1}
       style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]}
     >
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       {/* الرأس */}
       <View style={[styles.header, { backgroundColor: 'transparent', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <BackButton color={isDarkMode ? '#fff' : Colors.text} style={[styles.headerBtn, { backgroundColor: 'rgba(120,120,128,0.18)' }]} />
+        <BackButton color={isDarkMode ? '#fff' : Colors.text} style={[styles.headerBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]} />
         
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t('names.title')}</Text>
@@ -1090,7 +1090,7 @@ export default function AllahNamesScreen() {
             ]}
             selected={viewMode}
             onSelect={(key) => setViewMode(key as 'grid' | 'list')}
-            indicatorColor="#2f7659"
+            indicatorColor="#22C55E"
           />
         </View>
       </View>
@@ -1129,7 +1129,7 @@ export default function AllahNamesScreen() {
             {/* الرأس */}
             <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color="#8E8E93" />
+                <Ionicons name="close" size={24} color="#A8A8AD" />
               </TouchableOpacity>
               
               <Text style={styles.modalTitle}>
@@ -1151,7 +1151,7 @@ export default function AllahNamesScreen() {
                   <Ionicons
                     name={selectedName && favorites.includes(selectedName.id) ? 'heart' : 'heart-outline'}
                     size={22}
-                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : '#8E8E93'}
+                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : '#A8A8AD'}
                   />
                 </TouchableOpacity>
               </View>
@@ -1241,7 +1241,7 @@ export default function AllahNamesScreen() {
             <View style={[styles.shareModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={styles.shareModalTitle}>{t('names.shareHeader')}</Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color="#8E8E93" />
+                <Ionicons name="close" size={24} color="#A8A8AD" />
               </TouchableOpacity>
             </View>
             
@@ -1459,7 +1459,7 @@ const styles = StyleSheet.create({
   listItemMeaning: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
+    color: '#A8A8AD',
   },
   listItemActions: {
     flexDirection: 'row',
@@ -1469,7 +1469,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(120,120,128,0.15)',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1498,7 +1498,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#8E8E93',
+    color: '#A8A8AD',
   },
   modalHeaderActions: {
     flexDirection: 'row',
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.glass,
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1527,7 +1527,7 @@ const styles = StyleSheet.create({
   transliteration: {
     fontSize: 16,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
+    color: '#A8A8AD',
     marginTop: Spacing.xs,
   },
   
@@ -1666,7 +1666,7 @@ const styles = StyleSheet.create({
   sharePreviewMeaning: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
+    color: '#A8A8AD',
     marginTop: Spacing.xs,
   },
   shareOptions: {
@@ -1681,6 +1681,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: BorderRadius.lg,
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },

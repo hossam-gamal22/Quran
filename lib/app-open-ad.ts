@@ -23,10 +23,12 @@ let adInstance: any = null;
 let adReady = false;
 let lastAdShownTime = 0;
 let appOpenCount = 0;
-const MIN_AD_INTERVAL = 420_000; // 7 minutes between app-open ads
-const MIN_OPENS_BEFORE_AD = 3; // skip first 3 background→active transitions
-const SESSION_GRACE_PERIOD = 30_000; // no ads in first 30s after launch
+const MIN_AD_INTERVAL = 1_800_000; // 30 minutes between app-open ads (was 7 min)
+const MIN_OPENS_BEFORE_AD = 5; // skip first 5 background→active transitions (was 3)
+const SESSION_GRACE_PERIOD = 120_000; // no ads in first 2 minutes after launch (was 30s)
+const MIN_BACKGROUND_DURATION = 300_000; // only show ad if user was away 5+ minutes
 const sessionStartTime = Date.now();
+let lastBackgroundTime = 0;
 
 export const loadAppOpenAd = async (): Promise<void> => {
   if (!AppOpenAdClass || Platform.OS === 'web') return;
@@ -76,8 +78,20 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   // Grace period after initial app launch
   if (Date.now() - sessionStartTime < SESSION_GRACE_PERIOD) return false;
 
+  // Only show ad if user was in background for significant time
+  if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {
+    return false;
+  }
+
   // Enforce minimum interval between ads
   if (Date.now() - lastAdShownTime < MIN_AD_INTERVAL) return false;
+
+  // Smart ad manager checks (daily cap, sacred context, engagement reward)
+  try {
+    const { canShowAppOpenAd, isInSacredContext } = require('./smart-ad-manager');
+    if (isInSacredContext()) return false;
+    if (!(await canShowAppOpenAd())) return false;
+  } catch {}
 
   // Global ad cooldown check
   try {
@@ -98,6 +112,11 @@ export const showAppOpenAd = async (): Promise<boolean> => {
       const { recordGlobalAdShown } = require('./ads-config');
       recordGlobalAdShown();
     } catch {}
+    // Record in smart ad manager for daily cap
+    try {
+      const { recordAppOpenAdShown } = require('./smart-ad-manager');
+      await recordAppOpenAdShown();
+    } catch {}
     return true;
   } catch {
     return false;
@@ -109,6 +128,9 @@ export const initializeAppOpenAds = (): (() => void) => {
 
   let appState = AppState.currentState;
   const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+    if (nextState === 'background' || nextState === 'inactive') {
+      lastBackgroundTime = Date.now();
+    }
     if (appState.match(/inactive|background/) && nextState === 'active') {
       showAppOpenAd();
     }

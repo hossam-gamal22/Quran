@@ -2,7 +2,8 @@
 // Daily dhikr data layer — mixes local azkar.json + Firestore admin entries
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, getFirestore, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 const CACHE_KEY = '@daily_dhikr_cache';
 const CACHE_DATE_KEY = '@daily_dhikr_cache_date';
@@ -56,7 +57,6 @@ function getLocalPool(): DailyDhikr[] {
 // Fetch admin-added adhkar from Firestore
 async function fetchFirestoreAdhkar(): Promise<DailyDhikr[]> {
   try {
-    const db = getFirestore();
     const q = query(collection(db, 'dailyDhikr'), where('enabled', '==', true));
     const snap = await getDocs(q);
     return snap.docs.map(d => {

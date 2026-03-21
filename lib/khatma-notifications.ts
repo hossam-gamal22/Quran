@@ -2,7 +2,37 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Khatma } from './khatma-storage';
-import { t } from '@/lib/i18n';
+import { t } from './i18n';
+import { dirText } from './notification-text-direction';
+
+// Sound file mapping (must match app.json expo-notifications sounds)
+const SOUND_FILES: Record<string, string> = {
+  general_reminder: 'general_reminder.mp3',
+  salawat: 'salawat.mp3',
+  istighfar: 'istighfar.mp3',
+  tasbih: 'tasbih.mp3',
+};
+
+/**
+ * Resolve sound for khatma notifications
+ * Returns false for silent, 'default' for system sound, or filename for custom sound
+ */
+function resolveKhatmaSound(soundType?: string, soundEnabled?: boolean): string | false {
+  // Silent notification
+  if (soundEnabled === false || soundType === 'silent') {
+    return false;
+  }
+  
+  // Default system sound
+  if (!soundType || soundType === 'default') return 'default';
+  
+  // Lookup custom sound file
+  const file = SOUND_FILES[soundType] || 'general_reminder.mp3';
+  
+  // Android: no extension, iOS: with extension
+  if (Platform.OS === 'android') return file.replace(/\.mp3$/, '');
+  return file;
+}
 
 // ===== STORAGE KEY =====
 const KHATMA_NOTIFICATION_IDS_KEY = '@rooh_muslim_khatma_notification_ids';
@@ -12,14 +42,7 @@ interface KhatmaNotificationIds {
   [khatmaId: string]: string; // khatmaId -> notificationId
 }
 
-// ===== CONFIGURE NOTIFICATIONS =====
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  } as Notifications.NotificationBehavior),
-});
+// Notification handler is configured in app/_layout.tsx (single source of truth)
 
 // ===== REQUEST PERMISSIONS =====
 export const requestNotificationPermissions = async (): Promise<boolean> => {
@@ -45,8 +68,8 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
         name: t('notifications.khatmaChannel'),
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#2f7659',
-        sound: 'general_reminder.mp3',
+        lightColor: '#22C55E',
+        sound: 'general_reminder',
       });
     }
 
@@ -110,16 +133,18 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
     // Parse reminder time (format: "HH:mm")
     const [hours, minutes] = khatma.reminderTime.split(':').map(Number);
 
-    // Schedule daily notification
+    // Schedule daily notification with proper sound resolution
+    const soundValue = resolveKhatmaSound('general_reminder', true);
+    
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: `📖 ${t('notifications.dailyWirdTitle')}`,
-        body: `${t('notifications.dailyWirdBody')} - "${khatma.name}" - ${khatma.pagesPerDay}`,
+        title: dirText(`📖 ${t('notifications.dailyWirdTitle')}`),
+        body: dirText(`${t('notifications.dailyWirdBody')} - "${khatma.name}" - ${khatma.pagesPerDay}`),
         data: { 
           type: 'khatma_reminder', 
           khatmaId: khatma.id,
         },
-        sound: 'general_reminder.mp3',
+        sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
@@ -197,9 +222,9 @@ export const sendTestKhatmaNotification = async (): Promise<void> => {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `📖 ${t('notifications.testTitle')}`,
-        body: t('notifications.testBody'),
-        sound: 'general_reminder.mp3',
+        title: dirText(`📖 ${t('notifications.testTitle')}`),
+        body: dirText(t('notifications.testBody')),
+        sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate
@@ -217,9 +242,9 @@ export const sendKhatmaCompletionNotification = async (khatmaName: string): Prom
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `🎉 ${t('notifications.khatmaComplete')}`,
-        body: `${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`,
-        sound: 'general_reminder.mp3',
+        title: dirText(`🎉 ${t('notifications.khatmaComplete')}`),
+        body: dirText(`${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`),
+        sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate
@@ -237,9 +262,9 @@ export const sendWirdCompletionNotification = async (): Promise<void> => {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `✅ ${t('notifications.wellDone')}`,
-        body: t('khatma.wirdCompletedMsg'),
-        sound: 'general_reminder.mp3',
+        title: dirText(`✅ ${t('notifications.wellDone')}`),
+        body: dirText(t('khatma.wirdCompletedMsg')),
+        sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
       },
       trigger: null, // Immediate

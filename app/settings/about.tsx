@@ -109,7 +109,7 @@ const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isD
       style={[styles.featureItem, isDarkMode && styles.featureItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       <View style={styles.featureIcon}>
-        <MaterialCommunityIcons name={icon} size={24} color="#2f7659" />
+        <MaterialCommunityIcons name={icon} size={24} color="#22C55E" />
       </View>
       <View style={[styles.featureContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
         <Text style={[styles.featureTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
@@ -172,7 +172,7 @@ export default function AboutScreen() {
         {/* App Logo & Info */}
         <Animated.View entering={FadeInDown.delay(50).duration(500)}>
           <View
-            style={[styles.heroCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(47,118,89,0.85)' }]}
+            style={[styles.heroCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(6,79,47,0.85)' }]}
           >
             <TouchableOpacity onPress={handleLogoTap} activeOpacity={0.9}>
               <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
+    color: '#8E8E93',
     marginTop: 20,
     marginBottom: 12,
   },
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#2f765915',
+    backgroundColor: '#22C55E15',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   featureDesc: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
+    color: '#8E8E93',
     marginTop: 2,
   },
   statsContainer: {
@@ -409,12 +409,12 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 28,
     fontFamily: fontBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   statLabel: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
+    color: '#8E8E93',
     marginTop: 4,
   },
   statDivider: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   linkSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
+    color: '#8E8E93',
     marginTop: 2,
   },
   socialContainer: {
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2f765915',
+    backgroundColor: '#22C55E15',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
   creditRole: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
+    color: '#8E8E93',
     marginTop: 2,
   },
   footer: {
@@ -528,13 +528,13 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: '#666',
+    color: '#8E8E93',
     marginBottom: 8,
   },
   copyright: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
+    color: '#8E8E93',
     marginBottom: 4,
   },
   buildInfo: {

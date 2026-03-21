@@ -81,9 +81,9 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   }
 
   const surahName = currentSurah > 0 ? getSurahName(currentSurah) : '';
-  const primaryColor = '#2f7659';
+  const primaryColor = '#22C55E';
   const textColor = isDarkMode ? '#fff' : '#1C1C1E';
-  const textSecondary = isDarkMode ? '#8E8E93' : '#3A3A3C';
+  const textSecondary = isDarkMode ? '#A8A8AD' : '#3A3A3C';
 
   const handlePress = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

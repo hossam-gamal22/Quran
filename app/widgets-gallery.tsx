@@ -50,7 +50,7 @@ function getCategories(): WidgetCategory[] {
     id: 'prayer',
     title: t('widgets.prayerTimesTitle'),
     icon: 'mosque',
-    gradient: ['#2f7659', '#1d4a3a'],
+    gradient: ['#22C55E', '#1d4a3a'],
     deepLink: 'rooh-almuslim://prayer',
     description: t('widgets.prayerTimesDesc'),
   },
@@ -58,7 +58,7 @@ function getCategories(): WidgetCategory[] {
     id: 'ayah',
     title: t('widgets.dailyAyahTitle'),
     icon: 'book-open-page-variant',
-    gradient: ['#1e3a5f', '#2f7659'],
+    gradient: ['#1e3a5f', '#22C55E'],
     deepLink: 'rooh-almuslim://daily-ayah',
     description: t('widgets.dailyAyahDesc'),
   },
@@ -118,7 +118,7 @@ function AyahPreview({ size }: { size: WidgetSize }) {
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
-      colors={['#1e3a5f', '#2f7659']}
+      colors={['#1e3a5f', '#22C55E']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -172,7 +172,7 @@ function PrayerPreview({ size }: { size: WidgetSize }) {
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
-      colors={['#2f7659', '#1d4a3a']}
+      colors={['#22C55E', '#1d4a3a']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -501,7 +501,7 @@ export default function WidgetsGalleryScreen() {
               <MaterialCommunityIcons
                 name={activeCategory.icon as any}
                 size={22}
-                color="#3d9970"
+                color="#22C55E"
               />
               <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{activeCategory.title}</Text>
             </View>
@@ -546,7 +546,7 @@ export default function WidgetsGalleryScreen() {
             style={styles.addButton}
           >
             <LinearGradient
-              colors={['#2f7659', '#3d9970']}
+              colors={['#22C55E', '#22C55E']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.addButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -567,7 +567,7 @@ export default function WidgetsGalleryScreen() {
             style={[styles.bottomLink, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons name="cog-outline" size={18} color="#3d9970" />
+            <MaterialCommunityIcons name="cog-outline" size={18} color="#22C55E" />
             <Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.widgetSettings')}</Text>
             <MaterialCommunityIcons
               name={isRTL ? 'chevron-left' : 'chevron-right'}
@@ -746,7 +746,7 @@ const styles = StyleSheet.create({
   cardDescription: {
     fontFamily: fontRegular(),
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     lineHeight: 22,
     marginBottom: 16,
   },
@@ -809,6 +809,6 @@ const styles = StyleSheet.create({
   bottomLinkText: {
     fontFamily: fontMedium(),
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
 });

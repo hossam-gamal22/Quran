@@ -328,9 +328,9 @@ export default function NewKhatmaScreen() {
                         paddingHorizontal: 14,
                         paddingVertical: 8,
                         borderRadius: 20,
-                        backgroundColor: isSelected ? colors.primary : colors.card,
+                        backgroundColor: isSelected ? '#22C55E' : 'rgba(34, 197, 94, 0.15)',
                         borderWidth: 1,
-                        borderColor: isSelected ? colors.primary : colors.border,
+                        borderColor: isSelected ? '#22C55E' : 'rgba(34, 197, 94, 0.3)',
                       }}
                     >
                       <Text style={{
@@ -372,7 +372,7 @@ export default function NewKhatmaScreen() {
           style={[
             styles.createButton,
             {
-              backgroundColor: selectedDuration ? colors.primary : colors.border,
+              backgroundColor: selectedDuration ? '#22C55E' : colors.border,
               flexDirection: isRTL ? 'row-reverse' : 'row',
             },
           ]}

@@ -58,6 +58,12 @@ export const useInterstitialAd = (): UseInterstitialAdReturn => {
       return false;
     }
 
+    // Smart ad manager async checks (daily caps, new user grace, engagement reward)
+    try {
+      const { canShowInterstitial: smartCheck } = require('@/lib/smart-ad-manager');
+      if (!(await smartCheck())) return false;
+    } catch {}
+
     try {
       await interstitialRef.current.show();
       recordInterstitialShown();
@@ -87,6 +93,13 @@ export const showInterstitial = async (): Promise<boolean> => {
 
     const [config, sub] = await Promise.all([fetchAdsConfig(), getSubscriptionState()]);
     if (!config.enabled || sub.isPremium) return false;
+
+    // Smart ad manager checks
+    try {
+      const { canShowInterstitial: smartCheck, isInSacredContext } = require('@/lib/smart-ad-manager');
+      if (isInSacredContext()) return false;
+      if (!(await smartCheck())) return false;
+    } catch {}
 
     const adUnitId = getAdUnitId('INTERSTITIAL', config);
     if (!adUnitId) return false;

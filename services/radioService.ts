@@ -31,9 +31,29 @@ function ensureHttps(url: string): string {
 // ==================== Stream Fallback URLs ====================
 
 const STREAM_FALLBACKS: Record<string, string[]> = {
+  // Cairo Quran Radio — LIVE HLS from official ministry site (misrquran.gov.eg)
+  'https://service.webvideocore.net/CL1olYogIrDWvwqiIKK7eCxOS4PStqG9DuEjAr2ZjZQtvS3d4y9r0cvRhvS17SGN/a_7a4vuubc6mo8.m3u8': [
+    'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
+    'https://Qurango.net/radio/tarateel',
+  ],
+  // Saudi Quran Radio — primary is Al-Sudais, fallback to Shuraim
+  'https://backup.qurango.net/radio/abdulrahman_alsudaes': [
+    'https://backup.qurango.net/radio/saud_alshuraim',
+    'https://backup.qurango.net/radio/mix',
+  ],
+  // Legacy radiojar URLs → redirect to working equivalents
   'https://stream.radiojar.com/8s5u5tpdtwzuv': [
-    'https://n03.radiojar.com/8s5u5tpdtwzuv',
-    'https://n12.radiojar.com/0tpy1h0kxtzuv',
+    'https://service.webvideocore.net/CL1olYogIrDWvwqiIKK7eCxOS4PStqG9DuEjAr2ZjZQtvS3d4y9r0cvRhvS17SGN/a_7a4vuubc6mo8.m3u8',
+    'https://backup.qurango.net/radio/mahmoud_khalil_alhussary',
+  ],
+  'https://stream.radiojar.com/0tpy1h0kxtzuv': [
+    'https://backup.qurango.net/radio/abdulrahman_alsudaes',
+    'https://backup.qurango.net/radio/saud_alshuraim',
+  ],
+  // Old qurango Cairo fallback → try live first (only used if Cairo station cached old URL)
+  'https://backup.qurango.net/radio/mahmoud_khalil_alhussary': [
+    'https://Qurango.net/radio/tarateel',
+    'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
   ],
 };
 

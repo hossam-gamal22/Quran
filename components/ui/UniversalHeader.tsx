@@ -65,8 +65,15 @@ export function UniversalHeader({
       <View style={s.center}>
         {children || (
           <Text
-            style={[s.title, { color: titleColor || colors.text }, titleStyle]}
+            style={[
+              s.title,
+              { color: titleColor || colors.text },
+              { textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' },
+              titleStyle,
+            ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {title}
           </Text>

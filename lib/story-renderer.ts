@@ -101,11 +101,11 @@ function buildHtml(
     .header {
       text-align: center;
       padding: 30px 0;
-      border-bottom: 2px solid #0f987f;
+      border-bottom: 2px solid #22C55E;
       margin-bottom: 30px;
     }
     .header .icon { font-size: 60px; margin-bottom: 10px; }
-    .header h1 { font-size: 28px; color: #0f987f; }
+    .header h1 { font-size: 28px; color: #22C55E; }
     .header .subtitle { font-size: 16px; color: ${mutedColor}; margin-top: 8px; }
     .quick-info {
       display: flex; flex-wrap: wrap; gap: 12px;
@@ -121,7 +121,7 @@ function buildHtml(
       background: rgba(15, 152, 127, 0.06);
       border-radius: 12px;
     }
-    .toc h2 { font-size: 18px; margin-bottom: 12px; color: #0f987f; }
+    .toc h2 { font-size: 18px; margin-bottom: 12px; color: #22C55E; }
     .toc a {
       display: block; padding: 8px 0;
       color: inherit; text-decoration: none;
@@ -129,14 +129,14 @@ function buildHtml(
     }
     .section { margin-bottom: 32px; }
     .section h2 {
-      font-size: 22px; color: #0f987f;
+      font-size: 22px; color: #22C55E;
       margin-bottom: 16px; padding-bottom: 8px;
       border-bottom: 1px solid rgba(15,152,127,0.3);
     }
     .section p { margin-bottom: 16px; font-size: 16px; }
     .quran-quote {
       background: rgba(15, 152, 127, ${quoteAlpha});
-      border-right: 4px solid #0f987f;
+      border-right: 4px solid #22C55E;
       padding: 16px 20px;
       margin: 16px 0;
       border-radius: 0 12px 12px 0;
@@ -147,7 +147,7 @@ function buildHtml(
     }
     .quran-reference {
       text-align: center; font-size: 14px;
-      color: #0f987f; margin-top: 8px;
+      color: #22C55E; margin-top: 8px;
     }
     .lessons {
       background: rgba(15, 152, 127, ${lessonAlpha});
@@ -155,7 +155,7 @@ function buildHtml(
       padding: 20px;
       margin-top: 24px;
     }
-    .lessons h3 { color: #0f987f; margin-bottom: 12px; font-size: 18px; }
+    .lessons h3 { color: #22C55E; margin-bottom: 12px; font-size: 18px; }
     .lessons ul { list-style: none; padding: 0; }
     .lessons li {
       padding: 8px 0;
@@ -165,13 +165,13 @@ function buildHtml(
     }
     .lessons li::before {
       content: '•'; position: absolute;
-      right: 0; color: #0f987f;
+      right: 0; color: #22C55E;
     }
     .footer {
       text-align: center; padding: 24px 0; margin-top: 32px;
-      border-top: 2px solid #0f987f; color: ${mutedColor};
+      border-top: 2px solid #22C55E; color: ${mutedColor};
     }
-    .footer .app-name { font-size: 18px; color: #0f987f; margin-bottom: 4px; }
+    .footer .app-name { font-size: 18px; color: #22C55E; margin-bottom: 4px; }
   </style>
 </head>
 <body>

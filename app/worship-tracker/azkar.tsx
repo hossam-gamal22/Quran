@@ -41,7 +41,7 @@ const AZKAR_TYPES: { key: keyof Omit<DailyAzkarRecord, 'date'>; icon: string; co
   { key: 'evening', icon: 'weather-sunset-down', color: '#5d4e8c', labelKey: 'azkar.evening' },
   { key: 'sleep', icon: 'weather-night', color: '#1a237e', labelKey: 'azkar.sleep' },
   { key: 'wakeup', icon: 'white-balance-sunny', color: '#e65100', labelKey: 'azkar.wakeup' },
-  { key: 'afterPrayer', icon: 'mosque', color: '#2f7659', labelKey: 'azkar.afterPrayer' },
+  { key: 'afterPrayer', icon: 'mosque', color: '#22C55E', labelKey: 'azkar.afterPrayer' },
 ];
 
 // ========================================
@@ -60,7 +60,7 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   progress,
   size = 160,
   strokeWidth = 12,
-  color = '#2f7659',
+  color = '#22C55E',
   children,
 }) => {
   const radius = (size - strokeWidth) / 2;
@@ -205,8 +205,8 @@ export default function AzkarTrackerScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={onRefresh}
-              colors={['#2f7659']}
-              tintColor="#2f7659"
+              colors={['#22C55E']}
+              tintColor="#22C55E"
             />
           }
         >
@@ -214,7 +214,7 @@ export default function AzkarTrackerScreen() {
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <GlassCard style={styles.progressCard}>
               <View style={styles.progressCenter}>
-                <CircularProgress progress={todayProgress} color="#2f7659">
+                <CircularProgress progress={todayProgress} color="#22C55E">
                   <Text style={[styles.progressText, { color: colors.text }]}>
                     {todayCompleted}/5
                   </Text>
@@ -283,7 +283,7 @@ export default function AzkarTrackerScreen() {
                           styles.barFill,
                           {
                             height: `${(day.completed / maxBar) * 100}%`,
-                            backgroundColor: day.completed >= 5 ? '#2f7659' : day.completed > 0 ? '#f5a623' : (isDarkMode ? '#333' : '#e0e0e0'),
+                            backgroundColor: day.completed >= 5 ? '#22C55E' : day.completed > 0 ? '#f5a623' : (isDarkMode ? '#333' : '#e0e0e0'),
                           },
                         ]}
                       />
@@ -327,7 +327,7 @@ export default function AzkarTrackerScreen() {
             </View>
             <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassCard style={styles.statCard}>
-                <MaterialCommunityIcons name="calendar-check" size={24} color="#2f7659" />
+                <MaterialCommunityIcons name="calendar-check" size={24} color="#22C55E" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {azkarStats?.totalDays ?? 0}
                 </Text>
@@ -391,7 +391,7 @@ export default function AzkarTrackerScreen() {
                       {formatted}
                     </Text>
                     <View style={styles.historyBar}>
-                      <View style={[styles.historyBarFill, { width: `${pct}%`, backgroundColor: pct >= 100 ? '#2f7659' : '#f5a623' }]} />
+                      <View style={[styles.historyBarFill, { width: `${pct}%`, backgroundColor: pct >= 100 ? '#22C55E' : '#f5a623' }]} />
                     </View>
                     <Text style={[styles.historyValue, { color: colors.textLight }]}>
                       {entry.completed}/{entry.total}

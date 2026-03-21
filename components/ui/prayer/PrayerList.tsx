@@ -165,7 +165,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;
-  const activeGreen = '#2f7659';
+  const activeGreen = '#22C55E';
   const isPrayed = prayerStatus === 'prayed' || prayerStatus === 'late';
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -269,7 +269,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
 
           {showNotificationToggle && (
             <Switch
-              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
               thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
               ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
               onValueChange={(val) => handleToggle(val)}
@@ -326,9 +326,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.2)',
   },
   prayerItemNext: {
-    backgroundColor: 'rgba(47,118,89,0.18)',
+    backgroundColor: 'rgba(6,79,47,0.18)',
     borderWidth: 1,
-    borderColor: 'rgba(47,118,89,0.35)',
+    borderColor: 'rgba(6,79,47,0.35)',
   },
   prayerItemPassed: {
     opacity: 0.6,

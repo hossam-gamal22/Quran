@@ -26,7 +26,7 @@ const PRAYERS = [
   { key: 'fajr', tKey: 'prayer.fajr', icon: 'weather-sunset-up', color: '#3a7ca5' },
   { key: 'sunrise', tKey: 'prayer.sunrise', icon: 'white-balance-sunny', color: '#f5a623' },
   { key: 'dhuhr', tKey: 'prayer.dhuhr', icon: 'weather-sunny', color: '#c17f59' },
-  { key: 'asr', tKey: 'prayer.asr', icon: 'weather-sunny-alert', color: '#2f7659' },
+  { key: 'asr', tKey: 'prayer.asr', icon: 'weather-sunny-alert', color: '#22C55E' },
   { key: 'maghrib', tKey: 'prayer.maghrib', icon: 'weather-sunset-down', color: '#e91e63' },
   { key: 'isha', tKey: 'prayer.isha', icon: 'weather-night', color: '#5d4e8c' },
 ] as const;
@@ -206,6 +206,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stepperValueActive: {
-    color: '#2f7659',
+    color: '#22C55E',
   },
 });

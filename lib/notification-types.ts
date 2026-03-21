@@ -6,6 +6,8 @@ export interface NotificationSettings {
   prayers: Record<PrayerKey, boolean>;
   advanceMinutes: number;
   adhanSound: boolean;
+  adhanSoundType?: string;
+  soundType?: string;
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {

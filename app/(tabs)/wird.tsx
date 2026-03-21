@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   targetText: {
     fontFamily: fontMedium(),
     fontSize: 24,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     marginTop: -10,
   },
 
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontFamily: fontMedium(),
     fontSize: 14,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 4,
   },
   resetButton: {

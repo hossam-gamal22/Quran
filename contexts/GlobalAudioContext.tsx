@@ -7,6 +7,7 @@ import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
 import { audioPlayer, type PlaybackState } from '@/lib/audio-player';
 import { radioPlayer } from '@/lib/radio-player';
+import { audioCoordinator } from '@/lib/audio-coordinator';
 import type { RadioStation, RadioPlaybackState } from '@/types/radio';
 
 export type AudioSource = 'quran' | 'azkar' | 'radio' | 'none';
@@ -141,6 +142,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       setAzkarPlaying(false);
       setAzkarLoading(false);
       setSource('none');
+      audioCoordinator.releaseFocus('azkar-queue', 'azkar');
       return;
     }
 
@@ -152,7 +154,25 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
     await cleanupAzkar();
 
+    // Request audio focus — this will stop any other audio source
+    await audioCoordinator.requestFocus('azkar', {
+      stop: async () => {
+        await cleanupAzkar();
+        setAzkarPlaying(false);
+        setAzkarLoading(false);
+        setSource('none');
+      },
+    }, 'azkar-queue');
+
     try {
+      // Set audio mode for background playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        staysActiveInBackground: true,
+      });
+
       const { sound } = await Audio.Sound.createAsync(
         { uri: track.url },
         { shouldPlay: true, rate: playbackSpeed },

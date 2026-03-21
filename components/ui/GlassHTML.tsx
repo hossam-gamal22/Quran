@@ -101,11 +101,11 @@ export function GlassHTML({
   const colors = useMemo(() => ({
     text: isDarkMode ? '#FFFFFF' : '#1C1C1E',
     textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    link: isDarkMode ? '#4ADE80' : '#2f7659',
+    link: isDarkMode ? '#4ADE80' : '#22C55E',
     background: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
     border: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
     codeBackground: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    blockquoteBorder: isDarkMode ? '#4ADE80' : '#2f7659',
+    blockquoteBorder: isDarkMode ? '#4ADE80' : '#22C55E',
   }), [isDarkMode]);
 
   // Fetch HTML from URL if provided

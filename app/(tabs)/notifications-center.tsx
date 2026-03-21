@@ -117,15 +117,19 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function NotificationsCenterScreen() {
   const colors = useColors();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings: appSettings } = useSettings();
   const isRTL = useIsRTL();
   const [settings, setSettings] = useState<AllNotificationSettings>(DEFAULT_ALL_NOTIF);
   const [hasPermission, setHasPermission] = useState(false);
+  const [permissionChecked, setPermissionChecked] = useState(false);
   const [timePicker, setTimePicker] = useState<{ key: string; value: string; title: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState<AdhanType | null>(null);
   const [previewLoading, setPreviewLoading] = useState<AdhanType | null>(null);
   const previewSoundRef = useRef<Audio.Sound | null>(null);
+
+  // Get user's notification sound preference from app settings
+  const soundType = appSettings?.notifications?.soundType || 'general_reminder';
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
@@ -180,7 +184,10 @@ export default function NotificationsCenterScreen() {
 
   useEffect(() => {
     getAllNotifSettings().then(setSettings);
-    requestNotifPermission().then(setHasPermission);
+    requestNotifPermission().then((granted) => {
+      setHasPermission(granted);
+      setPermissionChecked(true);
+    });
   }, []);
 
   const updateAndSave = useCallback(async (update: Partial<AllNotificationSettings>) => {
@@ -189,9 +196,9 @@ export default function NotificationsCenterScreen() {
     setSettings(next);
     setSaving(true);
     await saveAllNotifSettings(next);
-    await scheduleAllNotifications(next);
+    await scheduleAllNotifications(next, soundType);
     setSaving(false);
-  }, [settings]);
+  }, [settings, soundType]);
 
   const updatePrayer = useCallback(async (prayer: keyof AllNotificationSettings['prayers'], value: boolean) => {
     const nextPrayers = { ...settings.prayers, [prayer]: value };
@@ -201,6 +208,7 @@ export default function NotificationsCenterScreen() {
   const handleRequestPermission = async () => {
     const granted = await requestNotifPermission();
     setHasPermission(granted);
+    setPermissionChecked(true);
     if (!granted) {
       Alert.alert(
         t('settings.notifPermissionTitle'),
@@ -243,14 +251,14 @@ export default function NotificationsCenterScreen() {
     prayerName: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' },
     // Advance row
     advanceRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexWrap: 'wrap' },
-    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border },
-    advChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.3)' },
+    advChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
     advChipText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     advChipTextActive: { color: '#fff' },
     // Radio buttons for adhan type
     radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.muted, alignItems: 'center' as const, justifyContent: 'center' as const },
     radioInner: { width: 12, height: 12, borderRadius: 6 },
-    previewBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(120,120,128,0.12)', alignItems: 'center' as const, justifyContent: 'center' as const },
+    previewBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(34, 197, 94, 0.15)', alignItems: 'center' as const, justifyContent: 'center' as const },
     // Save indicator
     savingBadge: { position: 'absolute', top: 10, ...(isRTL ? { left: 16 } : { right: 16 }), backgroundColor: colors.success + '20', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   });
@@ -281,7 +289,7 @@ export default function NotificationsCenterScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
 
         {/* Permission Banner */}
-        {!hasPermission && (
+        {permissionChecked && !hasPermission && (
           <TouchableOpacity style={[s.permBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handleRequestPermission}>
             <MaterialCommunityIcons name="alert" size={22} color={colors.warning} />
             <Text style={{ flex: 1, fontSize: 13, color: colors.warning, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' }}>

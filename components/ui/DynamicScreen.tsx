@@ -145,7 +145,7 @@ export function DynamicScreen({
     background: isDarkMode ? '#0F0F0F' : '#F7F7F7',
     text: isDarkMode ? '#FFFFFF' : '#1C1C1E',
     textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    accent: isDarkMode ? '#4ADE80' : '#2f7659',
+    accent: isDarkMode ? '#4ADE80' : '#22C55E',
   }), [isDarkMode]);
 
   // Animate content on load

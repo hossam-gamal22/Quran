@@ -95,7 +95,7 @@ export default function PrayerCalculationScreen() {
                     <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.asrJuristic === m.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -117,7 +117,7 @@ export default function PrayerCalculationScreen() {
                     <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.calculationMethod === m.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(120,120,128,0.2)',
   },
-  optionSelected: { backgroundColor: 'rgba(47,118,89,0.08)' },
+  optionSelected: { backgroundColor: 'rgba(6,79,47,0.08)' },
   optionLabel: { fontFamily: fontSemiBold(), fontSize: 15, color: '#333' },
   optionSub: { fontFamily: fontRegular(), fontSize: 12, color: '#999', marginTop: 2 },
 });

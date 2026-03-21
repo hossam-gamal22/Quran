@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.0.0",
+    "version": "1.0.4",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "1",
+      "buildNumber": "5",
       "entitlements": {
         "com.apple.security.application-groups": ["group.com.roohmuslim.app"]
       },
@@ -23,6 +23,10 @@
         "LSApplicationQueriesSchemes": ["whatsapp"],
         "GADApplicationIdentifier": "ca-app-pub-3645278220050673~7902167287",
         "NSSupportsLiveActivities": true,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsArbitraryLoadsForMedia": true
+        },
         "NSLocationWhenInUseUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
         "NSLocationAlwaysUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
         "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
@@ -43,7 +47,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 1,
+      "versionCode": 5,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -54,7 +58,8 @@
         "USE_EXACT_ALARM",
         "POST_NOTIFICATIONS",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
       ],
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
@@ -105,7 +110,22 @@
             "./assets/sounds/notifications/subhanallah.mp3",
             "./assets/sounds/notifications/alhamdulillah.mp3",
             "./assets/sounds/notifications/morning_adhkar.mp3",
-            "./assets/sounds/notifications/evening_adhkar.mp3"
+            "./assets/sounds/notifications/evening_adhkar.mp3",
+            "./assets/sounds/adhan/makkah.mp3",
+            "./assets/sounds/adhan/madinah.mp3",
+            "./assets/sounds/adhan/alaqsa.mp3",
+            "./assets/sounds/adhan/mishary.mp3",
+            "./assets/sounds/adhan/abdulbasit.mp3",
+            "./assets/sounds/adhan/sudais.mp3",
+            "./assets/sounds/adhan/egypt.mp3",
+            "./assets/sounds/adhan/dosari.mp3",
+            "./assets/sounds/adhan/ajman.mp3",
+            "./assets/sounds/adhan/ali_mulla.mp3",
+            "./assets/sounds/adhan/naqshbandi.mp3",
+            "./assets/sounds/adhan/sharif.mp3",
+            "./assets/sounds/adhan/mansoor_zahrani.mp3",
+            "./assets/sounds/adhan/haramain.mp3",
+            "./assets/sounds/adhan/silent.mp3"
           ]
         }
       ],
@@ -231,7 +251,9 @@
           ]
         }
       ],
-      "./plugins/with-ios-widgets"
+      "./plugins/with-ios-widgets",
+      "./plugins/with-android-gradle-fix",
+      ["./plugins/with-notification-large-icon", { "icon": "./assets/images/icons/icon.png" }]
     ],
     "experiments": {
       "typedRoutes": true
@@ -245,9 +267,7 @@
       }
     },
     "owner": "hossamgamal",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.3",
     "updates": {
       "url": "https://u.expo.dev/12ffec15-6357-43b4-a309-8e71cc2afc8c",
       "enabled": true,

@@ -45,7 +45,7 @@ interface SettingSwitchProps {
 
 const SettingSwitch: React.FC<SettingSwitchProps> = ({
   icon,
-  iconColor = '#2f7659',
+  iconColor = '#22C55E',
   title,
   subtitle,
   value,
@@ -76,7 +76,7 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onValueChange(val);
       }}
-      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
       thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
       ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
       disabled={disabled}
@@ -98,7 +98,7 @@ interface TimePickerRowProps {
 
 const TimePickerRow: React.FC<TimePickerRowProps> = ({
   icon,
-  iconColor = '#2f7659',
+  iconColor = '#22C55E',
   title,
   time,
   onTimeChange,
@@ -228,8 +228,6 @@ export default function WorshipTrackingSettingsScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
       />
 
       {/* Header */}
@@ -261,7 +259,7 @@ export default function WorshipTrackingSettingsScreen() {
           <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
             <SettingSwitch
               icon="bell-ring"
-              iconColor="#2f7659"
+              iconColor="#22C55E"
               title={t('worship.prayerLoggingReminder')}
               subtitle={t('worship.prayerLoggingReminderDesc')}
               value={settings.notifications.worshipPrayerLogging}
@@ -272,7 +270,7 @@ export default function WorshipTrackingSettingsScreen() {
             />
             <SettingSwitch
               icon="mosque"
-              iconColor="#2f7659"
+              iconColor="#22C55E"
               title={t('worship.prayerTimeAlerts')}
               subtitle={t('worship.prayerTimeAlertsDesc')}
               value={settings.notifications.prayerTimes}
@@ -573,7 +571,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 15,
     fontFamily: fontMedium(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   infoCard: {
     flexDirection: 'row',

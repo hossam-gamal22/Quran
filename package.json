@@ -1,7 +1,7 @@
 {
   "name": "rooh-almuslim",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "scripts": {
     "start": "expo start",
     "dev": "expo start --dev-client",
@@ -32,7 +32,7 @@
     "expo-audio": "~1.1.1",
     "expo-av": "~16.0.8",
     "expo-blur": "~15.0.8",
-    "expo-build-properties": "^55.0.10",
+    "expo-build-properties": "~1.0.10",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
@@ -42,6 +42,7 @@
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
     "expo-image-picker": "~17.0.10",
+    "expo-intent-launcher": "~13.0.8",
     "expo-keep-awake": "~15.0.8",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
@@ -81,7 +82,6 @@
     "react-native-svg": "15.12.1",
     "react-native-svg-transformer": "^1.5.3",
     "react-native-tab-view": "^4.2.2",
-    "react-native-track-player": "^4.1.2",
     "react-native-view-shot": "^4.0.0",
     "react-native-web": "^0.21.0",
     "react-native-webview": "13.15.0",
@@ -102,7 +102,7 @@
     "doctor": {
       "reactNativeDirectoryCheck": {
         "exclude": [
-          "react-native-track-player"
+          "react-native-shared-group-preferences"
         ]
       }
     }

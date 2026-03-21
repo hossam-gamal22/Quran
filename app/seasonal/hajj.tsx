@@ -250,7 +250,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
               <Text style={[styles.dayName, { color: colors.text }]}>{dayInfo.nameEn || dayInfo.name}</Text>
             )}
             {isCompleted && (
-              <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
+              <MaterialCommunityIcons name="check-circle" size={20} color="#22C55E" />
             )}
           </View>
           {isArabicLang ? (
@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a3e',
   },
   tenDayItemCompleted: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   tenDayItemCurrent: {
     backgroundColor: HAJJ_COLOR,

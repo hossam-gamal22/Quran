@@ -22,11 +22,12 @@ import {
   ChevronUp,
   Copy,
   X,
+  Calendar,
+  Clock,
 } from 'lucide-react';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { convertToPng } from '../utils/imageUpload';
+import { uploadImage } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
 import TranslateButton from '../components/TranslateButton';
 
@@ -34,10 +35,27 @@ import TranslateButton from '../components/TranslateButton';
 // الأنواع
 // ========================================
 
+interface MultiLangText {
+  ar: string;
+  en: string;
+  fr?: string;
+  de?: string;
+  es?: string;
+  tr?: string;
+  ur?: string;
+  id?: string;
+  ms?: string;
+  hi?: string;
+  bn?: string;
+  ru?: string;
+}
+
 interface WelcomeBannerData {
   enabled: boolean;
   title: string;
   subtitle: string;
+  titles?: MultiLangText;
+  subtitles?: MultiLangText;
   icon: string;
   customIconUrl?: string;
   color: string;
@@ -48,6 +66,8 @@ interface WelcomeBannerData {
   actionType?: 'navigate' | 'toast';
   toastMessage?: string;
   toastTranslations?: Record<string, string>;
+  scheduledFrom?: string;   // ISO date — banner visible from this date
+  scheduledUntil?: string;  // ISO date — banner hidden after this date
 }
 
 const DEFAULT_BANNER: WelcomeBannerData = {
@@ -168,6 +188,8 @@ export default function WelcomeBanner() {
   const [isUploadingBgAr, setIsUploadingBgAr] = useState(false);
   const [isUploadingBgNonAr, setIsUploadingBgNonAr] = useState(false);
   const [showOtherLangs, setShowOtherLangs] = useState(false);
+  const [showOtherTitleLangs, setShowOtherTitleLangs] = useState(false);
+  const [showOtherSubtitleLangs, setShowOtherSubtitleLangs] = useState(false);
   const iconInputRef = useRef<HTMLInputElement>(null);
   const bgArInputRef = useRef<HTMLInputElement>(null);
   const bgNonArInputRef = useRef<HTMLInputElement>(null);
@@ -199,17 +221,15 @@ export default function WelcomeBanner() {
     const setUploading = field === 'backgroundImage' ? setIsUploadingBgAr : setIsUploadingBgNonAr;
     setUploading(true);
     try {
-      const pngBlob = await convertToPng(file);
-      const timestamp = Date.now();
-      const isSvg = file.type === 'image/svg+xml';
-      const ext = isSvg ? 'svg' : 'png';
       const folder = field === 'backgroundImage' ? 'ar' : 'non-ar';
-      const storageRef = ref(storage, `welcome-banner/backgrounds/${folder}/${timestamp}.${ext}`);
-      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
-      const url = await getDownloadURL(storageRef);
-      updateBanner(field, url);
+      const result = await uploadImage(file, {
+        storagePath: `welcome-banner/backgrounds/${folder}`,
+        maxWidth: 1200,
+      });
+      updateBanner(field, result.url);
     } catch (err) {
       console.error('Error uploading background:', err);
+      alert('فشل رفع الصورة. تأكد من أن الملف صورة صالحة.');
     } finally {
       setUploading(false);
     }
@@ -220,18 +240,36 @@ export default function WelcomeBanner() {
     if (!file) return;
     setIsUploadingIcon(true);
     try {
-      const pngBlob = await convertToPng(file);
-      const timestamp = Date.now();
-      const isSvg = file.type === 'image/svg+xml';
-      const ext = isSvg ? 'svg' : 'png';
-      const storageRef = ref(storage, `welcome-banner/icons/${timestamp}.${ext}`);
-      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
-      const url = await getDownloadURL(storageRef);
-      setBanner(prev => ({ ...prev, customIconUrl: url, icon: '__custom__' }));
+      const result = await uploadImage(file, {
+        storagePath: 'welcome-banner/icons',
+        maxWidth: 512,
+      });
+      setBanner(prev => ({ ...prev, customIconUrl: result.url, icon: '__custom__' }));
     } catch (err) {
       console.error('Error uploading icon:', err);
+      alert('فشل رفع الأيقونة. تأكد من أن الملف صورة صالحة.');
     } finally {
       setIsUploadingIcon(false);
+    }
+  };
+
+  // تحديث عنوان بلغة معينة
+  const updateTitle = (lang: string, value: string) => {
+    const updated = { ...banner.titles, [lang]: value } as MultiLangText;
+    if (lang === 'ar') {
+      setBanner(prev => ({ ...prev, title: value, titles: updated }));
+    } else {
+      setBanner(prev => ({ ...prev, titles: updated }));
+    }
+  };
+
+  // تحديث العنوان الفرعي بلغة معينة
+  const updateSubtitle = (lang: string, value: string) => {
+    const updated = { ...banner.subtitles, [lang]: value } as MultiLangText;
+    if (lang === 'ar') {
+      setBanner(prev => ({ ...prev, subtitle: value, subtitles: updated }));
+    } else {
+      setBanner(prev => ({ ...prev, subtitles: updated }));
     }
   };
 
@@ -287,9 +325,22 @@ export default function WelcomeBanner() {
       const docSnap = await getDoc(docRef);
       const existingData = docSnap.exists() ? docSnap.data() : {};
 
+      // Ensure titles/subtitles ar field is synced with title/subtitle
+      const bannerToSave = {
+        ...banner,
+        titles: {
+          ...banner.titles,
+          ar: banner.titles?.ar || banner.title,
+        },
+        subtitles: {
+          ...banner.subtitles,
+          ar: banner.subtitles?.ar || banner.subtitle,
+        },
+      };
+
       await setDoc(docRef, {
         ...existingData,
-        welcomeBanner: banner,
+        welcomeBanner: bannerToSave,
       });
 
       setSaveStatus('success');
@@ -385,6 +436,74 @@ export default function WelcomeBanner() {
                 />
               </button>
             </div>
+          </div>
+
+          {/* جدولة العرض — Scheduling */}
+          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-white font-semibold">جدولة العرض</h3>
+              <span className="text-xs text-slate-400">(اختياري — اتركه فارغاً للعرض دائماً)</span>
+            </div>
+            <p className="text-slate-400 text-sm mb-4">
+              حدد متى يبدأ ومتى ينتهي عرض الرسالة الترحيبية تلقائياً. مفيد للمناسبات الإسلامية والأحداث المؤقتة.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-slate-300 block mb-2">
+                  <Clock className="w-4 h-4 inline ml-1" />
+                  يبدأ العرض من
+                </label>
+                <input
+                  type="datetime-local"
+                  title="تاريخ بداية العرض"
+                  value={banner.scheduledFrom || ''}
+                  onChange={(e) => updateBanner('scheduledFrom', e.target.value || undefined)}
+                  className="w-full p-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+                {banner.scheduledFrom && (
+                  <button
+                    onClick={() => updateBanner('scheduledFrom', undefined)}
+                    className="text-xs text-red-400 mt-1 hover:underline"
+                  >
+                    مسح التاريخ
+                  </button>
+                )}
+              </div>
+              <div>
+                <label className="text-sm text-slate-300 block mb-2">
+                  <Clock className="w-4 h-4 inline ml-1" />
+                  ينتهي العرض في
+                </label>
+                <input
+                  type="datetime-local"
+                  title="تاريخ نهاية العرض"
+                  value={banner.scheduledUntil || ''}
+                  onChange={(e) => updateBanner('scheduledUntil', e.target.value || undefined)}
+                  className="w-full p-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:border-emerald-500"
+                />
+                {banner.scheduledUntil && (
+                  <button
+                    onClick={() => updateBanner('scheduledUntil', undefined)}
+                    className="text-xs text-red-400 mt-1 hover:underline"
+                  >
+                    مسح التاريخ
+                  </button>
+                )}
+              </div>
+            </div>
+            {banner.scheduledFrom && banner.scheduledUntil && new Date(banner.scheduledUntil) < new Date() && (
+              <div className="mt-3 p-3 bg-red-500/10 rounded-xl border border-red-500/30 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-400" />
+                <span className="text-red-400 text-sm">تاريخ الانتهاء في الماضي — الرسالة مخفية حالياً</span>
+              </div>
+            )}
+            {banner.scheduledFrom && !banner.scheduledUntil && new Date(banner.scheduledFrom) > new Date() && (
+              <div className="mt-3 p-3 bg-amber-500/10 rounded-xl border border-amber-500/30 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-400 text-sm">الرسالة مجدولة — ستظهر بعد: {new Date(banner.scheduledFrom).toLocaleDateString('ar-EG')}</span>
+              </div>
+            )}
           </div>
 
           {/* نوع العرض */}
@@ -531,36 +650,134 @@ export default function WelcomeBanner() {
 
           {/* النصوص */}
           {banner.displayMode !== 'image_only' && (
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 space-y-4">
+          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 space-y-5">
             <div className="flex items-center gap-2 mb-2">
               <Type className="w-5 h-5 text-emerald-400" />
               <h3 className="text-white font-semibold">النصوص</h3>
             </div>
 
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">العنوان الرئيسي</label>
-              <input
-                type="text"
-                value={banner.title}
-                onChange={(e) => updateBanner('title', e.target.value)}
-                className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors"
-                placeholder="مثال: رمضان مبارك"
-                aria-label="العنوان الرئيسي"
-                dir="rtl"
-              />
+            {/* العنوان الرئيسي — متعدد اللغات */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm text-slate-400 font-medium">العنوان الرئيسي</label>
+                <TranslateButton
+                  sourceText={banner.titles?.ar || banner.title || ''}
+                  sourceLang="ar"
+                  contentType="ui"
+                  compact
+                  label="🌍 ترجمة العنوان"
+                  onTranslated={(translations) => {
+                    setBanner(prev => ({
+                      ...prev,
+                      titles: { ...prev.titles, ...translations } as MultiLangText,
+                    }));
+                  }}
+                />
+              </div>
+              {/* اللغات الأساسية */}
+              {PRIMARY_LANGS.map(lang => (
+                <div key={`title-${lang.code}`}>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {lang.flag} {lang.name}
+                  </label>
+                  <input
+                    type="text"
+                    value={(lang.code === 'ar' ? (banner.titles?.ar || banner.title) : banner.titles?.[lang.code as keyof MultiLangText]) || ''}
+                    onChange={(e) => updateTitle(lang.code, e.target.value)}
+                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    placeholder={lang.code === 'ar' ? 'مثال: رمضان مبارك' : 'Title...'}
+                    aria-label={`العنوان بـ${lang.name}`}
+                    dir={lang.rtl ? 'rtl' : 'ltr'}
+                  />
+                </div>
+              ))}
+              {/* باقي اللغات */}
+              <button
+                onClick={() => setShowOtherTitleLangs(!showOtherTitleLangs)}
+                className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                {showOtherTitleLangs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {showOtherTitleLangs ? 'إخفاء' : 'إظهار'} باقي اللغات ({OTHER_LANGS.length})
+              </button>
+              {showOtherTitleLangs && OTHER_LANGS.map(lang => (
+                <div key={`title-${lang.code}`}>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {lang.flag} {lang.name}
+                  </label>
+                  <input
+                    type="text"
+                    value={banner.titles?.[lang.code as keyof MultiLangText] || ''}
+                    onChange={(e) => updateTitle(lang.code, e.target.value)}
+                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    placeholder={`ترجمة ${lang.name}...`}
+                    aria-label={`العنوان بـ${lang.name}`}
+                    dir={lang.rtl ? 'rtl' : 'ltr'}
+                  />
+                </div>
+              ))}
             </div>
 
-            <div>
-              <label className="block text-sm text-slate-400 mb-2">العنوان الفرعي</label>
-              <input
-                type="text"
-                value={banner.subtitle}
-                onChange={(e) => updateBanner('subtitle', e.target.value)}
-                className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors"
-                placeholder="مثال: كل عام وأنتم بخير"
-                aria-label="العنوان الفرعي"
-                dir="rtl"
-              />
+            <div className="border-t border-slate-700" />
+
+            {/* العنوان الفرعي — متعدد اللغات */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm text-slate-400 font-medium">العنوان الفرعي</label>
+                <TranslateButton
+                  sourceText={banner.subtitles?.ar || banner.subtitle || ''}
+                  sourceLang="ar"
+                  contentType="ui"
+                  compact
+                  label="🌍 ترجمة العنوان الفرعي"
+                  onTranslated={(translations) => {
+                    setBanner(prev => ({
+                      ...prev,
+                      subtitles: { ...prev.subtitles, ...translations } as MultiLangText,
+                    }));
+                  }}
+                />
+              </div>
+              {/* اللغات الأساسية */}
+              {PRIMARY_LANGS.map(lang => (
+                <div key={`subtitle-${lang.code}`}>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {lang.flag} {lang.name}
+                  </label>
+                  <input
+                    type="text"
+                    value={(lang.code === 'ar' ? (banner.subtitles?.ar || banner.subtitle) : banner.subtitles?.[lang.code as keyof MultiLangText]) || ''}
+                    onChange={(e) => updateSubtitle(lang.code, e.target.value)}
+                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    placeholder={lang.code === 'ar' ? 'مثال: كل عام وأنتم بخير' : 'Subtitle...'}
+                    aria-label={`العنوان الفرعي بـ${lang.name}`}
+                    dir={lang.rtl ? 'rtl' : 'ltr'}
+                  />
+                </div>
+              ))}
+              {/* باقي اللغات */}
+              <button
+                onClick={() => setShowOtherSubtitleLangs(!showOtherSubtitleLangs)}
+                className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+              >
+                {showOtherSubtitleLangs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                {showOtherSubtitleLangs ? 'إخفاء' : 'إظهار'} باقي اللغات ({OTHER_LANGS.length})
+              </button>
+              {showOtherSubtitleLangs && OTHER_LANGS.map(lang => (
+                <div key={`subtitle-${lang.code}`}>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    {lang.flag} {lang.name}
+                  </label>
+                  <input
+                    type="text"
+                    value={banner.subtitles?.[lang.code as keyof MultiLangText] || ''}
+                    onChange={(e) => updateSubtitle(lang.code, e.target.value)}
+                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    placeholder={`ترجمة ${lang.name}...`}
+                    aria-label={`العنوان الفرعي بـ${lang.name}`}
+                    dir={lang.rtl ? 'rtl' : 'ltr'}
+                  />
+                </div>
+              ))}
             </div>
           </div>
           )}

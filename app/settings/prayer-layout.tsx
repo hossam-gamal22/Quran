@@ -49,7 +49,7 @@ export default function PrayerLayoutScreen() {
                 <Text style={[styles.optionSub, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.layoutListDesc')}</Text>
               </View>
               {current === 'list' && (
-                <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
               )}
             </TouchableOpacity>
 
@@ -62,7 +62,7 @@ export default function PrayerLayoutScreen() {
                 <Text style={[styles.optionSub, isDarkMode && styles.textMuted, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.layoutWidgetDesc')}</Text>
               </View>
               {current === 'widget' && (
-                <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
               )}
             </TouchableOpacity>
           </View>
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   section: { backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, overflow: 'hidden' },
   sectionDark: { backgroundColor: 'rgba(120,120,128,0.18)' },
   option: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(120,120,128,0.2)' },
-  optionSelected: { backgroundColor: 'rgba(47,118,89,0.08)' },
+  optionSelected: { backgroundColor: 'rgba(6,79,47,0.08)' },
   optionLabel: { fontFamily: fontSemiBold(), fontSize: 15, color: '#333' },
   optionSub: { fontFamily: fontRegular(), fontSize: 12, color: '#999', marginTop: 2 },
 });

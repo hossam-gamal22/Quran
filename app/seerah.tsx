@@ -41,9 +41,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // الألوان
 // ========================================
 
-const ACCENT = '#2f7659';
-const ACCENT_LIGHT = 'rgba(47,118,89,0.12)';
-const ACCENT_BORDER = 'rgba(47,118,89,0.30)';
+const ACCENT = '#22C55E';
+const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
+const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
 // ========================================
 // أنواع البيانات
@@ -264,8 +264,8 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
               s.glassOverlay,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(47,118,89,0.08)'
-                  : 'rgba(47,118,89,0.04)',
+                  ? 'rgba(6,79,47,0.08)'
+                  : 'rgba(6,79,47,0.04)',
                 borderColor: isDarkMode
                   ? 'rgba(255,255,255,0.08)'
                   : 'rgba(0,0,0,0.04)',
@@ -374,8 +374,8 @@ export default function SeerahScreen() {
     <ScreenContainer edges={['top', 'left', 'right']} screenKey="seerah">
       {/* Header */}
       <UniversalHeader
-        backStyle={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)', borderRadius: 14 }}
-        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)' } }]}
+        backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
+        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('seerah.title')}</Text>
@@ -395,8 +395,8 @@ export default function SeerahScreen() {
             s.heroOverlay,
             {
               backgroundColor: isDarkMode
-                ? 'rgba(47,118,89,0.15)'
-                : 'rgba(47,118,89,0.08)',
+                ? 'rgba(6,79,47,0.15)'
+                : 'rgba(6,79,47,0.08)',
             },
           ]}
         />
@@ -464,8 +464,8 @@ export default function SeerahScreen() {
               s.footerOverlay,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(47,118,89,0.12)'
-                  : 'rgba(47,118,89,0.06)',
+                  ? 'rgba(6,79,47,0.12)'
+                  : 'rgba(6,79,47,0.06)',
               },
             ]}
           />

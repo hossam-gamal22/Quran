@@ -31,8 +31,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from '@/lib/qiblaAssets';
-import { useInterstitialAd } from '@/components/ads/InterstitialAdManager';
-import { useAds } from '@/lib/ads-context';
+// Removed: interstitial ads on qibla style change to reduce user frustration
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -176,9 +175,7 @@ const QiblaScreen = () => {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const isAlignedRef = useRef(false);
 
-  // Ads
-  const { showAd } = useInterstitialAd();
-  const { config: adsConfig } = useAds();
+
 
   // Cumulative heading to avoid 360→0 wrap-around jitter
   const headingCumulative = useSharedValue(0);
@@ -200,14 +197,10 @@ const QiblaScreen = () => {
 
   const handleStyleChange = useCallback(async (styleId: string) => {
     if (styleId === currentStyleId) return;
-    // Show interstitial ad if enabled via admin config
-    if (adsConfig?.showAdOnQiblaStyleChange) {
-      await showAd();
-    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setCurrentStyleId(styleId);
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
-  }, [currentStyleId, adsConfig?.showAdOnQiblaStyleChange, showAd]);
+  }, [currentStyleId]);
 
   // ------ Location + Heading ------
   useEffect(() => {
@@ -377,7 +370,7 @@ const QiblaScreen = () => {
     return (
       <BackgroundWrapper {...bgProps}>
       <View style={styles.centeredLoading}>
-        <ActivityIndicator size="large" color="#2f7659" />
+        <ActivityIndicator size="large" color="#22C55E" />
         <Text style={[styles.loadingText, { color: colors.text }]}>{t('qibla.findingDirection') || 'Finding Qibla Direction...'}</Text>
       </View>
       </BackgroundWrapper>
@@ -631,8 +624,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   guidanceActive: {
-    backgroundColor: 'rgba(47, 118, 89, 0.2)',
-    shadowColor: '#2f7659',
+    backgroundColor: 'rgba(6, 79, 47, 0.2)',
+    shadowColor: '#22C55E',
     shadowOpacity: 0.7,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
@@ -678,8 +671,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   styleThumbnailActive: {
-    borderColor: '#2f7659',
-    backgroundColor: 'rgba(47,118,89,0.15)',
+    borderColor: '#22C55E',
+    backgroundColor: 'rgba(6,79,47,0.15)',
   },
   activeDot: {
     position: 'absolute',
@@ -707,7 +700,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,

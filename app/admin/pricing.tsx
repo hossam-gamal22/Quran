@@ -5,13 +5,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
   ActivityIndicator,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
@@ -110,14 +110,14 @@ export default function PricingScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Add Button */}
         <TouchableOpacity style={styles.addBtn} onPress={openAddModal}>
@@ -192,7 +192,7 @@ export default function PricingScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <Ionicons name="close" size={28} color={Colors.text} />

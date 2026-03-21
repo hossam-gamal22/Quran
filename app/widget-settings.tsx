@@ -41,7 +41,7 @@ import { UniversalHeader } from '@/components/ui';
 // ========================================
 
 const ACCENT_COLORS = [
-  { nameKey: 'widget.green', value: '#2f7659' },
+  { nameKey: 'widget.green', value: '#22C55E' },
   { nameKey: 'widget.blue', value: '#3a7ca5' },
   { nameKey: 'widget.purple', value: '#5d4e8c' },
   { nameKey: 'widget.orange', value: '#c17f59' },
@@ -133,7 +133,7 @@ const SettingRow: React.FC<SettingRowProps> = ({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onValueChange(newValue);
         }}
-        trackColor={{ false: '#ddd', true: '#2f7659' }}
+        trackColor={{ false: '#ddd', true: '#22C55E' }}
         thumbColor={value ? '#fff' : '#f4f3f4'}
       />
     </View>
@@ -626,7 +626,7 @@ export default function WidgetSettingsScreen() {
             style={[styles.refreshButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleRefreshWidget}
           >
-            <MaterialCommunityIcons name="refresh" size={20} color="#2f7659" />
+            <MaterialCommunityIcons name="refresh" size={20} color="#22C55E" />
             <Text style={styles.refreshButtonText}>{t('widgets.updateWidgetNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -664,7 +664,7 @@ export default function WidgetSettingsScreen() {
         >
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <LinearGradient
-              colors={['#2f7659', '#1d4a3a']}
+              colors={['#22C55E', '#1d4a3a']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.saveButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -817,8 +817,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#252540',
   },
   categoryOptionSelected: {
-    borderColor: '#2f7659',
-    backgroundColor: '#2f7659',
+    borderColor: '#22C55E',
+    backgroundColor: '#22C55E',
   },
   categoryText: {
     flex: 1,
@@ -840,14 +840,14 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 15,
     borderRadius: 16,
-    backgroundColor: '#2f765915',
+    backgroundColor: '#22C55E15',
     borderWidth: 2,
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   refreshButtonText: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   // الملاحظة
   noteCard: {

@@ -207,7 +207,7 @@ export default function QuranSearchScreen() {
       borderRadius: 19,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
     },
     headerLogo: {
       width: 52,
@@ -238,10 +238,10 @@ export default function QuranSearchScreen() {
     controlsRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
     controlChip: {
       paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.3)',
       flexDirection: 'row', alignItems: 'center', gap: 8,
     },
-    controlChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    controlChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
     controlChipText: { fontSize: 12, fontWeight: '700', color: colors.textLight },
     controlChipTextActive: { color: '#fff' },
     // Filter bar

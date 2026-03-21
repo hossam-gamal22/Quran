@@ -16,6 +16,8 @@ import {
   Search,
   X,
   Download,
+  Clock,
+  Bell,
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
@@ -98,13 +100,75 @@ const DEFAULT_ASSIGNMENTS: SoundAssignments = {
   },
 };
 
-type ActiveTab = 'library' | 'notifications' | 'events' | 'downloadable';
+// ==================== Notification Scheduling Types ====================
+
+interface NotificationScheduleItem {
+  enabled: boolean;
+  time: string;       // "HH:MM"
+  days: number[];     // 0=Sun...6=Sat, empty = every day
+  soundId: string;    // references a SoundFile.id
+}
+
+interface NotificationScheduleConfig {
+  morningAzkar: NotificationScheduleItem;
+  eveningAzkar: NotificationScheduleItem;
+  sleepAzkar: NotificationScheduleItem;
+  wakeupAzkar: NotificationScheduleItem;
+  dailyVerse: NotificationScheduleItem;
+  salawat: NotificationScheduleItem;
+  tasbih: NotificationScheduleItem;
+  istighfar: NotificationScheduleItem;
+  quranReading: NotificationScheduleItem;
+  kahfFriday: NotificationScheduleItem;
+  updatedAt?: string;
+}
+
+type ScheduleKey = keyof Omit<NotificationScheduleConfig, 'updatedAt'>;
+
+const SCHEDULE_TYPES: { key: ScheduleKey; label: string; icon: string; defaultTime: string; description: string }[] = [
+  { key: 'morningAzkar', label: 'أذكار الصباح', icon: '🌅', defaultTime: '06:00', description: 'تذكير يومي بأذكار الصباح' },
+  { key: 'eveningAzkar', label: 'أذكار المساء', icon: '🌙', defaultTime: '17:00', description: 'تذكير يومي بأذكار المساء' },
+  { key: 'sleepAzkar', label: 'أذكار النوم', icon: '😴', defaultTime: '22:00', description: 'تذكير قبل النوم' },
+  { key: 'wakeupAzkar', label: 'أذكار الاستيقاظ', icon: '⏰', defaultTime: '05:30', description: 'تذكير عند الاستيقاظ' },
+  { key: 'dailyVerse', label: 'آية يومية', icon: '📖', defaultTime: '08:00', description: 'آية من القرآن يومياً' },
+  { key: 'salawat', label: 'الصلاة على النبي', icon: '☪️', defaultTime: '09:00', description: 'تذكير بالصلاة على النبي' },
+  { key: 'tasbih', label: 'تذكير التسبيح', icon: '📿', defaultTime: '15:00', description: 'تذكير بالتسبيح والذكر' },
+  { key: 'istighfar', label: 'تذكير الاستغفار', icon: '🤲', defaultTime: '12:00', description: 'تذكير بالاستغفار' },
+  { key: 'quranReading', label: 'ورد القرآن', icon: '📚', defaultTime: '20:00', description: 'تذكير بقراءة الورد اليومي' },
+  { key: 'kahfFriday', label: 'سورة الكهف - الجمعة', icon: '🕌', defaultTime: '10:00', description: 'تذكير بقراءة سورة الكهف يوم الجمعة' },
+];
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'أحد', short: 'أ' },
+  { value: 1, label: 'إثنين', short: 'ث' },
+  { value: 2, label: 'ثلاثاء', short: 'ث' },
+  { value: 3, label: 'أربعاء', short: 'ر' },
+  { value: 4, label: 'خميس', short: 'خ' },
+  { value: 5, label: 'جمعة', short: 'ج' },
+  { value: 6, label: 'سبت', short: 'س' },
+];
+
+const DEFAULT_SCHEDULE_ITEM: NotificationScheduleItem = {
+  enabled: false,
+  time: '08:00',
+  days: [],
+  soundId: '',
+};
+
+const DEFAULT_SCHEDULE: NotificationScheduleConfig = Object.fromEntries(
+  SCHEDULE_TYPES.map(t => [t.key, { ...DEFAULT_SCHEDULE_ITEM, time: t.defaultTime }])
+) as unknown as NotificationScheduleConfig;
+
+const FIRESTORE_SCHEDULE_DOC = 'appConfig/notificationSchedule';
+
+type ActiveTab = 'library' | 'notifications' | 'events' | 'downloadable' | 'scheduling';
 
 // ==================== Component ====================
 
 export default function SoundManager() {
   const [sounds, setSounds] = useState<SoundFile[]>([]);
   const [assignments, setAssignments] = useState<SoundAssignments>(DEFAULT_ASSIGNMENTS);
+  const [schedule, setSchedule] = useState<NotificationScheduleConfig>(DEFAULT_SCHEDULE);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -129,9 +193,10 @@ export default function SoundManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [soundsSnap, assignmentsSnap] = await Promise.all([
+      const [soundsSnap, assignmentsSnap, scheduleSnap] = await Promise.all([
         getDocs(collection(db, FIRESTORE_SOUNDS_COLLECTION)),
         getDoc(doc(db, FIRESTORE_ASSIGNMENTS_DOC)),
+        getDoc(doc(db, FIRESTORE_SCHEDULE_DOC)),
       ]);
 
       const loadedSounds: SoundFile[] = soundsSnap.docs.map(d => ({
@@ -146,6 +211,17 @@ export default function SoundManager() {
           notifications: { ...DEFAULT_ASSIGNMENTS.notifications, ...data.notifications },
           pageEvents: { ...DEFAULT_ASSIGNMENTS.pageEvents, ...data.pageEvents },
         });
+      }
+
+      if (scheduleSnap.exists()) {
+        const data = scheduleSnap.data() as Partial<NotificationScheduleConfig>;
+        const merged: NotificationScheduleConfig = { ...DEFAULT_SCHEDULE };
+        for (const key of SCHEDULE_TYPES.map(t => t.key)) {
+          if (data[key]) {
+            merged[key] = { ...DEFAULT_SCHEDULE_ITEM, ...data[key] };
+          }
+        }
+        setSchedule(merged);
       }
     } catch (err) {
       console.error('Error loading sound data:', err);
@@ -322,6 +398,44 @@ export default function SoundManager() {
     }
   };
 
+  // ==================== Save Schedule ====================
+
+  const handleSaveSchedule = async () => {
+    setIsSaving(true);
+    setSaveStatus('idle');
+    try {
+      await setDoc(doc(db, FIRESTORE_SCHEDULE_DOC), {
+        ...schedule,
+        updatedAt: new Date().toISOString(),
+      });
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (err) {
+      console.error('Error saving schedule:', err);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateScheduleItem = (key: ScheduleKey, field: keyof NotificationScheduleItem, value: unknown) => {
+    setSchedule(prev => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const toggleScheduleDay = (key: ScheduleKey, day: number) => {
+    setSchedule(prev => {
+      const current = prev[key].days;
+      const updated = current.includes(day)
+        ? current.filter(d => d !== day)
+        : [...current, day].sort((a, b) => a - b);
+      return { ...prev, [key]: { ...prev[key], days: updated } };
+    });
+  };
+
   // ==================== Filtering ====================
 
   const filteredSounds = sounds.filter(s => {
@@ -365,6 +479,7 @@ export default function SoundManager() {
   const tabs: { key: ActiveTab; label: string; icon: React.ReactNode }[] = [
     { key: 'library', label: 'مكتبة الأصوات', icon: <Music className="w-4 h-4" /> },
     { key: 'notifications', label: 'أصوات الإشعارات', icon: <Volume2 className="w-4 h-4" /> },
+    { key: 'scheduling', label: 'جدولة الإشعارات', icon: <Bell className="w-4 h-4" /> },
     { key: 'events', label: 'أصوات الأحداث', icon: <Music className="w-4 h-4" /> },
     { key: 'downloadable', label: 'أصوات قابلة للتحميل', icon: <Download className="w-4 h-4" /> },
   ];
@@ -383,9 +498,9 @@ export default function SoundManager() {
           </div>
         </div>
 
-        {(activeTab === 'notifications' || activeTab === 'events') && (
+        {(activeTab === 'notifications' || activeTab === 'events' || activeTab === 'scheduling') && (
           <button
-            onClick={handleSaveAssignments}
+            onClick={activeTab === 'scheduling' ? handleSaveSchedule : activeTab === 'scheduling' ? handleSaveSchedule : handleSaveAssignments}
             disabled={isSaving}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all ${
               saveStatus === 'success'
@@ -777,6 +892,138 @@ export default function SoundManager() {
                       </button>
                     )}
                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== Notification Scheduling ==================== */}
+      {activeTab === 'scheduling' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-lg font-semibold text-white">جدولة الإشعارات الافتراضية</h3>
+            </div>
+            <p className="text-sm text-slate-400 mb-0">
+              حدد الوقت والأيام والصوت الافتراضي لكل نوع من الإشعارات. يمكن للمستخدم تعديل هذه الإعدادات من التطبيق.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {SCHEDULE_TYPES.map(({ key, label, icon, description }) => {
+              const item = schedule[key];
+              return (
+                <div
+                  key={key}
+                  className={`bg-slate-800 rounded-2xl border transition-colors ${
+                    item.enabled ? 'border-emerald-500/40' : 'border-slate-700'
+                  }`}
+                >
+                  {/* Header row */}
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{icon}</span>
+                      <div>
+                        <h4 className="text-white font-medium">{label}</h4>
+                        <p className="text-xs text-slate-400">{description}</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={item.enabled}
+                        title={`تفعيل ${label}`}
+                        onChange={() => updateScheduleItem(key, 'enabled', !item.enabled)}
+                      />
+                      <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full" />
+                    </label>
+                  </div>
+
+                  {/* Expanded settings */}
+                  {item.enabled && (
+                    <div className="px-4 pb-4 space-y-4 border-t border-slate-700 pt-4">
+                      {/* Time picker */}
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <label className="text-sm text-slate-300 w-16">الوقت</label>
+                        <input
+                          type="time"
+                          title={`وقت إشعار ${label}`}
+                          value={item.time}
+                          onChange={e => updateScheduleItem(key, 'time', e.target.value)}
+                          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Day selector */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm text-slate-300">الأيام</span>
+                          <span className="text-xs text-slate-500">(فارغ = كل يوم)</span>
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {DAYS_OF_WEEK.map(day => {
+                            const active = item.days.includes(day.value);
+                            return (
+                              <button
+                                key={day.value}
+                                onClick={() => toggleScheduleDay(key, day.value)}
+                                className={`w-10 h-10 rounded-lg text-xs font-medium transition-colors ${
+                                  active
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                }`}
+                                title={day.label}
+                              >
+                                {day.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Sound selector */}
+                      <div className="flex items-center gap-3">
+                        <Volume2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <label className="text-sm text-slate-300 w-16">الصوت</label>
+                        <select
+                          title={`صوت إشعار ${label}`}
+                          value={item.soundId}
+                          onChange={e => updateScheduleItem(key, 'soundId', e.target.value)}
+                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
+                        >
+                          <option value="">الصوت الافتراضي</option>
+                          {sounds
+                            .filter(s => s.category === 'notification' || s.category === 'adhan')
+                            .map(s => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
+                              </option>
+                            ))}
+                        </select>
+                        {item.soundId && (
+                          <button
+                            onClick={() => {
+                              const sound = sounds.find(s => s.id === item.soundId);
+                              if (sound) togglePlay(sound);
+                            }}
+                            className="p-1.5 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
+                            title="تشغيل الصوت"
+                          >
+                            {playingId === item.soundId ? (
+                              <Pause className="w-4 h-4 text-emerald-400" />
+                            ) : (
+                              <Play className="w-4 h-4 text-emerald-400" />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

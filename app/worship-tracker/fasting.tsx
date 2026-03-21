@@ -47,7 +47,7 @@ const { width } = Dimensions.get('window');
 
 const FASTING_TYPES: { key: DailyFastingRecord['type']; nameKey: string; descKey: string; color: string }[] = [
   { key: 'voluntary', nameKey: 'worship.voluntary', descKey: 'worship.voluntaryDesc', color: '#5d4e8c' },
-  { key: 'ramadan', nameKey: 'worship.ramadan', descKey: 'worship.ramadanDesc', color: '#2f7659' },
+  { key: 'ramadan', nameKey: 'worship.ramadan', descKey: 'worship.ramadanDesc', color: '#22C55E' },
   { key: 'makeup', nameKey: 'worship.makeup', descKey: 'worship.makeupDesc', color: '#c17f59' },
   { key: 'vow', nameKey: 'worship.vow', descKey: 'worship.vowDesc', color: '#3a7ca5' },
 ];
@@ -112,7 +112,7 @@ const FastingButton: React.FC<FastingButtonProps> = ({
         onPress={handlePress}
       >
         <View
-          style={[styles.fastingButton, { backgroundColor: isFasting ? 'rgba(47,118,89,0.85)' : 'rgba(93,78,140,0.85)' }]}
+          style={[styles.fastingButton, { backgroundColor: isFasting ? 'rgba(6,79,47,0.85)' : 'rgba(93,78,140,0.85)' }]}
         >
           <View style={styles.fastingButtonInner}>
             <MaterialCommunityIcons
@@ -230,7 +230,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       <Text style={[
         styles.calendarDayText,
         { color: colors.text },
-        isRamadan && !isFasted && !isToday && { color: '#2f7659' },
+        isRamadan && !isFasted && !isToday && { color: '#22C55E' },
         isToday && styles.calendarDayTextToday,
         isFasted && styles.calendarDayTextFasted,
       ]}>
@@ -240,7 +240,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
         <View style={styles.fastingDot} />
       )}
       {isRamadan && !isFasted && (
-        <View style={[styles.fastingDot, { backgroundColor: 'rgba(47,118,89,0.4)' }]} />
+        <View style={[styles.fastingDot, { backgroundColor: 'rgba(6,79,47,0.4)' }]} />
       )}
     </TouchableOpacity>
   );
@@ -494,8 +494,6 @@ export default function FastingTrackerScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
       />
       
       {/* الهيدر */}
@@ -551,7 +549,7 @@ export default function FastingTrackerScreen() {
             <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
-                  <MaterialCommunityIcons name="calendar-check" size={24} color="#2f7659" />
+                  <MaterialCommunityIcons name="calendar-check" size={24} color="#22C55E" />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.totalDays ?? 0}
@@ -647,12 +645,12 @@ export default function FastingTrackerScreen() {
                 <Text style={[styles.legendText, { color: colors.textLight }]}>{t('worship.fastingDay')}</Text>
               </View>
               <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <View style={[styles.legendDot, { backgroundColor: '#2f7659' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
                 <Text style={[styles.legendText, { color: colors.textLight }]}>{t('calendar.today')}</Text>
               </View>
               {ramadanDaysInMonth.length > 0 && (
                 <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <View style={[styles.legendDot, { backgroundColor: 'rgba(47,118,89,0.4)', borderWidth: 1, borderColor: 'rgba(47,118,89,0.6)' }]} />
+                  <View style={[styles.legendDot, { backgroundColor: 'rgba(6,79,47,0.4)', borderWidth: 1, borderColor: 'rgba(6,79,47,0.6)' }]} />
                   <Text style={[styles.legendText, { color: colors.textLight }]}>{t('worship.ramadan')}</Text>
                 </View>
               )}
@@ -874,7 +872,7 @@ const styles = StyleSheet.create({
     height: 40,
   },
   calendarDayToday: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 12,
   },
   calendarDayFasted: {
@@ -882,10 +880,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   calendarDayRamadan: {
-    backgroundColor: 'rgba(47,118,89,0.1)',
+    backgroundColor: 'rgba(6,79,47,0.1)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(47,118,89,0.2)',
+    borderColor: 'rgba(6,79,47,0.2)',
   },
   calendarDayText: {
     fontSize: 14,

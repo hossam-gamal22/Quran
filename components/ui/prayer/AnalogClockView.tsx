@@ -156,8 +156,8 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   const faceColor = isDarkMode ? '#1a1f2e' : '#fff';
   const borderColor = isDarkMode ? '#3a4050' : '#e0e0e0';
   const textColor = isDarkMode ? '#fff' : '#333';
-  const mutedColor = isDarkMode ? '#999' : '#666';
-  const accentColor = '#2f7659';
+  const mutedColor = isDarkMode ? '#A8A8AD' : '#8E8E93';
+  const accentColor = '#22C55E';
 
   return (
     <View style={styles.wrapper}>

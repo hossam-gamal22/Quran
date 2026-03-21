@@ -142,7 +142,7 @@ export function GlassButton({
       text: isDarkMode ? '#fff' : '#000',
     },
     primary: {
-      bg: isDarkMode ? 'rgba(47, 118, 89, 0.85)' : '#2f7659',
+      bg: isDarkMode ? 'rgba(6, 79, 47, 0.85)' : '#22C55E',
       text: '#fff',
     },
     destructive: {
@@ -236,7 +236,7 @@ export function GlassToggle({
   onToggle,
   label,
   icon,
-  iconColor = '#2f7659',
+  iconColor = '#22C55E',
   subtitle,
   disabled = false,
 }: GlassToggleProps) {
@@ -265,7 +265,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleSubtitle,
-              { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' },
+              { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {subtitle}
@@ -281,7 +281,7 @@ export function GlassToggle({
         disabled={disabled}
         trackColor={{
           false: isDarkMode ? '#39393D' : '#E9E9EB',
-          true: '#2f7659',
+          true: '#22C55E',
         }}
         thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
         ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
@@ -357,7 +357,7 @@ interface GlassListItemProps {
 
 export function GlassListItem({
   icon,
-  iconColor = '#2f7659',
+  iconColor = '#22C55E',
   title,
   subtitle,
   value,
@@ -403,13 +403,13 @@ export function GlassListItem({
             {title}
           </Text>
           {subtitle && (
-            <Text style={[styles.listItemSubtitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}> 
+            <Text style={[styles.listItemSubtitle, { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}> 
               {subtitle}
             </Text>
           )}
         </View>
         {value && (
-          <Text style={[styles.listItemValue, { color: isDarkMode ? '#8e8e93' : '#8e8e93' }]}> 
+          <Text style={[styles.listItemValue, { color: isDarkMode ? '#A8A8AD' : '#A8A8AD' }]}> 
             {value}
           </Text>
         )}
@@ -493,7 +493,7 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
   return (
     <View style={[styles.section, style]}>
       {title && (
-        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#8e8e93' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}>
           {title}
         </Text>
       )}
@@ -553,7 +553,7 @@ const SegmentItem: React.FC<{
   onPress: () => void;
   onLayoutCb: (x: number, width: number) => void;
 }> = React.memo(({ seg, activeProgress, isDarkMode, onPress, onLayoutCb }) => {  const isRTL = useIsRTL();  const activeColor = isDarkMode ? '#fff' : '#000';
-  const inactiveColor = isDarkMode ? '#8e8e93' : '#6c6c70';
+  const inactiveColor = isDarkMode ? '#A8A8AD' : '#6c6c70';
 
   const animatedLabelStyle = useAnimatedStyle(() => ({
     color: interpolateColor(activeProgress.value, [0, 1], [inactiveColor, activeColor]),

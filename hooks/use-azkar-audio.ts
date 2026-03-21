@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Audio } from 'expo-av';
 import { t } from '@/lib/i18n';
+import { audioCoordinator } from '@/lib/audio-coordinator';
 
 export interface AzkarAudioState {
   isPlaying: boolean;
@@ -42,12 +43,25 @@ export function useAzkarAudio(options: AzkarAudioOptions = {}) {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
+      // Request audio focus — this will stop any other audio source
+      const audioId = `azkar-item-${Date.now()}`;
+      await audioCoordinator.requestFocus('azkar-item', {
+        stop: async () => {
+          if (soundRef.current) {
+            await soundRef.current.stopAsync();
+            await soundRef.current.unloadAsync();
+            soundRef.current = null;
+          }
+          setState(prev => ({ ...prev, isPlaying: false, currentPosition: 0 }));
+        },
+      }, audioId);
+
       // تهيئة جلسة الصوت (ضروري على iOS)
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
-        staysActiveInBackground: false,
+        staysActiveInBackground: true,
       });
 
       const { sound } = await Audio.Sound.createAsync({ uri: audioUrl });

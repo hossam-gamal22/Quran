@@ -66,7 +66,7 @@ export default function TranslationsScreen() {
   const colors = {
     foreground: themeColors.foreground,
     muted: themeColors.muted,
-    accent: isDarkMode ? '#4ADE80' : '#2f7659',
+    accent: isDarkMode ? '#4ADE80' : '#22C55E',
     divider: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
   };
 

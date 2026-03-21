@@ -59,14 +59,14 @@ const PRAYER_KEYS: { key: PrayerName; nameKey: string; icon: string }[] = [
 ];
 
 const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; labelKey: string }[] = [
-  { value: 'prayed', color: '#2f7659', icon: 'check-circle', labelKey: 'worship.onTime' },
+  { value: 'prayed', color: '#22C55E', icon: 'check-circle', labelKey: 'worship.onTime' },
   { value: 'late', color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
   { value: 'missed', color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
   { value: 'none', color: '#999', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 ];
 
 const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; labelKey: string }> = {
-  prayed: { color: '#2f7659', icon: 'check-circle', labelKey: 'worship.onTime' },
+  prayed: { color: '#22C55E', icon: 'check-circle', labelKey: 'worship.onTime' },
   late: { color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
   missed: { color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
   none: { color: '#ccc', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
@@ -442,8 +442,6 @@ export default function PrayerTrackerScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
       />
       
       {/* الهيدر */}
@@ -462,15 +460,15 @@ export default function PrayerTrackerScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#2f7659']}
-            tintColor="#2f7659"
+            colors={['#22C55E']}
+            tintColor="#22C55E"
           />
         }
       >
         {/* بطاقة التقدم */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <View
-            style={[styles.progressCard, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+            style={[styles.progressCard, { backgroundColor: 'rgba(6,79,47,0.85)' }]}
           >
             <View style={[styles.progressHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View>
@@ -576,7 +574,7 @@ export default function PrayerTrackerScreen() {
             </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="check-all" size={24} color="#2f7659" />
+                <MaterialCommunityIcons name="check-all" size={24} color="#22C55E" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.prayedOnTime ?? 0}
                 </Text>
@@ -620,7 +618,7 @@ export default function PrayerTrackerScreen() {
           <Animated.View entering={FadeInDown.delay(500).duration(500)}>
             <GlassCard style={styles.statsCard}>
               <View style={[styles.fajrHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="weather-sunset-up" size={22} color="#2f7659" />
+                <MaterialCommunityIcons name="weather-sunset-up" size={22} color="#22C55E" />
                 <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, flex: 1 }]}>
                   {t('worship.historicalFajrTimes')}
                 </Text>
@@ -793,12 +791,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#2f765920',
+    backgroundColor: '#22C55E20',
   },
   returnTodayText: {
     fontSize: 12,
     fontFamily: fontSemiBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   sectionSubtitle: {
     fontSize: 12,
@@ -824,11 +822,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a2e',
   },
   weekDayToday: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   weekDaySelected: {
-    backgroundColor: '#2f765940',
-    borderColor: '#2f7659',
+    backgroundColor: '#22C55E40',
+    borderColor: '#22C55E',
     borderWidth: 1.5,
   },
   weekDayName: {
@@ -855,7 +853,7 @@ const styles = StyleSheet.create({
   },
   weekDayProgressFill: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   weekDayProgressComplete: {

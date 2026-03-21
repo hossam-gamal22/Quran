@@ -4,28 +4,13 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
-import { getApps, initializeApp } from 'firebase/app';
 import {
-  getFirestore,
   doc,
   getDoc,
   onSnapshot,
   type Unsubscribe,
 } from 'firebase/firestore';
-
-// Firebase Config (same as app-config-api.ts)
-const firebaseConfig = {
-  apiKey: 'AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A',
-  authDomain: 'rooh-almuslim.firebaseapp.com',
-  projectId: 'rooh-almuslim',
-  storageBucket: 'rooh-almuslim.firebasestorage.app',
-  messagingSenderId: '328160076358',
-  appId: '1:328160076358:web:fe5ec8e8b07355f1c06047',
-};
-
-const app =
-  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
+import { db } from '@/config/firebase';
 
 // ========================================
 // Types for Hajj & Umrah content

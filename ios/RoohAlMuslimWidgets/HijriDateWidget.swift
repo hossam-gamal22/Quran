@@ -476,7 +476,8 @@ struct HijriDateWidget_Previews: PreviewProvider {
             HijriDateWidgetEntryView(entry: HijriDateWidgetEntry(
                 date: Date(),
                 data: nil,
-                showGregorian: true
+                showGregorian: true,
+                language: "ar"
             ))
             .previewContext(WidgetPreviewContext(family: .systemSmall))
             .previewDisplayName("Small")
@@ -484,7 +485,8 @@ struct HijriDateWidget_Previews: PreviewProvider {
             HijriDateWidgetEntryView(entry: HijriDateWidgetEntry(
                 date: Date(),
                 data: nil,
-                showGregorian: true
+                showGregorian: true,
+                language: "ar"
             ))
             .previewContext(WidgetPreviewContext(family: .systemMedium))
             .previewDisplayName("Medium")
@@ -492,7 +494,8 @@ struct HijriDateWidget_Previews: PreviewProvider {
             HijriDateWidgetEntryView(entry: HijriDateWidgetEntry(
                 date: Date(),
                 data: nil,
-                showGregorian: true
+                showGregorian: true,
+                language: "ar"
             ))
             .previewContext(WidgetPreviewContext(family: .systemLarge))
             .previewDisplayName("Large")

@@ -317,10 +317,10 @@ export default function RuqyaScreen() {
               </Text>
             )}
 
-            {/* Translation — only for Arabic users who want to see English */}
-            {isArabic && showTranslation && (
+            {/* Translation — only for non-Arabic users */}
+            {!isArabic && showTranslation && (
               <Text style={[styles.translation, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
-                {getZikrTranslation(item, 'en' as any)}
+                {getZikrTranslation(item, 'en' as Language)}
               </Text>
             )}
 
@@ -546,7 +546,6 @@ export default function RuqyaScreen() {
 
         {/* مساحة آمنة */}
         <BannerAdComponent screen="ruqya" />
-        <View style={{ height: insets.bottom }} />
       </BackgroundWrapper>
     </>
   );

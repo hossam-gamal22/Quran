@@ -55,7 +55,7 @@ interface IOSToggleProps extends Omit<TouchableOpacityProps, 'style'> {
 // ========================================
 
 const COLOR_MAP = {
-  green: '#2f7659',
+  green: '#22C55E',
   greenLight: '#4ade80',
   red: '#ef4444',
   blue: '#3b82f6',

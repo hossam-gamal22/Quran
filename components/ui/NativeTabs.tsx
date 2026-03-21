@@ -195,7 +195,7 @@ function AndroidMaterialTabs({
                   {
                     color: isActive
                       ? (isDark ? '#fff' : activeColor)
-                      : (isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)'),
+                      : (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)'),
                     fontFamily: isActive ? fontBold() : fontSemiBold(),
                   },
                 ]}

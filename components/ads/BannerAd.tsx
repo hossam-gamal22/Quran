@@ -1,8 +1,9 @@
 // components/ads/BannerAd.tsx
-import React, { useState } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Platform, Animated } from 'react-native';
 import { useAds } from '@/lib/ads-context';
 import { AdScreenKey } from '@/lib/ads-config';
+import { BANNER_APPEARANCE_DELAY, recordBannerShown } from '@/lib/smart-ad-manager';
 
 // Dynamically import google-mobile-ads (fails gracefully in Expo Go)
 let GoogleBannerAd: any = null;
@@ -28,8 +29,29 @@ interface BannerAdComponentProps {
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey }) => {
   const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
   const [adLoaded, setAdLoaded] = useState(false);
+  const [delayPassed, setDelayPassed] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Delay banner appearance to prevent layout shifts and reduce initial annoyance
+  useEffect(() => {
+    const timer = setTimeout(() => setDelayPassed(true), BANNER_APPEARANCE_DELAY);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Gentle fade-in when ad loads
+  useEffect(() => {
+    if (adLoaded && delayPassed) {
+      recordBannerShown();
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [adLoaded, delayPassed, fadeAnim]);
 
   if (!GoogleBannerAd || Platform.OS === 'web') return null;
+  if (!delayPassed) return null;
 
   // Slot-based rendering (priority)
   if (slotKey) {
@@ -38,7 +60,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <View style={[styles.container, !adLoaded && styles.hidden]}>
+      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim }]}>
         <GoogleBannerAd
           unitId={slotUnitId}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -46,7 +68,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
           onAdLoaded={() => setAdLoaded(true)}
           onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner slot failed:', error); }}
         />
-      </View>
+      </Animated.View>
     );
   }
 
@@ -57,7 +79,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <View style={[styles.container, !adLoaded && styles.hidden]}>
+    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim }]}>
       <GoogleBannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -65,7 +87,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
         onAdLoaded={() => setAdLoaded(true)}
         onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner failed:', error); }}
       />
-    </View>
+    </Animated.View>
   );
 };
 

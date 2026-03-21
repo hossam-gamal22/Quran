@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, Platform, View, Text, TextInput, I18nManager } from 'react-native';
+import { AppState, AppStateStatus, Platform, View, Text, TextInput, LogBox, I18nManager } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
 import { useSettings } from '@/contexts/SettingsContext';
 
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
-import { languageInitPromise, getLanguage, isRTL as appIsRTL } from '@/lib/i18n';
+import { languageInitPromise, getLanguage } from '@/lib/i18n';
 import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
 
 // Contexts
@@ -57,6 +57,31 @@ import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES, ADHAN_SOUNDS as ADHAN_SOUND_FILES } from '@/lib/sound-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadInstalledSoundsCache } from '@/lib/notification-sound-installer';
+import { setupNotificationChannels, resetChannelsIfOutdated } from '@/services/notifications/channels';
+import {
+  requestNotificationPermissions as requestNewNotifPermissions,
+  requestBatteryOptimizationExemption,
+} from '@/services/notifications/permissions';
+
+// Disable system-level RTL — the app handles RTL manually via useIsRTL() hook
+// in 200+ components. Without this, Arabic device language causes double-reversal.
+I18nManager.allowRTL(false);
+I18nManager.forceRTL(false);
+
+// Suppress known non-critical warnings
+LogBox.ignoreLogs([
+  'expo-notifications: Android Push notifications',
+  'Failed to initialize IAP',
+  '[RN-IAP]',
+  'initConnection',
+  '[expo-av]:',
+  'setLayoutAnimationEnabledExperimental',
+  'Error playing ayah',
+  'LoadBundleFromServerRequestError',
+  'Could not load bundle',
+]);
 
 // Configure notification handler at the top level (before any component renders)
 // Wrapped in try-catch to avoid console error on Expo Go (SDK 53+ removed push notifications from Expo Go)
@@ -76,35 +101,16 @@ try {
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Register TrackPlayer playback service for radio lock screen controls
-// Must be at module scope (not inside a component)
-// Only in native/dev builds — Expo Go doesn't have the native module
-if (Platform.OS !== 'web') {
-  try {
-    const _ExpoConstants = require('expo-constants').default;
-    // 'storeClient' = Expo Go — skip TrackPlayer registration
-    if (_ExpoConstants.executionEnvironment !== 'storeClient') {
-      const _TrackPlayer = require('react-native-track-player').default;
-      const { PlaybackService } = require('@/lib/track-player-service');
-      _TrackPlayer.registerPlaybackService(() => PlaybackService);
-    }
-  } catch {
-    // TrackPlayer native module not available — radio will use expo-av fallback
-  }
-}
+// TrackPlayer removed — app uses expo-av exclusively for audio
 
 // Register Android widget task handler at module scope
-// Only in native/dev builds on Android
 if (Platform.OS === 'android') {
   try {
-    const _ExpoConstants = require('expo-constants').default;
-    if (_ExpoConstants.executionEnvironment !== 'storeClient') {
-      const { registerWidgetTaskHandler } = require('react-native-android-widget');
-      const { widgetTaskHandler } = require('@/lib/android-widget-task-handler');
-      registerWidgetTaskHandler(widgetTaskHandler);
-    }
+    const { registerWidgetTaskHandler } = require('react-native-android-widget');
+    const { widgetTaskHandler } = require('@/lib/android-widget-task-handler');
+    registerWidgetTaskHandler(widgetTaskHandler);
   } catch {
-    // react-native-android-widget not available in Expo Go
+    // react-native-android-widget not available
   }
 }
 
@@ -278,6 +284,36 @@ export default function RootLayout() {
     return () => clearTimeout(safetyTimer);
   }, []);
 
+  // Notification channels — SEPARATE useEffect, runs immediately on mount.
+  // Must NOT be inside Firebase useEffect: channels must be ready before
+  // any notification fires, and Firebase init can be slow or fail.
+  useEffect(() => {
+    async function initNotificationChannels() {
+      try {
+        const granted = await requestNewNotifPermissions();
+        if (!granted) return;
+
+        // Reset outdated cached channels (Android caches permanently)
+        await resetChannelsIfOutdated();
+
+        // Load user's saved sound preferences
+        const adhanSound    = (await AsyncStorage.getItem('selectedAdhanSound')) ?? 'makkah';
+        const fajrSound     = (await AsyncStorage.getItem('selectedFajrSound')) ?? 'makkah';
+        const reminderSound = (await AsyncStorage.getItem('selectedReminderSound')) ?? 'general_reminder';
+
+        // Create channels with correct sounds
+        await setupNotificationChannels(adhanSound, fajrSound, reminderSound);
+
+        // Battery optimization (Android only, shown once)
+        await requestBatteryOptimizationExemption();
+      } catch (error) {
+        console.error('[Notifications] Init failed:', error);
+      }
+    }
+
+    initNotificationChannels();
+  }, []);
+
   // Firebase Integration — each step isolated with timeout
   useEffect(() => {
     if (__DEV__) console.log('🚀 Starting app initialization...');
@@ -290,6 +326,14 @@ export default function RootLayout() {
         () => checkAndClearCacheOnUpdate().then(() => {}),
         'Cache check',
         3000
+      );
+
+      // Load installed sounds cache BEFORE any parallel init
+      // This must complete before notification scheduling uses getNotificationSoundValueSync()
+      await initWithTimeout(
+        () => loadInstalledSoundsCache(),
+        'Installed sounds cache',
+        2000
       );
 
       // Run remaining Firebase inits in parallel for faster startup
@@ -390,35 +434,6 @@ export default function RootLayout() {
       const soundType = data?.soundType as string | undefined;
       if (!soundType || soundType === 'default' || soundType === 'silent') return;
 
-      // Handle ayah audio from URL
-      if (soundType === 'ayah_audio' && data?.ayahAudioUrl) {
-        try {
-          if (currentSound) {
-            try { await currentSound.unloadAsync(); } catch {}
-            currentSound = null;
-          }
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-            shouldDuckAndroid: true,
-          });
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: data.ayahAudioUrl as string },
-            { shouldPlay: true }
-          );
-          currentSound = sound;
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync();
-              currentSound = null;
-            }
-          });
-        } catch (e) {
-          console.warn('Failed to play ayah audio:', e);
-        }
-        return;
-      }
-
       // Resolve the sound file (check notification sounds first, then adhan sounds)
       const soundFile = NOTIFICATION_SOUND_FILES[soundType] || ADHAN_SOUND_FILES[soundType];
       if (!soundFile) return;
@@ -477,28 +492,10 @@ export default function RootLayout() {
     return null;
   }
 
-  // ═══ RTL Mismatch Guard ═══
-  // I18nManager.isRTL reflects the device locale at native bridge initialization.
-  // If it doesn't match the app's saved language direction, forceRTL() was already
-  // called (persisted to disk) by loadSavedLanguage() — we just need to reload
-  // so the native bridge picks up the new value.
-  const shouldBeRTL = appIsRTL();
-  if (I18nManager.isRTL !== shouldBeRTL) {
-    // forceRTL already called in loadSavedLanguage(), just need restart
-    I18nManager.allowRTL(shouldBeRTL);
-    I18nManager.forceRTL(shouldBeRTL);
-    try {
-      const Updates = require('expo-updates');
-      Updates.reloadAsync();
-    } catch {
-      // expo-updates not available — try dev reload
-      try {
-        const { DevSettings } = require('react-native');
-        DevSettings.reload();
-      } catch {}
-    }
-    return null;
-  }
+  // RTL is handled manually via useIsRTL() hook throughout the app (200+ components).
+  // I18nManager.forceRTL() is NOT called — it causes double-reversal on Android
+  // production builds where the native bridge applies RTL, conflicting with the
+  // manual flexDirection: 'row-reverse' patterns used throughout the codebase.
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

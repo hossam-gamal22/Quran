@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { getSurahName, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS, SURAH_NAMES_AR, SURAH_NAMES_EN, fetchSurahTranslation } from '@/lib/quran-api';
@@ -65,6 +66,7 @@ function findSurahByName(query: string, lang: 'ar' | 'en'): number | null {
 }
 export default function TafsirSearchScreen() {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -200,26 +202,26 @@ export default function TafsirSearchScreen() {
     const surahName = getSurahName(item.surah.number);
     return (
       <TouchableOpacity
-        style={[s.resultCard, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}
+        style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
         onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
         activeOpacity={0.8}
       >
         <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={[s.surahBadge, { backgroundColor: colors.primary + '18' }]}>
+          <View style={[s.surahBadge, { backgroundColor: colors.primary + '30' }]}>
             <Text style={[s.surahBadgeText, { color: colors.primary }]}>
               {surahName} ({item.surah.number}:{item.numberInSurah})
             </Text>
           </View>
-          <View style={[s.juzBadge, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}>
-            <Text style={[s.juzBadgeText, { color: colors.muted }]}>{t('quranSearch.juzLabel')} {item.juz}</Text>
+          <View style={s.juzBadge}>
+            <Text style={s.juzBadgeText}>{t('quranSearch.juzLabel')} {item.juz}</Text>
           </View>
         </View>
-        <Text style={[s.resultText, { color: colors.foreground, fontSize: searchLang === 'ar' ? 18 : 14 }]}>
+        <Text style={[s.resultText, { color: colors.text, fontSize: searchLang === 'ar' ? 18 : 14 }]}>
           <HighlightText text={item.text} query={query} color={colors.primary} />
         </Text>
         <View style={[s.resultFooter, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
-            style={[s.tafsirBtn, { backgroundColor: colors.primary }]}
+            style={[s.tafsirBtn, { backgroundColor: '#22C55E' }]}
             onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
           >
             <Text style={s.tafsirBtnText}>{t('tafsirSearch.tafsirBtn')}</Text>
@@ -232,20 +234,20 @@ export default function TafsirSearchScreen() {
   const s = StyleSheet.create({
     header: {
       paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
-      borderBottomWidth: 1, borderBottomColor: colors.border,
+      borderBottomWidth: 1.5, borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
     },
-    title: { fontSize: 22, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 14 },
+    title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 14 },
     // Search bar
     searchRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
     inputWrap: {
       flex: 1, flexDirection: 'row', alignItems: 'center',
-      backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 14, borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
       paddingHorizontal: 14,
     },
-    input: { flex: 1, height: 46, fontSize: 16, color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', backgroundColor: 'transparent' },
     clearBtn: { padding: 4 },
     searchBtn: {
-      backgroundColor: colors.primary, borderRadius: 14,
+      backgroundColor: '#22C55E', borderRadius: 14,
       paddingHorizontal: 18, justifyContent: 'center',
     },
     searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
@@ -253,32 +255,32 @@ export default function TafsirSearchScreen() {
     langRow: { flexDirection: 'row', gap: 10 },
     langBtn: {
       flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center',
-      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
     },
-    langBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    langBtnText: { fontSize: 13, fontWeight: '700', color: colors.muted },
+    langBtnActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    langBtnText: { fontSize: 14, fontWeight: '700', color: colors.text },
     langBtnTextActive: { color: '#fff' },
     // Tafsir edition chips
     editionRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
     editionChip: {
-      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
     },
-    editionChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    editionChipText: { fontSize: 12, fontWeight: '700', color: colors.foreground },
+    editionChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    editionChipText: { fontSize: 14, fontWeight: '700', color: colors.text },
     editionChipTextActive: { color: '#fff' },
-    editionLabel: { fontSize: 12, color: colors.muted, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 2, textAlign: isRTL ? 'right' : 'left' },
+    editionLabel: { fontSize: 14, fontWeight: '600', color: colors.text, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left' },
     // Results
-    resultCount: { fontSize: 13, color: colors.muted, textAlign: isRTL ? 'right' : 'left', paddingHorizontal: 16, paddingVertical: 8 },
+    resultCount: { fontSize: 14, fontWeight: '600', color: colors.text, textAlign: isRTL ? 'right' : 'left', paddingHorizontal: 16, paddingVertical: 8 },
     resultCard: {
       marginHorizontal: 14, marginVertical: 6, borderRadius: 16,
       padding: 16, borderWidth: 1,
     },
     resultHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
     surahBadge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
-    surahBadgeText: { fontSize: 12, fontWeight: '700' },
-    juzBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1 },
-    juzBadgeText: { fontSize: 12 },
+    surahBadgeText: { fontSize: 13, fontWeight: '700' },
+    juzBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
+    juzBadgeText: { fontSize: 13, fontWeight: '600', color: colors.text },
     resultText: { textAlign: isRTL ? 'right' : 'left', lineHeight: 30, marginBottom: 10 },
     resultFooter: { flexDirection: 'row', justifyContent: 'flex-end' },
     tafsirBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
@@ -286,33 +288,33 @@ export default function TafsirSearchScreen() {
     // Empty
     emptyWrap: { flex: 1, alignItems: 'center', paddingTop: 60 },
     emptyEmoji: { fontSize: 52, marginBottom: 12 },
-    emptyTitle: { fontSize: 17, fontWeight: '700', color: colors.foreground, marginBottom: 6 },
-    emptyText: { fontSize: 14, color: colors.muted, textAlign: 'center', paddingHorizontal: 40, lineHeight: 22 },
+    emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 6 },
+    emptyText: { fontSize: 15, color: colors.textLight, textAlign: 'center', paddingHorizontal: 40, lineHeight: 24 },
     // Tafsir Modal
     modalWrap: { flex: 1, backgroundColor: colors.background },
     modalHeader: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
-    modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.foreground },
-    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(120,120,128,0.12)' },
+    modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.text },
+    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
     modalContent: { padding: 20, paddingBottom: 60 },
     ayahRef: { fontSize: 14, color: colors.primary, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
-      backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, padding: 16,
-      borderWidth: 1, borderColor: colors.border, marginBottom: 16,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 14, padding: 16,
+      borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)', marginBottom: 16,
     },
-    arabicText: { fontSize: 22, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
+    arabicText: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
-      paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
-      backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
     },
-    editionTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    editionTabText: { fontSize: 12, fontWeight: '700', color: colors.muted },
+    editionTabActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    editionTabText: { fontSize: 14, fontWeight: '700', color: colors.text },
     editionTabTextActive: { color: '#fff' },
     tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
-    tafsirText: { fontSize: 16, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
+    tafsirText: { fontSize: 17, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
   });
 
   return (
@@ -322,7 +324,7 @@ export default function TafsirSearchScreen() {
         <View style={s.header}>
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
-              <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={26} color={colors.foreground} />
+              <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={26} color={colors.text} />
             </TouchableOpacity>
             <Text style={[s.title, { marginBottom: 0, flex: 1 }]}>{t('tafsirSearch.title')}</Text>
             <View style={{ width: 34 }} />
@@ -332,14 +334,14 @@ export default function TafsirSearchScreen() {
             <View style={s.inputWrap}>
               {query.length > 0 && (
                 <TouchableOpacity style={s.clearBtn} onPress={() => { setQuery(''); setResults([]); setHasSearched(false); setSurahTafsirResult(null); }}>
-                  <MaterialCommunityIcons name="close-circle" size={18} color={colors.muted} />
+                  <MaterialCommunityIcons name="close-circle" size={18} color={isDarkMode ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)'} />
                 </TouchableOpacity>
               )}
               <TextInput
                 ref={inputRef}
                 style={s.input}
                 placeholder={t('tafsirSearch.placeholder')}
-                placeholderTextColor={colors.muted}
+                placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'}
                 value={query}
                 onChangeText={setQuery}
                 returnKeyType="search"
@@ -401,22 +403,22 @@ export default function TafsirSearchScreen() {
               keyExtractor={item => `surah_${item.numberInSurah}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[s.resultCard, { backgroundColor: 'rgba(120,120,128,0.12)', borderColor: colors.border }]}
+                  style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
                   onPress={() => handleOpenTafsir(surahTafsirResult.surahNumber, item.numberInSurah)}
                   activeOpacity={0.8}
                 >
                   <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[s.surahBadge, { backgroundColor: colors.primary + '18' }]}>
+                    <View style={[s.surahBadge, { backgroundColor: colors.primary + '30' }]}>
                       <Text style={[s.surahBadgeText, { color: colors.primary }]}>
                         {t('quran.ayah')} {item.numberInSurah}
                       </Text>
                     </View>
                   </View>
-                  <Text style={[s.resultText, { color: colors.foreground, fontSize: 18, lineHeight: 36 }]}>
+                  <Text style={[s.resultText, { color: colors.text, fontSize: 18, lineHeight: 36 }]}>
                     {item.arabicText}
                   </Text>
                   {item.tafsirText ? (
-                    <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 24, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={3}>
+                    <Text style={{ color: colors.textLight, fontSize: 14, lineHeight: 24, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={3}>
                       {item.tafsirText}
                     </Text>
                   ) : null}
@@ -441,13 +443,13 @@ export default function TafsirSearchScreen() {
               ListEmptyComponent={
                 hasSearched ? (
                   <View style={s.emptyWrap}>
-                    <MaterialCommunityIcons name="magnify" size={52} color={colors.muted} style={{ marginBottom: 12 }} />
+                    <MaterialCommunityIcons name="magnify" size={52} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'} style={{ marginBottom: 12 }} />
                     <Text style={s.emptyTitle}>{t('common.noResultsFound')}</Text>
                     <Text style={s.emptyText}>{t('tafsirSearch.tryDifferentWords')}</Text>
                   </View>
                 ) : (
                   <View style={s.emptyWrap}>
-                    <MaterialCommunityIcons name="book-search" size={52} color={colors.muted} style={{ marginBottom: 12 }} />
+                    <MaterialCommunityIcons name="book-search" size={52} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)'} style={{ marginBottom: 12 }} />
                     <Text style={s.emptyTitle}>{t('quranSearch.title')}</Text>
                     <Text style={s.emptyText}>{t('tafsirSearch.searchHint')}</Text>
                   </View>
@@ -468,7 +470,7 @@ export default function TafsirSearchScreen() {
         <View style={s.modalWrap}>
           <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={s.closeBtn} onPress={() => setTafsirDetail(null)}>
-              <MaterialCommunityIcons name="close" size={18} color={colors.foreground} />
+              <MaterialCommunityIcons name="close" size={18} color={colors.text} />
             </TouchableOpacity>
             <Text style={s.modalTitle}>{t('tafsirSearch.tafsirBtn')}</Text>
             <View style={{ width: 36 }} />

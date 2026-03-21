@@ -60,6 +60,7 @@ import { ORNAMENT_NO_TINT_INDICES, QURAN_THEMES, getGoldenColor, getSafeThemeInd
 import { Spacing, FONT_SIZES } from '@/constants/theme';
 import { getAppName } from '@/constants/app';
 import { useAppIdentity } from '@/hooks/use-app-identity';
+import { useSacredContext } from '@/hooks/use-sacred-context';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
 function getTargetAyahBg(themeIndex: number): string {
@@ -502,6 +503,7 @@ interface GlassHeaderProps {
   textColor: string;
   goldenColor: string;
   juz: number;
+  surahName: string;
   tafsirActive: boolean;
   isPageFavorited: boolean;
   currentPage: number;
@@ -512,61 +514,48 @@ interface GlassHeaderProps {
   onShare: () => void;
 }
 
-function GlassHeader({ isLightBg, textColor, goldenColor, juz, tafsirActive, isPageFavorited, currentPage, onTafsir, onPlay, onBack, onToggleFavorite, onShare }: GlassHeaderProps) {
+function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, onTafsir, onPlay, onBack, onToggleFavorite, onShare }: GlassHeaderProps) {
   return (
     <View style={gh.wrapper} collapsable={false}>
-      <BlurView
-        intensity={Platform.OS === 'ios' ? 80 : 40}
-        tint={isLightBg ? 'light' : 'dark'}
-        style={gh.blur}
-      >
-        <View style={[gh.inner, {
-          backgroundColor: isLightBg
-            ? 'rgba(255,255,255,0.4)'
-            : 'rgba(30,30,32,0.55)',
-        }]}>
-          {/* Left: tafsir toggle + play + heart (save page) + share */}
-          <View style={gh.left}>
-            <TouchableOpacity hitSlop={8} onPress={onTafsir}>
-              <MaterialCommunityIcons
-                name={tafsirActive ? 'book-open-variant' : 'book-open-page-variant-outline'}
-                size={22}
-                color={tafsirActive ? goldenColor : (isLightBg ? '#555' : '#bbb')}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8} onPress={onPlay}>
-              <MaterialCommunityIcons name="play-circle-outline" size={24} color={goldenColor} />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8} onPress={onToggleFavorite}>
-              <MaterialCommunityIcons
-                name={isPageFavorited ? 'heart' : 'heart-outline'}
-                size={22}
-                color={isPageFavorited ? '#EF4444' : goldenColor}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity hitSlop={8} onPress={onShare}>
-              <MaterialCommunityIcons name="share-variant-outline" size={20} color={goldenColor} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Center: page number + juz info */}
-          <View style={gh.center}>
-            <Text style={[gh.pageNum, { color: goldenColor }]}>
-              {toArabicNumber(currentPage)}
-            </Text>
-            <Text style={[gh.juzLabel, { color: isLightBg ? '#555' : '#bbb' }]}>
-              {translate('quran.juz')} {toArabicNumber(juz)}
-            </Text>
-          </View>
-
-          {/* Right: back */}
-          <View style={gh.right}>
-            <TouchableOpacity hitSlop={8} onPress={onBack}>
-              <Ionicons name="chevron-forward" size={28} color={goldenColor} />
-            </TouchableOpacity>
-          </View>
+      <View style={gh.inner}>
+        {/* Left: tafsir toggle + play + heart (save page) + share */}
+        <View style={gh.left}>
+          <TouchableOpacity hitSlop={8} onPress={onTafsir}>
+            <MaterialCommunityIcons
+              name={tafsirActive ? 'book-open-variant' : 'book-open-page-variant-outline'}
+              size={22}
+              color={tafsirActive ? goldenColor : (isLightBg ? '#555' : '#bbb')}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={onPlay}>
+            <MaterialCommunityIcons name="play-circle-outline" size={24} color={goldenColor} />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={onToggleFavorite}>
+            <MaterialCommunityIcons
+              name={isPageFavorited ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isPageFavorited ? '#EF4444' : goldenColor}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={onShare}>
+            <MaterialCommunityIcons name="share-variant-outline" size={20} color={goldenColor} />
+          </TouchableOpacity>
         </View>
-      </BlurView>
+
+        {/* Center: page number - surah name */}
+        <View style={gh.center}>
+          <Text style={[gh.pageInfo, { color: goldenColor }]} numberOfLines={1}>
+            {toArabicNumber(currentPage)} - {surahName}
+          </Text>
+        </View>
+
+        {/* Right: back */}
+        <View style={gh.right}>
+          <TouchableOpacity hitSlop={8} onPress={onBack}>
+            <Ionicons name="chevron-forward" size={28} color={goldenColor} />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
@@ -575,28 +564,17 @@ const gh = StyleSheet.create({
   wrapper: {
     zIndex: 10,
     height: 48,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    ...Platform.select({ android: { elevation: 3 } }),
-  },
-  blur: {
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    overflow: 'hidden',
   },
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
     height: 48,
     paddingHorizontal: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.15)',
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 70, justifyContent: 'flex-end' },
-  center: { alignItems: 'center', paddingHorizontal: 8 },
-  pageNum: { fontSize: 17, fontFamily: 'Amiri-Bold' },
-  juzLabel: { fontSize: 11, fontFamily: fontRegular(), marginTop: -2 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 50, justifyContent: 'flex-end' },
+  center: { alignItems: 'center', paddingHorizontal: 8, flexShrink: 0 },
+  pageInfo: { fontSize: 15, fontFamily: 'Amiri-Bold' },
 });
 
 // ══════════════════════════════════════════════
@@ -613,11 +591,14 @@ export default function SurahScreen() {
   const { settings, isDarkMode, updateDisplay, isLoading: settingsLoading, t } = useSettings();
   const isRTL = useIsRTL();
 
+  // Block all ads during Quran reading
+  useSacredContext('quran_reading');
+
   // Guard: wait for settings to load to prevent theme flash (race condition)
   if (settingsLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: isDarkMode ? '#1a1a2e' : '#f5f0e8', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#0f987f" />
+        <ActivityIndicator size="large" color="#22C55E" />
       </View>
     );
   }
@@ -1321,6 +1302,7 @@ export default function SurahScreen() {
               textColor={textColor}
               goldenColor={goldenColor}
               juz={juz}
+              surahName={surahsOnPage?.[0] || ''}
               tafsirActive={showTafsirPanel}
               isPageFavorited={isPageFavorited}
               currentPage={currentPage}

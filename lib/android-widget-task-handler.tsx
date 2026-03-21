@@ -76,16 +76,20 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
               width: 'match_parent',
               justifyContent: 'center',
               alignItems: 'center',
-              backgroundColor: '#0a0f0d',
-              borderRadius: 16,
+              backgroundGradient: {
+                from: '#081827',
+                to: '#0c2e3a',
+                orientation: 'TOP_BOTTOM',
+              },
+              borderRadius: 20,
             }}
           >
             <TextWidget
-              text="روح المسلم"
+              text="رُوح المسلم"
               style={{
-                fontSize: 16,
-                color: '#22c55e',
-                fontFamily: 'Amiri',
+                fontSize: 18,
+                color: '#22C55E',
+                fontFamily: 'AmiriBold',
               }}
             />
             <TextWidget
@@ -94,6 +98,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
                 fontSize: 12,
                 color: '#9ca3af',
                 fontFamily: 'Amiri',
+                marginTop: 6,
               }}
             />
           </FlexWidget>

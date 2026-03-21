@@ -5,12 +5,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -134,14 +134,14 @@ export default function AppSectionsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Home Sections */}
         <Text style={styles.groupTitle}>أقسام الصفحة الرئيسية</Text>

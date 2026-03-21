@@ -284,7 +284,7 @@ export default function KhatmaListScreen() {
           onPress: () => router.push('/khatma/new'),
           color: '#FFFFFF',
           size: 24,
-          style: { backgroundColor: colors.primary, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+          style: { backgroundColor: '#22C55E', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
         }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
@@ -313,7 +313,7 @@ export default function KhatmaListScreen() {
             {t('khatma.noKhatmasDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -325,7 +325,7 @@ export default function KhatmaListScreen() {
       {/* Floating Action Button for Active Khatma */}
       {activeKhatma && !activeKhatma.isCompleted && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          style={[styles.fab, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={() => router.push('/khatma/wird')}
         >
           <Ionicons name="book" size={24} color="#FFFFFF" />

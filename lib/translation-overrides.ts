@@ -15,8 +15,8 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,24 +39,6 @@ const COLLECTION_NAME = 'translationOverrides';
 const overridesMap = new Map<string, Partial<Record<LangCode, string>>>();
 let loaded = false;
 let unsubscribeSnapshot: (() => void) | null = null;
-
-// ─── Firebase ────────────────────────────────────────────────────────────────
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
-  authDomain: "rooh-almuslim.firebaseapp.com",
-  projectId: "rooh-almuslim",
-  storageBucket: "rooh-almuslim.firebasestorage.app",
-  messagingSenderId: "328160076358",
-  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
-};
-
-function getDb() {
-  const app = getApps().length === 0
-    ? initializeApp(firebaseConfig)
-    : getApps()[0];
-  return getFirestore(app);
-}
 
 // ─── Core Functions ──────────────────────────────────────────────────────────
 
@@ -86,7 +68,6 @@ export async function loadTranslationOverrides(): Promise<void> {
 
   // 2. Subscribe to Firestore for real-time updates
   try {
-    const db = getDb();
     const colRef = collection(db, COLLECTION_NAME);
 
     unsubscribeSnapshot = onSnapshot(colRef, (snapshot) => {

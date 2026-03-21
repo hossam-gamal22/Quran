@@ -5,7 +5,7 @@
 import { translations, Language, TranslationKeys } from '@/constants/translations';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRemoteTranslation } from '@/lib/remote-translations';
-import { I18nManager } from 'react-native';
+// I18nManager intentionally NOT used — RTL is handled manually via useIsRTL() hook
 
 // ==================== المتغيرات ====================
 
@@ -24,12 +24,10 @@ export const loadSavedLanguage = async (): Promise<Language> => {
     console.error('Error loading language:', error);
   }
 
-  // Set I18nManager RTL based on app's saved language (not system language)
-  // Always call unconditionally — reading I18nManager.isRTL caches the stale
-  // device-locale value and prevents forceRTL from taking effect on next launch.
-  const shouldBeRTL = ['ar', 'ur', 'fa'].includes(currentLanguage);
-  I18nManager.allowRTL(shouldBeRTL);
-  I18nManager.forceRTL(shouldBeRTL);
+  // RTL is handled manually via useIsRTL() hook in 200+ components.
+  // Do NOT call I18nManager.forceRTL() — it causes double-reversal on
+  // Android production builds where the native bridge actually applies RTL,
+  // conflicting with manual flexDirection: 'row-reverse' patterns.
 
   return currentLanguage;
 };

@@ -140,7 +140,7 @@ export function ScreenshotBranding() {
   if (isPremium) return null;
 
   const bgColor = isDarkMode ? '#1a1a2e' : '#FFFFFF';
-  const accentColor = '#0f987f';
+  const accentColor = '#22C55E';
 
   return (
     <>

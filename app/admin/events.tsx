@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -14,6 +13,7 @@ import {
   Switch,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { collection, getDocs, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
@@ -145,14 +145,14 @@ export default function EventsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Stats */}
         <View style={styles.statsRow}>
@@ -206,7 +206,7 @@ export default function EventsScreen() {
 
       {/* Edit/Add Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <Ionicons name="close" size={28} color={Colors.text} />

@@ -41,7 +41,7 @@ import {
   type PhotoCategory,
   type SavedPhoto,
 } from '@/lib/photo-backgrounds';
-import { useInterstitialAd } from '@/components/ads/InterstitialAdManager';
+// Removed: interstitial ads on background selection to reduce user frustration
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -57,7 +57,7 @@ export default function PhotoBackgroundsScreen() {
   const insets = useSafeAreaInsets();
   const { isPremium } = useSubscription();
   const router = useRouter();
-  const { showAd } = useInterstitialAd();
+
 
   const [viewMode, setViewMode] = useState<ViewMode>('saved');
   const [selectedCategory, setSelectedCategory] = useState<PhotoCategory>(PHOTO_CATEGORIES[0]);
@@ -149,9 +149,7 @@ export default function PhotoBackgroundsScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Refresh saved list
       loadSavedPhotos();
-      if (!isPremium) {
-        try { await showAd(); } catch { /* proceed silently */ }
-      }
+
     } catch (error) {
       console.error('Error setting background:', error);
       Alert.alert(t('common.error'), t('settings.backgroundLoadError'));
@@ -240,7 +238,7 @@ export default function PhotoBackgroundsScreen() {
         {viewMode === 'saved' && (
           savedLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#0f987f" />
+              <ActivityIndicator size="large" color="#22C55E" />
             </View>
           ) : savedPhotos.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -276,7 +274,7 @@ export default function PhotoBackgroundsScreen() {
                     />
                     {isCurrent && (
                       <View style={[styles.currentOverlay, isRTL ? { left: 6, right: undefined } : null]}>
-                        <MaterialCommunityIcons name="check-circle" size={24} color="#0f987f" />
+                        <MaterialCommunityIcons name="check-circle" size={24} color="#22C55E" />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -331,7 +329,7 @@ export default function PhotoBackgroundsScreen() {
             {/* Photo grid */}
             {loading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0f987f" />
+                <ActivityIndicator size="large" color="#22C55E" />
               </View>
             ) : (
               <ScrollView
@@ -396,9 +394,9 @@ export default function PhotoBackgroundsScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 updateDisplay({ dimOpacity: val } as any);
               }}
-              minimumTrackTintColor="#0f987f"
+              minimumTrackTintColor="#22C55E"
               maximumTrackTintColor={isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)'}
-              thumbTintColor="#0f987f"
+              thumbTintColor="#22C55E"
             />
           </View>
         )}
@@ -519,7 +517,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   categoryTabActive: {
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
   },
   categoryTabText: { fontSize: 15, fontFamily: fontSemiBold(), lineHeight: 22 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -579,7 +577,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   setBtn: {
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
     paddingVertical: 14,
     paddingHorizontal: 40,
     borderRadius: 14,
@@ -650,7 +648,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   modeBtnActive: {
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
   },
   modeBtnText: {
     fontSize: 14,
@@ -670,7 +668,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyBtn: {
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 12,
@@ -701,7 +699,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -186,7 +186,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(47, 118, 89, 0.1)',
+    backgroundColor: 'rgba(6, 79, 47, 0.1)',
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginVertical: Spacing.md,
@@ -210,14 +210,14 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     height: 4,
-    backgroundColor: 'rgba(47, 118, 89, 0.2)',
+    backgroundColor: 'rgba(6, 79, 47, 0.2)',
     borderRadius: 2,
     marginBottom: Spacing.md,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   controls: {

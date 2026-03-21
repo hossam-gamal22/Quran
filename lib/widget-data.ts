@@ -169,7 +169,7 @@ export const defaultWidgetSettings: WidgetSettings = {
     showLocation: true,
     showCompletion: true,
     colorScheme: 'auto',
-    accentColor: '#2f7659',
+    accentColor: '#22C55E',
   },
   azkarWidget: {
     enabled: true,
@@ -554,17 +554,20 @@ export const setPrayerCompleted = async (
 
 /**
  * كتابة البيانات للمشاركة مع الويدجت (iOS)
+ * يستخدم react-native-shared-group-preferences للكتابة إلى UserDefaults(suiteName:)
+ * الويدجت يقرأ من نفس UserDefaults بنفس المفتاح
  */
 const writeToSharedContainer = async (data: SharedWidgetData): Promise<void> => {
   if (Platform.OS !== 'ios') return;
   
   try {
-    // في iOS، نستخدم App Groups للمشاركة
-    // هذا يتطلب إعداد في Xcode
-    const sharedPath = `${FileSystem.documentDirectory}../shared/widget_data.json`;
-    await FileSystem.writeAsStringAsync(sharedPath, JSON.stringify(data));
+    const SharedGroupPreferences = require('react-native-shared-group-preferences').default;
+    await SharedGroupPreferences.setItem(
+      'widget_shared_data',
+      JSON.stringify(data),
+      'group.com.roohmuslim.app'
+    );
   } catch (error) {
-    // قد يفشل إذا لم يتم إعداد App Groups
     console.log('Shared container not available:', error);
   }
 };
@@ -676,7 +679,7 @@ export const getWidgetBackgroundColor = (prayer: string): string[] => {
   const colors: Record<string, string[]> = {
     fajr: ['#1a237e', '#283593'],
     sunrise: ['#ff6f00', '#ff8f00'],
-    dhuhr: ['#2f7659', '#1d4a3a'],
+    dhuhr: ['#22C55E', '#1d4a3a'],
     asr: ['#f57c00', '#ef6c00'],
     maghrib: ['#d84315', '#bf360c'],
     isha: ['#1a1a2e', '#16213e'],

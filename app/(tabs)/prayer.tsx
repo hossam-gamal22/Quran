@@ -53,6 +53,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { getDateLocale } from '@/lib/i18n';
@@ -111,6 +112,9 @@ export default function PrayerScreen() {
   const language = settings?.language || 'ar';
   const router = useRouter();
   const { todayPrayer, updatePrayerWithTime, saveDayTimes } = usePrayerTracker();
+
+  // Block all ads during prayer times viewing
+  useSacredContext('prayer_time');
 
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationType | null>(null);
@@ -224,14 +228,16 @@ export default function PrayerScreen() {
 
   const params = useLocalSearchParams() as { view?: string; tab?: string } | undefined;
 
-  // Auto-select tab when navigated with params
-  useEffect(() => {
-    if (params?.tab === 'qibla') {
-      setTopSelectedKey('qibla');
-    } else {
-      setTopSelectedKey('prayer');
-    }
-  }, [params?.tab]);
+  // Auto-select tab when navigated with params - reset to prayer when no tab param
+  useFocusEffect(
+    useCallback(() => {
+      if (params?.tab === 'qibla') {
+        setTopSelectedKey('qibla');
+      } else {
+        setTopSelectedKey('prayer');
+      }
+    }, [params?.tab])
+  );
 
   // Load Live Activity settings on mount
   useEffect(() => {
@@ -528,7 +534,7 @@ export default function PrayerScreen() {
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={[styles.container, isDarkMode && styles.containerDark]}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor="transparent" />
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
         {/* Header — same as tasbih */}
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -574,11 +580,11 @@ export default function PrayerScreen() {
             tabs={prayerTopSegments.map(s => ({ key: s.key, label: s.label }))}
             selected={topSelectedKey}
             onSelect={(key) => setTopSelectedKey(key as 'prayer' | 'qibla')}
-            indicatorColor="#2f7659"
+            indicatorColor="#22C55E"
           />
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#2f7659']} tintColor="#2f7659" />}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#22C55E']} tintColor="#22C55E" />}>
           {error && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="alert-circle" size={24} color="#ef5350" />
@@ -658,9 +664,9 @@ export default function PrayerScreen() {
                                 {/* Minute hand */}
                                 <Line x1="50" y1="50" x2="68" y2="35" stroke={isDarkMode ? '#ddd' : '#555'} strokeWidth="2" strokeLinecap="round" />
                                 {/* Second hand */}
-                                <Line x1="50" y1="50" x2="45" y2="18" stroke="#2f7659" strokeWidth="1" strokeLinecap="round" />
+                                <Line x1="50" y1="50" x2="45" y2="18" stroke="#22C55E" strokeWidth="1" strokeLinecap="round" />
                                 {/* Center dot */}
-                                <Circle cx="50" cy="50" r="3" fill="#2f7659" />
+                                <Circle cx="50" cy="50" r="3" fill="#22C55E" />
                               </Svg>
                             </View>
                           )}
@@ -669,7 +675,7 @@ export default function PrayerScreen() {
                               <Text style={[styles.thumbDigitalTime, { color: colors.text }]}>05:23</Text>
                               <Text style={[styles.thumbDigitalLabel, { color: colors.textLight }]}>{t('prayer.fajr')}</Text>
                               <View style={styles.thumbDigitalSeparator} />
-                              <MaterialCommunityIcons name="mosque" size={16} color="#2f7659" />
+                              <MaterialCommunityIcons name="mosque" size={16} color="#22C55E" />
                             </View>
                           )}
                         </TouchableOpacity>
@@ -742,7 +748,7 @@ export default function PrayerScreen() {
             <GlassCard style={settingsStyles.content}>
               <View style={[settingsStyles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Text style={[settingsStyles.title, { color: colors.text }]}>{t('prayer.prayerSettingsTitle')}</Text>
-                <TouchableOpacity onPress={() => setShowSettings(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => setShowSettings(false)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(34, 197, 94, 0.15)', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialCommunityIcons name="close" size={18} color={colors.text} />
                 </TouchableOpacity>
               </View>
@@ -750,7 +756,7 @@ export default function PrayerScreen() {
                 {/* طريقة الحساب — Dropdown */}
                 <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.calculationMethod')}</Text>
                 <TouchableOpacity
-                  style={[settingsStyles.dropdownBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.18)' : 'rgba(120,120,128,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => setShowMethodPicker(prev => !prev)}
                 >
                   <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left' }]}>
@@ -761,9 +767,9 @@ export default function PrayerScreen() {
                 {showMethodPicker && (
                   <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
                     {PRAYER_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(47,118,89,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value }); setShowMethodPicker(false); }}>
+                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value }); setShowMethodPicker(false); }}>
                         <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{method.subtitle}</Text></View>
-                        {settings.prayer.calculationMethod === method.value && <MaterialCommunityIcons name="check" size={18} color="#2f7659" />}
+                        {settings.prayer.calculationMethod === method.value && <MaterialCommunityIcons name="check" size={18} color="#22C55E" />}
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -772,7 +778,7 @@ export default function PrayerScreen() {
                 {/* مذهب العصر — Dropdown */}
                 <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.asrMethod')}</Text>
                 <TouchableOpacity
-                  style={[settingsStyles.dropdownBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.18)' : 'rgba(120,120,128,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                   onPress={() => setShowAsrPicker(prev => !prev)}
                 >
                   <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left' }]}>
@@ -783,9 +789,9 @@ export default function PrayerScreen() {
                 {showAsrPicker && (
                   <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
                     {ASR_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(47,118,89,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1 }); setShowAsrPicker(false); }}>
+                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1 }); setShowAsrPicker(false); }}>
                         <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{method.subtitle}</Text></View>
-                        {settings.prayer.asrJuristic === method.value && <MaterialCommunityIcons name="check" size={18} color="#2f7659" />}
+                        {settings.prayer.asrJuristic === method.value && <MaterialCommunityIcons name="check" size={18} color="#22C55E" />}
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -817,8 +823,8 @@ export default function PrayerScreen() {
                               {
                                 flexDirection: isRTL ? 'row-reverse' : 'row',
                                 backgroundColor: liveActivityStyle === s.id
-                                  ? 'rgba(47,118,89,0.15)'
-                                  : isDarkMode ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.06)',
+                                  ? 'rgba(6,79,47,0.15)'
+                                  : isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(120,120,128,0.06)',
                                 borderRadius: 12,
                                 paddingHorizontal: 14,
                                 paddingVertical: 10,
@@ -838,7 +844,7 @@ export default function PrayerScreen() {
                               </Text>
                             </View>
                             {liveActivityStyle === s.id && (
-                              <MaterialCommunityIcons name="check" size={18} color="#2f7659" />
+                              <MaterialCommunityIcons name="check" size={18} color="#22C55E" />
                             )}
                           </TouchableOpacity>
                         ))}
@@ -912,9 +918,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   clockStyleThumbnailActive: {
-    borderColor: '#2f7659',
-    backgroundColor: 'rgba(47,118,89,0.18)',
-    shadowColor: '#2f7659',
+    borderColor: '#22C55E',
+    backgroundColor: 'rgba(6,79,47,0.18)',
+    shadowColor: '#22C55E',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 10,
@@ -929,7 +935,7 @@ const styles = StyleSheet.create({
   thumbWidgetRow: { alignItems: 'center', justifyContent: 'space-between' },
   thumbWidgetLogoSide: { alignItems: 'center', gap: 1 },
   thumbWidgetLogo: { width: 18, height: 18, borderRadius: 5 },
-  thumbWidgetAppName: { fontSize: 4, fontFamily: fontSemiBold(), color: '#0f987f' },
+  thumbWidgetAppName: { fontSize: 4, fontFamily: fontSemiBold(), color: '#22C55E' },
   thumbWidgetCountdownSide: { alignItems: 'center' },
   thumbWidgetCountdown: { fontSize: 10, fontFamily: fontBold(), letterSpacing: 0.5 },
   thumbWidgetPrayerLabel: { fontSize: 5, fontFamily: fontSemiBold() },
@@ -939,7 +945,7 @@ const styles = StyleSheet.create({
   thumbDigitalContainer: { width: CLOCK_THUMB_SIZE, height: CLOCK_THUMB_SIZE - 12, alignItems: 'center', justifyContent: 'center' },
   thumbDigitalTime: { fontSize: 14, fontFamily: fontBold(), letterSpacing: 1 },
   thumbDigitalLabel: { fontSize: 7, fontFamily: fontSemiBold(), marginTop: -2 },
-  thumbDigitalSeparator: { width: 20, height: 1, backgroundColor: 'rgba(47,118,89,0.4)', marginVertical: 2 },
+  thumbDigitalSeparator: { width: 20, height: 1, backgroundColor: 'rgba(6,79,47,0.4)', marginVertical: 2 },
   thumbDigitalCountdown: { fontSize: 9, fontFamily: fontBold(), color: '#555' },
 });
 

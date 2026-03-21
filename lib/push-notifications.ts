@@ -2,24 +2,10 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { t } from '@/lib/i18n';
-
-// ==================== Firebase Config ====================
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
-  authDomain: "rooh-almuslim.firebaseapp.com",
-  projectId: "rooh-almuslim",
-  storageBucket: "rooh-almuslim.firebasestorage.app",
-  messagingSenderId: "328160076358",
-  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
-};
-
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+import { t } from './i18n';
+import { dirText } from './notification-text-direction';
+import { getAndroidChannelForSoundSync } from './notification-sound-installer';
 
 // ==================== Types ====================
 
@@ -72,10 +58,9 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       return false;
     }
 
-    // Android specific channel setup
-    if (Platform.OS === 'android') {
-      await setupAndroidChannels();
-    }
+    // Android channels are now set up in services/notifications/channels.ts
+    // via setupNotificationChannels() called from app/_layout.tsx
+    // This ensures user-selected sounds are applied correctly
 
     return true;
   } catch (error) {
@@ -85,56 +70,18 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 // ==================== Android Channels ====================
-
-const setupAndroidChannels = async (): Promise<void> => {
-  // Prayer Times Channel
-  await Notifications.setNotificationChannelAsync('prayer-times', {
-    name: t('notifications.prayerTimesChannel'),
-    description: t('notifications.prayerTimesDesc'),
-    importance: Notifications.AndroidImportance.HIGH,
-    sound: 'general_reminder.mp3',
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#10B981',
-  });
-
-  // Azkar Channel
-  await Notifications.setNotificationChannelAsync('azkar', {
-    name: t('notifications.azkarChannel'),
-    description: t('notifications.azkarDesc'),
-    importance: Notifications.AndroidImportance.HIGH,
-    sound: 'general_reminder.mp3',
-    vibrationPattern: [0, 250, 250, 250],
-  });
-
-  // Daily Ayah Channel
-  await Notifications.setNotificationChannelAsync('daily-ayah', {
-    name: t('notifications.dailyVerseChannel'),
-    description: t('notifications.dailyVerseDesc'),
-    importance: Notifications.AndroidImportance.HIGH,
-    sound: 'general_reminder.mp3',
-    vibrationPattern: [0, 250, 250, 250],
-  });
-
-  // General Updates Channel
-  await Notifications.setNotificationChannelAsync('general', {
-    name: t('notifications.generalChannel'),
-    description: t('notifications.generalDesc'),
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'general_reminder.mp3',
-  });
-
-  // Seasonal Content Channel
-  await Notifications.setNotificationChannelAsync('seasonal', {
-    name: t('notifications.seasonalChannel'),
-    description: t('notifications.seasonalChannelDesc'),
-    importance: Notifications.AndroidImportance.DEFAULT,
-    sound: 'general_reminder.mp3',
-  });
-};
+// NOTE: Android channels are now centralized in services/notifications/channels.ts
+// The setupNotificationChannels() function there handles all channel creation
+// with user-selected sounds. This prevents the immutability conflict where
+// channels created here with default sounds would override user preferences.
 
 /**
  * Create or get a dynamic Android notification channel for a specific sound.
  * Android channels are immutable after creation — so we create one per sound type.
+ * 
+ * For custom downloaded sounds, returns the pre-created channel from notification-sound-installer.
+ * For bundled sounds, creates a channel with the sound name.
+ * 
  * Returns the channelId to use when scheduling the notification.
  */
 export const getOrCreateSoundChannel = async (
@@ -144,8 +91,18 @@ export const getOrCreateSoundChannel = async (
   if (Platform.OS !== 'android') return baseChannel;
   if (!soundType || soundType === 'default' || soundType === 'general_reminder') return baseChannel;
 
+  // Check if this is a custom installed sound (downloaded from Firebase)
+  // Custom sounds have channels created during installation with ID: custom_sound_{soundId}
+  const customChannelId = getAndroidChannelForSoundSync(soundType);
+  if (customChannelId) {
+    console.log(`[push-notifications] Using custom channel ${customChannelId} for sound ${soundType}`);
+    return customChannelId;
+  }
+
+  // For bundled sounds, create a channel with the sound name
   const channelId = `${baseChannel}_${soundType}`;
-  const soundFile = `${soundType}.mp3`;
+  // Android raw resources referenced WITHOUT file extension
+  const soundFile = soundType;
 
   // Channel names for user display
   const channelNames: Record<string, string> = {
@@ -306,8 +263,8 @@ export const scheduleLocalNotification = async (
 
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: notification.title,
-      body: notification.body,
+      title: dirText(notification.title),
+      body: dirText(notification.body),
       data: notification.data,
       sound: soundEnabled ? 'default' : undefined,
       ...(Platform.OS === 'android' && channelId && { channelId }),

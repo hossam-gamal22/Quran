@@ -36,7 +36,7 @@ const { width } = Dimensions.get('window');
 const ENGAGEMENT_CATEGORIES = [
   { icon: 'mosque' as const, labelKey: 'prayer', color: '#c17f59' },
   { icon: 'book-open-variant' as const, labelKey: 'quran', color: '#3a7ca5' },
-  { icon: 'hands-pray' as const, labelKey: 'azkar', color: '#2f7659' },
+  { icon: 'hands-pray' as const, labelKey: 'azkar', color: '#22C55E' },
   { icon: 'counter' as const, labelKey: 'tasbih', color: '#5d4e8c' },
 ];
 
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   headerTitle: {
     fontSize: 22,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   content: {
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 18,
     gap: 10,
-    backgroundColor: 'rgba(47,118,89,0.85)',
+    backgroundColor: 'rgba(6,79,47,0.85)',
   },
   continueButtonText: {
     fontSize: 18,
@@ -387,6 +387,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
 });

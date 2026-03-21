@@ -9,9 +9,9 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const Colors = {
   // الألوان الأساسية
-  primary: '#2f7659',
-  primaryLight: '#3d9970',
-  primaryDark: '#245c47',
+  primary: '#22C55E',
+  primaryLight: '#4ADE80',
+  primaryDark: '#16A34A',
   
   // الألوان الثانوية
   secondary: '#6366F1',
@@ -46,7 +46,7 @@ export const Colors = {
   
   // ألوان خاصة
   gold: '#FFD700',
-  quranGreen: '#2f7659',
+  quranGreen: '#22C55E',
   prayerBlue: '#007AFF',
   
   // ألوان زجاجية
@@ -58,7 +58,7 @@ export const Colors = {
 
   // Aliases used by admin screens
   textMuted: '#8E8E93',
-  accent: '#2f7659',
+  accent: '#22C55E',
   shadow: '#000000',
 };
 
@@ -68,9 +68,9 @@ export const Colors = {
 
 export const DarkColors = {
   // الألوان الأساسية
-  primary: '#3d9970',
-  primaryLight: '#4db380',
-  primaryDark: '#2f7659',
+  primary: '#22C55E',
+  primaryLight: '#4ADE80',
+  primaryDark: '#16A34A',
   
   // الألوان الثانوية
   secondary: '#818CF8',
@@ -85,7 +85,7 @@ export const DarkColors = {
   // النصوص
   text: '#FFFFFF',
   textSecondary: '#EBEBF5',
-  textLight: '#8E8E93',
+  textLight: '#A8A8AD',
   textOnPrimary: '#FFFFFF',
   
   // حالات
@@ -99,25 +99,25 @@ export const DarkColors = {
   black: '#000000',
   
   // الحدود والفواصل
-  border: 'rgba(255,255,255,0.1)',
-  divider: 'rgba(255,255,255,0.05)',
+  border: 'rgba(255,255,255,0.18)',
+  divider: 'rgba(255,255,255,0.08)',
   overlay: 'rgba(0, 0, 0, 0.6)',
   
   // ألوان خاصة
   gold: '#FFD60A',
-  quranGreen: '#3d9970',
+  quranGreen: '#22C55E',
   prayerBlue: '#0A84FF',
   
   // ألوان زجاجية للدارك مود
   glass: 'rgba(26, 31, 43, 0.8)',
   glassDark: 'rgba(26, 31, 43, 0.6)',
   glassLight: 'rgba(36, 43, 58, 0.9)',
-  glassBorder: 'rgba(255, 255, 255, 0.1)',
+  glassBorder: 'rgba(255, 255, 255, 0.18)',
   cardGlass: 'rgba(26, 31, 43, 0.85)',
 
   // Aliases used by admin screens
-  textMuted: '#8E8E93',
-  accent: '#3d9970',
+  textMuted: '#A8A8AD',
+  accent: '#22C55E',
   shadow: '#000000',
 };
 
@@ -381,7 +381,7 @@ export const Animation = {
 // ============================================
 
 export const AvailableAccentColors = [
-  { name: 'أخضر', nameEn: 'Green', value: '#2f7659' },
+  { name: 'أخضر', nameEn: 'Green', value: '#22C55E' },
   { name: 'أزرق', nameEn: 'Blue', value: '#007AFF' },
   { name: 'بنفسجي', nameEn: 'Purple', value: '#5856D6' },
   { name: 'وردي', nameEn: 'Pink', value: '#FF2D55' },
@@ -397,7 +397,7 @@ export const AvailableAccentColors = [
 
 export const CARD_COLORS = [
   '#1e3a5f', // أزرق داكن
-  '#2f7659', // أخضر إسلامي
+  '#22C55E', // أخضر إسلامي
   '#5b21b6', // بنفسجي
   '#7c2d12', // بني محروق
   '#1e40af', // أزرق ملكي

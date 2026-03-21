@@ -1,58 +1,17 @@
 // lib/track-player-setup.ts
-// Setup and initialization for react-native-track-player
-// Uses lazy require to avoid crash in Expo Go (native module not available)
+// DEPRECATED: TrackPlayer has been replaced with expo-av for audio playback
+// These exports are kept as no-ops to prevent import errors during migration
 
-import { Platform } from 'react-native';
-
-let isSetup = false;
-
+/**
+ * No-op: TrackPlayer setup is disabled, app uses expo-av instead
+ */
 export async function setupTrackPlayer(): Promise<boolean> {
-  if (isSetup) return true;
-  if (Platform.OS === 'web') return false;
-
-  try {
-    const mod = require('react-native-track-player');
-    const TrackPlayer = mod.default || mod;
-    const Capability = mod.Capability;
-    const AppKilledPlaybackBehavior = mod.AppKilledPlaybackBehavior;
-
-    await TrackPlayer.setupPlayer({
-      autoHandleInterruptions: true,
-    });
-
-    await TrackPlayer.updateOptions({
-      capabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.Stop,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-        Capability.SeekTo,
-      ],
-      compactCapabilities: [
-        Capability.Play,
-        Capability.Pause,
-        Capability.SkipToNext,
-      ],
-      android: {
-        appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
-      },
-    });
-
-    isSetup = true;
-    return true;
-  } catch (error) {
-    // Player might already be initialized
-    const message = (error as Error)?.message || '';
-    if (message.includes('already been initialized')) {
-      isSetup = true;
-      return true;
-    }
-    console.warn('[track-player] Setup failed:', error);
-    return false;
-  }
+  return false;
 }
 
+/**
+ * No-op: Always returns false as TrackPlayer is disabled
+ */
 export function isTrackPlayerSetup(): boolean {
-  return isSetup;
+  return false;
 }

@@ -124,7 +124,7 @@ export default function CustomDhikrScreen() {
                   <MaterialCommunityIcons
                     name={icon as any}
                     size={24}
-                    color={selectedIcon === icon ? '#2f7659' : isDarkMode ? '#aaa' : '#666'}
+                    color={selectedIcon === icon ? '#22C55E' : isDarkMode ? '#aaa' : '#666'}
                   />
                 </TouchableOpacity>
               ))}
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 20, fontFamily: fontBold(), color: '#333' },
   saveBtn: {
-    backgroundColor: 'rgba(47,118,89,0.85)',
+    backgroundColor: 'rgba(6,79,47,0.85)',
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 12,
@@ -239,9 +239,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.08)',
   },
   iconOptionSelected: {
-    backgroundColor: 'rgba(47,118,89,0.15)',
+    backgroundColor: 'rgba(6,79,47,0.15)',
     borderWidth: 2,
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   input: {
     fontFamily: fontMedium(),

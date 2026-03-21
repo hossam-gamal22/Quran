@@ -127,13 +127,13 @@ const DEFAULT_SETTINGS: AdsSettings = {
     ayat_universe: true,
     hadith_sifat: true,
   },
-  showAdOnAppOpen: false,
+  showAdOnAppOpen: true,
   interstitialMode: 'pages',
-  interstitialFrequency: 5,
-  interstitialTimeInterval: 3,
+  interstitialFrequency: 8,
+  interstitialTimeInterval: 5,
   interstitialSessionLimit: 2,
   delayFirstAd: true,
-  firstAdDelay: 30,
+  firstAdDelay: 60,
   updatedAt: new Date().toISOString(),
 };
 

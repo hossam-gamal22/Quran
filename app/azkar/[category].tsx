@@ -67,6 +67,7 @@ import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
 import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
@@ -151,6 +152,9 @@ export default function CategoryAzkarScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
+
+  // Block all ads during azkar session
+  useSacredContext('azkar_session');
 
   // الحالة
   const [allAzkar, setAllAzkar] = useState<Zikr[]>([]);
@@ -818,7 +822,7 @@ export default function CategoryAzkarScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <MaterialCommunityIcons name="alert-circle-outline" size={48} color={darkMode ? '#9CA3AF' : '#6B7280'} />
         <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16 }}>{t('azkar.noDataSection')}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#2f7659', borderRadius: 20 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#22C55E', borderRadius: 20 }}>
           <Text style={{ color: '#FFF', fontSize: 16 }}>{t('azkar.goBack')}</Text>
         </TouchableOpacity>
       </View>
@@ -829,7 +833,7 @@ export default function CategoryAzkarScreen() {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator size="large" color="#2f7659" />
+        <ActivityIndicator size="large" color="#22C55E" />
         <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12 }}>{t('common.loading')}</Text>
       </View>
     );
@@ -1672,7 +1676,6 @@ export default function CategoryAzkarScreen() {
 
         {/* مساحة آمنة */}
         <BannerAdComponent screen="azkar" />
-        <View style={{ height: insets.bottom }} />
       </BackgroundWrapper>
 
       {/* Toast overlay for loop-back */}

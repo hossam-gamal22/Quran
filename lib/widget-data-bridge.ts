@@ -82,19 +82,34 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
     if (Platform.OS === 'android') {
       try {
         const { requestWidgetUpdate } = require('react-native-android-widget');
-        // Update all widget types
-        await Promise.allSettled([
-          requestWidgetUpdate({ widgetName: 'PrayerTimesSmall' }),
-          requestWidgetUpdate({ widgetName: 'PrayerTimesMedium' }),
-          requestWidgetUpdate({ widgetName: 'DailyVerseSmall' }),
-          requestWidgetUpdate({ widgetName: 'DailyVerseMedium' }),
-          requestWidgetUpdate({ widgetName: 'DailyDhikrSmall' }),
-          requestWidgetUpdate({ widgetName: 'DailyDhikrMedium' }),
-          requestWidgetUpdate({ widgetName: 'AzkarProgressSmall' }),
-          requestWidgetUpdate({ widgetName: 'AzkarProgressMedium' }),
-          requestWidgetUpdate({ widgetName: 'HijriDateSmall' }),
-          requestWidgetUpdate({ widgetName: 'HijriDateMedium' }),
-        ]);
+        const { widgetTaskHandler } = require('./android-widget-task-handler');
+
+        // requestWidgetUpdate needs a renderWidget callback
+        const widgetNames = [
+          'PrayerTimesSmall', 'PrayerTimesMedium',
+          'DailyVerseSmall', 'DailyVerseMedium',
+          'DailyDhikrSmall', 'DailyDhikrMedium',
+          'AzkarProgressSmall', 'AzkarProgressMedium',
+          'HijriDateSmall', 'HijriDateMedium',
+        ];
+
+        await Promise.allSettled(
+          widgetNames.map((widgetName) =>
+            requestWidgetUpdate({
+              widgetName,
+              renderWidget: async (widgetInfo: any) => {
+                // Use a promise to capture the rendered widget
+                let rendered: any = null;
+                await widgetTaskHandler({
+                  widgetInfo,
+                  widgetAction: 'WIDGET_UPDATE',
+                  renderWidget: (component: any) => { rendered = component; },
+                });
+                return rendered;
+              },
+            })
+          )
+        );
       } catch {
         // react-native-android-widget not available (Expo Go / web)
       }

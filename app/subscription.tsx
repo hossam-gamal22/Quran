@@ -24,7 +24,7 @@ import { useTranslation } from '@/contexts/SettingsContext';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
-const ACCENT = '#0f987f';
+const ACCENT = '#22C55E';
 
 export default function SubscriptionScreen() {
   const colors = useColors();

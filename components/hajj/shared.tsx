@@ -29,9 +29,9 @@ function stripTashkeel(text: string): string {
 // الألوان المشتركة
 // ========================================
 
-export const ACCENT = '#2f7659';
-export const ACCENT_LIGHT = 'rgba(47,118,89,0.12)';
-export const ACCENT_BORDER = 'rgba(47,118,89,0.30)';
+export const ACCENT = '#22C55E';
+export const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
+export const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
 // Removed hardcoded ARABIC_NUMS — use localizeNumber() instead
 
@@ -134,7 +134,7 @@ export const DuaRitualCard: React.FC<{
                 style={[
                   s.duaBox,
                   {
-                    backgroundColor: isDarkMode ? 'rgba(47,118,89,0.10)' : 'rgba(47,118,89,0.06)',
+                    backgroundColor: isDarkMode ? 'rgba(6,79,47,0.10)' : 'rgba(6,79,47,0.06)',
                     borderColor: ACCENT_BORDER,
                   },
                 ]}
@@ -261,7 +261,7 @@ export const GlassSection: React.FC<{
                     style={[
                       s.duaBox,
                       {
-                        backgroundColor: isDarkMode ? 'rgba(47,118,89,0.10)' : 'rgba(47,118,89,0.06)',
+                        backgroundColor: isDarkMode ? 'rgba(6,79,47,0.10)' : 'rgba(6,79,47,0.06)',
                         borderColor: ACCENT_BORDER,
                       },
                     ]}

@@ -116,7 +116,7 @@ export default function DisplaySettingsScreen() {
                     {t(fs.labelKey)}
                   </Text>
                   {settings.display.fontSize === fs.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -180,14 +180,14 @@ export default function DisplaySettingsScreen() {
                     <MaterialCommunityIcons
                       name={layout.icon}
                       size={24}
-                      color={(settings.display.homeLayout || 'grid') === layout.value ? '#2f7659' : (isDarkMode ? '#999' : '#666')}
+                      color={(settings.display.homeLayout || 'grid') === layout.value ? '#22C55E' : (isDarkMode ? '#999' : '#666')}
                     />
                     <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
                       {t(layout.labelKey)}
                     </Text>
                   </View>
                   {(settings.display.homeLayout || 'grid') === layout.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -198,7 +198,7 @@ export default function DisplaySettingsScreen() {
           <Animated.View entering={FadeInDown.delay(275).duration(400)}>
             <View style={[styles.section, isDarkMode && styles.sectionDark, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, marginTop: 16 }]}>
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
-                <MaterialCommunityIcons name="information-outline" size={24} color="#2f7659" />
+                <MaterialCommunityIcons name="information-outline" size={24} color="#22C55E" />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
                     {t('settings.showSectionInfo')}
@@ -214,7 +214,7 @@ export default function DisplaySettingsScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateDisplay({ showSectionInfo: val });
                 }}
-                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
                 thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                 ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
               />
@@ -252,7 +252,7 @@ export default function DisplaySettingsScreen() {
                       />
                       {isSelected && (
                         <View style={styles.bgCheck}>
-                          <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#22C55E" />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -279,7 +279,7 @@ export default function DisplaySettingsScreen() {
                       />
                       {isSelected && (
                         <View style={styles.bgCheck}>
-                          <MaterialCommunityIcons name="check-circle" size={20} color="#2f7659" />
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#22C55E" />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -299,9 +299,9 @@ export default function DisplaySettingsScreen() {
               }}
               activeOpacity={0.7}
             >
-              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-                <MaterialCommunityIcons name="image-multiple" size={22} color="#0f987f" />
-                <Text style={[styles.optionLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.photoBackgrounds')}</Text>
+              <View style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <MaterialCommunityIcons name="image-multiple" size={22} color="#22C55E" />
+                <Text numberOfLines={1} style={[styles.optionLabel, isDarkMode && styles.textLight, { flex: 1, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.photoBackgrounds')}</Text>
               </View>
               <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={22} color={isDarkMode ? '#999' : '#666'} />
             </TouchableOpacity>
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(120,120,128,0.2)',
   },
   optionSelected: {
-    backgroundColor: 'rgba(47,118,89,0.08)',
+    backgroundColor: 'rgba(6,79,47,0.08)',
   },
   optionLabel: {
     fontFamily: fontMedium(),
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   bgThumbSelected: {
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   bgGridImage: {
     borderRadius: 10,

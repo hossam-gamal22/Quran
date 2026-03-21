@@ -1,5 +1,4 @@
 // lib/remote-config.ts
-import { initializeApp, getApps } from 'firebase/app';
 import { 
   getRemoteConfig, 
   fetchAndActivate, 
@@ -7,19 +6,7 @@ import {
   RemoteConfig
 } from 'firebase/remote-config';
 import { t } from '@/lib/i18n';
-
-// Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
-  authDomain: "rooh-almuslim.firebaseapp.com",
-  projectId: "rooh-almuslim",
-  storageBucket: "rooh-almuslim.firebasestorage.app",
-  messagingSenderId: "328160076358",
-  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
-};
-
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+import app from '@/config/firebase';
 
 let remoteConfig: RemoteConfig | null = null;
 

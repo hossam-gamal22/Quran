@@ -426,7 +426,7 @@ export default function AzkarScreen() {
                   setViewMode(newMode);
                   await AsyncStorage.setItem('azkar_view_mode', newMode);
                 }}
-                indicatorColor="#2f7659"
+                indicatorColor="#22C55E"
               />
             </View>
           </View>

@@ -194,11 +194,11 @@ export default function LocationScreen() {
             {locationInfo && (
               <Animated.View entering={FadeIn.delay(500).duration(500)} style={styles.locationCard}>
                 <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="city" size={24} color="#2f7659" />
+                  <MaterialCommunityIcons name="city" size={24} color="#22C55E" />
                   <Text style={styles.locationText}>{locationInfo.city}</Text>
                 </View>
                 <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="flag" size={24} color="#2f7659" />
+                  <MaterialCommunityIcons name="flag" size={24} color="#22C55E" />
                   <Text style={styles.locationText}>{locationInfo.country}</Text>
                 </View>
               </Animated.View>
@@ -227,7 +227,7 @@ export default function LocationScreen() {
 
             {/* ملاحظة */}
             <Animated.View entering={FadeInDown.delay(600).duration(500)} style={[styles.noteContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="shield-check" size={20} color="#2f7659" />
+              <MaterialCommunityIcons name="shield-check" size={20} color="#22C55E" />
               <Text style={styles.noteText}>
                 {tOnboarding('privacyNote')}
               </Text>
@@ -249,7 +249,7 @@ export default function LocationScreen() {
                 activeOpacity={0.8}
               >
                 <View
-                  style={[styles.continueButtonGradient, { backgroundColor: locationGranted ? 'rgba(47,118,89,0.85)' : 'rgba(102,102,102,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                  style={[styles.continueButtonGradient, { backgroundColor: locationGranted ? 'rgba(6,79,47,0.85)' : 'rgba(102,102,102,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 >
                   <Text style={styles.continueButtonText}>
                     {locationGranted ? tOnboarding('continue') : tOnboarding('continueWithoutLocation')}
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   headerTitle: {
     fontSize: 22,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   content: {
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   title: {
     fontSize: 26,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   locationCard: {
-    backgroundColor: 'rgba(47,118,89,0.2)',
+    backgroundColor: 'rgba(6,79,47,0.2)',
     borderRadius: 16,
     padding: 20,
     marginTop: 24,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   noteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(47,118,89,0.15)',
+    backgroundColor: 'rgba(6,79,47,0.15)',
     borderRadius: 12,
     padding: 14,
     marginTop: 24,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 15,
     fontFamily: fontMedium(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   continueButton: {
     borderRadius: 16,
@@ -470,6 +470,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
 });

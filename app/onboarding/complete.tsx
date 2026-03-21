@@ -93,7 +93,7 @@ export default function CompleteScreen() {
           fadeOut={true}
           explosionSpeed={300}
           fallSpeed={2500}
-          colors={['#2f7659', '#3a7ca5', '#f5a623', '#c17f59', '#5d4e8c']}
+          colors={['#22C55E', '#3a7ca5', '#f5a623', '#c17f59', '#5d4e8c']}
         />
 
         <SafeAreaView style={styles.safeArea}>
@@ -140,7 +140,7 @@ export default function CompleteScreen() {
                   <MaterialCommunityIcons
                     name={preferences.locationEnabled ? 'map-marker-check' : 'map-marker-off'}
                     size={20}
-                    color={preferences.locationEnabled ? '#2f7659' : '#999'}
+                    color={preferences.locationEnabled ? '#22C55E' : '#999'}
                   />
                 </View>
                 <Text style={styles.summaryLabel}>{tOnboarding('locationLabel')}</Text>
@@ -181,7 +181,7 @@ export default function CompleteScreen() {
               activeOpacity={0.8}
             >
               <View
-                style={[styles.startButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={[styles.startButtonGradient, { backgroundColor: 'rgba(6,79,47,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                 <Text style={styles.startButtonText}>{tOnboarding('startNow')}</Text>
                 <MaterialCommunityIcons name="rocket-launch" size={26} color="#fff" />
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 15,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   title: {
     fontSize: 32,

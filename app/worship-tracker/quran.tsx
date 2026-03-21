@@ -132,7 +132,7 @@ const JuzProgress: React.FC<JuzProgressProps> = ({
           {t('worship.juzNumber')} {juzNumber}
         </Text>
         {isComplete && (
-          <MaterialCommunityIcons name="check-circle" size={18} color="#2f7659" />
+          <MaterialCommunityIcons name="check-circle" size={18} color="#22C55E" />
         )}
       </View>
       <View style={[styles.juzProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -279,8 +279,6 @@ export default function QuranTrackerScreen() {
     <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
       />
       
       {/* الهيدر */}
@@ -365,7 +363,7 @@ export default function QuranTrackerScreen() {
             </View>
             {todayProgress >= 100 && (
               <View style={[styles.completedBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="check-circle" size={18} color="#2f7659" />
+                <MaterialCommunityIcons name="check-circle" size={18} color="#22C55E" />
                 <Text style={styles.completedText}>{t('worship.todayGoalComplete')}</Text>
               </View>
             )}
@@ -422,7 +420,7 @@ export default function QuranTrackerScreen() {
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
-                  <MaterialCommunityIcons name="check-decagram" size={24} color="#2f7659" />
+                  <MaterialCommunityIcons name="check-decagram" size={24} color="#22C55E" />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.khatmasCompleted ?? 0}
@@ -480,10 +478,10 @@ export default function QuranTrackerScreen() {
                     </View>
                     <View style={historyStyles.barCol}>
                       <View style={[historyStyles.barBg, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                        <View style={[historyStyles.barFill, { width: `${barWidth}%`, backgroundColor: barWidth >= 100 ? '#2f7659' : '#c17f59' }]} />
+                        <View style={[historyStyles.barFill, { width: `${barWidth}%`, backgroundColor: barWidth >= 100 ? '#22C55E' : '#c17f59' }]} />
                       </View>
                     </View>
-                    <Text style={[historyStyles.pagesText, { color: entry.pages >= dailyGoal ? '#2f7659' : colors.text }]}>
+                    <Text style={[historyStyles.pagesText, { color: entry.pages >= dailyGoal ? '#22C55E' : colors.text }]}>
                       {entry.pages} {t('worship.pages')}
                     </Text>
                   </View>
@@ -641,13 +639,13 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     padding: 10,
-    backgroundColor: '#2f765915',
+    backgroundColor: '#22C55E15',
     borderRadius: 10,
   },
   completedText: {
     fontSize: 13,
     fontFamily: fontMedium(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   // إضافة سريعة
   quickAddContainer: {
@@ -861,7 +859,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   juzProgressComplete: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   juzPages: {
     fontSize: 10,

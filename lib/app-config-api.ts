@@ -1,22 +1,8 @@
 // lib/app-config-api.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, getDoc, collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 import { APP_CONFIG } from '../constants/app';
-
-// Firebase Config
-const firebaseConfig = {
-  apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
-  authDomain: "rooh-almuslim.firebaseapp.com",
-  projectId: "rooh-almuslim",
-  storageBucket: "rooh-almuslim.firebasestorage.app",
-  messagingSenderId: "328160076358",
-  appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
-};
-
-// Initialize Firebase (مرة واحدة فقط)
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
 
 export interface WelcomeBannerConfig {
   enabled: boolean;
@@ -25,10 +11,13 @@ export interface WelcomeBannerConfig {
   titles?: MultiLangText;
   subtitles?: MultiLangText;
   icon: string;
+  customIconUrl?: string;
   color: string;
   route: string;
   displayMode?: 'text' | 'text_image' | 'image_only';
   backgroundImage?: string;
+  scheduledFrom?: string;   // ISO date — banner visible from this date
+  scheduledUntil?: string;  // ISO date — banner hidden after this date
 }
 
 export interface MultiLangText {

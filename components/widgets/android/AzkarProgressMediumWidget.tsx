@@ -4,7 +4,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
@@ -19,8 +19,8 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'row',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.azkar,
+        borderRadius: 20,
         padding: 12,
       }}
       clickAction="OPEN_APP"
@@ -44,7 +44,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginBottom: 3,
+            marginBottom: 4,
           }}
         >
           <TextWidget
@@ -55,7 +55,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             text="الصباح"
             style={{
               fontSize: 12,
-              color: azkar.morningCompleted ? COLORS.green : COLORS.grayLight,
+              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
               fontFamily: FONT.amiri,
             }}
           />
@@ -74,7 +74,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             text="المساء"
             style={{
               fontSize: 12,
-              color: azkar.eveningCompleted ? COLORS.green : COLORS.grayLight,
+              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
               fontFamily: FONT.amiri,
             }}
           />
@@ -86,7 +86,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
         style={{
           width: 1,
           height: 'match_parent',
-          backgroundColor: COLORS.grayDark,
+          backgroundColor: COLORS.divider,
           marginRight: 10,
         }}
       />
@@ -95,7 +95,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
       <FlexWidget
         style={{
           flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           flex: 1,
         }}
       >
@@ -103,8 +103,8 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           text="ذكر عشوائي"
           style={{
             fontSize: 10,
-            color: COLORS.gray,
-            fontFamily: FONT.amiri,
+            color: COLORS.tealLight,
+            fontFamily: FONT.amiriBold,
             marginBottom: 4,
           }}
         />
@@ -118,6 +118,16 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           }}
           maxLines={3}
           truncate="END"
+        />
+        <TextWidget
+          text={BRANDING.name}
+          style={{
+            fontSize: BRANDING.fontSize,
+            color: BRANDING.color,
+            fontFamily: FONT.amiri,
+            textAlign: 'right',
+            marginTop: 2,
+          }}
         />
       </FlexWidget>
     </FlexWidget>

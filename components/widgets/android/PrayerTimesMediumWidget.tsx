@@ -1,14 +1,13 @@
 // components/widgets/android/PrayerTimesMediumWidget.tsx
-// 4×2 widget: All 5 prayer times in a row, next highlighted green
+// 4×2 widget: All 5 prayer times in a row, next highlighted
 
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
-  // Filter out sunrise — show only 5 obligatory prayers
   const prayers = prayer.allPrayers.filter(p => p.name !== 'Sunrise');
 
   return (
@@ -17,9 +16,9 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
-        padding: 10,
+        backgroundGradient: GRADIENTS.prayer,
+        borderRadius: 20,
+        padding: 12,
       }}
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://prayer' }}
@@ -31,7 +30,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           width: 'match_parent',
-          marginBottom: 6,
+          marginBottom: 8,
           paddingHorizontal: 4,
         }}
       >
@@ -39,15 +38,15 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
           text="🕌 مواقيت الصلاة"
           style={{
             fontSize: 13,
-            color: COLORS.green,
+            color: COLORS.tealLight,
             fontFamily: FONT.amiriBold,
           }}
         />
         <TextWidget
-          text={prayer.hijriDate}
+          text={BRANDING.name}
           style={{
-            fontSize: 11,
-            color: COLORS.gray,
+            fontSize: BRANDING.fontSize,
+            color: BRANDING.color,
             fontFamily: FONT.amiri,
           }}
         />
@@ -73,8 +72,8 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isNext ? COLORS.green : '#00000000',
-                borderRadius: 10,
+                backgroundColor: isNext ? COLORS.teal : '#00000000',
+                borderRadius: 12,
                 paddingHorizontal: 8,
                 paddingVertical: 6,
               }}
@@ -83,7 +82,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 text={p.nameAr}
                 style={{
                   fontSize: 12,
-                  color: isNext ? COLORS.bg : isPassed ? COLORS.grayDark : COLORS.grayLight,
+                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.grayLight,
                   fontFamily: FONT.amiriBold,
                 }}
               />
@@ -91,7 +90,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 text={p.time}
                 style={{
                   fontSize: 13,
-                  color: isNext ? COLORS.bg : isPassed ? COLORS.grayDark : COLORS.white,
+                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.whiteAlt,
                   fontFamily: FONT.amiri,
                   marginTop: 2,
                 }}
@@ -100,6 +99,18 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
           );
         })}
       </FlexWidget>
+
+      {/* Hijri date footer */}
+      <TextWidget
+        text={prayer.hijriDate}
+        style={{
+          fontSize: 10,
+          color: COLORS.gray,
+          fontFamily: FONT.amiri,
+          textAlign: 'center',
+          marginTop: 4,
+        }}
+      />
     </FlexWidget>
   );
 }

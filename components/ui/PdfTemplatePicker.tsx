@@ -54,7 +54,7 @@ const PALETTES: Record<PdfTemplate, {
 }> = {
   emerald: {
     pageBg: '#0a1f1a',
-    headerGrad: ['#052e23', '#0f987f'],
+    headerGrad: ['#052e23', '#22C55E'],
     sectionBg1: 'rgba(15,152,127,0.15)',
     sectionBorder1: 'rgba(15,152,127,0.3)',
     sectionTitle1: '#4eecc4',
@@ -66,7 +66,7 @@ const PALETTES: Record<PdfTemplate, {
     duaText: '#f0ece0',
     textColor: 'rgba(232,240,237,0.7)',
     accentLine: '#c9a84c',
-    accent: '#0f987f',
+    accent: '#22C55E',
   },
   royal: {
     pageBg: '#0f0e1e',
@@ -413,7 +413,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                       styles.card,
                       {
                         borderColor: selected.startsWith('custom_bg:')
-                          ? '#0f987f'
+                          ? '#22C55E'
                           : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                         borderWidth: selected.startsWith('custom_bg:') ? 2.5 : 1,
                         backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#fafafa',
@@ -434,7 +434,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                       <Text style={[styles.cardDesc, { color: colors.textLight }]}>{t('pdfExport.bgFromApp')}</Text>
                     </View>
                     {selected.startsWith('custom_bg:') && (
-                      <View style={[styles.check, { backgroundColor: '#0f987f' }, isRTL ? { right: 6, left: undefined } : null]}>
+                      <View style={[styles.check, { backgroundColor: '#22C55E' }, isRTL ? { right: 6, left: undefined } : null]}>
                         <MaterialCommunityIcons name="check" size={14} color="#fff" />
                       </View>
                     )}
@@ -459,7 +459,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                             style={[
                               styles.bgThumb,
                               {
-                                borderColor: isActive ? '#0f987f' : 'transparent',
+                                borderColor: isActive ? '#22C55E' : 'transparent',
                                 borderWidth: isActive ? 2.5 : 0,
                               },
                               isRTL && { transform: [{ scaleX: -1 }] },
@@ -468,7 +468,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                             <Image source={bg.source} style={styles.bgThumbImage} />
                             <Text style={[styles.bgThumbLabel, { color: colors.text }]}>{bg.name_ar}</Text>
                             {isActive && (
-                              <View style={[styles.bgCheck, { backgroundColor: '#0f987f' }, isRTL ? { right: 4, left: undefined } : null]}>
+                              <View style={[styles.bgCheck, { backgroundColor: '#22C55E' }, isRTL ? { right: 4, left: undefined } : null]}>
                                 <MaterialCommunityIcons name="check" size={10} color="#fff" />
                               </View>
                             )}
@@ -536,11 +536,11 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                 {
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                   backgroundColor: (() => {
-                    if (selected.startsWith('custom_bg:')) return '#0f987f';
+                    if (selected.startsWith('custom_bg:')) return '#22C55E';
                     const palette = PALETTES[selected as keyof typeof PALETTES];
                     if (palette) return palette.accent;
                     const ct = customTemplates.find(t => t.id === selected);
-                    return ct?.headerGradTo || '#0f987f';
+                    return ct?.headerGradTo || '#22C55E';
                   })(),
                   opacity: exporting || (selected.startsWith('custom_bg:') && !selectedBg) ? 0.5 : 1,
                 },

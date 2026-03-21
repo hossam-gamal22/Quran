@@ -65,7 +65,7 @@ const DEFAULT_ONBOARDING: OnboardingConfig = {
   description: 'تطبيق شامل للأذكار والقرآن الكريم وأوقات الصلاة',
   features: [
     { icon: 'book-open-variant', label: 'القرآن الكريم', color: '#3a7ca5' },
-    { icon: 'hands-pray', label: 'الأذكار والأدعية', color: '#2f7659' },
+    { icon: 'hands-pray', label: 'الأذكار والأدعية', color: '#22C55E' },
     { icon: 'mosque', label: 'أوقات الصلاة', color: '#c17f59' },
     { icon: 'compass', label: 'اتجاه القبلة', color: '#5d4e8c' },
   ],

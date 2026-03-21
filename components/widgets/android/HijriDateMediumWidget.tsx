@@ -4,7 +4,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
@@ -21,12 +21,8 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'row',
-        backgroundGradient: {
-          from: '#1a1a0a',
-          to: '#0a0f0d',
-          orientation: 'LEFT_RIGHT',
-        },
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.hijri,
+        borderRadius: 20,
         padding: 14,
       }}
       clickAction="OPEN_APP"
@@ -60,7 +56,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
         style={{
           width: 1,
           height: 'match_parent',
-          backgroundColor: COLORS.grayDark,
+          backgroundColor: COLORS.divider,
           marginHorizontal: 10,
         }}
       />
@@ -69,7 +65,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
       <FlexWidget
         style={{
           flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           flex: 1,
         }}
       >
@@ -77,39 +73,48 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
           text="التقويم الهجري"
           style={{
             fontSize: 11,
-            color: COLORS.green,
-            fontFamily: FONT.amiriBold,
-            marginBottom: 4,
-          }}
-        />
-        <TextWidget
-          text={monthYear}
-          style={{
-            fontSize: 16,
-            color: COLORS.white,
+            color: COLORS.tealLight,
             fontFamily: FONT.amiriBold,
           }}
         />
-        <TextWidget
-          text={gregorian}
-          style={{
-            fontSize: 13,
-            color: COLORS.gray,
-            fontFamily: FONT.amiri,
-            marginTop: 4,
-          }}
-        />
-        {prayer.location ? (
+        <FlexWidget style={{ flexDirection: 'column' }}>
           <TextWidget
-            text={`📍 ${prayer.location}`}
+            text={monthYear}
             style={{
-              fontSize: 10,
-              color: COLORS.grayDark,
+              fontSize: 16,
+              color: COLORS.white,
+              fontFamily: FONT.amiriBold,
+            }}
+          />
+          <TextWidget
+            text={gregorian}
+            style={{
+              fontSize: 13,
+              color: COLORS.gray,
               fontFamily: FONT.amiri,
               marginTop: 2,
             }}
           />
-        ) : null}
+          {prayer.location ? (
+            <TextWidget
+              text={`📍 ${prayer.location}`}
+              style={{
+                fontSize: 10,
+                color: COLORS.grayDark,
+                fontFamily: FONT.amiri,
+                marginTop: 2,
+              }}
+            />
+          ) : null}
+        </FlexWidget>
+        <TextWidget
+          text={BRANDING.name}
+          style={{
+            fontSize: BRANDING.fontSize,
+            color: BRANDING.color,
+            fontFamily: FONT.amiri,
+          }}
+        />
       </FlexWidget>
     </FlexWidget>
   );

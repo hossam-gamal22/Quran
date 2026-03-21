@@ -54,7 +54,7 @@ export function MissingTranslationCard({ pageName }: Props) {
         </Text>
       </View>
       <TouchableOpacity onPress={handlePress} style={[styles.ctaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <MaterialCommunityIcons name="email-outline" size={14} color="#0f987f" />
+        <MaterialCommunityIcons name="email-outline" size={14} color="#22C55E" />
         <Text style={[styles.cta, { textAlign: isRTL ? 'right' : 'left' }]}>
           {msg.cta}
         </Text>
@@ -91,6 +91,6 @@ const styles = StyleSheet.create({
   cta: {
     fontSize: 13,
     fontFamily: fontSemiBold(),
-    color: '#0f987f',
+    color: '#22C55E',
   },
 });

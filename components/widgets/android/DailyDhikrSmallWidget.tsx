@@ -4,7 +4,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
   const { dhikr } = data;
@@ -18,10 +18,10 @@ export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.dhikr,
+        borderRadius: 20,
         padding: 12,
       }}
       clickAction="OPEN_APP"
@@ -38,7 +38,7 @@ export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
           color: COLORS.white,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 6,
+          marginTop: 4,
         }}
         maxLines={3}
         truncate="END"
@@ -48,12 +48,20 @@ export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
           text={`${dhikr.count}×`}
           style={{
             fontSize: 12,
-            color: COLORS.green,
+            color: COLORS.tealLight,
             fontFamily: FONT.amiriBold,
-            marginTop: 4,
+            marginTop: 2,
           }}
         />
       )}
+      <TextWidget
+        text={BRANDING.name}
+        style={{
+          fontSize: BRANDING.fontSize,
+          color: BRANDING.color,
+          fontFamily: FONT.amiri,
+        }}
+      />
     </FlexWidget>
   );
 }

@@ -127,11 +127,15 @@ export async function fetchAdminCategories(): Promise<PhotoCategory[]> {
     const categories: PhotoCategory[] = snap.docs
       .map(d => d.data() as AdminCategoryDoc)
       .filter(c => c.is_active)
-      .map(c => ({
-        id: c.id,
-        name_ar: c.name_ar,
-        searchTerm: '', // not needed for admin photos
-      }));
+      .map(c => {
+        // Use fallback searchTerm so Pexels API works when no admin photos exist
+        const fallback = FALLBACK_CATEGORIES.find(fc => fc.id === c.id);
+        return {
+          id: c.id,
+          name_ar: c.name_ar,
+          searchTerm: fallback?.searchTerm || `${c.name_ar} wallpaper no people`,
+        };
+      });
 
     if (categories.length > 0) {
       _categories = categories;
@@ -226,7 +230,11 @@ export async function fetchCategoryPhotos(category: PhotoCategory): Promise<Pexe
   }
 
   // 2. Fallback: fetch from Pexels API directly
-  if (!category.searchTerm) return [];
+  // Resolve searchTerm from fallback categories if cached category has empty searchTerm
+  const searchTerm = category.searchTerm
+    || FALLBACK_CATEGORIES.find(fc => fc.id === category.id)?.searchTerm
+    || '';
+  if (!searchTerm) return [];
 
   const cacheKey = `${CACHE_KEY}_${category.id}`;
 
@@ -246,7 +254,7 @@ export async function fetchCategoryPhotos(category: PhotoCategory): Promise<Pexe
   // Fetch from Pexels API
   try {
     const { searchPhotos } = await import('@/lib/api/pexels');
-    const result = await searchPhotos(category.searchTerm, 1, 15, 'portrait');
+    const result = await searchPhotos(searchTerm, 1, 15, 'portrait');
     // Filter out photos with people (check alt text)
     const photos: PexelsPhoto[] = result.photos
       .filter((p: any) => {

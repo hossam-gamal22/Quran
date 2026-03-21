@@ -61,7 +61,7 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
     : '00:47:00';
 
   const textColor = isDarkMode ? '#e0e0e0' : '#081827';
-  const mutedColor = isDarkMode ? '#aaa' : 'rgba(8,24,39,0.6)';
+  const mutedColor = isDarkMode ? '#C8C8CC' : 'rgba(8,24,39,0.6)';
 
   // Build schedule from prayerTimes
   const schedule = PRAYER_KEYS.map((key) => ({
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 8,
     fontFamily: fontSemiBold(),
-    color: '#0f987f',
+    color: '#22C55E',
     marginTop: 3,
   },
   currentBar: {

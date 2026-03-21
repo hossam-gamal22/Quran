@@ -91,8 +91,8 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   const pad = (n: number) => String(n).padStart(2, '0');
 
   const textColor = isDarkMode ? '#fff' : '#1a1a2e';
-  const mutedColor = isDarkMode ? '#666' : '#aaa';
-  const accentColor = '#2f7659';
+  const mutedColor = isDarkMode ? '#A8A8AD' : '#8E8E93';
+  const accentColor = '#22C55E';
 
   return (
     <View style={styles.wrapper}>

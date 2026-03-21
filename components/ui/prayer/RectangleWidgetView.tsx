@@ -66,7 +66,7 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   const bgColor = isDarkMode ? 'rgba(30,30,32,0.09)' : 'rgba(0,0,0,0.09)';
   const countdownColor = isDarkMode ? '#e0e0e0' : '#081827';
   const labelColor = isDarkMode ? '#aaa' : '#081827';
-  const greenColor = '#0f987f';
+  const greenColor = '#22C55E';
 
   return (
     <View style={styles.wrapper}>

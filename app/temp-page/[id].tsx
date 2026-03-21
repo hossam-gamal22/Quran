@@ -33,7 +33,7 @@ export default function TempPageScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#0f987f" />
+          <ActivityIndicator size="large" color="#22C55E" />
         </View>
       </SafeAreaView>
     );
@@ -64,7 +64,7 @@ export default function TempPageScreen() {
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#0f987f" />
+            <ActivityIndicator size="large" color="#22C55E" />
           </View>
         )}
       />

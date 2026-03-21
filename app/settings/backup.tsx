@@ -510,7 +510,7 @@ export default function BackupScreen() {
         {/* Status Card */}
         <Animated.View entering={FadeInDown.delay(50).duration(500)}>
           <View
-            style={[styles.statusCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(47,118,89,0.85)' }]}
+            style={[styles.statusCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(6,79,47,0.85)' }]}
           >
             <View style={styles.statusIcon}>
               <MaterialCommunityIcons
@@ -548,7 +548,7 @@ export default function BackupScreen() {
           <ActionCard
             icon="cloud-upload"
             iconColor="#fff"
-            gradientColors={['#2f7659', '#1d4a3a']}
+            gradientColors={['#22C55E', '#1d4a3a']}
             title={t('backup.createBackup')}
             subtitle={t('backup.createBackupDesc')}
             onPress={createBackup}

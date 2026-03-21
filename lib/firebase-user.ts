@@ -9,13 +9,15 @@ import {
   updateDoc, 
   getDoc, 
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  increment 
 } from 'firebase/firestore';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Localization from 'expo-localization';
+import Constants from 'expo-constants';
 
 // ==================== الثوابت ====================
 
@@ -38,6 +40,7 @@ export interface UserData {
   country: string;
   timezone: string;
   fcmToken: string;
+  installSource: string;
   isActive: boolean;
   isPremium: boolean;
   createdAt: Timestamp | null;
@@ -103,32 +106,63 @@ export const getFCMToken = async (): Promise<string> => {
   }
 };
 
+/**
+ * Detect where the app was installed from
+ */
+const detectInstallSource = async (): Promise<string> => {
+  try {
+    if (Platform.OS === 'android') {
+      try {
+        const installer = await NativeModules?.RNGetInstallerPackageName?.getInstallerPackageName?.();
+        if (installer === 'com.android.vending') return 'play_store';
+        if (installer === 'com.google.android.packageinstaller' || installer === 'com.android.packageinstaller') return 'external_apk';
+        if (installer === 'com.samsung.android.packageinstaller') return 'external_apk';
+      } catch {}
+      if (Constants.appOwnership === 'expo') return 'expo_go';
+      if (Constants.appOwnership === 'standalone' || !Constants.appOwnership) return 'play_store';
+      return 'unknown';
+    }
+    if (Platform.OS === 'ios') {
+      if (Constants.appOwnership === 'expo') return 'expo_go';
+      if (Constants.appOwnership === 'standalone' || !Constants.appOwnership) return 'app_store';
+      return 'unknown';
+    }
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
 export const registerUser = async (): Promise<{ success: boolean; userId: string }> => {
   try {
     const userId = await getUserId();
     const userRef = doc(db, 'users', userId);
     const userDoc = await getDoc(userRef);
     const fcmToken = await getFCMToken();
+    const installSource = await detectInstallSource();
     
     const locales = Localization.getLocales();
+    const appVersion = Constants.expoConfig?.version || '1.0.0';
     const userData: Partial<UserData> = {
       id: userId,
       platform: Platform.OS as 'ios' | 'android' | 'web',
       deviceName: Device.deviceName || 'Unknown Device',
       deviceBrand: Device.brand || 'Unknown',
       osVersion: Device.osVersion || 'Unknown',
-      appVersion: '1.0.0',
+      appVersion,
       language: locales[0]?.languageCode || 'ar',
       country: locales[0]?.regionCode || 'SA',
       timezone: Localization.getCalendars()[0]?.timeZone || 'Asia/Riyadh',
       fcmToken,
       isActive: true,
       isPremium: false,
+      installSource,
       updatedAt: serverTimestamp() as any,
       lastActive: serverTimestamp() as any,
     };
     
     if (!userDoc.exists()) {
+      // New user — create doc and track install
       await setDoc(userRef, {
         ...userData,
         createdAt: serverTimestamp(),
@@ -140,9 +174,29 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
         },
       });
       await AsyncStorage.setItem(STORAGE_KEYS.FIRST_OPEN, 'false');
-      console.log('✅ New user registered successfully:', userId);
+      
+      // Track install in global stats
+      try {
+        const statsRef = doc(db, 'stats', 'global');
+        const installField = `installs_${installSource}`;
+        await updateDoc(statsRef, {
+          totalInstalls: increment(1),
+          [installField]: increment(1),
+          [`installs_${Platform.OS}`]: increment(1),
+          lastInstall: serverTimestamp(),
+        });
+      } catch {
+        // stats doc might not exist yet
+      }
+      
+      console.log('✅ New user registered:', userId, 'from:', installSource);
     } else {
-      await updateDoc(userRef, userData);
+      // Existing user — update session data
+      await updateDoc(userRef, {
+        ...userData,
+        // Preserve installSource if already set (don't override on subsequent sessions)
+        ...(userDoc.data()?.installSource ? {} : { installSource }),
+      });
       console.log('✅ User data updated:', userId);
     }
     

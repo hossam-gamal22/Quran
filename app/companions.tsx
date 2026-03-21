@@ -43,9 +43,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // الألوان
 // ========================================
 
-const ACCENT = '#2f7659';
-const ACCENT_LIGHT = 'rgba(47,118,89,0.12)';
-const ACCENT_BORDER = 'rgba(47,118,89,0.30)';
+const ACCENT = '#22C55E';
+const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
+const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
 // ========================================
 // أنواع البيانات
@@ -648,7 +648,7 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
       />
       <View style={[s.cardContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[s.cardAvatar, { backgroundColor: ACCENT_LIGHT }]}>
-          <MaterialCommunityIcons name="account" size={24} color={ACCENT} />
+          <MaterialCommunityIcons name="account" size={24} color="#fff" />
         </View>
         <View style={s.cardTextWrap}>
           <Text style={[s.cardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
@@ -695,7 +695,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
           onPress={onBack}
           style={[
             s.detailBackBtn,
-            { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)' },
+            { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
           ]}
         >
           <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={26} color={colors.text} />
@@ -708,7 +708,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             onPress={onToggleFav}
             style={[
               s.detailShareBtn,
-              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)' },
+              { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
             ]}
           >
             <MaterialCommunityIcons name={isFav ? 'heart' : 'heart-outline'} size={20} color={isFav ? '#ef4444' : colors.text} />
@@ -717,7 +717,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
             onPress={onShare}
             style={[
               s.detailShareBtn,
-              { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)' },
+              { backgroundColor: 'rgba(34, 197, 94, 0.15)' },
             ]}
           >
             <MaterialCommunityIcons name="share-variant" size={20} color={colors.text} />
@@ -742,14 +742,14 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
               s.detailHeroOverlay,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(47,118,89,0.15)'
-                  : 'rgba(47,118,89,0.08)',
+                  ? 'rgba(6,79,47,0.15)'
+                  : 'rgba(6,79,47,0.08)',
               },
             ]}
           />
           <View style={s.detailHeroContent}>
             <View style={[s.detailAvatarLarge, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="account" size={36} color={ACCENT} />
+              <MaterialCommunityIcons name="account" size={36} color="#fff" />
             </View>
             <Text style={[s.detailName, { color: colors.text }]}>
               {getCompanionName(companion)}
@@ -777,7 +777,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="book-open-variant" size={18} color={ACCENT} />
+              <MaterialCommunityIcons name="book-open-variant" size={18} color="#fff" />
             </View>
             <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {t('companions.story')}
@@ -794,8 +794,8 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 s.detailGlassOverlay,
                 {
                   backgroundColor: isDarkMode
-                    ? 'rgba(47,118,89,0.08)'
-                    : 'rgba(47,118,89,0.04)',
+                    ? 'rgba(6,79,47,0.08)'
+                    : 'rgba(6,79,47,0.04)',
                   borderColor: isDarkMode
                     ? 'rgba(255,255,255,0.08)'
                     : 'rgba(0,0,0,0.04)',
@@ -840,7 +840,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="star-four-points" size={18} color={ACCENT} />
+              <MaterialCommunityIcons name="star-four-points" size={18} color="#fff" />
             </View>
             <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {t('companions.virtues')}
@@ -857,8 +857,8 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 s.detailGlassOverlay,
                 {
                   backgroundColor: isDarkMode
-                    ? 'rgba(47,118,89,0.08)'
-                    : 'rgba(47,118,89,0.04)',
+                    ? 'rgba(6,79,47,0.08)'
+                    : 'rgba(6,79,47,0.04)',
                   borderColor: isDarkMode
                     ? 'rgba(255,255,255,0.08)'
                     : 'rgba(0,0,0,0.04)',
@@ -870,7 +870,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 const lang = getLanguage();
                 return (
                   <View key={idx} style={[s.virtueRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <MaterialCommunityIcons name="star-four-points" size={14} color={ACCENT} style={s.virtueIcon} />
+                    <MaterialCommunityIcons name="star-four-points" size={14} color="#fff" style={s.virtueIcon} />
                     {lang === 'ar' || lang === 'en' ? (
                       <Text style={[s.virtueText, { color: colors.text, textAlign: lang === 'ar' ? 'right' : 'left', writingDirection: lang === 'ar' ? 'rtl' : 'ltr' }]}>
                         {virtue}
@@ -899,8 +899,8 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
               s.detailFooterOverlay,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(47,118,89,0.12)'
-                  : 'rgba(47,118,89,0.06)',
+                  ? 'rgba(6,79,47,0.12)'
+                  : 'rgba(6,79,47,0.06)',
               },
             ]}
           />
@@ -1058,8 +1058,8 @@ export default function CompanionsScreen() {
     <ScreenContainer edges={['top', 'left', 'right']} screenKey="companions">
       {/* Header */}
       <UniversalHeader
-        backStyle={{ backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)', borderRadius: 14 }}
-        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)' } }]}
+        backStyle={{ backgroundColor: 'rgba(34, 197, 94, 0.15)', borderRadius: 14 }}
+        rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('companions.title')}</Text>
@@ -1079,13 +1079,13 @@ export default function CompanionsScreen() {
             s.heroOverlay,
             {
               backgroundColor: isDarkMode
-                ? 'rgba(47,118,89,0.15)'
-                : 'rgba(47,118,89,0.08)',
+                ? 'rgba(6,79,47,0.15)'
+                : 'rgba(6,79,47,0.08)',
             },
           ]}
         />
         <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="account-group" size={36} color={ACCENT} />
+          <MaterialCommunityIcons name="account-group" size={36} color="#fff" />
           <View style={s.heroTextWrap}>
             <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
               {t('companions.heroTitle')}
@@ -1144,13 +1144,13 @@ export default function CompanionsScreen() {
               s.footerOverlay,
               {
                 backgroundColor: isDarkMode
-                  ? 'rgba(47,118,89,0.12)'
-                  : 'rgba(47,118,89,0.06)',
+                  ? 'rgba(6,79,47,0.12)'
+                  : 'rgba(6,79,47,0.06)',
               },
             ]}
           />
           <View style={s.footerContent}>
-            <MaterialCommunityIcons name="star-crescent" size={24} color={ACCENT} />
+            <MaterialCommunityIcons name="star-crescent" size={24} color="#fff" />
             <Text style={[s.footerText, { color: colors.text }]}>
               {t('companions.footerDua')}
             </Text>

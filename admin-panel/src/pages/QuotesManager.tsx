@@ -2,6 +2,8 @@
 // إدارة الحكم والأقوال - روح المسلم
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
 import { Plus, Search, Edit2, Trash2, Save, X, Download, RefreshCw, Copy, CopyPlus } from 'lucide-react';
 
 // ========================================
@@ -76,8 +78,33 @@ const QuotesManager: React.FC = () => {
   // ========================================
 
   useEffect(() => {
-    loadQuotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const unsub = onSnapshot(query(collection(db, 'quotes')), (snap) => {
+      const loaded: IslamicQuote[] = [];
+      snap.forEach(d => {
+        const data = d.data();
+        loaded.push({
+          id: d.id,
+          arabic: data.arabic || '',
+          translation: data.translation || '',
+          author: data.author || '',
+          source: data.source || '',
+          category: data.category || 'wisdom',
+          isActive: data.isActive !== false,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : (data.updatedAt || new Date().toISOString()),
+        });
+      });
+      loaded.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setQuotesList(loaded);
+      setQuotesData({
+        version: '1.0.0',
+        lastUpdate: new Date().toISOString(),
+        totalCount: loaded.length,
+        quotes: loaded,
+      });
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => unsub();
   }, []);
 
   useEffect(() => {
@@ -103,49 +130,6 @@ const QuotesManager: React.FC = () => {
 
     setFilteredList(filtered);
   }, [quotesList, selectedCategory, searchQuery]);
-
-  const loadQuotes = async () => {
-    setLoading(true);
-    try {
-      // Simulated data - in production, fetch from Firebase
-      const mockQuotes: IslamicQuote[] = [
-        {
-          id: '1',
-          arabic: 'قيمة كل امرئ ما يحسنه',
-          translation: 'The value of a person is what he excels at.',
-          author: 'علي بن أبي طالب رضي الله عنه',
-          category: 'companions',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          arabic: 'العلم بلا عمل كالشجر بلا ثمر',
-          translation: 'Knowledge without action is like a tree without fruit.',
-          author: 'الإمام الشافعي',
-          category: 'scholars',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        },
-      ];
-
-      setQuotesList(mockQuotes);
-      setQuotesData({
-        version: '1.0.0',
-        lastUpdate: new Date().toISOString(),
-        totalCount: mockQuotes.length,
-        quotes: mockQuotes,
-      });
-      showNotification('تم تحميل الأقوال بنجاح', 'success');
-    } catch (error) {
-      console.error('Error loading quotes:', error);
-      showNotification('فشل في تحميل الأقوال', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const showNotification = (message: string, type: 'success' | 'error') => {
     setNotification({ show: true, message, type });
@@ -182,28 +166,36 @@ const QuotesManager: React.FC = () => {
     }
 
     try {
-      if (editingQuote) {
-        // Update existing quote
-        const updatedQuotes = quotesList.map(q =>
-          q.id === editingQuote.id
-            ? { ...q, ...formData, updatedAt: new Date().toISOString() }
-            : q
-        );
-        setQuotesList(updatedQuotes);
+      if (editingQuote && editingQuote.id) {
+        // Update existing quote in Firestore
+        await setDoc(doc(db, 'quotes', editingQuote.id), {
+          arabic: formData.arabic,
+          translation: formData.translation,
+          author: formData.author,
+          source: formData.source || '',
+          category: formData.category || 'wisdom',
+          isActive: formData.isActive !== false,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
         showNotification('تم تحديث القول بنجاح', 'success');
       } else {
-        // Add new quote
-        const newQuote: IslamicQuote = {
-          ...formData as IslamicQuote,
-          id: Date.now().toString(),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        setQuotesList([...quotesList, newQuote]);
+        // Add new quote to Firestore
+        const newId = `quote_${Date.now()}`;
+        await setDoc(doc(db, 'quotes', newId), {
+          arabic: formData.arabic,
+          translation: formData.translation,
+          author: formData.author,
+          source: formData.source || '',
+          category: formData.category || 'wisdom',
+          isActive: formData.isActive !== false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
         showNotification('تم إضافة القول بنجاح', 'success');
       }
       setShowAddModal(false);
-    } catch {
+    } catch (e) {
+      console.error('Error saving quote:', e);
       showNotification('فشل في حفظ القول', 'error');
     }
   };
@@ -212,18 +204,22 @@ const QuotesManager: React.FC = () => {
     if (!confirm('هل أنت متأكد من حذف هذا القول؟')) return;
 
     try {
-      setQuotesList(quotesList.filter(q => q.id !== quoteId));
+      await deleteDoc(doc(db, 'quotes', quoteId));
       showNotification('تم حذف القول بنجاح', 'success');
-    } catch {
+    } catch (e) {
+      console.error('Error deleting quote:', e);
       showNotification('فشل في حذف القول', 'error');
     }
   };
 
   const handleToggleActive = async (quoteId: string) => {
-    const updatedQuotes = quotesList.map(q =>
-      q.id === quoteId ? { ...q, isActive: !q.isActive, updatedAt: new Date().toISOString() } : q
-    );
-    setQuotesList(updatedQuotes);
+    const quote = quotesList.find(q => q.id === quoteId);
+    if (!quote) return;
+    try {
+      await setDoc(doc(db, 'quotes', quoteId), { isActive: !quote.isActive, updatedAt: serverTimestamp() }, { merge: true });
+    } catch (e) {
+      console.error('Error toggling quote:', e);
+    }
   };
 
   const handleExportQuotes = () => {
@@ -264,16 +260,9 @@ const QuotesManager: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">إدارة الحكم والأقوال</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">إضافة وتعديل وحذف الأقوال والحكم الإسلامية</p>
+            <p className="text-gray-500 dark:text-gray-400 mt-1">إضافة وتعديل وحذف الأقوال والحكم الإسلامية — بيانات حية من Firestore</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={loadQuotes}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              تحديث
-            </button>
             <button
               onClick={handleExportQuotes}
               className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"

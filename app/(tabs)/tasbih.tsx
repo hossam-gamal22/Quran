@@ -32,6 +32,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import BackgroundWrapper from '../../components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { useColors } from '@/hooks/use-colors';
+import { useSacredContext } from '@/hooks/use-sacred-context';
 import { getLanguage, t } from '@/lib/i18n';
 import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
 import { copyToClipboard } from '../../lib/clipboard';
@@ -219,7 +220,7 @@ const RING_SIZE = SCREEN_WIDTH * 0.72;
 const RING_STROKE = 14;
 const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
-const GREEN = '#2f7659';
+const GREEN = '#22C55E';
 const GREEN_LIGHT = '#34D399';
 
 const STORAGE_KEYS = {
@@ -247,6 +248,9 @@ export default function TasbihScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+
+  // Block all ads during tasbih counting
+  useSacredContext('tasbih_active');
 
   const C = {
     bg: isDarkMode ? '#0f1117' : '#f5f5f5',
@@ -646,13 +650,13 @@ export default function TasbihScreen() {
             <Text style={[s.headerTitle, { color: C.text }, colors.textShadowStyle]}>{t('tabs.tasbih')}</Text>
             <SectionInfoButton sectionKey="tasbih" />
           </View>
-          {/* Left side in RTL: settings + add custom */}
+          {/* Left side in RTL: add custom + settings */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
-            <TouchableOpacity onPress={() => setShowSettings(true)} style={s.headerBtn}>
-              <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
-            </TouchableOpacity>
             <TouchableOpacity onPress={() => setShowCustomModal(true)} style={s.headerBtn}>
               <MaterialCommunityIcons name="plus" size={22} color={C.text} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/settings/custom-dhikr')} style={s.headerBtn}>
+              <MaterialCommunityIcons name="cog-outline" size={22} color={C.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -785,7 +789,7 @@ export default function TasbihScreen() {
         <View style={s.counterArea}>
           <TouchableOpacity activeOpacity={0.9} onPress={handlePress}>
             <Animated.View style={[s.ringContainer, tapAnimStyle, {
-              backgroundColor: isDarkMode ? 'rgba(47,118,89,0.04)' : 'rgba(47,118,89,0.03)',
+              backgroundColor: isDarkMode ? 'rgba(6,79,47,0.04)' : 'rgba(6,79,47,0.03)',
               borderRadius: (RING_SIZE + 20) / 2,
               ...Platform.select({
                 ios: { shadowColor: GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.15, shadowRadius: 24 },
@@ -850,7 +854,7 @@ export default function TasbihScreen() {
           {/* Reset button */}
           <TouchableOpacity
             style={[s.resetBtn, {
-              backgroundColor: count > 0 ? (isDarkMode ? 'rgba(47,118,89,0.12)' : 'rgba(47,118,89,0.08)') : (isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
+              backgroundColor: count > 0 ? (isDarkMode ? 'rgba(6,79,47,0.12)' : 'rgba(6,79,47,0.08)') : (isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)'),
               borderColor: count > 0 ? GREEN + '30' : C.cardBorder,
               flexDirection: isRTL ? 'row-reverse' : 'row',
             }]}
@@ -873,7 +877,7 @@ export default function TasbihScreen() {
       {/* Reset toast */}
       {resetToastVisible && (
         <View style={s.toastContainer}>
-          <View style={[s.toast, { backgroundColor: isDarkMode ? 'rgba(47,118,89,0.95)' : 'rgba(47,118,89,0.9)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[s.toast, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.95)' : 'rgba(6,79,47,0.9)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="check-circle" size={18} color="#fff" />
             <Text style={s.toastText}>{t('tasbih.dailyResetToast')}</Text>
           </View>
@@ -886,7 +890,7 @@ export default function TasbihScreen() {
           <View style={[s.modalSheet, { backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.selectDhikr')}</Text>
-              <TouchableOpacity onPress={() => setShowTasbihList(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+              <TouchableOpacity onPress={() => setShowTasbihList(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
                 <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
@@ -896,7 +900,7 @@ export default function TasbihScreen() {
               {PRESET_TASBIHAT.map((item) => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[s.listItem, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.06)' }, selectedTasbih.id === item.id && { borderColor: GREEN, borderWidth: 2 }]}
+                  style={[s.listItem, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(120,120,128,0.06)' }, selectedTasbih.id === item.id && { borderColor: GREEN, borderWidth: 2 }]}
                   onPress={() => selectTasbih(item)}
                 >
                   <View style={{ flex: 1 }}>
@@ -917,7 +921,7 @@ export default function TasbihScreen() {
                   {customTasbihat.map((item) => (
                     <TouchableOpacity
                       key={item.id}
-                      style={[s.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(120,120,128,0.12)' : 'rgba(120,120,128,0.06)' }]}
+                      style={[s.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(120,120,128,0.06)' }]}
                       onPress={() => selectTasbih(item)}
                       onLongPress={() => deleteCustomTasbih(item.id)}
                     >
@@ -955,13 +959,13 @@ export default function TasbihScreen() {
           }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.addCustomDhikr')}</Text>
-              <TouchableOpacity onPress={() => setShowCustomModal(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+              <TouchableOpacity onPress={() => setShowCustomModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
                 <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
             <Text style={[s.inputLabel, { color: C.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('tasbih.dhikrText')}</Text>
             <TextInput
-              style={[s.input, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
+              style={[s.input, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
               value={customText}
               onChangeText={setCustomText}
               placeholder={t('tasbih.enterDhikrText')}
@@ -978,7 +982,7 @@ export default function TasbihScreen() {
                 <MaterialCommunityIcons name="plus" size={22} color={GREEN} />
               </TouchableOpacity>
               <TextInput
-                style={[s.stepperInput, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
+                style={[s.stepperInput, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(120,120,128,0.08)', color: C.text }]}
                 value={customTarget}
                 onChangeText={setCustomTarget}
                 placeholder="33"
@@ -1006,7 +1010,7 @@ export default function TasbihScreen() {
           <View style={[s.modalSheet, { height: 'auto', backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('common.settings')}</Text>
-              <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+              <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
                 <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
@@ -1027,31 +1031,31 @@ export default function TasbihScreen() {
           <View style={[s.modalSheet, { backgroundColor: isDarkMode ? '#1c1e23' : '#fff' }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.myStats')}</Text>
-              <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)' }]}>
+              <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
                 <MaterialCommunityIcons name="close" size={18} color={C.text} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               {/* Summary cards */}
               <View style={s.statsGrid}>
-                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' }]}>
                   <MaterialCommunityIcons name="calendar-today" size={28} color={GREEN} />
                   <Text style={[s.statValue, { color: C.text }]}>{String(totalCount)}</Text>
                   <Text style={[s.statLabel, { color: C.textSec }]}>{t('tasbih.todaysCount')}</Text>
                 </View>
-                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' }]}>
                   <MaterialCommunityIcons name="sync" size={28} color={GREEN} />
                   <Text style={[s.statValue, { color: C.text }]}>{String(rounds)}</Text>
                   <Text style={[s.statLabel, { color: C.textSec }]}>{t('tasbih.completedRounds')}</Text>
                 </View>
               </View>
               <View style={s.statsGrid}>
-                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' }]}>
                   <MaterialCommunityIcons name="sigma" size={28} color={GREEN} />
                   <Text style={[s.statValue, { color: C.text }]}>{String(allTimeTotal)}</Text>
                   <Text style={[s.statLabel, { color: C.textSec }]}>{t('tasbih.todayTotal')}</Text>
                 </View>
-                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' }]}>
+                <View style={[s.statCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' }]}>
                   <MaterialCommunityIcons name="chart-line" size={28} color={GREEN} />
                   <Text style={[s.statValue, { color: C.text }]}>{String(avgPerDay)}</Text>
                   <Text style={[s.statLabel, { color: C.textSec }]}>{t('tasbih.dailyAverage')}</Text>

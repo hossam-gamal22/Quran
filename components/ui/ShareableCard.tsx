@@ -157,7 +157,7 @@ export function ShareableCard({
     Alert.alert(t('common.copied'), t('common.textCopiedSuccess'));
   };
 
-  const selectedCardColor = CARD_COLORS[selectedColor] || '#2f7659';
+  const selectedCardColor = CARD_COLORS[selectedColor] || '#22C55E';
   const selectedImage = APP_BACKGROUNDS[selectedBackground];
 
   const randomizeColor = () => {
@@ -249,9 +249,9 @@ export function ShareableCard({
             </Text>
             <TouchableOpacity onPress={onClose}>
               <View style={[styles.closeBtn, {
-                backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)',
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
               }]}>
-                <MaterialCommunityIcons name="close" size={16} color={isDarkMode ? '#8e8e93' : '#6c6c70'} />
+                <MaterialCommunityIcons name="close" size={16} color={isDarkMode ? '#A8A8AD' : '#6c6c70'} />
               </View>
             </TouchableOpacity>
           </View>
@@ -278,11 +278,11 @@ export function ShareableCard({
           {/* Background Mode */}
           <View style={[styles.modeActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeBackground}>
-              <MaterialCommunityIcons name="image-multiple" size={18} color="#2f7659" />
+              <MaterialCommunityIcons name="image-multiple" size={18} color="#22C55E" />
               <Text style={styles.modeButtonText}>{t('common.randomBackground')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeColor}>
-              <MaterialCommunityIcons name="palette" size={18} color="#2f7659" />
+              <MaterialCommunityIcons name="palette" size={18} color="#22C55E" />
               <Text style={styles.modeButtonText}>{t('common.randomColor')}</Text>
             </TouchableOpacity>
           </View>
@@ -310,7 +310,7 @@ export function ShareableCard({
           <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleCopy}>
               <View style={[styles.actionIcon, {
-                backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)',
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
               }]}>
                 <MaterialCommunityIcons name="content-copy" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
@@ -319,7 +319,7 @@ export function ShareableCard({
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsText}>
               <View style={[styles.actionIcon, {
-                backgroundColor: isDarkMode ? 'rgba(120,120,128,0.24)' : 'rgba(120,120,128,0.12)',
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
               }]}>
                 <MaterialCommunityIcons name="text" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
@@ -327,7 +327,7 @@ export function ShareableCard({
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsImage}>
-              <View style={[styles.actionIcon, { backgroundColor: '#2f7659' }]}>
+              <View style={[styles.actionIcon, { backgroundColor: '#22C55E' }]}>
                 <MaterialCommunityIcons name="image" size={22} color="#fff" />
               </View>
               <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.image')}</Text>
@@ -454,12 +454,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(47,118,89,0.12)',
+    backgroundColor: 'rgba(6,79,47,0.12)',
   },
   modeButtonText: {
     fontSize: 12,
     fontFamily: fontSemiBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   colorPicker: {
     flexDirection: 'row',

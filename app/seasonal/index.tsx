@@ -210,7 +210,7 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
             <Text style={[styles.actionsTitle, { color: colors.text }]}>{t('seasonal.ashura.recommendedActions')}:</Text>
             {day.recommendedActions.map((action, index) => (
               <View key={index} style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#2f7659" />
+                <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#22C55E" />
                 <Text style={[styles.actionText, { color: colors.textLight }]}>{action}</Text>
               </View>
             ))}
@@ -366,8 +366,8 @@ export default function SeasonalIndexScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={isDarkMode ? '#fff' : '#2f7659'}
-            colors={['#2f7659']}
+            tintColor={isDarkMode ? '#fff' : '#22C55E'}
+            colors={['#22C55E']}
           />
         }
       >
@@ -428,7 +428,7 @@ export default function SeasonalIndexScreen() {
           <View
             style={[styles.tipGradient, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           >
-            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#2f7659" />
+            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#22C55E" />
             <View style={styles.tipContent}>
               <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>{t('seasonal.hajj.tipTitle')}</Text>
               <Text style={[styles.tipText, { color: colors.textLight }]}>
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#2f7659',
+    color: '#22C55E',
     marginBottom: 4,
   },
   tipText: {

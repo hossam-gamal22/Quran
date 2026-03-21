@@ -4,7 +4,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
   const { verse } = data;
@@ -15,13 +15,9 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'center',
-        backgroundGradient: {
-          from: '#0a1628',
-          to: '#0a1a20',
-          orientation: 'LEFT_RIGHT',
-        },
-        borderRadius: 16,
+        justifyContent: 'space-between',
+        backgroundGradient: GRADIENTS.verse,
+        borderRadius: 20,
         padding: 14,
       }}
       clickAction="OPEN_APP"
@@ -34,14 +30,13 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           width: 'match_parent',
-          marginBottom: 6,
         }}
       >
         <TextWidget
           text="📖 آية اليوم"
           style={{
             fontSize: 12,
-            color: COLORS.green,
+            color: COLORS.tealLight,
             fontFamily: FONT.amiriBold,
           }}
         />
@@ -63,10 +58,22 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
           color: COLORS.white,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 4,
+          marginTop: 6,
         }}
         maxLines={4}
         truncate="END"
+      />
+
+      {/* Branding footer */}
+      <TextWidget
+        text={BRANDING.name}
+        style={{
+          fontSize: BRANDING.fontSize,
+          color: BRANDING.color,
+          fontFamily: FONT.amiri,
+          textAlign: 'center',
+          marginTop: 4,
+        }}
       />
     </FlexWidget>
   );

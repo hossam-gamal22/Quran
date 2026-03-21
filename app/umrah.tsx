@@ -105,7 +105,7 @@ export default function UmrahScreen() {
           tint={isDarkMode ? 'dark' : 'light'}
           style={StyleSheet.absoluteFill}
         />
-        <View style={[s.heroOverlay, { backgroundColor: isDarkMode ? 'rgba(47,118,89,0.15)' : 'rgba(47,118,89,0.08)' }]} />
+        <View style={[s.heroOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.15)' : 'rgba(6,79,47,0.08)' }]} />
         <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons name="mosque" size={36} color={ACCENT} />
           <View style={s.heroTextWrap}>
@@ -166,15 +166,15 @@ export default function UmrahScreen() {
         {/* Footer */}
         <View style={s.footerOuter}>
           <BlurView intensity={Platform.OS === 'ios' ? 40 : 15} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-          <View style={[s.footerOverlay, { backgroundColor: isDarkMode ? 'rgba(47,118,89,0.12)' : 'rgba(47,118,89,0.06)' }]} />
+          <View style={[s.footerOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.12)' : 'rgba(6,79,47,0.06)' }]} />
           <View style={s.footerContent}>
             <MaterialCommunityIcons name="star-crescent" size={24} color={ACCENT} />
             <Text style={[s.footerText, { color: colors.text }]}>{t('hajj.footerDua')}</Text>
             <Text style={[s.footerNote, { color: colors.textLight }]}>{t('hajj.footerNoteUmrah')}</Text>
           </View>
         </View>
-        <BannerAdComponent screen="hajj_umrah" />
         <MissingTranslationCard pageName="Umrah" />
+        <BannerAdComponent screen="hajj_umrah" />
       </ScrollView>
       <PdfTemplatePicker
         visible={showTemplatePicker}

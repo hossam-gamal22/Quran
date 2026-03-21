@@ -2,6 +2,10 @@
 import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { getAyahAudioUrl, saveLastPlayback, getLastPlayback, getCachedSurah } from './quran-cache';
+import { audioCoordinator } from './audio-coordinator';
+
+// TrackPlayer has been removed — always use expo-av
+// Lock screen controls are not available with expo-av
 
 export interface PlaybackState {
   isPlaying: boolean;
@@ -35,6 +39,7 @@ class AudioPlayerManager {
   private loadingId: number = 0;
   private surahOffsets: Map<string, number[]> = new Map();
   private offsetPoller: number | null = null;
+  private isTransitioning: boolean = false;
 
   constructor() {
     this.initAudio();
@@ -42,11 +47,13 @@ class AudioPlayerManager {
 
   private async initAudio() {
     if (Platform.OS !== 'web') {
+      // Configure expo-av for background playback
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
       });
+      console.log('[audio-player] ✅ Using expo-av for Quran playback');
     }
   }
 
@@ -77,13 +84,21 @@ class AudioPlayerManager {
       this.continuousPlay = continuous;
       const myLoadId = ++this.loadingId;
 
+      // Request audio focus — this will stop any other audio source
+      await audioCoordinator.requestFocus('quran', {
+        stop: () => this.stop(),
+        pause: () => this.togglePlayPause(),
+      }, 'quran-player');
+
       // get surah info
       const surah = await getCachedSurah(surahNumber);
       this.surahAyahsCount = surah?.numberOfAyahs || 0;
 
       // stop current sound FIRST — stop() resets playingFullSurah to false,
       // so we must set it again afterwards.
-      await this.stop();
+      // Use skipReleaseFocus=true to keep the coordinator focus we just acquired
+      this.isTransitioning = true;
+      await this.stop(true);
       // Abort if a newer playAyah call was made while we were loading
       if (myLoadId !== this.loadingId) return;
       this.playingFullSurah = !!continuous;
@@ -126,8 +141,12 @@ class AudioPlayerManager {
       }
 
       console.log('[audio-player] creating sound url=', audioUrl, 'playingFullSurah=', this.playingFullSurah);
+      
       // If full surah mode and starting from a specific ayah, don't auto-play — seek first
       const needsSeek = this.playingFullSurah && ayahNumber > 1;
+
+      // Use expo-av for playback
+      this.isTransitioning = false;
       let sound: Audio.Sound;
       try {
         ({ sound } = await Audio.Sound.createAsync(
@@ -181,9 +200,25 @@ class AudioPlayerManager {
         }
       }
     } catch (error) {
-      console.error('Error playing ayah:', error);
+      console.warn('Error playing ayah:', error);
+      this.isTransitioning = false;
       this.updateState({ isLoading: false, isPlaying: false });
     }
+  }
+
+  private getReciterName(reciterIdentifier: string): string {
+    const reciterNames: Record<string, string> = {
+      'ar.alafasy': 'مشاري العفاسي',
+      'ar.abdullahbasfar': 'عبدالله بصفر',
+      'ar.abdurrahmaansudais': 'عبدالرحمن السديس',
+      'ar.shaatree': 'أبو بكر الشاطري',
+      'ar.husary': 'محمود خليل الحصري',
+      'ar.minshawi': 'محمد صديق المنشاوي',
+      'ar.hudhaify': 'علي الحذيفي',
+      'ar.ibrahim.akhdar': 'إبراهيم الأخضر',
+      'ar.muhammadjibreel': 'محمد جبريل',
+    };
+    return reciterNames[reciterIdentifier] || 'القارئ';
   }
 
   private async onPlaybackStatusUpdate(status: any) {
@@ -212,7 +247,8 @@ class AudioPlayerManager {
     }
   }
 
-  async stop(): Promise<void> {
+  async stop(skipReleaseFocus = false): Promise<void> {
+    // Stop expo-av sound if exists
     if (this.sound) {
       await this.sound.stopAsync();
       await this.sound.unloadAsync();
@@ -229,6 +265,11 @@ class AudioPlayerManager {
       currentAyah: 0,
       playingFullSurah: false,
     });
+    
+    // Release audio focus (skip when called internally during playAyah transition)
+    if (!skipReleaseFocus) {
+      audioCoordinator.releaseFocus('quran-player', 'quran');
+    }
   }
 
   async playNextAyah(suppressLoading: boolean = false): Promise<void> {

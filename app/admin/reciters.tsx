@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -14,6 +13,7 @@ import {
   Switch,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
@@ -141,7 +141,7 @@ export default function RecitersScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
@@ -150,7 +150,7 @@ export default function RecitersScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
@@ -282,7 +282,7 @@ export default function RecitersScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <Ionicons name="close" size={28} color={Colors.text} />

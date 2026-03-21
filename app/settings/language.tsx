@@ -137,7 +137,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         </View>
         {isSelected && (
           <View style={styles.checkIcon}>
-            <MaterialCommunityIcons name="check-circle" size={24} color="#2f7659" />
+            <MaterialCommunityIcons name="check-circle" size={24} color="#22C55E" />
           </View>
         )}
       </TouchableOpacity>
@@ -405,7 +405,7 @@ export default function LanguageScreen() {
       {isChanging && (
         <View style={styles.loadingOverlay}>
           <View style={[styles.loadingCard, isDarkMode && styles.loadingCardDark]}>
-            <MaterialCommunityIcons name="loading" size={40} color="#2f7659" />
+            <MaterialCommunityIcons name="loading" size={40} color="#22C55E" />
             <Text style={[styles.loadingText, { color: colors.text }]}>
               {t('common.loading')}
             </Text>
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   infoHighlight: {
     fontFamily: fontBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   scrollView: {
     flex: 1,
@@ -509,11 +509,11 @@ const styles = StyleSheet.create({
   languageItemSelected: {
     backgroundColor: '#e8f5e9',
     borderWidth: 2,
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   languageItemSelectedDark: {
     backgroundColor: '#1a2f1a',
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   languageFlag: {
     width: 36,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   languageNameSelected: {
-    color: '#2f7659',
+    color: '#22C55E',
   },
   languageEnglish: {
     fontSize: 13,

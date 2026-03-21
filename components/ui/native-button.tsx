@@ -416,11 +416,11 @@ export const NativeToggleSwitch: React.FC<NativeToggleSwitchProps> = ({
         styles.toggleBase,
         {
           backgroundColor: enabled
-            ? 'rgba(47,118,89,0.55)'
-            : (isDarkMode ? 'rgba(120,120,128,0.25)' : 'rgba(120,120,128,0.18)'),
+            ? 'rgba(6,79,47,0.55)'
+            : (isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(120,120,128,0.18)'),
           borderWidth: 1,
           borderColor: enabled
-            ? 'rgba(47,118,89,0.5)'
+            ? 'rgba(6,79,47,0.5)'
             : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(120,120,128,0.15)'),
           opacity: disabled ? 0.5 : 1,
         },

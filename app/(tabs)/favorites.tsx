@@ -248,7 +248,7 @@ export default function FavoritesScreen() {
   // Local overrides for glass card and accent that differ from hook values
   const cardBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
   const cardBorder = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
-  const accent = isDarkMode ? '#4ADE80' : '#2f7659';
+  const accent = isDarkMode ? '#4ADE80' : '#22C55E';
 
   const toggleSection = useCallback((key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
@@ -919,7 +919,7 @@ export default function FavoritesScreen() {
             ]}
             selected={activeTab}
             onSelect={(key) => setActiveTab(key as typeof activeTab)}
-            indicatorColor="#2f7659"
+            indicatorColor="#22C55E"
           />
         </View>
 
@@ -934,7 +934,7 @@ export default function FavoritesScreen() {
                 ]}
                 selected={sortBy}
                 onSelect={(key) => setSortBy(key as 'date' | 'surah')}
-                indicatorColor="#2f7659"
+                indicatorColor="#22C55E"
               />
             </View>
             <View style={s.countBadge}>

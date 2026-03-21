@@ -11,10 +11,11 @@ import React, {
   ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Appearance, ColorSchemeName, Alert, I18nManager } from 'react-native';
+import { Appearance, ColorSchemeName, Alert, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
 import { scheduleNotificationsFromSettings } from '@/lib/notifications-manager';
+import { resetChannelsWithNewSound } from '@/services/notifications/channels';
 import { 
   t as translate, 
   setLanguage as setI18nLanguage, 
@@ -446,11 +447,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         // تحديث اللغة في نظام الترجمة
         await setI18nLanguage(loadedSettings.language);
         
-        // Set I18nManager RTL based on loaded app language
-        // Always call unconditionally — do not read I18nManager.isRTL (stale device locale)
-        const shouldBeRTL = isRTL(loadedSettings.language);
-        I18nManager.allowRTL(shouldBeRTL);
-        I18nManager.forceRTL(shouldBeRTL);
+        // RTL is handled manually via useIsRTL() hook — do NOT call
+        // I18nManager.forceRTL() as it causes double-reversal on Android production builds.
 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
@@ -473,6 +471,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             dailyVerseTime: n.dailyVerseTime,
             sound: n.sound,
             vibration: n.vibration !== false,
+            soundType: n.soundType,
+            adhanSoundType: n.adhanSoundType,
             azkarSoundType: n.azkarSoundType,
             dailyVerseSoundType: n.dailyVerseSoundType,
             salawatReminder: n.salawatReminder,
@@ -545,11 +545,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     // تحديث نظام الترجمة
     await setI18nLanguage(language);
     
-    // Set I18nManager RTL direction based on app language
-    // Always call unconditionally — do not read I18nManager.isRTL (stale device locale)
-    const shouldBeRTL = isRTL(language);
-    I18nManager.allowRTL(shouldBeRTL);
-    I18nManager.forceRTL(shouldBeRTL);
+    // RTL is handled manually via useIsRTL() hook — do NOT call
+    // I18nManager.forceRTL() as it causes double-reversal on Android production builds.
     
     // حفظ الإعدادات
     const newSettings = { ...settings, language };
@@ -582,7 +579,33 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       notifications: { ...settings.notifications, ...notifications },
     };
     await saveSettings(newSettings);
-    
+
+    // If sound-related keys changed, reset Android channels so the new sound takes effect
+    const soundKeys = ['adhanSoundType', 'soundType', 'azkarSoundType'] as const;
+    const soundChanged = soundKeys.some(k => k in notifications);
+    if (soundChanged) {
+      const n2 = newSettings.notifications;
+      const adhan = n2.adhanSoundType || 'makkah';
+      const fajr = n2.adhanSoundType || 'makkah'; // Fajr uses same adhan by default
+      const reminder = n2.soundType || 'general_reminder';
+      // Persist for _layout.tsx channel init on next cold start
+      await AsyncStorage.multiSet([
+        ['selectedAdhanSound', adhan],
+        ['selectedFajrSound', fajr],
+        ['selectedReminderSound', reminder],
+      ]);
+      // Delete + recreate channels so Android picks up the new sound
+      await resetChannelsWithNewSound(adhan, fajr, reminder).catch(() => {});
+
+      // Verify channels were recreated with the correct sound
+      if (Platform.OS === 'android') {
+        const channels = await Notifications.getNotificationChannelsAsync();
+        const channelInfo = channels.map(c => ({ id: c.id, sound: (c as any).sound }));
+        // eslint-disable-next-line no-console
+        console.log('[Settings] Active channels after reset:', channelInfo);
+      }
+    }
+
     // Schedule or cancel notifications based on updated settings
     const n = newSettings.notifications;
     await scheduleNotificationsFromSettings({
@@ -603,6 +626,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       dailyVerseTime: n.dailyVerseTime,
       sound: n.sound,
       vibration: n.vibration !== false,
+      soundType: n.soundType,
+      adhanSoundType: n.adhanSoundType,
       azkarSoundType: n.azkarSoundType,
       dailyVerseSoundType: n.dailyVerseSoundType,
       salawatReminder: n.salawatReminder,

@@ -4,11 +4,10 @@
 import React from 'react';
 import { FlexWidget, TextWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, FONT } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
 
 export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
-  // Parse hijri date parts — expected format "DD MonthName YYYY هـ"
   const hijriParts = prayer.hijriDate.split(' ');
   const day = hijriParts[0] || '';
   const monthYear = hijriParts.slice(1).join(' ');
@@ -19,10 +18,10 @@ export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundColor: COLORS.bg,
-        borderRadius: 16,
+        backgroundGradient: GRADIENTS.hijri,
+        borderRadius: 20,
         padding: 12,
       }}
       clickAction="OPEN_APP"
@@ -38,7 +37,6 @@ export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
           fontSize: 32,
           color: COLORS.gold,
           fontFamily: FONT.amiriBold,
-          marginTop: 2,
         }}
       />
       <TextWidget
@@ -48,9 +46,16 @@ export function HijriDateSmallWidget({ data }: { data: SharedWidgetData }) {
           color: COLORS.grayLight,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 2,
         }}
         maxLines={2}
+      />
+      <TextWidget
+        text={BRANDING.name}
+        style={{
+          fontSize: BRANDING.fontSize,
+          color: BRANDING.color,
+          fontFamily: FONT.amiri,
+        }}
       />
     </FlexWidget>
   );

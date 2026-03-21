@@ -170,14 +170,14 @@ export default function HadithSifatScreen() {
                   </View>
                   <View style={[styles.hadithActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? '#2a2a3e' : '#f5f5f5' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
                       onPress={() => handleToggleFav(hadith)}
                     >
                       <MaterialCommunityIcons name={favIds.has(hadith.id) ? 'heart' : 'heart-outline'} size={16} color={favIds.has(hadith.id) ? '#ef4444' : colors.text} />
                       <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('common.save')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? '#2a2a3e' : '#f5f5f5' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         shareHadith(hadith);
@@ -194,7 +194,6 @@ export default function HadithSifatScreen() {
         })}
 
         <BannerAdComponent screen="hadith_sifat" />
-        <View style={{ height: 100 }} />
       </ScrollView>
     </ScreenContainer>
   );

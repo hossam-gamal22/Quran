@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -14,6 +13,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
@@ -447,7 +447,7 @@ export default function WidgetsScreen() {
   // ------ Main render ------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('admin.widgetTitle')}</Text>
@@ -480,7 +480,7 @@ export default function WidgetsScreen() {
 
       {/* Create / Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={styles.modalContainer}>
           {/* Modal header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeModal}>

@@ -20,7 +20,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
-const GREEN = '#2f7659';
+const GREEN = '#22C55E';
 const DAILY_STATS_KEY = 'tasbih_daily_stats';
 const TYPE_STATS_KEY = 'tasbih_type_stats';
 
@@ -121,7 +121,7 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' },
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
                 ]}
               >
                 <MaterialCommunityIcons name="calendar-today" size={28} color={GREEN} />
@@ -131,7 +131,7 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' },
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
                 ]}
               >
                 <MaterialCommunityIcons name="sync" size={28} color={GREEN} />
@@ -144,7 +144,7 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' },
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
                 ]}
               >
                 <MaterialCommunityIcons name="sigma" size={28} color={GREEN} />
@@ -154,7 +154,7 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(47,118,89,0.08)' },
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
                 ]}
               >
                 <MaterialCommunityIcons name="chart-line" size={28} color={GREEN} />

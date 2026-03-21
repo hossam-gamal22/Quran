@@ -34,6 +34,7 @@ import {
   isRadioFavorite,
 } from '@/services/radioService';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 
 const ACCENT = '#22C55E';
 
@@ -142,7 +143,7 @@ function RadioScreen() {
         adTimerRef.current = setTimeout(() => {
           try { showInterstitial(); } catch {}
           adTimerRef.current = null;
-        }, 20_000);
+        }, 60_000); // Show after 60s of listening (was 20s)
         console.log('[Radio] Starting playback for:', station.name);
         await playRadio(station);
         console.log('[Radio] playRadio call completed');
@@ -231,14 +232,14 @@ function RadioScreen() {
       >
         <View style={[styles.stationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* Station icon */}
-          <View style={[styles.stationIcon, { backgroundColor: playing ? ACCENT : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)') }]}>
+          <View style={[styles.stationIcon, { backgroundColor: playing ? ACCENT : (isDarkMode ? 'rgba(255,255,255,0.1)' : ACCENT) }]}>
             {buffering ? (
-              <ActivityIndicator size="small" color={playing ? '#fff' : ACCENT} />
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
               <MaterialCommunityIcons
                 name={playing ? 'radio' : 'radio-tower'}
                 size={22}
-                color={playing ? '#fff' : ACCENT}
+                color="#fff"
               />
             )}
           </View>
@@ -473,19 +474,26 @@ function RadioScreen() {
           )}
         </View>
       ) : (
-        <FlatList
-          data={filteredStations}
-          keyExtractor={(item) => item.id}
-          renderItem={renderStation}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <Text style={[styles.stationCountText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
-              {filteredStations.length} {t('radio.stationCount')}
-            </Text>
-          }
-        />
+        <View style={styles.listWrapper}>
+          <FlatList
+            data={filteredStations}
+            keyExtractor={(item) => item.id}
+            renderItem={renderStation}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <Text style={[styles.stationCountText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                {filteredStations.length} {t('radio.stationCount')}
+              </Text>
+            }
+          />
+        </View>
       )}
+
+      {/* Fixed Banner at Bottom */}
+      <View style={styles.fixedBannerContainer}>
+        <BannerAdComponent />
+      </View>
     </ScreenContainer>
   );
 }
@@ -605,9 +613,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
+  listWrapper: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: 120,
+    paddingBottom: 16,
+  },
+  fixedBannerContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: 'transparent',
   },
   stationCountText: {
     fontSize: FONT_SIZES.sm,

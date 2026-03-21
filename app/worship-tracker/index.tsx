@@ -315,8 +315,6 @@ export default function WorshipTrackerScreen() {
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
-        translucent
       />
       
       {/* الهيدر */}
@@ -345,8 +343,8 @@ export default function WorshipTrackerScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#2f7659']}
-            tintColor="#2f7659"
+            colors={['#22C55E']}
+            tintColor="#22C55E"
           />
         }
       >
@@ -371,7 +369,7 @@ export default function WorshipTrackerScreen() {
               value={`${stats?.prayer?.percentage ?? 0}%`}
               subtitle={`${t('worship.currentStreak')}: ${stats?.prayer?.streak ?? 0} ${t('home.days')}`}
               icon="mosque"
-              color="#2f7659"
+              color="#22C55E"
               index={0}
               onPress={() => navigateTo('prayer')}
               isDarkMode={isDarkMode}
@@ -452,7 +450,7 @@ export default function WorshipTrackerScreen() {
               title={t('worship.prayerTracker')}
               description={t('worship.tapToSelectStatus')}
               icon="mosque"
-              colors={['#2f7659', '#1d4a3a']}
+              colors={['#22C55E', '#1d4a3a']}
               progress={getPrayerProgress()}
               status={getPrayedCount()}
               index={0}

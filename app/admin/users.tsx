@@ -5,13 +5,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { collection, getDocs, doc, updateDoc, query, orderBy, limit, where } from 'firebase/firestore';
@@ -121,14 +121,14 @@ export default function UsersScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       {/* Stats */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>

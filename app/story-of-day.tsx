@@ -73,7 +73,7 @@ function formatTime(ms: number) {
 
 export default function StoryOfDayScreen() {
   const isRTL = useIsRTL();
-  const { settings } = useSettings();
+  const { settings, isDarkMode } = useSettings();
   const colors = useColors();
   const { isPremium } = useSubscription();
   const { stop: stopGlobalAudio } = useGlobalAudio();
@@ -390,8 +390,8 @@ export default function StoryOfDayScreen() {
                         }}
                         activeOpacity={0.7}
                         style={[styles.chip, {
-                          backgroundColor: active ? colors.primary : colors.card,
-                          borderColor: active ? colors.primary : colors.border,
+                          backgroundColor: active ? '#22C55E' : 'rgba(34, 197, 94, 0.15)',
+                          borderColor: active ? '#22C55E' : 'rgba(34, 197, 94, 0.3)',
                         }]}
                       >
                         <Text
@@ -483,17 +483,17 @@ export default function StoryOfDayScreen() {
                   disabled={saving}
                   activeOpacity={0.7}
                   style={[styles.actionBtn, {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
+                    backgroundColor: '#22C55E',
+                    borderColor: 'transparent',
                     flexDirection: isRTL ? 'row-reverse' : 'row',
                   }]}
                 >
                   {saving ? (
-                    <ActivityIndicator color={colors.primary} size="small" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <MaterialCommunityIcons name="download" size={20} color={colors.primary} />
+                    <MaterialCommunityIcons name="download" size={20} color="#fff" />
                   )}
-                  <Text style={[styles.btnText, { color: colors.text }]}>
+                  <Text style={[styles.btnText, { color: '#fff' }]}>
                     {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
                   </Text>
                 </TouchableOpacity>
@@ -503,15 +503,15 @@ export default function StoryOfDayScreen() {
                   disabled={sharing}
                   activeOpacity={0.7}
                   style={[styles.actionBtn, {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    borderColor: 'rgba(34, 197, 94, 0.3)',
                     flexDirection: isRTL ? 'row-reverse' : 'row',
                   }]}
                 >
                   {sharing ? (
                     <ActivityIndicator color={colors.primary} size="small" />
                   ) : (
-                    <MaterialCommunityIcons name="share-variant" size={20} color={colors.primary} />
+                    <MaterialCommunityIcons name="share-variant" size={20} color={colors.text} />
                   )}
                   <Text style={[styles.btnText, { color: colors.text }]}>
                     {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}

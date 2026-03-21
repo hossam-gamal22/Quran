@@ -23,6 +23,7 @@ import {
   clearBadge,
   NotificationSettings,
 } from '@/lib/push-notifications';
+import { getAyahSoundUri } from '@/lib/notification-sound-cache';
 import { useRouter } from 'expo-router';
 
 // ==================== Types ====================
@@ -129,10 +130,26 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
         console.log('Notification received:', notification);
         const data = notification.request.content.data;
         // Play ayah audio when custom reminder with ayah content arrives in foreground
-        if (data?.type === 'custom' && data?.contentType === 'ayah' && data?.ayahAudioUrl) {
+        if (data?.type === 'custom' && data?.contentType === 'ayah') {
           try {
+            // Try to use cached sound first, fallback to URL
+            let audioUri = String(data.ayahAudioUrl || '');
+            
+            // If we have surah/ayah/reciter info, try to get cached version
+            if (data.surah && data.ayah && data.reciter) {
+              const cached = await getAyahSoundUri(
+                Number(data.surah),
+                Number(data.ayah),
+                String(data.reciter)
+              );
+              audioUri = cached.uri;
+              console.log(`📱 Playing ayah from ${cached.isLocal ? 'cache' : 'network'}: ${audioUri}`);
+            }
+            
+            if (!audioUri) return;
+            
             const { sound } = await Audio.Sound.createAsync(
-              { uri: String(data.ayahAudioUrl) },
+              { uri: audioUri },
               { shouldPlay: true }
             );
             sound.setOnPlaybackStatusUpdate((status) => {

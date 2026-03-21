@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -13,6 +12,7 @@ import {
   Modal,
   Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
@@ -166,7 +166,7 @@ export default function ContentScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       {/* Filter Tabs */}
       <ScrollView
         horizontal
@@ -313,7 +313,7 @@ export default function ContentScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowModal(false)}>
               <Ionicons name="close" size={28} color={Colors.text} />

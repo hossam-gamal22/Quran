@@ -45,8 +45,8 @@ const CARD_WIDTH = (width - 48) / 2;
 // الثوابت
 // ========================================
 
-const RAMADAN_COLOR = '#2f7659';
-const RAMADAN_GRADIENT = ['#2f7659', '#1d4a3a'];
+const RAMADAN_COLOR = '#22C55E';
+const RAMADAN_GRADIENT = ['#22C55E', '#1d4a3a'];
 
 const RAMADAN_DUAS = [
   {
@@ -76,7 +76,7 @@ const RAMADAN_DUAS = [
 ];
 
 const DAILY_CHECKLIST = [
-  { id: 'fasting', icon: 'food-off', labelKey: 'ramadan.fasting' as const, color: '#2f7659' },
+  { id: 'fasting', icon: 'food-off', labelKey: 'ramadan.fasting' as const, color: '#22C55E' },
   { id: 'fajr', icon: 'weather-sunset-up', labelKey: 'ramadan.fajrPrayer' as const, color: '#5d4e8c' },
   { id: 'quran', icon: 'book-open-variant', labelKey: 'ramadan.quranReading' as const, color: '#3a7ca5' },
   { id: 'tarawih', icon: 'mosque', labelKey: 'ramadan.tarawih' as const, color: '#c17f59' },
@@ -489,7 +489,7 @@ export default function RamadanScreen() {
               label={t('ramadan.fastingDays')}
               value={stats.fasting}
               unit={t('ramadan.dayUnit')}
-              color="#2f7659"
+              color="#22C55E"
               isDarkMode={isDarkMode}
             />
             <StatsCard

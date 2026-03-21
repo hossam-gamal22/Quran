@@ -40,7 +40,7 @@ const getNotificationOptions = () => [
     icon: 'book-open-variant',
     title: tOnboarding('adhkar'),
     description: tOnboarding('adhkarDesc'),
-    color: '#2f7659',
+    color: '#22C55E',
   },
   {
     id: 'salawat',
@@ -257,7 +257,7 @@ export default function NotificationsScreen() {
                 activeOpacity={0.8}
               >
               <View
-                style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={[styles.continueButtonGradient, { backgroundColor: 'rgba(6,79,47,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                   <Text style={styles.continueButtonText}>{tOnboarding('continue')}</Text>
                   <MaterialCommunityIcons name={isRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   headerTitle: {
     fontSize: 22,
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   content: {
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   title: {
     fontSize: 24,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 15,
     fontFamily: fontMedium(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   continueButton: {
     borderRadius: 16,
@@ -475,6 +475,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
 });

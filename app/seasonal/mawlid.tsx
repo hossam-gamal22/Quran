@@ -84,7 +84,7 @@ const RECOMMENDED_ACTIONS = [
   { id: 'salawat', icon: 'heart', title: 'الإكثار من الصلاة على النبي ﷺ', color: '#e91e63' },
   { id: 'seerah', icon: 'book-open-variant', title: 'قراءة السيرة النبوية', color: '#3a7ca5' },
   { id: 'sunnah', icon: 'star', title: 'اتباع سنته ﷺ', color: '#f5a623' },
-  { id: 'akhlaq', icon: 'account-heart', title: 'التخلق بأخلاقه ﷺ', color: '#2f7659' },
+  { id: 'akhlaq', icon: 'account-heart', title: 'التخلق بأخلاقه ﷺ', color: '#22C55E' },
 ];
 
 // ========================================
@@ -261,7 +261,7 @@ export default function MawlidScreen() {
     { id: 'salawat', icon: 'heart', title: t('seasonal.mawlid.actionSalawat'), color: '#e91e63' },
     { id: 'seerah', icon: 'book-open-variant', title: t('seasonal.mawlid.actionSeerah'), color: '#3a7ca5' },
     { id: 'sunnah', icon: 'star', title: t('seasonal.mawlid.actionSunnah'), color: '#f5a623' },
-    { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#2f7659' },
+    { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#22C55E' },
   ], [t]);
 
   const handleRefresh = useCallback(async () => {

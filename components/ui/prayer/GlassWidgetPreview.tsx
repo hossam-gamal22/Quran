@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 10,
     fontFamily: fontSemiBold(),
-    color: '#0f987f',
+    color: '#22C55E',
     marginBottom: 8,
   },
   countdown: {

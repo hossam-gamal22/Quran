@@ -33,10 +33,10 @@ import { useColors } from '@/hooks/use-colors';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { t } from '@/lib/i18n';
 import { ADHAN_SOUNDS as ADHAN_SOUND_FILES, NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES } from '@/lib/sound-manager';
-import { getSurahName, RECITERS } from '@/lib/quran-api';
-import { getAyahAudioUrl } from '@/lib/quran-cache';
+import { getSurahName } from '@/lib/quran-api';
 import { fetchDownloadableSounds, getDownloadedSounds, downloadSound, isSoundDownloaded, type DownloadableSound, type DownloadedSound } from '@/lib/downloadable-sounds';
-import { showInterstitial } from '@/components/ads/InterstitialAdManager';
+
+// Removed: interstitial ads on sound download to reduce user frustration
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 // Enable LayoutAnimation on Android
@@ -101,14 +101,10 @@ const AYAH_COUNTS = [
 ];
 
 // Content type options for custom reminder
-const CONTENT_TYPES: { id: 'text' | 'ayah' | 'surah'; labelKey: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
+const CONTENT_TYPES: { id: 'text' | 'surah'; labelKey: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
   { id: 'text', labelKey: 'notificationSounds.freeText', icon: 'pencil-outline' },
-  { id: 'ayah', labelKey: 'notificationSounds.quranicVerse', icon: 'book-open-variant' },
   { id: 'surah', labelKey: 'notificationSounds.surah', icon: 'bookshelf' },
 ];
-
-// Popular reciters (top 8 for picker)
-const POPULAR_RECITERS = RECITERS.slice(0, 8);
 
 const REMINDER_OPTIONS = [
   { value: 5, label: t('notificationSounds.minutesBefore', { count: '5' }) },
@@ -140,7 +136,7 @@ const NOTIFICATION_CATEGORIES: NotificationCategoryDef[] = [
   {
     id: 'prayer',
     icon: 'mosque',
-    iconColor: '#2f7659',
+    iconColor: '#22C55E',
     titleKey: 'notificationSounds.prayer',
     subtitleKey: 'notificationSounds.prayerTimesAlerts',
   },
@@ -175,7 +171,7 @@ const NOTIFICATION_CATEGORIES: NotificationCategoryDef[] = [
   {
     id: 'dailyVerse',
     icon: 'book-open-page-variant',
-    iconColor: '#2f7659',
+    iconColor: '#22C55E',
     titleKey: 'notificationSounds.verseOfDay',
     subtitleKey: 'notificationSounds.verseOfDayDesc',
   },
@@ -228,68 +224,7 @@ const springLayoutAnimation = () => {
   });
 };
 
-// ========================================
-// Test notification function
-// ========================================
 
-const sendTestNotification = async (title: string, body: string, soundType?: string, extraData?: Record<string, any>) => {
-  if (!__DEV__) return;
-  try {
-    // 1) Immediate notification
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        sound: true,
-        data: { type: 'test', soundType: soundType || 'default', ...extraData },
-        ...(Platform.OS === 'android' && { channelId: 'general' }),
-      },
-      trigger: null,
-    });
-
-    // 2) If this is an ayah test, play the audio directly
-    if (extraData?.contentType === 'ayah' && extraData?.ayahAudioUrl) {
-      try {
-        const { Audio } = require('expo-av');
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: extraData.ayahAudioUrl },
-          { shouldPlay: true }
-        );
-        sound.setOnPlaybackStatusUpdate((status: any) => {
-          if (status.isLoaded && status.didJustFinish) {
-            sound.unloadAsync();
-          }
-        });
-      } catch (e) {
-        console.warn('Failed to play test ayah audio:', e);
-      }
-    }
-
-    // 3) Scheduled notification after 10 seconds to verify scheduling works
-    const futureDate = new Date(Date.now() + 10 * 1000);
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'test_scheduled',
-      content: {
-        title: title,
-        body: t('notificationSounds.testScheduledBody'),
-        sound: true,
-        data: { type: 'test_scheduled', soundType: soundType || 'default', ...extraData },
-        ...(Platform.OS === 'android' && { channelId: 'general' }),
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: futureDate,
-      },
-    });
-
-    Alert.alert(t('notificationSounds.testSuccess'), t('notificationSounds.testSuccessMsg'));
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  } catch (err) {
-    console.error('❌ Test notification failed:', err);
-    Alert.alert(t('notificationSounds.testError'), t('notificationSounds.testErrorMsg') + String(err));
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-  }
-};
 
 // ========================================
 // المكون الرئيسي
@@ -300,7 +235,6 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { settings, isDarkMode, updateNotifications } = useSettings();
   const colors = useColors();
-  const isArabic = (settings.language || 'ar') === 'ar';
   const [permissionStatus, setPermissionStatus] = useState<string>('unknown');
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [prayerNotifications, setPrayerNotifications] = useState<{ [key: string]: boolean }>({
@@ -331,8 +265,6 @@ export default function NotificationsScreen() {
 
   // Custom reminder content picker state
   const [showSurahPicker, setShowSurahPicker] = useState(false);
-  const [showReciterPicker, setShowReciterPicker] = useState(false);
-  const [ayahPreviewLoading, setAyahPreviewLoading] = useState(false);
 
   const stopPreview = useCallback(async () => {
     if (previewSoundRef.current) {
@@ -406,12 +338,14 @@ export default function NotificationsScreen() {
     loadDownloadable();
   }, []);
 
+  // Check if ayah is already cached when selection changes
+
+
   const handleDownloadSound = async (sound: DownloadableSound) => {
     if (downloadingId) return;
     setDownloadingId(sound.id);
     try {
-      // Show interstitial ad before download
-      try { await showInterstitial(); } catch {}
+      // Removed: interstitial ad before sound download to reduce user frustration
       
       const downloaded = await downloadSound(sound);
       setDownloadedSounds(prev => [...prev.filter(s => s.id !== sound.id), downloaded]);
@@ -590,29 +524,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Get test notification content for each category
-  const getTestContent = (categoryId: string): { title: string; body: string } => {
-    switch (categoryId) {
-      case 'prayer':
-        return { title: t('notificationSounds.testPrayerTitle'), body: t('notificationSounds.testPrayerBody') };
-      case 'salawat':
-        return { title: t('notificationSounds.testSalawatTitle'), body: t('notificationSounds.testSalawatBody') };
-      case 'tasbih':
-        return { title: t('notificationSounds.testTasbihTitle'), body: t('notificationSounds.testTasbihBody') };
-      case 'istighfar':
-        return { title: t('notificationSounds.testIstighfarTitle'), body: t('notificationSounds.testIstighfarBody') };
-      case 'azkar':
-        return { title: t('notificationSounds.testAzkarTitle'), body: t('notificationSounds.testAzkarBody') };
-      case 'dailyVerse':
-        return { title: t('notificationSounds.testVerseTitle'), body: t('notificationSounds.testVerseBody') };
-      case 'customReminder':
-        return { title: t('notificationSounds.testCustomTitle'), body: settings.notifications.customReminderTitle || t('notificationSounds.testCustomBody') };
-      case 'kahf':
-        return { title: t('settings.kahfTitle'), body: t('settings.kahfBody') };
-      default:
-        return { title: t('notificationSounds.testDefaultTitle'), body: t('notificationSounds.testDefaultBody') };
-    }
-  };
+
 
   // Sound mapping description for each category
   const getSoundDescription = (categoryId: string): string => {
@@ -689,13 +601,14 @@ export default function NotificationsScreen() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
           >
-            <Text style={[styles.dayPickerToggleAll, { color: '#2f7659', textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.dayPickerToggleAll, { color: '#22C55E', textAlign: isRTL ? 'right' : 'left' }]}>
               {allSelected ? t('notificationSounds.customSelection') : t('notificationSounds.allDays')}
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={[styles.dayChipsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {ALL_DAYS.map((day, index) => {
+        <View style={styles.dayChipsRow}>
+          {(isRTL ? [...ALL_DAYS].reverse() : ALL_DAYS).map((day) => {
+            const index = day - 1; // 1-based day to 0-based label index
             const isSelected = selectedDays.includes(day);
             return (
               <TouchableOpacity
@@ -743,7 +656,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ prayerReminder: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -810,7 +723,7 @@ export default function NotificationsScreen() {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 handleTogglePrayerNotification(prayer.key, val);
               }}
-              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
               thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
               ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
               disabled={!isEnabled}
@@ -831,7 +744,7 @@ export default function NotificationsScreen() {
           }}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="volume-high" size={20} color="#2f7659" />
+          <MaterialCommunityIcons name="volume-high" size={20} color="#22C55E" />
           <Text style={[styles.adhanSoundHeaderText, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
             {t('notificationSounds.adhanSound')}
           </Text>
@@ -878,17 +791,17 @@ export default function NotificationsScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {previewLoading === selectedId ? (
-                    <ActivityIndicator size="small" color="#2f7659" />
+                    <ActivityIndicator size="small" color="#22C55E" />
                   ) : (
                     <MaterialCommunityIcons
                       name={previewPlaying === selectedId ? 'stop-circle' : 'play-circle'}
                       size={26}
-                      color={previewPlaying === selectedId ? '#ef5350' : '#2f7659'}
+                      color={previewPlaying === selectedId ? '#ef5350' : '#22C55E'}
                     />
                   )}
                 </TouchableOpacity>
               )}
-              <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+              <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
             </View>
           );
         })()}
@@ -944,18 +857,18 @@ export default function NotificationsScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {previewLoading === sound.id ? (
-                    <ActivityIndicator size="small" color="#2f7659" />
+                    <ActivityIndicator size="small" color="#22C55E" />
                   ) : (
                     <MaterialCommunityIcons
                       name={previewPlaying === sound.id ? 'stop-circle' : 'play-circle'}
                       size={26}
-                      color={previewPlaying === sound.id ? '#ef5350' : '#2f7659'}
+                      color={previewPlaying === sound.id ? '#ef5350' : '#22C55E'}
                     />
                   )}
                 </TouchableOpacity>
               )}
               {isSelected && (
-                <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
               )}
             </TouchableOpacity>
           );
@@ -963,7 +876,7 @@ export default function NotificationsScreen() {
       </View>
 
       {/* Test + Close buttons */}
-      {renderTestAndCloseButtons('prayer')}
+      {renderCloseButton()}
     </View>
   );
 
@@ -983,7 +896,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ morningAzkar: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -1038,7 +951,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ eveningAzkar: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -1093,7 +1006,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ sleepAzkar: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -1148,7 +1061,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ wakeupAzkar: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -1203,7 +1116,7 @@ export default function NotificationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             updateNotifications({ afterPrayerAzkar: val });
           }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
           disabled={!isEnabled}
@@ -1225,7 +1138,7 @@ export default function NotificationsScreen() {
       {/* Sound picker */}
       {renderReminderSoundPicker('azkar')}
 
-      {renderTestAndCloseButtons('azkar')}
+      {renderCloseButton()}
     </View>
   );
 
@@ -1235,7 +1148,7 @@ export default function NotificationsScreen() {
     return (
       <View style={styles.reminderSoundSection}>
         <View style={[styles.adhanSoundHeader, isDarkMode && { borderBottomColor: '#2a2a3e' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="volume-high" size={20} color="#2f7659" />
+          <MaterialCommunityIcons name="volume-high" size={20} color="#22C55E" />
           <Text style={[styles.adhanSoundHeaderText, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
             {t('notificationSounds.reminderSound')}
           </Text>
@@ -1285,18 +1198,18 @@ export default function NotificationsScreen() {
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {previewLoading === sound.id ? (
-                    <ActivityIndicator size="small" color="#2f7659" />
+                    <ActivityIndicator size="small" color="#22C55E" />
                   ) : (
                     <MaterialCommunityIcons
                       name={previewPlaying === sound.id ? 'stop-circle' : 'play-circle'}
                       size={26}
-                      color={previewPlaying === sound.id ? '#ef5350' : '#2f7659'}
+                      color={previewPlaying === sound.id ? '#ef5350' : '#22C55E'}
                     />
                   )}
                 </TouchableOpacity>
               )}
               {isSelected && (
-                <MaterialCommunityIcons name="check-circle" size={22} color="#2f7659" />
+                <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
               )}
             </TouchableOpacity>
           );
@@ -1322,7 +1235,7 @@ export default function NotificationsScreen() {
                 setActiveTimePicker(activeTimePicker === timePickerKey ? null : timePickerKey);
               }}
             >
-              <MaterialCommunityIcons name="clock-outline" size={18} color={category?.iconColor || '#2f7659'} />
+              <MaterialCommunityIcons name="clock-outline" size={18} color={category?.iconColor || '#22C55E'} />
               <Text style={[styles.timePickerLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
                 {t('notificationSounds.reminderTime')}
               </Text>
@@ -1355,54 +1268,14 @@ export default function NotificationsScreen() {
         {/* Per-category sound picker */}
         {renderReminderSoundPicker(categoryId)}
 
-        {renderTestAndCloseButtons(categoryId)}
+        {renderCloseButton()}
       </View>
     );
   };
 
-  const renderTestAndCloseButtons = (categoryId: string) => {
-    const testContent = getTestContent(categoryId);
-    const soundType = categoryId === 'prayer'
-      ? (settings.notifications.adhanSoundType || 'default')
-      : getCategorySoundType(categoryId);
-    
-    // Build extra data for custom reminder ayah test
-    let extraData: Record<string, any> | undefined;
-    if (categoryId === 'customReminder' && settings.notifications.customReminderContentType === 'ayah' 
-        && settings.notifications.customReminderSurah && settings.notifications.customReminderAyah) {
-      const reciter = settings.notifications.customReminderReciter || 'ar.alafasy';
-      // حساب رقم الآية الكلي
-      let totalAyahs = 0;
-      for (let i = 0; i < settings.notifications.customReminderSurah - 1; i++) {
-        totalAyahs += AYAH_COUNTS[i];
-      }
-      const globalAyah = totalAyahs + settings.notifications.customReminderAyah;
-      extraData = {
-        type: 'custom',
-        contentType: 'ayah',
-        surah: settings.notifications.customReminderSurah,
-        ayah: settings.notifications.customReminderAyah,
-        ayahAudioUrl: getAyahAudioUrl(reciter, globalAyah),
-      };
-    }
-
+  const renderCloseButton = () => {
     return (
       <View style={[styles.actionButtonsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        {__DEV__ && (
-        <TouchableOpacity
-          style={[styles.testButton, isDarkMode && styles.testButtonDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-          onPress={() => {
-            sendTestNotification(testContent.title, testContent.body, soundType, extraData);
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="bell-check" size={18} color="#2f7659" />
-          <Text style={[styles.testButtonText, { color: '#2f7659', textAlign: isRTL ? 'right' : 'left' }]}>
-            {t('notificationSounds.testNotification')}
-          </Text>
-        </TouchableOpacity>
-        )}
-
         <TouchableOpacity
           style={[styles.closeButton, isDarkMode && styles.closeButtonDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={collapseCategory}
@@ -1423,44 +1296,6 @@ export default function NotificationsScreen() {
     const customTitle = settings.notifications.customReminderTitle || '';
     const contentType = settings.notifications.customReminderContentType || 'text';
     const selectedSurah = settings.notifications.customReminderSurah || 0;
-    const selectedAyah = settings.notifications.customReminderAyah || 1;
-    const selectedReciter = settings.notifications.customReminderReciter || 'ar.alafasy';
-    const maxAyah = selectedSurah > 0 ? AYAH_COUNTS[selectedSurah - 1] : 1;
-
-    // حساب رقم الآية الكلي من رقم السورة والآية
-    const getGlobalAyahNumber = (surah: number, ayah: number): number => {
-      let total = 0;
-      for (let i = 0; i < surah - 1; i++) {
-        total += AYAH_COUNTS[i];
-      }
-      return total + ayah;
-    };
-
-    const previewAyahAudio = async () => {
-      if (!selectedSurah || !selectedAyah) return;
-      setAyahPreviewLoading(true);
-      try {
-        await stopPreview();
-        const globalAyah = getGlobalAyahNumber(selectedSurah, selectedAyah);
-        const url = getAyahAudioUrl(selectedReciter, globalAyah);
-        console.log('🔊 Preview ayah URL:', url);
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true }
-        );
-        previewSoundRef.current = sound;
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            sound.unloadAsync();
-            previewSoundRef.current = null;
-          }
-        });
-      } catch (e) {
-        console.warn('Error previewing ayah audio:', e);
-      } finally {
-        setAyahPreviewLoading(false);
-      }
-    };
 
     return (
       <View style={styles.expandedContent}>
@@ -1513,8 +1348,8 @@ export default function NotificationsScreen() {
           />
         </View>
 
-        {/* Surah picker — for 'ayah' and 'surah' types */}
-        {(contentType === 'ayah' || contentType === 'surah') && (
+        {/* Surah picker — for 'surah' type */}
+        {contentType === 'surah' && (
           <>
             <TouchableOpacity
               style={[styles.timePickerRow, isDarkMode && styles.timePickerRowDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -1523,7 +1358,7 @@ export default function NotificationsScreen() {
                 setShowSurahPicker(!showSurahPicker);
               }}
             >
-              <MaterialCommunityIcons name="book-open-variant" size={18} color="#2f7659" />
+              <MaterialCommunityIcons name="book-open-variant" size={18} color="#22C55E" />
               <Text style={[styles.timePickerLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
                 {t('notificationSounds.surah')}
               </Text>
@@ -1591,125 +1426,6 @@ export default function NotificationsScreen() {
           </>
         )}
 
-        {/* Ayah number picker — only for 'ayah' type */}
-        {contentType === 'ayah' && selectedSurah > 0 && (
-          <View style={[styles.timePickerRow, isDarkMode && styles.timePickerRowDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="format-list-numbered" size={18} color="#2f7659" />
-            <Text style={[styles.timePickerLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
-              {t('notificationSounds.ayahNumber')}
-            </Text>
-            <View style={[styles.ayahNumberPicker, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity
-                style={styles.ayahArrowBtn}
-                onPress={() => {
-                  if (selectedAyah > 1) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    updateNotifications({ customReminderAyah: selectedAyah - 1 });
-                  }
-                }}
-              >
-                <MaterialCommunityIcons name="minus" size={18} color={selectedAyah <= 1 ? '#999' : '#2f7659'} />
-              </TouchableOpacity>
-              <TextInput
-                style={[styles.ayahNumberInput, isDarkMode && styles.textLight]}
-                value={String(selectedAyah)}
-                onChangeText={(text) => {
-                  const num = parseInt(text) || 1;
-                  updateNotifications({ customReminderAyah: Math.min(Math.max(1, num), maxAyah) });
-                }}
-                keyboardType="number-pad"
-                textAlign="center"
-              />
-              <TouchableOpacity
-                style={styles.ayahArrowBtn}
-                onPress={() => {
-                  if (selectedAyah < maxAyah) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    updateNotifications({ customReminderAyah: selectedAyah + 1 });
-                  }
-                }}
-              >
-                <MaterialCommunityIcons name="plus" size={18} color={selectedAyah >= maxAyah ? '#999' : '#2f7659'} />
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.ayahMaxLabel, isDarkMode && { color: '#666' }]}>
-              / {maxAyah}
-            </Text>
-          </View>
-        )}
-
-        {/* Reciter picker — only for 'ayah' type */}
-        {contentType === 'ayah' && selectedSurah > 0 && (
-          <>
-            <TouchableOpacity
-              style={[styles.timePickerRow, isDarkMode && styles.timePickerRowDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-              onPress={() => {
-                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                setShowReciterPicker(!showReciterPicker);
-              }}
-            >
-              <MaterialCommunityIcons name="microphone" size={18} color="#2f7659" />
-              <Text style={[styles.timePickerLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
-                {t('notificationSounds.theReciter')}
-              </Text>
-              <Text style={styles.timePickerValue}>
-                {RECITERS.find(r => r.id === selectedReciter)?.[isArabic ? 'nameAr' : 'name'] || 'Mishary Al-Afasy'}
-              </Text>
-              <MaterialCommunityIcons 
-                name={showReciterPicker ? 'chevron-up' : 'chevron-down'} 
-                size={20} 
-                color={isDarkMode ? '#999' : '#666'} 
-              />
-            </TouchableOpacity>
-
-            {showReciterPicker && (
-              <View style={[styles.reciterPickerList, isDarkMode && styles.reciterPickerListDark]}>
-                {POPULAR_RECITERS.map((reciter) => (
-                  <TouchableOpacity
-                    key={reciter.id}
-                    style={[
-                      styles.reciterPickerItem,
-                      selectedReciter === reciter.id && styles.reciterPickerItemActive,
-                      { alignItems: isRTL ? 'flex-end' : 'flex-start' },
-                    ]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      updateNotifications({ customReminderReciter: reciter.id });
-                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                      setShowReciterPicker(false);
-                    }}
-                  >
-                    <Text style={[
-                      styles.reciterPickerName,
-                      isDarkMode && styles.textLight,
-                      selectedReciter === reciter.id && { color: '#fff' },
-                      { textAlign: isRTL ? 'right' : 'left' },
-                    ]}>
-                      {isArabic ? reciter.nameAr : reciter.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Preview ayah audio button */}
-            <TouchableOpacity
-              style={[styles.previewAyahBtn, isDarkMode && styles.previewAyahBtnDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-              onPress={previewAyahAudio}
-              disabled={ayahPreviewLoading}
-            >
-              {ayahPreviewLoading ? (
-                <ActivityIndicator size="small" color="#2f7659" />
-              ) : (
-                <MaterialCommunityIcons name="play-circle-outline" size={20} color="#2f7659" />
-              )}
-              <Text style={[styles.previewAyahText, { textAlign: isRTL ? 'right' : 'left' }]}>
-                {t('notificationSounds.listenToAyah')}
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-
         {/* Time picker */}
         <TouchableOpacity
           style={[styles.timePickerRow, isDarkMode && styles.timePickerRowDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -1746,19 +1462,9 @@ export default function NotificationsScreen() {
         {/* Day-of-week picker */}
         {renderDayPicker('customReminder')}
 
-        {/* Sound picker — hide when ayah audio is the sound source */}
-        {contentType !== 'ayah' && renderReminderSoundPicker('customReminder')}
+        {renderReminderSoundPicker('customReminder')}
 
-        {contentType === 'ayah' && (
-          <View style={[styles.soundInfoRow]}>
-            <MaterialCommunityIcons name="information-outline" size={16} color={isDarkMode ? '#888' : '#999'} />
-            <Text style={[styles.soundInfoText, isDarkMode && { color: '#888' }, { textAlign: isRTL ? 'right' : 'left' }]}>
-              {t('notificationSounds.ayahAsSound')}
-            </Text>
-          </View>
-        )}
-
-        {renderTestAndCloseButtons('customReminder')}
+        {renderCloseButton()}
       </View>
     );
   };
@@ -1766,7 +1472,7 @@ export default function NotificationsScreen() {
   const renderKahfExpanded = () => {
     return (
       <View style={styles.expandedContent}>
-        {renderTestAndCloseButtons('kahf')}
+        {renderCloseButton()}
       </View>
     );
   };
@@ -1857,7 +1563,7 @@ export default function NotificationsScreen() {
             <Switch
               value={settings.notifications.enabled}
               onValueChange={handleToggleMain}
-              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
               thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
               ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
             />
@@ -1919,7 +1625,7 @@ export default function NotificationsScreen() {
                           }
                         }
                       }}
-                      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
                       thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                       ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
                       disabled={!isEnabled}
@@ -1975,7 +1681,7 @@ export default function NotificationsScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateNotifications({ sound: val });
                 }}
-                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
                 thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                 ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
                 disabled={!isEnabled}
@@ -1997,7 +1703,7 @@ export default function NotificationsScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   updateNotifications({ vibration: val });
                 }}
-                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
                 thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                 ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
                 disabled={!isEnabled}
@@ -2226,7 +1932,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2386,7 +2092,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a3e',
   },
   chipOptionSelected: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   chipOptionText: {
     fontSize: 13,
@@ -2426,7 +2132,7 @@ const styles = StyleSheet.create({
   timePickerValue: {
     fontSize: 15,
     fontFamily: fontSemiBold(),
-    color: '#2f7659',
+    color: '#22C55E',
   },
 
   // Sound info row
@@ -2441,6 +2147,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontRegular(),
     color: '#999',
+  },
+  ayahDownloadAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  ayahDownloadAlertText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    lineHeight: 20,
   },
 
   // Adhan sound section
@@ -2477,7 +2199,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#2a2a3e',
   },
   adhanSoundOptionSelected: {
-    backgroundColor: 'rgba(47, 118, 89, 0.06)',
+    backgroundColor: 'rgba(6, 79, 47, 0.06)',
     borderRadius: 10,
   },
   adhanSoundIconBg: {
@@ -2489,7 +2211,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   adhanSoundIconBgSelected: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   adhanSoundContent: {
     flex: 1,
@@ -2500,7 +2222,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   adhanSoundTitleSelected: {
-    color: '#2f7659',
+    color: '#22C55E',
   },
   adhanSoundSubtitle: {
     fontSize: 11,
@@ -2529,23 +2251,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
   },
-  testButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: 'rgba(47, 118, 89, 0.1)',
-    gap: 8,
-  },
-  testButtonDark: {
-    backgroundColor: 'rgba(47, 118, 89, 0.15)',
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontFamily: fontSemiBold(),
-  },
+
   closeButton: {
     flex: 1,
     flexDirection: 'row',
@@ -2650,8 +2356,8 @@ const styles = StyleSheet.create({
     borderColor: '#3a3a4e',
   },
   contentTypeChipActive: {
-    backgroundColor: '#2f7659',
-    borderColor: '#2f7659',
+    backgroundColor: '#22C55E',
+    borderColor: '#22C55E',
   },
   contentTypeText: {
     fontSize: 13,
@@ -2683,7 +2389,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   surahPickerItemActive: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 8,
     borderBottomColor: 'transparent',
   },
@@ -2716,7 +2422,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(47,118,89,0.1)',
+    backgroundColor: 'rgba(6,79,47,0.1)',
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },
@@ -2750,7 +2456,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   reciterPickerItemActive: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 8,
     borderBottomColor: 'transparent',
   },
@@ -2769,16 +2475,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: 'rgba(47,118,89,0.08)',
+    backgroundColor: 'rgba(6,79,47,0.08)',
     marginVertical: 4,
   },
   previewAyahBtnDark: {
-    backgroundColor: 'rgba(47,118,89,0.15)',
+    backgroundColor: 'rgba(6,79,47,0.15)',
   },
   previewAyahText: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#2f7659',
+    color: '#22C55E',
+  },
+  downloadedAyahBtn: {
+    backgroundColor: 'rgba(34,197,94,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(34,197,94,0.3)',
   },
 
   // Downloadable sounds styles
@@ -2881,26 +2592,28 @@ const styles = StyleSheet.create({
     fontFamily: fontSemiBold(),
   },
   dayChipsRow: {
-    justifyContent: 'space-between' as const,
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    justifyContent: 'center' as const,
     gap: 8,
   },
   dayChip: {
-    flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     backgroundColor: '#f0f0f0',
-    minHeight: 32,
+    minHeight: 36,
   },
   dayChipSelected: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   dayChipDark: {
     backgroundColor: '#2a2a2c',
   },
   dayChipText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: fontSemiBold(),
     color: '#555',
   },

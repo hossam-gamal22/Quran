@@ -185,7 +185,7 @@ export default function LanguageScreen() {
 
           {/* الوصف */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.descContainer}>
-            <MaterialCommunityIcons name="translate" size={40} color="#2f7659" />
+            <MaterialCommunityIcons name="translate" size={40} color="#22C55E" />
             <Text style={[styles.descText, { textAlign: isSelectedRTL ? 'right' : 'left' }]}>
               {screenText.desc}
             </Text>
@@ -217,7 +217,7 @@ export default function LanguageScreen() {
                 activeOpacity={0.8}
               >
                 <View
-                  style={[styles.continueButtonGradient, { backgroundColor: 'rgba(47,118,89,0.85)' }]}
+                  style={[styles.continueButtonGradient, { backgroundColor: 'rgba(6,79,47,0.85)' }]}
                 >
                   <Text style={styles.continueButtonText}>{screenText.btn}</Text>
 <MaterialCommunityIcons name={isSelectedRTL ? 'arrow-left' : 'arrow-right'} size={24} color="#fff" />
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   stepText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
   },
   headerTitle: {
     fontSize: 22,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 2,
   },
   descContainer: {
@@ -328,8 +328,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   languageItemSelected: {
-    backgroundColor: 'rgba(47,118,89,0.2)',
-    borderColor: '#2f7659',
+    backgroundColor: 'rgba(6,79,47,0.2)',
+    borderColor: '#22C55E',
   },
   flag: {
     width: 36,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   languageNameSelected: {
-    color: '#2f7659',
+    color: '#22C55E',
   },
   languageNameEn: {
     fontSize: 13,
@@ -373,13 +373,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   radioOuterSelected: {
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   bottomContainer: {
     paddingHorizontal: 24,
@@ -416,6 +416,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
 });

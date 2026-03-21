@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  react-native-track-player@4.1.2:
-    hash: a4a74564d3c18a8fe34543c6d089650a7573cf1a49c60662efc58ccf35abd87b
-    path: patches/react-native-track-player@4.1.2.patch
-
 importers:
 
   .:
@@ -68,8 +63,8 @@ importers:
         specifier: ~15.0.8
         version: 15.0.8(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       expo-build-properties:
-        specifier: ^55.0.10
-        version: 55.0.10(expo@54.0.33)
+        specifier: ~1.0.10
+        version: 1.0.10(expo@54.0.33)
       expo-clipboard:
         specifier: ~8.0.8
         version: 8.0.8(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -97,6 +92,9 @@ importers:
       expo-image-picker:
         specifier: ~17.0.10
         version: 17.0.10(expo@54.0.33)
+      expo-intent-launcher:
+        specifier: ~13.0.8
+        version: 13.0.8(expo@54.0.33)
       expo-keep-awake:
         specifier: ~15.0.8
         version: 15.0.8(expo@54.0.33)(react@19.1.0)
@@ -214,9 +212,6 @@ importers:
       react-native-tab-view:
         specifier: ^4.2.2
         version: 4.2.2(react-native-pager-view@6.9.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      react-native-track-player:
-        specifier: ^4.1.2
-        version: 4.1.2(patch_hash=a4a74564d3c18a8fe34543c6d089650a7573cf1a49c60662efc58ccf35abd87b)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native-view-shot:
         specifier: ^4.0.0
         version: 4.0.3(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -873,9 +868,6 @@ packages:
 
   '@expo/schema-utils@0.1.8':
     resolution: {integrity: sha512-9I6ZqvnAvKKDiO+ZF8BpQQFYWXOJvTAL5L/227RUbWG1OVZDInFifzCBiqAZ3b67NRfeAgpgvbA7rejsqhY62A==}
-
-  '@expo/schema-utils@55.0.2':
-    resolution: {integrity: sha512-QZ5WKbJOWkCrMq0/kfhV9ry8te/OaS34YgLVpG8u9y2gix96TlpRTbxM/YATjNcUR2s4fiQmPCOxkGtog4i37g==}
 
   '@expo/sdk-runtime-versions@1.0.0':
     resolution: {integrity: sha512-Doz2bfiPndXYFPMRwPyGa1k5QaKDVpY806UJj570epIiMzWaYyCtobasyfC++qfIXVb5Ocy7r3tP9d62hAQ7IQ==}
@@ -1865,6 +1857,9 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
+  ajv@8.18.0:
+    resolution: {integrity: sha512-PlXPeEWMXMZ7sPYOHqmDyCJzcfNrUr3fGNKtezX14ykXOEIvyK81d+qydx89KY5O71FKMPaQ2vBfBFI5NHR63A==}
+
   anser@1.4.10:
     resolution: {integrity: sha512-hCv9AqTQ8ycjpSd3upOJd7vFwW1JaoYQ7tpham03GJ1ca8/65rqn0RpaWpItOAd6ylW9wAw6luXYPJIyPFVOww==}
 
@@ -2508,8 +2503,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  expo-build-properties@55.0.10:
-    resolution: {integrity: sha512-9+JCQuIQaEi27XDIFTR2Y4vok0FidWux2UKrKWD5E38/0fozbZcVUzS14FgMF1F0lalmXMgebH/vjRpbYWJIMA==}
+  expo-build-properties@1.0.10:
+    resolution: {integrity: sha512-mFCZbrbrv0AP5RB151tAoRzwRJelqM7bCJzCkxpu+owOyH+p/rFC/q7H5q8B9EpVWj8etaIuszR+gKwohpmu1Q==}
     peerDependencies:
       expo: '*'
 
@@ -2577,6 +2572,11 @@ packages:
     peerDependenciesMeta:
       react-native-web:
         optional: true
+
+  expo-intent-launcher@13.0.8:
+    resolution: {integrity: sha512-sgGFotttKKN6dIatjOEJT8M6Arfakus7vIxgshg5VkxarVhZBGJzOJam7rbUlB1O/gQ8em9G8vhEU9AfjEIe7A==}
+    peerDependencies:
+      expo: '*'
 
   expo-json-utils@0.15.0:
     resolution: {integrity: sha512-duRT6oGl80IDzH2LD2yEFWNwGIC2WkozsB6HF3cDYNoNNdUvFk6uN3YiwsTsqVM/D0z6LEAQ01/SlYvN+Fw0JQ==}
@@ -2768,6 +2768,9 @@ packages:
 
   fast-json-stable-stringify@2.1.0:
     resolution: {integrity: sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==}
+
+  fast-uri@3.1.0:
+    resolution: {integrity: sha512-iPeeDKJSWf4IEOasVVrknXpaBV0IApz/gp7S2bb7Z4Lljbl2MGJRqInZiUrQwV16cpzw/D3S5j5Julj/gT52AA==}
 
   faye-websocket@0.11.4:
     resolution: {integrity: sha512-CzbClwlXAuiRQAlUyfqPgvPoNKTckTPGfwZV4ZdAhVcP2lh9KUxJg2b5GkE7XbjKQ3YJnQ9z6D9ntLAlB+tP8g==}
@@ -3132,6 +3135,9 @@ packages:
 
   json-parse-even-better-errors@2.3.1:
     resolution: {integrity: sha512-xyFwyhro/JEof6Ghe2iz2NcXoj2sloNsWr/XsERDK/oiPCfaNhl5ONfp+jQdAZRQQ0IJWNzH9zIZF7li91kh2w==}
+
+  json-schema-traverse@1.0.0:
+    resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
 
   json5@2.2.3:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
@@ -3906,19 +3912,6 @@ packages:
       react: '>= 18.2.0'
       react-native: '*'
       react-native-pager-view: '>= 6.0.0'
-
-  react-native-track-player@4.1.2:
-    resolution: {integrity: sha512-cIgMlqVJx/95hirUWPRW8CHxiBFj9Rjl/voKHh2jF/2URYMTQyt76t/m2FKvjeYUW2doKv4QSCBIOUmtyDLtJw==}
-    peerDependencies:
-      react: '>=16.8.6'
-      react-native: '>=0.60.0-rc.2'
-      react-native-windows: '>=0.63.0'
-      shaka-player: ^4.7.9
-    peerDependenciesMeta:
-      react-native-windows:
-        optional: true
-      shaka-player:
-        optional: true
 
   react-native-view-shot@4.0.3:
     resolution: {integrity: sha512-USNjYmED7C0me02c1DxKA0074Hw+y/nxo+xJKlffMvfUWWzL5ELh/TJA/pTnVqFurIrzthZDPtDM7aBFJuhrHQ==}
@@ -5505,8 +5498,6 @@ snapshots:
 
   '@expo/schema-utils@0.1.8': {}
 
-  '@expo/schema-utils@55.0.2': {}
-
   '@expo/sdk-runtime-versions@1.0.0': {}
 
   '@expo/spawn-async@1.7.2':
@@ -6694,6 +6685,13 @@ snapshots:
 
   agent-base@7.1.4: {}
 
+  ajv@8.18.0:
+    dependencies:
+      fast-deep-equal: 3.1.3
+      fast-uri: 3.1.0
+      json-schema-traverse: 1.0.0
+      require-from-string: 2.0.2
+
   anser@1.4.10: {}
 
   ansi-escapes@4.3.2:
@@ -7366,11 +7364,10 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
-  expo-build-properties@55.0.10(expo@54.0.33):
+  expo-build-properties@1.0.10(expo@54.0.33):
     dependencies:
-      '@expo/schema-utils': 55.0.2
+      ajv: 8.18.0
       expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native-webview@13.15.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
-      resolve-from: 5.0.0
       semver: 7.7.4
 
   expo-clipboard@8.0.8(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
@@ -7431,6 +7428,10 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
     optionalDependencies:
       react-native-web: 0.21.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+
+  expo-intent-launcher@13.0.8(expo@54.0.33):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native-webview@13.15.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
 
   expo-json-utils@0.15.0: {}
 
@@ -7668,6 +7669,8 @@ snapshots:
   fast-deep-equal@3.1.3: {}
 
   fast-json-stable-stringify@2.1.0: {}
+
+  fast-uri@3.1.0: {}
 
   faye-websocket@0.11.4:
     dependencies:
@@ -8090,6 +8093,8 @@ snapshots:
   jsesc@3.1.0: {}
 
   json-parse-even-better-errors@2.3.1: {}
+
+  json-schema-traverse@1.0.0: {}
 
   json5@2.2.3: {}
 
@@ -9035,11 +9040,6 @@ snapshots:
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
       react-native-pager-view: 6.9.1(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       use-latest-callback: 0.2.6(react@19.1.0)
-
-  react-native-track-player@4.1.2(patch_hash=a4a74564d3c18a8fe34543c6d089650a7573cf1a49c60662efc58ccf35abd87b)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
-    dependencies:
-      react: 19.1.0
-      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
   react-native-view-shot@4.0.3(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0):
     dependencies:

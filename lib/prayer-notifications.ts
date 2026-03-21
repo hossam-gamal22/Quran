@@ -7,7 +7,9 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
-import { t } from '@/lib/i18n';
+import { t } from './i18n';
+import { getOrCreateSoundChannel } from './push-notifications';
+import { dirText } from './notification-text-direction';
 import { 
   NotificationSettings, 
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -65,10 +67,6 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     return false;
   }
 
-  if (!Device.isDevice) {
-    return false;
-  }
-
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('prayer-times', {
       name: t('notifications.prayerChannel'),
@@ -76,7 +74,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#1B6B3A',
-      sound: 'general_reminder.mp3',
+      sound: 'general_reminder', // Android raw resource WITHOUT .mp3 extension
     });
   }
 
@@ -143,6 +141,54 @@ export async function schedulePrayerNotifications(
       appSettings.calculationMethod
     );
 
+    // Resolve the Android channel for the user's selected sound
+    const adhanSoundType = notifSettings.adhanSoundType;
+    const soundType = notifSettings.soundType;
+    // Prefer adhan-specific sound, then global soundType, then default
+    const effectiveSoundType = adhanSoundType && adhanSoundType !== 'default' ? adhanSoundType : soundType;
+    const resolvedChannelId = await getOrCreateSoundChannel('prayer-times', effectiveSoundType);
+
+    // Map of sound types to actual filenames (must match app.json expo-notifications sounds)
+    const SOUND_FILES: Record<string, string> = {
+      makkah: 'makkah.mp3',
+      madinah: 'madinah.mp3',
+      alaqsa: 'alaqsa.mp3',
+      mishary: 'mishary.mp3',
+      abdulbasit: 'abdulbasit.mp3',
+      sudais: 'sudais.mp3',
+      egypt: 'egypt.mp3',
+      dosari: 'dosari.mp3',
+      ajman: 'ajman.mp3',
+      ali_mulla: 'ali_mulla.mp3',
+      naqshbandi: 'naqshbandi.mp3',
+      sharif: 'sharif.mp3',
+      mansoor_zahrani: 'mansoor_zahrani.mp3',
+      haramain: 'haramain.mp3',
+      general_reminder: 'general_reminder.mp3',
+      salawat: 'salawat.mp3',
+      istighfar: 'istighfar.mp3',
+      tasbih: 'tasbih.mp3',
+    };
+
+    // Determine the sound value for notification content
+    // iOS: 'default' = system sound, 'filename.mp3' = custom, false = silent
+    // Android: channel controls sound, but we set content.sound too
+    let soundValue: string | false = 'default';
+    
+    if (!notifSettings.adhanSound || effectiveSoundType === 'silent') {
+      // Silent - no sound
+      soundValue = false;
+    } else if (effectiveSoundType && effectiveSoundType !== 'default') {
+      // Custom sound - look up in map
+      const soundFile = SOUND_FILES[effectiveSoundType];
+      if (soundFile) {
+        // Android: no extension, iOS: with extension
+        soundValue = Platform.OS === 'android' 
+          ? soundFile.replace(/\.mp3$/, '') 
+          : soundFile;
+      }
+    }
+
     const scheduledIds: string[] = [];
 
     for (const prayerKey of PRAYER_KEYS) {
@@ -163,12 +209,12 @@ export async function schedulePrayerNotifications(
         const id = await Notifications.scheduleNotificationAsync({
           identifier: `prayer_${prayerKey}`,
           content: {
-            title: `${emoji} ${prayerName}`,
-            body: message,
+            title: dirText(`${emoji} ${prayerName}`),
+            body: dirText(message),
             data: { prayer: prayerKey, time: timeStr },
-            sound: 'general_reminder.mp3',
+            sound: soundValue,
             priority: Notifications.AndroidNotificationPriority.HIGH,
-            ...(Platform.OS === 'android' && { channelId: 'prayer-times' }),
+            ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,

@@ -62,7 +62,7 @@ const AZKAR_CATEGORIES = [
   { id: 'evening', nameKey: 'home.eveningAzkar', icon: 'weather-night', color: '#5d4e8c', count: 33 },
   { id: 'sleep', nameKey: 'home.sleepAzkar', icon: 'bed', color: '#3a7ca5', count: 15 },
   { id: 'wakeup', nameKey: 'home.wakeupAzkar', icon: 'weather-sunset-up', color: '#c17f59', count: 10 },
-  { id: 'after_prayer', nameKey: 'azkar.afterPrayer', icon: 'mosque', color: '#2f7659', count: 20 },
+  { id: 'after_prayer', nameKey: 'azkar.afterPrayer', icon: 'mosque', color: '#22C55E', count: 20 },
   { id: 'ruqya', nameKey: 'azkar.ruqya', icon: 'shield-check', color: '#e91e63', count: 12 },
 ];
 
@@ -74,7 +74,7 @@ const QUICK_ACCESS = [
   { id: 'surah_yasin', nameKey: 'home.surahYasin', icon: 'book-open-page-variant', color: '#5d4e8c' },
   { id: 'surah_mulk', nameKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488' },
   { id: 'names', nameKey: 'home.namesOfAllah', icon: 'star-crescent', color: '#c17f59' },
-  { id: 'tasbih', nameKey: 'tabs.tasbih', icon: 'counter', color: '#2f7659' },
+  { id: 'tasbih', nameKey: 'tabs.tasbih', icon: 'counter', color: '#22C55E' },
   { id: 'salawat', nameKey: 'home.salawat', icon: 'star-crescent', color: '#e91e63' },
   { id: 'istighfar', nameKey: 'home.istighfar', icon: 'heart', color: '#8B5CF6' },
   { id: 'hajj', nameKey: 'hajjUmrah.title', icon: 'star-crescent', color: '#0D9488' },
@@ -99,12 +99,12 @@ const EXTRA_APP_PAGES: CustomQuickAccessItem[] = [
   { id: 'page_hijri', icon: 'calendar-month', color: '#0D9488', label: '', nameKey: 'home.hijriCalendar', route: '/hijri' },
   { id: 'page_widget_settings', icon: 'widgets', color: '#6366F1', label: '', nameKey: 'home.widgetSettingsLabel', route: '/widget-settings' },
   { id: 'page_daily_dua', icon: 'hands-pray', color: '#c17f59', label: '', nameKey: 'home.dailyDua', route: '/daily-dua' },
-  { id: 'page_seerah', icon: 'book-account', color: '#2f7659', label: '', nameKey: 'home.seerah', route: '/seerah' },
+  { id: 'page_seerah', icon: 'book-account', color: '#22C55E', label: '', nameKey: 'home.seerah', route: '/seerah' },
   { id: 'page_names', icon: 'star-crescent', color: '#DAA520', label: '', nameKey: 'home.namesOfAllah', route: '/names' },
   { id: 'page_ruqya', icon: 'shield-check', color: '#e91e63', label: '', nameKey: 'azkar.ruqya', route: '/ruqya' },
-  { id: 'page_companions', icon: 'account-group', color: '#2f7659', label: '', nameKey: 'companions.title', route: '/companions' },
+  { id: 'page_companions', icon: 'account-group', color: '#22C55E', label: '', nameKey: 'companions.title', route: '/companions' },
   { id: 'page_quran_bookmarks', icon: 'bookmark', color: '#4CAF50', label: '', nameKey: 'home.quranBookmarks', route: '/quran-bookmarks' },
-  { id: 'page_worship_tracker', icon: 'chart-line', color: '#2f7659', label: '', nameKey: 'home.followWorship', route: '/worship-tracker' },
+  { id: 'page_worship_tracker', icon: 'chart-line', color: '#22C55E', label: '', nameKey: 'home.followWorship', route: '/worship-tracker' },
 ];
 
 const CUSTOM_ITEMS_STORAGE_KEY = '@quick_access_custom_items';
@@ -112,7 +112,7 @@ const COLLAPSED_SECTIONS_KEY = '@home_collapsed_sections';
 
 const DUA_CATEGORIES = [
   { id: 'quran_duas', nameKey: 'azkar.quranDuas', icon: 'book-open-variant', color: '#3a7ca5' },
-  { id: 'sunnah_duas', nameKey: 'azkar.sunnahDuas', icon: 'book-cross', color: '#2f7659' },
+  { id: 'sunnah_duas', nameKey: 'azkar.sunnahDuas', icon: 'book-cross', color: '#22C55E' },
 ];
 
 // ========================================
@@ -145,7 +145,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: 'evening', labelKey: 'home.eveningAzkar', icon: 'weather-night', color: '#5d4e8c', route: '/azkar/evening' },
       { id: 'sleep', labelKey: 'home.sleepAzkar', icon: 'bed', color: '#3a7ca5', route: '/azkar/sleep' },
       { id: 'wakeup', labelKey: 'home.wakeupAzkar', icon: 'weather-sunset-up', color: '#c17f59', route: '/azkar/wakeup' },
-      { id: 'after_prayer', labelKey: 'azkar.afterPrayer', icon: 'mosque', color: '#2f7659', route: '/azkar/after_prayer' },
+      { id: 'after_prayer', labelKey: 'azkar.afterPrayer', icon: 'mosque', color: '#22C55E', route: '/azkar/after_prayer' },
       { id: 'benefit_azkar', labelKey: 'home.benefitAzkar', icon: 'information', color: '#f5a623', route: '/azkar-search?mode=benefits' },
     ],
   },
@@ -156,7 +156,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     color: '#6366F1',
     items: [
       { id: 'seerah', labelKey: 'seerah.title', icon: 'book-account', color: '#6366F1', route: '/seerah' },
-      { id: 'companions', labelKey: 'companions.title', icon: 'account-group', color: '#2f7659', route: '/companions' },
+      { id: 'companions', labelKey: 'companions.title', icon: 'account-group', color: '#22C55E', route: '/companions' },
     ],
   },
   {
@@ -166,7 +166,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     color: '#0D9488',
     items: [
       { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#2f7659', route: '/umrah' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#22C55E', route: '/umrah' },
     ],
   },
   {
@@ -180,7 +180,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah/67' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#DAA520', route: '/surah/2?ayah=255' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#f5a623', route: '/daily-ayah' },
-      { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#2f7659', route: '/(tabs)/quran' },
+      { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#22C55E', route: '/(tabs)/quran' },
     ],
   },
   {
@@ -200,14 +200,15 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     id: 'worship',
     titleKey: 'home.worshipSection',
     icon: 'mosque',
-    color: '#2f7659',
+    color: '#22C55E',
     items: [
-      { id: 'worship_tracker', labelKey: 'home.worshipTracker', icon: 'chart-areaspline', color: '#2f7659', route: '/worship-tracker' },
-      { id: 'prayer_times', labelKey: 'home.prayerTimesLabel', icon: 'clock-outline', color: '#2f7659', route: '/(tabs)/prayer' },
+      { id: 'worship_tracker', labelKey: 'home.worshipTracker', icon: 'chart-areaspline', color: '#22C55E', route: '/worship-tracker' },
+      { id: 'prayer_times', labelKey: 'home.prayerTimesLabel', icon: 'clock-outline', color: '#22C55E', route: '/(tabs)/prayer' },
       { id: 'qibla', labelKey: 'home.qibla', icon: 'compass', color: '#5856D6', route: '/(tabs)/prayer?tab=qibla' },
       { id: 'next_prayer', labelKey: 'home.myNextPrayer', icon: 'mosque', color: '#0D9488', route: '/(tabs)/prayer?view=next' },
       { id: 'hijri_calendar', labelKey: 'home.hijriCalendar', icon: 'calendar-month', color: '#0D9488', route: '/hijri' },
       { id: 'radio', labelKey: 'radio.title', icon: 'radio', color: '#22C55E', route: '/radio' },
+      { id: 'question_answer', labelKey: 'questionAnswer.title', icon: 'frequently-asked-questions', color: '#6366F1', route: '/question-answer' },
     ],
   },
   {
@@ -216,7 +217,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
     icon: 'counter',
     color: '#8B5CF6',
     items: [
-      { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#2f7659', route: '/(tabs)/tasbih' },
+      { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#22C55E', route: '/(tabs)/tasbih' },
       { id: 'istighfar', labelKey: 'home.istighfar', icon: 'heart', color: '#8B5CF6', route: '/azkar/istighfar' },
       { id: 'salawat', labelKey: 'home.salawat', icon: 'star-crescent', color: '#e91e63', route: '/azkar/salawat' },
       { id: 'tasbih_log', labelKey: 'home.tasbihLog', icon: 'history', color: '#3a7ca5', route: '/tasbih-stats' },
@@ -246,7 +247,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'evening_azkar', labelKey: 'home.eveningAzkar', icon: 'weather-night', color: '#5d4e8c', route: '/azkar/evening' },
       { id: 'sleep_azkar', labelKey: 'home.sleepAzkar', icon: 'bed', color: '#3a7ca5', route: '/azkar/sleep' },
       { id: 'wakeup_azkar', labelKey: 'home.wakeupAzkar', icon: 'weather-sunset-up', color: '#c17f59', route: '/azkar/wakeup' },
-      { id: 'after_prayer_azkar', labelKey: 'azkar.afterPrayer', icon: 'mosque', color: '#2f7659', route: '/azkar/after_prayer' },
+      { id: 'after_prayer_azkar', labelKey: 'azkar.afterPrayer', icon: 'mosque', color: '#22C55E', route: '/azkar/after_prayer' },
       { id: 'benefit_azkar', labelKey: 'home.benefitAzkar', icon: 'information', color: '#f5a623', route: '/azkar-search?mode=benefits' },
     ],
   },
@@ -254,14 +255,14 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     id: 'cat_stories', titleKey: 'home.storiesSection', icon: 'book-account', color: '#6366F1',
     items: [
       { id: 'seerah', labelKey: 'seerah.title', icon: 'book-account', color: '#6366F1', route: '/seerah' },
-      { id: 'companions_stories', labelKey: 'companions.title', icon: 'account-group', color: '#2f7659', route: '/companions' },
+      { id: 'companions_stories', labelKey: 'companions.title', icon: 'account-group', color: '#22C55E', route: '/companions' },
     ],
   },
   {
     id: 'cat_hajj', titleKey: 'home.hajjUmrahSection', icon: 'star-crescent', color: '#0D9488',
     items: [
       { id: 'hajj_duas', labelKey: 'hajjUmrah.hajj', icon: 'mosque', color: '#0D9488', route: '/hajj' },
-      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#2f7659', route: '/umrah' },
+      { id: 'umrah_duas', labelKey: 'hajjUmrah.umrah', icon: 'hands-pray', color: '#22C55E', route: '/umrah' },
     ],
   },
   {
@@ -272,7 +273,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'surah_mulk', labelKey: 'home.surahMulk', icon: 'book-open-page-variant', color: '#0D9488', route: '/surah/67' },
       { id: 'ayat_kursi', labelKey: 'home.ayatKursi', icon: 'shield-star', color: '#DAA520', route: '/surah/2?ayah=255' },
       { id: 'daily_ayah', labelKey: 'home.dailyVerse', icon: 'star-four-points', color: '#f5a623', route: '/daily-ayah' },
-      { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#2f7659', route: '/(tabs)/quran' },
+      { id: 'full_mushaf', labelKey: 'home.fullMushaf', icon: 'book-open-variant', color: '#22C55E', route: '/(tabs)/quran' },
     ],
   },
   {
@@ -286,20 +287,21 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
     ],
   },
   {
-    id: 'cat_worship', titleKey: 'home.worshipSection', icon: 'mosque', color: '#2f7659',
+    id: 'cat_worship', titleKey: 'home.worshipSection', icon: 'mosque', color: '#22C55E',
     items: [
-      { id: 'worship_tracker', labelKey: 'home.worshipTracker', icon: 'chart-areaspline', color: '#2f7659', route: '/worship-tracker' },
-      { id: 'prayer_times', labelKey: 'home.prayerTimesLabel', icon: 'clock-outline', color: '#2f7659', route: '/(tabs)/prayer' },
+      { id: 'worship_tracker', labelKey: 'home.worshipTracker', icon: 'chart-areaspline', color: '#22C55E', route: '/worship-tracker' },
+      { id: 'prayer_times', labelKey: 'home.prayerTimesLabel', icon: 'clock-outline', color: '#22C55E', route: '/(tabs)/prayer' },
       { id: 'qibla', labelKey: 'home.qibla', icon: 'compass', color: '#5856D6', route: '/(tabs)/prayer?tab=qibla' },
       { id: 'next_prayer', labelKey: 'home.myNextPrayer', icon: 'mosque', color: '#0D9488', route: '/(tabs)/prayer?view=next' },
       { id: 'hijri_calendar', labelKey: 'home.hijriCalendar', icon: 'calendar-month', color: '#0D9488', route: '/hijri' },
       { id: 'radio', labelKey: 'radio.title', icon: 'radio', color: '#22C55E', route: '/radio' },
+      { id: 'question_answer', labelKey: 'questionAnswer.title', icon: 'frequently-asked-questions', color: '#6366F1', route: '/question-answer' },
     ],
   },
   {
     id: 'cat_tasbih', titleKey: 'home.tasbihSection', icon: 'counter', color: '#8B5CF6',
     items: [
-      { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#2f7659', route: '/(tabs)/tasbih' },
+      { id: 'tasbih', labelKey: 'tabs.tasbih', icon: 'counter', color: '#22C55E', route: '/(tabs)/tasbih' },
       { id: 'istighfar', labelKey: 'home.istighfar', icon: 'heart', color: '#8B5CF6', route: '/azkar/istighfar' },
       { id: 'salawat', labelKey: 'home.salawat', icon: 'star-crescent', color: '#e91e63', route: '/azkar/salawat' },
       { id: 'tasbih_log', labelKey: 'home.tasbihLog', icon: 'history', color: '#3a7ca5', route: '/tasbih-stats' },
@@ -361,7 +363,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMo
               <View style={styles.gridCardIcon}> 
                 <MaterialCommunityIcons name={category.icon as any} size={28} color={category.color} />
               </View>
-              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2}>
+              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {t(category.nameKey)}
               </Text>
             </View>
@@ -401,7 +403,7 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMo
             <View style={styles.listCardIcon}> 
               <MaterialCommunityIcons name={category.icon as any} size={22} color={category.color} />
             </View>
-            <Text style={[styles.listCardLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            <Text style={[styles.listCardLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {t(category.nameKey)}
             </Text>
             <MaterialCommunityIcons
@@ -476,7 +478,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }} style={[collapsibleStyles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} activeOpacity={0.7}>
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-          {icon && <MaterialCommunityIcons name={icon as any} size={20} color="#2f7659" />}
+          {icon && <MaterialCommunityIcons name={icon as any} size={20} color="#22C55E" />}
           <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0, textAlign: isRTL ? 'right' : 'left' }, isDarkMode && styles.textMuted]}>{title}</Text>
           {infoKey && <SectionInfoButton sectionKey={infoKey} />}
         </View>
@@ -796,58 +798,70 @@ export default function HomeScreen() {
     .filter(item => selectedQuickAccessIds.includes(item.id))
     .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
 
+  // Strip emoji characters that can't render with custom fonts (show as "?" boxes)
+  const stripEmojis = useCallback((text: string) => {
+    return text
+      .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{FE00}-\u{FE0F}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{200D}]|[\u{20E3}]|[\u{FE0F}]|[\u{E0020}-\u{E007F}]|[\u{1F100}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{E000}-\u{F8FF}]/gu, '')
+      .trim();
+  }, []);
+
   // Resolve multi-lang banner text with fallback: titles[lang] → titles.en → t() seasonal key → title
   const resolveBannerText = useCallback((banner: WelcomeBannerConfig, field: 'title' | 'subtitle') => {
     const lang = (settings.language || 'ar') as keyof MultiLangText;
     const multiField = field === 'title' ? banner.titles : banner.subtitles;
     if (multiField) {
       const resolved = multiField[lang] || multiField.en;
-      if (resolved) return resolved;
+      if (resolved) return stripEmojis(resolved);
     }
     // If current language is Arabic, return the Arabic field directly
-    if (lang === 'ar') return banner[field];
+    if (lang === 'ar') return stripEmojis(banner[field]);
     // For non-Arabic languages without multi-lang data, try translation keys
     const text = banner[field] || '';
     if (text.includes('\u0639\u064a\u062f') || text.includes('\u0645\u0628\u0627\u0631\u0643')) {
-      return t(field === 'title' ? 'seasonal.eid.title' : 'seasonal.eid.subtitle');
+      return stripEmojis(t(field === 'title' ? 'seasonal.eid.title' : 'seasonal.eid.subtitle'));
     }
     if (text.includes('\u0631\u0645\u0636\u0627\u0646')) {
-      return t(field === 'title' ? 'seasonal.ramadan.title' : 'seasonal.ramadan.subtitle');
+      return stripEmojis(t(field === 'title' ? 'seasonal.ramadan.title' : 'seasonal.ramadan.subtitle'));
     }
-    return banner[field];
-  }, [settings.language]);
+    return stripEmojis(banner[field]);
+  }, [settings.language, stripEmojis]);
 
-  // Welcome banner from Firestore
-  const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>({
-    enabled: true,
-    title: t('seasonal.ramadan.title'),
-    subtitle: t('seasonal.ramadan.subtitle'),
-    icon: 'heart',
-    color: '#2f7659',
-    route: '/worship-tracker',
-  });
+  // Welcome banner from Firestore (start null to avoid flash of stale content)
+  const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>(null);
+
+  // Helper: check if banner is within its scheduled date range
+  const isBannerActive = useCallback((banner: WelcomeBannerConfig | null): boolean => {
+    if (!banner || !banner.enabled) return false;
+    const now = new Date();
+    if ((banner as any).scheduledFrom) {
+      const from = new Date((banner as any).scheduledFrom);
+      if (from > now) return false;
+    }
+    if ((banner as any).scheduledUntil) {
+      const until = new Date((banner as any).scheduledUntil);
+      if (until < now) return false;
+    }
+    return true;
+  }, []);
 
   useEffect(() => {
     let mounted = true;
+    // 1) Load from AsyncStorage cache instantly (no flash)
+    AsyncStorage.getItem('remote_app_config').then(cached => {
+      if (!mounted) return;
+      if (cached) {
+        try {
+          const cfg = JSON.parse(cached);
+          if (cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
+        } catch {}
+      }
+    });
+    // 2) Then fetch from Firebase (updates if changed)
     fetchAppConfig().then(cfg => {
       if (mounted && cfg.welcomeBanner) setWelcomeBanner(cfg.welcomeBanner);
     }).catch(() => {});
     return () => { mounted = false; };
   }, []);
-
-  // Keep default banner in sync with language changes
-  useEffect(() => {
-    setWelcomeBanner(prev => {
-      if (prev && !prev.titles && !prev.subtitles) {
-        return {
-          ...prev,
-          title: t('seasonal.ramadan.title'),
-          subtitle: t('seasonal.ramadan.subtitle'),
-        };
-      }
-      return prev;
-    });
-  }, [settings.language]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -982,13 +996,13 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={isDarkMode ? '#fff' : '#2f7659'}
-            colors={['#2f7659']}
+            tintColor={isDarkMode ? '#fff' : '#22C55E'}
+            colors={['#22C55E']}
           />
         }
       >
         {/* الرسالة الترحيبية */}
-        {welcomeBanner?.enabled && (
+        {isBannerActive(welcomeBanner) && welcomeBanner && (
           <Animated.View entering={FadeIn.duration(600)}>
             <TouchableOpacity
               activeOpacity={0.9}
@@ -1013,7 +1027,11 @@ export default function HomeScreen() {
                         <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
                         <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
                       </View>
-                      <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'heart') as any} size={36} color="#fff" />
+                      {welcomeBanner.customIconUrl ? (
+                        <Image source={{ uri: welcomeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
+                      ) : (
+                        <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
+                      )}
                     </View>
                   </View>
                 </ImageBackground>
@@ -1026,7 +1044,11 @@ export default function HomeScreen() {
                       <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
                       <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
                     </View>
-                    <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'heart') as any} size={36} color="#fff" />
+                    {welcomeBanner.customIconUrl ? (
+                      <Image source={{ uri: welcomeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
+                    ) : (
+                      <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
+                    )}
                   </View>
                 </View>
               )}
@@ -1171,7 +1193,7 @@ export default function HomeScreen() {
                               <View style={styles.gridCardIcon}>
                                 <MaterialCommunityIcons name={item.icon as any} size={28} color={item.color} />
                               </View>
-                              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2}>
+                              <Text style={[styles.gridCardLabel, isDarkMode && styles.textLight]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                                 {t(item.labelKey)}
                               </Text>
                             </>
@@ -1181,7 +1203,7 @@ export default function HomeScreen() {
                                 <View style={[styles.listCardIcon, { backgroundColor: `${item.color}18` }]}>
                                   <MaterialCommunityIcons name={item.icon as any} size={24} color={item.color} />
                                 </View>
-                                <Text style={[styles.listCardLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
+                                <Text style={[styles.listCardLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                                   {t(item.labelKey)}
                                 </Text>
                               </View>
@@ -1203,7 +1225,6 @@ export default function HomeScreen() {
         ))}
 
         <BannerAdComponent screen="home" />
-        <View style={styles.bottomSpace} />
       </ScrollView>
       </SafeAreaView>
 
@@ -1333,7 +1354,7 @@ export default function HomeScreen() {
                                 <MaterialCommunityIcons
                                   name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
                                   size={24}
-                                  color={isSelected ? '#2f7659' : (isDarkMode ? '#666' : '#ccc')}
+                                  color={isSelected ? '#22C55E' : (isDarkMode ? '#666' : '#ccc')}
                                 />
                               </TouchableOpacity>
                             );
@@ -1371,7 +1392,7 @@ export default function HomeScreen() {
                           <View style={[styles.modalItemIcon, { backgroundColor: `${page.color}20` }]}><MaterialCommunityIcons name={page.icon as any} size={20} color={page.color} /></View>
                           <Text style={[styles.modalItemLabel, { color: colors.text }]}>{page.nameKey ? t(page.nameKey) : page.label}</Text>
                         </View>
-                        {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#2f7659" />}
+                        {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#22C55E" />}
                       </TouchableOpacity>
                     );
                   })}
@@ -1400,7 +1421,7 @@ export default function HomeScreen() {
                               <Text style={[styles.surahSubtitle, { color: colors.textLight }]}>{surah.englishName} · {surah.ayahs.length} {t('quran.ayahs')}</Text>
                             </View>
                           </View>
-                          {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#2f7659" />}
+                          {alreadyAdded && <MaterialCommunityIcons name="check" size={20} color="#22C55E" />}
                         </TouchableOpacity>
                       );
                     })}
@@ -1591,7 +1612,7 @@ export default function HomeScreen() {
                             setNotificationScheduled(false);
                           });
                         }}
-                        trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+                        trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
                         thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
                         ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
                       />
@@ -1985,7 +2006,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.12)',
   },
   modalBtnConfirm: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   modalBtnText: {
     fontSize: 15,
@@ -2040,7 +2061,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalModeBtnActive: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   modalModeBtnText: {
     fontSize: 14,

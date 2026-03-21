@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
   Switch,
   TextInput,
@@ -13,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { t } from '@/lib/i18n';
@@ -125,14 +125,14 @@ export default function AdsSettingsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Master Toggle */}
         <View style={styles.mainToggle}>

@@ -25,7 +25,7 @@ export default function OnboardingIndex() {
   // شاشة التحميل أثناء التحقق والتوجيه
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#2f7659" />
+      <ActivityIndicator size="large" color="#22C55E" />
     </View>
   );
 }

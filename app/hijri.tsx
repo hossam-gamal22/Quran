@@ -619,7 +619,6 @@ export default function HijriScreen() {
         </View>
 
         <BannerAdComponent screen="hijri" />
-        <View style={{ height: 30 }} />
       </ScrollView>
 
       {/* ============================================ */}
@@ -734,7 +733,7 @@ const styles = StyleSheet.create({
   weekdayText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
   },
 
@@ -755,7 +754,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   dayCellToday: {
-    backgroundColor: 'rgba(47,118,89,0.15)',
+    backgroundColor: 'rgba(6,79,47,0.15)',
     borderRadius: BorderRadius.md,
   },
   blessedPeriodCell: {
@@ -837,7 +836,7 @@ const styles = StyleSheet.create({
   },
   selectedEventDesc: {
     fontSize: Typography.sizes.xs,
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
   },
 

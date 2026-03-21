@@ -24,7 +24,7 @@ function formatTime(ms: number): string {
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const ACCENT = '#2f7659';
+const ACCENT = '#22C55E';
 
 export function GlobalAudioBar() {
   const { isDarkMode } = useSettings();
@@ -119,7 +119,7 @@ export function GlobalAudioBar() {
   };
 
   const textColor = isDarkMode ? '#fff' : '#1C1C1E';
-  const textSecondary = isDarkMode ? '#8E8E93' : '#3A3A3C';
+  const textSecondary = isDarkMode ? '#A8A8AD' : '#3A3A3C';
 
   if (minimized) {
     return (

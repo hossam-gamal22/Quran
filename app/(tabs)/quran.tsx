@@ -796,7 +796,7 @@ export default function QuranScreen() {
 
         {/* الهيدر */}
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {/* Right side in RTL: worship tracker + favorites + radio */}
+          {/* Right side in RTL: worship tracker + radio */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
             <TouchableOpacity
               style={styles.headerBtn}
@@ -810,12 +810,6 @@ export default function QuranScreen() {
             >
               <MaterialCommunityIcons name="chart-bar" size={22} color={colors.text} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerBtn}
-              onPress={openBookmarkPage}
-            >
-              <MaterialCommunityIcons name="bookmark-outline" size={22} color={colors.text} />
-            </TouchableOpacity>
           </View>
 
           {/* Center: title */}
@@ -825,8 +819,14 @@ export default function QuranScreen() {
             </Text>
           </View>
 
-          {/* Left side in RTL: settings */}
+          {/* Left side in RTL: bookmark + settings */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
+            <TouchableOpacity
+              style={styles.headerBtn}
+              onPress={openBookmarkPage}
+            >
+              <MaterialCommunityIcons name="bookmark-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerBtn}
               onPress={() => setShowSettings(true)}
@@ -1093,7 +1093,7 @@ export default function QuranScreen() {
                           <MaterialCommunityIcons
                             name="close"
                             size={16}
-                            color={isLightBg ? '#6c6c70' : '#8e8e93'}
+                            color={isLightBg ? '#6c6c70' : '#A8A8AD'}
                           />
                         </View>
                       </BlurView>

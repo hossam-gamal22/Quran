@@ -151,11 +151,11 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
   showAdOnAppOpen: true,
   showAdOnQiblaStyleChange: true,
   interstitialMode: 'pages',
-  interstitialFrequency: 5,
-  interstitialTimeInterval: 3,
+  interstitialFrequency: 8,
+  interstitialTimeInterval: 5,
   interstitialSessionLimit: 2,
   delayFirstAd: true,
-  firstAdDelay: 30,
+  firstAdDelay: 60,
 };
 
 // ==================== Functions ====================
@@ -342,7 +342,7 @@ export const getSlotsForScreen = (
 // Prevents ANY ad type from showing within 2 minutes of another ad
 
 let _globalLastAdTime = 0;
-const GLOBAL_AD_COOLDOWN = 120_000; // 2 minutes between any ad types
+const GLOBAL_AD_COOLDOWN = 300_000; // 5 minutes between any ad types (was 2 min)
 
 export function canShowGlobalAd(): boolean {
   return Date.now() - _globalLastAdTime >= GLOBAL_AD_COOLDOWN;

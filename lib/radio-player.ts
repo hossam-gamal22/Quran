@@ -1,47 +1,14 @@
 // lib/radio-player.ts
-// Radio player engine — uses TrackPlayer in native builds, expo-av in Expo Go
-// Provides high-level API for radio streaming with lock screen controls
+// Radio player engine — uses expo-av for audio streaming
+// Provides high-level API for radio streaming
 
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
 import { Audio } from 'expo-av';
-import { setupTrackPlayer, isTrackPlayerSetup } from '@/lib/track-player-setup';
 import { resolveStreamUrl } from '@/services/radioService';
+import { audioCoordinator } from '@/lib/audio-coordinator';
 import type { RadioStation, RadioPlaybackState, RadioPlaybackStatus } from '@/types/radio';
 
-// Detect Expo Go — 'storeClient' means running inside Expo Go
-const _isExpoGo = Constants.executionEnvironment === 'storeClient';
-
-// Lazy-loaded TrackPlayer (only in native/dev builds)
-let _TrackPlayer: any = null;
-let _State: any = null;
-let _Event: any = null;
-let _trackPlayerAvailable = false;
-
-function getTrackPlayer() {
-  if (_isExpoGo) return null; // Never attempt in Expo Go
-  if (_TrackPlayer) return _TrackPlayer;
-  try {
-    const mod = require('react-native-track-player');
-    _TrackPlayer = mod.default || mod;
-    _State = mod.State;
-    _Event = mod.Event;
-    _trackPlayerAvailable = true;
-    return _TrackPlayer;
-  } catch {
-    _trackPlayerAvailable = false;
-    return null;
-  }
-}
-
-export function isTrackPlayerAvailable(): boolean {
-  if (_isExpoGo) return false;
-  if (_trackPlayerAvailable) return true;
-  getTrackPlayer();
-  return _trackPlayerAvailable;
-}
-
-// ==================== expo-av Fallback (for Expo Go) ====================
+// ==================== expo-av Audio Player ====================
 
 let _expoAvSound: Audio.Sound | null = null;
 let _expoAvAudioConfigured = false;
@@ -58,27 +25,77 @@ async function ensureExpoAvConfig() {
 }
 
 async function playWithExpoAv(url: string): Promise<void> {
+  console.log('[RadioPlayer] playWithExpoAv:', url);
   await ensureExpoAvConfig();
   // Unload previous sound
   if (_expoAvSound) {
     try { await _expoAvSound.unloadAsync(); } catch {}
     _expoAvSound = null;
   }
-  const { sound } = await Audio.Sound.createAsync(
+
+  // Pre-check the stream URL with a HEAD request (quick 3s timeout)
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok && res.status !== 200) {
+      console.warn(`[RadioPlayer] Stream URL returned ${res.status}: ${url}`);
+      throw new Error(`Stream returned HTTP ${res.status}`);
+    }
+    console.log(`[RadioPlayer] Stream URL OK (${res.status}), creating sound...`);
+  } catch (e: any) {
+    // AbortError means timeout — still try to play (some streams don't reply to HEAD)
+    if (e?.name !== 'AbortError') {
+      throw e;
+    }
+    console.log('[RadioPlayer] HEAD request timed out, trying to play anyway...');
+  }
+
+  // Race createAsync against a timeout — some dead URLs hang forever
+  const createPromise = Audio.Sound.createAsync(
     { uri: url },
-    { shouldPlay: true },
+    { shouldPlay: true, progressUpdateIntervalMillis: 500 },
   );
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Stream connection timed out')), 15_000)
+  );
+  const { sound } = await Promise.race([createPromise, timeoutPromise]);
   _expoAvSound = sound;
+  console.log('[RadioPlayer] expo-av sound created successfully');
+
+  // Set up a playback start timeout — if not playing within 8s, error out
+  let playbackStarted = false;
+  const playbackTimer = setTimeout(() => {
+    if (!playbackStarted && _expoAvSound === sound) {
+      console.warn('[RadioPlayer] expo-av: No playback after 12s, erroring out');
+      updateState({ status: 'error', errorMessage: 'Stream failed to start playing' });
+      try { sound.unloadAsync(); } catch {}
+      if (_expoAvSound === sound) _expoAvSound = null;
+    }
+  }, 12_000);
+
   // Monitor playback status
   sound.setOnPlaybackStatusUpdate((status) => {
     if (!status.isLoaded) {
       if (status.error) {
+        console.warn('[RadioPlayer] expo-av error:', status.error);
+        playbackStarted = true; // prevent timeout from also firing
+        clearTimeout(playbackTimer);
         updateState({ status: 'error', errorMessage: status.error });
       }
       return;
     }
-    if (status.isPlaying) updateState({ status: 'playing' });
-    else if (status.isBuffering) updateState({ status: 'buffering' });
+    if (status.isPlaying) {
+      if (!playbackStarted) {
+        playbackStarted = true;
+        clearTimeout(playbackTimer);
+        console.log('[RadioPlayer] expo-av: Stream is PLAYING');
+      }
+      updateState({ status: 'playing' });
+    } else if (status.isBuffering) {
+      updateState({ status: 'buffering' });
+    }
   });
 }
 
@@ -120,10 +137,11 @@ let currentState: RadioPlaybackState = {
   volume: 1,
 };
 
-// Auto-retry config for Android stream failures
+// Auto-retry config for stream failures
 let _retryCount = 0;
 const MAX_AUTO_RETRIES = 2;
 let _retryTimer: ReturnType<typeof setTimeout> | null = null;
+let _playLock = false;
 
 const listeners = new Set<RadioPlayerListener>();
 
@@ -136,52 +154,6 @@ function notifyListeners() {
 function updateState(partial: Partial<RadioPlaybackState>) {
   currentState = { ...currentState, ...partial };
   notifyListeners();
-}
-
-// ==================== Track Player Event Monitoring ====================
-
-let eventsRegistered = false;
-
-function registerPlayerEvents() {
-  if (eventsRegistered || Platform.OS === 'web') return;
-  const TP = getTrackPlayer();
-  if (!TP || !_Event || !_State) return;
-  eventsRegistered = true;
-
-  TP.addEventListener(_Event.PlaybackState, (event: any) => {
-    const state = event.state;
-    let status: RadioPlaybackStatus = 'idle';
-
-    if (state === _State.Playing) status = 'playing';
-    else if (state === _State.Paused) status = 'paused';
-    else if (state === _State.Buffering || state === _State.Connecting) status = 'buffering';
-    else if (state === _State.Loading) status = 'loading';
-    else status = 'idle';
-
-    updateState({ status });
-  });
-
-  TP.addEventListener(_Event.PlaybackError, (event: any) => {
-    console.error('[RadioPlayer] Playback error:', event);
-
-    // On Android, auto-retry on stream connection errors (HTTP blocked, timeout, etc.)
-    if (Platform.OS === 'android' && _retryCount < MAX_AUTO_RETRIES && currentState.currentStation) {
-      _retryCount++;
-      console.log(`[RadioPlayer] Auto-retry ${_retryCount}/${MAX_AUTO_RETRIES}`);
-      updateState({ status: 'buffering', errorMessage: undefined });
-      if (_retryTimer) clearTimeout(_retryTimer);
-      _retryTimer = setTimeout(() => {
-        const station = currentState.currentStation;
-        if (station) radioPlayer.play(station);
-      }, 1500);
-      return;
-    }
-
-    updateState({
-      status: 'error',
-      errorMessage: event.message || 'Stream playback error',
-    });
-  });
 }
 
 // ==================== Public API ====================
@@ -204,14 +176,27 @@ export const radioPlayer = {
   },
 
   /**
-   * Play a radio station
-   * Sets up TrackPlayer if needed, then loads and plays the stream
+   * Play a radio station using expo-av
    */
   async play(station: RadioStation): Promise<void> {
     if (Platform.OS === 'web') {
       console.warn('[RadioPlayer] Not supported on web');
       return;
     }
+
+    // Debounce rapid play calls
+    if (_playLock) {
+      console.log('[RadioPlayer] Play already in progress, ignoring');
+      return;
+    }
+    _playLock = true;
+    setTimeout(() => { _playLock = false; }, 1000);
+
+    // Request audio focus — this will stop any other audio source
+    await audioCoordinator.requestFocus('radio', {
+      stop: () => radioPlayer.stop(),
+      pause: () => radioPlayer.togglePlayPause(),
+    }, 'radio-player');
 
     // Reset retry counter on new play attempt
     _retryCount = 0;
@@ -223,160 +208,63 @@ export const radioPlayer = {
       errorMessage: undefined,
     });
 
-    // Safety: reject early if neither TrackPlayer nor expo-av available
-    if (!_isExpoGo && !getTrackPlayer()) {
-      console.error('[RadioPlayer] No audio engine available');
-      updateState({ status: 'error', errorMessage: 'Audio player not available on this device' });
-      return;
-    }
-
-    // Use expo-av fallback in Expo Go
-    if (_isExpoGo) {
-      try {
-        const resolvedUrl = await resolveStreamUrl(station.streamUrl);
-        await playWithExpoAv(resolvedUrl);
-      } catch (error) {
-        console.error('[RadioPlayer] expo-av fallback error:', error);
-        updateState({ status: 'error', errorMessage: 'Failed to play stream' });
-      }
-      return;
-    }
-
-    const TP = getTrackPlayer();
-    if (!TP) {
-      updateState({ status: 'error', errorMessage: 'Radio player unavailable' });
-      return;
-    }
-
-    // Setup player if not already done
-    if (!isTrackPlayerSetup()) {
-      const success = await setupTrackPlayer();
-      if (!success) {
-        updateState({ status: 'error', errorMessage: 'Failed to initialize audio player' });
+    try {
+      const resolvedUrl = await resolveStreamUrl(station.streamUrl);
+      await playWithExpoAv(resolvedUrl);
+    } catch (error) {
+      console.error('[RadioPlayer] expo-av error:', error);
+      
+      // Auto-retry on stream connection errors
+      if (_retryCount < MAX_AUTO_RETRIES) {
+        _retryCount++;
+        console.log(`[RadioPlayer] Auto-retry ${_retryCount}/${MAX_AUTO_RETRIES}`);
+        updateState({ status: 'buffering', errorMessage: undefined });
+        if (_retryTimer) clearTimeout(_retryTimer);
+        _retryTimer = setTimeout(() => {
+          if (station) radioPlayer._retryPlay(station);
+        }, 2000);
         return;
       }
+      
+      updateState({ status: 'error', errorMessage: 'Failed to play stream' });
     }
+  },
 
-    registerPlayerEvents();
+  /** Internal retry — same as play() but does NOT reset _retryCount */
+  async _retryPlay(station: RadioStation): Promise<void> {
+    if (Platform.OS === 'web') return;
 
-    // Playback timeout — if no state change within 15s, surface error
-    let playbackStarted = false;
-    const playbackTimeout = setTimeout(() => {
-      if (!playbackStarted && currentState.status === 'loading') {
-        console.warn('[RadioPlayer] Playback timeout — no response after 15s');
-        updateState({
-          status: 'error',
-          errorMessage: 'Stream connection timed out',
-        });
-      }
-    }, 15_000);
-
-    // Mark started when state changes from loading
-    const unsub = radioPlayer.subscribe((s) => {
-      if (s.status !== 'loading') {
-        playbackStarted = true;
-        clearTimeout(playbackTimeout);
-        unsub();
-      }
-    });
+    updateState({ status: 'loading', currentStation: station, errorMessage: undefined });
 
     try {
-      await TP.reset();
-
       const resolvedUrl = await resolveStreamUrl(station.streamUrl);
-
-      await TP.add({
-        id: station.id,
-        url: resolvedUrl,
-        title: station.name,
-        artist: station.nameTranslations?.en || 'Quran Radio',
-        artwork: station.imageUrl || undefined,
-        isLiveStream: true,
-      });
-
-      await TP.play();
-    } catch (error) {
-      clearTimeout(playbackTimeout);
-      unsub();
-      console.error('[RadioPlayer] Failed to play station:', error);
-      updateState({
-        status: 'error',
-        errorMessage: 'Failed to play stream',
-      });
+      await playWithExpoAv(resolvedUrl);
+    } catch {
+      updateState({ status: 'error', errorMessage: 'Failed to play stream' });
     }
   },
 
   /** Toggle play/pause */
   async togglePlayPause(): Promise<void> {
     if (Platform.OS === 'web') return;
-
-    if (_isExpoGo) {
-      await toggleExpoAv();
-      return;
-    }
-
-    if (!isTrackPlayerSetup()) return;
-    const TP = getTrackPlayer();
-    if (!TP || !_State) return;
-
-    try {
-      const playbackState = await TP.getPlaybackState();
-      const state = playbackState.state;
-
-      if (state === _State.Playing) {
-        await TP.pause();
-      } else if (state === _State.Paused || state === _State.Stopped) {
-        await TP.play();
-      }
-    } catch (error) {
-      console.error('[RadioPlayer] togglePlayPause error:', error);
-    }
+    await toggleExpoAv();
   },
 
   /** Stop playback and clear */
   async stop(): Promise<void> {
     if (Platform.OS === 'web') return;
 
-    if (_isExpoGo) {
-      await stopExpoAv();
-      updateState({ status: 'idle', currentStation: null, errorMessage: undefined });
-      return;
-    }
-
-    if (!isTrackPlayerSetup()) return;
-    const TP = getTrackPlayer();
-    if (!TP) return;
-
-    try {
-      await TP.reset();
-      updateState({
-        status: 'idle',
-        currentStation: null,
-        errorMessage: undefined,
-      });
-    } catch (error) {
-      console.error('[RadioPlayer] stop error:', error);
-    }
+    await stopExpoAv();
+    updateState({ status: 'idle', currentStation: null, errorMessage: undefined });
+    audioCoordinator.releaseFocus('radio-player', 'radio');
   },
 
   /** Set volume (0 to 1) */
   async setVolume(volume: number): Promise<void> {
     if (Platform.OS === 'web') return;
     const clamped = Math.max(0, Math.min(1, volume));
-
-    if (_isExpoGo) {
-      await setExpoAvVolume(clamped);
-      updateState({ volume: clamped });
-      return;
-    }
-
-    if (!isTrackPlayerSetup()) return;
-    const TP = getTrackPlayer();
-    if (!TP) return;
-    try {
-      await TP.setVolume(clamped);
-      updateState({ volume: clamped });
-    } catch {}
+    await setExpoAvVolume(clamped);
+    updateState({ volume: clamped });
   },
 
   /** Retry playing the current station (on error) */

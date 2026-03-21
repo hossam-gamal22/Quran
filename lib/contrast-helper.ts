@@ -104,9 +104,9 @@ export function getContrastPalette(backgroundColor: string) {
   return {
     text: light ? '#1C1C1E' : '#FFFFFF',
     textSecondary: light ? '#3A3A3C' : '#EBEBF5',
-    textMuted: light ? '#8E8E93' : 'rgba(255,255,255,0.6)',
+    textMuted: light ? '#8E8E93' : 'rgba(255,255,255,0.85)',
     icon: light ? '#3A3A3C' : '#FFFFFF',
-    iconMuted: light ? '#8E8E93' : 'rgba(255,255,255,0.5)',
+    iconMuted: light ? '#8E8E93' : 'rgba(255,255,255,0.7)',
     border: light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
     divider: light ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
     overlay: light ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',

@@ -2,6 +2,18 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { fetchAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
+import {
+  initSmartAdManager,
+  canShowBanner as smartCanShowBanner,
+  canShowInterstitial as smartCanShowInterstitial,
+  recordBannerShown as smartRecordBanner,
+  recordInterstitialShown as smartRecordInterstitial,
+  recordPageView as smartRecordPageView,
+  enterSacredContext,
+  exitSacredContext,
+  isInSacredContext,
+  type SacredContext,
+} from './smart-ad-manager';
 
 interface AdsContextType {
   config: AdsConfig | null;
@@ -21,6 +33,10 @@ interface AdsContextType {
   getSlotAdType: (slotKey: string) => 'banner' | 'interstitial' | null;
   // Screen-based dynamic slots
   getScreenSlots: (screen: string, position?: 'top' | 'bottom') => { key: string; slot: AdSlot }[];
+  // Smart ad context management
+  enterSacredContext: (ctx: SacredContext) => void;
+  exitSacredContext: (ctx: SacredContext) => void;
+  isInSacredContext: () => boolean;
 }
 
 const AdsContext = createContext<AdsContextType | undefined>(undefined);
@@ -40,6 +56,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       const [adsConfig, subState] = await Promise.all([
         fetchAdsConfig(),
         getSubscriptionState(),
+        initSmartAdManager(),
       ]);
       setConfig(adsConfig);
       setIsPremiumUser(subState.isPremium);
@@ -56,17 +73,20 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
 
   const onPageView = useCallback(() => {
     setPageViews(prev => prev + 1);
+    smartRecordPageView();
   }, []);
 
   const recordInterstitialShown = useCallback(() => {
     setSessionAdsShown(prev => prev + 1);
     setLastAdTime(Date.now());
     recordGlobalAdShown();
+    smartRecordInterstitial();
   }, []);
 
   const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
     if (isPremiumUser) return false;
     if (!config) return false;
+    if (!smartCanShowBanner()) return false;
     return isBannerEnabledForScreen(config, screen);
   }, [config, isPremiumUser]);
 
@@ -86,6 +106,11 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
     if (!canShowGlobalAd()) return false;
+
+    // Smart ad manager checks (sacred context, daily caps, engagement reward)
+    // Note: smartCanShowInterstitial is async but we do a sync sacred-context check here
+    // The full async check runs in InterstitialAdManager before actually showing
+    if (isInSacredContext()) return false;
 
     if (config.delayFirstAd) {
       const secondsSinceStart = (Date.now() - appStartTime) / 1000;
@@ -147,6 +172,9 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       isSlotEnabled,
       getSlotAdType,
       getScreenSlots,
+      enterSacredContext,
+      exitSacredContext,
+      isInSacredContext,
     }}>
       {children}
     </AdsContext.Provider>

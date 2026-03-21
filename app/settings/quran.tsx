@@ -42,12 +42,12 @@ export default function QuranSettingsScreen() {
   const hookColors = useColors();
 
   const colors = {
-    primary: '#2f7659',
+    primary: '#22C55E',
     foreground: hookColors.text,
     muted: hookColors.textLight,
     card: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
     cardBorder: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-    accent: isDarkMode ? '#4ADE80' : '#2f7659',
+    accent: isDarkMode ? '#4ADE80' : '#22C55E',
   };
 
   const currentFontAdjust = settings.display.quranFontSizeAdjust ?? 0;
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   bgItemSelected: {
-    borderColor: '#2f7659',
+    borderColor: '#22C55E',
   },
   bgImage: {
     width: '100%',
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     alignItems: 'center',
     justifyContent: 'center',
   },

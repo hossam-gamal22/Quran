@@ -53,7 +53,7 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
             onPress={(e) => e.stopPropagation()}
           >
             <View style={infoStyles.iconWrap}>
-              <MaterialCommunityIcons name="information" size={40} color="#2f7659" />
+              <MaterialCommunityIcons name="information" size={40} color="#22C55E" />
             </View>
             {title ? (
               <Text style={[infoStyles.title, { color: colors.text }]}>{title}</Text>
@@ -95,7 +95,7 @@ const infoStyles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 18,
-    backgroundColor: 'rgba(47,118,89,0.12)',
+    backgroundColor: 'rgba(6,79,47,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -114,7 +114,7 @@ const infoStyles = StyleSheet.create({
   },
   okBtn: {
     marginTop: 24,
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 48,

@@ -1151,6 +1151,10 @@ export interface TranslationKeys {
     istighfar: string;
     istighfarReminder: string;
     listenToAyah: string;
+    downloadAyahSound: string;
+    ayahDownloaded: string;
+    downloadFailed: string;
+    ayahDownloadRequired: string;
     mansoor_zahrani: string;
     mansoor_zahraniDesc: string;
     morningAzkar: string;
@@ -2273,6 +2277,19 @@ export interface TranslationKeys {
     noFavorites: string;
     noFavoritesDesc: string;
   };
+  // سؤال وجواب
+  questionAnswer: {
+    title: string;
+    description: string;
+    noQuestions: string;
+    source: string;
+    question: string;
+    answer: string;
+    subjects: string;
+    loadingCategories: string;
+    loadingQuestions: string;
+    errorLoading: string;
+  };
 }
 // ==================== العربية ====================
 const ar: TranslationKeys = {
@@ -2666,7 +2683,7 @@ const ar: TranslationKeys = {
     startingOver: 'بدأت من جديد',
   },
   prayer: {
-    title: 'أوقات الصلاة',
+    title: 'مواقيت الصلاة',
     times: 'المواقيت',
     fajr: 'الفجر',
     sunrise: 'الشروق',
@@ -3387,6 +3404,10 @@ const ar: TranslationKeys = {
     istighfar: 'الاستغفار',
     istighfarReminder: 'تذكير بالاستغفار',
     listenToAyah: 'استمع للآية',
+    downloadAyahSound: 'تحميل صوت الآية',
+    ayahDownloaded: 'تم تحميل الآية',
+    downloadFailed: 'فشل التحميل، حاول مرة أخرى',
+    ayahDownloadRequired: 'يجب تحميل صوت الآية لتشغيلها مع الإشعار. بدون التحميل، سيُستخدم الصوت الافتراضي للنظام فقط.',
     mansoor_zahrani: 'منصور الزهراني',
     mansoor_zahraniDesc: 'أذان منصور الزهراني',
     morningAzkar: 'أذكار الصباح',
@@ -4494,6 +4515,18 @@ const ar: TranslationKeys = {
     volume: 'مستوى الصوت',
     noFavorites: 'لا توجد محطات محفوظة',
     noFavoritesDesc: 'اضغط على أيقونة القلب لحفظ محطاتك المفضلة',
+  },
+  questionAnswer: {
+    title: 'سؤال وجواب',
+    description: 'فتاوى وأحكام شرعية من برامج إذاعة القرآن الكريم من القاهرة',
+    noQuestions: 'لا توجد أسئلة في هذا القسم',
+    source: 'المصدر: إذاعة القرآن الكريم من القاهرة',
+    question: 'السؤال',
+    answer: 'الجواب',
+    subjects: 'الموضوعات',
+    loadingCategories: 'جاري تحميل الأقسام...',
+    loadingQuestions: 'جاري تحميل الأسئلة...',
+    errorLoading: 'خطأ في تحميل البيانات',
   },
 };
 // ==================== English ====================
@@ -5609,6 +5642,10 @@ const en: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Istighfar Reminder',
     listenToAyah: 'Listen to Ayah',
+    downloadAyahSound: 'Download Ayah Sound',
+    ayahDownloaded: 'Ayah Downloaded',
+    downloadFailed: 'Download failed, please try again',
+    ayahDownloadRequired: 'You must download the ayah sound to play it with the notification. Without downloading, only the default system sound will be used.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Mansoor Al-Zahrani Adhan',
     morningAzkar: 'Morning Adhkar',
@@ -6716,6 +6753,18 @@ const en: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'No saved stations',
     noFavoritesDesc: 'Tap the heart icon to save your favorite stations',
+  },
+  questionAnswer: {
+    title: 'Q&A',
+    description: 'Islamic rulings and fatwas from Cairo Quran Radio programs',
+    noQuestions: 'No questions in this section',
+    source: 'Source: Cairo Quran Radio',
+    question: 'Question',
+    answer: 'Answer',
+    subjects: 'Subjects',
+    loadingCategories: 'Loading categories...',
+    loadingQuestions: 'Loading questions...',
+    errorLoading: 'Error loading data',
   },
 };
 //==================== Français ====================
@@ -7832,6 +7881,10 @@ const fr: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Rappel d\'Istighfar',
     listenToAyah: 'Écouter le verset',
+    downloadAyahSound: 'Télécharger le son du verset',
+    ayahDownloaded: 'Verset téléchargé',
+    downloadFailed: 'Échec du téléchargement, veuillez réessayer',
+    ayahDownloadRequired: 'Vous devez télécharger le son du verset pour le jouer avec la notification. Sans téléchargement, seul le son système par défaut sera utilisé.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Adhan de Mansoor Al-Zahrani',
     morningAzkar: 'Adhkar du matin',
@@ -8939,6 +8992,18 @@ const fr: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'Aucune station enregistrée',
     noFavoritesDesc: 'Appuyez sur l\'icône cœur pour enregistrer vos stations préférées',
+  },
+  questionAnswer: {
+    title: 'Questions et Réponses',
+    description: 'Fatwas et règles islamiques des programmes de Radio Coran du Caire',
+    noQuestions: 'Pas de questions dans cette section',
+    source: 'Source: Radio Coran du Caire',
+    question: 'Question',
+    answer: 'Réponse',
+    subjects: 'Sujets',
+    loadingCategories: 'Chargement des catégories...',
+    loadingQuestions: 'Chargement des questions...',
+    errorLoading: 'Erreur de chargement des données',
   },
 };
 
@@ -10056,6 +10121,10 @@ const de: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Istighfar-Erinnerung',
     listenToAyah: 'Ayah anhören',
+    downloadAyahSound: 'Ayah-Sound herunterladen',
+    ayahDownloaded: 'Ayah heruntergeladen',
+    downloadFailed: 'Download fehlgeschlagen, bitte erneut versuchen',
+    ayahDownloadRequired: 'Sie müssen den Ayah-Sound herunterladen, um ihn mit der Benachrichtigung abzuspielen. Ohne Download wird nur der Standard-Systemton verwendet.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Mansoor Al-Zahrani Adhan',
     morningAzkar: 'Morgen-Adhkar',
@@ -11163,6 +11232,18 @@ const de: TranslationKeys = {
     volume: 'Lautstärke',
     noFavorites: 'Keine gespeicherten Sender',
     noFavoritesDesc: 'Tippen Sie auf das Herzsymbol, um Ihre Lieblingssender zu speichern',
+  },
+  questionAnswer: {
+    title: 'Fragen und Antworten',
+    description: 'Islamische Urteile und Fatwas aus den Programmen des Kairo Quran Radios',
+    noQuestions: 'Keine Fragen in diesem Abschnitt',
+    source: 'Quelle: Kairo Quran Radio',
+    question: 'Frage',
+    answer: 'Antwort',
+    subjects: 'Themen',
+    loadingCategories: 'Kategorien werden geladen...',
+    loadingQuestions: 'Fragen werden geladen...',
+    errorLoading: 'Fehler beim Laden der Daten',
   },
 };
 
@@ -12280,6 +12361,10 @@ const tr: TranslationKeys = {
     istighfar: 'İstiğfar',
     istighfarReminder: 'İstiğfar Hatırlatıcısı',
     listenToAyah: 'Ayeti Dinle',
+    downloadAyahSound: 'Ayet Sesini İndir',
+    ayahDownloaded: 'Ayet İndirildi',
+    downloadFailed: 'İndirme başarısız, lütfen tekrar deneyin',
+    ayahDownloadRequired: 'Bildirimle birlikte çalmak için ayet sesini indirmeniz gerekmektedir. İndirmeden yalnızca varsayılan sistem sesi kullanılır.',
     mansoor_zahrani: 'Mansur ez-Zahrani',
     mansoor_zahraniDesc: 'Mansoor Al-Zahrani Ezanı',
     morningAzkar: 'Sabah Zikirleri',
@@ -13387,6 +13472,18 @@ const tr: TranslationKeys = {
     volume: 'Ses',
     noFavorites: 'Kayıtlı istasyon yok',
     noFavoritesDesc: 'Favori istasyonlarınızı kaydetmek için kalp simgesine dokunun',
+  },
+  questionAnswer: {
+    title: 'Soru ve Cevap',
+    description: 'Kahire Kur\'an Radyosu programlarından İslami hükümler ve fetvalar',
+    noQuestions: 'Bu bölümde soru yok',
+    source: 'Kaynak: Kahire Kur\'an Radyosu',
+    question: 'Soru',
+    answer: 'Cevap',
+    subjects: 'Konular',
+    loadingCategories: 'Kategoriler yükleniyor...',
+    loadingQuestions: 'Sorular yükleniyor...',
+    errorLoading: 'Veri yükleme hatası',
   },
 };
 
@@ -14504,6 +14601,10 @@ const es: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Recordatorio de Istighfar',
     listenToAyah: 'Escuchar el Ayah',
+    downloadAyahSound: 'Descargar sonido del Ayah',
+    ayahDownloaded: 'Ayah descargado',
+    downloadFailed: 'Descarga fallida, intente de nuevo',
+    ayahDownloadRequired: 'Debe descargar el sonido del Ayah para reproducirlo con la notificación. Sin descargarlo, solo se usará el sonido predeterminado del sistema.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Adhan de Mansoor Al-Zahrani',
     morningAzkar: 'Adhkar de la mañana',
@@ -15611,6 +15712,18 @@ const es: TranslationKeys = {
     volume: 'Volumen',
     noFavorites: 'Sin estaciones guardadas',
     noFavoritesDesc: 'Toca el icono del corazón para guardar tus estaciones favoritas',
+  },
+  questionAnswer: {
+    title: 'Preguntas y Respuestas',
+    description: 'Fatuas y normas islámicas de los programas de Radio Corán de El Cairo',
+    noQuestions: 'No hay preguntas en esta sección',
+    source: 'Fuente: Radio Corán de El Cairo',
+    question: 'Pregunta',
+    answer: 'Respuesta',
+    subjects: 'Temas',
+    loadingCategories: 'Cargando categorías...',
+    loadingQuestions: 'Cargando preguntas...',
+    errorLoading: 'Error al cargar los datos',
   },
 };
 // ==================== اردو (Urdu) ====================
@@ -16727,6 +16840,10 @@ const ur: TranslationKeys = {
     istighfar: 'استغفار',
     istighfarReminder: 'استغفار کی یاددہانی',
     listenToAyah: 'آیت سنیں',
+    downloadAyahSound: 'آیت کی آواز ڈاؤن لوڈ کریں',
+    ayahDownloaded: 'آیت ڈاؤن لوڈ ہو گئی',
+    downloadFailed: 'ڈاؤن لوڈ ناکام، دوبارہ کوشش کریں',
+    ayahDownloadRequired: 'اشعار کے ساتھ چلانے کے لیے آیت کی آواز ڈاؤن لوڈ کرنا ضروری ہے۔ ڈاؤن لوڈ کے بغیر، صرف ڈیفالٹ سسٹم آواز استعمال ہوگی۔',
     mansoor_zahrani: 'منصور الزہرانی',
     mansoor_zahraniDesc: 'منصور الزہرانی اذان',
     morningAzkar: 'صبح کے اذکار',
@@ -17834,6 +17951,18 @@ const ur: TranslationKeys = {
     volume: 'آواز',
     noFavorites: 'کوئی محفوظ اسٹیشن نہیں',
     noFavoritesDesc: 'اپنے پسندیدہ اسٹیشنز محفوظ کرنے کے لیے دل کے آئیکن پر دبائیں',
+  },
+  questionAnswer: {
+    title: 'سوال و جواب',
+    description: 'قاہرہ قرآن ریڈیو کے پروگراموں سے اسلامی احکام اور فتاوی',
+    noQuestions: 'اس حصے میں کوئی سوال نہیں',
+    source: 'ماخذ: قاہرہ قرآن ریڈیو',
+    question: 'سوال',
+    answer: 'جواب',
+    subjects: 'موضوعات',
+    loadingCategories: 'زمرے لوڈ ہو رہے ہیں...',
+    loadingQuestions: 'سوالات لوڈ ہو رہے ہیں...',
+    errorLoading: 'ڈیٹا لوڈ کرنے میں خرابی',
   },
 };
 
@@ -18951,6 +19080,10 @@ const id: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Pengingat Istighfar',
     listenToAyah: 'Dengarkan Ayat',
+    downloadAyahSound: 'Unduh Suara Ayat',
+    ayahDownloaded: 'Ayat Terunduh',
+    downloadFailed: 'Unduhan gagal, silakan coba lagi',
+    ayahDownloadRequired: 'Anda harus mengunduh suara ayat untuk memainkannya bersama notifikasi. Tanpa mengunduh, hanya suara sistem default yang akan digunakan.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Adzan Mansoor Al-Zahrani',
     morningAzkar: 'Dzikir Pagi',
@@ -20058,6 +20191,18 @@ const id: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'Belum ada stasiun tersimpan',
     noFavoritesDesc: 'Ketuk ikon hati untuk menyimpan stasiun favorit Anda',
+  },
+  questionAnswer: {
+    title: 'Tanya Jawab',
+    description: 'Fatwa dan hukum Islam dari program Radio Al-Quran Kairo',
+    noQuestions: 'Tidak ada pertanyaan di bagian ini',
+    source: 'Sumber: Radio Al-Quran Kairo',
+    question: 'Pertanyaan',
+    answer: 'Jawaban',
+    subjects: 'Topik',
+    loadingCategories: 'Memuat kategori...',
+    loadingQuestions: 'Memuat pertanyaan...',
+    errorLoading: 'Gagal memuat data',
   },
 };
 
@@ -21175,6 +21320,10 @@ const ms: TranslationKeys = {
     istighfar: 'Istighfar',
     istighfarReminder: 'Peringatan Istighfar',
     listenToAyah: 'Dengar Ayat',
+    downloadAyahSound: 'Muat Turun Bunyi Ayat',
+    ayahDownloaded: 'Ayat Dimuat Turun',
+    downloadFailed: 'Muat turun gagal, sila cuba lagi',
+    ayahDownloadRequired: 'Anda mesti memuat turun bunyi ayat untuk memainkannya bersama pemberitahuan. Tanpa muat turun, hanya bunyi sistem lalai akan digunakan.',
     mansoor_zahrani: 'Mansoor Al-Zahrani',
     mansoor_zahraniDesc: 'Azan Mansoor Al-Zahrani',
     morningAzkar: 'Zikir Pagi',
@@ -22282,6 +22431,18 @@ const ms: TranslationKeys = {
     volume: 'Kelantangan',
     noFavorites: 'Tiada stesen tersimpan',
     noFavoritesDesc: 'Ketik ikon hati untuk menyimpan stesen kegemaran anda',
+  },
+  questionAnswer: {
+    title: 'Soal Jawab',
+    description: 'Fatwa dan hukum Islam daripada program Radio Al-Quran Kaherah',
+    noQuestions: 'Tiada soalan dalam bahagian ini',
+    source: 'Sumber: Radio Al-Quran Kaherah',
+    question: 'Soalan',
+    answer: 'Jawapan',
+    subjects: 'Topik',
+    loadingCategories: 'Memuatkan kategori...',
+    loadingQuestions: 'Memuatkan soalan...',
+    errorLoading: 'Ralat memuatkan data',
   },
 };
 // ==================== हिन्दी (Hindi) ======================================
@@ -23399,6 +23560,10 @@ const hi: TranslationKeys = {
     istighfar: 'इस्तिग़फ़ार',
     istighfarReminder: 'इस्तिग़फ़ार अनुस्मारक',
     listenToAyah: 'आयत सुनें',
+    downloadAyahSound: 'आयत ध्वनि डाउनलोड करें',
+    ayahDownloaded: 'आयत डाउनलोड हो गई',
+    downloadFailed: 'डाउनलोड विफल, कृपया पुनः प्रयास करें',
+    ayahDownloadRequired: 'अधिसूचना के साथ चलाने के लिए आपको आयत ध्वनि डाउनलोड करनी होगी। डाउनलोड के बिना, केवल डिफॉल्ट सिस्टम ध्वनि का उपयोग किया जाएगा।',
     mansoor_zahrani: 'मंसूर अल-ज़हरानी',
     mansoor_zahraniDesc: 'मंसूर अल-ज़हरानी अज़ान',
     morningAzkar: 'सुबह के अज़कार',
@@ -24506,6 +24671,18 @@ const hi: TranslationKeys = {
     volume: 'आवाज़',
     noFavorites: 'कोई सहेजा हुआ स्टेशन नहीं',
     noFavoritesDesc: 'अपने पसंदीदा स्टेशन सहेजने के लिए दिल आइकन पर टैप करें',
+  },
+  questionAnswer: {
+    title: 'प्रश्न और उत्तर',
+    description: 'काहिरा कुरान रेडियो कार्यक्रमों से इस्लामी नियम और फतवे',
+    noQuestions: 'इस खंड में कोई प्रश्न नहीं',
+    source: 'स्रोत: काहिरा कुरान रेडियो',
+    question: 'प्रश्न',
+    answer: 'उत्तर',
+    subjects: 'विषय',
+    loadingCategories: 'श्रेणियाँ लोड हो रही हैं...',
+    loadingQuestions: 'प्रश्न लोड हो रहे हैं...',
+    errorLoading: 'डेटा लोड करने में त्रुटि',
   },
 };
 
@@ -25623,6 +25800,10 @@ const bn: TranslationKeys = {
     istighfar: 'ইস্তিগফার',
     istighfarReminder: 'ইস্তিগফার স্মরণ',
     listenToAyah: 'আয়াত শুনুন',
+    downloadAyahSound: 'আয়াতের শব্দ ডাউনলোড করুন',
+    ayahDownloaded: 'আয়াত ডাউনলোড হয়েছে',
+    downloadFailed: 'ডাউনলোড ব্যর্থ, আবার চেষ্টা করুন',
+    ayahDownloadRequired: 'নোটিফিকেশনের সাথে চালাতে আয়াতের শব্দ ডাউনলোড করতে হবে। ডাউনলোড ছাড়া, শুধুমাত্র ডিফল্ট সিস্টেম শব্দ ব্যবহার হবে।',
     mansoor_zahrani: 'মানসুর আল-যাহরানি',
     mansoor_zahraniDesc: 'মানসুর আল-যাহরানি আযান',
     morningAzkar: 'সকালের আযকার',
@@ -26730,6 +26911,18 @@ const bn: TranslationKeys = {
     volume: 'ভলিউম',
     noFavorites: 'কোনো সংরক্ষিত স্টেশন নেই',
     noFavoritesDesc: 'আপনার পছন্দের স্টেশন সংরক্ষণ করতে হার্ট আইকনে ট্যাপ করুন',
+  },
+  questionAnswer: {
+    title: 'প্রশ্ন ও উত্তর',
+    description: 'কায়রো কুরআন রেডিও প্রোগ্রাম থেকে ইসলামী বিধান ও ফতোয়া',
+    noQuestions: 'এই বিভাগে কোন প্রশ্ন নেই',
+    source: 'উৎস: কায়রো কুরআন রেডিও',
+    question: 'প্রশ্ন',
+    answer: 'উত্তর',
+    subjects: 'বিষয়',
+    loadingCategories: 'বিভাগ লোড হচ্ছে...',
+    loadingQuestions: 'প্রশ্ন লোড হচ্ছে...',
+    errorLoading: 'ডেটা লোড করতে ত্রুটি',
   },
 };
 
@@ -27846,6 +28039,10 @@ const ru: TranslationKeys = {
     istighfar: 'Истигфар',
     istighfarReminder: 'Напоминание истигфар',
     listenToAyah: 'Послушать аят',
+    downloadAyahSound: 'Скачать звук аята',
+    ayahDownloaded: 'Аят скачан',
+    downloadFailed: 'Ошибка загрузки, попробуйте снова',
+    ayahDownloadRequired: 'Вы должны скачать звук аята для воспроизведения с уведомлением. Без загрузки будет использован только стандартный системный звук.',
     mansoor_zahrani: 'Мансур Аль-Захрани',
     mansoor_zahraniDesc: 'Азан Мансура Аль-Захрани',
     morningAzkar: 'Утренние азкар',
@@ -28953,6 +29150,18 @@ const ru: TranslationKeys = {
     volume: 'Громкость',
     noFavorites: 'Нет сохранённых станций',
     noFavoritesDesc: 'Нажмите на значок сердца, чтобы сохранить любимые станции',
+  },
+  questionAnswer: {
+    title: 'Вопросы и ответы',
+    description: 'Исламские решения и фетвы из программ Каирского радио Корана',
+    noQuestions: 'В этом разделе нет вопросов',
+    source: 'Источник: Каирское радио Корана',
+    question: 'Вопрос',
+    answer: 'Ответ',
+    subjects: 'Темы',
+    loadingCategories: 'Загрузка категорий...',
+    loadingQuestions: 'Загрузка вопросов...',
+    errorLoading: 'Ошибка загрузки данных',
   },
 };
 

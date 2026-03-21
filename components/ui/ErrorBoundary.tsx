@@ -141,7 +141,7 @@ class ErrorBoundary extends Component<Props, State> {
                   activeOpacity={0.8}
                 >
                   <View
-                    style={[styles.buttonGradient, { backgroundColor: 'rgba(47,118,89,0.85)', flexDirection: isRTL() ? 'row-reverse' : 'row' }]}
+                    style={[styles.buttonGradient, { backgroundColor: 'rgba(6,79,47,0.85)', flexDirection: isRTL() ? 'row-reverse' : 'row' }]}
                   >
                     <MaterialCommunityIcons name="reload" size={22} color="#fff" />
                     <Text style={styles.buttonText}>{t('errorBoundary.restartApp')}</Text>
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.6)',
+    color: 'rgba(255,255,255,0.85)',
     lineHeight: 20,
   },
   errorStack: {

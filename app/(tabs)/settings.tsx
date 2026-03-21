@@ -55,7 +55,7 @@ interface SettingItemProps {
 
 const SettingItem: React.FC<SettingItemProps> = ({
   icon,
-  iconColor = '#2f7659',
+  iconColor = '#22C55E',
   title,
   subtitle,
   value,
@@ -109,7 +109,7 @@ const SettingItem: React.FC<SettingItemProps> = ({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onSwitchChange?.(val);
           }}
-          trackColor={{ false: colors.text === '#FFFFFF' ? '#39393D' : '#E9E9EB', true: '#2f7659' }}
+          trackColor={{ false: colors.text === '#FFFFFF' ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
           ios_backgroundColor={colors.text === '#FFFFFF' ? '#39393D' : '#E9E9EB'}
         />
@@ -250,7 +250,6 @@ export default function SettingsScreen() {
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor="transparent"
       />
 
       {/* الهيدر */}
@@ -288,7 +287,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.notifications')} index={1} colors={colors}>
           <SettingItem
             icon="bell"
-            iconColor="#2f7659"
+            iconColor="#22C55E"
             title={t('settings.notifications')}
             showArrow={false}
             showSwitch
@@ -358,7 +357,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.shareAppSection')} index={5} colors={colors}>
           <SettingItem
             icon="share-variant"
-            iconColor="#2f7659"
+            iconColor="#22C55E"
             title={t('settings.shareApp')}
             showArrow={false}
             onPress={handleShare}
@@ -626,6 +625,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   suggestBtnSend: {
-    backgroundColor: '#0f987f',
+    backgroundColor: '#22C55E',
   },
 });

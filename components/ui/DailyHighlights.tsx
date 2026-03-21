@@ -197,7 +197,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
             id: `temp-${tp.id}`,
             title: isArabic ? tp.title : (tp.titleEn || tp.title),
             icon: tp.icon || 'file-document-outline',
-            color: tp.color || '#0f987f',
+            color: tp.color || '#22C55E',
             route: `/temp-page/${tp.id}`,
           }));
           setAdminHighlights(prev => [
@@ -257,7 +257,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       id: 'hijri-date',
       title: `${hijriDate.day} ${hijriDate.monthName}`,
       icon: 'calendar-month',
-      color: '#2f7659',
+      color: '#22C55E',
       route: '/hijri',
     },
     {
@@ -351,8 +351,8 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     setTempOrder(highlights.map(h => h.id));
   };
 
-  const labelColor = isDarkMode ? '#ccc' : '#555';
-  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
+  const labelColor = isDarkMode ? '#E0E0E0' : '#555';
+  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)';
 
   const scrollRef = useRef<ScrollView>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(true);
@@ -480,7 +480,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
 
       {loading && (
         <View style={[styles.loadingBadge, isRTL ? { left: 12, right: undefined } : null]}>
-          <ActivityIndicator size="small" color="#2f7659" />
+          <ActivityIndicator size="small" color="#22C55E" />
         </View>
       )}
 
@@ -802,7 +802,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(120,120,128,0.12)',
   },
   reorderDoneBtn: {
-    backgroundColor: '#2f7659',
+    backgroundColor: '#22C55E',
   },
   reorderBtnText: {
     fontSize: 15,

@@ -2,7 +2,8 @@
 // Admin daily content override — checks Firestore before using local/API data
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 import { DailyHadith } from '@/data/daily-hadiths';
 import { IslamicQuote } from '@/data/quotes';
 
@@ -35,7 +36,6 @@ async function fetchOverride<T>(key: string): Promise<T | null> {
 
   // Check Firestore
   try {
-    const db = getFirestore();
     const snap = await getDoc(doc(db, 'dailyContent', key));
     if (snap.exists()) {
       const docData = snap.data();

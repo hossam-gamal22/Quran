@@ -76,7 +76,7 @@ const DEFAULT_SEASONS_DATA: Record<SeasonType, SeasonDataEntry> = {
     description: 'شهر الصيام والقيام وتلاوة القرآن',
     startDate: { month: 9, day: 1 },
     endDate: { month: 9, day: 30 },
-    color: '#2f7659',
+    color: '#22C55E',
     icon: 'moon-waning-crescent',
     specialDays: [
       {
