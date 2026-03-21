@@ -16,6 +16,7 @@ export interface WelcomeBannerConfig {
   route: string;
   displayMode?: 'text' | 'text_image' | 'image_only';
   backgroundImage?: string;
+  backgroundImageNonAr?: string;
   scheduledFrom?: string;   // ISO date — banner visible from this date
   scheduledUntil?: string;  // ISO date — banner hidden after this date
 }
@@ -427,6 +428,57 @@ export const fetchDynamicBackgrounds = async (): Promise<DynamicBackground[]> =>
 };
 
 // ========================================
+// إعدادات الخلفيات المدمجة (overrides من الأدمن)
+// ========================================
+
+export interface BuiltInBackgroundOverride {
+  name_ar?: string;
+  name_en?: string;
+  is_premium: boolean;
+  is_active: boolean;
+  order_index: number;
+}
+
+export const fetchBuiltInBackgroundOverrides = async (): Promise<Record<string, BuiltInBackgroundOverride>> => {
+  try {
+    const cached = await AsyncStorage.getItem('builtin_bg_overrides');
+    const cacheTime = await AsyncStorage.getItem('builtin_bg_overrides_time');
+    
+    // Use cache if less than 7 days old
+    if (cached && cacheTime) {
+      const age = Date.now() - parseInt(cacheTime, 10);
+      if (age < 7 * 24 * 60 * 60 * 1000) {
+        return JSON.parse(cached);
+      }
+    }
+  } catch {}
+
+  try {
+    const overridesRef = collection(db, 'builtInBackgroundOverrides');
+    const snap = await getDocs(overridesRef);
+    const overrides: Record<string, BuiltInBackgroundOverride> = {};
+    snap.forEach((d) => {
+      overrides[d.id] = d.data() as BuiltInBackgroundOverride;
+    });
+
+    await AsyncStorage.setItem('builtin_bg_overrides', JSON.stringify(overrides));
+    await AsyncStorage.setItem('builtin_bg_overrides_time', String(Date.now()));
+
+    return overrides;
+  } catch (error) {
+    console.log('❌ خطأ في جلب إعدادات الخلفيات المدمجة:', error);
+  }
+
+  // Fallback to cache
+  try {
+    const cached = await AsyncStorage.getItem('builtin_bg_overrides');
+    if (cached) return JSON.parse(cached);
+  } catch {}
+
+  return {};
+};
+
+// ========================================
 // Server-Driven UI (SDUI) API
 // واجهة المستخدم الديناميكية
 // ========================================
@@ -661,9 +713,21 @@ export interface HomeThemeConfig {
   appIconUrl: string;
 }
 
+export interface QuickAccessItem {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  icon: string;
+  color: string;
+  enabled: boolean;
+  order: number;
+  route?: string;
+}
+
 export interface HomePageConfig {
   highlights: { items: HomeHighlightItem[] };
   sections: { items: HomeSectionItem[] };
+  quickAccess?: { items: QuickAccessItem[] };
   dailyContent: DailyContentConfig;
   theme: HomeThemeConfig;
   updatedAt?: string;

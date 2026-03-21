@@ -562,7 +562,7 @@ export default function WelcomeBanner() {
                     value={banner.backgroundImage}
                     onChange={(e) => handleImageUrlChange('backgroundImage', e.target.value)}
                     className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
-                    placeholder="رابط مباشر أو رابط Google Drive"
+                    placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
                     aria-label="رابط صورة الخلفية للعربية"
                     dir="ltr"
                   />
@@ -623,7 +623,7 @@ export default function WelcomeBanner() {
                     value={banner.backgroundImageNonAr || ''}
                     onChange={(e) => handleImageUrlChange('backgroundImageNonAr', e.target.value)}
                     className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
-                    placeholder="رابط مباشر أو رابط Google Drive"
+                    placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
                     aria-label="رابط صورة الخلفية لغير العربية"
                     dir="ltr"
                   />

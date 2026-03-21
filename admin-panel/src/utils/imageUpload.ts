@@ -112,16 +112,23 @@ export async function uploadImage(
     }
   }
 
+  console.log('[Upload] Processing:', file.name, `${(file.size / 1024).toFixed(1)}KB`, file.type);
+
   // Process image (skip conversion for small web-friendly files)
   const { blob, ext, contentType } = await processImage(file, maxWidth ?? MAX_IMAGE_WIDTH);
+
+  console.log('[Upload] Processed:', `${(blob.size / 1024).toFixed(1)}KB`, ext, contentType);
 
   const fileName = `${Date.now()}.${ext}`;
   const fullPath = `${storagePath}/${fileName}`;
 
   const storageRef = ref(storage, fullPath);
 
+  console.log('[Upload] Uploading to:', fullPath);
   await uploadBytes(storageRef, blob, { contentType });
+  console.log('[Upload] Getting download URL...');
   const url = await getDownloadURL(storageRef);
 
+  console.log('[Upload] Success:', url.substring(0, 80) + '...');
   return { url, storagePath: fullPath };
 }

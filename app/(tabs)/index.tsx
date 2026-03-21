@@ -36,7 +36,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { useColors } from '@/hooks/use-colors';
-import { fetchAppConfig, WelcomeBannerConfig, MultiLangText, fetchHomePageConfig, type HomePageConfig } from '@/lib/app-config-api';
+import { fetchAppConfig, WelcomeBannerConfig, MultiLangText, fetchHomePageConfig, subscribeToHomePageConfig, type HomePageConfig } from '@/lib/app-config-api';
 import { useFeatures } from '@/hooks/use-feature-enabled';
 import DailyHighlights from '@/components/ui/DailyHighlights';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -419,15 +419,28 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onPress, isDarkMo
 };
 
 interface QuickAccessItemProps {
-  item: { id: string; nameKey?: string; icon: string; color: string; label?: string };
+  item: { id: string; nameKey?: string; icon: string; color: string; label?: string; nameAr?: string; nameEn?: string };
   onPress: () => void;
   isDarkMode: boolean;
   index: number;
   t: (key: string) => string;
   isRTL?: boolean;
+  lang?: string;
 }
 
-const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDarkMode, index, t, isRTL }) => {
+const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDarkMode, index, t, isRTL, lang }) => {
+  // Resolve item name: Firestore nameAr/nameEn > translation key > label
+  const getItemName = () => {
+    // If Firestore provides nameAr/nameEn, use based on language
+    const itemAny = item as any;
+    if (itemAny.nameAr || itemAny.nameEn) {
+      const isArabic = lang === 'ar' || lang === 'ur' || lang === 'fa';
+      return isArabic ? (itemAny.nameAr || itemAny.nameEn) : (itemAny.nameEn || itemAny.nameAr);
+    }
+    // Fallback to translation key or label
+    return item.nameKey ? t(item.nameKey) : (item.label || '');
+  };
+
   return (
     <Animated.View entering={FadeInDown.delay(200 + index * 60).duration(400)}>
       <TouchableOpacity
@@ -441,7 +454,7 @@ const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDark
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <MaterialCommunityIcons name={safeIcon(item.icon) as any} size={28} color={item.color} style={{ marginBottom: 6 }} />
           <Text style={[styles.quickAccessName, isDarkMode && styles.textLight, { writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-            {item.nameKey ? t(item.nameKey) : (item.label || '')}
+            {getItemName()}
           </Text>
           </View>
         </GlassCard>
@@ -570,9 +583,16 @@ export default function HomeScreen() {
   // HomePageConfig: section visibility/ordering from admin
   const [homeConfig, setHomeConfig] = useState<HomePageConfig | null>(null);
   useEffect(() => {
+    // Load cached config first for instant display
     fetchHomePageConfig().then(cfg => {
       if (cfg) setHomeConfig(cfg);
     });
+    // Subscribe to real-time updates from admin panel
+    const unsubscribe = subscribeToHomePageConfig(
+      (cfg) => setHomeConfig(cfg),
+      (err) => console.warn('Home config subscription error:', err)
+    );
+    return () => unsubscribe();
   }, []);
 
   // Map section IDs to feature keys for toggle filtering
@@ -614,6 +634,7 @@ export default function HomeScreen() {
   // Quick Access customization
   const DEFAULT_QUICK_ACCESS_IDS = QUICK_ACCESS.slice(0, 4).map(i => i.id);
   const [selectedQuickAccessIds, setSelectedQuickAccessIds] = useState<string[]>(DEFAULT_QUICK_ACCESS_IDS);
+  const [hasUserCustomized, setHasUserCustomized] = useState<boolean | null>(null); // null = loading, false = use Firestore, true = use local
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [modalMode, setModalMode] = useState<'select' | 'reorder'>('select');
@@ -740,8 +761,14 @@ export default function HomeScreen() {
     Promise.all([
       AsyncStorage.getItem('@quick_access_items'),
       AsyncStorage.getItem(CUSTOM_ITEMS_STORAGE_KEY),
-    ]).then(([stored, storedCustom]) => {
-      if (stored) {
+      AsyncStorage.getItem('@quick_access_customized'),
+    ]).then(([stored, storedCustom, customizedFlag]) => {
+      // Check if user has ever customized their Quick Access
+      const userHasCustomized = customizedFlag === 'true';
+      setHasUserCustomized(userHasCustomized);
+      
+      if (userHasCustomized && stored) {
+        // User has customized - use their saved preferences
         try {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -780,23 +807,89 @@ export default function HomeScreen() {
   const saveQuickAccessIds = useCallback(async (ids: string[], customs: CustomQuickAccessItem[]) => {
     setSelectedQuickAccessIds(ids);
     setCustomItems(customs);
+    setHasUserCustomized(true); // Mark that user has customized
     await AsyncStorage.setItem('@quick_access_items', JSON.stringify(ids));
     await AsyncStorage.setItem(CUSTOM_ITEMS_STORAGE_KEY, JSON.stringify(customs));
+    await AsyncStorage.setItem('@quick_access_customized', 'true'); // Save flag
+  }, []);
+
+  // Reset Quick Access to Firestore defaults (admin settings)
+  const resetQuickAccessToDefaults = useCallback(async () => {
+    setHasUserCustomized(false);
+    setCustomItems([]);
+    await AsyncStorage.removeItem('@quick_access_items');
+    await AsyncStorage.removeItem(CUSTOM_ITEMS_STORAGE_KEY);
+    await AsyncStorage.removeItem('@quick_access_customized');
+    setShowCustomizeModal(false);
   }, []);
 
   const allQuickAccessItems = useMemo(() => {
+    // If Firestore config has quickAccess items, use them
+    if (homeConfig?.quickAccess?.items?.length) {
+      const firestoreItems = homeConfig.quickAccess.items.map(item => ({
+        id: item.id,
+        nameKey: `home.${item.id}`, // Will be overridden by nameAr/nameEn
+        nameAr: item.nameAr,
+        nameEn: item.nameEn,
+        icon: item.icon,
+        color: item.color,
+        enabled: item.enabled,
+        order: item.order,
+        route: item.route,
+        label: undefined,
+      }));
+      const firestoreIds = new Set(firestoreItems.map(i => i.id));
+      return [...firestoreItems, ...customItems.filter(c => !firestoreIds.has(c.id))];
+    }
+    // Fallback to local hardcoded items
     const builtIn = QUICK_ACCESS.map(item => ({ ...item, label: undefined, route: undefined }));
-    return [...builtIn, ...customItems];
-  }, [customItems]);
+    const builtInIds = new Set(builtIn.map(i => i.id));
+    return [...builtIn, ...customItems.filter(c => !builtInIds.has(c.id))];
+  }, [homeConfig, customItems]);
 
   const pendingAllQuickAccessItems = useMemo(() => {
+    // If Firestore config has quickAccess items, use them for the modal too
+    if (homeConfig?.quickAccess?.items?.length) {
+      const firestoreItems = homeConfig.quickAccess.items.map(item => ({
+        id: item.id,
+        nameKey: `home.${item.id}`,
+        nameAr: item.nameAr,
+        nameEn: item.nameEn,
+        icon: item.icon,
+        color: item.color,
+        enabled: item.enabled,
+        order: item.order,
+        route: item.route,
+        label: undefined,
+      }));
+      const firestoreIds = new Set(firestoreItems.map(i => i.id));
+      return [...firestoreItems, ...pendingCustomItems.filter(c => !firestoreIds.has(c.id))];
+    }
     const builtIn = QUICK_ACCESS.map(item => ({ ...item, label: undefined, route: undefined }));
-    return [...builtIn, ...pendingCustomItems];
-  }, [pendingCustomItems]);
+    const builtInIds = new Set(builtIn.map(i => i.id));
+    return [...builtIn, ...pendingCustomItems.filter(c => !builtInIds.has(c.id))];
+  }, [homeConfig, pendingCustomItems]);
 
-  const filteredQuickAccess = [...allQuickAccessItems]
-    .filter(item => selectedQuickAccessIds.includes(item.id))
-    .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
+  const filteredQuickAccess = useMemo(() => {
+    // If user hasn't customized AND Firestore has config → use Firestore defaults
+    if (!hasUserCustomized && homeConfig?.quickAccess?.items?.length) {
+      return [...allQuickAccessItems]
+        .filter(item => {
+          // Custom items (user-added) are always shown if selected
+          if (!('enabled' in item)) return selectedQuickAccessIds.includes(item.id);
+          return (item as any).enabled === true;
+        })
+        .sort((a, b) => {
+          const orderA = (a as any).order ?? 99;
+          const orderB = (b as any).order ?? 99;
+          return orderA - orderB;
+        });
+    }
+    // User has customized - use their saved selection and order
+    return [...allQuickAccessItems]
+      .filter(item => selectedQuickAccessIds.includes(item.id))
+      .sort((a, b) => selectedQuickAccessIds.indexOf(a.id) - selectedQuickAccessIds.indexOf(b.id));
+  }, [homeConfig, allQuickAccessItems, selectedQuickAccessIds]);
 
   // Strip emoji characters that can't render with custom fonts (show as "?" boxes)
   const stripEmojis = useCallback((text: string) => {
@@ -901,10 +994,10 @@ export default function HomeScreen() {
       return;
     }
 
-    // Check custom items first
-    const custom = customItems.find(c => c.id === itemId);
-    if (custom) {
-      router.push(custom.route as any);
+    // Check all items (Firestore + custom) for an explicit route
+    const itemWithRoute = allQuickAccessItems.find(item => item.id === itemId && (item as any).route);
+    if (itemWithRoute && (itemWithRoute as any).route) {
+      router.push((itemWithRoute as any).route as any);
       return;
     }
     switch (itemId) {
@@ -1008,20 +1101,41 @@ export default function HomeScreen() {
               activeOpacity={0.9}
               onPress={() => router.push(welcomeBanner.route as any)}
             >
-              {welcomeBanner.displayMode === 'image_only' && welcomeBanner.backgroundImage ? (
-                <Image
-                  source={{ uri: welcomeBanner.backgroundImage }}
-                  style={styles.seasonCardImage}
-                  resizeMode="cover"
-                />
-              ) : welcomeBanner.displayMode === 'text_image' && welcomeBanner.backgroundImage ? (
-                <ImageBackground
-                  source={{ uri: welcomeBanner.backgroundImage }}
-                  style={styles.seasonCard}
-                  imageStyle={{ borderRadius: 20 }}
-                  resizeMode="cover"
-                >
-                  <View style={styles.seasonCardOverlay}>
+              {(() => {
+                const isRTLLang = settings.language === 'ar' || settings.language === 'ur' || settings.language === 'fa';
+                const bannerBg = (!isRTLLang && welcomeBanner.backgroundImageNonAr) ? welcomeBanner.backgroundImageNonAr : welcomeBanner.backgroundImage;
+                
+                return welcomeBanner.displayMode === 'image_only' && bannerBg ? (
+                  <Image
+                    source={{ uri: bannerBg }}
+                    style={styles.seasonCardImage}
+                    resizeMode="cover"
+                  />
+                ) : welcomeBanner.displayMode === 'text_image' && bannerBg ? (
+                  <ImageBackground
+                    source={{ uri: bannerBg }}
+                    style={styles.seasonCard}
+                    imageStyle={{ borderRadius: 20 }}
+                    resizeMode="cover"
+                  >
+                    <View style={styles.seasonCardOverlay}>
+                      <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <View style={styles.seasonInfo}>
+                          <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
+                          <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
+                        </View>
+                        {welcomeBanner.customIconUrl ? (
+                          <Image source={{ uri: welcomeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
+                        ) : (
+                          <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
+                        )}
+                      </View>
+                    </View>
+                  </ImageBackground>
+                ) : (
+                  <View
+                    style={[styles.seasonCard, { backgroundColor: `${welcomeBanner.color}CC` }]}
+                  >
                     <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <View style={styles.seasonInfo}>
                         <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
@@ -1034,24 +1148,8 @@ export default function HomeScreen() {
                       )}
                     </View>
                   </View>
-                </ImageBackground>
-              ) : (
-                <View
-                  style={[styles.seasonCard, { backgroundColor: `${welcomeBanner.color}CC` }]}
-                >
-                  <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={styles.seasonInfo}>
-                      <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'title')}</Text>
-                      <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{resolveBannerText(welcomeBanner, 'subtitle')}</Text>
-                    </View>
-                    {welcomeBanner.customIconUrl ? (
-                      <Image source={{ uri: welcomeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
-                    ) : (
-                      <MaterialCommunityIcons name={safeIcon(welcomeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
-                    )}
-                  </View>
-                </View>
-              )}
+                );
+              })()}
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -1098,6 +1196,7 @@ export default function HomeScreen() {
                   index={index}
                   t={t}
                   isRTL={isRTL}
+                  lang={settings.language}
                 />
               </Animated.View>
             ))}
@@ -1384,7 +1483,11 @@ export default function HomeScreen() {
 
               {addOtherMode === 'pages' && (
                 <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-                  {EXTRA_APP_PAGES.map(page => {
+                  {EXTRA_APP_PAGES.filter(page => {
+                    // Hide pages already managed by Firestore config
+                    if (homeConfig?.quickAccess?.items?.some(fi => fi.id === page.id)) return false;
+                    return true;
+                  }).map(page => {
                     const alreadyAdded = pendingCustomItems.some(c => c.id === page.id);
                     return (
                       <TouchableOpacity key={page.id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }, alreadyAdded && { opacity: 0.5 }]} activeOpacity={0.7} disabled={alreadyAdded} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPendingCustomItems(prev => [...prev, page]); setPendingIds(prev => [...prev, page.id]); setAddOtherMode(null); }}>
@@ -1438,7 +1541,13 @@ export default function HomeScreen() {
                       <View key={id} style={[styles.modalItem, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                           <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}><MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} /></View>
-                          <Text style={[styles.modalItemLabel, { color: colors.text }]}>{item.nameKey ? t(item.nameKey) : ((item as any).label || '')}</Text>
+                          <Text style={[styles.modalItemLabel, { color: colors.text }]}>
+                            {(item as any).nameAr || (item as any).nameEn 
+                              ? ((settings.language === 'ar' || settings.language === 'ur' || settings.language === 'fa') 
+                                ? ((item as any).nameAr || (item as any).nameEn) 
+                                : ((item as any).nameEn || (item as any).nameAr))
+                              : (item.nameKey ? t(item.nameKey) : ((item as any).label || ''))}
+                          </Text>
                         </View>
                         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 4 }}>
                           <TouchableOpacity disabled={index === 0} onPress={() => moveQuickAccessItem(index, -1)} style={{ opacity: index === 0 ? 0.3 : 1, padding: 4 }}><MaterialCommunityIcons name="chevron-up" size={22} color={isDarkMode ? '#fff' : '#333'} /></TouchableOpacity>
@@ -1451,13 +1560,32 @@ export default function HomeScreen() {
               )}
 
               {!addOtherMode && (
-                <View style={[styles.modalButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setShowCustomizeModal(false)}>
-                    <Text style={[styles.modalBtnText, { color: colors.textLight }]}>{t('common.cancel')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]} disabled={!pendingIds.length} onPress={() => { saveQuickAccessIds(pendingIds, pendingCustomItems); setShowCustomizeModal(false); }}>
-                    <Text style={styles.modalBtnConfirmText}>{t('common.save')}</Text>
-                  </TouchableOpacity>
+                <View style={{ gap: 12 }}>
+                  {/* Reset to defaults button - only show if user has customized */}
+                  {hasUserCustomized && homeConfig?.quickAccess?.items?.length && (
+                    <TouchableOpacity 
+                      style={{ 
+                        paddingVertical: 10, 
+                        paddingHorizontal: 16, 
+                        borderRadius: 8, 
+                        backgroundColor: isDarkMode ? 'rgba(255,100,100,0.15)' : 'rgba(220,38,38,0.1)',
+                        alignItems: 'center',
+                      }} 
+                      onPress={resetQuickAccessToDefaults}
+                    >
+                      <Text style={{ color: '#DC2626', fontFamily: 'Cairo-SemiBold', fontSize: 14 }}>
+                        {t('home.resetToDefaults')}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  <View style={[styles.modalButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <TouchableOpacity style={[styles.modalBtn, styles.modalBtnCancel]} onPress={() => setShowCustomizeModal(false)}>
+                      <Text style={[styles.modalBtnText, { color: colors.textLight }]}>{t('common.cancel')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]} disabled={!pendingIds.length} onPress={() => { saveQuickAccessIds(pendingIds, pendingCustomItems); setShowCustomizeModal(false); }}>
+                      <Text style={styles.modalBtnConfirmText}>{t('common.save')}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
