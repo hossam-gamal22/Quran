@@ -196,15 +196,11 @@ export default function WelcomeBanner() {
 
   // تحويل رابط Google Drive إلى رابط مباشر
   const convertDriveLink = (url: string): string => {
-    // Format: https://drive.google.com/file/d/FILE_ID/view...
-    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    // Extract file ID from various Google Drive URL formats
+    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (fileIdMatch) {
-      return `https://drive.google.com/uc?export=view&id=${fileIdMatch[1]}`;
-    }
-    // Format: https://drive.google.com/open?id=FILE_ID
-    const openIdMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (openIdMatch) {
-      return `https://drive.google.com/uc?export=view&id=${openIdMatch[1]}`;
+      // Use lh3.googleusercontent.com proxy which works reliably
+      return `https://lh3.googleusercontent.com/d/${fileIdMatch[1]}`;
     }
     return url;
   };
@@ -587,7 +583,17 @@ export default function WelcomeBanner() {
                       src={banner.backgroundImage}
                       alt="معاينة الخلفية العربية"
                       className="w-full h-28 object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.error-msg')) {
+                          const errorDiv = document.createElement('div');
+                          errorDiv.className = 'error-msg p-4 text-center text-red-400 text-sm bg-red-500/10';
+                          errorDiv.textContent = 'فشل تحميل الصورة - تأكد من صحة الرابط';
+                          parent.appendChild(errorDiv);
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -638,13 +644,23 @@ export default function WelcomeBanner() {
                       src={banner.backgroundImageNonAr}
                       alt="معاينة الخلفية الإنجليزية"
                       className="w-full h-28 object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.error-msg')) {
+                          const errorDiv = document.createElement('div');
+                          errorDiv.className = 'error-msg p-4 text-center text-red-400 text-sm bg-red-500/10';
+                          errorDiv.textContent = 'فشل تحميل الصورة - تأكد من صحة الرابط';
+                          parent.appendChild(errorDiv);
+                        }
+                      }}
                     />
                   </div>
                 )}
               </div>
 
-              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 800×200 أو نسبة 4:1 — يدعم رفع مباشر أو لصق رابط Google Drive (يتم تحويله تلقائياً)</p>
+              <p className="text-xs text-slate-500 mt-3">يفضل بأبعاد 800×200 أو نسبة 4:1 — يدعم رفع مباشر (مفضل) أو لصق رابط Google Drive</p>
             </div>
           )}
 
