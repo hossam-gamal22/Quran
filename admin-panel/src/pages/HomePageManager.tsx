@@ -119,12 +119,12 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   { id: 'surah_kahf', nameAr: 'سورة الكهف', nameEn: 'Al-Kahf', icon: 'book-open-page-variant', color: '#3a7ca5', enabled: true, order: 3, route: '' },
   { id: 'surah_yasin', nameAr: 'سورة يس', nameEn: 'Yasin', icon: 'book-open-page-variant', color: '#5d4e8c', enabled: true, order: 4, route: '' },
   { id: 'surah_mulk', nameAr: 'سورة الملك', nameEn: 'Al-Mulk', icon: 'book-open-page-variant', color: '#0D9488', enabled: true, order: 5, route: '' },
-  { id: 'names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#c17f59', enabled: true, order: 6, route: '' },
+  { id: 'names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#c17f59', enabled: true, order: 6, route: '/names' },
   { id: 'tasbih', nameAr: 'التسبيح', nameEn: 'Tasbih', icon: 'counter', color: '#2f7659', enabled: true, order: 7, route: '' },
   { id: 'salawat', nameAr: 'الصلاة على النبي', nameEn: 'Salawat', icon: 'star-crescent', color: '#e91e63', enabled: true, order: 8, route: '' },
   { id: 'istighfar', nameAr: 'الاستغفار', nameEn: 'Istighfar', icon: 'heart', color: '#8B5CF6', enabled: true, order: 9, route: '' },
   { id: 'hajj', nameAr: 'الحج والعمرة', nameEn: 'Hajj & Umrah', icon: 'star-crescent', color: '#0D9488', enabled: true, order: 10, route: '' },
-  { id: 'seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#6366F1', enabled: true, order: 11, route: '' },
+  { id: 'seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#6366F1', enabled: true, order: 11, route: '/seerah' },
   { id: 'benefit_azkar', nameAr: 'فضل الأذكار', nameEn: 'Azkar Benefits', icon: 'information', color: '#f5a623', enabled: true, order: 12, route: '' },
   { id: 'radio', nameAr: 'إذاعة القرآن', nameEn: 'Quran Radio', icon: 'radio', color: '#22C55E', enabled: true, order: 13, route: '' },
   // صفحات إضافية يمكن إضافتها للوصول السريع
@@ -136,8 +136,9 @@ const DEFAULT_QUICK_ACCESS: QuickAccessItem[] = [
   { id: 'page_companions', nameAr: 'قصص الصحابة', nameEn: 'Companions', icon: 'account-group', color: '#2f7659', enabled: false, order: 19, route: '/companions' },
   { id: 'page_quran_bookmarks', nameAr: 'إشارات المصحف', nameEn: 'Quran Bookmarks', icon: 'bookmark', color: '#4CAF50', enabled: false, order: 20, route: '/quran-bookmarks' },
   { id: 'page_worship_tracker', nameAr: 'تتبع العبادات', nameEn: 'Worship Tracker', icon: 'chart-line', color: '#2f7659', enabled: false, order: 21, route: '/worship-tracker' },
-  { id: 'page_seerah', nameAr: 'السيرة النبوية', nameEn: 'Seerah', icon: 'book-account', color: '#2f7659', enabled: false, order: 22, route: '/seerah' },
-  { id: 'page_names', nameAr: 'أسماء الله الحسنى', nameEn: 'Names of Allah', icon: 'star-crescent', color: '#DAA520', enabled: false, order: 23, route: '/names' },
+  { id: 'page_temp', nameAr: 'الصفحة المؤقتة', nameEn: 'Temp Page', icon: 'file-document-outline', color: '#FF9800', enabled: false, order: 22, route: '/temp-page' },
+  { id: 'page_daily_ayah', nameAr: 'آية اليوم', nameEn: 'Daily Ayah', icon: 'book-open-variant', color: '#3a7ca5', enabled: false, order: 23, route: '/daily-ayah' },
+  { id: 'page_hadith', nameAr: 'حديث اليوم', nameEn: 'Hadith of Day', icon: 'message-text', color: '#6366F1', enabled: false, order: 24, route: '/hadith-of-day' },
 ];
 
 const DEFAULT_DAILY_CONTENT: DailyContentConfig = {
@@ -360,6 +361,23 @@ export default function HomePageManager() {
           {isSaving ? 'جاري الحفظ...' : saveStatus === 'success' ? 'تم الحفظ!' : saveStatus === 'error' ? 'خطأ!' : 'حفظ التغييرات'}
         </button>
       </div>
+
+      {/* Theme Settings Banner */}
+      <Link
+        to="/themes"
+        className="flex items-center justify-between p-4 bg-gradient-to-l from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-2xl hover:border-emerald-500/40 transition-all group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+            <Palette className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <p className="text-white font-medium">المظهر والألوان</p>
+            <p className="text-slate-400 text-sm">لتعديل ألوان التطبيق والثيمات، اذهب إلى صفحة الثيمات</p>
+          </div>
+        </div>
+        <ExternalLink className="w-5 h-5 text-emerald-400 group-hover:translate-x-[-4px] transition-transform" />
+      </Link>
 
       {/* Tabs */}
       <div className="flex gap-2 flex-wrap">
