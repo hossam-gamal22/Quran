@@ -1,6 +1,50 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+
+// Helper function to format Firestore Timestamp or string dates
+const formatDate = (date: unknown): string => {
+  if (!date) return '-';
+  
+  // If it's a Firestore Timestamp
+  if (date && typeof date === 'object' && 'toDate' in date && typeof (date as Timestamp).toDate === 'function') {
+    try {
+      return (date as Timestamp).toDate().toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '-';
+    }
+  }
+  
+  // If it's an object with seconds/nanoseconds (raw Timestamp shape)
+  if (date && typeof date === 'object' && 'seconds' in date) {
+    try {
+      const timestamp = date as { seconds: number; nanoseconds: number };
+      return new Date(timestamp.seconds * 1000).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '-';
+    }
+  }
+  
+  // If it's already a string
+  if (typeof date === 'string') return date;
+  
+  // If it's a Date object
+  if (date instanceof Date) return date.toLocaleDateString('ar-EG');
+  
+  return '-';
+};
 
 interface User {
   id: string;
@@ -11,8 +55,8 @@ interface User {
   plan: 'free' | 'monthly' | 'yearly' | 'lifetime';
   status: 'active' | 'inactive' | 'banned';
   adsEnabled: boolean;
-  registrationDate: string;
-  lastActive: string;
+  registrationDate: unknown;
+  lastActive: unknown;
   totalSpent: number;
   currency: string;
 }
@@ -226,7 +270,7 @@ export default function Users() {
                       {user.adsEnabled ? 'مفعّلة' : 'معطّلة'}
                     </span>
                   </td>
-                  <td className="px-4 py-4 text-sm text-slate-400">{user.lastActive || '-'}</td>
+                  <td className="px-4 py-4 text-sm text-slate-400">{formatDate(user.lastActive)}</td>
                   <td className="px-4 py-4">
                     <div className="flex gap-2">
                       <button onClick={() => handleEditUser(user)} className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg">تعديل</button>
