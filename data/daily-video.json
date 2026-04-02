@@ -1,55 +1,4 @@
 {
-  "2026-03-25": {
-    "ayahText": "وَمِنْهُمْ أُمِّيُّونَ لَا يَعْلَمُونَ ٱلْكِتَٰبَ إِلَّآ أَمَانِىَّ وَإِنْ هُمْ إِلَّا يَظُنُّونَ",
-    "surahName": "سُورَةُ البَقَرَةِ",
-    "surahEnglish": "Al-Baqara",
-    "surahNumber": 2,
-    "ayahNumber": 78,
-    "globalAyahNumber": 85,
-    "generatedAt": "2026-03-25T01:52:13.348Z",
-    "videos": [
-      {
-        "reciterId": "ar.alafasy",
-        "reciterLabel": "مشاري العفاسي",
-        "reciterLabelEn": "Mishary Alafasy",
-        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-alafasy.mp4",
-        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-alafasy-premium.mp4",
-        "duration": 13.66
-      },
-      {
-        "reciterId": "ar.abdulsamad",
-        "reciterLabel": "عبدالباسط عبدالصمد",
-        "reciterLabelEn": "Abdul Basit",
-        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-abdulsamad.mp4",
-        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-abdulsamad-premium.mp4",
-        "duration": 22.78
-      },
-      {
-        "reciterId": "ar.abdurrahmaansudais",
-        "reciterLabel": "عبدالرحمن السديس",
-        "reciterLabelEn": "Abdurrahman As-Sudais",
-        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-abdurrahmaansudais.mp4",
-        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-abdurrahmaansudais-premium.mp4",
-        "duration": 9.72
-      },
-      {
-        "reciterId": "ar.mahermuaiqly",
-        "reciterLabel": "ماهر المعيقلي",
-        "reciterLabelEn": "Maher Al Muaiqly",
-        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-mahermuaiqly.mp4",
-        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-mahermuaiqly-premium.mp4",
-        "duration": 10.27
-      },
-      {
-        "reciterId": "ar.saoodshuraym",
-        "reciterLabel": "سعود الشريم",
-        "reciterLabelEn": "Saud Ash-Shuraym",
-        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-saoodshuraym.mp4",
-        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-03-25-saoodshuraym-premium.mp4",
-        "duration": 8.46
-      }
-    ]
-  },
   "2026-03-26": {
     "ayahText": "فَوَيْلٌۭ لِّلَّذِينَ يَكْتُبُونَ ٱلْكِتَٰبَ بِأَيْدِيهِمْ ثُمَّ يَقُولُونَ هَٰذَا مِنْ عِندِ ٱللَّهِ لِيَشْتَرُوا۟ بِهِۦ ثَمَنًۭا قَلِيلًۭا ۖ فَوَيْلٌۭ لَّهُم مِّمَّا كَتَبَتْ أَيْدِيهِمْ وَوَيْلٌۭ لَّهُم مِّمَّا يَكْسِبُونَ",
     "surahName": "سُورَةُ البَقَرَةِ",
@@ -404,6 +353,57 @@
         "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-01-saoodshuraym.mp4",
         "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-01-saoodshuraym-premium.mp4",
         "duration": 46.32
+      }
+    ]
+  },
+  "2026-04-02": {
+    "ayahText": "أُو۟لَٰٓئِكَ ٱلَّذِينَ ٱشْتَرَوُا۟ ٱلْحَيَوٰةَ ٱلدُّنْيَا بِٱلْءَاخِرَةِ ۖ فَلَا يُخَفَّفُ عَنْهُمُ ٱلْعَذَابُ وَلَا هُمْ يُنصَرُونَ",
+    "surahName": "سُورَةُ البَقَرَةِ",
+    "surahEnglish": "Al-Baqara",
+    "surahNumber": 2,
+    "ayahNumber": 86,
+    "globalAyahNumber": 93,
+    "generatedAt": "2026-04-02T01:56:53.420Z",
+    "videos": [
+      {
+        "reciterId": "ar.alafasy",
+        "reciterLabel": "مشاري العفاسي",
+        "reciterLabelEn": "Mishary Alafasy",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-alafasy.mp4",
+        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-alafasy-premium.mp4",
+        "duration": 16.85
+      },
+      {
+        "reciterId": "ar.abdulsamad",
+        "reciterLabel": "عبدالباسط عبدالصمد",
+        "reciterLabelEn": "Abdul Basit",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-abdulsamad.mp4",
+        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-abdulsamad-premium.mp4",
+        "duration": 426.97
+      },
+      {
+        "reciterId": "ar.abdurrahmaansudais",
+        "reciterLabel": "عبدالرحمن السديس",
+        "reciterLabelEn": "Abdurrahman As-Sudais",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-abdurrahmaansudais.mp4",
+        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-abdurrahmaansudais-premium.mp4",
+        "duration": 15.54
+      },
+      {
+        "reciterId": "ar.mahermuaiqly",
+        "reciterLabel": "ماهر المعيقلي",
+        "reciterLabelEn": "Maher Al Muaiqly",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-mahermuaiqly.mp4",
+        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-mahermuaiqly-premium.mp4",
+        "duration": 12.62
+      },
+      {
+        "reciterId": "ar.saoodshuraym",
+        "reciterLabel": "سعود الشريم",
+        "reciterLabelEn": "Saud Ash-Shuraym",
+        "url": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-saoodshuraym.mp4",
+        "premiumUrl": "https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public/video-2026-04-02-saoodshuraym-premium.mp4",
+        "duration": 12.38
       }
     ]
   }
