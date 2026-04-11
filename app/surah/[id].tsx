@@ -231,6 +231,7 @@ interface MushafPageProps {
   width: number;
   fontSizeAdjust: number;
   forceLightText?: boolean;
+  forcePlainArabicForCapture?: boolean;
   useCdnImage?: boolean;
   bookmarkMap: Record<string, BookmarkColor>;
   playingAyahKey: string | null;
@@ -243,13 +244,14 @@ interface MushafPageProps {
 }
 
 const MushafPage = React.memo(function MushafPage({
-  page, themeIndex, width, fontSizeAdjust, forceLightText, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
+  page, themeIndex, width, fontSizeAdjust, forceLightText, forcePlainArabicForCapture, useCdnImage, bookmarkMap, playingAyahKey, highlightAyahKey, onAyahLongPress,
   translationMap, showTranslation, translationFontSize = 14, translationIsRTL = false,
 }: MushafPageProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   // Use forceLightText (actual background) to determine CPAL mode, not system isDarkMode
   const needsDarkFont = forceLightText ?? isDarkMode;
+  const shouldForcePlainArabic = !!forcePlainArabicForCapture && Platform.OS === 'android';
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, needsDarkFont));
   const [fontError, setFontError] = useState(false);
   const baseTextColor = getQuranTextColor('', themeIndex);
@@ -282,6 +284,7 @@ const MushafPage = React.memo(function MushafPage({
 
   // Load QCF4 per-page font (use needsDarkFont based on actual background)
   useEffect(() => {
+    if (shouldForcePlainArabic) return;
     if (isPageFontLoaded(page, needsDarkFont)) {
       setFontLoaded(true);
       return;
@@ -291,7 +294,7 @@ const MushafPage = React.memo(function MushafPage({
     loadPageFont(page, needsDarkFont)
       .then(() => setFontLoaded(true))
       .catch(() => setFontError(true));
-  }, [page, needsDarkFont]);
+  }, [page, needsDarkFont, shouldForcePlainArabic]);
 
   const blocks = useMemo(() => buildPageBlocks(page), [page]);
   const fontFamily = getPageFontFamily(page, needsDarkFont);
@@ -312,7 +315,7 @@ const MushafPage = React.memo(function MushafPage({
   const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.18) : 0;
 
   // Font loading state
-  if (!fontLoaded && !fontError) {
+  if (!shouldForcePlainArabic && !fontLoaded && !fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={goldenColor} />
@@ -321,7 +324,7 @@ const MushafPage = React.memo(function MushafPage({
   }
 
   // Font failed to load — retry UI
-  if (fontError) {
+  if (!shouldForcePlainArabic && fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ color: textColor, marginBottom: 12 }}>{translate('quran.fontLoadError')}</Text>
@@ -389,7 +392,7 @@ const MushafPage = React.memo(function MushafPage({
             <View key={i}>
               <Text
                 style={{
-                  fontFamily: fontLoaded ? fontFamily : 'Amiri-Regular',
+                    fontFamily: !shouldForcePlainArabic && fontLoaded ? fontFamily : 'Amiri-Regular',
                   fontSize,
                   textAlign: 'center',
                   lineHeight,
@@ -415,7 +418,7 @@ const MushafPage = React.memo(function MushafPage({
                   const ayahObj = surahData?.ayahs.find(a => a.ns === group.ayah);
                   const ayahText = ayahObj?.t;
 
-                  if (ayahText && !fontLoaded) {
+                  if (ayahText && (shouldForcePlainArabic || !fontLoaded)) {
                     const wordsFromAyah = ayahText.split(/\s+/).filter(Boolean);
                     let wordIndex = 0;
                     return (
@@ -1296,6 +1299,7 @@ export default function SurahScreen() {
               width={SCREEN_WIDTH}
               fontSizeAdjust={fontSizeAdjust}
               forceLightText={forceLightText}
+              forcePlainArabicForCapture={Platform.OS === 'android'}
               useCdnImage={settings?.display?.quranUseCdnPages}
               bookmarkMap={{}}
               playingAyahKey={null}

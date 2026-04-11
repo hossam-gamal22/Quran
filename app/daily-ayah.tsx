@@ -29,6 +29,7 @@ import { getDailyAyahOverride } from '@/lib/daily-content-override';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { localizeNumber } from '@/lib/format-number';
+import { getFullVerseText } from '@/lib/quran-cache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -136,6 +137,7 @@ interface AyahCardProps {
   isArabic?: boolean;
   verseTranslation?: string | null;
   language?: string;
+  fullArabicText?: string | null;
 }
 
 const toArabicNumeral = (n: number) => localizeNumber(n);
@@ -146,11 +148,16 @@ const TEXT_SHADOW = {
   textShadowRadius: 3,
 };
 
-function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar' }: AyahCardProps) {
+function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar', fullArabicText }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
   const { logoSource } = useAppIdentity();
   const isSolidBg = bgUrl.startsWith('#');
-  const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
+  // Use full verse text when available, fall back to excerpt
+  const displayArabic = fullArabicText || ayah.arabic;
+  // Dynamic font sizing: smaller font for long verses to fit the card
+  const arabicLen = displayArabic.length;
+  const cardFontSize = arabicLen > 150 ? 18 : arabicLen > 80 ? 22 : 26;
+  const cardLineHeight = arabicLen > 150 ? 36 : arabicLen > 80 ? 42 : 50;
 
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}>
@@ -175,8 +182,8 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
                 {qcfGlyphs.join('')}
               </Text>
             ) : (
-              <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
-                ﴿ {ayah.arabic} ﴾
+              <Text style={{ fontSize: cardFontSize, color: '#FFFFFF', textAlign: 'center', lineHeight: cardLineHeight, fontFamily: UTHMANI_FALLBACK, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
+                {displayArabic} ﴿{toArabicNumeral(ayah.ayah)}﴾
               </Text>
             )
           ) : (
@@ -243,6 +250,7 @@ export default function DailyAyahVideoScreen() {
   const [qcfFontFamily, setQcfFontFamily] = useState<string | null>(null);
   const [overrideAyah, setOverrideAyah] = useState<typeof DAILY_AYAHS[0] | null>(null);
   const [verseTranslation, setVerseTranslation] = useState<string | null>(null);
+  const [fullArabicText, setFullArabicText] = useState<string | null>(null);
 
   const currentAyah = overrideAyah || DAILY_AYAHS[ayahIdx];
 
@@ -275,6 +283,12 @@ export default function DailyAyahVideoScreen() {
       }
     });
   }, []);
+
+  // Load full verse text from local Quran data (DAILY_AYAHS stores only excerpts)
+  useEffect(() => {
+    const full = getFullVerseText(currentAyah.surah, currentAyah.ayah);
+    setFullArabicText(full);
+  }, [currentAyah.surah, currentAyah.ayah]);
   const currentBg = selectedCat.images[selectedBgIdx];
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -381,7 +395,7 @@ export default function DailyAyahVideoScreen() {
     try {
       if (Platform.OS === 'web') {
         await Share.share({
-          message: `${currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— ${t('common.appName')}`,
+          message: `${fullArabicText || currentAyah.arabic}\n\n﴿ ${currentAyah.ref} ﴾\n\n${currentAyah.trans}\n\n— ${t('common.appName')}`,
         });
         return;
       }
@@ -390,12 +404,12 @@ export default function DailyAyahVideoScreen() {
       if (canShare) {
         await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `${t('shareService.ayahRef')}: ${currentAyah.ref}` });
       } else {
-        await Share.share({ message: `${currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾` });
+        await Share.share({ message: `${fullArabicText || currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾` });
       }
     } catch {
       Alert.alert(t('common.error'), t('common.shareError'));
     }
-  }, [currentAyah]);
+  }, [currentAyah, fullArabicText]);
 
   const s = StyleSheet.create({
     title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },
@@ -463,6 +477,7 @@ export default function DailyAyahVideoScreen() {
               isArabic={isArabic}
               verseTranslation={verseTranslation}
               language={language}
+              fullArabicText={fullArabicText}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -514,7 +529,7 @@ export default function DailyAyahVideoScreen() {
               </Text>
             ) : (
               <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
-                ﴿ {currentAyah.arabic} ﴾
+                {fullArabicText || currentAyah.arabic} ﴿{toArabicNumeral(currentAyah.ayah)}﴾
               </Text>
             )
           ) : (

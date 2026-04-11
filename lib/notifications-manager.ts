@@ -683,6 +683,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
         ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
         ...(Platform.OS === 'ios' && iosAttachments && { attachments: iosAttachments }),
       };
 
@@ -925,6 +926,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
                     data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: notifSettings.azkarSoundType || 'general_reminder', iconType: 'prayer_beads' },
                     ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
                     ...(Platform.OS === 'android' && { channelId: afterPrayerChannelId }),
+                    ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
                     ...(Platform.OS === 'ios' && afterPrayerAttachments && { attachments: afterPrayerAttachments }),
                   },
                   trigger: {
@@ -1196,6 +1198,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
               sound: resolveNotificationSound(worshipWeeklySoundType, notifSettings.sound),
               data: { type: 'worship_weekly', iconType: 'reminder' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
+              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
               ...(Platform.OS === 'ios' && worshipWeeklyAttachments && { attachments: worshipWeeklyAttachments }),
             },
             trigger: {
@@ -1262,6 +1265,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
                 ayah: 1,
               },
               ...(Platform.OS === 'android' && { channelId: kahfChannelId }),
+              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
               ...(Platform.OS === 'ios' && kahfAttachments && { attachments: kahfAttachments }),
             },
             trigger: {
@@ -1392,6 +1396,7 @@ export async function scheduleRefreshReminder(): Promise<void> {
           sound: 'default',
           data: { type: 'refresh_reminder', iconType: 'reminder' },
           ...(Platform.OS === 'android' && { channelId: 'general' }),
+          ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
           ...(Platform.OS === 'ios' && refreshAttachments && { attachments: refreshAttachments }),
         },
         trigger: {
@@ -1619,6 +1624,7 @@ export async function sendTestNotification(
       ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
       ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
       ...(Platform.OS === 'android' && opts.vibration === false && { vibrate: [0] }),
+      ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       ...(Platform.OS === 'ios' && testAttachments && { attachments: testAttachments }),
     },
     trigger: {

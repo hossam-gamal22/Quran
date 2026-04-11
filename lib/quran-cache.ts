@@ -48,6 +48,14 @@ export interface LastPlayback {
   timestamp: number;
 }
 
+// ─── الحصول على نص الآية كامل من البيانات المحلية ────────────────────────────
+export function getFullVerseText(surahNumber: number, ayahNumber: number): string | null {
+  const surah = (localQuranData as any[]).find(s => s.number === surahNumber);
+  if (!surah) return null;
+  const ayah = surah.ayahs?.find((a: any) => a.numberInSurah === ayahNumber);
+  return ayah?.text ?? null;
+}
+
 // ─── التحقق من صلاحية الكاش ─────────────────────────────────────────────────
 async function isCacheValid(): Promise<boolean> {
   try {

@@ -661,7 +661,7 @@ export default function WidgetsGalleryScreen() {
           <TouchableOpacity
             onPress={() => {
               if (isActiveWidgetLocked) {
-                guardPremiumFeature('premium_widgets', router, isPremium);
+                guardPremiumFeature('advanced_stats', router, isPremium);
                 return;
               }
               handleAddWidget();

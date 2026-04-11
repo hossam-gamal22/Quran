@@ -1407,7 +1407,7 @@ export default function HomeScreen() {
             <Animated.View entering={FadeIn.duration(600)}>
               <TouchableOpacity
                 activeOpacity={0.9}
-                onPress={() => router.push('/surah/18' as any)}
+                onPress={() => router.push('/surah-kahf' as any)}
               >
                 <LinearGradient
                   colors={['#1a4a3a', '#2d6a4f']}

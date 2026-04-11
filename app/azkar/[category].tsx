@@ -222,6 +222,24 @@ export default function CategoryAzkarScreen() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
 
+  const triggerFeedback = useCallback((type: 'light' | 'medium' | 'success' = 'light') => {
+    if (Platform.OS === 'web') return;
+    if (Platform.OS === 'ios') {
+      if (type === 'success') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      } else {
+        Haptics.impactAsync(type === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      }
+      return;
+    }
+
+    if (type === 'success') {
+      Vibration.vibrate([0, 100, 50, 100]);
+    } else {
+      Vibration.vibrate(type === 'medium' ? 30 : 20);
+    }
+  }, []);
+
   // ===================================
   // تحميل البيانات
   // ===================================
@@ -371,7 +389,7 @@ export default function CategoryAzkarScreen() {
     setNewDhikrCount('33');
     setNewDhikrTranslation('');
     setShowAddModal(false);
-    if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    triggerFeedback('success');
   };
 
   const deleteCustomDhikr = (id: string) => {
@@ -386,7 +404,7 @@ export default function CategoryAzkarScreen() {
           onPress: async () => {
             const updated = customAzkar.filter(d => d.id !== id);
             await saveCustomAzkar(updated);
-            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            triggerFeedback('medium');
           },
         },
       ],
@@ -556,7 +574,7 @@ export default function CategoryAzkarScreen() {
         duration: 300,
         useNativeDriver: false,
       }).start();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      triggerFeedback('success');
       setToastMsg(t('azkar.startingOver'));
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToastMsg(null), 2000);
@@ -590,10 +608,8 @@ export default function CategoryAzkarScreen() {
     }
     
     setFavorites(prev => ({ ...prev, [zikrId]: !isCurrentlyFavorite }));
-    
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
+
+    triggerFeedback('medium');
   };
 
   // ===================================
@@ -602,7 +618,7 @@ export default function CategoryAzkarScreen() {
 
   const openShareOptions = (zikr: Zikr | CustomDhikr) => {
     setShareTargetZikr(zikr);
-    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    triggerFeedback('light');
     Alert.alert(
       t('common.share'),
       '',
@@ -1418,7 +1434,7 @@ export default function CategoryAzkarScreen() {
                           if (cdDone) return;
                           const next = cdCount + 1;
                           setCounts(prev => ({ ...prev, [cd.id as any]: next }));
-                          if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          triggerFeedback('light');
                         }}
                         onLongPress={() => deleteCustomDhikr(cd.id)}
                         activeOpacity={0.8}
@@ -1604,9 +1620,9 @@ export default function CategoryAzkarScreen() {
                             if (categoryLocked || zDone) return;
                             const next = zCount + 1;
                             setCounts(prev => ({ ...prev, [zikr.id]: next }));
-                            if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            triggerFeedback('light');
                             if (next >= zikr.count) {
-                              if (Platform.OS === 'ios') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              triggerFeedback('success');
                               const updated = { ...counts, [zikr.id]: next };
                               if (checkAllCompleted(updated)) setTimeout(() => handleCategoryCompleted(), 500);
                             }
@@ -1640,7 +1656,7 @@ export default function CategoryAzkarScreen() {
                         if (cdDone) return;
                         const next = cdCount + 1;
                         setCounts(prev => ({ ...prev, [cd.id as any]: next }));
-                        if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        triggerFeedback('light');
                       }}
                       onLongPress={() => deleteCustomDhikr(cd.id)}
                       activeOpacity={0.8}

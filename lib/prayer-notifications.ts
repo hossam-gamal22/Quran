@@ -244,8 +244,10 @@ export async function schedulePrayerNotifications(
               data: { type: 'prayer', prayer: prayerKey, time: cleanTime, soundType: effectiveSoundType, iconType: 'mosque' },
               sound: soundValue,
               priority: Notifications.AndroidNotificationPriority.MAX,
-              // iOS: bypass DND and Silent mode for prayer notifications
-              ...(Platform.OS === 'ios' && { interruptionLevel: 'critical' as const }),
+              // iOS: bypass Focus mode for prayer notifications
+              // NOTE: 'timeSensitive' does NOT require Apple's critical-alerts entitlement.
+              // 'critical' silently drops the notification without the entitlement.
+              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
               ...(Platform.OS === 'ios' && mosqueAttachments && { attachments: mosqueAttachments }),
               ...(Platform.OS === 'android' && { channelId }),
             },
