@@ -1103,7 +1103,7 @@ export default function HomeScreen() {
               onPress={() => router.push(welcomeBanner.route as any)}
             >
               {(() => {
-                const isRTLLang = settings.language === 'ar' || settings.language === 'ur' || settings.language === 'fa';
+                const isRTLLang = settings.language === 'ar' || settings.language === 'ur' || (settings.language as string) === 'fa';
                 const bannerBg = (!isRTLLang && welcomeBanner.backgroundImageNonAr) ? welcomeBanner.backgroundImageNonAr : welcomeBanner.backgroundImage;
                 
                 return welcomeBanner.displayMode === 'image_only' && bannerBg ? (
@@ -1546,7 +1546,7 @@ export default function HomeScreen() {
                           <View style={[styles.modalItemIcon, { backgroundColor: `${item.color}20` }]}><MaterialCommunityIcons name={item.icon as any} size={20} color={item.color} /></View>
                           <Text style={[styles.modalItemLabel, { color: colors.text }]}>
                             {(item as any).nameAr || (item as any).nameEn 
-                              ? ((settings.language === 'ar' || settings.language === 'ur' || settings.language === 'fa') 
+                              ? ((settings.language === 'ar' || settings.language === 'ur' || (settings.language as string) === 'fa') 
                                 ? ((item as any).nameAr || (item as any).nameEn) 
                                 : ((item as any).nameEn || (item as any).nameAr))
                               : (item.nameKey ? t(item.nameKey) : ((item as any).label || ''))}
