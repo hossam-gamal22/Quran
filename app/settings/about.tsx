@@ -1,17 +1,17 @@
 // app/settings/about.tsx
 // صفحة عن التطبيق - روح المسلم
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   Linking,
   Image,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +22,8 @@ import Animated, { FadeInDown, FadeIn, useAnimatedStyle, useSharedValue, withSpr
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { fetchAppConfig } from '@/lib/app-config-api';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -68,10 +70,11 @@ const LinkItem: React.FC<LinkItemProps> = ({
   isDarkMode,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <TouchableOpacity
-      style={[styles.linkItem, isDarkMode && styles.linkItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      style={[styles.linkItem, { borderBottomColor: colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -82,12 +85,12 @@ const LinkItem: React.FC<LinkItemProps> = ({
         <MaterialCommunityIcons name={icon} size={22} color={iconColor} />
       </View>
       <View style={[styles.linkContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-        <Text style={[styles.linkTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
+        <Text style={[styles.linkTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
         {subtitle && (
-          <Text style={[styles.linkSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subtitle}</Text>
+          <Text style={[styles.linkSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subtitle}</Text>
         )}
       </View>
-      <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={isDarkMode ? '#666' : '#ccc'} />
+      <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.textLight} />
     </TouchableOpacity>
   );
 };
@@ -102,18 +105,19 @@ interface FeatureItemProps {
 
 const FeatureItem: React.FC<FeatureItemProps> = ({ icon, title, desc, index, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 80).duration(400)}
-      style={[styles.featureItem, isDarkMode && styles.featureItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      style={[styles.featureItem, { borderBottomColor: colors.border, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
     >
       <View style={styles.featureIcon}>
-        <MaterialCommunityIcons name={icon} size={24} color="#22C55E" />
+        <MaterialCommunityIcons name={icon} size={24} color="#0d8e62" />
       </View>
       <View style={[styles.featureContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-        <Text style={[styles.featureTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
-        <Text style={[styles.featureDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{desc}</Text>
+        <Text style={[styles.featureTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
+        <Text style={[styles.featureDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{desc}</Text>
       </View>
     </Animated.View>
   );
@@ -127,9 +131,17 @@ export default function AboutScreen() {
   const isRTL = useIsRTL();
   const { isDarkMode, t, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { logoSource } = useAppIdentity();
   const [tapCount, setTapCount] = useState(0);
   const logoScale = useSharedValue(1);
+  const [contactEmail, setContactEmail] = useState(APP_INFO.email);
+
+  useEffect(() => {
+    fetchAppConfig().then(config => {
+      if (config.contact?.email) setContactEmail(config.contact.email);
+    }).catch(() => {});
+  }, []);
 
   const handleLogoTap = () => {
     setTapCount((prev) => prev + 1);
@@ -150,16 +162,13 @@ export default function AboutScreen() {
   }));
 
   const openEmail = () => {
-    Linking.openURL(`mailto:${APP_INFO.email}?subject=${encodeURIComponent(t('aboutApp.emailSubject'))}`);
+    Linking.openURL(`mailto:${contactEmail}?subject=${encodeURIComponent(t('aboutApp.emailSubject'))}`).catch(() => {});
   };
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
       <UniversalHeader title={t('settings.about')} />
@@ -191,8 +200,8 @@ export default function AboutScreen() {
 
         {/* Description */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={[styles.descCard, isDarkMode && styles.descCardDark]}>
-            <Text style={[styles.descText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+          <View style={[styles.descCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.descText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('aboutApp.description')}
             </Text>
           </View>
@@ -200,8 +209,8 @@ export default function AboutScreen() {
 
         {/* Features */}
         <Animated.View entering={FadeIn.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('aboutApp.features')}</Text>
-          <View style={[styles.featuresGrid, isDarkMode && styles.featuresGridDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('aboutApp.features')}</Text>
+          <View style={[styles.featuresGrid, { backgroundColor: colors.card }]}>
             {FEATURES.map((feature, index) => (
               <FeatureItem
                 key={feature.titleKey}
@@ -217,18 +226,18 @@ export default function AboutScreen() {
 
         {/* Stats */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('aboutApp.stats')}</Text>
-          <View style={[styles.statsContainer, isDarkMode && styles.statsContainerDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('aboutApp.stats')}</Text>
+          <View style={[styles.statsContainer, { backgroundColor: colors.card }]}>
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.text }]}>12</Text>
               <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('settings.language')}</Text>
             </View>
-            <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.text }]}>114</Text>
               <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('quran.surah')}</Text>
             </View>
-            <View style={[styles.statDivider, isDarkMode && styles.statDividerDark]} />
+            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
               <Text style={[styles.statNumber, { color: colors.text }]}>100+</Text>
               <Text style={[styles.statLabel, { color: colors.textLight }]}>{t('home.azkarSection')}</Text>
@@ -238,13 +247,13 @@ export default function AboutScreen() {
 
         {/* Links */}
         <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.support')}</Text>
-          <View style={[styles.linksCard, isDarkMode && styles.linksCardDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.support')}</Text>
+          <View style={[styles.linksCard, { backgroundColor: colors.card }]}>
             <LinkItem
               icon="email"
               iconColor="#3a7ca5"
               title={t('settings.contactUs')}
-              subtitle={APP_INFO.email}
+              subtitle={contactEmail}
               onPress={openEmail}
               isDarkMode={isDarkMode}
             />
@@ -252,7 +261,7 @@ export default function AboutScreen() {
               icon="facebook"
               iconColor="#1877F2"
               title="Facebook"
-              onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/')}
+              onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/').catch(() => {})}
               isDarkMode={isDarkMode}
             />
           </View>
@@ -276,13 +285,9 @@ export default function AboutScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
   },
   scrollView: {
     flex: 1,
@@ -329,51 +334,37 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   descCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 10,
   },
-  descCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   descText: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: '#333',
     lineHeight: 26,
     textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#8E8E93',
     marginTop: 20,
     marginBottom: 12,
   },
   featuresGrid: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  featuresGridDark: {
-    backgroundColor: '#1a1a2e',
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  featureItemDark: {
-    borderBottomColor: '#2a2a3e',
   },
   featureIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#22C55E15',
+    backgroundColor: '#0d8e6215',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -384,24 +375,18 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   featureDesc: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginTop: 2,
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     justifyContent: 'space-around',
     alignItems: 'center',
-  },
-  statsContainerDark: {
-    backgroundColor: '#1a1a2e',
   },
   statItem: {
     alignItems: 'center',
@@ -409,39 +394,26 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 28,
     fontFamily: fontBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   statLabel: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginTop: 4,
   },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: '#eee',
-  },
-  statDividerDark: {
-    backgroundColor: '#2a2a3e',
   },
   linksCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  linksCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   linkItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  linkItemDark: {
-    borderBottomColor: '#2a2a3e',
   },
   linkIconBg: {
     width: 42,
@@ -457,12 +429,10 @@ const styles = StyleSheet.create({
   linkTitle: {
     fontSize: 15,
     fontFamily: fontSemiBold(),
-    color: '#333',
   },
   linkSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginTop: 2,
   },
   socialContainer: {
@@ -478,12 +448,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   creditsCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  creditsCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   creditItem: {
     flexDirection: 'row',
@@ -494,14 +460,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  creditItemBorderDark: {
-    borderBottomColor: '#2a2a3e',
-  },
   creditIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#22C55E15',
+    backgroundColor: '#0d8e6215',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -512,12 +475,10 @@ const styles = StyleSheet.create({
   creditName: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   creditRole: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginTop: 2,
   },
   footer: {
@@ -528,19 +489,16 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginBottom: 8,
   },
   copyright: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#8E8E93',
     marginBottom: 4,
   },
   buildInfo: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    color: '#ccc',
   },
   bottomSpace: {
     height: 100,

@@ -49,6 +49,7 @@ import {
   getAzkarRecord,
   saveAzkarRecord,
   toggleAzkar,
+  markAzkarCompleted,
   
   // الإحصائيات
   getWorshipStats,
@@ -59,6 +60,7 @@ import {
   formatDate,
   clearAllWorshipData,
 } from '@/lib/worship-storage';
+
 
 // ========================================
 // أنواع السياق
@@ -100,7 +102,8 @@ interface WorshipContextType {
   getQuranForDate: (date: string) => Promise<DailyQuranRecord | null>;
   
   // دوال الأذكار
-  toggleAzkarType: (type: keyof Omit<DailyAzkarRecord, 'date'>) => Promise<boolean>;
+  toggleAzkarType: (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => Promise<boolean>;
+  markAzkarDone: (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => Promise<void>;
   getAzkarForDate: (date: string) => Promise<DailyAzkarRecord | null>;
   
   // دوال عامة
@@ -165,6 +168,7 @@ const defaultAzkarRecord: DailyAzkarRecord = {
   sleep: false,
   wakeup: false,
   afterPrayer: false,
+  zikrCount: 0,
 };
 
 // ========================================
@@ -404,7 +408,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   // دوال الأذكار
   // ========================================
 
-  const toggleAzkarType = useCallback(async (type: keyof Omit<DailyAzkarRecord, 'date'>) => {
+  const toggleAzkarType = useCallback(async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
     const today = getTodayDate();
     const result = await toggleAzkar(today, type);
     
@@ -421,6 +425,15 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   const getAzkarForDate = useCallback(async (date: string) => {
     return await getAzkarRecord(date);
   }, []);
+
+  const markAzkarDone = useCallback(async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
+    const today = getTodayDate();
+    await markAzkarCompleted(today, type);
+    // Refresh in-memory state so all consumers see the update immediately
+    const newRecord = await getAzkarRecord(today);
+    setTodayAzkar(newRecord || { ...defaultAzkarRecord, date: today });
+    await refreshStats();
+  }, [refreshStats]);
 
   // ========================================
   // دوال عامة
@@ -479,6 +492,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
     
     // دوال الأذكار
     toggleAzkarType,
+    markAzkarDone,
     getAzkarForDate,
     
     // دوال عامة
@@ -597,6 +611,7 @@ export const useAzkarTracker = () => {
     todayAzkar,
     stats,
     toggleAzkarType,
+    markAzkarDone,
     getAzkarForDate,
   } = useWorship();
   
@@ -604,6 +619,7 @@ export const useAzkarTracker = () => {
     todayAzkar,
     azkarStats: stats?.azkar,
     toggleAzkarType,
+    markAzkarDone,
     getAzkarForDate,
   };
 };

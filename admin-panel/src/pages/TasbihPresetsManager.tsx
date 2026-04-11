@@ -2,9 +2,10 @@
 // إدارة التسبيحات المسبقة
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Save, Trash2, Edit2, X, GripVertical, Copy } from 'lucide-react';
+import { Plus, Save, Trash2, Edit2, X, Copy, Download } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getDefaultTasbihPresets } from '../data/adhkar-defaults';
 
 interface TasbihPreset {
   id: string;
@@ -51,7 +52,9 @@ const TasbihPresetsManager: React.FC = () => {
       setEditingPreset(null);
       loadPresets();
     } catch (e) {
-      setSaveMsg(`❌ ${(e as Error).message}`);
+      const msg = `❌ فشل الحفظ: ${(e as Error).message}`;
+      setSaveMsg(msg);
+      alert(msg);
     }
   };
 
@@ -60,7 +63,9 @@ const TasbihPresetsManager: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'tasbihPresets', id));
       loadPresets();
-    } catch { /* empty */ }
+    } catch (e) {
+      alert(`فشل الحذف: ${(e as Error).message}`);
+    }
   };
 
   const openEdit = (preset?: TasbihPreset) => {
@@ -75,11 +80,31 @@ const TasbihPresetsManager: React.FC = () => {
           <h1 className="text-2xl font-bold text-white">إدارة التسبيحات</h1>
           <p className="text-slate-400 mt-1">إضافة وتعديل التسبيحات المسبقة</p>
         </div>
-        <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+        <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
           <Plus size={18} /> إضافة تسبيح
         </button>
+        {presets.length === 0 && (
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors"
+            onClick={async () => {
+              if (!confirm('هل تريد استيراد التسبيحات الافتراضية من التطبيق (15 تسبيح)؟')) return;
+              try {
+                const defaults = getDefaultTasbihPresets();
+                for (const p of defaults) {
+                  await setDoc(doc(db, 'tasbihPresets', p.id), p);
+                }
+                await loadPresets();
+                setSaveMsg(`✅ تم استيراد ${defaults.length} تسبيح`);
+              } catch (e) {
+                alert(`❌ فشل الاستيراد: ${(e as Error).message}`);
+              }
+            }}
+          >
+            <Download size={18} /> استيراد الافتراضي
+          </button>
+        )}
       </div>
-      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>{saveMsg}</p>}
+      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>{saveMsg}</p>}
 
       {isLoading ? (
         <div className="text-center text-slate-400 py-12">جاري التحميل...</div>
@@ -91,8 +116,7 @@ const TasbihPresetsManager: React.FC = () => {
       ) : (
         <div className="space-y-3">
           {presets.map(p => (
-            <div key={p.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 flex items-center gap-4">
-              <GripVertical size={18} className="text-slate-500" />
+            <div key={p.id} className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50 flex items-center gap-4">
               <div className="flex-1">
                 <p className="text-white font-bold text-lg" dir="rtl">{p.text}</p>
                 {p.transliteration && <p className="text-slate-400 text-sm">{p.transliteration}</p>}
@@ -101,8 +125,8 @@ const TasbihPresetsManager: React.FC = () => {
                   {p.reference && <span>{p.reference}</span>}
                 </div>
               </div>
-              <button onClick={() => openEdit(p)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" title="تعديل" aria-label="تعديل"><Edit2 size={16} /></button>
-              <button onClick={() => openEdit({ ...p, id: `tasbih_${Date.now()}`, text: p.text + ' (نسخة)', order: presets.length })} className="p-2 hover:bg-emerald-700/30 rounded-lg text-emerald-400" title="تكرار" aria-label="تكرار"><Copy size={16} /></button>
+              <button onClick={() => openEdit(p)} className="p-2 hover:bg-admin-surface-light rounded-lg text-slate-400" title="تعديل" aria-label="تعديل"><Edit2 size={16} /></button>
+              <button onClick={() => openEdit({ ...p, id: `tasbih_${Date.now()}`, text: p.text + ' (نسخة)', order: presets.length })} className="p-2 hover:bg-accent-dark/30 rounded-lg text-accent-light" title="تكرار" aria-label="تكرار"><Copy size={16} /></button>
               <button onClick={() => handleDelete(p.id)} className="p-2 hover:bg-red-900/50 rounded-lg text-red-400" title="حذف" aria-label="حذف"><Trash2 size={16} /></button>
             </div>
           ))}
@@ -112,7 +136,7 @@ const TasbihPresetsManager: React.FC = () => {
       {/* Modal */}
       {isModalOpen && editingPreset && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-xl p-6 space-y-4">
+          <div className="bg-admin-bg rounded-2xl border border-admin-border w-full max-w-xl p-6 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold text-lg">{editingPreset.id.startsWith('tasbih_') ? 'إضافة تسبيح' : 'تعديل'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white" title="إغلاق" aria-label="إغلاق"><X size={20} /></button>
@@ -121,20 +145,20 @@ const TasbihPresetsManager: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">النص العربي *</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" dir="rtl" value={editingPreset.text} onChange={e => setEditingPreset({ ...editingPreset, text: e.target.value })} placeholder="سُبْحَانَ اللهِ" aria-label="النص العربي" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" dir="rtl" value={editingPreset.text} onChange={e => setEditingPreset({ ...editingPreset, text: e.target.value })} placeholder="سُبْحَانَ اللهِ" aria-label="النص العربي" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">النطق</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingPreset.transliteration || ''} onChange={e => setEditingPreset({ ...editingPreset, transliteration: e.target.value })} placeholder="SubhanAllah" aria-label="النطق" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingPreset.transliteration || ''} onChange={e => setEditingPreset({ ...editingPreset, transliteration: e.target.value })} placeholder="SubhanAllah" aria-label="النطق" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">العدد المستهدف</label>
-                  <input type="number" min={1} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingPreset.target} onChange={e => setEditingPreset({ ...editingPreset, target: Number(e.target.value) })} aria-label="العدد المستهدف" />
+                  <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingPreset.target} onChange={e => setEditingPreset({ ...editingPreset, target: Number(e.target.value) })} aria-label="العدد المستهدف" />
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">المصدر</label>
-                  <select className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingPreset.source || 'hadith_sahih'} onChange={e => setEditingPreset({ ...editingPreset, source: e.target.value as TasbihPreset['source'] })} aria-label="المصدر">
+                  <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingPreset.source || 'hadith_sahih'} onChange={e => setEditingPreset({ ...editingPreset, source: e.target.value as TasbihPreset['source'] })} aria-label="المصدر">
                     <option value="quran">قرآن</option>
                     <option value="hadith_sahih">حديث صحيح</option>
                     <option value="hadith_hasan">حديث حسن</option>
@@ -144,19 +168,19 @@ const TasbihPresetsManager: React.FC = () => {
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الفضل</label>
-                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} dir="rtl" value={editingPreset.virtue || ''} onChange={e => setEditingPreset({ ...editingPreset, virtue: e.target.value })} placeholder="فضل الذكر" aria-label="الفضل" />
+                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} dir="rtl" value={editingPreset.virtue || ''} onChange={e => setEditingPreset({ ...editingPreset, virtue: e.target.value })} placeholder="فضل الذكر" aria-label="الفضل" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">المرجع</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" dir="rtl" value={editingPreset.reference || ''} onChange={e => setEditingPreset({ ...editingPreset, reference: e.target.value })} placeholder="صحيح مسلم" aria-label="المرجع" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" dir="rtl" value={editingPreset.reference || ''} onChange={e => setEditingPreset({ ...editingPreset, reference: e.target.value })} placeholder="صحيح مسلم" aria-label="المرجع" />
               </div>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => handleSave(editingPreset)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+              <button onClick={() => handleSave(editingPreset)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
                 <Save size={16} /> حفظ
               </button>
-              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">إلغاء</button>
+              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">إلغاء</button>
             </div>
           </div>
         </div>

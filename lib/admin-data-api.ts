@@ -43,47 +43,6 @@ async function fetchWithCache<T>(
   return fallback;
 }
 
-// ==================== Onboarding Config ====================
-
-export interface OnboardingFeature {
-  icon: string;
-  label: string;
-  color: string;
-}
-
-export interface OnboardingConfig {
-  appName: string;
-  tagline: string;
-  description: string;
-  features: OnboardingFeature[];
-  screens: string[];
-}
-
-const DEFAULT_ONBOARDING: OnboardingConfig = {
-  appName: 'روح المسلم',
-  tagline: 'رفيقك في رحلة الإيمان',
-  description: 'تطبيق شامل للأذكار والقرآن الكريم وأوقات الصلاة',
-  features: [
-    { icon: 'book-open-variant', label: 'القرآن الكريم', color: '#3a7ca5' },
-    { icon: 'hands-pray', label: 'الأذكار والأدعية', color: '#22C55E' },
-    { icon: 'mosque', label: 'أوقات الصلاة', color: '#c17f59' },
-    { icon: 'compass', label: 'اتجاه القبلة', color: '#5d4e8c' },
-  ],
-  screens: ['welcome', 'language', 'location', 'notifications', 'complete'],
-};
-
-export async function fetchOnboardingConfig(): Promise<OnboardingConfig> {
-  return fetchWithCache(
-    '@admin_onboarding_config',
-    async () => {
-      const snap = await getDoc(doc(db, 'appConfig', 'onboarding'));
-      if (snap.exists()) return snap.data() as OnboardingConfig;
-      return null;
-    },
-    DEFAULT_ONBOARDING,
-  );
-}
-
 // ==================== Tasbih Presets ====================
 
 export interface TasbihPreset {

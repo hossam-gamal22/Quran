@@ -32,6 +32,8 @@ import {
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 const { width } = Dimensions.get('window');
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -61,8 +63,8 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   strokeWidth = 12,
   language = 'ar',
   isDarkMode = false,
-  primaryColor = '#22C55E',
-  secondaryColor = '#4ade80',
+  primaryColor = '#0d8e62',
+  secondaryColor = '#3da87e',
   variant = 'creative',
   show24Hour = false,
 }) => {
@@ -78,6 +80,8 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   } | null>(null);
   const [totalDuration, setTotalDuration] = useState<number>(0);
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // حساب أبعاد الدائرة
   const radius = (size - strokeWidth) / 2;
@@ -166,7 +170,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
           <MaterialCommunityIcons
             name="timer-sand"
             size={50}
-            color={isDarkMode ? '#666' : '#ccc'}
+            color={colors.textLight}
           />
         </View>
       </View>
@@ -200,7 +204,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
           cx={center}
           cy={center}
           r={radius}
-          stroke={isDarkMode ? '#333' : '#e0e0e0'}
+          stroke={colors.border}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -233,19 +237,19 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
               />
             </Animated.View>
 
-            <Text style={[styles.prayerNameCreative, isDarkMode && styles.textLight]}>
+            <Text style={[styles.prayerNameCreative, { color: colors.text }]}>
               {prayerNameLocalized}
             </Text>
 
-            <Text style={[styles.bigTime, isDarkMode && styles.textLight]}>
+            <Text style={[styles.bigTime, { color: colors.text }]}>
               {formatHMS(timeRemaining)}
             </Text>
 
-            <Text style={[styles.subtitle, isDarkMode && styles.textMuted]}>
+            <Text style={[styles.subtitle, { color: colors.textLight }]}>
               {t('prayer.timeRemaining')}
             </Text>
 
-            <Text style={[styles.adhanTimeCreative, isDarkMode && styles.textMuted]}>
+            <Text style={[styles.adhanTimeCreative, { color: colors.textLight }]}>
               {formatPrayerTime(nextPrayer.time, show24Hour)}
             </Text>
           </>
@@ -261,21 +265,21 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
             </Animated.View>
 
             {/* اسم الصلاة */}
-            <Text style={[styles.prayerName, isDarkMode && styles.textLight]}>
+            <Text style={[styles.prayerName, { color: colors.text }]}>
               {prayerNameLocalized}
             </Text>
 
             {/* الوقت المتبقي */}
             <View style={styles.timeContainer}>
-              <TimeDigit value={timeRemaining.hours} label={t('countdown.hourLabel')} isDarkMode={isDarkMode} />
-              <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-              <TimeDigit value={timeRemaining.minutes} label={t('countdown.minuteLabel')} isDarkMode={isDarkMode} />
-              <Text style={[styles.timeSeparator, isDarkMode && styles.textLight]}>:</Text>
-              <TimeDigit value={timeRemaining.seconds} label={t('countdown.secondLabel')} isDarkMode={isDarkMode} />
+              <TimeDigit value={timeRemaining.hours} label={t('countdown.hourLabel')} colors={colors} />
+              <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+              <TimeDigit value={timeRemaining.minutes} label={t('countdown.minuteLabel')} colors={colors} />
+              <Text style={[styles.timeSeparator, { color: colors.text }]}>:</Text>
+              <TimeDigit value={timeRemaining.seconds} label={t('countdown.secondLabel')} colors={colors} />
             </View>
 
             {/* وقت الأذان */}
-            <Text style={[styles.adhanTime, isDarkMode && styles.textMuted]}>
+            <Text style={[styles.adhanTime, { color: colors.textLight }]}>
               {formatPrayerTime(nextPrayer.time, show24Hour)}
             </Text>
           </>
@@ -304,16 +308,17 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 interface TimeDigitProps {
   value: number;
   label: string;
-  isDarkMode: boolean;
+  colors: ReturnType<typeof useColors>;
 }
 
-const TimeDigit: React.FC<TimeDigitProps> = ({ value, label, isDarkMode }) => {
+const TimeDigit: React.FC<TimeDigitProps> = ({ value, label, colors }) => {
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <View style={styles.digitContainer}>
-      <Text style={[styles.digitValue, isDarkMode && styles.textLight]}>
+      <Text style={[styles.digitValue, { color: colors.text }]}>
         {String(value).padStart(2, '0')}
       </Text>
-      <Text style={[styles.digitLabel, isDarkMode && styles.textMuted]}>
+      <Text style={[styles.digitLabel, { color: colors.textLight }]}>
         {label}
       </Text>
     </View>
@@ -324,7 +329,7 @@ const TimeDigit: React.FC<TimeDigitProps> = ({ value, label, isDarkMode }) => {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -349,36 +354,25 @@ const styles = StyleSheet.create({
   prayerName: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 4,
   },
   prayerNameCreative: {
     fontSize: 22,
     fontFamily: fontBold(),
-    color: '#e6fff6',
     marginBottom: 6,
   },
   bigTime: {
     fontSize: 56,
     fontFamily: fontBold(),
-    color: '#fff',
     marginTop: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#9ca3af',
     marginTop: 6,
   },
   adhanTimeCreative: {
     fontSize: 13,
-    color: '#94a3b8',
     marginTop: 8,
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   timeContainer: {
     flexDirection: 'row',
@@ -388,7 +382,6 @@ const styles = StyleSheet.create({
   timeSeparator: {
     fontSize: 28,
     fontFamily: fontBold(),
-    color: '#333',
     marginHorizontal: 2,
   },
   digitContainer: {
@@ -398,18 +391,15 @@ const styles = StyleSheet.create({
   digitValue: {
     fontSize: 28,
     fontFamily: fontBold(),
-    color: '#333',
   },
   digitLabel: {
     fontSize: 10,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: -4,
   },
   adhanTime: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#666',
     marginTop: 8,
   },
   secondsHand: {

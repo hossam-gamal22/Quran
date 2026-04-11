@@ -8,10 +8,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   RefreshControl,
   Dimensions,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SeasonInfo, SeasonType, getSeasonProgress } from '@/lib/seasonal-content';
 import GlassCard from '@/components/ui/GlassCard';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
@@ -54,6 +55,8 @@ const ActiveSeasonCard: React.FC<ActiveSeasonCardProps> = ({
   isDarkMode,
 }) => {
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const progress = getSeasonProgress(season);
 
   return (
@@ -131,10 +134,11 @@ interface UpcomingSeasonCardProps {
 
 const UpcomingSeasonCard: React.FC<UpcomingSeasonCardProps> = ({ season, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-      <View style={[styles.upcomingCard, isDarkMode && styles.upcomingCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.upcomingCard, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.upcomingIconContainer}>
           <MaterialCommunityIcons name={season.icon as any} size={28} color={season.color} />
         </View>
@@ -174,12 +178,13 @@ interface SpecialDayCardProps {
 
 const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeIn.duration(500)}>
       <View style={styles.starAboveCardWrapper}>
         <View style={styles.starAboveCard}>
-          <MaterialCommunityIcons name="star-four-points" size={24} color="#f5a623" />
+          <MaterialCommunityIcons name="star-four-points" size={24} color="#c07b10" />
         </View>
         <View
           style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
@@ -210,7 +215,7 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
             <Text style={[styles.actionsTitle, { color: colors.text }]}>{t('seasonal.ashura.recommendedActions')}:</Text>
             {day.recommendedActions.map((action, index) => (
               <View key={index} style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#22C55E" />
+                <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#0d8e62" />
                 <Text style={[styles.actionText, { color: colors.textLight }]}>{action}</Text>
               </View>
             ))}
@@ -232,13 +237,14 @@ interface SeasonGridItemProps {
 const SeasonGridItem: React.FC<SeasonGridItemProps> = ({ season, onPress, index, isDarkMode }) => {
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View
       entering={FadeInRight.delay(index * 80).duration(400)}
       style={styles.gridItemContainer}
     >
       <TouchableOpacity
-        style={[styles.gridItem, isDarkMode && styles.gridItemDark]}
+        style={[styles.gridItem, { backgroundColor: colors.card }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
@@ -266,13 +272,14 @@ interface NoSeasonCardProps {
 
 const NoSeasonCard: React.FC<NoSeasonCardProps> = ({ upcomingSeason, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInDown.duration(500)}>
-      <View style={[styles.noSeasonCard, isDarkMode && styles.noSeasonCardDark]}>
+      <View style={[styles.noSeasonCard, { backgroundColor: colors.card }]}>
         <MaterialCommunityIcons
           name="calendar-clock"
           size={60}
-          color={isDarkMode ? '#444' : '#ddd'}
+          color={colors.textLight}
         />
         <Text style={[styles.noSeasonTitle, { color: colors.text }]}>
           {t('seasonal.noActiveSeason')}
@@ -316,6 +323,7 @@ export default function SeasonalIndexScreen() {
     refreshSeasonalData,
   } = useSeasonal();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -346,11 +354,8 @@ export default function SeasonalIndexScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
       <UniversalHeader
@@ -366,8 +371,8 @@ export default function SeasonalIndexScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={isDarkMode ? '#fff' : '#22C55E'}
-            colors={['#22C55E']}
+            tintColor={colors.primary}
+            colors={['#0d8e62']}
           />
         }
       >
@@ -428,9 +433,9 @@ export default function SeasonalIndexScreen() {
           <View
             style={[styles.tipGradient, { backgroundColor: isDarkMode ? 'rgba(26,42,26,0.85)' : 'rgba(232,245,233,0.85)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           >
-            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#22C55E" />
+            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#0d8e62" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, isDarkMode && styles.textLight]}>{t('seasonal.hajj.tipTitle')}</Text>
+              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.hajj.tipTitle')}</Text>
               <Text style={[styles.tipText, { color: colors.textLight }]}>
                 استغل المواسم الإسلامية في مضاعفة الأجر والتقرب إلى الله بالطاعات
               </Text>
@@ -462,19 +467,9 @@ const adjustColor = (color: string, amount: number): string => {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   scrollView: {
     flex: 1,
@@ -587,12 +582,8 @@ const styles = StyleSheet.create({
   upcomingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
-  },
-  upcomingCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   upcomingIconContainer: {
     width: 56,
@@ -608,12 +599,10 @@ const styles = StyleSheet.create({
   upcomingLabel: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
   },
   upcomingName: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
   },
   upcomingDays: {
     alignItems: 'center',
@@ -625,7 +614,6 @@ const styles = StyleSheet.create({
   upcomingDaysLabel: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
   },
 
   // بطاقة اليوم المميز
@@ -660,12 +648,10 @@ const styles = StyleSheet.create({
   specialDayTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
   },
   specialDayDesc: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#666',
     marginBottom: 12,
   },
   virtuesContainer: {
@@ -674,7 +660,6 @@ const styles = StyleSheet.create({
   virtuesTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 8,
   },
   virtueItem: {
@@ -686,14 +671,12 @@ const styles = StyleSheet.create({
   virtueText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     flex: 1,
   },
   actionsContainer: {},
   actionsTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 8,
   },
   actionItem: {
@@ -705,30 +688,23 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     flex: 1,
   },
 
   // بطاقة لا يوجد موسم
   noSeasonCard: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 30,
     alignItems: 'center',
   },
-  noSeasonCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   noSeasonTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     marginTop: 15,
   },
   noSeasonSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#999',
     textAlign: 'center',
     marginTop: 8,
   },
@@ -741,14 +717,12 @@ const styles = StyleSheet.create({
   noSeasonUpcomingText: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#666',
   },
 
   // شبكة المواسم
   sectionTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#666',
     marginTop: 24,
     marginBottom: 12,
   },
@@ -762,14 +736,10 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   gridItem: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     position: 'relative',
-  },
-  gridItemDark: {
-    backgroundColor: '#1a1a2e',
   },
   gridIconBg: {
     width: 50,
@@ -782,7 +752,6 @@ const styles = StyleSheet.create({
   gridItemName: {
     fontSize: 12,
     fontFamily: fontMedium(),
-    color: '#333',
     textAlign: 'center',
   },
   activeDot: {
@@ -811,13 +780,12 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
     marginBottom: 4,
   },
   tipText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
   },
 

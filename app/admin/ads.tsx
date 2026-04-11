@@ -143,10 +143,10 @@ export default function AdsSettingsScreen() {
               color={config.enabled ? Colors.success : Colors.textMuted}
             />
             <View>
-              <Text style={[styles.toggleTitle, { textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.toggleTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('admin.adsTitle')}
               </Text>
-              <Text style={[styles.toggleStatus, { textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.toggleStatus, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {config.enabled ? t('admin.enabled') : t('admin.disabled')}
               </Text>
             </View>

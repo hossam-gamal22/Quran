@@ -189,20 +189,11 @@ struct SmallAzkarWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [getCategoryColor(category), getCategoryColor(category).opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: getCategoryColor(category))
             
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: getCategoryIcon(category))
-                        .font(.system(size: 12))
-                    Text(getCategoryName(category, translatedName: categoryTranslatedName))
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.9))
+            VStack(spacing: 6) {
+                // App icon
+                WidgetAppIcon(size: 32)
                 
                 Spacer()
                 
@@ -215,21 +206,23 @@ struct SmallAzkarWidgetView: View {
                 Spacer()
                 
                 if (entry.data?.randomZikr.count ?? 1) > 1 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 10))
-                        Text("\(entry.data?.randomZikr.count ?? 1) \(entry.data?.randomZikr.timesLabel ?? "مرات")")
-                            .font(.system(size: 10, weight: .medium))
+                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 9))
+                            Text("\(entry.data?.randomZikr.count ?? 1) \(entry.data?.randomZikr.timesLabel ?? "مرات")")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(WidgetConstants.Colors.gold)
                     }
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(8)
                 }
             }
             .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -250,85 +243,80 @@ struct MediumAzkarWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [getCategoryColor(category), getCategoryColor(category).opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: getCategoryColor(category))
             
-            HStack(spacing: 15) {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Image(systemName: getCategoryIcon(category))
-                            .font(.system(size: 14))
-                        Text(getCategoryName(category, translatedName: categoryTranslatedName))
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    WidgetAppIcon(size: 20)
+                    Text(getCategoryName(category, translatedName: categoryTranslatedName))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
                     Spacer()
                     
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 6) {
+                    // Morning/Evening completion
+                    HStack(spacing: 8) {
+                        HStack(spacing: 3) {
                             Image(systemName: entry.data?.morningCompleted ?? false ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 12))
-                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.6))
-                            Text("الصباح")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.9))
+                                .font(.system(size: 10))
+                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.4))
+                            Text("صباح")
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.6))
                         }
-                        
-                        HStack(spacing: 6) {
+                        HStack(spacing: 3) {
                             Image(systemName: entry.data?.eveningCompleted ?? false ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 12))
-                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.6))
-                            Text("المساء")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.9))
+                                .font(.system(size: 10))
+                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.4))
+                            Text("مساء")
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                
+                HStack(spacing: 12) {
+                    // Zikr text
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده")
+                            .font(.system(size: 15, weight: .medium))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(4)
+                            .foregroundColor(.white)
+                        
+                        if entry.settings?.showTranslation ?? false,
+                           let translation = entry.data?.randomZikr.translation {
+                            Text(translation)
+                                .font(.system(size: 10))
+                                .multilineTextAlignment(.trailing)
+                                .lineLimit(2)
+                                .foregroundColor(.white.opacity(0.5))
                         }
                     }
                     
                     if (entry.data?.randomZikr.count ?? 1) > 1 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "repeat")
-                                .font(.system(size: 10))
-                            Text("\(entry.data?.randomZikr.count ?? 1)×")
-                                .font(.system(size: 11, weight: .bold))
+                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "repeat")
+                                    .font(.system(size: 9))
+                                Text("\(entry.data?.randomZikr.count ?? 1)×")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(WidgetConstants.Colors.gold)
                         }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(10)
                     }
                 }
-                .frame(width: 90)
-                
-                Rectangle()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 1)
-                
-                VStack(alignment: .trailing, spacing: 8) {
-                    Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده")
-                        .font(.system(size: 15, weight: .medium))
-                        .multilineTextAlignment(.trailing)
-                        .lineLimit(5)
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    if entry.settings?.showTranslation ?? false,
-                       let translation = entry.data?.randomZikr.translation {
-                        Text(translation)
-                            .font(.system(size: 10))
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
+                .padding(.horizontal)
+                .padding(.bottom, 10)
             }
-            .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -349,53 +337,46 @@ struct LargeAzkarWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [getCategoryColor(category), getCategoryColor(category).opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: getCategoryColor(category))
             
-            VStack(spacing: 15) {
-                // الهيدر
+            VStack(spacing: 12) {
+                // Header
                 HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: getCategoryIcon(category))
-                            .font(.system(size: 18))
-                        Text(getCategoryName(category, translatedName: categoryTranslatedName))
-                            .font(.system(size: 16, weight: .bold))
-                    }
-                    .foregroundColor(.white)
+                    WidgetAppIcon(size: 20)
+                    Text(getCategoryName(category, translatedName: categoryTranslatedName))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
                     
                     Spacer()
                     
-                    HStack(spacing: 12) {
-                        VStack(spacing: 2) {
+                    HStack(spacing: 10) {
+                        HStack(spacing: 3) {
                             Image(systemName: entry.data?.morningCompleted ?? false ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 16))
-                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.5))
+                                .font(.system(size: 14))
+                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.4))
                             Text("صباح")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                         
-                        VStack(spacing: 2) {
+                        HStack(spacing: 3) {
                             Image(systemName: entry.data?.eveningCompleted ?? false ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 16))
-                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.5))
+                                .font(.system(size: 14))
+                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.4))
                             Text("مساء")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(.white.opacity(0.7))
                         }
                     }
                 }
                 .padding(.horizontal)
                 
                 Divider()
-                    .background(Color.white.opacity(0.3))
+                    .background(WidgetConstants.Glass.border)
                     .padding(.horizontal)
                 
-                // النص الرئيسي
-                VStack(spacing: 12) {
+                // Main dhikr text
+                VStack(spacing: 10) {
                     Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده، سبحان الله العظيم")
                         .font(.system(size: 20, weight: .medium))
                         .multilineTextAlignment(.center)
@@ -409,53 +390,55 @@ struct LargeAzkarWidgetView: View {
                             .font(.system(size: 12))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
-                            .foregroundColor(.white.opacity(0.75))
+                            .foregroundColor(.white.opacity(0.5))
                             .padding(.horizontal)
                     }
                 }
                 
                 Spacer()
                 
-                // الفائدة
+                // Benefit
                 if let benefit = entry.data?.randomZikr.benefit {
-                    VStack(spacing: 6) {
+                    VStack(spacing: 5) {
                         HStack {
                             Image(systemName: "lightbulb.fill")
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                             Text("الفائدة")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 10, weight: .bold))
                         }
-                        .foregroundColor(.yellow)
+                        .foregroundColor(WidgetConstants.Colors.gold)
                         
                         Text(benefit)
                             .font(.system(size: 11))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(.white.opacity(0.7))
                     }
-                    .padding()
-                    .background(Color.white.opacity(0.15))
+                    .padding(10)
+                    .background(WidgetConstants.Glass.highlight)
                     .cornerRadius(12)
                     .padding(.horizontal)
                 }
                 
-                // العدد
+                // Count
                 if (entry.data?.randomZikr.count ?? 1) > 1 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 12))
-                        Text("كرر \(entry.data?.randomZikr.count ?? 1) مرات")
-                            .font(.system(size: 12, weight: .medium))
+                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 11))
+                            Text("كرر \(entry.data?.randomZikr.count ?? 1) مرات")
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(WidgetConstants.Colors.gold)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 15)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(12)
                 }
             }
             .padding(.vertical)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 

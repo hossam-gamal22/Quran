@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BackButton } from './BackButton';
 import { fontBold } from '@/lib/fonts';
+import MarqueeText from './MarqueeText';
 
 export interface HeaderAction {
   icon: string;
@@ -40,6 +42,7 @@ export function UniversalHeader({
   children,
 }: UniversalHeaderProps) {
   const colors = useColors();
+  const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
 
   return (
@@ -64,19 +67,18 @@ export function UniversalHeader({
       {/* Center: title or custom children */}
       <View style={s.center}>
         {children || (
-          <Text
+          <MarqueeText
+            text={title || ''}
             style={[
               s.title,
               { color: titleColor || colors.text },
               { textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' },
               titleStyle,
             ]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
-          >
-            {title}
-          </Text>
+            containerStyle={{ width: '100%' }}
+            speed={40}
+            delay={800}
+          />
         )}
       </View>
 
@@ -106,7 +108,7 @@ export function UniversalHeader({
   );
 }
 
-const s = StyleSheet.create({
+const _s = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingHorizontal: 16,

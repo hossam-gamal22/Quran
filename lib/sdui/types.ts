@@ -22,24 +22,9 @@ export interface BaseSectionConfig {
 }
 
 /**
- * All supported section types
+ * Supported section types (only implemented ones)
  */
-export type SDUISectionType =
-  | 'welcome_banner'
-  | 'quick_actions'
-  | 'highlights_grid'
-  | 'featured_content'
-  | 'html_block'
-  | 'prayer_times'
-  | 'daily_ayah'
-  | 'azkar_categories'
-  | 'khatma_progress'
-  | 'worship_stats'
-  | 'seasonal_banner'
-  | 'custom_cards'
-  | 'image_carousel'
-  | 'announcement'
-  | 'spacer';
+export type SDUISectionType = 'html_block' | 'spacer';
 
 /**
  * Conditional display rules for sections
@@ -62,68 +47,6 @@ export interface SectionConditions {
 // ═══════════════════════════════════════════════════════════════════════════
 // Section-Specific Configurations
 // ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Welcome Banner Section
- */
-export interface WelcomeBannerSection extends BaseSectionConfig {
-  type: 'welcome_banner';
-  data: {
-    greeting: string;
-    icon: string;
-    color: string;
-    route?: string;
-    backgroundImage?: string;
-    displayMode: 'text' | 'text_image' | 'image_only';
-  };
-}
-
-/**
- * Quick Actions Grid Section
- */
-export interface QuickActionsSection extends BaseSectionConfig {
-  type: 'quick_actions';
-  data: {
-    columns: 2 | 3 | 4;
-    items: QuickActionItem[];
-  };
-}
-
-export interface QuickActionItem {
-  id: string;
-  title: string;
-  icon: string;
-  color: string;
-  route: string;
-  routeType: 'internal' | 'url' | 'html';
-  enabled: boolean;
-  badge?: string;
-}
-
-/**
- * Highlights Grid Section
- */
-export interface HighlightsGridSection extends BaseSectionConfig {
-  type: 'highlights_grid';
-  data: {
-    layout: 'grid' | 'horizontal_scroll' | 'masonry';
-    items: HighlightItem[];
-  };
-}
-
-export interface HighlightItem {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon: string;
-  color: string;
-  backgroundColor?: string;
-  imageUrl?: string;
-  route: string;
-  routeType: 'internal' | 'url' | 'html';
-  enabled: boolean;
-  order: number;
-}
 
 /**
  * HTML Block Section — Injected HTML content with native styling
@@ -149,155 +72,6 @@ export interface HTMLBlockSection extends BaseSectionConfig {
 }
 
 /**
- * Featured Content Section (e.g., daily hadith, story of the day)
- */
-export interface FeaturedContentSection extends BaseSectionConfig {
-  type: 'featured_content';
-  data: {
-    contentType: 'hadith' | 'story' | 'dua' | 'ayah' | 'tip';
-    content: {
-      title: string;
-      body: string;
-      source?: string;
-      route?: string;
-    };
-    style: 'card' | 'banner' | 'minimal';
-  };
-}
-
-/**
- * Prayer Times Section
- */
-export interface PrayerTimesSection extends BaseSectionConfig {
-  type: 'prayer_times';
-  data: {
-    showNextPrayer: boolean;
-    showAllPrayers: boolean;
-    compact: boolean;
-  };
-}
-
-/**
- * Daily Ayah Section
- */
-export interface DailyAyahSection extends BaseSectionConfig {
-  type: 'daily_ayah';
-  data: {
-    showTranslation: boolean;
-    showTafsir: boolean;
-    style: 'full' | 'compact';
-  };
-}
-
-/**
- * Azkar Categories Section
- */
-export interface AzkarCategoriesSection extends BaseSectionConfig {
-  type: 'azkar_categories';
-  data: {
-    layout: 'grid' | 'list' | 'horizontal';
-    categories: string[]; // Category IDs to show
-    showProgress: boolean;
-  };
-}
-
-/**
- * Khatma Progress Section
- */
-export interface KhatmaProgressSection extends BaseSectionConfig {
-  type: 'khatma_progress';
-  data: {
-    showActiveKhatma: boolean;
-    showHistory: boolean;
-  };
-}
-
-/**
- * Worship Stats Section
- */
-export interface WorshipStatsSection extends BaseSectionConfig {
-  type: 'worship_stats';
-  data: {
-    showPrayer: boolean;
-    showQuran: boolean;
-    showFasting: boolean;
-    showAzkar: boolean;
-    period: 'today' | 'week' | 'month';
-  };
-}
-
-/**
- * Seasonal Banner Section
- */
-export interface SeasonalBannerSection extends BaseSectionConfig {
-  type: 'seasonal_banner';
-  data: {
-    season: string;
-    title: string;
-    subtitle?: string;
-    imageUrl?: string;
-    backgroundColor: string;
-    textColor: string;
-    route?: string;
-  };
-}
-
-/**
- * Custom Cards Section
- */
-export interface CustomCardsSection extends BaseSectionConfig {
-  type: 'custom_cards';
-  data: {
-    layout: 'vertical' | 'horizontal';
-    cards: CustomCard[];
-  };
-}
-
-export interface CustomCard {
-  id: string;
-  title: string;
-  description?: string;
-  imageUrl?: string;
-  icon?: string;
-  color: string;
-  route: string;
-  routeType: 'internal' | 'url' | 'html';
-}
-
-/**
- * Image Carousel Section
- */
-export interface ImageCarouselSection extends BaseSectionConfig {
-  type: 'image_carousel';
-  data: {
-    autoPlay: boolean;
-    autoPlayInterval: number;
-    images: CarouselImage[];
-  };
-}
-
-export interface CarouselImage {
-  id: string;
-  imageUrl: string;
-  title?: string;
-  route?: string;
-}
-
-/**
- * Announcement Section
- */
-export interface AnnouncementSection extends BaseSectionConfig {
-  type: 'announcement';
-  data: {
-    message: string;
-    type: 'info' | 'warning' | 'success' | 'promo';
-    dismissible: boolean;
-    route?: string;
-    expiresAt?: string;
-  };
-}
-
-/**
  * Spacer Section
  */
 export interface SpacerSection extends BaseSectionConfig {
@@ -311,22 +85,7 @@ export interface SpacerSection extends BaseSectionConfig {
 // Union type for all sections
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type SDUISection =
-  | WelcomeBannerSection
-  | QuickActionsSection
-  | HighlightsGridSection
-  | HTMLBlockSection
-  | FeaturedContentSection
-  | PrayerTimesSection
-  | DailyAyahSection
-  | AzkarCategoriesSection
-  | KhatmaProgressSection
-  | WorshipStatsSection
-  | SeasonalBannerSection
-  | CustomCardsSection
-  | ImageCarouselSection
-  | AnnouncementSection
-  | SpacerSection;
+export type SDUISection = HTMLBlockSection | SpacerSection;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Screen Configuration

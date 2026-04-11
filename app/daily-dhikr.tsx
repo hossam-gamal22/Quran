@@ -20,18 +20,20 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { BrandedCapture, type BrandedCaptureHandle } from '@/components/ui/BrandedCapture';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { useFavorite } from '@/hooks/use-favorite';
 import { getDhikrOfTheDay, getRandomDhikr, type DailyDhikr } from '@/lib/daily-dhikr';
 import { getFavorites, type FavoriteItem } from '@/lib/favorites-manager';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { translateBenefit } from '@/lib/benefit-translations';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
@@ -48,11 +50,11 @@ function resolveVal(val: any): string | undefined {
 
 /** Get dhikr text in the user's language, returns { text, isTranslated } */
 function getDhikrText(dhikr: DailyDhikr, lang: string): { text: string; isTranslated: boolean } {
-  if (lang === 'ar') return { text: dhikr.arabic, isTranslated: true };
+  if (lang === 'ar') return { text: stripAzkarBrackets(dhikr.arabic), isTranslated: true };
   const t = dhikr.translations;
   const translated = resolveVal(t?.[lang]) || resolveVal(t?.en);
   if (translated) return { text: translated, isTranslated: true };
-  return { text: dhikr.arabic, isTranslated: false };
+  return { text: stripAzkarBrackets(dhikr.arabic), isTranslated: false };
 }
 
 /** Get benefit text in the user's language, returns { text, isTranslated } */
@@ -95,13 +97,14 @@ export default function DailyDhikrScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const language = getLanguage();
   const isArabic = language === 'ar';
 
   const params = useLocalSearchParams<{ dhikrId?: string }>();
   const [dhikr, setDhikr] = useState<DailyDhikr | null>(null);
   const [loading, setLoading] = useState(true);
-  const brandedRef = useRef<BrandedCaptureHandle>(null);
+  const brandedRef = useRef<IslamicShareCardHandle>(null);
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     dhikr ? `dhikr_${dhikr.id}` : 'dhikr_loading',
@@ -181,7 +184,7 @@ export default function DailyDhikrScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={[styles.container, { backgroundColor: isDarkMode ? '#111827' : '#F3F4F6', justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={[styles.container, { backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' }]}>
           <ActivityIndicator size="large" color={ACCENT} />
         </View>
       </>
@@ -197,19 +200,19 @@ export default function DailyDhikrScreen() {
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
         opacity={settings.display.backgroundOpacity ?? 1}
-        style={[styles.container, { backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : (isDarkMode ? '#111827' : '#F3F4F6') }]}
+        style={styles.container}
       >
         {/* Header */}
         <UniversalHeader
-          backColor={isDarkMode ? '#F9FAFB' : '#1F2937'}
+          backColor={colors.text}
           style={{ paddingTop: insets.top }}
           rightActions={[
-            { icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : (isDarkMode ? '#F9FAFB' : '#1F2937') },
-            { icon: 'share-variant', onPress: handleShare, color: isDarkMode ? '#F9FAFB' : '#1F2937' },
+            { icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : colors.text },
+            { icon: 'share-variant', onPress: handleShare, color: colors.text },
           ]}
         >
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Text style={{ fontSize: 18, fontFamily: fontBold(), color: isDarkMode ? '#F9FAFB' : '#1F2937' }} numberOfLines={1}>{t('azkar.dailyAzkar')}</Text>
+            <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('azkar.dailyAzkar')}</Text>
             <SectionInfoButton sectionKey="azkar" />
           </View>
         </UniversalHeader>
@@ -226,39 +229,17 @@ export default function DailyDhikrScreen() {
             </View>
           </View>
 
-          {/* Branded image capture */}
-          <BrandedCapture ref={brandedRef} title={t('azkar.dailyAzkar')}>
-            <View style={[styles.captureInner]}>
-              {getDhikrText(dhikr, language).isTranslated ? (
-                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                  {getDhikrText(dhikr, language).text}
-                </Text>
-              ) : (
-                <TranslatedText from="ar" style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                  {getDhikrText(dhikr, language).text}
-                </TranslatedText>
-              )}
-              {(() => {
-                const benefit = getDhikrBenefitText(dhikr, language);
-                if (!benefit) return null;
-                return benefit.isTranslated ? (
-                  <Text style={[styles.benefitTextCapture, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {benefit.text}
-                  </Text>
-                ) : (
-                  <TranslatedText from="ar" style={[styles.benefitTextCapture, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {benefit.text}
-                  </TranslatedText>
-                );
-              })()}
-              <Text style={[styles.referenceCaptureText, { color: ACCENT }]}>
-                📖 {transliterateReference(dhikr.reference, language)}
-              </Text>
-            </View>
-          </BrandedCapture>
+          {/* Premium Islamic share card */}
+          <IslamicShareCard
+            ref={brandedRef}
+            categoryLabel={t('azkar.dailyAzkar')}
+            arabicText={dhikr.arabic}
+            sourceText={transliterateReference(dhikr.reference, language)}
+            benefitText={dhikr.benefit}
+          />
 
           {/* Dhikr card */}
-          <GlassCard intensity={46} style={styles.dhikrCard}>
+          <GlassCard intensity={80} borderRadius={20} style={styles.dhikrCard}>
             {getDhikrText(dhikr, language).isTranslated ? (
               <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {getDhikrText(dhikr, language).text}
@@ -275,8 +256,8 @@ export default function DailyDhikrScreen() {
             const benefit = getDhikrBenefitText(dhikr, language);
             if (!benefit) return null;
             return (
-              <GlassCard intensity={46} style={styles.benefitCard}>
-                <Text style={[styles.benefitLabel, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]}>{t('azkar.dhikrVirtue')}</Text>
+              <GlassCard intensity={80} borderRadius={16} style={styles.benefitCard}>
+                <Text style={[styles.benefitLabel, { color: ACCENT, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('azkar.dhikrVirtue')}</Text>
                 {benefit.isTranslated ? (
                   <Text style={[styles.benefitText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {benefit.text}
@@ -322,7 +303,7 @@ export default function DailyDhikrScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
   contentContainer: {
@@ -362,10 +343,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginBottom: 8,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   benefitText: {
     fontSize: 16,
     lineHeight: 26,
+    flexShrink: 1,
   },
   referenceRow: {
     flexDirection: 'row',
@@ -377,6 +361,8 @@ const styles = StyleSheet.create({
   referenceText: {
     fontSize: 14,
     fontWeight: '500',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   refreshButton: {
     flexDirection: 'row',
@@ -391,11 +377,15 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 15,
     fontWeight: '600',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
 
   footerText: {
     textAlign: 'center',
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   captureInner: {
     padding: 24,
@@ -412,5 +402,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 16,
     textAlign: 'center',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

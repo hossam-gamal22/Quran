@@ -24,10 +24,7 @@ import {
   RefreshCw,
   Check,
   X,
-  Bell,
-  Target,
-  Zap,
-  Award
+  Bell
 } from 'lucide-react';
 import { collection, doc, getDocs, setDoc, deleteDoc, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -70,11 +67,6 @@ interface SeasonalContent {
     action: string;
   };
   translations?: Record<string, string>;
-  stats: {
-    views: number;
-    interactions: number;
-    shares: number;
-  };
   createdAt: string;
   updatedAt: string;
 }
@@ -132,7 +124,6 @@ const INITIAL_CONTENT: SeasonalContent[] = [
     isHijriDate: true,
     priority: 1,
     isActive: true,
-    stats: { views: 25000, interactions: 15000, shares: 3500 },
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-02-28T00:00:00Z'
   },
@@ -153,7 +144,6 @@ const INITIAL_CONTENT: SeasonalContent[] = [
     isHijriDate: false,
     priority: 1,
     isActive: true,
-    stats: { views: 35000, interactions: 28000, shares: 8000 },
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-02-28T00:00:00Z'
   }
@@ -162,7 +152,6 @@ const INITIAL_CONTENT: SeasonalContent[] = [
 // ==================== المكون الرئيسي ====================
 
 const Seasonal: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'content' | 'analytics'>('content');
   const [contents, setContents] = useState<SeasonalContent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -170,6 +159,7 @@ const Seasonal: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingContent, setEditingContent] = useState<SeasonalContent | null>(null);
   const [modalTab, setModalTab] = useState<'content' | 'design' | 'schedule' | 'action'>('content');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -229,7 +219,6 @@ const Seasonal: React.FC = () => {
       isHijriDate: true,
       priority: 1,
       isActive: true,
-      stats: { views: 0, interactions: 0, shares: 0 },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -242,10 +231,9 @@ const Seasonal: React.FC = () => {
   };
 
   const handleDeleteContent = (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا المحتوى؟')) {
-      setContents(prev => prev.filter(c => c.id !== id));
-      deleteDoc(doc(db, 'seasonalContent', id)).catch(console.error);
-    }
+    setContents(prev => prev.filter(c => c.id !== id));
+    setDeleteConfirmId(null);
+    deleteDoc(doc(db, 'seasonalContent', id)).catch(console.error);
   };
 
   const handleToggleActive = (id: string) => {
@@ -272,10 +260,6 @@ const Seasonal: React.FC = () => {
     setShowModal(false);
     setEditingContent(null);
   };
-
-  const totalViews = contents.reduce((sum, c) => sum + c.stats.views, 0);
-  const totalInteractions = contents.reduce((sum, c) => sum + c.stats.interactions, 0);
-  const avgEngagement = totalViews > 0 ? ((totalInteractions / totalViews) * 100).toFixed(1) : '0';
 
   if (isLoading) {
     return (
@@ -308,7 +292,7 @@ const Seasonal: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 text-white bg-accent-dark rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             حفظ الكل
@@ -316,86 +300,26 @@ const Seasonal: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Calendar className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">إجمالي المحتوى</p>
-              <p className="text-xl font-bold text-gray-800">{contents.length}</p>
-            </div>
-          </div>
+      {/* Content Count */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border inline-flex items-center gap-3">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Calendar className="w-5 h-5 text-blue-600" />
         </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Eye className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">المشاهدات</p>
-              <p className="text-xl font-bold text-gray-800">{totalViews.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Target className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">التفاعلات</p>
-              <p className="text-xl font-bold text-gray-800">{totalInteractions.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <Zap className="w-5 h-5 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">نسبة التفاعل</p>
-              <p className="text-xl font-bold text-gray-800">{avgEngagement}%</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <button
-          onClick={() => setActiveTab('content')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-            activeTab === 'content' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <Sparkles className="w-4 h-4" />
-          المحتوى الموسمي
-        </button>
-        <button
-          onClick={() => setActiveTab('analytics')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-            activeTab === 'analytics' ? 'bg-emerald-100 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          <Target className="w-4 h-4" />
-          التحليلات
-        </button>
-      </div>
-
-      {/* Content Tab */}
-      {activeTab === 'content' && (
         <div>
+          <p className="text-sm text-gray-500">إجمالي المحتوى</p>
+          <p className="text-xl font-bold text-gray-800">{contents.length}</p>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div>
           {/* Toolbar */}
           <div className="flex items-center justify-between mb-4">
             <select
               value={selectedSeason}
               onChange={(e) => setSelectedSeason(e.target.value as SeasonType | 'all')}
               aria-label="فلترة حسب الموسم"
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-accent"
             >
               <option value="all">جميع المواسم</option>
               {SEASON_TYPES.map(s => (
@@ -404,7 +328,7 @@ const Seasonal: React.FC = () => {
             </select>
             <button
               onClick={handleAddContent}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-lg hover:bg-emerald-700 transition-colors"
             >
               <Plus className="w-4 h-4" />
               إضافة محتوى
@@ -462,7 +386,7 @@ const Seasonal: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleEditContent({ ...content, id: `sc_${Date.now()}`, titleAr: content.titleAr + ' (نسخة)' })}
-                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg"
+                            className="p-2 text-accent hover:bg-emerald-50 rounded-lg"
                             aria-label="تكرار"
                             title="تكرار"
                           >
@@ -476,27 +400,26 @@ const Seasonal: React.FC = () => {
                           >
                             {content.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-                          <button
-                            onClick={() => handleDeleteContent(content.id)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                            aria-label="حذف"
-                            title="حذف"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {deleteConfirmId === content.id ? (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleDeleteContent(content.id)} className="px-2 py-1 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors">تأكيد الحذف</button>
+                              <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-1 bg-gray-200 text-gray-700 rounded-lg text-xs hover:bg-gray-300 transition-colors">إلغاء</button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirmId(content.id)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              aria-label="حذف"
+                              title="حذف"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                       
-                      {/* Stats */}
+                      {/* Date info */}
                       <div className="flex items-center gap-6 mt-4 pt-4 border-t">
-                        <div className="flex items-center gap-1 text-sm text-gray-500">
-                          <Eye className="w-4 h-4" />
-                          <span>{content.stats.views.toLocaleString()} مشاهدة</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-gray-500">
-                          <Target className="w-4 h-4" />
-                          <span>{content.stats.interactions.toLocaleString()} تفاعل</span>
-                        </div>
                         <div className="flex items-center gap-1 text-sm text-gray-500">
                           <Clock className="w-4 h-4" />
                           <span>{content.isHijriDate ? 'هجري' : 'ميلادي'}: {content.startDate}</span>
@@ -509,41 +432,6 @@ const Seasonal: React.FC = () => {
             })}
           </div>
         </div>
-      )}
-
-      {/* Analytics Tab */}
-      {activeTab === 'analytics' && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border">
-          <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-amber-500" />
-            أفضل المحتوى أداءً
-          </h3>
-          <div className="space-y-3">
-            {[...contents]
-              .sort((a, b) => b.stats.views - a.stats.views)
-              .map((content, i) => (
-                <div key={content.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                    i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-200 text-gray-600'
-                  }`}>
-                    {i + 1}
-                  </div>
-                  <span className="text-2xl">{content.icon}</span>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-800">{content.titleAr}</p>
-                    <p className="text-sm text-gray-500">
-                      {SEASON_TYPES.find(s => s.value === content.seasonType)?.labelAr}
-                    </p>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-bold text-gray-800">{content.stats.views.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">مشاهدة</p>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
 
       {/* Modal */}
       {showModal && editingContent && (
@@ -647,10 +535,15 @@ const Seasonal: React.FC = () => {
                     contentType="ui"
                     label="🌍 ترجمة العنوان لكل اللغات"
                     onTranslated={(translations) => {
+                      // حفظ ترجمات العنوان بمفتاح title_{lang}
+                      const titleTranslations: Record<string, string> = {};
+                      for (const [lang, text] of Object.entries(translations)) {
+                        titleTranslations[`title_${lang}`] = text;
+                      }
                       setEditingContent({
                         ...editingContent,
                         titleEn: translations.en || editingContent.titleEn,
-                        translations: { ...editingContent.translations, ...translations },
+                        translations: { ...editingContent.translations, ...titleTranslations },
                       });
                     }}
                   />
@@ -688,10 +581,15 @@ const Seasonal: React.FC = () => {
                     arabicText={editingContent.contentAr}
                     initialValues={{ ar: editingContent.contentAr, en: editingContent.contentEn }}
                     onSave={(translations: Record<string, string>) => {
+                      // حفظ ترجمات المحتوى بمفتاح content_{lang}
+                      const contentTranslations: Record<string, string> = {};
+                      for (const [lang, text] of Object.entries(translations)) {
+                        contentTranslations[`content_${lang}`] = text;
+                      }
                       setEditingContent({
                         ...editingContent,
                         contentEn: translations.en || editingContent.contentEn,
-                        translations,
+                        translations: { ...editingContent.translations, ...contentTranslations },
                       });
                     }}
                   />
@@ -837,7 +735,7 @@ const Seasonal: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveContent}
-                className="px-4 py-2 text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                className="px-4 py-2 text-white bg-accent-dark rounded-lg hover:bg-accent-dark"
               >
                 حفظ
               </button>

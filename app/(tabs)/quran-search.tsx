@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -190,7 +191,7 @@ export default function QuranSearchScreen() {
     })(),
   } : null;
 
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     header: {
       paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12,
       borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -219,7 +220,7 @@ export default function QuranSearchScreen() {
       color: colors.text,
       textAlign: 'center',
     },
-    title: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 12 },
+    title: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 12 },
     // Search row
     searchRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
     inputWrap: {
@@ -227,7 +228,7 @@ export default function QuranSearchScreen() {
       backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1.5,
       borderColor: hasSearched ? colors.primary : colors.border, paddingHorizontal: 12,
     },
-    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left' },
+    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     clearBtn: { padding: 4 },
     searchBtn: {
       backgroundColor: colors.primary, borderRadius: 14, paddingHorizontal: 16,
@@ -241,7 +242,7 @@ export default function QuranSearchScreen() {
       backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.3)',
       flexDirection: 'row', alignItems: 'center', gap: 8,
     },
-    controlChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    controlChipActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     controlChipText: { fontSize: 12, fontWeight: '700', color: colors.textLight },
     controlChipTextActive: { color: '#fff' },
     // Filter bar
@@ -252,22 +253,22 @@ export default function QuranSearchScreen() {
     },
     filterChip: {
       paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12,
-      backgroundColor: colors.primary + '15', borderWidth: 1, borderColor: colors.primary + '30',
+      backgroundColor: colors.primary + '25', borderWidth: 1, borderColor: colors.primary + '35',
     },
-    filterChipText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+    filterChipText: { fontSize: 11, fontWeight: '700', color: colors.primaryText },
     filterClearBtn: { padding: 4 },
     // Stats bar
     statsBar: {
       flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 8,
-      backgroundColor: colors.primary + '08', borderBottomWidth: 1, borderBottomColor: colors.border,
+      backgroundColor: colors.primary + '15', borderBottomWidth: 1, borderBottomColor: colors.border,
       gap: 12, flexWrap: 'wrap',
     },
     statItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    statNum: { fontSize: 14, fontWeight: '800', color: colors.primary },
+    statNum: { fontSize: 14, fontWeight: '800', color: colors.primaryText },
     statLabel: { fontSize: 11, color: colors.textLight },
     // Result count
     resultCount: {
-      fontSize: 13, color: colors.textLight, textAlign: isRTL ? 'right' : 'left',
+      fontSize: 13, color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
       paddingHorizontal: 16, paddingVertical: 6,
     },
     // Result card
@@ -280,10 +281,10 @@ export default function QuranSearchScreen() {
       paddingTop: 12, paddingBottom: 6, gap: 8,
     },
     surahBadge: {
-      backgroundColor: colors.primary + '15', borderRadius: 20,
+      backgroundColor: colors.primary + '25', borderRadius: 20,
       paddingHorizontal: 10, paddingVertical: 4,
     },
-    surahBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    surahBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primaryText },
     juzBadge: {
       backgroundColor: colors.surface, borderRadius: 16,
       paddingHorizontal: 8, paddingVertical: 4,
@@ -296,7 +297,7 @@ export default function QuranSearchScreen() {
       fontSize: searchLang === 'ar' ? 18 : 14,
       paddingHorizontal: 14, paddingBottom: 10,
       lineHeight: searchLang === 'ar' ? 34 : 22,
-      textAlign: isRTL ? 'right' : 'left',
+      textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
     },
     // Actions
     resultActions: {
@@ -306,11 +307,11 @@ export default function QuranSearchScreen() {
       flex: 1, paddingVertical: 9, alignItems: 'center',
       flexDirection: 'row', justifyContent: 'center', gap: 8,
     },
-    resultActionText: { fontSize: 12, fontWeight: '600', color: colors.primary },
+    resultActionText: { fontSize: 12, fontWeight: '600', color: colors.primaryText },
     actionDivider: { width: 0.5, backgroundColor: colors.border },
     // History
     historyWrap: { paddingHorizontal: 16, paddingTop: 12 },
-    historyTitle: { fontSize: 14, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', marginBottom: 8 },
+    historyTitle: { fontSize: 14, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 8 },
     historyRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     historyChip: {
       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
@@ -331,22 +332,22 @@ export default function QuranSearchScreen() {
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.text },
     closeBtn: { padding: 8, borderRadius: 20, backgroundColor: colors.surface },
     modalContent: { padding: 20, paddingBottom: 60 },
-    ayahRef: { fontSize: 14, color: colors.primary, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 10 },
+    ayahRef: { fontSize: 14, color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
       backgroundColor: colors.surface, borderRadius: 14, padding: 16,
       borderWidth: 1, borderColor: colors.border, marginBottom: 16,
     },
-    arabicTextLarge: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
+    arabicTextLarge: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
       paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
       backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     },
-    editionTabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    editionTabActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     editionTabText: { fontSize: 12, fontWeight: '700', color: colors.textLight },
     editionTabTextActive: { color: '#fff' },
-    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
-    tafsirText: { fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
+    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 10 },
+    tafsirText: { fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 32 },
     // Surah filter modal
     surahModalWrap: { flex: 1, backgroundColor: colors.background },
     surahModalHeader: {
@@ -358,12 +359,13 @@ export default function QuranSearchScreen() {
       borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 8,
     },
     surahNum: {
-      width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15',
+      width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '25',
       justifyContent: 'center', alignItems: 'center',
     },
-    surahNumText: { fontSize: 12, fontWeight: '700', color: colors.primary },
-    surahItemName: { flex: 1, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' },
+    surahNumText: { fontSize: 12, fontWeight: '700', color: colors.primaryText },
+    surahItemName: { flex: 1, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontWeight: '600' },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   const renderResult = useCallback(({ item, index }: { item: SearchResult; index: number }) => {
     const surahName = getSurahName(item.surah.number);
@@ -387,7 +389,7 @@ export default function QuranSearchScreen() {
             <IconSymbol
               name={isBookmarkedItem ? 'star.fill' : 'star'}
               size={18}
-              color={isBookmarkedItem ? '#F59E0B' : colors.textLight}
+              color={isBookmarkedItem ? (isDarkMode ? '#F59E0B' : '#B57200') : colors.textLight}
             />
           </TouchableOpacity>
           <View style={s.flex1} />
@@ -427,9 +429,9 @@ export default function QuranSearchScreen() {
             <IconSymbol
               name={isBookmarkedItem ? 'star.fill' : 'star'}
               size={14}
-              color={isBookmarkedItem ? '#F59E0B' : colors.primary}
+              color={isBookmarkedItem ? (isDarkMode ? '#F59E0B' : '#B57200') : colors.primary}
             />
-            <Text style={[s.resultActionText, isBookmarkedItem && { color: '#F59E0B' }]}>
+            <Text style={[s.resultActionText, isBookmarkedItem && { color: isDarkMode ? '#F59E0B' : '#B57200' }]}>
               {isBookmarkedItem ? t('quranSearch.saved') : t('quranSearch.saveBtn')}
             </Text>
           </TouchableOpacity>
@@ -532,7 +534,7 @@ export default function QuranSearchScreen() {
             <TouchableOpacity style={s.filterClearBtn} onPress={() => setSurahFilter(null)}>
               <IconSymbol name="xmark.circle.fill" size={16} color={colors.textLight} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 12, color: colors.textLight, flex: 1, textAlign: isRTL ? 'right' : 'left' }}>
+            <Text style={{ fontSize: 12, color: colors.textLight, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
               {t('quranSearch.activeFilter')}
             </Text>
             <View style={s.filterChip}>
@@ -588,6 +590,10 @@ export default function QuranSearchScreen() {
             renderItem={renderResult}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
+            initialNumToRender={15}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS !== 'web'}
             ListEmptyComponent={
               !hasSearched ? (
                 <View style={s.historyWrap}>
@@ -714,10 +720,10 @@ export default function QuranSearchScreen() {
             <Text style={[s.modalTitle, { flex: 1 }]}>{t('quranSearch.chooseSurahFilter')}</Text>
           </View>
           <TouchableOpacity
-            style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === null && { backgroundColor: colors.primary + '12' }]}
+            style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === null && { backgroundColor: colors.primary + '22' }]}
             onPress={() => { setSurahFilter(null); setShowSurahFilter(false); }}
           >
-            <Text style={[s.surahItemName, surahFilter === null && { color: colors.primary }]}>{t('quranSearch.allSurahs')}</Text>
+            <Text style={[s.surahItemName, surahFilter === null && { color: colors.primaryText }]}>{t('quranSearch.allSurahs')}</Text>
             {surahFilter === null && <IconSymbol name="checkmark" size={16} color={colors.primary} />}
           </TouchableOpacity>
           <FlatList
@@ -725,11 +731,11 @@ export default function QuranSearchScreen() {
             keyExtractor={n => n.toString()}
             renderItem={({ item: n }) => (
               <TouchableOpacity
-                style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === n && { backgroundColor: colors.primary + '12' }]}
+                style={[s.surahItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, surahFilter === n && { backgroundColor: colors.primary + '22' }]}
                 onPress={() => { setSurahFilter(n); setShowSurahFilter(false); }}
               >
                 {surahFilter === n && <IconSymbol name="checkmark" size={16} color={colors.primary} />}
-                <Text style={[s.surahItemName, surahFilter === n && { color: colors.primary }]}>
+                <Text style={[s.surahItemName, surahFilter === n && { color: colors.primaryText }]}>
                   {getSurahName(n)}
                 </Text>
                 <View style={s.surahNum}><Text style={s.surahNumText}>{n}</Text></View>

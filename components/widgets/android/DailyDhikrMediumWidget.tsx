@@ -1,10 +1,10 @@
 // components/widgets/android/DailyDhikrMediumWidget.tsx
-// 4×2 widget: Full dhikr text + source/category
+// 4×2 widget: Full dhikr text + category + count
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
   const { dhikr } = data;
@@ -32,33 +32,51 @@ export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
           width: 'match_parent',
         }}
       >
-        <TextWidget
-          text="📿 ذكر اليوم"
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ImageWidget
+            image={APP_ICON}
+            imageWidth={ICON_SIZE.header}
+            imageHeight={ICON_SIZE.header}
+            radius={6}
+          />
+          <TextWidget
+            text="ذكر اليوم"
+            style={{
+              fontSize: 13,
+              color: COLORS.tealLight,
+              fontFamily: FONT.amiriBold,
+              marginLeft: 6,
+            }}
+          />
+        </FlexWidget>
+        <FlexWidget
           style={{
-            fontSize: 12,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
+            backgroundColor: COLORS.cardBg,
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 3,
           }}
-        />
-        <TextWidget
-          text={dhikr.categoryName}
-          style={{
-            fontSize: 11,
-            color: COLORS.gray,
-            fontFamily: FONT.amiri,
-          }}
-        />
+        >
+          <TextWidget
+            text={dhikr.categoryName}
+            style={{
+              fontSize: 10,
+              color: COLORS.gray,
+              fontFamily: FONT.amiri,
+            }}
+          />
+        </FlexWidget>
       </FlexWidget>
 
       {/* Dhikr text */}
       <TextWidget
         text={dhikr.arabic}
         style={{
-          fontSize: 16,
+          fontSize: 17,
           color: COLORS.white,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 4,
+          marginVertical: 4,
         }}
         maxLines={3}
         truncate="END"
@@ -71,18 +89,26 @@ export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           width: 'match_parent',
-          marginTop: 4,
         }}
       >
         {dhikr.count > 0 ? (
-          <TextWidget
-            text={`${dhikr.count} ${dhikr.timesLabel || 'مرة'}`}
+          <FlexWidget
             style={{
-              fontSize: 11,
-              color: COLORS.gold,
-              fontFamily: FONT.amiri,
+              backgroundColor: COLORS.badgeBg,
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 3,
             }}
-          />
+          >
+            <TextWidget
+              text={`${dhikr.count} ${dhikr.timesLabel || 'مرة'}`}
+              style={{
+                fontSize: 11,
+                color: COLORS.gold,
+                fontFamily: FONT.amiri,
+              }}
+            />
+          </FlexWidget>
         ) : (
           <TextWidget text="" style={{ fontSize: 1 }} />
         )}
@@ -90,7 +116,7 @@ export function DailyDhikrMediumWidget({ data }: { data: SharedWidgetData }) {
           text={BRANDING.name}
           style={{
             fontSize: BRANDING.fontSize,
-            color: BRANDING.color,
+            color: COLORS.teal,
             fontFamily: FONT.amiri,
           }}
         />

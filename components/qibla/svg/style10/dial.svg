@@ -14,9 +14,10 @@
         font-family: Helvetica-Bold, Helvetica;
         font-size: 24px;
         font-weight: 700;
+        fill: #ffffff;
       }
       .st9, .st6 {
-        fill: #848484;
+        fill: #a0a0a0;
       }
 
       .st10 {
@@ -25,7 +26,7 @@
 
       .st10, .st11 {
         fill: none;
-        stroke: #4c4c4c;
+        stroke: #888888;
         stroke-miterlimit: 10;
       }
 
@@ -52,9 +53,9 @@
       <stop offset="1" stop-color="#000"/>
     </radialGradient>
     <linearGradient id="linear-gradient" x1="1912.39" y1="-169.31" x2="2189.11" y2="-169.31" gradientTransform="translate(-1180.04 -1421.22) rotate(45) scale(1 -1)" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#f7c9d6"/>
-      <stop offset=".5" stop-color="#fdeff2"/>
-      <stop offset="1" stop-color="#9e6178"/>
+      <stop offset="0" stop-color="#1a1a1a"/>
+      <stop offset=".5" stop-color="#2d2d2d"/>
+      <stop offset="1" stop-color="#0f0f0f"/>
     </linearGradient>
     <linearGradient id="linear-gradient1" x1="1425.12" y1="-1159.52" x2="1440.28" y2="-1159.52" gradientTransform="translate(-610.53 -1419.01) rotate(22.45) scale(1 -1)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#737373"/>

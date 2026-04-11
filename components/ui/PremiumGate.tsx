@@ -7,7 +7,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { usePremiumFeature } from '@/hooks/use-premium-feature';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import type { PremiumFeatureKey } from '@/types/premium';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -22,12 +24,15 @@ interface PremiumGateProps {
 
 export function PremiumGate({ feature, children, fallback }: PremiumGateProps) {
   const { isLocked } = usePremiumFeature(feature);
+  const { isSubscriptionEnabled } = useSubscription();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const router = useRouter();
   const { t } = useSettings();
 
-  if (!isLocked) return <>{children}</>;
+  // If subscriptions are disabled globally, render children freely
+  if (!isSubscriptionEnabled || !isLocked) return <>{children}</>;
 
   if (fallback) return <>{fallback}</>;
 
@@ -47,7 +52,7 @@ export function PremiumGate({ feature, children, fallback }: PremiumGateProps) {
           }}
           activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="crown" size={18} color="#fff" />
+          <MaterialCommunityIcons name="crown" size={18} color="#1a1a1a" />
           <Text style={styles.upgradeText}>{t('subscription.upgrade') || 'Upgrade'}</Text>
         </TouchableOpacity>
       </View>
@@ -55,7 +60,7 @@ export function PremiumGate({ feature, children, fallback }: PremiumGateProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -90,7 +95,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   upgradeText: {
-    color: '#fff',
+    color: '#1a1a1a',
     fontSize: 15,
     fontWeight: '600',
   },

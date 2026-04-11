@@ -9,12 +9,11 @@ import {
   Modal,
   StyleSheet,
   Platform,
-  StatusBar,
   ScrollView,
-  Image,
   Alert,
   Dimensions,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -33,6 +32,7 @@ import { useSettings } from '../../contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useAppConfig } from '@/lib/app-config-context';
 import { useColors } from '../../hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getLastRead } from '../../lib/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -52,13 +52,6 @@ import {
   deleteDownload,
 } from '@/lib/audio-download-manager';
 
-// Background images
-const QURAN_BG_IMAGES: Record<string, any> = {
-  quranbg1: require('@/assets/images/quran/quranbg1.png'),
-  quranbg2: require('@/assets/images/quran/quranbg2.png'),
-  quranbg3: require('@/assets/images/quran/quranbg3.png'),
-  quranbg4: require('@/assets/images/quran/quranbg4.png'),
-};
 import {
   Spacing,
   BorderRadius,
@@ -159,6 +152,8 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
   primaryColor,
   accentColor,
 }) => {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const scale = useSharedValue(1);
   const tint = accentColor || primaryColor;
 
@@ -228,9 +223,10 @@ export default function QuranScreen() {
   const { isDarkMode, settings, updateDisplay, updateNotifications, t } = useSettings();
   const { config } = useAppConfig();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const isArabic = settings.language === 'ar';
-  const isLightBg = !isDarkMode;
+  const isLightBg = !isDarkMode && !colors.hasBgOverride;
 
   const {
     surahs,
@@ -489,8 +485,8 @@ export default function QuranScreen() {
       return (
         <View style={{ borderRadius: 16, overflow: 'hidden' }}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 25}
-            tint={isLightBg ? 'light' : 'dark'}
+            intensity={Platform.OS === 'ios' ? 30 : 15}
+            tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
             style={{ borderRadius: 16 }}
           >
             <TouchableOpacity
@@ -499,8 +495,8 @@ export default function QuranScreen() {
                 {
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                   backgroundColor: isLightBg
-                    ? 'rgba(255,255,255,0.35)'
-                    : 'rgba(28,30,36,0.35)',
+                    ? 'rgba(255,255,255,0.15)'
+                    : 'rgba(28,30,36,0.15)',
                   borderColor: isCurrentPlaying
                     ? colors.primary + '55'
                     : isLightBg
@@ -518,7 +514,7 @@ export default function QuranScreen() {
                   { backgroundColor: colors.primary + '14' },
                 ]}
               >
-                <Text style={[styles.surahNumberText, { color: colors.primary }]}>
+                <Text style={[styles.surahNumberText, { color: colors.text }]}>
                   {toLocalizedNumber(item.number, isArabic)}
                 </Text>
               </View>
@@ -552,7 +548,7 @@ export default function QuranScreen() {
                     >
                       {downloadingSet.has(item.number) ? (
                         <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                          <ActivityIndicator size={14} color="#F59E0B" />
+                          <ActivityIndicator size={14} color={isDarkMode ? '#F59E0B' : '#B57200'} />
                           <Text style={styles.progressText}>
                             {Math.round((progressMap.get(item.number) || 0) * 100)}%
                           </Text>
@@ -569,10 +565,10 @@ export default function QuranScreen() {
                           size={22}
                           color={
                             downloadedSet.has(item.number)
-                              ? '#22C55E'
+                              ? '#0d8e62'
                               : failedSet.has(item.number)
                                 ? '#EF4444'
-                                : '#9CA3AF'
+                                : colors.textLight
                           }
                         />
                       )}
@@ -608,7 +604,6 @@ export default function QuranScreen() {
                     name={isRTL ? 'chevron-left' : 'chevron-right'}
                     size={18}
                     color={colors.textSecondary}
-                    style={{ opacity: 0.5 }}
                   />
                 )}
               </View>
@@ -635,7 +630,7 @@ export default function QuranScreen() {
               flexDirection: isRTL ? 'row-reverse' : 'row',
             },
             isSelected && {
-              backgroundColor: colors.primary + '12',
+              backgroundColor: isLightBg ? colors.primary + '22' : colors.primary + '12',
             },
           ]}
           onPress={() => selectReciter(item.identifier)}
@@ -647,9 +642,9 @@ export default function QuranScreen() {
                 styles.reciterAvatar,
                 {
                   backgroundColor: isSelected
-                    ? colors.primary + '20'
+                    ? colors.primary + '25'
                     : isLightBg
-                      ? 'rgba(0,0,0,0.04)'
+                      ? 'rgba(0,0,0,0.08)'
                       : 'rgba(255,255,255,0.06)',
                 },
               ]}
@@ -712,7 +707,7 @@ export default function QuranScreen() {
             { backgroundColor: colors.primary + '14' },
           ]}
         >
-          <Text style={[styles.surahNumberText, { color: colors.primary }]}>
+          <Text style={[styles.surahNumberText, { color: colors.text }]}>
             {toLocalizedNumber(item.number, isArabic)}
           </Text>
         </View>
@@ -728,7 +723,6 @@ export default function QuranScreen() {
           name={isRTL ? 'chevron-left' : 'chevron-right'}
           size={18}
           color={colors.textSecondary}
-          style={{ opacity: 0.5 }}
         />
       </TouchableOpacity>
     ),
@@ -789,21 +783,12 @@ export default function QuranScreen() {
         style={[styles.container, { backgroundColor: 'transparent' }]}
         edges={['top']}
       >
-        <StatusBar
-          barStyle={isLightBg ? 'dark-content' : 'light-content'}
-          backgroundColor={colors.background}
-        />
+        <StatusBar style={colors.statusBarStyle} />
 
         {/* الهيدر */}
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {/* Right side in RTL: worship tracker + radio */}
+          {/* Right side in RTL: worship tracker */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
-            <TouchableOpacity
-              style={styles.headerBtn}
-              onPress={() => router.push('/radio' as any)}
-            >
-              <MaterialCommunityIcons name="radio" size={22} color={colors.text} />
-            </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerBtn}
               onPress={() => router.push('/worship-tracker/quran' as any)}
@@ -819,13 +804,13 @@ export default function QuranScreen() {
             </Text>
           </View>
 
-          {/* Left side in RTL: bookmark + settings */}
+          {/* Left side in RTL: radio + settings */}
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.xs }}>
             <TouchableOpacity
               style={styles.headerBtn}
-              onPress={openBookmarkPage}
+              onPress={() => router.push('/radio' as any)}
             >
-              <MaterialCommunityIcons name="bookmark-outline" size={22} color={colors.text} />
+              <MaterialCommunityIcons name="radio" size={22} color={colors.text} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.headerBtn}
@@ -842,7 +827,7 @@ export default function QuranScreen() {
             tabs={quranSegments.map(s => ({ key: s.key, label: s.label }))}
             selected={activeTab}
             onSelect={(key) => setActiveTab(key as 'surahs' | 'juz' | 'listen')}
-            indicatorColor="#D4AF37"
+            indicatorColor="#0d8e62"
           />
         </View>
 
@@ -899,15 +884,16 @@ export default function QuranScreen() {
               styles.searchContainer,
               {
                 flexDirection: isRTL ? 'row-reverse' : 'row',
-                backgroundColor: isLightBg
-                  ? 'rgba(255,255,255,0.45)'
-                  : 'rgba(120,120,128,0.12)',
                 borderColor: isLightBg
                   ? 'rgba(255,255,255,0.6)'
                   : 'rgba(255,255,255,0.04)',
               },
             ]}
           >
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.60)' : 'rgba(30,30,30,0.40)' }]} />
             <MaterialCommunityIcons
               name="magnify"
               size={20}
@@ -951,7 +937,7 @@ export default function QuranScreen() {
                 onPress={openLastReadSurah}
                 isLightBg={isLightBg}
                 primaryColor={colors.primary}
-                accentColor="#16A34A"
+                accentColor="#0d8e62"
               />
             </View>
             <View style={[styles.quickActionsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1039,8 +1025,8 @@ export default function QuranScreen() {
             />
             <View style={styles.modalContainer}>
               <BlurView
-                intensity={Platform.OS === 'ios' ? 40 : 18}
-                tint={isLightBg ? 'light' : 'dark'}
+                intensity={Platform.OS === 'ios' ? 80 : 18}
+                tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                 style={styles.modalBlur}
               >
                 <View
@@ -1048,8 +1034,8 @@ export default function QuranScreen() {
                     styles.modalContent,
                     {
                       backgroundColor: isLightBg
-                        ? 'rgba(255,255,255,0.75)'
-                        : 'rgba(28,28,30,0.75)',
+                        ? 'rgba(255,255,255,0.60)'
+                        : 'rgba(28,28,30,0.20)',
                     },
                   ]}
                 >
@@ -1076,8 +1062,8 @@ export default function QuranScreen() {
                       onPress={() => setShowReciterModal(false)}
                     >
                       <BlurView
-                        intensity={Platform.OS === 'ios' ? 25 : 10}
-                        tint={isLightBg ? 'light' : 'dark'}
+                        intensity={Platform.OS === 'ios' ? 40 : 10}
+                        tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                         style={styles.modalCloseBtnBlur}
                       >
                         <View
@@ -1129,11 +1115,11 @@ export default function QuranScreen() {
             />
             <View style={{ borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden', height: Dimensions.get('window').height * 0.7 }}>
               <BlurView
-                intensity={Platform.OS === 'ios' ? 60 : 40}
-                tint={isLightBg ? 'systemChromeMaterialLight' : 'systemChromeMaterialDark'}
+                intensity={Platform.OS === 'ios' ? 80 : 40}
+                tint={(isLightBg ? 'systemThickMaterialLight' : 'systemThickMaterialDark') as any}
                 style={StyleSheet.absoluteFill}
               />
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.4)' : 'rgba(30,30,32,0.55)', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 0.5, borderColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.12)' }]} />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isLightBg ? 'rgba(255,255,255,0.60)' : 'rgba(30,30,30,0.40)', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: isLightBg ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)' }]} />
               <View style={{ flex: 1, padding: Spacing.lg, paddingBottom: Spacing.xl + 20 }}>
               <View style={[styles.settingsHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <Text style={[styles.settingsTitle, { color: colors.text }]}>{t('quran.quranSettings')}</Text>
@@ -1165,7 +1151,7 @@ export default function QuranScreen() {
                     >
                       <MaterialCommunityIcons name="minus" size={22} color={isLightBg ? '#333' : '#ddd'} />
                     </TouchableOpacity>
-                    <Text style={{ color: colors.primary, fontSize: 16, fontFamily: fontSemiBold() }}>
+                    <Text style={{ color: colors.primaryText, fontSize: 16, fontFamily: fontSemiBold() }}>
                       {(settings.display.quranFontSizeAdjust ?? 0) === 0 ? t('quran.defaultSize') : (settings.display.quranFontSizeAdjust ?? 0) > 0 ? `+${settings.display.quranFontSizeAdjust}` : String(settings.display.quranFontSizeAdjust)}
                     </Text>
                     <TouchableOpacity
@@ -1204,45 +1190,7 @@ export default function QuranScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* ─── 3. خلفية المصحف ─── */}
-                <View style={{ marginBottom: 16 }}>
-                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
-                    <MaterialCommunityIcons name="image-outline" size={14} color={colors.textSecondary} />
-                    <Text style={[styles.settingsSectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>
-                      {t('quran.mushafBackground')}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm, marginTop: 8 }}>
-                    {(['quranbg1', 'quranbg2', 'quranbg3', 'quranbg4'] as const).map(key => {
-                      const isSelected = (settings.display.quranBackground ?? 'quranbg1') === key;
-                      return (
-                        <TouchableOpacity
-                          key={key}
-                          style={{
-                            width: 60,
-                            height: 85,
-                            borderRadius: 10,
-                            overflow: 'hidden',
-                            borderWidth: isSelected ? 2.5 : 1,
-                            borderColor: isSelected ? colors.primary : 'rgba(120,120,128,0.2)',
-                          }}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            updateDisplay({ quranBackground: key });
-                          }}
-                        >
-                          <Image
-                            source={QURAN_BG_IMAGES[key]}
-                            style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
-                          />
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* ─── 4. الترجمة للغات أخرى ─── */}
+                {/* ─── 3. الترجمة للغات أخرى ─── */}
                 <View style={{ marginBottom: 16 }}>
                   <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: Spacing.sm }}>
                     <MaterialCommunityIcons name="translate" size={14} color={colors.textSecondary} />
@@ -1405,7 +1353,7 @@ export default function QuranScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -1419,6 +1367,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
     fontWeight: '500',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   errorContainer: {
     flex: 1,
@@ -1431,6 +1381,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
     textAlign: 'center',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   retryButton: {
     paddingHorizontal: Spacing.xl,
@@ -1443,6 +1395,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
     fontWeight: '600',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
 
   // Header
@@ -1456,6 +1410,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   headerBtn: {
     width: 40,
@@ -1474,6 +1430,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 14,
+    overflow: 'hidden',
   },
   searchInput: {
     flex: 1,
@@ -1519,6 +1476,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xs,
     fontFamily: fontSemiBold(),
     fontWeight: '600',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 
   // Surah List
@@ -1547,6 +1506,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontBold(),
     fontWeight: '700',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   surahInfo: {
     flex: 1,
@@ -1557,11 +1518,15 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontFamily: 'Amiri-Bold',
     fontWeight: '600',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   surahDetails: {
     fontSize: FONT_SIZES.xs,
     fontFamily: fontRegular(),
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   pageInfo: {
     flexDirection: 'row',
@@ -1589,6 +1554,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: fontBold(),
     color: '#F59E0B',
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   playIconCircle: {
     width: 32,
@@ -1626,11 +1593,15 @@ const styles = StyleSheet.create({
   reciterSelectorLabel: {
     fontSize: FONT_SIZES.xs,
     fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   reciterSelectorName: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
     fontWeight: '600',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
 
   // Empty State
@@ -1644,6 +1615,8 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
+    lineHeight: 24,
+    includeFontPadding: false,
   },
 
   // Modal - Glass
@@ -1729,6 +1702,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
     fontWeight: '500',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   // Quran Settings Modal
   settingsOverlay: {
@@ -1769,3 +1744,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+const styles = _styles;

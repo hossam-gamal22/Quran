@@ -8,12 +8,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   TextInput,
   Alert,
-  Image,
-  ImageSourcePropType,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -23,6 +23,7 @@ import Animated, { FadeInDown, FadeInRight, FadeIn } from 'react-native-reanimat
 
 import { useSettings, Language } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -35,39 +36,24 @@ interface LanguageInfo {
   code: Language;
   name: string;
   nativeName: string;
-  flagIcon: ImageSourcePropType;
+  flag: string;
   rtl: boolean;
   region: string;
 }
 
-const FLAG_IMAGES: Record<Language, ImageSourcePropType> = {
-  ar: require('@/assets/images/flags/sa.png'),
-  en: require('@/assets/images/flags/us.png'),
-  fr: require('@/assets/images/flags/fr.png'),
-  de: require('@/assets/images/flags/de.png'),
-  es: require('@/assets/images/flags/es.png'),
-  tr: require('@/assets/images/flags/tr.png'),
-  ur: require('@/assets/images/flags/pk.png'),
-  id: require('@/assets/images/flags/id.png'),
-  ms: require('@/assets/images/flags/my.png'),
-  hi: require('@/assets/images/flags/in.png'),
-  bn: require('@/assets/images/flags/bd.png'),
-  ru: require('@/assets/images/flags/ru.png'),
-};
-
 const LANGUAGES: LanguageInfo[] = [
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flagIcon: FLAG_IMAGES.ar, rtl: true, region: 'priority' },
-  { code: 'en', name: 'English', nativeName: 'English', flagIcon: FLAG_IMAGES.en, rtl: false, region: 'priority' },
-  { code: 'fr', name: 'French', nativeName: 'Français', flagIcon: FLAG_IMAGES.fr, rtl: false, region: 'priority' },
-  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flagIcon: FLAG_IMAGES.tr, rtl: false, region: 'other' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flagIcon: FLAG_IMAGES.ur, rtl: true, region: 'other' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch', flagIcon: FLAG_IMAGES.de, rtl: false, region: 'other' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', flagIcon: FLAG_IMAGES.es, rtl: false, region: 'other' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flagIcon: FLAG_IMAGES.hi, rtl: false, region: 'other' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flagIcon: FLAG_IMAGES.bn, rtl: false, region: 'other' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flagIcon: FLAG_IMAGES.id, rtl: false, region: 'other' },
-  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flagIcon: FLAG_IMAGES.ms, rtl: false, region: 'other' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский', flagIcon: FLAG_IMAGES.ru, rtl: false, region: 'other' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true, region: 'priority' },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸', rtl: false, region: 'priority' },
+  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷', rtl: false, region: 'priority' },
+  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', rtl: false, region: 'other' },
+  { code: 'ur', name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', rtl: true, region: 'other' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch', flag: '🇩🇪', rtl: false, region: 'other' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸', rtl: false, region: 'other' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳', rtl: false, region: 'other' },
+  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', flag: '🇧🇩', rtl: false, region: 'other' },
+  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', rtl: false, region: 'other' },
+  { code: 'ms', name: 'Malay', nativeName: 'Bahasa Melayu', flag: '🇲🇾', rtl: false, region: 'other' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺', rtl: false, region: 'other' },
 ];
 
 const REGION_KEYS = ['priority', 'other'];
@@ -99,15 +85,15 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
   isRTL,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInRight.delay(index * 50).duration(400)}>
       <TouchableOpacity
         style={[
           styles.languageItem,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
-          isDarkMode && styles.languageItemDark,
+          { backgroundColor: colors.card },
           isSelected && styles.languageItemSelected,
-          isSelected && isDarkMode && styles.languageItemSelectedDark,
         ]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -115,12 +101,16 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         }}
         activeOpacity={0.7}
       >
-        <Image source={language.flagIcon} style={styles.languageFlag} resizeMode="contain" />
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+        <Text style={styles.flagEmoji}>{language.flag}</Text>
         <View style={[styles.languageInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
           <Text
             style={[
               styles.languageName,
-              { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
               isSelected && styles.languageNameSelected,
             ]}
           >
@@ -129,7 +119,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
           <Text
             style={[
               styles.languageEnglish,
-              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
             ]}
           >
             {language.name}
@@ -137,7 +127,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         </View>
         {isSelected && (
           <View style={styles.checkIcon}>
-            <MaterialCommunityIcons name="check-circle" size={24} color="#22C55E" />
+            <MaterialCommunityIcons name="check-circle" size={24} color="#0d8e62" />
           </View>
         )}
       </TouchableOpacity>
@@ -165,11 +155,12 @@ const RegionSection: React.FC<RegionSectionProps> = ({
   isRTL,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   if (languages.length === 0) return null;
 
   return (
     <View style={styles.regionSection}>
-      <Text style={[styles.regionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+      <Text style={[styles.regionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
         {region}
       </Text>
       {languages.map((lang, idx) => (
@@ -195,6 +186,7 @@ export default function LanguageScreen() {
   const router = useRouter();
   const { settings, isDarkMode, updateLanguage, t } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const [searchQuery, setSearchQuery] = useState('');
   const [isChanging, setIsChanging] = useState(false);
   const isRTL = useIsRTL();
@@ -270,10 +262,7 @@ export default function LanguageScreen() {
       style={[styles.container, { backgroundColor: 'transparent' }]}
       edges={['top']}
     >
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
       <UniversalHeader title={t('settings.language')} />
@@ -283,16 +272,20 @@ export default function LanguageScreen() {
         entering={FadeInDown.delay(100).duration(500)}
         style={styles.searchContainer}
       >
-        <View style={[styles.searchBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.searchBarDark]}>
+        <View style={[styles.searchBar, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: colors.card }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <MaterialCommunityIcons
             name="magnify"
             size={22}
-            color={isDarkMode ? '#666' : '#999'}
+            color={colors.textLight}
           />
           <TextInput
-            style={[styles.searchInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}
+            style={[styles.searchInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
             placeholder={t('common.search') + '...'}
-            placeholderTextColor={isDarkMode ? '#666' : '#999'}
+            placeholderTextColor={colors.textLight}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -301,7 +294,7 @@ export default function LanguageScreen() {
               <MaterialCommunityIcons
                 name="close-circle"
                 size={20}
-                color={isDarkMode ? '#666' : '#999'}
+                color={colors.textLight}
               />
             </TouchableOpacity>
           )}
@@ -313,9 +306,13 @@ export default function LanguageScreen() {
         entering={FadeInDown.delay(150).duration(500)}
         style={styles.infoCardContainer}
       >
-        <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.infoCardDark]}>
+        <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: colors.surface }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(26,42,58,0.60)' : 'rgba(232,244,253,0.60)' }]} />
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
-          <Text style={[styles.infoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.infoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('settings.language')}:{' '}
             <Text style={styles.infoHighlight}>
               {LANGUAGES.find((l) => l.code === settings.language)?.nativeName}
@@ -350,7 +347,7 @@ export default function LanguageScreen() {
                 <MaterialCommunityIcons
                   name="translate-off"
                   size={48}
-                  color={isDarkMode ? '#444' : '#ccc'}
+                  color={colors.textLight}
                 />
                 <Text style={[styles.emptyText, { color: colors.textLight }]}>
                   {t('quran.noResults')}
@@ -388,7 +385,7 @@ export default function LanguageScreen() {
           <MaterialCommunityIcons
             name="translate"
             size={24}
-            color={isDarkMode ? '#444' : '#ddd'}
+            color={colors.textLight}
           />
           <Text style={[styles.footerText, { color: colors.textLight }]}>
             12 {t('settings.language')}
@@ -404,8 +401,8 @@ export default function LanguageScreen() {
       {/* Loading Overlay */}
       {isChanging && (
         <View style={styles.loadingOverlay}>
-          <View style={[styles.loadingCard, isDarkMode && styles.loadingCardDark]}>
-            <MaterialCommunityIcons name="loading" size={40} color="#22C55E" />
+          <View style={[styles.loadingCard, { backgroundColor: colors.card }]}>
+            <MaterialCommunityIcons name="loading" size={40} color="#0d8e62" />
             <Text style={[styles.loadingText, { color: colors.text }]}>
               {t('common.loading')}
             </Text>
@@ -421,13 +418,9 @@ export default function LanguageScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -436,21 +429,17 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 12,
     paddingHorizontal: 15,
     height: 50,
+    overflow: 'hidden' as const,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  searchBarDark: {
-    backgroundColor: '#1a1a2e',
   },
   searchInput: {
     flex: 1,
     marginHorizontal: 10,
     fontSize: 16,
     fontFamily: fontRegular(),
-    color: '#333',
   },
   infoCardContainer: {
     paddingHorizontal: 16,
@@ -459,23 +448,21 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f4fd',
     borderRadius: 12,
     padding: 12,
     gap: 10,
-  },
-  infoCardDark: {
-    backgroundColor: '#1a2a3a',
+    overflow: 'hidden' as const,
+    borderWidth: 1,
+    borderColor: 'rgba(58,124,165,0.20)',
   },
   infoText: {
     flex: 1,
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#333',
   },
   infoHighlight: {
     fontFamily: fontBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   scrollView: {
     flex: 1,
@@ -489,36 +476,30 @@ const styles = StyleSheet.create({
   regionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
     marginBottom: 10,
     marginTop: 5,
   },
   languageItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
+    overflow: 'hidden' as const,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
     gap: 12,
-  },
-  languageItemDark: {
-    backgroundColor: '#1a1a2e',
   },
   languageItemSelected: {
     backgroundColor: '#e8f5e9',
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
   languageItemSelectedDark: {
     backgroundColor: '#1a2f1a',
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
-  languageFlag: {
-    width: 36,
-    height: 24,
-    borderRadius: 4,
+  flagEmoji: {
+    fontSize: 28,
   },
   languageInfo: {
     flex: 1,
@@ -526,15 +507,13 @@ const styles = StyleSheet.create({
   languageName: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
   },
   languageNameSelected: {
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   languageEnglish: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#999',
     marginTop: 2,
   },
   rtlBadge: {
@@ -546,7 +525,6 @@ const styles = StyleSheet.create({
   rtlBadgeText: {
     fontSize: 10,
     fontFamily: fontBold(),
-    color: '#666',
   },
   checkIcon: {
   },
@@ -557,7 +535,6 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontFamily: fontRegular(),
-    color: '#999',
     marginTop: 15,
   },
   footer: {
@@ -568,12 +545,10 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#999',
   },
   footerSubtext: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#ccc',
   },
   bottomSpace: {
     height: 100,
@@ -589,18 +564,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingCard: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 30,
     alignItems: 'center',
     gap: 15,
   },
-  loadingCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   loadingText: {
     fontSize: 16,
     fontFamily: fontMedium(),
-    color: '#333',
   },
 });

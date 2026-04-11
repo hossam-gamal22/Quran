@@ -22,6 +22,8 @@ import RenderHtml, {
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -90,6 +92,8 @@ export function GlassHTML({
 }: GlassHTMLProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
+  const _themeColors = useColors();
+  const styles = useScaledStyles(_styles, _themeColors.fs);
   const { width: windowWidth } = useWindowDimensions();
   const contentWidth = windowWidth - 32 - (padding * 2);
 
@@ -101,11 +105,11 @@ export function GlassHTML({
   const colors = useMemo(() => ({
     text: isDarkMode ? '#FFFFFF' : '#1C1C1E',
     textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    link: isDarkMode ? '#4ADE80' : '#22C55E',
+    link: isDarkMode ? '#3da87e' : '#0d8e62',
     background: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
-    border: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-    codeBackground: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-    blockquoteBorder: isDarkMode ? '#4ADE80' : '#22C55E',
+    border: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+    codeBackground: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+    blockquoteBorder: isDarkMode ? '#3da87e' : '#0d8e62',
   }), [isDarkMode]);
 
   // Fetch HTML from URL if provided
@@ -377,8 +381,9 @@ export function GlassHTML({
   return (
     <View style={[styles.glassOuter, { borderRadius }]}>
       <BlurView
+       
         intensity={Platform.OS === 'ios' ? blurIntensity : Math.min(blurIntensity, 30)}
-        tint={isDarkMode ? 'dark' : 'light'}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={[styles.blurView, { borderRadius }]}
       >
         <View
@@ -403,7 +408,7 @@ export function GlassHTML({
 // Styles
 // ═══════════════════════════════════════════════════════════════════════════
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   glassOuter: {
     overflow: 'hidden',
     marginHorizontal: 16,

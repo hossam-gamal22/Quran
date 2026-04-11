@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
-  StatusBar,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,8 +28,10 @@ import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getDateLocale } from '@/lib/i18n';
+import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 
@@ -36,12 +39,12 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const AZKAR_TYPES: { key: keyof Omit<DailyAzkarRecord, 'date'>; icon: string; color: string; labelKey: string }[] = [
-  { key: 'morning', icon: 'weather-sunset-up', color: '#f5a623', labelKey: 'azkar.morning' },
-  { key: 'evening', icon: 'weather-sunset-down', color: '#5d4e8c', labelKey: 'azkar.evening' },
+const AZKAR_TYPES: { key: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>; icon: string; color: string; labelKey: string }[] = [
+  { key: 'morning', icon: 'weather-sunset-up', color: '#c07b10', labelKey: 'azkar.morning' },
+  { key: 'evening', icon: 'weather-sunset-down', color: '#4a3d73', labelKey: 'azkar.evening' },
   { key: 'sleep', icon: 'weather-night', color: '#1a237e', labelKey: 'azkar.sleep' },
   { key: 'wakeup', icon: 'white-balance-sunny', color: '#e65100', labelKey: 'azkar.wakeup' },
-  { key: 'afterPrayer', icon: 'mosque', color: '#22C55E', labelKey: 'azkar.afterPrayer' },
+  { key: 'afterPrayer', icon: 'mosque', color: '#0d8e62', labelKey: 'azkar.afterPrayer' },
 ];
 
 // ========================================
@@ -60,7 +63,7 @@ const CircularProgress: React.FC<CircularProgressProps> = ({
   progress,
   size = 160,
   strokeWidth = 12,
-  color = '#22C55E',
+  color = '#0d8e62',
   children,
 }) => {
   const radius = (size - strokeWidth) / 2;
@@ -115,6 +118,7 @@ export default function AzkarTrackerScreen() {
 
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // تحميل السجل
   useEffect(() => {
@@ -151,7 +155,7 @@ export default function AzkarTrackerScreen() {
     setIsRefreshing(false);
   }, []);
 
-  const handleToggle = async (type: keyof Omit<DailyAzkarRecord, 'date'>) => {
+  const handleToggle = async (type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await toggleAzkarType(type);
   };
@@ -178,14 +182,14 @@ export default function AzkarTrackerScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (isDarkMode ? '#11151c' : '#fff') : 'transparent' }]}
+      style={styles.container}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         {/* Header */}
         <UniversalHeader
-          title={t('azkar.title')}
+          title={t('worship.azkarTracker')}
           titleColor={colors.text}
           onBack={() => {
             if (router.canGoBack()) {
@@ -205,8 +209,8 @@ export default function AzkarTrackerScreen() {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={onRefresh}
-              colors={['#22C55E']}
-              tintColor="#22C55E"
+              colors={['#0d8e62']}
+              tintColor="#0d8e62"
             />
           }
         >
@@ -214,7 +218,7 @@ export default function AzkarTrackerScreen() {
           <Animated.View entering={FadeInDown.delay(100).duration(500)}>
             <GlassCard style={styles.progressCard}>
               <View style={styles.progressCenter}>
-                <CircularProgress progress={todayProgress} color="#22C55E">
+                <CircularProgress progress={todayProgress} color="#0d8e62">
                   <Text style={[styles.progressText, { color: colors.text }]}>
                     {todayCompleted}/5
                   </Text>
@@ -228,7 +232,7 @@ export default function AzkarTrackerScreen() {
 
           {/* Azkar Types Checklist */}
           <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('worship.azkarTracker')}
             </Text>
 
@@ -239,20 +243,24 @@ export default function AzkarTrackerScreen() {
                   key={azkar.key}
                   style={[
                     styles.azkarItem,
-                    isDarkMode && styles.azkarItemDark,
+                    { backgroundColor: colors.card },
                     isCompleted && { borderColor: azkar.color, borderWidth: 1.5 },
                     { flexDirection: isRTL ? 'row-reverse' : 'row' },
                   ]}
                   onPress={() => handleToggle(azkar.key)}
                   activeOpacity={0.7}
                 >
+                  {Platform.OS === 'ios' && (
+                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                  )}
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                   <View style={[styles.azkarIcon, { backgroundColor: azkar.color + '22' }]}>
                     <MaterialCommunityIcons name={azkar.icon as any} size={24} color={azkar.color} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[
                       styles.azkarLabel,
-                      { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
+                      { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
                       isCompleted && { textDecorationLine: 'line-through', opacity: 0.6 },
                     ]}>
                       {t(azkar.labelKey)}
@@ -261,7 +269,7 @@ export default function AzkarTrackerScreen() {
                   <MaterialCommunityIcons
                     name={isCompleted ? 'check-circle' : 'circle-outline'}
                     size={28}
-                    color={isCompleted ? azkar.color : (isDarkMode ? '#555' : '#ccc')}
+                    color={isCompleted ? azkar.color : colors.textLight}
                   />
                 </TouchableOpacity>
               );
@@ -270,7 +278,7 @@ export default function AzkarTrackerScreen() {
 
           {/* Weekly Chart */}
           <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('worship.thisWeek')}
             </Text>
             <GlassCard style={styles.chartCard}>
@@ -278,12 +286,16 @@ export default function AzkarTrackerScreen() {
                 {weekData.map((day, i) => (
                   <View key={i} style={styles.chartBar}>
                     <View style={styles.barContainer}>
+                      {Platform.OS === 'ios' && (
+                        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                      )}
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                       <View
                         style={[
                           styles.barFill,
                           {
                             height: `${(day.completed / maxBar) * 100}%`,
-                            backgroundColor: day.completed >= 5 ? '#22C55E' : day.completed > 0 ? '#f5a623' : (isDarkMode ? '#333' : '#e0e0e0'),
+                            backgroundColor: day.completed >= 5 ? '#0d8e62' : day.completed > 0 ? '#c07b10' : (isDarkMode ? '#333' : '#e0e0e0'),
                           },
                         ]}
                       />
@@ -302,12 +314,12 @@ export default function AzkarTrackerScreen() {
 
           {/* Statistics */}
           <Animated.View entering={FadeInDown.delay(400).duration(500)}>
-            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('worship.statistics')}
             </Text>
             <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassCard style={styles.statCard}>
-                <MaterialCommunityIcons name="weather-sunset-up" size={24} color="#f5a623" />
+                <MaterialCommunityIcons name="weather-sunset-up" size={24} color="#c07b10" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {azkarStats?.morningCompleted ?? 0}
                 </Text>
@@ -316,7 +328,7 @@ export default function AzkarTrackerScreen() {
                 </Text>
               </GlassCard>
               <GlassCard style={styles.statCard}>
-                <MaterialCommunityIcons name="weather-sunset-down" size={24} color="#5d4e8c" />
+                <MaterialCommunityIcons name="weather-sunset-down" size={24} color="#4a3d73" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {azkarStats?.eveningCompleted ?? 0}
                 </Text>
@@ -327,7 +339,7 @@ export default function AzkarTrackerScreen() {
             </View>
             <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <GlassCard style={styles.statCard}>
-                <MaterialCommunityIcons name="calendar-check" size={24} color="#22C55E" />
+                <MaterialCommunityIcons name="calendar-check" size={24} color="#0d8e62" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {azkarStats?.totalDays ?? 0}
                 </Text>
@@ -370,7 +382,7 @@ export default function AzkarTrackerScreen() {
           {/* Recent History */}
           {history.length > 0 && (
             <Animated.View entering={FadeInDown.delay(500).duration(500)}>
-              <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('worship.readingHistory')}
               </Text>
               {history.slice(0, 10).map((entry, i) => {
@@ -383,15 +395,23 @@ export default function AzkarTrackerScreen() {
                     key={entry.date}
                     style={[
                       styles.historyItem,
-                      isDarkMode && styles.historyItemDark,
+                      { backgroundColor: colors.card },
                       { flexDirection: isRTL ? 'row-reverse' : 'row' },
                     ]}
                   >
-                    <Text style={[styles.historyDate, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                    {Platform.OS === 'ios' && (
+                      <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                    )}
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                    <Text style={[styles.historyDate, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                       {formatted}
                     </Text>
                     <View style={styles.historyBar}>
-                      <View style={[styles.historyBarFill, { width: `${pct}%`, backgroundColor: pct >= 100 ? '#22C55E' : '#f5a623' }]} />
+                      {Platform.OS === 'ios' && (
+                        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                      )}
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                      <View style={[styles.historyBarFill, { width: `${pct}%`, backgroundColor: pct >= 100 ? '#0d8e62' : '#c07b10' }]} />
                     </View>
                     <Text style={[styles.historyValue, { color: colors.textLight }]}>
                       {entry.completed}/{entry.total}
@@ -413,7 +433,7 @@ export default function AzkarTrackerScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1 },
 
   scrollView: { flex: 1 },
@@ -423,24 +443,25 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     marginTop: 20,
     marginBottom: 10,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   progressCard: { padding: 24, marginBottom: 8 },
   progressCenter: { alignItems: 'center' },
-  progressText: { fontSize: 32, fontFamily: fontBold() },
-  progressLabel: { fontSize: 13, fontFamily: fontRegular(), marginTop: 2 },
+  progressText: { fontSize: 32, fontFamily: fontBold(), lineHeight: 50, includeFontPadding: false },
+  progressLabel: { fontSize: 13, fontFamily: fontRegular(), marginTop: 2, lineHeight: 22, includeFontPadding: false },
   azkarItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
     marginBottom: 8,
     borderRadius: 14,
-    backgroundColor: 'rgba(120,120,128,0.12)',
+    overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(120,120,128,0.2)',
     gap: 12,
   },
   azkarItemDark: {
-    backgroundColor: 'rgba(120,120,128,0.18)',
     borderColor: 'rgba(120,120,128,0.25)',
   },
   azkarIcon: {
@@ -453,6 +474,8 @@ const styles = StyleSheet.create({
   azkarLabel: {
     fontSize: 16,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   chartCard: { padding: 16 },
   chartContainer: {
@@ -465,7 +488,6 @@ const styles = StyleSheet.create({
   barContainer: {
     width: 20,
     height: 80,
-    backgroundColor: 'rgba(120,120,128,0.1)',
     borderRadius: 10,
     justifyContent: 'flex-end',
     overflow: 'hidden',
@@ -475,8 +497,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     minHeight: 4,
   },
-  barLabel: { fontSize: 10, fontFamily: fontRegular(), marginTop: 4 },
-  barValue: { fontSize: 12, fontFamily: fontBold() },
+  barLabel: { fontSize: 10, fontFamily: fontRegular(), marginTop: 4, lineHeight: 16, includeFontPadding: false },
+  barValue: { fontSize: 12, fontFamily: fontBold(), lineHeight: 20, includeFontPadding: false },
   statsGrid: {
     flexDirection: 'row',
     gap: 10,
@@ -487,8 +509,8 @@ const styles = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
   },
-  statValue: { fontSize: 24, fontFamily: fontBold(), marginTop: 6 },
-  statLabel: { fontSize: 12, fontFamily: fontRegular(), marginTop: 2, textAlign: 'center' },
+  statValue: { fontSize: 24, fontFamily: fontBold(), marginTop: 6, lineHeight: 38, includeFontPadding: false },
+  statLabel: { fontSize: 12, fontFamily: fontRegular(), marginTop: 2, textAlign: 'center', lineHeight: 20, includeFontPadding: false },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -496,20 +518,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 6,
     borderRadius: 10,
-    backgroundColor: 'rgba(120,120,128,0.08)',
+    overflow: 'hidden',
   },
   historyItemDark: {
-    backgroundColor: 'rgba(120,120,128,0.14)',
   },
-  historyDate: { width: 80, fontSize: 12, fontFamily: fontRegular() },
+  historyDate: { width: 80, fontSize: 12, fontFamily: fontRegular(), lineHeight: 20, includeFontPadding: false },
   historyBar: {
     flex: 1,
     height: 8,
-    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 4,
     marginHorizontal: 10,
     overflow: 'hidden',
   },
   historyBarFill: { height: '100%', borderRadius: 4 },
-  historyValue: { fontSize: 12, fontFamily: fontSemiBold(), width: 30, textAlign: 'center' },
+  historyValue: { fontSize: 12, fontFamily: fontSemiBold(), width: 30, textAlign: 'center', lineHeight: 20, includeFontPadding: false },
 });
+const styles = _styles;

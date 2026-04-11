@@ -13,6 +13,7 @@ import {
   UIManager,
 } from 'react-native';
 import { fontRegular } from '@/lib/fonts';
+import { ScreenContainer } from '@/components/screen-container';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -24,7 +25,8 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t, getLanguage } from '@/lib/i18n';
 import { localizeNumber } from '@/lib/format-number';
 import { TranslatedText } from '@/components/ui/TranslatedText';
-import { s } from '@/components/hajj/shared';
+import { s as _sharedS } from '@/components/hajj/shared';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import {
   fetchHajjUmrahContent,
   subscribeToHajjUmrahContent,
@@ -35,7 +37,7 @@ import {
 // الألوان
 // ========================================
 
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
@@ -642,6 +644,7 @@ const DuaRitualCard: React.FC<{
   initiallyExpanded?: boolean;
 }> = ({ group, isDarkMode, colors, initiallyExpanded = false }) => {
   const isRTL = useIsRTL();
+  const s = useScaledStyles(_sharedS, colors.fs);
   const lang = getLanguage();
   const isArabic = lang === 'ar';
   const [expanded, setExpanded] = useState(initiallyExpanded);
@@ -672,13 +675,13 @@ const DuaRitualCard: React.FC<{
         </View>
         <View style={s.sectionTitleWrap}>
           {isArabic ? (
-            <Text style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{group.title}</Text>
+            <Text style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{group.title}</Text>
           ) : lang === 'en' ? (
-            <Text style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{group.titleEn}</Text>
+            <Text style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{group.titleEn}</Text>
           ) : (
-            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{group.titleEn}</TranslatedText>
+            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{group.titleEn}</TranslatedText>
           )}
-          <Text style={[s.sectionDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+          <Text style={[s.sectionDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
             {group.duas.length} {group.duas.length > 10 ? t('hajj.duaWord') : group.duas.length > 2 ? t('hajj.duasWord') : t('hajj.duaWord')}
           </Text>
         </View>
@@ -690,8 +693,9 @@ const DuaRitualCard: React.FC<{
       {expanded && (
         <View style={s.glassOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 50 : 20}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 30 : 12}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -699,7 +703,7 @@ const DuaRitualCard: React.FC<{
               s.glassOverlay,
               {
                 backgroundColor: isDarkMode ? 'rgba(30,30,32,0.55)' : 'rgba(255,255,255,0.50)',
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.60)' : 'rgba(0,0,0,0.06)',
               },
             ]}
           />
@@ -719,29 +723,29 @@ const DuaRitualCard: React.FC<{
                 <Text style={[s.duaArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}>{dua.arabic}</Text>
                 {dua.occasion && (
                   <View style={[s.duaMetaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <MaterialCommunityIcons name="clock-outline" size={13} color={ACCENT} />
+                    <MaterialCommunityIcons name="clock-outline" size={13} color={colors.textLight} />
                     {isArabic ? (
-                      <Text style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{dua.occasion}</Text>
+                      <Text style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.occasion}</Text>
                     ) : lang === 'en' ? (
-                      <Text style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{dua.occasionEn}</Text>
+                      <Text style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.occasionEn}</Text>
                     ) : (
-                      <TranslatedText from="en" type="section" style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{dua.occasionEn}</TranslatedText>
+                      <TranslatedText from="en" type="section" style={[s.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.occasionEn}</TranslatedText>
                     )}
                   </View>
                 )}
                 {dua.reference && (
                   <View style={[s.duaMetaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <MaterialCommunityIcons name="book-open-variant" size={13} color={ACCENT} />
+                    <MaterialCommunityIcons name="book-open-variant" size={13} color={colors.textLight} />
                     {isArabic ? (
-                      <Text style={[s.duaReference, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]}>{dua.reference}</Text>
+                      <Text style={[s.duaReference, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.reference}</Text>
                     ) : dua.referenceEn ? (
                       lang === 'en' ? (
-                        <Text style={[s.duaReference, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]}>{dua.referenceEn}</Text>
+                        <Text style={[s.duaReference, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.referenceEn}</Text>
                       ) : (
-                        <TranslatedText from="en" type="section" style={[s.duaReference, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]}>{dua.referenceEn}</TranslatedText>
+                        <TranslatedText from="en" type="section" style={[s.duaReference, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.referenceEn}</TranslatedText>
                       )
                     ) : (
-                      <Text style={[s.duaReference, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]}>{dua.reference}</Text>
+                      <Text style={[s.duaReference, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.reference}</Text>
                     )}
                   </View>
                 )}
@@ -765,7 +769,7 @@ const GlassSection: React.FC<{
   colors: ReturnType<typeof useColors>;
   initiallyExpanded?: boolean;
 }> = ({ section, sectionIndex, isDarkMode, colors, initiallyExpanded = false }) => {
-  const isRTL = useIsRTL();  const { t } = useSettings();  const lang = getLanguage();  const isArabic = lang === 'ar';  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const isRTL = useIsRTL();  const s = useScaledStyles(_sharedS, colors.fs);  const { t } = useSettings();  const lang = getLanguage();  const isArabic = lang === 'ar';  const [expanded, setExpanded] = useState(initiallyExpanded);
   const rotateAnim = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
 
   const toggleExpand = useCallback(() => {
@@ -804,7 +808,7 @@ const GlassSection: React.FC<{
               {section.titleEn || section.title}
             </Text>
           ) : (
-            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {section.titleEn || section.title}
             </TranslatedText>
           )}
@@ -817,14 +821,14 @@ const GlassSection: React.FC<{
               {section.descriptionEn || section.description}
             </Text>
           ) : (
-            <TranslatedText from="en" type="section" style={[s.sectionDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={expanded ? undefined : 1}>
+            <TranslatedText from="en" type="section" style={[s.sectionDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={expanded ? undefined : 1}>
               {section.descriptionEn || section.description}
             </TranslatedText>
           )}
         </View>
         <View style={s.sectionHeaderRight}>
           <View style={[s.sectionBadge, { backgroundColor: ACCENT_LIGHT }]}>
-            <Text style={[s.sectionBadgeText, { color: ACCENT }]}>
+            <Text style={[s.sectionBadgeText, { color: colors.text }]}>
               {localizeNumber(sectionIndex + 1)}
             </Text>
           </View>
@@ -838,8 +842,9 @@ const GlassSection: React.FC<{
       {expanded && (
         <View style={s.glassOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 50 : 20}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 30 : 12}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -850,7 +855,7 @@ const GlassSection: React.FC<{
                   ? 'rgba(30,30,32,0.55)'
                   : 'rgba(255,255,255,0.50)',
                 borderColor: isDarkMode
-                  ? 'rgba(255,255,255,0.10)'
+                  ? 'rgba(255,255,255,0.60)'
                   : 'rgba(0,0,0,0.06)',
               },
             ]}
@@ -858,8 +863,8 @@ const GlassSection: React.FC<{
           <View style={s.glassContent}>
             {/* Steps list */}
             <View style={[s.stepsLabel, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="format-list-numbered" size={16} color={ACCENT} />
-              <Text style={[s.stepsLabelText, { color: ACCENT }]}>{t('hajjUmrah.steps')}</Text>
+              <MaterialCommunityIcons name="format-list-numbered" size={16} color={colors.text} />
+              <Text style={[s.stepsLabelText, { color: colors.text }]}>{t('hajjUmrah.steps')}</Text>
             </View>
             {section.steps.map((step, i) => (
               <View key={i} style={[s.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -875,7 +880,7 @@ const GlassSection: React.FC<{
                     {step.en}
                   </Text>
                 ) : (
-                  <TranslatedText from="en" type="section" style={[s.stepText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <TranslatedText from="en" type="section" style={[s.stepText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {step.en}
                   </TranslatedText>
                 )}
@@ -886,8 +891,8 @@ const GlassSection: React.FC<{
             {section.duas.length > 0 && (
               <View style={[s.duasContainer, { borderTopColor: ACCENT_BORDER }]}>
                 <View style={[s.duasHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="hands-pray" size={16} color={ACCENT} />
-                  <Text style={[s.duasHeaderText, { color: ACCENT }]}>{t('hajjUmrah.duas')}</Text>
+                  <MaterialCommunityIcons name="hands-pray" size={16} color={colors.text} />
+                  <Text style={[s.duasHeaderText, { color: colors.text }]}>{t('hajjUmrah.duas')}</Text>
                 </View>
                 {section.duas.map((dua, i) => (
                   <View
@@ -908,21 +913,21 @@ const GlassSection: React.FC<{
                     </Text>
                     {dua.note && (
                       isArabic ? (
-                        <Text style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                        <Text style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                           {`— ${dua.note}`}
                         </Text>
                       ) : dua.noteEn ? (
                         lang === 'en' ? (
-                          <Text style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                          <Text style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                             {`— ${dua.noteEn}`}
                           </Text>
                         ) : (
-                          <TranslatedText from="en" type="section" style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                          <TranslatedText from="en" type="section" style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                             {`— ${dua.noteEn}`}
                           </TranslatedText>
                         )
                       ) : (
-                        <TranslatedText from="ar" type="section" style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                        <TranslatedText from="ar" type="section" style={[s.duaNote, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                           {`— ${dua.note}`}
                         </TranslatedText>
                       )
@@ -1025,10 +1030,12 @@ export default function HajjUmrahScreen() {
   }, [tab]);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text style={{ fontFamily: fontRegular(), fontSize: 16, opacity: 0.5 }}>
-        {t('common.loading')}
-      </Text>
-    </View>
+    <ScreenContainer edges={['top']}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontFamily: fontRegular(), fontSize: 16, opacity: 0.5, lineHeight: 28, includeFontPadding: false }}>
+          {t('common.loading')}
+        </Text>
+      </View>
+    </ScreenContainer>
   );
 }

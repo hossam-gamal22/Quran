@@ -15,8 +15,11 @@ import {
 import { fontBold } from '@/lib/fonts';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { getContrastTextColor } from '@/lib/contrast-helper';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 interface ColoredButtonProps extends Omit<TouchableOpacityProps, 'style'> {
   label: string;
   icon?: string;
@@ -37,8 +40,8 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
   icon,
   backgroundColor,
   iconBackgroundColor,
-  iconColor = '#fff',
-  textColor = '#fff',
+  iconColor,
+  textColor,
   size = 'medium',
   style,
   textStyle,
@@ -49,6 +52,12 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
 }) => {
   const sizeConfig = SIZE_MAP[size];
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
+
+  // Auto-detect contrast-safe text/icon color from background if not explicitly provided
+  const resolvedTextColor = textColor ?? getContrastTextColor(backgroundColor);
+  const resolvedIconColor = iconColor ?? resolvedTextColor;
 
   const handlePress = () => {
     if (disabled) return;
@@ -88,7 +97,7 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
           <MaterialCommunityIcons
             name={icon as any}
             size={sizeConfig.iconSize * 0.6}
-            color={iconColor}
+            color={resolvedIconColor}
           />
         </View>
       )}
@@ -97,7 +106,7 @@ export const ColoredButton: React.FC<ColoredButtonProps> = ({
           styles.text,
           {
             fontSize: sizeConfig.fontSize,
-            color: textColor,
+            color: resolvedTextColor,
           },
           textStyle,
         ]}
@@ -126,19 +135,19 @@ const SIZE_MAP = {
   },
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.12)',
   },
   iconContainer: {
-    borderRadius: 12,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },

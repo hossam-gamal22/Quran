@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -20,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getDateLocale } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
@@ -29,10 +31,12 @@ import { getBookmarks, removeBookmark, Bookmark, addBookmark } from '@/lib/stora
 import { getSurahName } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import ViewShot, { captureRef } from 'react-native-view-shot';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFavoriteAzkar, removeFromFavorites, Zikr } from '@/lib/azkar-api';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 
 import {
   getFavorites as getUnifiedFavorites,
@@ -242,13 +246,14 @@ export default function FavoritesScreen() {
   const [sortBy, setSortBy] = useState<'date' | 'surah'>('date');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const cardRef = useRef<ViewShot>(null!);
+  const islamicCardRef = useRef<IslamicShareCardHandle>(null);
 
   const colors = useColors();
   const insets = useSafeAreaInsets();
   // Local overrides for glass card and accent that differ from hook values
   const cardBg = isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
   const cardBorder = isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.06)';
-  const accent = isDarkMode ? '#4ADE80' : '#22C55E';
+  const accent = isDarkMode ? '#3da87e' : '#0d8e62';
 
   const toggleSection = useCallback((key: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.create(250, 'easeInEaseOut', 'opacity'));
@@ -271,7 +276,14 @@ export default function FavoritesScreen() {
     try {
       const savedIds = await AsyncStorage.getItem('allah_names_favorites');
       if (savedIds) {
-        const ids: number[] = JSON.parse(savedIds);
+        let ids: number[] = JSON.parse(savedIds);
+        // Migrate old IDs (2-100) to new range (1-99) after "Allah" entry removal
+        const migrated = await AsyncStorage.getItem('allah_names_favorites_migrated_v2');
+        if (!migrated && ids.some(id => id > 99)) {
+          ids = ids.filter(id => id > 1).map(id => id - 1);
+          await AsyncStorage.setItem('allah_names_favorites', JSON.stringify(ids));
+          await AsyncStorage.setItem('allah_names_favorites_migrated_v2', 'true');
+        }
         setNamesFavorites(ALLAH_NAMES.filter(n => ids.includes(n.id)));
       } else {
         setNamesFavorites([]);
@@ -430,12 +442,12 @@ export default function FavoritesScreen() {
   // Share azkar as text
   const handleShareAzkar = useCallback(async (zikr: Zikr) => {
     await Share.share({
-      message: `${zikr.arabic}\n\n📿 ${zikr.reference}\n\n${t('favorites.repeatCount')}: ${zikr.count}`,
+      message: `${stripAzkarBrackets(zikr.arabic)}\n\n📿 ${zikr.reference}\n\n${t('favorites.repeatCount')}: ${zikr.count}`,
     });
   }, [t]);
 
   // Styles with proper glassmorphism and improved contrast
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     // Header
     header: {
       flexDirection: 'row',
@@ -517,7 +529,7 @@ export default function FavoritesScreen() {
     iconBtn: {
       padding: 6,
       borderRadius: 12,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
     },
     ayahText: {
       fontSize: 20,
@@ -656,7 +668,7 @@ export default function FavoritesScreen() {
     },
     modalCard: {
       width: '100%',
-      backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      backgroundColor: colors.card,
       borderRadius: 24,
       padding: 20,
       maxHeight: '90%',
@@ -717,7 +729,7 @@ export default function FavoritesScreen() {
     },
     // Note modal
     noteModalCard: {
-      backgroundColor: isDarkMode ? '#1C1C1E' : '#FFFFFF',
+      backgroundColor: colors.card,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       padding: 24,
@@ -738,7 +750,7 @@ export default function FavoritesScreen() {
       marginBottom: 12,
     },
     noteInput: {
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
       borderWidth: 1,
       borderColor: cardBorder,
       borderRadius: 16,
@@ -746,7 +758,7 @@ export default function FavoritesScreen() {
       fontSize: 16,
       fontFamily: fontRegular(),
       color: colors.foreground,
-      textAlign: isRTL ? 'right' : 'left',
+      textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
       minHeight: 100,
       marginBottom: 16,
     },
@@ -762,6 +774,7 @@ export default function FavoritesScreen() {
       fontSize: 16,
     },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   const renderBookmark = ({ item, index }: { item: Bookmark; index: number }) => (
     <Animated.View 
@@ -769,8 +782,9 @@ export default function FavoritesScreen() {
       style={s.card}
     >
       <BlurView
-        intensity={Platform.OS === 'ios' ? 60 : 30}
-        tint={isDarkMode ? 'dark' : 'light'}
+       
+        intensity={Platform.OS === 'ios' ? 30 : 15}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={{ borderRadius: 20, overflow: 'hidden' }}
       >
         <TouchableOpacity 
@@ -786,7 +800,7 @@ export default function FavoritesScreen() {
             >
               <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.muted} />
             </TouchableOpacity>
-            <Text style={[s.dateText, { textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.dateText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {new Date(item.createdAt).toLocaleDateString(getDateLocale())}
             </Text>
             <TouchableOpacity 
@@ -800,12 +814,12 @@ export default function FavoritesScreen() {
           </View>
 
           {/* Ayah Text */}
-          <Text style={[s.ayahText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.ayahText}</Text>
+          <Text style={[s.ayahText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.ayahText}</Text>
 
           {/* Note */}
           {item.note ? (
             <View style={s.noteBox}>
-              <Text style={[s.noteText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.note}</Text>
+              <Text style={[s.noteText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.note}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -828,7 +842,7 @@ export default function FavoritesScreen() {
                 router.push(`/surah/${item.surahNumber}?page=${item.ayahNumber}&autoShare=true`);
               } else {
                 setSelectedBookmark(item);
-                setShowExportModal(true);
+                setTimeout(() => islamicCardRef.current?.showSizePicker(), 50);
               }
             }}
           >
@@ -869,10 +883,10 @@ export default function FavoritesScreen() {
         activeOpacity={0.7}
         onPress={() => navigateToAzkar(item)}
       >
-        <Text style={[s.azkarText, { textAlign: isRTL ? 'right' : 'left' }]}>{item.arabic}</Text>
+        <Text style={[s.azkarText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{stripAzkarBrackets(item.arabic)}</Text>
         <View style={[s.azkarMeta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Text style={s.azkarCount}>×{item.count}</Text>
-          <Text style={[s.azkarRef, { textAlign: isRTL ? 'right' : 'left' }]}>{item.reference}</Text>
+          <Text style={[s.azkarRef, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.reference}</Text>
         </View>
       </TouchableOpacity>
       <View style={[s.actionsBar, { marginHorizontal: 16, marginTop: -8, marginBottom: 8, borderRadius: 0, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: cardBg, borderWidth: 0.5, borderColor: cardBorder, borderTopWidth: 0, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -902,6 +916,7 @@ export default function FavoritesScreen() {
       style={{ flex: 1, backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : colors.background }}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <StatusBar style={colors.statusBarStyle} />
         {/* Header */}
         <Animated.View entering={FadeIn.duration(400)} style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <BackButton />
@@ -919,7 +934,7 @@ export default function FavoritesScreen() {
             ]}
             selected={activeTab}
             onSelect={(key) => setActiveTab(key as typeof activeTab)}
-            indicatorColor="#22C55E"
+            indicatorColor="#0d8e62"
           />
         </View>
 
@@ -934,7 +949,7 @@ export default function FavoritesScreen() {
                 ]}
                 selected={sortBy}
                 onSelect={(key) => setSortBy(key as 'date' | 'surah')}
-                indicatorColor="#22C55E"
+                indicatorColor="#0d8e62"
               />
             </View>
             <View style={s.countBadge}>
@@ -1022,14 +1037,14 @@ export default function FavoritesScreen() {
                         alignItems: isRTL ? 'flex-end' : 'flex-start',
                       }}
                     >
-                      <Text style={{ fontFamily: fontBold(), fontSize: 22, color: accent, textAlign: isRTL ? 'right' : 'left' }}>
+                      <Text style={{ fontFamily: fontBold(), fontSize: 22, color: accent, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                         {item.name}
                       </Text>
-                      <Text style={{ fontFamily: fontRegular(), fontSize: 14, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginTop: 4 }}>
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 14, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 4 }}>
                         {item.meaning}
                       </Text>
                       {item.evidence && (
-                        <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 4 }}>
+                        <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 4 }}>
                           {item.evidence}
                         </Text>
                       )}
@@ -1103,11 +1118,11 @@ export default function FavoritesScreen() {
                               alignItems: isRTL ? 'flex-end' : 'flex-start',
                             }}
                           >
-                            <Text style={{ fontFamily: 'Amiri-Regular', fontSize: 18, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 }}>
-                              {item.arabic}
+                            <Text style={{ fontFamily: 'Amiri-Regular', fontSize: 18, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 32 }}>
+                              {stripAzkarBrackets(item.arabic)}
                             </Text>
                             {item.reference && (
-                              <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: accent, marginTop: 6, textAlign: isRTL ? 'right' : 'left' }}>
+                              <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: accent, marginTop: 6, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                                 {item.reference}
                               </Text>
                             )}
@@ -1213,9 +1228,9 @@ export default function FavoritesScreen() {
         >
           <View style={s.noteModalCard}>
             <View style={s.noteHandle} />
-            <Text style={[s.noteTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('favorites.addNote')}</Text>
+            <Text style={[s.noteTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('favorites.addNote')}</Text>
             {editingBookmark && (
-              <Text style={{ color: accent, textAlign: isRTL ? 'right' : 'left', fontSize: 14, marginBottom: 10, fontFamily: fontBold() }}>
+              <Text style={{ color: accent, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontSize: 14, marginBottom: 10, fontFamily: fontBold() }}>
                 {editingBookmark.surahName} • {editingBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} {editingBookmark.ayahNumber}
               </Text>
             )}
@@ -1234,6 +1249,18 @@ export default function FavoritesScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Premium Islamic share card (hidden, for image export) */}
+      {selectedBookmark && (
+        <IslamicShareCard
+          ref={islamicCardRef}
+          categoryLabel={t('common.favorites')}
+          arabicText={selectedBookmark.ayahText || ''}
+          sourceText={`﴿ ${selectedBookmark.surahName} • ${selectedBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} ${selectedBookmark.ayahNumber} ﴾`}
+          showBasmala
+          noteText={selectedBookmark.note || undefined}
+        />
+      )}
       </SafeAreaView>
     </BackgroundWrapper>
   );

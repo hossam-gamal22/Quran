@@ -9,10 +9,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  StatusBar,
   Alert,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -31,6 +31,7 @@ import {
 import GlassCard from '@/components/ui/GlassCard';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 
@@ -41,7 +42,7 @@ import { UniversalHeader } from '@/components/ui';
 // ========================================
 
 const ACCENT_COLORS = [
-  { nameKey: 'widget.green', value: '#22C55E' },
+  { nameKey: 'widget.green', value: '#0d8e62' },
   { nameKey: 'widget.blue', value: '#3a7ca5' },
   { nameKey: 'widget.purple', value: '#5d4e8c' },
   { nameKey: 'widget.orange', value: '#c17f59' },
@@ -79,16 +80,18 @@ const SettingSection: React.FC<SettingSectionProps> = ({
   isDarkMode = false,
   isRTL = false,
 }) => {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
-      <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-        <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.section, { backgroundColor: colors.card }]}>
+        <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
           <MaterialCommunityIcons
             name={icon}
             size={22}
-            color={isDarkMode ? '#fff' : '#333'}
+            color={colors.text}
           />
-          <Text style={[styles.sectionTitle, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {title}
           </Text>
         </View>
@@ -115,14 +118,16 @@ const SettingRow: React.FC<SettingRowProps> = ({
   isDarkMode = false,
   isRTL = false,
 }) => {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
       <View style={[styles.settingInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-        <Text style={[styles.settingLabel, isDarkMode && styles.textLight, { textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {label}
         </Text>
         {description && (
-          <Text style={[styles.settingDescription, { color: isDarkMode ? '#999' : '#666', textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.settingDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {description}
           </Text>
         )}
@@ -133,7 +138,7 @@ const SettingRow: React.FC<SettingRowProps> = ({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onValueChange(newValue);
         }}
-        trackColor={{ false: '#ddd', true: '#22C55E' }}
+        trackColor={{ false: '#ddd', true: '#0d8e62' }}
         thumbColor={value ? '#fff' : '#f4f3f4'}
       />
     </View>
@@ -152,6 +157,8 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
   isDarkMode = false,
 }) => {
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <View style={[styles.colorPicker, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
       {ACCENT_COLORS.map((color, index) => (
@@ -189,6 +196,8 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   isDarkMode = false,
   isRTL = false,
 }) => {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <View style={styles.categorySelector}>
       {AZKAR_CATEGORIES.map((category, index) => {
@@ -202,7 +211,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
               style={[
                 styles.categoryOption,
                 { flexDirection: isRTL ? 'row-reverse' : 'row' },
-                isDarkMode && styles.categoryOptionDark,
+                !isSelected && { backgroundColor: colors.surface },
                 isSelected && styles.categoryOptionSelected,
               ]}
               onPress={() => {
@@ -213,13 +222,12 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
               <MaterialCommunityIcons
                 name={category.icon as any}
                 size={20}
-                color={isSelected ? '#fff' : isDarkMode ? '#aaa' : '#666'}
+                color={isSelected ? '#fff' : colors.icon}
               />
               <Text
                 style={[
                   styles.categoryText,
-                  isDarkMode && styles.textMuted,
-                  isSelected && styles.categoryTextSelected,
+                  { color: isSelected ? '#fff' : colors.text },
                 ]}
               >
                 {t(category.nameKey)}
@@ -248,6 +256,7 @@ export default function WidgetSettingsScreen() {
   const { settings: appSettings, isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // تحميل الإعدادات
   useEffect(() => {
@@ -324,23 +333,25 @@ export default function WidgetSettingsScreen() {
 
   // تبديل فئة الأذكار
   const toggleAzkarCategory = useCallback((category: string) => {
+    let changed = false;
     setSettings((prev) => {
       const categories = prev.azkarWidget.categories.includes(category)
         ? prev.azkarWidget.categories.filter((c) => c !== category)
         : [...prev.azkarWidget.categories, category];
-      
+
       // يجب اختيار فئة واحدة على الأقل
       if (categories.length === 0) {
         Alert.alert(t('common.warning'), t('widgets.selectAtLeastOneCategory'));
         return prev;
       }
-      
+
+      changed = true;
       return {
         ...prev,
         azkarWidget: { ...prev.azkarWidget, categories },
       };
     });
-    setHasChanges(true);
+    if (changed) setHasChanges(true);
   }, []);
 
   // حفظ الإعدادات
@@ -382,13 +393,10 @@ export default function WidgetSettingsScreen() {
   return (
     <BackgroundWrapper backgroundKey={appSettings.display.appBackground} backgroundUrl={appSettings.display.appBackgroundUrl} opacity={appSettings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView
-      style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       edges={['top']}
     >
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* الهيدر */}
       <UniversalHeader
@@ -486,7 +494,7 @@ export default function WidgetSettingsScreen() {
           />
 
           <View style={[styles.settingRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('widgets.accentColor')}
             </Text>
           </View>
@@ -522,7 +530,7 @@ export default function WidgetSettingsScreen() {
           />
 
           <View style={[styles.settingRow, { marginTop: 15, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.settingLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('widgets.azkarCategories')}
             </Text>
           </View>
@@ -626,7 +634,7 @@ export default function WidgetSettingsScreen() {
             style={[styles.refreshButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleRefreshWidget}
           >
-            <MaterialCommunityIcons name="refresh" size={20} color="#22C55E" />
+            <MaterialCommunityIcons name="refresh" size={20} color="#0d8e62" />
             <Text style={styles.refreshButtonText}>{t('widgets.updateWidgetNow')}</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -644,7 +652,7 @@ export default function WidgetSettingsScreen() {
                 {t('widgets.note')}
               </Text>
             </View>
-            <Text style={[styles.noteText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.noteText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('widgets.addToHomeScreen')}:{'\n'}
               {Platform.OS === 'ios'
                 ? `• ${t('widgets.addWidgetIosInstructions')}\n• ${t('common.appName')}`
@@ -664,7 +672,7 @@ export default function WidgetSettingsScreen() {
         >
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <LinearGradient
-              colors={['#22C55E', '#1d4a3a']}
+              colors={['#0d8e62', '#1d4a3a']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.saveButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -684,20 +692,9 @@ export default function WidgetSettingsScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
-
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
   },
   scrollView: {
     flex: 1,
@@ -720,12 +717,16 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     color: '#fff',
     marginTop: 10,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   previewSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 5,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   // الأقسام
   section: {
@@ -739,9 +740,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  sectionDark: {
-    backgroundColor: '#1a1a2e',
-  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -753,6 +751,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   // صف الإعداد
   settingRow: {
@@ -768,11 +768,15 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 15,
     fontFamily: fontMedium(),
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   settingDescription: {
     fontSize: 12,
     fontFamily: fontRegular(),
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   // اختيار الألوان
   colorPicker: {
@@ -813,17 +817,16 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  categoryOptionDark: {
-    backgroundColor: '#252540',
-  },
   categoryOptionSelected: {
-    borderColor: '#22C55E',
-    backgroundColor: '#22C55E',
+    borderColor: '#0d8e62',
+    backgroundColor: '#0d8e62',
   },
   categoryText: {
     flex: 1,
     fontSize: 14,
     fontFamily: fontMedium(),
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   categoryTextSelected: {
     color: '#fff',
@@ -840,14 +843,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 15,
     borderRadius: 16,
-    backgroundColor: '#22C55E15',
+    backgroundColor: '#0d8e6215',
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
   refreshButtonText: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   // الملاحظة
   noteCard: {
@@ -864,6 +869,8 @@ const styles = StyleSheet.create({
   noteTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   noteText: {
     fontSize: 13,
@@ -894,6 +901,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   bottomSpace: {
     height: 100,

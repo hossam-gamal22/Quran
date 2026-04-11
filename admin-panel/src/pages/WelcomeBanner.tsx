@@ -302,7 +302,7 @@ export default function WelcomeBanner() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+        <RefreshCw className="w-8 h-8 text-accent-light animate-spin" />
       </div>
     );
   }
@@ -312,8 +312,8 @@ export default function WelcomeBanner() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-            <Megaphone className="w-6 h-6 text-emerald-400" />
+          <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
+            <Megaphone className="w-6 h-6 text-accent-light" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">الرسالة الترحيبية</h1>
@@ -329,7 +329,7 @@ export default function WelcomeBanner() {
               ? 'bg-green-500 text-white'
               : saveStatus === 'error'
               ? 'bg-red-500 text-white'
-              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              : 'bg-accent hover:bg-accent-dark text-white'
           } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isSaving ? (
@@ -349,11 +349,11 @@ export default function WelcomeBanner() {
         {/* الإعدادات */}
         <div className="lg:col-span-2 space-y-6">
           {/* تفعيل/إخفاء */}
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {banner.enabled ? (
-                  <Eye className="w-5 h-5 text-emerald-400" />
+                  <Eye className="w-5 h-5 text-accent-light" />
                 ) : (
                   <EyeOff className="w-5 h-5 text-slate-400" />
                 )}
@@ -365,7 +365,7 @@ export default function WelcomeBanner() {
               <button
                 onClick={() => updateBanner('enabled', !banner.enabled)}
                 className={`relative w-14 h-7 rounded-full transition-colors ${
-                  banner.enabled ? 'bg-emerald-500' : 'bg-slate-600'
+                  banner.enabled ? 'bg-accent' : 'bg-admin-surface-light'
                 }`}
                 aria-label={banner.enabled ? 'تعطيل الرسالة الترحيبية' : 'تفعيل الرسالة الترحيبية'}
                 title={banner.enabled ? 'تعطيل الرسالة الترحيبية' : 'تفعيل الرسالة الترحيبية'}
@@ -380,9 +380,9 @@ export default function WelcomeBanner() {
           </div>
 
           {/* جدولة العرض — Scheduling */}
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-5 h-5 text-emerald-400" />
+              <Calendar className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">جدولة العرض</h3>
               <span className="text-xs text-slate-400">(اختياري — اتركه فارغاً للعرض دائماً)</span>
             </div>
@@ -400,7 +400,7 @@ export default function WelcomeBanner() {
                   title="تاريخ بداية العرض"
                   value={banner.scheduledFrom || ''}
                   onChange={(e) => updateBanner('scheduledFrom', e.target.value || undefined)}
-                  className="w-full p-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full p-3 rounded-xl bg-admin-surface-light border border-admin-border text-white text-sm focus:outline-none focus:border-accent"
                 />
                 {banner.scheduledFrom && (
                   <button
@@ -421,7 +421,7 @@ export default function WelcomeBanner() {
                   title="تاريخ نهاية العرض"
                   value={banner.scheduledUntil || ''}
                   onChange={(e) => updateBanner('scheduledUntil', e.target.value || undefined)}
-                  className="w-full p-3 rounded-xl bg-slate-700 border border-slate-600 text-white text-sm focus:outline-none focus:border-emerald-500"
+                  className="w-full p-3 rounded-xl bg-admin-surface-light border border-admin-border text-white text-sm focus:outline-none focus:border-accent"
                 />
                 {banner.scheduledUntil && (
                   <button
@@ -448,9 +448,9 @@ export default function WelcomeBanner() {
           </div>
 
           {/* نوع العرض */}
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center gap-2 mb-4">
-              <Layout className="w-5 h-5 text-emerald-400" />
+              <Layout className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">نوع العرض</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -462,8 +462,8 @@ export default function WelcomeBanner() {
                     onClick={() => updateBanner('displayMode', mode.value)}
                     className={`p-4 rounded-xl border text-right transition-all ${
                       banner.displayMode === mode.value
-                        ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                        : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                        ? 'border-accent bg-accent/20 text-white'
+                        : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                     }`}
                   >
                     <Icon className="w-5 h-5 mb-2" />
@@ -477,9 +477,9 @@ export default function WelcomeBanner() {
 
           {/* صور الخلفية */}
           {(banner.displayMode === 'text_image' || banner.displayMode === 'image_only') && (
-            <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+            <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
               <div className="flex items-center gap-2 mb-4">
-                <Image className="w-5 h-5 text-emerald-400" />
+                <Image className="w-5 h-5 text-accent-light" />
                 <h3 className="text-white font-semibold">صور الخلفية</h3>
               </div>
 
@@ -494,20 +494,20 @@ export default function WelcomeBanner() {
                     type="text"
                     value={banner.backgroundImage}
                     onChange={(e) => handleImageUrlChange('backgroundImage', e.target.value)}
-                    className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
+                    className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
                     placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
                     aria-label="رابط صورة الخلفية للعربية"
                     dir="ltr"
                   />
 
                   {banner.backgroundImage && (
-                    <button onClick={() => updateBanner('backgroundImage', '')} className="p-3 rounded-xl border border-slate-600 bg-slate-700 text-red-400 hover:bg-red-500/10" title="إزالة">
+                    <button onClick={() => updateBanner('backgroundImage', '')} className="p-3 rounded-xl border border-admin-border bg-admin-surface-light text-red-400 hover:bg-red-500/10" title="إزالة">
                       <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
                 {banner.backgroundImage && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-600">
+                  <div className="mt-2 rounded-xl overflow-hidden border border-admin-border">
                     <img
                       src={banner.backgroundImage}
                       alt="معاينة الخلفية العربية"
@@ -539,20 +539,20 @@ export default function WelcomeBanner() {
                     type="text"
                     value={banner.backgroundImageNonAr || ''}
                     onChange={(e) => handleImageUrlChange('backgroundImageNonAr', e.target.value)}
-                    className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
+                    className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
                     placeholder="رابط صورة مباشر (Imgur, imgbb, etc.)"
                     aria-label="رابط صورة الخلفية لغير العربية"
                     dir="ltr"
                   />
 
                   {banner.backgroundImageNonAr && (
-                    <button onClick={() => updateBanner('backgroundImageNonAr', '')} className="p-3 rounded-xl border border-slate-600 bg-slate-700 text-red-400 hover:bg-red-500/10" title="إزالة">
+                    <button onClick={() => updateBanner('backgroundImageNonAr', '')} className="p-3 rounded-xl border border-admin-border bg-admin-surface-light text-red-400 hover:bg-red-500/10" title="إزالة">
                       <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
                 {banner.backgroundImageNonAr && (
-                  <div className="mt-2 rounded-xl overflow-hidden border border-slate-600">
+                  <div className="mt-2 rounded-xl overflow-hidden border border-admin-border">
                     <img
                       src={banner.backgroundImageNonAr}
                       alt="معاينة الخلفية الإنجليزية"
@@ -579,9 +579,9 @@ export default function WelcomeBanner() {
 
           {/* النصوص */}
           {banner.displayMode !== 'image_only' && (
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 space-y-5">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border space-y-5">
             <div className="flex items-center gap-2 mb-2">
-              <Type className="w-5 h-5 text-emerald-400" />
+              <Type className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">النصوص</h3>
             </div>
 
@@ -613,7 +613,7 @@ export default function WelcomeBanner() {
                     type="text"
                     value={(lang.code === 'ar' ? (banner.titles?.ar || banner.title) : banner.titles?.[lang.code as keyof MultiLangText]) || ''}
                     onChange={(e) => updateTitle(lang.code, e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                     placeholder={lang.code === 'ar' ? 'مثال: رمضان مبارك' : 'Title...'}
                     aria-label={`العنوان بـ${lang.name}`}
                     dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -637,7 +637,7 @@ export default function WelcomeBanner() {
                     type="text"
                     value={banner.titles?.[lang.code as keyof MultiLangText] || ''}
                     onChange={(e) => updateTitle(lang.code, e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                     placeholder={`ترجمة ${lang.name}...`}
                     aria-label={`العنوان بـ${lang.name}`}
                     dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -646,7 +646,7 @@ export default function WelcomeBanner() {
               ))}
             </div>
 
-            <div className="border-t border-slate-700" />
+            <div className="border-t border-admin-border" />
 
             {/* العنوان الفرعي — متعدد اللغات */}
             <div className="space-y-3">
@@ -676,7 +676,7 @@ export default function WelcomeBanner() {
                     type="text"
                     value={(lang.code === 'ar' ? (banner.subtitles?.ar || banner.subtitle) : banner.subtitles?.[lang.code as keyof MultiLangText]) || ''}
                     onChange={(e) => updateSubtitle(lang.code, e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                     placeholder={lang.code === 'ar' ? 'مثال: كل عام وأنتم بخير' : 'Subtitle...'}
                     aria-label={`العنوان الفرعي بـ${lang.name}`}
                     dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -700,7 +700,7 @@ export default function WelcomeBanner() {
                     type="text"
                     value={banner.subtitles?.[lang.code as keyof MultiLangText] || ''}
                     onChange={(e) => updateSubtitle(lang.code, e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                     placeholder={`ترجمة ${lang.name}...`}
                     aria-label={`العنوان الفرعي بـ${lang.name}`}
                     dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -713,9 +713,9 @@ export default function WelcomeBanner() {
 
           {/* الأيقونة */}
           {banner.displayMode !== 'image_only' && (
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-emerald-400" />
+              <Sparkles className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">الأيقونة</h3>
             </div>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -725,8 +725,8 @@ export default function WelcomeBanner() {
                   onClick={() => setBanner(prev => ({ ...prev, icon: opt.value, customIconUrl: '' }))}
                   className={`p-3 rounded-xl border text-center transition-all ${
                     banner.icon === opt.value && !banner.customIconUrl
-                      ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                      : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                      ? 'border-accent bg-accent/20 text-white'
+                      : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                   }`}
                 >
                   <span className="text-lg">{opt.label.split(' ')[0]}</span>
@@ -736,7 +736,7 @@ export default function WelcomeBanner() {
             </div>
 
             {/* رفع أيقونة مخصصة */}
-            <div className="mt-4 pt-4 border-t border-slate-700">
+            <div className="mt-4 pt-4 border-t border-admin-border">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm text-slate-400">أو رفع أيقونة مخصصة (PNG / SVG)</label>
                 {banner.customIconUrl && (
@@ -753,12 +753,12 @@ export default function WelcomeBanner() {
                   type="text"
                   value={banner.customIconUrl || ''}
                   onChange={(e) => setBanner(prev => ({ ...prev, customIconUrl: e.target.value, icon: e.target.value ? '__custom__' : 'moon-waning-crescent' }))}
-                  className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
+                  className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
                   placeholder="رابط صورة الأيقونة (Imgur, imgbb, etc.)"
                   dir="ltr"
                 />
                 {banner.customIconUrl && (
-                  <img src={banner.customIconUrl} alt="icon" className="w-10 h-10 rounded-lg object-contain border border-slate-600 bg-slate-700 p-1" />
+                  <img src={banner.customIconUrl} alt="icon" className="w-10 h-10 rounded-lg object-contain border border-admin-border bg-admin-surface-light p-1" />
                 )}
               </div>
             </div>
@@ -767,9 +767,9 @@ export default function WelcomeBanner() {
 
           {/* اللون */}
           {banner.displayMode !== 'image_only' && (
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center gap-2 mb-4">
-              <Palette className="w-5 h-5 text-emerald-400" />
+              <Palette className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">لون البانر</h3>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -780,7 +780,7 @@ export default function WelcomeBanner() {
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all ${
                     banner.color === c.value
                       ? 'border-white ring-2 ring-white/30'
-                      : 'border-slate-600 hover:border-slate-500'
+                      : 'border-admin-border hover:border-slate-500'
                   }`}
                 >
                   <Styled
@@ -797,14 +797,14 @@ export default function WelcomeBanner() {
                 type="color"
                 value={banner.color}
                 onChange={(e) => updateBanner('color', e.target.value)}
-                className="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer"
+                className="w-10 h-10 rounded-lg border border-admin-border cursor-pointer"
                 aria-label="اختيار لون مخصص"
               />
               <input
                 type="text"
                 value={banner.color}
                 onChange={(e) => updateBanner('color', e.target.value)}
-                className="bg-slate-700 text-white rounded-lg px-3 py-2 w-32 border border-slate-600 text-sm font-mono"
+                className="bg-admin-surface-light text-white rounded-lg px-3 py-2 w-32 border border-admin-border text-sm font-mono"
                 aria-label="كود اللون"
                 placeholder="#000000"
                 dir="ltr"
@@ -814,9 +814,9 @@ export default function WelcomeBanner() {
           )}
 
           {/* الوجهة / الإجراء */}
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
             <div className="flex items-center gap-2 mb-4">
-              <Link className="w-5 h-5 text-emerald-400" />
+              <Link className="w-5 h-5 text-accent-light" />
               <h3 className="text-white font-semibold">عند الضغط على البانر</h3>
             </div>
 
@@ -826,8 +826,8 @@ export default function WelcomeBanner() {
                 onClick={() => updateBanner('actionType', 'navigate')}
                 className={`flex-1 p-3 rounded-xl border text-sm text-center transition-all ${
                   (banner.actionType || 'navigate') === 'navigate'
-                    ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                    ? 'border-accent bg-accent/20 text-white'
+                    : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                 }`}
               >
                 <Link className="w-4 h-4 mx-auto mb-1" />
@@ -837,8 +837,8 @@ export default function WelcomeBanner() {
                 onClick={() => updateBanner('actionType', 'toast')}
                 className={`flex-1 p-3 rounded-xl border text-sm text-center transition-all ${
                   banner.actionType === 'toast'
-                    ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                    ? 'border-accent bg-accent/20 text-white'
+                    : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                 }`}
               >
                 <MessageSquare className="w-4 h-4 mx-auto mb-1" />
@@ -859,8 +859,8 @@ export default function WelcomeBanner() {
                       }}
                       className={`p-3 rounded-xl border text-sm transition-all ${
                         banner.route === r.value && !customRoute
-                          ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                          : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                          ? 'border-accent bg-accent/20 text-white'
+                          : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                       }`}
                     >
                       {r.label}
@@ -878,7 +878,7 @@ export default function WelcomeBanner() {
                         updateBanner('route', e.target.value);
                       }
                     }}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors font-mono text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors font-mono text-sm"
                     placeholder="/custom/route"
                     aria-label="رابط مخصص"
                     dir="ltr"
@@ -894,7 +894,7 @@ export default function WelcomeBanner() {
                   <label className="text-sm text-slate-400">رسالة الإشعار (Toast)</label>
                   <button
                     onClick={copyToastToAllLangs}
-                    className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                    className="text-xs text-accent-light hover:text-emerald-300 flex items-center gap-1"
                   >
                     <Copy className="w-3 h-3" /> نسخ العربي لكل اللغات
                   </button>
@@ -926,7 +926,7 @@ export default function WelcomeBanner() {
                           setBanner(prev => ({ ...prev, toastMessage: e.target.value, toastTranslations: updated }));
                         }
                       }}
-                      className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                      className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                       placeholder={lang.code === 'ar' ? 'رسالة التوست بالعربية...' : 'Toast message in English...'}
                       dir={lang.rtl ? 'rtl' : 'ltr'}
                       rows={2}
@@ -954,7 +954,7 @@ export default function WelcomeBanner() {
                         const updated = { ...banner.toastTranslations, [lang.code]: e.target.value };
                         setBanner(prev => ({ ...prev, toastTranslations: updated }));
                       }}
-                      className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none transition-colors text-sm"
+                      className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none transition-colors text-sm"
                       placeholder={`ترجمة ${lang.name}...`}
                       dir={lang.rtl ? 'rtl' : 'ltr'}
                       rows={2}
@@ -1062,7 +1062,7 @@ export default function WelcomeBanner() {
                     </Styled>
                   )
                 ) : (
-                  <div className="rounded-2xl p-5 bg-slate-800 text-slate-500 text-center">
+                  <div className="rounded-2xl p-5 bg-admin-surface text-slate-500 text-center">
                     <EyeOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">البانر مخفي</p>
                   </div>
@@ -1071,8 +1071,8 @@ export default function WelcomeBanner() {
             </div>
 
             {/* Info */}
-            <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2">ملاحظات</h4>
+            <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
+              <h4 className="text-sm font-semibold text-accent-light mb-2">ملاحظات</h4>
               <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside">
                 <li>التغييرات تظهر فوراً بعد الحفظ</li>
                 <li>يتم تحميل الإعدادات عند فتح التطبيق</li>

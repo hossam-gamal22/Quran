@@ -12,7 +12,6 @@ import { radioPlayer } from '@/lib/radio-player';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 import { markTrackPlayerSetupDone, isTrackPlayerSetupDone, onTrackPlayerSetupDone } from '@/lib/track-player-ready';
 import { getCategoryTrimMs } from '@/lib/azkar-audio-config';
-import { Asset } from 'expo-asset';
 import type { RadioStation, RadioPlaybackState } from '@/types/radio';
 
 // Dynamic import of TrackPlayer - may not be available in Expo Go
@@ -53,8 +52,8 @@ export interface AudioTrack {
   title: string;
   subtitle?: string;
   url: string;
-  /** Audio source — require() number for bundled assets, or string URI (file:// / https://) for remote/cached. */
-  localSource?: number | string;
+  /** Optional bundled audio source from require(). Takes priority over url. */
+  localSource?: number;
   /** Category ID for intro trimming (azkar only). */
   categoryId?: string;
 }
@@ -96,8 +95,6 @@ interface GlobalAudioContextType {
   // Playback speed
   playbackSpeed: number;
   setPlaybackSpeed: (speed: number) => void;
-  /** Register a callback to be called when a track is skipped due to missing local audio. */
-  setOnTrackSkipped: (cb: (() => void) | null) => void;
 }
 
 const defaultRadioState: RadioPlaybackState = {
@@ -140,7 +137,6 @@ const GlobalAudioContext = createContext<GlobalAudioContextType>({
   previous: async () => {},
   playbackSpeed: 1,
   setPlaybackSpeed: () => {},
-  setOnTrackSkipped: () => {},
 });
 
 export function GlobalAudioProvider({ children }: { children: React.ReactNode }) {
@@ -165,17 +161,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const trackPlayerListeners = useRef<(() => void)[]>([]);
   const progressPoller = useRef<number | null>(null);
   const isTogglingRef = useRef(false);
-  // Consecutive audio error counter — stops retrying after 3 failures
-  const audioErrorCountRef = useRef<number>(0);
-  // Guard against double-fire of didJustFinish for the same track index
-  const lastAdvancedIdx = useRef(-1);
-  // Whether expo-av audio mode has been configured for this queue session
-  const audioModeSetRef = useRef(false);
-  // Callback for when a track is skipped due to missing local audio
-  const onTrackSkippedRef = useRef<(() => void) | null>(null);
-  const setOnTrackSkipped = useCallback((cb: (() => void) | null) => {
-    onTrackSkippedRef.current = cb;
-  }, []);
 
   // Keep refs in sync
   useEffect(() => { sourceRef.current = source; }, [source]);
@@ -267,17 +252,13 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         await TrackPlayer.reset();
       } catch {}
     }
-
+    
     if (azkarSound.current) {
       try {
-        // Detach the status callback first to prevent didJustFinish from firing during cleanup
-        azkarSound.current.setOnPlaybackStatusUpdate(null);
         await azkarSound.current.stopAsync();
         await azkarSound.current.unloadAsync();
       } catch {}
       azkarSound.current = null;
-      // Brief yield to let iOS fully release the AVPlayerItem decoder resources
-      await new Promise(r => setTimeout(r, 50));
     }
   }, []);
 
@@ -287,7 +268,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     if (idx < 0 || idx >= queue.length) {
       // Queue finished
       await cleanupAzkar();
-      audioModeSetRef.current = false;
       setAzkarPlaying(false);
       azkarPlayingRef.current = false;
       setAzkarLoading(false);
@@ -296,10 +276,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       audioCoordinator.releaseFocus('azkar-queue', 'azkar');
       return;
     }
-
-    // Guard against double-fire of didJustFinish for the same track
-    if (lastAdvancedIdx.current === idx) return;
-    lastAdvancedIdx.current = idx;
 
     const track = queue[idx];
     setQueueIndex(idx);
@@ -324,33 +300,14 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     try {
       if (isTrackPlayerReady() && TrackPlayer) {
         // Use TrackPlayer for native platforms (with lock screen controls)
-        // Resolve each localSource to a playable URL:
-        //   - string → already a file:// or https:// URI, use directly
-        //   - number → bundled require() asset, resolve via expo-asset
-        const tpTracks = await Promise.all(
-          queue.map(async (t, i) => {
-            let resolvedUrl = t.url; // fallback (bare filename — should not be used)
-            if (typeof t.localSource === 'string') {
-              resolvedUrl = t.localSource;
-            } else if (typeof t.localSource === 'number') {
-              try {
-                const asset = Asset.fromModule(t.localSource);
-                if (!asset.localUri) await asset.downloadAsync();
-                resolvedUrl = asset.localUri ?? asset.uri;
-              } catch (assetErr) {
-                console.warn('[GlobalAudio] Failed to resolve asset for track:', t.url, assetErr);
-              }
-            }
-            return {
-              id: `azkar-${t.id}-${i}`,
-              url: resolvedUrl,
-              title: t.title,
-              artist: t.subtitle || 'أذكار',
-              album: 'الأذكار',
-              artwork: require('../assets/images/icons/icon.png'),
-            };
-          })
-        );
+        const tpTracks = queue.map((t, i) => ({
+          id: `azkar-${t.id}-${i}`,
+          url: t.url,
+          title: t.title,
+          artist: t.subtitle || 'أذكار',
+          album: 'الأذكار',
+          artwork: require('../assets/images/icons/icon.png'),
+        }));
 
         await TrackPlayer.reset();
         await TrackPlayer.add(tpTracks);
@@ -361,7 +318,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
 
         await TrackPlayer.setRate(playbackSpeed);
         await TrackPlayer.play();
-        audioErrorCountRef.current = 0; // Reset consecutive error count on successful playback
 
         // Apply intro trim for current track if configured
         const trimMs = track.categoryId ? getCategoryTrimMs(track.categoryId) : 0;
@@ -376,147 +332,64 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
           }, 100);
         }
 
-        console.log('[GlobalAudio] Playing azkar queue via TrackPlayer (offline-first), tracks:', tpTracks.length);
+        console.log('[GlobalAudio] Playing azkar queue with TrackPlayer, tracks:', tpTracks.length);
       } else {
         // Use expo-av for web platform / Expo Go fallback
-        if (!track.localSource) {
-          console.warn('[GlobalAudio] No audio source for track, skipping:', track.url);
-          setAzkarLoading(false);
-          audioErrorCountRef.current += 1;
-          if (audioErrorCountRef.current >= 3) {
-            audioErrorCountRef.current = 0;
-            onTrackSkippedRef.current?.();
-            setAzkarPlaying(false);
-            azkarPlayingRef.current = false;
-            setSource('none');
-            sourceRef.current = 'none';
-            return;
-          }
-          onTrackSkippedRef.current?.();
-          lastAdvancedIdx.current = -1; // Reset guard for skip-advance
-          playAzkarAtIndex(idx + 1);
-          return;
-        }
-
-        // Set audio mode once per queue session (avoid reconfiguring AVAudioSession per track)
-        if (!audioModeSetRef.current) {
-          await Audio.setAudioModeAsync({
-            allowsRecordingIOS: false,
-            playsInSilentModeIOS: true,
-            shouldDuckAndroid: true,
-            staysActiveInBackground: true,
-          });
-          audioModeSetRef.current = true;
-        }
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          staysActiveInBackground: true,
+        });
 
         // Check for intro trim for this category
         const trimMs = track.categoryId ? getCategoryTrimMs(track.categoryId) : 0;
 
-        // Create sound with retry — iOS needs time to release the previous decoder
-        let sound: Audio.Sound | null = null;
-        let createAttempts = 0;
-        const MAX_CREATE_ATTEMPTS = 3;
+        const { sound } = await Audio.Sound.createAsync(
+          track.localSource ? track.localSource : { uri: track.url },
+          { shouldPlay: false, rate: playbackSpeed },
+          async (status: any) => {
+            if (status.isLoaded) {
+              setPosition(status.positionMillis || 0);
+              setDuration(status.durationMillis || 0);
+              setAzkarPlaying(status.isPlaying);
+              azkarPlayingRef.current = status.isPlaying;
+              setAzkarLoading(false);
 
-        while (!sound && createAttempts < MAX_CREATE_ATTEMPTS) {
-          createAttempts++;
-          try {
-            // Small delay before retry to let iOS release the previous AVPlayerItem decoder
-            if (createAttempts > 1) {
-              await new Promise(r => setTimeout(r, 150 * createAttempts));
-            }
-            // Resolve source: string URI → { uri }, number → pass directly (require ID)
-            const avSource = typeof track.localSource === 'string'
-              ? { uri: track.localSource }
-              : track.localSource as number;
-            const created = await Audio.Sound.createAsync(
-              avSource,
-              { shouldPlay: false, rate: playbackSpeed },
-              (status: any) => {
-                if (status.isLoaded) {
-                  setPosition(status.positionMillis || 0);
-                  setDuration(status.durationMillis || 0);
-                  setAzkarPlaying(status.isPlaying);
-                  azkarPlayingRef.current = status.isPlaying;
-                  setAzkarLoading(false);
-
-                  if (status.didJustFinish) {
-                    // Auto-advance to next track
-                    playAzkarAtIndex(idx + 1);
-                  }
-                } else if (status.error) {
-                  // Sound failed to load/play — skip to next track
-                  console.error('[GlobalAudio] expo-av playback error:', status.error);
-                  setAzkarLoading(false);
-                  audioErrorCountRef.current += 1;
-                  if (audioErrorCountRef.current >= 3) {
-                    audioErrorCountRef.current = 0;
-                    setAzkarPlaying(false);
-                    azkarPlayingRef.current = false;
-                    setSource('none');
-                    sourceRef.current = 'none';
-                    return;
-                  }
-                  playAzkarAtIndex(idx + 1);
-                }
+              if (status.didJustFinish) {
+                // Auto-advance to next track
+                playAzkarAtIndex(idx + 1);
               }
-            );
-            sound = created.sound;
-          } catch (createErr) {
-            console.warn(`[GlobalAudio] createAsync attempt ${createAttempts}/${MAX_CREATE_ATTEMPTS} failed:`, createErr);
-            if (createAttempts >= MAX_CREATE_ATTEMPTS) {
-              throw createErr; // Let outer catch handle it
+            } else if (status.error) {
+              // Sound failed to load/play — skip to next track
+              console.error('[GlobalAudio] expo-av playback error:', status.error);
+              setAzkarLoading(false);
+              playAzkarAtIndex(idx + 1);
             }
           }
-        }
-
-        azkarSound.current = sound!;
+        );
+        azkarSound.current = sound;
 
         // Apply intro trim AFTER sound is created
         if (trimMs > 0) {
           try {
-            const status = await sound!.getStatusAsync();
+            const status = await sound.getStatusAsync();
             if (status.isLoaded && status.durationMillis && status.durationMillis > trimMs) {
-              await sound!.setPositionAsync(trimMs);
+              await sound.setPositionAsync(trimMs);
             }
           } catch (e) {
             console.error('[GlobalAudio] Failed to apply intro trim:', e);
           }
         }
 
-        // Start playback
-        await sound!.playAsync();
-        audioErrorCountRef.current = 0; // Reset consecutive error count on successful playback
+        // Now start playback
+        await sound.playAsync();
       }
     } catch (error) {
-      console.warn('[GlobalAudio] Error playing azkar track:', error);
+      console.error('[GlobalAudio] Error playing azkar track:', error);
       setAzkarLoading(false);
-
-      audioErrorCountRef.current += 1;
-      if (audioErrorCountRef.current >= 3) {
-        // Stop retrying — 3 consecutive failures means something is structurally wrong
-        audioErrorCountRef.current = 0;
-        setAzkarPlaying(false);
-        azkarPlayingRef.current = false;
-        setSource('none');
-        sourceRef.current = 'none';
-        audioCoordinator.releaseFocus('azkar-queue', 'azkar');
-        return;
-      }
-
-      // Advance to next track only if within retry limit
-      const nextIdx = idx + 1;
-      if (nextIdx < azkarQueue.current.length) {
-        lastAdvancedIdx.current = -1; // Reset guard for error-advance
-        playAzkarAtIndex(nextIdx);
-      } else {
-        // End of playlist — stop cleanly
-        audioErrorCountRef.current = 0;
-        setAzkarPlaying(false);
-        azkarPlayingRef.current = false;
-        setSource('none');
-        sourceRef.current = 'none';
-        audioCoordinator.releaseFocus('azkar-queue', 'azkar');
-      }
+      // Try next track
+      playAzkarAtIndex(idx + 1);
     }
   }, [cleanupAzkar, playbackSpeed]);
 
@@ -559,7 +432,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
   const playAzkarQueue = useCallback(async (tracks: AudioTrack[], startIndex = 0, route?: string) => {
     if (tracks.length === 0) return;
     azkarQueue.current = tracks;
-    lastAdvancedIdx.current = -1; // Reset double-fire guard for new queue
     if (route) setSourceRoute(route);
 
     // Stop Quran if playing
@@ -660,7 +532,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     } else if (currentSource === 'radio') {
       await radioPlayer.stop();
     }
-    audioModeSetRef.current = false;
     setSource('none');
     sourceRef.current = 'none';
     setSourceRoute(undefined);
@@ -762,7 +633,6 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       previous,
       playbackSpeed,
       setPlaybackSpeed,
-      setOnTrackSkipped,
     }}>
       {children}
     </GlobalAudioContext.Provider>

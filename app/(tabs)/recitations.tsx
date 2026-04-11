@@ -28,9 +28,6 @@ import {
   isDownloading,
   getDownloadedForReciter,
 } from '@/lib/audio-download-manager';
-import { useSubscription } from '@/contexts/SubscriptionContext';
-import { guardPremiumFeature } from '@/lib/premium-guard';
-import { useRouter } from 'expo-router';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const AYAH_COUNTS_114 = [
@@ -79,8 +76,6 @@ export default function RecitationsScreen() {
   const isRTL = useIsRTL();
   const language = getLanguage();
   const isArabic = language === 'ar';
-  const router = useRouter();
-  const { isPremium } = useSubscription();
   const [selectedReciter, setSelectedReciter] = useState(RECITERS[0]);
   const [showReciterModal, setShowReciterModal] = useState(false);
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
@@ -136,16 +131,7 @@ export default function RecitationsScreen() {
 
   useEffect(() => { loadDownloaded(); }, [loadDownloaded]);
 
-  // ── HARD LOCKDOWN: flip to false once IAP is verified ──
-  const TESTING_FORCE_FREE = false;
-  const effectivePremium = TESTING_FORCE_FREE ? false : isPremium;
-
   const handleDownload = useCallback(async (surahNum: number) => {
-    console.log('[Download Guard] isPremium:', isPremium, '| effectivePremium:', effectivePremium);
-    if (!effectivePremium) {
-      router.push('/subscription' as any);
-      return;          // ← stops here, no download logic runs
-    }
     if (isDownloading(surahNum, selectedReciter.identifier)) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDownloadingSet(prev => new Set(prev).add(surahNum));
@@ -161,7 +147,7 @@ export default function RecitationsScreen() {
         return next;
       });
     }
-  }, [selectedReciter.identifier, effectivePremium, router]);
+  }, [selectedReciter.identifier]);
 
   const handleDeleteDownload = useCallback(async (surahNum: number) => {
     Alert.alert(t('common.delete'), `${t('common.delete')} ${getSurahName(surahNum)}?`, [
@@ -358,24 +344,16 @@ export default function RecitationsScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={s.downloadBtn}
-          onPress={() => {
-            if (!effectivePremium) {
-              router.push('/subscription' as any);
-              return;
-            }
-            isItemDownloaded ? handleDeleteDownload(item.num) : handleDownload(item.num);
-          }}
+          onPress={() => isItemDownloaded ? handleDeleteDownload(item.num) : handleDownload(item.num)}
           disabled={isItemDownloading}
         >
           {isItemDownloading
             ? <ActivityIndicator size={14} color={colors.primary} />
-            : !effectivePremium
-              ? <MaterialCommunityIcons name="lock" size={20} color="#f59e0b" />
-              : <MaterialCommunityIcons
-                  name={isItemDownloaded ? 'check-circle' : 'download-circle-outline'}
-                  size={22}
-                  color={isItemDownloaded ? '#0d8e62' : colors.muted}
-                />
+            : <MaterialCommunityIcons
+                name={isItemDownloaded ? 'check-circle' : 'download-circle-outline'}
+                size={22}
+                color={isItemDownloaded ? '#0d8e62' : colors.muted}
+              />
           }
         </TouchableOpacity>
         <TouchableOpacity
@@ -523,7 +501,7 @@ export default function RecitationsScreen() {
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
             <Text style={s.modalTitle}>{t('quran.chooseReciter')}</Text>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
               {RECITERS.map(r => (
                 <TouchableOpacity
                   key={r.identifier}

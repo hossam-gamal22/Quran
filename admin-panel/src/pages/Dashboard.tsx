@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Users, Activity, Clock, Eye, BookOpen, Moon, TrendingUp, RefreshCw,
-  Sparkles, FileText, Bell, Palette, Calendar, Settings, CheckCircle, Star, Globe, AlertCircle
+  Sparkles, FileText, Bell, Palette, Calendar, Settings, CheckCircle, Star, Globe, AlertCircle,
+  Heart, HandMetal
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { Styled } from '../components/Styled';
+import { fetchActiveDevices } from '../utils/user-query';
 
 // ✅ استخدام jsDelivr CDN بدل raw.githubusercontent (يحل مشكلة CORS)
 const AZKAR_JSON_URL = 'https://cdn.jsdelivr.net/gh/hossam-gamal22/Quran@main/data/json/azkar.json';
@@ -36,11 +38,35 @@ interface ActivityItem {
 const QUICK_ACTIONS = [
   { id: '1', title: 'شاشات البداية', icon: Sparkles, path: '/splash-screens', color: 'bg-purple-500/20 text-purple-400' },
   { id: '2', title: 'إدارة المحتوى', icon: FileText, path: '/content', color: 'bg-blue-500/20 text-blue-400' },
-  { id: '3', title: 'الأذكار', icon: Moon, path: '/azkar', color: 'bg-emerald-500/20 text-emerald-400' },
+  { id: '3', title: 'الأذكار', icon: Moon, path: '/azkar', color: 'bg-accent/20 text-accent-light' },
   { id: '4', title: 'الإشعارات', icon: Bell, path: '/notifications', color: 'bg-amber-500/20 text-amber-400' },
   { id: '5', title: 'المستخدمين', icon: Users, path: '/users', color: 'bg-pink-500/20 text-pink-400' },
-  { id: '6', title: 'الإعدادات', icon: Settings, path: '/settings', color: 'bg-slate-500/20 text-slate-400' },
+  { id: '6', title: 'الإعدادات', icon: Settings, path: '/settings', color: 'bg-admin-muted/20 text-slate-400' },
 ];
+
+/** Generate a human-readable Arabic description from activity doc fields */
+const getActivityDescription = (data: Record<string, any>): string => {
+  switch (data.type) {
+    case 'azkar':
+      return data.category ? `قراءة ذكر — ${data.category}` : 'قراءة ذكر';
+    case 'quran':
+      return data.surahName ? `قراءة ${data.surahName}` : 'قراءة صفحة قرآن';
+    case 'prayer':
+      return data.prayerName
+        ? `تسجيل صلاة ${data.prayerName}${data.onTime ? ' ✓' : ''}`
+        : 'تسجيل صلاة';
+    case 'tasbih':
+      return data.count ? `تسبيح ${data.count} مرة` : 'تسبيح';
+    case 'khatma':
+      return data.surahName
+        ? `تقدم في الختمة — ${data.surahName} (${data.progressPercent || 0}%)`
+        : 'تقدم في الختمة';
+    case 'app_open':
+      return 'فتح التطبيق';
+    default:
+      return '';
+  }
+};
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<Stats>({
@@ -93,30 +119,15 @@ const Dashboard: React.FC = () => {
     let activityData: ActivityItem[] = [];
 
     try {
-      // تحميل المستخدمين
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const users = usersSnapshot.docs
-        .map(doc => doc.data())
-        .filter(u => !u.placeholder); // تجاهل الـ placeholder
-      
-      const now = new Date();
-      const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // تحميل المستخدمين (SSOT: unified query + dedup)
+      const { stats: deviceStats } = await fetchActiveDevices();
 
       usersData = {
-        total: users.length,
-        active: users.filter(u => {
-          if (!u.lastActive) return false;
-          const lastActive = u.lastActive.toDate ? u.lastActive.toDate() : new Date(u.lastActive);
-          return lastActive > weekAgo;
-        }).length,
-        daily: users.filter(u => {
-          if (!u.lastActive) return false;
-          const lastActive = u.lastActive.toDate ? u.lastActive.toDate() : new Date(u.lastActive);
-          return lastActive > dayAgo;
-        }).length,
-        ios: users.filter(u => u.platform === 'ios').length,
-        android: users.filter(u => u.platform === 'android').length,
+        total: deviceStats.total,
+        active: deviceStats.active,
+        daily: deviceStats.daily,
+        ios: deviceStats.ios,
+        android: deviceStats.android,
       };
 
       // تحميل الإحصائيات
@@ -134,7 +145,7 @@ const Dashboard: React.FC = () => {
       // تحميل آخر النشاطات
       try {
         const activitySnapshot = await getDocs(
-          query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(5))
+          query(collection(db, 'activity'), orderBy('timestamp', 'desc'), limit(20))
         );
         activityData = activitySnapshot.docs
           .map(doc => {
@@ -142,12 +153,13 @@ const Dashboard: React.FC = () => {
             return {
               id: doc.id,
               type: data.type || 'user',
-              description: data.description || '',
+              description: data.description || getActivityDescription(data),
               time: data.timestamp ? formatTimeAgo(data.timestamp.toDate()) : 'منذ قليل',
               country: data.country,
             };
           })
-          .filter(item => item.description.trim().length > 0);
+          .filter(item => item.type !== 'app_open' && item.description.trim().length > 0)
+          .slice(0, 8);
       } catch (e) {
         console.log('Activity collection not found or empty');
       }
@@ -175,8 +187,7 @@ const Dashboard: React.FC = () => {
     // النشاط الافتراضي إذا لم يوجد
     if (activityData.length === 0) {
       activityData = [
-        { id: '1', type: 'info', description: 'التطبيق جاهز للنشر', time: 'الآن' },
-        { id: '2', type: 'azkar', description: `${totalAzkar} ذكر جاهز`, time: 'منذ دقيقة' },
+        { id: '1', type: 'info', description: 'لا توجد أنشطة حديثة بعد', time: 'الآن' },
       ];
     }
     setActivity(activityData);
@@ -204,7 +215,7 @@ const Dashboard: React.FC = () => {
     iconBg: string;
     subtitle?: string;
   }> = ({ title, value, icon, iconBg, subtitle }) => (
-    <div className="bg-slate-800/50 backdrop-blur-sm p-5 rounded-2xl border border-slate-700/50 hover:border-emerald-500/30 transition-all">
+    <div className="bg-admin-surface/50 backdrop-blur-sm p-5 rounded-2xl border border-admin-border/50 hover:border-accent/30 transition-all">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-slate-400">{title}</p>
@@ -237,7 +248,7 @@ const Dashboard: React.FC = () => {
             disabled={isLoading}
             aria-label="تحديث البيانات"
             title="تحديث البيانات"
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-accent-dark rounded-xl text-white transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             تحديث
@@ -265,8 +276,8 @@ const Dashboard: React.FC = () => {
         <StatCard
           title="المستخدمين النشطين"
           value={stats.activeUsers}
-          icon={<Activity className="w-6 h-6 text-emerald-400" />}
-          iconBg="bg-emerald-500/20"
+          icon={<Activity className="w-6 h-6 text-accent-light" />}
+          iconBg="bg-accent/20"
           subtitle="آخر 7 أيام"
         />
         <StatCard
@@ -295,8 +306,8 @@ const Dashboard: React.FC = () => {
         <StatCard
           title="صفحات القرآن"
           value={stats.totalQuranPages}
-          icon={<BookOpen className="w-6 h-6 text-emerald-400" />}
-          iconBg="bg-emerald-500/20"
+          icon={<BookOpen className="w-6 h-6 text-accent-light" />}
+          iconBg="bg-accent/20"
         />
         <StatCard
           title="الصلوات المسجلة"
@@ -309,14 +320,14 @@ const Dashboard: React.FC = () => {
       {/* Quick Actions & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
+          <div className="bg-admin-surface/50 backdrop-blur-sm p-6 rounded-2xl border border-admin-border/50">
             <h2 className="text-lg font-bold text-white mb-4">إجراءات سريعة</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {QUICK_ACTIONS.map(action => (
                 <Link
                   key={action.id}
                   to={action.path}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-slate-700/30 border border-slate-600/30 hover:border-emerald-500/30 hover:bg-slate-700/50 transition-all"
+                  className="flex items-center gap-3 p-4 rounded-xl bg-admin-surface-light/30 border border-admin-border/30 hover:border-accent/30 hover:bg-admin-surface-light/50 transition-all"
                 >
                   <div className={`p-2 rounded-lg ${action.color}`}>
                     <action.icon className="w-5 h-5" />
@@ -328,18 +339,21 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
+        <div className="bg-admin-surface/50 backdrop-blur-sm p-6 rounded-2xl border border-admin-border/50">
           <h2 className="text-lg font-bold text-white mb-4">النشاط الأخير</h2>
           <div className="space-y-3">
             {activity.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">لا يوجد نشاط حالي</p>
             ) : (
               activity.map(item => (
-                <div key={item.id} className="flex items-start gap-3 py-2 border-b border-slate-700/50 last:border-0">
+                <div key={item.id} className="flex items-start gap-3 py-2 border-b border-admin-border/50 last:border-0">
                   <div className="mt-1">
                     {item.type === 'user' && <Users className="w-4 h-4 text-blue-400" />}
                     {item.type === 'azkar' && <Moon className="w-4 h-4 text-purple-400" />}
-                    {item.type === 'quran' && <BookOpen className="w-4 h-4 text-emerald-400" />}
+                    {item.type === 'quran' && <BookOpen className="w-4 h-4 text-accent-light" />}
+                    {item.type === 'prayer' && <Clock className="w-4 h-4 text-blue-400" />}
+                    {item.type === 'tasbih' && <Heart className="w-4 h-4 text-pink-400" />}
+                    {item.type === 'khatma' && <Star className="w-4 h-4 text-yellow-400" />}
                     {item.type === 'info' && <AlertCircle className="w-4 h-4 text-amber-400" />}
                   </div>
                   <div className="flex-1">
@@ -356,7 +370,7 @@ const Dashboard: React.FC = () => {
 
       {/* Platform Distribution */}
       {stats.totalUsers > 0 && (
-        <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
+        <div className="bg-admin-surface/50 backdrop-blur-sm p-6 rounded-2xl border border-admin-border/50">
           <h2 className="text-lg font-bold text-white mb-4">توزيع المستخدمين</h2>
           <div className="grid grid-cols-2 gap-6">
             <div>
@@ -366,7 +380,7 @@ const Dashboard: React.FC = () => {
                   {stats.iosUsers.toLocaleString()} ({stats.totalUsers > 0 ? Math.round((stats.iosUsers / stats.totalUsers) * 100) : 0}%)
                 </span>
               </div>
-              <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-3 bg-admin-surface-light rounded-full overflow-hidden">
                 <Styled 
                   className="h-full bg-blue-500 rounded-full transition-all" 
                   css={{ width: `${stats.totalUsers > 0 ? (stats.iosUsers / stats.totalUsers) * 100 : 0}%` }} 
@@ -380,9 +394,9 @@ const Dashboard: React.FC = () => {
                   {stats.androidUsers.toLocaleString()} ({stats.totalUsers > 0 ? Math.round((stats.androidUsers / stats.totalUsers) * 100) : 0}%)
                 </span>
               </div>
-              <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-3 bg-admin-surface-light rounded-full overflow-hidden">
                 <Styled 
-                  className="h-full bg-emerald-500 rounded-full transition-all" 
+                  className="h-full bg-accent rounded-full transition-all" 
                   css={{ width: `${stats.totalUsers > 0 ? (stats.androidUsers / stats.totalUsers) * 100 : 0}%` }} 
                 />
               </div>
@@ -392,10 +406,10 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* System Status */}
-      <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50">
+      <div className="bg-admin-surface/50 backdrop-blur-sm p-6 rounded-2xl border border-admin-border/50">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-white">حالة النظام</h2>
-          <span className="flex items-center gap-2 text-sm text-emerald-400">
+          <span className="flex items-center gap-2 text-sm text-accent-light">
             <CheckCircle className="w-4 h-4" />
             جاهز للنشر
           </span>
@@ -407,11 +421,11 @@ const Dashboard: React.FC = () => {
             { name: 'Admin Panel', status: true },
             { name: 'API', status: true },
           ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between py-2 px-3 bg-slate-700/30 rounded-lg">
+            <div key={i} className="flex items-center justify-between py-2 px-3 bg-admin-surface-light/30 rounded-lg">
               <span className="text-slate-400">{item.name}</span>
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${item.status ? 'bg-emerald-500' : 'bg-yellow-500'} animate-pulse`} />
-                <span className={`text-sm ${item.status ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                <span className={`w-2 h-2 rounded-full ${item.status ? 'bg-accent' : 'bg-yellow-500'} animate-pulse`} />
+                <span className={`text-sm ${item.status ? 'text-accent-light' : 'text-yellow-400'}`}>
                   {item.status ? 'يعمل' : 'انتظار'}
                 </span>
               </div>

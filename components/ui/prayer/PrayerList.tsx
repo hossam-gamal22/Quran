@@ -19,6 +19,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 
 import {
   PrayerTimes,
@@ -30,6 +31,8 @@ import {
 } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import type { PrayerStatus } from '@/lib/worship-storage';
 
 interface PrayerListProps {
@@ -89,17 +92,23 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   onPrayerStatusToggle,
 }) => {
   const { t } = useSettings();
+  const themeColors = useColors();
+  const styles = useScaledStyles(_styles, themeColors.fs);
 
   if (!prayerTimes) {
     return (
-      <View style={[styles.container, isDarkMode && styles.containerDark]}>
+      <View style={[styles.container]}>
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
         <View style={styles.loadingContainer}>
           <MaterialCommunityIcons
             name="clock-outline"
             size={40}
-            color={isDarkMode ? '#666' : '#ccc'}
+            color={themeColors.textLight}
           />
-          <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
+            <Text style={[styles.loadingText, { color: themeColors.textLight }]}>
             {t('common.loading')}
           </Text>
         </View>
@@ -118,7 +127,11 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   ];
 
   return (
-    <View style={[styles.container, isDarkMode && styles.containerDark]}>
+    <View style={[styles.container]}>
+      {Platform.OS === 'ios' && (
+        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
       {prayers.map((prayer, index) => (
         <PrayerItem
           key={prayer.name}
@@ -144,7 +157,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   );
 };
 
-const PrayerItem: React.FC<PrayerItemProps> = ({
+const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
   name,
   time,
   isNext,
@@ -160,12 +173,14 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
 }) => {
   const { t } = useSettings();
   const isRTL = useIsRTL();
+  const themeColors = useColors();
+  const styles = useScaledStyles(_styles, themeColors.fs);
   const scale = useSharedValue(1);
   const prayerNameLocalized = t(`prayer.${name}`);
   const icon = getPrayerIcon(name);
   const colors = prayerColors[name];
   const accentColor = isDarkMode ? colors.dark : colors.light;
-  const activeGreen = '#22C55E';
+  const activeGreen = '#0d8e62';
   const isPrayed = prayerStatus === 'prayed' || prayerStatus === 'late';
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -195,12 +210,15 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
         onPress={handlePress}
         style={[
           styles.prayerItem,
-          isDarkMode && styles.prayerItemDark,
           isNext && styles.prayerItemNext,
           isPassed && !isNext && styles.prayerItemPassed,
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
         <View
           style={[
             styles.iconContainer,
@@ -219,8 +237,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           <Text
             style={[
               styles.prayerName,
-              isDarkMode && styles.textLight,
-              isPassed && !isNext && styles.textPassed,
+              { color: themeColors.text },
+              isPassed && !isNext && { color: themeColors.textLight },
               isNext && { color: activeGreen },
               { textAlign: isRTL ? 'right' : 'left' },
             ]}
@@ -246,7 +264,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             <MaterialCommunityIcons
               name={isPrayed ? 'check-circle' : 'checkbox-blank-circle-outline'}
               size={22}
-              color={isPrayed ? (isDarkMode ? '#4caf50' : '#2e7d32') : (isDarkMode ? '#555' : '#ccc')}
+              color={isPrayed ? (isDarkMode ? '#0d8e62' : '#2e7d32') : themeColors.textLight}
             />
           </TouchableOpacity>
         )}
@@ -259,8 +277,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
           <Text
             style={[
               styles.prayerTime,
-              isDarkMode && styles.textLight,
-              isPassed && !isNext && styles.textPassed,
+              { color: themeColors.text },
+              isPassed && !isNext && { color: themeColors.textLight },
               isNext && { color: activeGreen },
             ]}
           >
@@ -269,9 +287,9 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
 
           {showNotificationToggle && (
             <Switch
-              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
+              trackColor={{ false: themeColors.border, true: '#0d8e62' }}
               thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-              ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+              ios_backgroundColor={themeColors.border}
               onValueChange={(val) => handleToggle(val)}
               value={notificationEnabled || false}
             />
@@ -281,20 +299,17 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
     </Animated.View>
     </Animated.View>
   );
-};
+});
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginVertical: 10,
-    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 20,
     padding: 10,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
-  },
-  containerDark: {
-    backgroundColor: 'rgba(120,120,128,0.18)',
+    overflow: 'hidden',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -304,11 +319,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#666',
     fontFamily: fontRegular(),
-  },
-  textLight: {
-    color: '#fff',
   },
   prayerItem: {
     flexDirection: 'row',
@@ -317,13 +328,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginVertical: 4,
     borderRadius: 16,
-    backgroundColor: 'rgba(120,120,128,0.1)',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'transparent',
     gap: 8,
-  },
-  prayerItemDark: {
-    backgroundColor: 'rgba(120,120,128,0.2)',
   },
   prayerItemNext: {
     backgroundColor: 'rgba(6,79,47,0.18)',
@@ -345,10 +353,6 @@ const styles = StyleSheet.create({
   prayerName: {
     fontSize: 17,
     fontFamily: fontSemiBold(),
-    color: '#333',
-  },
-  textPassed: {
-    color: '#999',
   },
   nextBadge: {
     paddingHorizontal: 8,
@@ -370,7 +374,6 @@ const styles = StyleSheet.create({
   prayerTime: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
   },
   passedIcon: {
   },

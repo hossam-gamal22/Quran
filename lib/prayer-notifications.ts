@@ -13,7 +13,6 @@ import { getAdhanChannelId } from '../services/notifications/channels';
 import { dirText } from './notification-text-direction';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
-import { NotifIds } from './notificationIds';
 import { 
   NotificationSettings, 
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -110,42 +109,29 @@ export async function checkNotificationPermissions(): Promise<boolean> {
 }
 
 // ─── تحويل وقت الصلاة لـ Date object ─────────────────────────────────────────
-// Minimum lead time (ms) a trigger must be in the future to be scheduled.
-// Prevents "barely future" dates that become past by the time Android's
-// AlarmManager registers them (causing immediate fire) or iOS drops them.
-const MIN_SCHEDULE_BUFFER_MS = 60_000; // 60 seconds
-
 function prayerTimeToDateForDay(timeStr: string, day: Date, advanceMinutes: number = 0): Date {
   const cleaned = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
   const parts = cleaned.split(':').map(Number);
   const hours = Number.isFinite(parts[0]) && parts[0] >= 0 && parts[0] <= 23 ? parts[0] : 0;
   const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
-  // Clamp advanceMinutes to 0–120 to prevent corrupted settings from
-  // rolling dates into the past (JS Date handles negative minutes by
-  // subtracting days, which would silently create past-dated triggers).
-  const safeAdvance = (Number.isFinite(advanceMinutes) && advanceMinutes >= 0 && advanceMinutes <= 120)
-    ? advanceMinutes
-    : 0;
-  const result = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - safeAdvance, 0, 0);
-  // Guard against invalid Date (NaN) — return epoch-0 so the future-time check skips it.
-  if (isNaN(result.getTime())) return new Date(0);
-  return result;
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - advanceMinutes, 0, 0);
 }
 
-// عدد الأيام المجدولة مسبقاً:
-// iOS:     7 days  (respects 64-notification budget: 7 × 5 = 35 slots)
-// Android: 30 days (survives extended offline periods without background refresh)
-// The app reschedules on every foreground resume, so both windows are sufficient.
-const PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 7 : 30;
+// عدد الأيام المجدولة مسبقاً — 7 days (reduced from 14).
+// Android OEMs (Xiaomi/MIUI, Samsung, Huawei) throttle or drop alarms when
+// the total count exceeds ~50-100 setAlarmClock entries. 7 days × 5 prayers
+// = 35 DATE triggers — well within safe limits. The app reschedules on every
+// foreground resume via ensurePrayerNotificationsExist(), so 7 days is sufficient.
+const PRAYER_SCHEDULE_DAYS = 7;
 
-// ─── جدولة إشعارات الصلاة ─────────────────────────────────────────
+// ─── جدولة إشعارات الصلاة لـ 7 أيام ─────────────────────────────────────────
 export async function schedulePrayerNotifications(
   notifSettings: NotificationSettings
-): Promise<number> {
-  if (!notifSettings.enabled) return 0;
+): Promise<void> {
+  if (!notifSettings.enabled) return;
 
   const hasPermission = await requestNotificationPermissions();
-  if (!hasPermission) return 0;
+  if (!hasPermission) return;
 
   // Android 12+ (API 31+): verify SCHEDULE_EXACT_ALARM for DATE triggers
   const exactAlarmOk = await checkExactAlarmPermission();
@@ -154,7 +140,7 @@ export async function schedulePrayerNotifications(
   }
 
   const location = await getPrayerLocation();
-  if (!location) return 0;
+  if (!location) return;
 
   const appSettings = await getSettings();
   
@@ -172,25 +158,16 @@ export async function schedulePrayerNotifications(
     const currentMonth = today.getMonth() + 1;
     const currentYear = today.getFullYear();
 
-    // Build a map of all unique months we need for the scheduling window.
-    // iOS (7 days): 1-2 months. Android (30 days): up to 3 months.
-    const monthsNeeded = new Map<string, { month: number; year: number }>();
-    for (let d = 0; d < PRAYER_SCHEDULE_DAYS; d++) {
-      const dt = new Date(today);
-      dt.setDate(today.getDate() + d);
-      const m = dt.getMonth() + 1;
-      const y = dt.getFullYear();
-      const key = `${y}-${m}`;
-      if (!monthsNeeded.has(key)) monthsNeeded.set(key, { month: m, year: y });
-    }
+    const monthlyData = await fetchMonthlyPrayerTimes(
+      location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
+    );
 
-    // Fetch all needed months (each with independent cache fallback)
-    const monthlyDataMap = new Map<string, PrayerTimesResponse[]>();
-    for (const [key, { month, year }] of monthsNeeded) {
-      const data = await fetchMonthlyPrayerTimes(
-        location.latitude, location.longitude, month, year, appSettings.calculationMethod
+    // If the scheduling window spans into next month, fetch that too
+    let nextMonthData: PrayerTimesResponse[] | null = null;
+    if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
+      nextMonthData = await fetchMonthlyPrayerTimes(
+        location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
       );
-      monthlyDataMap.set(key, data);
     }
 
     // ─── API fetch succeeded — NOW cancel old prayer notifications ──────────
@@ -213,38 +190,15 @@ export async function schedulePrayerNotifications(
     const fajrChannelId = getAdhanChannelId(effectiveSoundType);
 
     // Resolve sound using the unified function (single source of truth in channels.ts)
-    // Treat undefined/missing adhanSound as enabled (default ON for prayer notifications).
-    // Only explicit `false` silences the azan — prevents iOS from getting a silent payload.
-    // Pass isAdhan=true so the resolver uses the short WAV on iOS (Apple's 30s limit).
-    const soundValue = notifSettings.adhanSound === false
+    const soundValue = !notifSettings.adhanSound
       ? false
-      : resolveNotificationSound(effectiveSoundType, true, true);
-
-    // Final guard: if soundValue resolved to something unexpected (empty string, null, undefined),
-    // fall back to the platform-appropriate makkah adhan file so iOS never gets an invalid payload.
-    // iOS silently drops the ENTIRE notification if content.sound is a string that doesn't
-    // match a real bundled file, so we validate the extension and fall back to the short WAV.
-    let safeSoundValue: string | boolean = (soundValue === false)
-      ? false
-      : (typeof soundValue === 'string' && soundValue.length > 0)
-        ? soundValue
-        : (Platform.OS === 'ios' ? 'makkah_short.wav' : 'makkah');
-
-    // iOS-specific: ensure the resolved filename ends with a known audio extension.
-    // Short adhan files use .wav; original bundled sounds use .mp3.
-    // If neither extension is present (e.g. Android raw resource name leaked through),
-    // fall back to the short WAV so iOS doesn't silently drop the notification.
-    if (Platform.OS === 'ios' && typeof safeSoundValue === 'string'
-        && !safeSoundValue.endsWith('.mp3') && !safeSoundValue.endsWith('.wav')) {
-      console.warn(`[prayer-notif] iOS sound value missing audio extension ("${safeSoundValue}"), falling back to makkah_short.wav`);
-      safeSoundValue = 'makkah_short.wav';
-    }
-    console.log(`[prayer-notif] Sound resolved: adhanSound=${notifSettings.adhanSound}, effectiveType=${effectiveSoundType}, raw=${String(soundValue)}, safe=${String(safeSoundValue)}`);
+      : resolveNotificationSound(effectiveSoundType, true);
 
     const scheduledIds: string[] = [];
-    // NOTE: We intentionally do NOT capture a `const now = new Date()` here.
-    // Each iteration uses a fresh `Date.now()` call to avoid stale-timestamp
-    // races where a prayer becomes past during the async scheduling loop.
+    // Refresh `now` AFTER the API fetch + cancellation completes.
+    // Using a stale `now` from before the fetch would skip today's
+    // prayer slots that became "past" only during the fetch delay.
+    const now = new Date();
     const mosqueAttachments = await getNotificationIconAttachment('mosque');
 
     for (let dayOffset = 0; dayOffset < PRAYER_SCHEDULE_DAYS; dayOffset++) {
@@ -252,9 +206,8 @@ export async function schedulePrayerNotifications(
       targetDate.setDate(today.getDate() + dayOffset);
 
       // Pick prayer data from the correct month
-      const mKey = `${targetDate.getFullYear()}-${targetDate.getMonth() + 1}`;
-      const source = monthlyDataMap.get(mKey);
-      if (!source) continue;
+      const isNextMonth = targetDate.getMonth() + 1 !== currentMonth || targetDate.getFullYear() !== currentYear;
+      const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
       const dayData = source[targetDate.getDate() - 1]; // Array is 0-indexed, days are 1-indexed
       if (!dayData) continue;
 
@@ -266,13 +219,8 @@ export async function schedulePrayerNotifications(
         if (!timeStr) continue;
 
         const triggerDate = prayerTimeToDateForDay(timeStr, targetDate, notifSettings.advanceMinutes);
-        // Fresh timestamp on EVERY iteration — never use a stale `now` variable.
-        // This prevents races where prayers become past during the async loop.
-        const nowMs = Date.now();
-        if (triggerDate.getTime() <= nowMs + MIN_SCHEDULE_BUFFER_MS) {
-          const delta = triggerDate.getTime() - nowMs;
-          const reason = delta <= 0 ? 'past' : `within ${MIN_SCHEDULE_BUFFER_MS}ms buffer (delta=${delta}ms)`;
-          console.log(`[prayer-notif] SKIP ${prayerKey} d+${dayOffset} — ${reason} | trigger=${triggerDate.getTime()} now=${nowMs}`);
+        if (triggerDate <= now) {
+          console.log(`[prayer-notif] SKIP ${prayerKey} d+${dayOffset} — past (${triggerDate.toISOString()} <= ${now.toISOString()})`);
           continue;
         }
 
@@ -287,26 +235,17 @@ export async function schedulePrayerNotifications(
         try {
           const channelId = prayerKey === 'fajr' ? fajrChannelId : regularChannelId;
           const identifier = dayOffset === 0 ? `prayer_${prayerKey}` : `prayer_${prayerKey}_d${dayOffset}`;
-          // Last-resort guard: re-check right before the schedule call.
-          // Content assembly above takes non-trivial time; the trigger may
-          // have slipped into the past during that window.
-          if (triggerDate.getTime() <= Date.now()) {
-            console.log(`[prayer-notif] SKIP ${prayerKey} d+${dayOffset} — slipped past during content assembly | trigger=${triggerDate.getTime()} now=${Date.now()}`);
-            continue;
-          }
-          console.log(`[prayer-notif] SCHEDULING ${prayerKey}${isFriday && prayerKey === 'dhuhr' ? ' (JUMUAH)' : ''} d+${dayOffset} → ${triggerDate.toISOString()} (in ${Math.round((triggerDate.getTime() - Date.now()) / 1000)}s) | id=${identifier} | ch=${channelId}`);
+          console.log(`[prayer-notif] SCHEDULING ${prayerKey}${isFriday && prayerKey === 'dhuhr' ? ' (JUMUAH)' : ''} d+${dayOffset} → ${triggerDate.toISOString()} | id=${identifier} | ch=${channelId}`);
           const id = await Notifications.scheduleNotificationAsync({
             identifier,
             content: {
               title: dirText(notifTitle),
               body: dirText(message),
               data: { type: 'prayer', prayer: prayerKey, time: cleanTime, soundType: effectiveSoundType, iconType: 'mosque' },
-              sound: safeSoundValue,
+              sound: soundValue,
               priority: Notifications.AndroidNotificationPriority.MAX,
-              // iOS: bypass Focus mode and notification summaries for prayer notifications
-              // NOTE: 'timeSensitive' does NOT require Apple's critical-alerts entitlement.
-              // 'critical' silently drops the notification without the entitlement.
-              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+              // iOS: bypass DND and Silent mode for prayer notifications
+              ...(Platform.OS === 'ios' && { interruptionLevel: 'critical' as const }),
               ...(Platform.OS === 'ios' && mosqueAttachments && { attachments: mosqueAttachments }),
               ...(Platform.OS === 'android' && { channelId }),
             },
@@ -318,44 +257,6 @@ export async function schedulePrayerNotifications(
           });
           scheduledIds.push(id);
           console.log(`[prayer-notif] ✅ ${prayerKey} d+${dayOffset} scheduled OK (id=${id})`);
-
-          // ── Schedule 15-min fallback completion notification (today only) ──
-          // For dayOffset > 0 the daily reschedule will create fresh fallbacks.
-          // Skip sunrise — it's informational, not a prayer to complete.
-          if (dayOffset === 0 && prayerKey !== 'sunrise') {
-            try {
-              const FALLBACK_DELAY_MS = 17 * 60 * 1000; // 15 min wait + 2 min grace
-              const fallbackDate = new Date(triggerDate.getTime() + FALLBACK_DELAY_MS);
-              // Only schedule if the fallback time is still in the future
-              if (fallbackDate.getTime() > Date.now() + MIN_SCHEDULE_BUFFER_MS) {
-                const fallbackIdentifier = `prayer_completion_${prayerKey}`;
-                const fallbackId = await Notifications.scheduleNotificationAsync({
-                  identifier: fallbackIdentifier,
-                  content: {
-                    title: dirText(t('notifications.didYouPray') || `هل صليت ${prayerName}؟`),
-                    body: dirText(t('notifications.didYouPrayBody') || 'لا تنسَ صلاتك، بارك الله فيك'),
-                    sound: 'default',
-                    data: { type: 'prayer_completion', prayer: prayerKey },
-                    ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-                    ...(Platform.OS === 'android' && { channelId: 'completion_default' }),
-                  },
-                  trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: fallbackDate,
-                    ...(Platform.OS === 'android' && { channelId: 'completion_default' }),
-                  },
-                });
-                // Persist IDs so Smart Tracker can cancel the fallback
-                scheduledIds.push(fallbackId);
-                await NotifIds.saveAdhanId(prayerKey, id);
-                await NotifIds.saveFallbackId(prayerKey, fallbackId);
-                await NotifIds.saveAdhanFiredAt(prayerKey, triggerDate.getTime());
-                console.log(`[prayer-notif] 🔔 Fallback scheduled: ${fallbackIdentifier} → ${fallbackDate.toISOString()} (id=${fallbackId})`);
-              }
-            } catch (fe) {
-              console.warn(`[prayer-notif] ⚠️ Failed to schedule fallback for ${prayerKey}:`, fe);
-            }
-          }
         } catch (e) {
           console.error(`[prayer-notif] ❌ FAILED to schedule ${prayerKey} d+${dayOffset}:`, e);
         }
@@ -371,7 +272,6 @@ export async function schedulePrayerNotifications(
     if (scheduledIds.length === 0) {
       console.warn('[prayer-notif] ⚠️ Zero prayers scheduled — all may have been in the past or data was empty');
     }
-    return scheduledIds.length;
   } catch (e) {
     console.error('[prayer-notif] ❌ Failed to fetch/schedule prayer times:', e);
     // Re-throw so notifications-manager knows prayer scheduling failed
@@ -384,7 +284,6 @@ export async function schedulePrayerNotifications(
 export async function cancelAllPrayerNotifications(): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
-    // Cancel adhan (prayer_*), fallback (prayer_completion_*), and tracker-fired (prayer_done_*) notifications
     if (n.identifier.startsWith('prayer_')) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
     }

@@ -9,12 +9,17 @@ import {
   Save, Plus, Trash2, Edit2, ChevronDown, ChevronUp,
   BookOpen, Mountain, Footprints, Users, RefreshCw,
   GripVertical, AlertCircle, CheckCircle, Calendar, Star,
-  Upload, X,
+  Upload, X, Download,
 } from 'lucide-react';
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { convertToPng } from '../utils/imageUpload';
+import { processImage } from '../utils/imageUpload';
+import {
+  getDefaultHajjUmrahContent,
+  getDefaultSeerahContent,
+  getDefaultCompanionsContent,
+} from '../data/app-defaults';
 
 // ─── Types (mirror lib/content-api.ts) ──────────────────────────────────
 
@@ -216,13 +221,25 @@ function IconUploadField({
 
     setUploading(true);
     try {
-      const pngBlob = await convertToPng(file);
       const isSvg = file.type === 'image/svg+xml';
-      const ext = isSvg ? 'svg' : 'png';
+      let uploadBlob: Blob;
+      let contentType: string;
+      let ext: string;
+
+      if (isSvg) {
+        uploadBlob = file;
+        contentType = 'image/svg+xml';
+        ext = 'svg';
+      } else {
+        uploadBlob = await processImage(file);
+        contentType = 'image/png';
+        ext = 'png';
+      }
+
       const fileName = `icon_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.[^.]+$/, '')}.${ext}`;
       const storagePath = `${CONTENT_ICON_STORAGE_PATH}/${fileName}`;
       const storageRef = ref(storage, storagePath);
-      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
+      await uploadBytes(storageRef, uploadBlob, { contentType });
       const url = await getDownloadURL(storageRef);
       onUpload(url, storagePath);
     } catch (err) {
@@ -249,17 +266,17 @@ function IconUploadField({
       <label className="text-xs text-slate-400 mb-1 block">{label || 'صورة الأيقونة'}</label>
       {iconUrl ? (
         <div className="flex items-center gap-2">
-          <img src={iconUrl} alt="icon" className="w-10 h-10 rounded-lg object-cover border border-slate-600" />
+          <img src={iconUrl} alt="icon" className="w-10 h-10 rounded-lg object-cover border border-admin-border" />
           <button onClick={handleRemove} className="text-xs text-red-400 hover:text-red-300" title="إزالة الأيقونة" aria-label="إزالة الأيقونة">
             <X size={14} />
           </button>
-          <button onClick={() => fileRef.current?.click()} className="text-xs text-emerald-400 hover:text-emerald-300">تغيير</button>
+          <button onClick={() => fileRef.current?.click()} className="text-xs text-accent-light hover:text-emerald-300">تغيير</button>
         </div>
       ) : (
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs text-slate-400 hover:text-white hover:border-slate-500 disabled:opacity-50"
+          className="flex items-center gap-1 px-3 py-1.5 bg-admin-surface border border-admin-border rounded text-xs text-slate-400 hover:text-white hover:border-slate-500 disabled:opacity-50"
         >
           {uploading ? <RefreshCw size={12} className="animate-spin" /> : <Upload size={12} />}
           {uploading ? 'جاري الرفع...' : 'رفع صورة'}
@@ -326,13 +343,13 @@ function RitualSectionEditor({
   };
 
   return (
-    <div className="border border-slate-700 rounded-lg mb-3 overflow-hidden">
-      <div className="flex items-center gap-2 p-3 bg-slate-800 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <div className="border border-admin-border rounded-lg mb-3 overflow-hidden">
+      <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <div className="flex items-center gap-1">
           <button
             onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
             disabled={isFirst}
-            className="p-1 hover:bg-slate-700 rounded disabled:opacity-30"
+            className="p-1 hover:bg-admin-surface-light rounded disabled:opacity-30"
             title="تحريك لأعلى"
             aria-label="تحريك لأعلى"
           >
@@ -341,7 +358,7 @@ function RitualSectionEditor({
           <button
             onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
             disabled={isLast}
-            className="p-1 hover:bg-slate-700 rounded disabled:opacity-30"
+            className="p-1 hover:bg-admin-surface-light rounded disabled:opacity-30"
             title="تحريك لأسفل"
             aria-label="تحريك لأسفل"
           >
@@ -355,14 +372,14 @@ function RitualSectionEditor({
         <span className="text-xs text-slate-500">
           {section.steps.length} خطوة • {section.duas.length} دعاء
         </span>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف القسم">
+        <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف القسم "${section.title || 'قسم جديد'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف القسم">
           <Trash2 size={14} className="text-red-400" />
         </button>
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-4 bg-slate-900/50">
+        <div className="p-4 space-y-4 bg-admin-bg/50">
           {/* Basic fields */}
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -370,7 +387,7 @@ function RitualSectionEditor({
               <input
                 value={section.title}
                 onChange={(e) => updateField('title', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="العنوان"
                 aria-label="العنوان"
@@ -381,7 +398,7 @@ function RitualSectionEditor({
               <input
                 value={section.icon}
                 onChange={(e) => updateField('icon', e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 placeholder="e.g. mosque, walk, tent"
                 aria-label="الأيقونة"
               />
@@ -402,7 +419,7 @@ function RitualSectionEditor({
                   <input
                     value={val}
                     onChange={(e) => onUpdate({ ...section, titleTranslations: { ...section.titleTranslations, [lang]: e.target.value } })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
+                    className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-xs"
                     title={`ترجمة ${lang}`}
                     aria-label={`ترجمة ${lang}`}
                   />
@@ -416,7 +433,7 @@ function RitualSectionEditor({
               ['en','fr','tr','ur','id','de','es','bn','ms','ru'].forEach(l => { if (!langs[l]) langs[l] = ''; });
               onUpdate({ ...section, titleTranslations: langs });
             }}
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="text-xs text-accent-light hover:text-emerald-300"
           >
             {section.titleTranslations ? '+ تعديل الترجمات' : '+ إضافة ترجمات العنوان'}
           </button>
@@ -425,7 +442,7 @@ function RitualSectionEditor({
             <textarea
               value={section.description}
               onChange={(e) => updateField('description', e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right min-h-[60px]"
+              className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right min-h-[60px]"
               dir="rtl"
               title="الوصف"
               aria-label="الوصف"
@@ -436,7 +453,7 @@ function RitualSectionEditor({
           {/* Steps */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={addStep} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={addStep} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة خطوة
               </button>
               <span className="text-xs text-slate-400 font-medium">الخطوات ({section.steps.length})</span>
@@ -447,7 +464,7 @@ function RitualSectionEditor({
                 <textarea
                   value={step.text}
                   onChange={(e) => updateStep(i, e.target.value)}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm min-h-[40px]"
+                  className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[40px]"
                   dir="rtl"
                   title="نص الخطوة"
                   aria-label="نص الخطوة"
@@ -463,20 +480,20 @@ function RitualSectionEditor({
           {/* Duas */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={addDua} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={addDua} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة دعاء
               </button>
               <span className="text-xs text-slate-400 font-medium">الأدعية ({section.duas.length})</span>
             </div>
             {section.duas.map((dua, i) => (
-              <div key={i} className="border border-slate-700 rounded p-3 mb-2 bg-slate-800/50">
+              <div key={i} className="border border-admin-border rounded p-3 mb-2 bg-admin-surface/50">
                 <div className="flex items-start gap-2">
                   <div className="flex-1 space-y-2">
                     <textarea
                       value={dua.arabic}
                       onChange={(e) => updateDua(i, 'arabic', e.target.value)}
                       placeholder="نص الدعاء بالعربية"
-                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm min-h-[50px]"
+                      className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[50px]"
                       dir="rtl"
                       aria-label="نص الدعاء"
                     />
@@ -484,7 +501,7 @@ function RitualSectionEditor({
                       value={dua.note || ''}
                       onChange={(e) => updateDua(i, 'note', e.target.value)}
                       placeholder="ملاحظة (اختياري)"
-                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm"
+                      className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm"
                       dir="rtl"
                       aria-label="ملاحظة"
                     />
@@ -532,27 +549,27 @@ function DuaGroupEditor({
   };
 
   return (
-    <div className="border border-slate-700 rounded-lg mb-3 overflow-hidden">
-      <div className="flex items-center gap-2 p-3 bg-slate-800 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <div className="border border-admin-border rounded-lg mb-3 overflow-hidden">
+      <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <span className="text-sm font-medium text-slate-300 flex-1">
           {index + 1}. {group.title || 'مجموعة جديدة'}
         </span>
         <span className="text-xs text-slate-500">{group.duas.length} دعاء</span>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف المجموعة">
+        <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف المجموعة "${group.title || 'مجموعة جديدة'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف المجموعة">
           <Trash2 size={14} className="text-red-400" />
         </button>
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-4 bg-slate-900/50">
+        <div className="p-4 space-y-4 bg-admin-bg/50">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-400 mb-1 block">عنوان المجموعة</label>
               <input
                 value={group.title}
                 onChange={(e) => onUpdate({ ...group, title: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="عنوان المجموعة"
                 aria-label="عنوان المجموعة"
@@ -563,7 +580,7 @@ function DuaGroupEditor({
               <input
                 value={group.icon}
                 onChange={(e) => onUpdate({ ...group, icon: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 title="أيقونة المجموعة"
                 aria-label="أيقونة المجموعة"
                 placeholder="e.g. mosque, walk"
@@ -573,20 +590,20 @@ function DuaGroupEditor({
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={addDua} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={addDua} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة دعاء
               </button>
               <span className="text-xs text-slate-400 font-medium">الأدعية ({group.duas.length})</span>
             </div>
             {group.duas.map((dua, i) => (
-              <div key={i} className="border border-slate-700 rounded p-3 mb-2 bg-slate-800/50">
+              <div key={i} className="border border-admin-border rounded p-3 mb-2 bg-admin-surface/50">
                 <div className="flex items-start gap-2">
                   <div className="flex-1 space-y-2">
                     <textarea
                       value={dua.arabic}
                       onChange={(e) => updateDua(i, 'arabic', e.target.value)}
                       placeholder="نص الدعاء"
-                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm min-h-[50px]"
+                      className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[50px]"
                       dir="rtl"
                       aria-label="نص الدعاء"
                     />
@@ -594,7 +611,7 @@ function DuaGroupEditor({
                       value={dua.occasion}
                       onChange={(e) => updateDua(i, 'occasion', e.target.value)}
                       placeholder="المناسبة"
-                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm"
+                      className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm"
                       dir="rtl"
                       aria-label="المناسبة"
                     />
@@ -602,7 +619,7 @@ function DuaGroupEditor({
                       value={dua.reference || ''}
                       onChange={(e) => updateDua(i, 'reference', e.target.value)}
                       placeholder="المرجع (اختياري)"
-                      className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm"
+                      className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm"
                       dir="rtl"
                       aria-label="المرجع"
                     />
@@ -650,27 +667,27 @@ function SeerahSectionEditor({
   };
 
   return (
-    <div className="border border-slate-700 rounded-lg mb-3 overflow-hidden">
-      <div className="flex items-center gap-2 p-3 bg-slate-800 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <div className="border border-admin-border rounded-lg mb-3 overflow-hidden">
+      <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <span className="text-sm font-medium text-slate-300 flex-1">
           {index + 1}. {section.title || 'قسم جديد'}
         </span>
         <span className="text-xs text-slate-500">{section.paragraphs.length} فقرة</span>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف القسم">
+        <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف القسم "${section.title || 'قسم جديد'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف القسم">
           <Trash2 size={14} className="text-red-400" />
         </button>
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-4 bg-slate-900/50">
+        <div className="p-4 space-y-4 bg-admin-bg/50">
           <div className="grid grid-cols-4 gap-3">
             <div>
               <label className="text-xs text-slate-400 mb-1 block">العنوان (عربي)</label>
               <input
                 value={section.title}
                 onChange={(e) => onUpdate({ ...section, title: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="عنوان القسم"
                 aria-label="عنوان القسم"
@@ -681,7 +698,7 @@ function SeerahSectionEditor({
               <input
                 value={section.titleEn}
                 onChange={(e) => onUpdate({ ...section, titleEn: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 title="العنوان بالإنجليزية"
                 aria-label="العنوان بالإنجليزية"
               />
@@ -691,7 +708,7 @@ function SeerahSectionEditor({
               <input
                 value={section.icon}
                 onChange={(e) => onUpdate({ ...section, icon: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 title="أيقونة القسم"
                 aria-label="أيقونة القسم"
               />
@@ -712,7 +729,7 @@ function SeerahSectionEditor({
                   <input
                     value={val}
                     onChange={(e) => onUpdate({ ...section, titleTranslations: { ...section.titleTranslations, [lang]: e.target.value } })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
+                    className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-xs"
                     title={`ترجمة ${lang}`}
                     aria-label={`ترجمة ${lang}`}
                   />
@@ -726,14 +743,14 @@ function SeerahSectionEditor({
               ['fr','tr','ur','id','de','es','bn','ms','ru'].forEach(l => { if (!langs[l]) langs[l] = ''; });
               onUpdate({ ...section, titleTranslations: langs });
             }}
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="text-xs text-accent-light hover:text-emerald-300"
           >
             {section.titleTranslations ? '+ تعديل الترجمات' : '+ إضافة ترجمات العنوان'}
           </button>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={addParagraph} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={addParagraph} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة فقرة
               </button>
               <span className="text-xs text-slate-400 font-medium">الفقرات ({section.paragraphs.length})</span>
@@ -744,7 +761,7 @@ function SeerahSectionEditor({
                 <textarea
                   value={p}
                   onChange={(e) => updateParagraph(i, e.target.value)}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm min-h-[80px]"
+                  className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[80px]"
                   dir="rtl"
                   title="نص الفقرة"
                   aria-label="نص الفقرة"
@@ -794,27 +811,27 @@ function CompanionEditor({
   };
 
   return (
-    <div className="border border-slate-700 rounded-lg mb-3 overflow-hidden">
-      <div className="flex items-center gap-2 p-3 bg-slate-800 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+    <div className="border border-admin-border rounded-lg mb-3 overflow-hidden">
+      <div className="flex items-center gap-2 p-3 bg-admin-surface cursor-pointer" onClick={() => setExpanded(!expanded)}>
         <span className="text-sm font-medium text-slate-300 flex-1">
           {index + 1}. {companion.nameAr || 'صحابي جديد'}
         </span>
         <span className="text-xs text-slate-500">{companion.category}</span>
-        <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف">
+        <button onClick={(e) => { e.stopPropagation(); if (confirm(`هل تريد حذف "${companion.nameAr || 'صحابي جديد'}"؟`)) onDelete(); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف">
           <Trash2 size={14} className="text-red-400" />
         </button>
         {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
 
       {expanded && (
-        <div className="p-4 space-y-3 bg-slate-900/50">
+        <div className="p-4 space-y-3 bg-admin-bg/50">
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs text-slate-400 mb-1 block">الاسم (عربي)</label>
               <input
                 value={companion.nameAr}
                 onChange={(e) => onUpdate({ ...companion, nameAr: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="اسم الصحابي"
                 aria-label="اسم الصحابي"
@@ -825,7 +842,7 @@ function CompanionEditor({
               <input
                 value={companion.nameEn}
                 onChange={(e) => onUpdate({ ...companion, nameEn: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 dir="ltr"
                 title="الاسم بالإنجليزيةجليزية"
                 aria-label="الاسم بالإنجليزية"
@@ -836,7 +853,7 @@ function CompanionEditor({
               <select
                 value={companion.category}
                 onChange={(e) => onUpdate({ ...companion, category: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 title="اختر التصنيف"
                 aria-label="التصنيف"
               >
@@ -852,7 +869,7 @@ function CompanionEditor({
               <input
                 value={companion.brief}
                 onChange={(e) => onUpdate({ ...companion, brief: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right"
                 dir="rtl"
                 title="وصف مختصر"
                 aria-label="الوصف المختصر"
@@ -863,7 +880,7 @@ function CompanionEditor({
               <input
                 value={companion.icon || ''}
                 onChange={(e) => onUpdate({ ...companion, icon: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white"
+                className="w-full bg-admin-surface border border-admin-border rounded px-3 py-2 text-white"
                 title="أيقونة الصحابي"
                 aria-label="أيقونة الصحابي"
               />
@@ -884,7 +901,7 @@ function CompanionEditor({
                   <input
                     value={val}
                     onChange={(e) => onUpdate({ ...companion, nameTranslations: { ...companion.nameTranslations, [lang]: e.target.value } })}
-                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
+                    className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-xs"
                     title={`ترجمة الاسم ${lang}`}
                     aria-label={`ترجمة الاسم ${lang}`}
                   />
@@ -898,13 +915,13 @@ function CompanionEditor({
               ['fr','tr','ur','id','de','es','bn','ms','ru'].forEach(l => { if (!langs[l]) langs[l] = ''; });
               onUpdate({ ...companion, nameTranslations: langs });
             }}
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="text-xs text-accent-light hover:text-emerald-300"
           >
             {companion.nameTranslations ? '+ تعديل ترجمات الاسم' : '+ إضافة ترجمات الاسم'}
           </button>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={() => onUpdate({ ...companion, story: [...companion.story, ''] })} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={() => onUpdate({ ...companion, story: [...companion.story, ''] })} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة فقرة
               </button>
               <span className="text-xs text-slate-400 font-medium">القصة ({companion.story.length} فقرة)</span>
@@ -919,7 +936,7 @@ function CompanionEditor({
                     newStory[i] = e.target.value;
                     onUpdate({ ...companion, story: newStory });
                   }}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm min-h-[80px]"
+                  className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm min-h-[80px]"
                   dir="rtl"
                   title="فقرة من القصة"
                   aria-label="فقرة من القصة"
@@ -933,7 +950,7 @@ function CompanionEditor({
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <button onClick={addVirtue} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+              <button onClick={addVirtue} className="flex items-center gap-1 text-xs text-accent-light hover:text-emerald-300">
                 <Plus size={14} /> إضافة منقبة
               </button>
               <span className="text-xs text-slate-400 font-medium">المناقب ({companion.virtues.length})</span>
@@ -943,7 +960,7 @@ function CompanionEditor({
                 <input
                   value={v}
                   onChange={(e) => updateVirtue(i, e.target.value)}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-2 text-white text-right text-sm"
+                  className="flex-1 bg-admin-surface border border-admin-border rounded px-3 py-2 text-white text-right text-sm"
                   dir="rtl"
                   title="نص المنقبة"
                   aria-label="نص المنقبة"
@@ -990,12 +1007,15 @@ export default function ContentManager() {
         getDoc(doc(db, 'appContent', 'seerahContent')),
         getDoc(doc(db, 'appContent', 'companionsContent')),
         getDoc(doc(db, 'appContent', 'seasonsMetadata')),
-        ...SEASONAL_PAGES.map(p => getDoc(doc(db, 'appContent', `seasonalContent/${p.key}`))),
+        ...SEASONAL_PAGES.map(p => getDoc(doc(db, 'appContent', `seasonalContent_${p.key}`))),
       ]);
 
       if (hajjDoc.exists()) setHajjUmrah(hajjDoc.data() as HajjUmrahContent);
+      else setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
       if (seerahDoc.exists()) setSeerah(seerahDoc.data() as SeerahContent);
+      else setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
       if (companionsDoc.exists()) setCompanions(companionsDoc.data() as CompanionsContent);
+      else setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
       if (seasonsMetaDoc.exists()) setSeasonsMeta(seasonsMetaDoc.data() as SeasonsMetadata);
 
       const seasonalData: Record<SeasonalPageKey, SeasonalPageContent | null> = {
@@ -1072,7 +1092,7 @@ export default function ContentManager() {
     if (!data) return;
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appContent', `seasonalContent/${activeSeasonalPage}`), {
+      await setDoc(doc(db, 'appContent', `seasonalContent_${activeSeasonalPage}`), {
         ...data,
         updatedAt: new Date().toISOString(),
       });
@@ -1152,27 +1172,18 @@ export default function ContentManager() {
 
   // Helper to initialize content with defaults
   const initHajjUmrah = () => {
-    setHajjUmrah({
-      umrahSections: [],
-      hajjSections: [],
-      duasByRitual: [],
-    });
+    setHajjUmrah(getDefaultHajjUmrahContent() as unknown as HajjUmrahContent);
+    setStatus({ type: 'success', message: 'تم تحميل المحتوى الافتراضي للحج والعمرة' });
   };
 
   const initSeerah = () => {
-    setSeerah({ sections: [] });
+    setSeerah(getDefaultSeerahContent() as unknown as SeerahContent);
+    setStatus({ type: 'success', message: 'تم تحميل المحتوى الافتراضي للسيرة النبوية' });
   };
 
   const initCompanions = () => {
-    setCompanions({
-      companions: [],
-      categories: [
-        { key: 'ashara', title: 'العشرة المبشرون بالجنة', icon: 'star-crescent' },
-        { key: 'muhajirun', title: 'المهاجرون', icon: 'road-variant' },
-        { key: 'ansar', title: 'الأنصار', icon: 'home-heart' },
-        { key: 'mothers', title: 'أمهات المؤمنين', icon: 'heart-multiple' },
-      ],
-    });
+    setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent);
+    setStatus({ type: 'success', message: 'تم تحميل المحتوى الافتراضي للصحابة' });
   };
 
   const initSeasonal = (page: SeasonalPageKey) => {
@@ -1224,7 +1235,7 @@ export default function ContentManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <RefreshCw className="animate-spin text-emerald-400" size={24} />
+        <RefreshCw className="animate-spin text-accent-light" size={24} />
         <span className="text-slate-400 mr-2">جاري التحميل...</span>
       </div>
     );
@@ -1240,7 +1251,7 @@ export default function ContentManager() {
         </div>
         <div className="flex items-center gap-3">
           {status && (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${status.type === 'success' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${status.type === 'success' ? 'bg-emerald-900/30 text-accent-light' : 'bg-red-900/30 text-red-400'}`}>
               {status.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
               {status.message}
             </div>
@@ -1248,14 +1259,14 @@ export default function ContentManager() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-emerald-700 rounded-lg text-white text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
             حفظ
           </button>
           <button
             onClick={loadAllContent}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-white text-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-admin-surface-light hover:bg-slate-600 rounded-lg text-white text-sm transition-colors"
             title="إعادة تحميل"
             aria-label="إعادة تحميل"
           >
@@ -1265,15 +1276,15 @@ export default function ContentManager() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-800 rounded-lg p-1">
+      <div className="flex gap-1 mb-6 bg-admin-surface rounded-lg p-1">
         {TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors flex-1 justify-center ${
               activeTab === tab.key
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                ? 'bg-accent-dark text-white'
+                : 'text-slate-400 hover:text-white hover:bg-admin-surface-light'
             }`}
           >
             <tab.icon size={16} />
@@ -1291,15 +1302,23 @@ export default function ContentManager() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">مناسك الحج ({hajjUmrah.hajjSections.length} قسم)</h2>
-                <button
-                  onClick={() => setHajjUmrah({
-                    ...hajjUmrah,
-                    hajjSections: [...hajjUmrah.hajjSections, { title: '', icon: 'mosque', description: '', steps: [], duas: [] }],
-                  })}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
-                >
-                  <Plus size={14} /> إضافة قسم
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { if (confirm('سيتم استبدال محتوى الحج الحالي بالمحتوى الافتراضي من التطبيق. متأكد؟')) { const defaults = getDefaultHajjUmrahContent(); setHajjUmrah({ ...hajjUmrah, hajjSections: defaults.hajjSections as unknown as HajjUmrahContent['hajjSections'] }); setStatus({ type: 'success', message: 'تم استيراد أقسام الحج الافتراضية' }); } }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
+                  >
+                    <Download size={14} /> استيراد الافتراضي
+                  </button>
+                  <button
+                    onClick={() => setHajjUmrah({
+                      ...hajjUmrah,
+                      hajjSections: [...hajjUmrah.hajjSections, { title: '', icon: 'mosque', description: '', steps: [], duas: [] }],
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                  >
+                    <Plus size={14} /> إضافة قسم
+                  </button>
+                </div>
               </div>
               {hajjUmrah.hajjSections.map((section, i) => (
                 <RitualSectionEditor
@@ -1331,15 +1350,23 @@ export default function ContentManager() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">مناسك العمرة ({hajjUmrah.umrahSections.length} قسم)</h2>
-                <button
-                  onClick={() => setHajjUmrah({
-                    ...hajjUmrah,
-                    umrahSections: [...hajjUmrah.umrahSections, { title: '', icon: 'mosque', description: '', steps: [], duas: [] }],
-                  })}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
-                >
-                  <Plus size={14} /> إضافة قسم
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { if (confirm('سيتم استبدال محتوى العمرة الحالي بالمحتوى الافتراضي من التطبيق. متأكد؟')) { const defaults = getDefaultHajjUmrahContent(); setHajjUmrah({ ...hajjUmrah, umrahSections: defaults.umrahSections as unknown as HajjUmrahContent['umrahSections'] }); setStatus({ type: 'success', message: 'تم استيراد أقسام العمرة الافتراضية' }); } }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
+                  >
+                    <Download size={14} /> استيراد الافتراضي
+                  </button>
+                  <button
+                    onClick={() => setHajjUmrah({
+                      ...hajjUmrah,
+                      umrahSections: [...hajjUmrah.umrahSections, { title: '', icon: 'mosque', description: '', steps: [], duas: [] }],
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                  >
+                    <Plus size={14} /> إضافة قسم
+                  </button>
+                </div>
               </div>
               {hajjUmrah.umrahSections.map((section, i) => (
                 <RitualSectionEditor
@@ -1371,15 +1398,23 @@ export default function ContentManager() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">مجموعات الأدعية ({hajjUmrah.duasByRitual.length} مجموعة)</h2>
-                <button
-                  onClick={() => setHajjUmrah({
-                    ...hajjUmrah,
-                    duasByRitual: [...hajjUmrah.duasByRitual, { title: '', icon: 'hands-pray', duas: [] }],
-                  })}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
-                >
-                  <Plus size={14} /> إضافة مجموعة
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { if (confirm('سيتم استبدال الأدعية الحالية بالأدعية الافتراضية من التطبيق. متأكد؟')) { const defaults = getDefaultHajjUmrahContent(); setHajjUmrah({ ...hajjUmrah, duasByRitual: defaults.duasByRitual as unknown as HajjUmrahContent['duasByRitual'] }); setStatus({ type: 'success', message: 'تم استيراد الأدعية الافتراضية' }); } }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
+                  >
+                    <Download size={14} /> استيراد الافتراضي
+                  </button>
+                  <button
+                    onClick={() => setHajjUmrah({
+                      ...hajjUmrah,
+                      duasByRitual: [...hajjUmrah.duasByRitual, { title: '', icon: 'hands-pray', duas: [] }],
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                  >
+                    <Plus size={14} /> إضافة مجموعة
+                  </button>
+                </div>
               </div>
               {hajjUmrah.duasByRitual.map((group, i) => (
                 <DuaGroupEditor
@@ -1407,15 +1442,23 @@ export default function ContentManager() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">أقسام السيرة ({seerah.sections.length} قسم)</h2>
-                <button
-                  onClick={() => setSeerah({
-                    ...seerah,
-                    sections: [...seerah.sections, { title: '', titleEn: '', icon: 'book-open-variant', paragraphs: [] }],
-                  })}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
-                >
-                  <Plus size={14} /> إضافة قسم
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { if (confirm('سيتم استبدال محتوى السيرة الحالي بالمحتوى الافتراضي من التطبيق. متأكد؟')) { setSeerah(getDefaultSeerahContent() as unknown as SeerahContent); setStatus({ type: 'success', message: 'تم استيراد أقسام السيرة الافتراضية' }); } }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
+                  >
+                    <Download size={14} /> استيراد الافتراضي
+                  </button>
+                  <button
+                    onClick={() => setSeerah({
+                      ...seerah,
+                      sections: [...seerah.sections, { title: '', titleEn: '', icon: 'book-open-variant', paragraphs: [] }],
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                  >
+                    <Plus size={14} /> إضافة قسم
+                  </button>
+                </div>
               </div>
               {seerah.sections.map((section, i) => (
                 <SeerahSectionEditor
@@ -1447,18 +1490,26 @@ export default function ContentManager() {
             <>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-white">الصحابة ({companions.companions.length} صحابي)</h2>
-                <button
-                  onClick={() => setCompanions({
-                    ...companions,
-                    companions: [...companions.companions, {
-                      id: `companion-${Date.now()}`, nameAr: '', nameEn: '', category: companions.categories[0]?.key || 'ashara',
-                      brief: '', story: [], virtues: [],
-                    }],
-                  })}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
-                >
-                  <Plus size={14} /> إضافة صحابي
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { if (confirm('سيتم استبدال قائمة الصحابة الحالية بالمحتوى الافتراضي من التطبيق. متأكد؟')) { setCompanions(getDefaultCompanionsContent() as unknown as CompanionsContent); setStatus({ type: 'success', message: 'تم استيراد بيانات الصحابة الافتراضية' }); } }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-amber-600/20 text-amber-400 rounded-lg text-sm hover:bg-amber-600/30"
+                  >
+                    <Download size={14} /> استيراد الافتراضي
+                  </button>
+                  <button
+                    onClick={() => setCompanions({
+                      ...companions,
+                      companions: [...companions.companions, {
+                        id: `companion-${Date.now()}`, nameAr: '', nameEn: '', category: companions.categories[0]?.key || 'ashara',
+                        brief: '', story: [], virtues: [],
+                      }],
+                    })}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
+                  >
+                    <Plus size={14} /> إضافة صحابي
+                  </button>
+                </div>
               </div>
               {companions.companions.map((comp, i) => (
                 <CompanionEditor
@@ -1492,8 +1543,8 @@ export default function ContentManager() {
                 onClick={() => setActiveSeasonalPage(p.key)}
                 className={`px-3 py-1.5 rounded-lg text-sm ${
                   activeSeasonalPage === p.key
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    ? 'bg-accent-dark text-white'
+                    : 'bg-admin-surface text-slate-400 hover:bg-admin-surface-light'
                 }`}
               >
                 {p.label}
@@ -1519,20 +1570,20 @@ export default function ContentManager() {
                         },
                       }));
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
                   >
                     <Plus size={14} /> إضافة دعاء
                   </button>
                 </div>
                 {seasonal[activeSeasonalPage]!.duas.map((dua, i) => (
-                  <div key={i} className="border border-slate-700 rounded-lg mb-2 p-3 bg-slate-900/50">
+                  <div key={i} className="border border-admin-border rounded-lg mb-2 p-3 bg-admin-bg/50">
                     <div className="grid grid-cols-2 gap-2 mb-2">
-                      <input value={dua.id} onChange={(e) => updateSeasonalDua(i, { ...dua, id: e.target.value })} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="المعرّف" title="معرف الدعاء" aria-label="معرف الدعاء" />
-                      <input value={dua.titleKey} onChange={(e) => updateSeasonalDua(i, { ...dua, titleKey: e.target.value })} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="مفتاح العنوان" title="مفتاح العنوان" aria-label="مفتاح العنوان" />
+                      <input value={dua.id} onChange={(e) => updateSeasonalDua(i, { ...dua, id: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="المعرّف" title="معرف الدعاء" aria-label="معرف الدعاء" />
+                      <input value={dua.titleKey} onChange={(e) => updateSeasonalDua(i, { ...dua, titleKey: e.target.value })} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="مفتاح العنوان" title="مفتاح العنوان" aria-label="مفتاح العنوان" />
                     </div>
-                    <textarea value={dua.arabic} onChange={(e) => updateSeasonalDua(i, { ...dua, arabic: e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[60px]" dir="rtl" placeholder="النص العربي" title="النص العربي" aria-label="النص العربي" />
+                    <textarea value={dua.arabic} onChange={(e) => updateSeasonalDua(i, { ...dua, arabic: e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[60px]" dir="rtl" placeholder="النص العربي" title="النص العربي" aria-label="النص العربي" />
                     <div className="flex items-center gap-2">
-                      <input value={dua.translation} onChange={(e) => updateSeasonalDua(i, { ...dua, translation: e.target.value })} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="الترجمة" title="الترجمة" aria-label="الترجمة" />
+                      <input value={dua.translation} onChange={(e) => updateSeasonalDua(i, { ...dua, translation: e.target.value })} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="الترجمة" title="الترجمة" aria-label="الترجمة" />
                       <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, duas: data.duas.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف الدعاء">
                         <Trash2 size={14} className="text-red-400" />
                       </button>
@@ -1555,16 +1606,16 @@ export default function ContentManager() {
                         },
                       }));
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg text-sm hover:bg-emerald-600/30"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-accent-dark/20 text-accent-light rounded-lg text-sm hover:bg-accent-dark/30"
                   >
                     <Plus size={14} /> إضافة عنصر
                   </button>
                 </div>
                 {seasonal[activeSeasonalPage]!.checklist.map((item, i) => (
                   <div key={i} className="flex items-center gap-2 mb-2">
-                    <input value={item.id} onChange={(e) => updateSeasonalChecklist(i, { ...item, id: e.target.value })} className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="id" title="معرف العنصر" aria-label="معرف العنصر" />
-                    <input value={item.icon} onChange={(e) => updateSeasonalChecklist(i, { ...item, icon: e.target.value })} className="w-28 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="أيقونة" title="أيقونة العنصر" aria-label="أيقونة العنصر" />
-                    <input value={item.labelKey} onChange={(e) => updateSeasonalChecklist(i, { ...item, labelKey: e.target.value })} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="مفتاح النص" title="مفتاح النص" aria-label="مفتاح النص" />
+                    <input value={item.id} onChange={(e) => updateSeasonalChecklist(i, { ...item, id: e.target.value })} className="w-24 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="id" title="معرف العنصر" aria-label="معرف العنصر" />
+                    <input value={item.icon} onChange={(e) => updateSeasonalChecklist(i, { ...item, icon: e.target.value })} className="w-28 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="أيقونة" title="أيقونة العنصر" aria-label="أيقونة العنصر" />
+                    <input value={item.labelKey} onChange={(e) => updateSeasonalChecklist(i, { ...item, labelKey: e.target.value })} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="مفتاح النص" title="مفتاح النص" aria-label="مفتاح النص" />
                     <input type="color" value={item.color} onChange={(e) => updateSeasonalChecklist(i, { ...item, color: e.target.value })} className="w-8 h-8 rounded cursor-pointer" title="لون العنصر" aria-label="لون العنصر" />
                     <button onClick={() => { const data = seasonal[activeSeasonalPage]!; setSeasonal(prev => ({ ...prev, [activeSeasonalPage]: { ...data, checklist: data.checklist.filter((_, idx) => idx !== i) } })); }} className="p-1 hover:bg-red-900/30 rounded" title="حذف العنصر">
                       <Trash2 size={14} className="text-red-400" />
@@ -1591,8 +1642,8 @@ export default function ContentManager() {
                     onClick={() => setActiveSeasonKey(s.key)}
                     className={`px-3 py-1.5 rounded-lg text-sm ${
                       activeSeasonKey === s.key
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        ? 'bg-accent-dark text-white'
+                        : 'bg-admin-surface text-slate-400 hover:bg-admin-surface-light'
                     }`}
                   >
                     {s.label}
@@ -1605,57 +1656,57 @@ export default function ContentManager() {
                 return (
                   <div className="space-y-4">
                     {/* Basic info */}
-                    <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
+                    <div className="border border-admin-border rounded-lg p-4 bg-admin-bg/50">
                       <h3 className="text-sm font-semibold text-slate-300 mb-3">المعلومات الأساسية</h3>
                       <div className="grid grid-cols-2 gap-3 mb-3">
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">الاسم بالعربية</label>
-                          <input value={season.nameAr} onChange={e => updateSeasonMeta(activeSeasonKey, 'nameAr', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm text-right" dir="rtl" title="الاسم بالعربية" aria-label="الاسم بالعربية" />
+                          <input value={season.nameAr} onChange={e => updateSeasonMeta(activeSeasonKey, 'nameAr', e.target.value)} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm text-right" dir="rtl" title="الاسم بالعربية" aria-label="الاسم بالعربية" />
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">الاسم بالإنجليزية</label>
-                          <input value={season.nameEn} onChange={e => updateSeasonMeta(activeSeasonKey, 'nameEn', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="الاسم بالإنجليزية" aria-label="الاسم بالإنجليزية" />
+                          <input value={season.nameEn} onChange={e => updateSeasonMeta(activeSeasonKey, 'nameEn', e.target.value)} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="الاسم بالإنجليزية" aria-label="الاسم بالإنجليزية" />
                         </div>
                       </div>
                       <div className="mb-3">
                         <label className="text-xs text-slate-500 block mb-1">الوصف</label>
-                        <textarea value={season.description} onChange={e => updateSeasonMeta(activeSeasonKey, 'description', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm text-right min-h-[50px]" dir="rtl" title="الوصف" aria-label="وصف الموسم" placeholder="وصف الموسم" />
+                        <textarea value={season.description} onChange={e => updateSeasonMeta(activeSeasonKey, 'description', e.target.value)} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm text-right min-h-[50px]" dir="rtl" title="الوصف" aria-label="وصف الموسم" placeholder="وصف الموسم" />
                       </div>
                       <div className="grid grid-cols-4 gap-3">
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">شهر البداية</label>
-                          <input type="number" min={1} max={12} value={season.startDate.month} onChange={e => updateSeasonMeta(activeSeasonKey, 'startDate', { ...season.startDate, month: +e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="شهر البداية" aria-label="شهر البداية" />
+                          <input type="number" min={1} max={12} value={season.startDate.month} onChange={e => updateSeasonMeta(activeSeasonKey, 'startDate', { ...season.startDate, month: +e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="شهر البداية" aria-label="شهر البداية" />
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">يوم البداية</label>
-                          <input type="number" min={1} max={30} value={season.startDate.day} onChange={e => updateSeasonMeta(activeSeasonKey, 'startDate', { ...season.startDate, day: +e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="يوم البداية" aria-label="يوم البداية" />
+                          <input type="number" min={1} max={30} value={season.startDate.day} onChange={e => updateSeasonMeta(activeSeasonKey, 'startDate', { ...season.startDate, day: +e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="يوم البداية" aria-label="يوم البداية" />
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">شهر النهاية</label>
-                          <input type="number" min={1} max={12} value={season.endDate.month} onChange={e => updateSeasonMeta(activeSeasonKey, 'endDate', { ...season.endDate, month: +e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="شهر النهاية" aria-label="شهر النهاية" />
+                          <input type="number" min={1} max={12} value={season.endDate.month} onChange={e => updateSeasonMeta(activeSeasonKey, 'endDate', { ...season.endDate, month: +e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="شهر النهاية" aria-label="شهر النهاية" />
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">يوم النهاية</label>
-                          <input type="number" min={1} max={30} value={season.endDate.day} onChange={e => updateSeasonMeta(activeSeasonKey, 'endDate', { ...season.endDate, day: +e.target.value })} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="يوم النهاية" aria-label="يوم النهاية" />
+                          <input type="number" min={1} max={30} value={season.endDate.day} onChange={e => updateSeasonMeta(activeSeasonKey, 'endDate', { ...season.endDate, day: +e.target.value })} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="يوم النهاية" aria-label="يوم النهاية" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3 mt-3">
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">الأيقونة</label>
-                          <input value={season.icon} onChange={e => updateSeasonMeta(activeSeasonKey, 'icon', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="اسم الأيقونة" aria-label="اسم الأيقونة" />
+                          <input value={season.icon} onChange={e => updateSeasonMeta(activeSeasonKey, 'icon', e.target.value)} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="اسم الأيقونة" aria-label="اسم الأيقونة" />
                         </div>
                         <div>
                           <label className="text-xs text-slate-500 block mb-1">اللون</label>
                           <div className="flex items-center gap-2">
                             <input type="color" value={season.color} onChange={e => updateSeasonMeta(activeSeasonKey, 'color', e.target.value)} className="w-8 h-8 rounded cursor-pointer" title="لون الموسم" aria-label="لون الموسم" />
-                            <input value={season.color} onChange={e => updateSeasonMeta(activeSeasonKey, 'color', e.target.value)} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm" title="كود اللون" aria-label="كود اللون" />
+                            <input value={season.color} onChange={e => updateSeasonMeta(activeSeasonKey, 'color', e.target.value)} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm" title="كود اللون" aria-label="كود اللون" />
                           </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Special Days */}
-                    <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
+                    <div className="border border-admin-border rounded-lg p-4 bg-admin-bg/50">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-slate-300">الأيام المميزة ({season.specialDays?.length || 0})</h3>
                         <button
@@ -1663,42 +1714,42 @@ export default function ContentManager() {
                             const days = [...(season.specialDays || []), { day: 1, nameAr: '', nameEn: '', description: '', virtues: [], recommendedActions: [] }];
                             updateSeasonMeta(activeSeasonKey, 'specialDays', days);
                           }}
-                          className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded text-xs hover:bg-emerald-600/30"
+                          className="flex items-center gap-1 px-2 py-1 bg-accent-dark/20 text-accent-light rounded text-xs hover:bg-accent-dark/30"
                         >
                           <Plus size={12} /> إضافة
                         </button>
                       </div>
                       {(season.specialDays || []).map((sd, si) => (
-                        <div key={si} className="border border-slate-600 rounded-lg p-3 mb-2 bg-slate-800/50">
+                        <div key={si} className="border border-admin-border rounded-lg p-3 mb-2 bg-admin-surface/50">
                           <div className="grid grid-cols-4 gap-2 mb-2">
-                            <input type="number" value={sd.day} min={1} max={30} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, day: +e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="اليوم" title="رقم اليوم" aria-label="رقم اليوم" />
-                            <input value={sd.nameAr} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, nameAr: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الاسم بالعربية" title="الاسم بالعربية" aria-label="الاسم بالعربية" />
-                            <input value={sd.nameEn} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, nameEn: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm" placeholder="الاسم بالإنجليزية" title="الاسم بالإنجليزية" aria-label="الاسم بالإنجليزية" />
+                            <input type="number" value={sd.day} min={1} max={30} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, day: +e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="اليوم" title="رقم اليوم" aria-label="رقم اليوم" />
+                            <input value={sd.nameAr} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, nameAr: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right" dir="rtl" placeholder="الاسم بالعربية" title="الاسم بالعربية" aria-label="الاسم بالعربية" />
+                            <input value={sd.nameEn} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, nameEn: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm" placeholder="الاسم بالإنجليزية" title="الاسم بالإنجليزية" aria-label="الاسم بالإنجليزية" />
                             <button onClick={() => { const days = (season.specialDays || []).filter((_, idx) => idx !== si); updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="p-1 hover:bg-red-900/30 rounded self-center justify-self-center" title="حذف اليوم">
                               <Trash2 size={14} className="text-red-400" />
                             </button>
                           </div>
-                          <textarea value={sd.description} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, description: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[40px]" dir="rtl" placeholder="الوصف" title="الوصف" aria-label="وصف اليوم" />
+                          <textarea value={sd.description} onChange={e => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, description: e.target.value }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="w-full bg-admin-surface border border-admin-border rounded px-2 py-1 text-white text-sm text-right mb-2 min-h-[40px]" dir="rtl" placeholder="الوصف" title="الوصف" aria-label="وصف اليوم" />
                           <div className="grid grid-cols-2 gap-2">
                             <div>
                               <span className="text-xs text-slate-500 block mb-1">الفضائل</span>
                               {sd.virtues.map((v, vi) => (
                                 <div key={vi} className="flex gap-1 mb-1">
-                                  <input value={v} onChange={e => { const days = [...(season.specialDays || [])]; const virtues = [...sd.virtues]; virtues[vi] = e.target.value; days[si] = { ...sd, virtues }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-white text-xs text-right" dir="rtl" title="نص الفضيلة" aria-label="نص الفضيلة" />
+                                  <input value={v} onChange={e => { const days = [...(season.specialDays || [])]; const virtues = [...sd.virtues]; virtues[vi] = e.target.value; days[si] = { ...sd, virtues }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-0.5 text-white text-xs text-right" dir="rtl" title="نص الفضيلة" aria-label="نص الفضيلة" />
                                   <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, virtues: sd.virtues.filter((_, idx) => idx !== vi) }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="p-0.5 hover:bg-red-900/30 rounded" title="حذف"><Trash2 size={10} className="text-red-400" /></button>
                                 </div>
                               ))}
-                              <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, virtues: [...sd.virtues, ''] }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="text-emerald-400 text-xs hover:text-emerald-300">+ فضيلة</button>
+                              <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, virtues: [...sd.virtues, ''] }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="text-accent-light text-xs hover:text-emerald-300">+ فضيلة</button>
                             </div>
                             <div>
                               <span className="text-xs text-slate-500 block mb-1">الأعمال المستحبة</span>
                               {sd.recommendedActions.map((a, ai) => (
                                 <div key={ai} className="flex gap-1 mb-1">
-                                  <input value={a} onChange={e => { const days = [...(season.specialDays || [])]; const actions = [...sd.recommendedActions]; actions[ai] = e.target.value; days[si] = { ...sd, recommendedActions: actions }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-white text-xs text-right" dir="rtl" title="نص العمل" aria-label="نص العمل" />
+                                  <input value={a} onChange={e => { const days = [...(season.specialDays || [])]; const actions = [...sd.recommendedActions]; actions[ai] = e.target.value; days[si] = { ...sd, recommendedActions: actions }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-0.5 text-white text-xs text-right" dir="rtl" title="نص العمل" aria-label="نص العمل" />
                                   <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, recommendedActions: sd.recommendedActions.filter((_, idx) => idx !== ai) }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="p-0.5 hover:bg-red-900/30 rounded" title="حذف"><Trash2 size={10} className="text-red-400" /></button>
                                 </div>
                               ))}
-                              <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, recommendedActions: [...sd.recommendedActions, ''] }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="text-emerald-400 text-xs hover:text-emerald-300">+ عمل</button>
+                              <button onClick={() => { const days = [...(season.specialDays || [])]; days[si] = { ...sd, recommendedActions: [...sd.recommendedActions, ''] }; updateSeasonMeta(activeSeasonKey, 'specialDays', days); }} className="text-accent-light text-xs hover:text-emerald-300">+ عمل</button>
                             </div>
                           </div>
                         </div>
@@ -1706,19 +1757,19 @@ export default function ContentManager() {
                     </div>
 
                     {/* Greetings */}
-                    <div className="border border-slate-700 rounded-lg p-4 bg-slate-900/50">
+                    <div className="border border-admin-border rounded-lg p-4 bg-admin-bg/50">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-slate-300">التحيات الموسمية ({season.greetings?.length || 0})</h3>
                         <button
                           onClick={() => updateSeasonMeta(activeSeasonKey, 'greetings', [...(season.greetings || []), ''])}
-                          className="flex items-center gap-1 px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded text-xs hover:bg-emerald-600/30"
+                          className="flex items-center gap-1 px-2 py-1 bg-accent-dark/20 text-accent-light rounded text-xs hover:bg-accent-dark/30"
                         >
                           <Plus size={12} /> إضافة
                         </button>
                       </div>
                       {(season.greetings || []).map((g, gi) => (
                         <div key={gi} className="flex items-center gap-2 mb-2">
-                          <input value={g} onChange={e => { const greetings = [...(season.greetings || [])]; greetings[gi] = e.target.value; updateSeasonMeta(activeSeasonKey, 'greetings', greetings); }} className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-white text-sm text-right" dir="rtl" title="نص التحية" aria-label="نص التحية" />
+                          <input value={g} onChange={e => { const greetings = [...(season.greetings || [])]; greetings[gi] = e.target.value; updateSeasonMeta(activeSeasonKey, 'greetings', greetings); }} className="flex-1 bg-admin-surface border border-admin-border rounded px-2 py-1.5 text-white text-sm text-right" dir="rtl" title="نص التحية" aria-label="نص التحية" />
                           <button onClick={() => updateSeasonMeta(activeSeasonKey, 'greetings', (season.greetings || []).filter((_, idx) => idx !== gi))} className="p-1 hover:bg-red-900/30 rounded" title="حذف التحية">
                             <Trash2 size={14} className="text-red-400" />
                           </button>
@@ -1743,14 +1794,16 @@ function EmptyState({ label, onInit }: { label: string; onInit: () => void }) {
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <Edit2 size={32} className="text-slate-600 mb-3" />
       <p className="text-slate-400 mb-4">لا يوجد محتوى {label} في قاعدة البيانات بعد</p>
-      <button
-        onClick={onInit}
-        className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm"
-      >
-        <Plus size={16} /> إنشاء محتوى فارغ
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onInit}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-emerald-700 rounded-lg text-white text-sm transition-colors"
+        >
+          <Download size={16} /> تحميل المحتوى الافتراضي
+        </button>
+      </div>
       <p className="text-xs text-slate-500 mt-3">
-        يمكنك أيضاً تشغيل سكربت البذر لتحميل المحتوى الحالي من التطبيق
+        سيتم تحميل المحتوى الافتراضي المُضمّن في التطبيق — يمكنك تعديله ثم حفظه
       </p>
     </div>
   );

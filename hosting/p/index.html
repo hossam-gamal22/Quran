@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading...</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0a0f1a; color: #e0e0e0; min-height: 100vh; }
+    .loading { display: flex; align-items: center; justify-content: center; min-height: 100vh; flex-direction: column; gap: 16px; }
+    .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #0f987f; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: #6b7280; font-size: 0.9rem; }
+    .hidden { display: none; }
+    .error-state { text-align: center; padding: 120px 24px; }
+    .error-state h1 { font-size: 4rem; margin-bottom: 16px; }
+    .error-state p { color: #6b7280; margin-bottom: 24px; }
+    .error-state a { color: #0f987f; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p class="loading-text">Loading page...</p>
+  </div>
+  <div id="content"></div>
+  <div id="error" class="error-state hidden">
+    <h1>404</h1>
+    <p>This page doesn't exist or hasn't been published yet.</p>
+    <a href="/">← Back to Home</a>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js';
+    import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/11.7.1/firebase-firestore.js';
+    import { renderPage } from '../shared/renderer.js';
+
+    const app = initializeApp({
+      apiKey: "AIzaSyAojqduIulMDaUVTjtrtL2tIE5q_NwOH1A",
+      authDomain: "rooh-almuslim.firebaseapp.com",
+      projectId: "rooh-almuslim",
+      storageBucket: "rooh-almuslim.firebasestorage.app",
+      messagingSenderId: "328160076358",
+      appId: "1:328160076358:web:fe5ec8e8b07355f1c06047"
+    });
+    const db = getFirestore(app);
+
+    async function loadPage() {
+      // Get slug from URL: /p/my-page → "my-page"
+      const path = window.location.pathname.replace(/^\/p\//, '').replace(/\/$/, '');
+      if (!path) return showError();
+
+      try {
+        const snap = await getDoc(doc(db, 'websitePages', path));
+        if (!snap.exists()) return showError();
+
+        const data = snap.data();
+        if (!data.published) return showError();
+
+        // Render the page
+        const html = renderPage(data);
+
+        // Replace the entire document
+        document.open();
+        document.write(html);
+        document.close();
+      } catch (e) {
+        console.error('Failed to load page:', e);
+        showError();
+      }
+    }
+
+    function showError() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('error').classList.remove('hidden');
+    }
+
+    loadPage();
+  </script>
+</body>
+</html>

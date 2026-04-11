@@ -3,16 +3,17 @@
 // آخر تحديث: 2026-03-04
 // محدث لدعم 12 لغة
 
-import { db } from '../firebase';
-import { 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
+import { db, functions } from '../firebase';
+import {
+  collection,
+  getDocs,
+  query,
+  where,
   Timestamp,
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 // ==================== الأنواع ====================
 
@@ -58,9 +59,10 @@ export interface PushNotificationPayload {
   // الترجمات لكل اللغات
   translations: NotificationTranslations;
   // الاستهداف
-  targetAudience: 'all' | 'ios' | 'android' | 'active' | 'inactive' | 'custom';
+  targetAudience: 'all' | 'ios' | 'android' | 'active' | 'inactive' | 'custom' | 'single_user';
   targetLanguages?: string[];
   targetCountries?: string[];
+  targetUserId?: string;
   // الإجراء
   actionType?: 'none' | 'screen' | 'url';
   actionUrl?: string;
@@ -101,7 +103,6 @@ export interface UserStats {
 
 // ==================== الثوابت ====================
 
-const EXPO_PUSH_API = 'https://exp.host/--/api/v2/push/send';
 const BATCH_SIZE = 100;
 
 // ==================== دوال مساعدة ====================
@@ -112,12 +113,30 @@ const BATCH_SIZE = 100;
 const fetchUserTokens = async (
   targetAudience: string,
   targetLanguages?: string[],
-  targetCountries?: string[]
+  targetCountries?: string[],
+  targetUserId?: string
 ): Promise<UserToken[]> => {
   try {
     const usersRef = collection(db, 'users');
     let usersQuery = query(usersRef);
-    
+
+    // Single user targeting — fetch just that one doc
+    if (targetAudience === 'single_user' && targetUserId) {
+      const { getDoc, doc: docRef } = await import('firebase/firestore');
+      const userSnap = await getDoc(docRef(db, 'users', targetUserId));
+      if (!userSnap.exists()) return [];
+      const data = userSnap.data();
+      if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return [];
+      return [{
+        id: userSnap.id,
+        fcmToken: data.fcmToken,
+        platform: data.platform || 'unknown',
+        language: data.language || 'ar',
+        country: data.country || 'SA',
+        lastActive: data.lastActive,
+      }];
+    }
+
     // تصفية حسب المنصة
     if (targetAudience === 'ios') {
       usersQuery = query(usersRef, where('platform', '==', 'ios'));
@@ -126,10 +145,14 @@ const fetchUserTokens = async (
     }
     
     const snapshot = await getDocs(usersQuery);
+    const STORE_SOURCES = new Set(['play_store', 'app_store']);
     let users: UserToken[] = [];
     
     snapshot.forEach(doc => {
       const data = doc.data();
+      // SSOT: skip placeholders and non-store installs
+      if (data.placeholder) return;
+      if (!STORE_SOURCES.has(data.installSource)) return;
       // تجاهل المستخدمين بدون توكن
       if (data.fcmToken && data.fcmToken.startsWith('ExponentPushToken')) {
         users.push({
@@ -211,48 +234,62 @@ const getTranslationForUser = (
 };
 
 /**
- * إرسال دفعة من الإشعارات
+ * إرسال دفعة من الإشعارات.
+ * - في بيئة التطوير (localhost): يستخدم Vite proxy لتجاوز CORS
+ * - في الإنتاج: يستخدم Firebase Cloud Function
  */
 const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
-  try {
-    const response = await fetch(EXPO_PUSH_API, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    
-    let successCount = 0;
-    let failureCount = 0;
-    const errors: string[] = [];
-    
-    if (result.data) {
-      result.data.forEach((item: any, index: number) => {
-        if (item.status === 'ok') {
-          successCount++;
-        } else {
-          failureCount++;
-          errors.push(`Token ${index}: ${item.message || 'Unknown error'}`);
-        }
+  const isDev = import.meta.env.DEV;
+
+  // ─── بيئة التطوير: Vite proxy (localhost) ───
+  if (isDev) {
+    try {
+      const res = await fetch('/expo-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(messages),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json();
+      let ok = 0, fail = 0;
+      const errs: string[] = [];
+      (result.data ?? []).forEach((t: any, i: number) => {
+        if (t.status === 'ok') ok++;
+        else { fail++; errs.push(`Token ${i}: ${t.message ?? 'error'}`); }
+      });
+      console.log(`✅ Sent ${ok} via Vite proxy`);
+      return { successCount: ok, failureCount: fail, errors: errs };
+    } catch (error: any) {
+      console.error('Proxy error:', error);
+      return { successCount: 0, failureCount: messages.length, errors: [error.message] };
     }
-    
-    return { successCount, failureCount, errors };
-  } catch (error) {
-    console.error('Batch send error:', error);
+  }
+
+  // ─── الإنتاج: Firebase Cloud Function ───
+  try {
+    const sendPushNotifications = httpsCallable<
+      { messages: ExpoPushMessage[] },
+      { success: boolean; sentCount: number; tickets: { status: string; message?: string }[] }
+    >(functions, 'sendPushNotifications');
+
+    const result = await sendPushNotifications({ messages });
+    const { tickets = [] } = result.data;
+
+    let ok = 0, fail = 0;
+    const errs: string[] = [];
+    tickets.forEach((t, i) => {
+      if (t.status === 'ok') ok++;
+      else { fail++; errs.push(`Token ${i}: ${t.message ?? 'error'}`); }
+    });
+
+    console.log(`✅ Sent ${ok} via Cloud Function`);
+    return { successCount: ok, failureCount: fail, errors: errs };
+  } catch (error: any) {
+    console.error('Cloud Function error:', error);
     return {
       successCount: 0,
       failureCount: messages.length,
-      errors: [(error as Error).message],
+      errors: [error.message || 'يجب ترقية Firebase إلى خطة Blaze لتفعيل Cloud Functions'],
     };
   }
 };
@@ -275,7 +312,8 @@ export const sendPushNotification = async (
     const users = await fetchUserTokens(
       payload.targetAudience,
       payload.targetLanguages,
-      payload.targetCountries
+      payload.targetCountries,
+      payload.targetUserId
     );
     
     if (users.length === 0) {
@@ -313,39 +351,54 @@ export const sendPushNotification = async (
       };
     });
     
-    // 3. إرسال على دفعات
+    // 3. Save notification doc FIRST to get its ID for tracking
+    const notificationDoc: Record<string, any> = {
+      translations: payload.translations,
+      targetAudience: payload.targetAudience,
+      status: 'sending',
+      sentCount: 0,
+      failedCount: 0,
+      perLanguage: {},
+      deliveredCount: 0,
+      openedCount: 0,
+      clickedCount: 0,
+      createdAt: serverTimestamp(),
+    };
+    if (payload.targetLanguages) notificationDoc.targetLanguages = payload.targetLanguages;
+    if (payload.targetCountries) notificationDoc.targetCountries = payload.targetCountries;
+    if (payload.actionType) notificationDoc.actionType = payload.actionType;
+    if (payload.actionUrl) notificationDoc.actionUrl = payload.actionUrl;
+    if (payload.imageUrl) notificationDoc.imageUrl = payload.imageUrl;
+    const notifDocRef = await addDoc(collection(db, 'notifications'), notificationDoc);
+
+    // 4. Inject the doc ID into each message's data for open tracking
+    for (const msg of messages) {
+      (msg as any).data = { ...(msg as any).data, notificationDocId: notifDocRef.id };
+    }
+
+    // 5. إرسال على دفعات
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
       const batch = messages.slice(i, i + BATCH_SIZE);
       const result = await sendBatch(batch);
-      
+
       sentCount += result.successCount;
       failedCount += result.failureCount;
       errors.push(...result.errors);
-      
-      // تأخير بين الدفعات
+
       if (i + BATCH_SIZE < messages.length) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
-    
-    // 4. تسجيل الإشعار في Firebase
-    await addDoc(collection(db, 'notifications'), {
-      translations: payload.translations,
-      targetAudience: payload.targetAudience,
-      targetLanguages: payload.targetLanguages,
-      targetCountries: payload.targetCountries,
-      actionType: payload.actionType,
-      actionUrl: payload.actionUrl,
-      imageUrl: payload.imageUrl,
+
+    // 6. Update the doc with final send counts
+    const { updateDoc: updateDocFn } = await import('firebase/firestore');
+    await updateDocFn(notifDocRef, {
       status: 'sent',
       sentCount,
       failedCount,
       perLanguage,
       deliveredCount: sentCount,
-      openedCount: 0,
-      clickedCount: 0,
       sentAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
     });
     
     console.log(`✅ Sent: ${sentCount}, Failed: ${failedCount}`);
@@ -390,27 +443,13 @@ export const sendTestNotification = async (token: string, language: string = 'ar
   };
   
   const msg = testMessages[language] || testMessages.ar;
-  
-  try {
-    const response = await fetch(EXPO_PUSH_API, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([{
-        to: token,
-        title: msg.title,
-        body: msg.body,
-        sound: 'default',
-      }]),
-    });
-    
-    return response.ok;
-  } catch (error) {
-    console.error('Test notification error:', error);
-    return false;
-  }
+  const result = await sendBatch([{
+    to: token,
+    title: msg.title,
+    body: msg.body,
+    sound: 'default',
+  }]);
+  return result.successCount > 0 || result.errors.length === 0;
 };
 
 /**
@@ -421,29 +460,19 @@ export const isValidExpoToken = (token: string): boolean => {
 };
 
 /**
- * الحصول على إحصائيات المستخدمين
+ * الحصول على إحصائيات المستخدمين — SSOT: same filter & dedup as all other pages
  */
 export const getUserStats = async (): Promise<UserStats> => {
   try {
-    const users = await fetchUserTokens('all');
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
-    // حساب التوزيع حسب اللغة
-    const byLanguage: { [lang: string]: number } = {};
-    users.forEach(u => {
-      byLanguage[u.language] = (byLanguage[u.language] || 0) + 1;
-    });
-    
+    const { fetchActiveDevices } = await import('../utils/user-query');
+    const { stats } = await fetchActiveDevices();
     return {
-      total: users.length,
-      withTokens: users.filter(u => u.fcmToken).length,
-      ios: users.filter(u => u.platform === 'ios').length,
-      android: users.filter(u => u.platform === 'android').length,
-      active: users.filter(u => {
-        if (!u.lastActive) return false;
-        return u.lastActive.toDate() > weekAgo;
-      }).length,
-      byLanguage,
+      total: stats.total,
+      withTokens: stats.withTokens,
+      ios: stats.ios,
+      android: stats.android,
+      active: stats.active,
+      byLanguage: stats.byLanguage,
     };
   } catch (error) {
     return { total: 0, withTokens: 0, ios: 0, android: 0, active: 0, byLanguage: {} };
@@ -458,10 +487,13 @@ export const getUserStats = async (): Promise<UserStats> => {
 export const getInactiveUserCount = async (inactiveDays: number): Promise<number> => {
   try {
     const threshold = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+    const STORE_SOURCES = new Set(['play_store', 'app_store']);
     const snapshot = await getDocs(collection(db, 'users'));
     let count = 0;
     snapshot.forEach(doc => {
       const data = doc.data();
+      if (data.placeholder) return;
+      if (!STORE_SOURCES.has(data.installSource)) return;
       if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
       if (!data.lastActive) { count++; return; }
       if (data.lastActive.toDate() <= threshold) count++;
@@ -489,11 +521,14 @@ export const sendReengagementNotification = async (params: {
   try {
     // Fetch inactive users with configurable threshold
     const threshold = new Date(Date.now() - inactiveDays * 24 * 60 * 60 * 1000);
+    const STORE_SOURCES = new Set(['play_store', 'app_store']);
     const snapshot = await getDocs(collection(db, 'users'));
     const users: UserToken[] = [];
 
     snapshot.forEach(doc => {
       const data = doc.data();
+      if (data.placeholder) return;
+      if (!STORE_SOURCES.has(data.installSource)) return;
       if (!data.fcmToken || !data.fcmToken.startsWith('ExponentPushToken')) return;
       const isInactive = !data.lastActive || data.lastActive.toDate() <= threshold;
       if (isInactive) {
@@ -554,6 +589,42 @@ export const sendReengagementNotification = async (params: {
   } catch (error) {
     return { success: false, sentCount, failedCount, errors: [(error as Error).message], perLanguage };
   }
+};
+
+// ==================== إشعار التحديث ====================
+
+/**
+ * ترجمات إشعار تحديث التطبيق (12 لغة)
+ */
+const UPDATE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
+  ar: { title: '🎉 تحديث جديد متاح', body: 'يتوفر إصدار جديد من روح المسلم. حدّث الآن للحصول على أفضل تجربة.' },
+  en: { title: '🎉 New Update Available', body: 'A new version of Rooh Al-Muslim is available. Update now for the best experience.' },
+  fr: { title: '🎉 Nouvelle mise à jour disponible', body: 'Une nouvelle version de Rooh Al-Muslim est disponible. Mettez à jour maintenant.' },
+  de: { title: '🎉 Neues Update verfügbar', body: 'Eine neue Version von Rooh Al-Muslim ist verfügbar. Jetzt aktualisieren.' },
+  es: { title: '🎉 Nueva actualización disponible', body: 'Una nueva versión de Rooh Al-Muslim está disponible. Actualiza ahora.' },
+  tr: { title: '🎉 Yeni Güncelleme Mevcut', body: 'Rooh Al-Muslim uygulamasının yeni sürümü mevcut. En iyi deneyim için şimdi güncelleyin.' },
+  ur: { title: '🎉 نئی اپ ڈیٹ دستیاب ہے', body: 'روح المسلم کا نیا ورژن دستیاب ہے۔ بہتر تجربے کے لیے ابھی اپ ڈیٹ کریں۔' },
+  id: { title: '🎉 Pembaruan Baru Tersedia', body: 'Versi baru Rooh Al-Muslim tersedia. Perbarui sekarang untuk pengalaman terbaik.' },
+  ms: { title: '🎉 Kemas Kini Baharu Tersedia', body: 'Versi baharu Rooh Al-Muslim tersedia. Kemas kini sekarang untuk pengalaman terbaik.' },
+  hi: { title: '🎉 नया अपडेट उपलब्ध', body: 'रूह अल-मुस्लिम का नया संस्करण उपलब्ध है। सर्वोत्तम अनुभव के लिए अभी अपडेट करें।' },
+  bn: { title: '🎉 নতুন আপডেট পাওয়া যাচ্ছে', body: 'রূহ আল-মুসলিমের নতুন সংস্করণ পাওয়া যাচ্ছে। সেরা অভিজ্ঞতার জন্য এখনই আপডেট করুন।' },
+  ru: { title: '🎉 Доступно новое обновление', body: 'Доступна новая версия Rooh Al-Muslim. Обновите сейчас для лучшего опыта.' },
+};
+
+/**
+ * إرسال إشعار تحديث التطبيق لجميع المستخدمين
+ * يُستدعى من لوحة التحكم عند تعيين إصدار جديد
+ */
+export const sendUpdatePushNotification = async (
+  storeUrlIos: string,
+  storeUrlAndroid: string,
+): Promise<SendResult> => {
+  return sendPushNotification({
+    translations: UPDATE_NOTIFICATION_TRANSLATIONS,
+    targetAudience: 'all',
+    actionType: 'url',
+    actionUrl: storeUrlAndroid || storeUrlIos, // fallback
+  });
 };
 
 /**

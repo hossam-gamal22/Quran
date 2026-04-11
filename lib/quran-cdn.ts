@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // List of CDN hosts to try (ordered by preference)
 const HOSTS = [

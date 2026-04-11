@@ -21,6 +21,10 @@ import {
 } from '@/lib/seasonal-content';
 import { loadSeasonsMetadata } from '@/lib/content-api';
 import { getHijriDate } from '@/lib/hijri-date';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { getLanguage } from '@/lib/i18n';
+import type { WelcomeBannerConfig } from '@/lib/app-config-api';
 
 // ========================================
 // الأنواع
@@ -76,6 +80,9 @@ interface SeasonalContextType {
   // المحتوى
   seasonalContent: SeasonalContent[];
   featuredContent: SeasonalContent | null;
+  
+  // بانر المحتوى الموسمي من الأدمن
+  adminBanner: WelcomeBannerConfig | null;
   
   // الدوال
   refreshSeasonalData: () => Promise<void>;
@@ -156,6 +163,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
   const [settings, setSettings] = useState<SeasonalSettings>(defaultSettings);
   const [seasonalContent, setSeasonalContent] = useState<SeasonalContent[]>([]);
   const [featuredContent, setFeaturedContent] = useState<SeasonalContent | null>(null);
+  const [adminBanner, setAdminBanner] = useState<WelcomeBannerConfig | null>(null);
 
   // ========================================
   // تحميل البيانات
@@ -207,9 +215,37 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
 
   const loadSeasonalContent = useCallback(async (seasonType: SeasonType) => {
     try {
-      // هنا يمكن تحميل المحتوى من API أو من ملفات محلية
-      // حالياً نستخدم محتوى تجريبي
-      const content: SeasonalContent[] = generateSampleContent(seasonType);
+      // جلب المحتوى من Firestore (ما يكتبه الأدمن)
+      const lang = getLanguage() || 'ar';
+      const q = query(
+        collection(db, 'seasonalContent'),
+        where('isActive', '==', true),
+        orderBy('priority', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      
+      const firestoreContent: SeasonalContent[] = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        // تصفية حسب نوع الموسم (أو سماح بالمحتوى المخصص)
+        if (data.seasonType === seasonType || data.seasonType === 'custom') {
+          firestoreContent.push({
+            id: doc.id,
+            seasonType: data.seasonType as SeasonType,
+            title: lang === 'ar' ? (data.titleAr || data.titleEn || '') : (data.titleEn || data.titleAr || ''),
+            content: lang === 'ar' ? (data.contentAr || data.contentEn || '') : (data.contentEn || data.contentAr || ''),
+            type: mapContentType(data.contentType || 'reminder'),
+            day: data.day,
+            priority: data.priority || 999,
+          });
+        }
+      });
+
+      // استخدام المحتوى من Firestore، مع fallback للمحتوى المحلي إذا لم يوجد محتوى
+      const content = firestoreContent.length > 0
+        ? firestoreContent
+        : generateLocalFallbackContent(seasonType);
+      
       setSeasonalContent(content);
       
       // اختيار محتوى مميز عشوائي
@@ -219,6 +255,123 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
       }
     } catch (error) {
       console.error('Error loading seasonal content:', error);
+    }
+  }, []);
+
+  // ========================================
+  // جلب بانر المحتوى الموسمي من الأدمن
+  // ========================================
+
+  const loadAdminBanners = useCallback(async () => {
+    try {
+      const lang = getLanguage() || 'ar';
+      const q = query(
+        collection(db, 'seasonalContent'),
+        where('isActive', '==', true),
+        orderBy('priority', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        setAdminBanner(null);
+        return;
+      }
+
+      const now = new Date();
+      const hijri = getHijriDate(now);
+      const dayOfWeek = now.getDay(); // 0=Sun, 5=Fri
+
+      // خريطة المواسم حسب التاريخ الهجري
+      const seasonHijriRanges: Record<string, { month: number; startDay: number; endDay: number }> = {
+        ramadan:   { month: 9,  startDay: 1,  endDay: 30 },
+        eid_fitr:  { month: 10, startDay: 1,  endDay: 3 },
+        eid_adha:  { month: 12, startDay: 10, endDay: 13 },
+        hajj:      { month: 12, startDay: 8,  endDay: 13 },
+        mawlid:    { month: 3,  startDay: 12, endDay: 12 },
+        ashura:    { month: 1,  startDay: 9,  endDay: 10 },
+        isra_miraj:{ month: 7,  startDay: 27, endDay: 27 },
+      };
+
+      // تحقق هل المحتوى يطابق اليوم
+      const isActiveToday = (data: any): boolean => {
+        const type = data.seasonType;
+
+        // يوم الجمعة
+        if (type === 'friday') return dayOfWeek === 5;
+
+        // مواسم هجرية ثابتة
+        const range = seasonHijriRanges[type];
+        if (range) {
+          return hijri.month === range.month && hijri.day >= range.startDay && hijri.day <= range.endDay;
+        }
+
+        // محتوى مخصص — تحقق من نطاق التاريخ
+        if (type === 'custom' && data.startDate && data.endDate) {
+          if (data.isHijriDate) {
+            const [startM, startD] = data.startDate.split('-').map(Number);
+            const [endM, endD] = data.endDate.split('-').map(Number);
+            if (startM && startD && endM && endD) {
+              const hijriDayOfYear = (hijri.month - 1) * 30 + hijri.day;
+              const startDayOfYear = (startM - 1) * 30 + startD;
+              const endDayOfYear = (endM - 1) * 30 + endD;
+              return hijriDayOfYear >= startDayOfYear && hijriDayOfYear <= endDayOfYear;
+            }
+          } else {
+            const start = new Date(data.startDate);
+            const end = new Date(data.endDate);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              return now >= start && now <= end;
+            }
+          }
+        }
+
+        return false;
+      };
+
+      // Route map for season types
+      const seasonRoutes: Record<string, string> = {
+        ramadan: '/seasonal/ramadan',
+        hajj: '/seasonal/hajj',
+        eid_fitr: '/seasonal/ramadan',
+        eid_adha: '/seasonal/hajj',
+        mawlid: '/seasonal/mawlid',
+        ashura: '/seasonal/ashura',
+        isra_miraj: '/seasonal/ashura',
+        friday: '/(tabs)',
+        custom: '/(tabs)',
+      };
+
+      // البحث عن أول محتوى يطابق اليوم (مرتب حسب الأولوية)
+      let bestMatch: WelcomeBannerConfig | null = null;
+      snapshot.forEach(doc => {
+        if (bestMatch) return; // خذ أول مطابقة فقط (أعلى أولوية)
+        const data = doc.data();
+        if (isActiveToday(data)) {
+          // استخدام الترجمات المحفوظة أولاً، ثم العربي/الإنجليزي كـ fallback
+          const translations = data.translations || {};
+          const title = translations[`title_${lang}`]
+            || (lang === 'ar' ? data.titleAr : data.titleEn)
+            || data.titleAr || data.titleEn || '';
+          const subtitle = translations[`content_${lang}`]
+            || (lang === 'ar' ? data.contentAr : data.contentEn)
+            || data.contentAr || data.contentEn || '';
+          bestMatch = {
+            enabled: true,
+            title,
+            subtitle,
+            icon: data.icon || 'moon-waning-crescent',
+            color: data.backgroundColor || '#1a1a2e',
+            route: data.targetScreen ? `/${data.targetScreen}` : (seasonRoutes[data.seasonType] || '/(tabs)'),
+            displayMode: data.backgroundImage ? 'text_image' : 'text',
+            backgroundImage: data.backgroundImage,
+          };
+        }
+      });
+
+      setAdminBanner(bestMatch);
+    } catch (error) {
+      // Silently handle — missing admin banners is expected when no seasonal content is configured
+      console.warn('Admin banners not available:', (error as any)?.code || error);
+      setAdminBanner(null);
     }
   }, []);
 
@@ -269,12 +422,15 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
         setSeasonalContent([]);
         setFeaturedContent(null);
       }
+
+      // جلب بانرات الأدمن (دائماً — حتى لو لا يوجد موسم تقويمي)
+      await loadAdminBanners();
     } catch (error) {
       console.error('Error refreshing seasonal data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [loadSettings, loadProgress, loadSeasonalContent]);
+  }, [loadSettings, loadProgress, loadSeasonalContent, loadAdminBanners]);
 
   // ========================================
   // إدارة التقدم
@@ -417,6 +573,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
     settings,
     seasonalContent,
     featuredContent,
+    adminBanner,
     refreshSeasonalData,
     markDayCompleted,
     updateProgress,
@@ -511,9 +668,25 @@ const checkAchievements = (progress: SeasonalProgress, season: SeasonInfo): stri
 };
 
 /**
- * إنشاء محتوى تجريبي
+ * تحويل نوع المحتوى من صيغة الأدمن إلى صيغة التطبيق
  */
-const generateSampleContent = (seasonType: SeasonType): SeasonalContent[] => {
+const mapContentType = (adminType: string): SeasonalContent['type'] => {
+  const mapping: Record<string, SeasonalContent['type']> = {
+    greeting: 'tip',
+    azkar: 'zikr',
+    dua: 'dua',
+    reminder: 'tip',
+    challenge: 'tip',
+    fact: 'article',
+    quote: 'hadith',
+  };
+  return mapping[adminType] || 'tip';
+};
+
+/**
+ * محتوى احتياطي محلي (يُستخدم فقط عند عدم وجود محتوى في Firestore)
+ */
+const generateLocalFallbackContent = (seasonType: SeasonType): SeasonalContent[] => {
   const content: SeasonalContent[] = [];
 
   if (seasonType === 'ramadan') {
@@ -534,22 +707,6 @@ const generateSampleContent = (seasonType: SeasonType): SeasonalContent[] => {
         type: 'dua',
         day: 27,
         priority: 1,
-      },
-      {
-        id: 'ramadan_tip_1',
-        seasonType: 'ramadan',
-        title: 'نصيحة رمضانية',
-        content: 'احرص على قراءة جزء من القرآن يومياً لختم القرآن في رمضان',
-        type: 'tip',
-        priority: 2,
-      },
-      {
-        id: 'ramadan_hadith_1',
-        seasonType: 'ramadan',
-        title: 'حديث عن رمضان',
-        content: 'مَن صامَ رَمَضانَ إيمانًا واحْتِسابًا غُفِرَ له ما تَقَدَّمَ مِن ذَنْبِهِ',
-        type: 'hadith',
-        priority: 1,
       }
     );
   } else if (seasonType === 'dhul_hijjah') {
@@ -561,14 +718,6 @@ const generateSampleContent = (seasonType: SeasonType): SeasonalContent[] => {
         content: 'لا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
         type: 'dua',
         day: 9,
-        priority: 1,
-      },
-      {
-        id: 'dhul_hijjah_tip_1',
-        seasonType: 'dhul_hijjah',
-        title: 'فضل العشر',
-        content: 'ما من أيام العمل الصالح فيها أحب إلى الله من هذه الأيام',
-        type: 'hadith',
         priority: 1,
       }
     );

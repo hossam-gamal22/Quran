@@ -53,7 +53,6 @@ import { GlobalAudioProvider, markTrackPlayerReady } from '@/contexts/GlobalAudi
 import { usePathname, useRouter } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { scheduleMidnightRefresh } from '@/lib/widget-data-bridge';
-import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { initRemoteTranslations } from '@/lib/remote-translations';
@@ -112,7 +111,7 @@ try {
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
-      shouldSetBadge: true,
+      shouldSetBadge: false,
       shouldShowBanner: true,
       shouldShowList: true,
     }),
@@ -456,20 +455,6 @@ export default function RootLayout() {
         await registerBackgroundNotificationTask();
         console.log('[Notifications] Background task registered');
 
-        // Pre-cache upcoming months of prayer times so background scheduling
-        // works reliably offline. Non-blocking — failures are silently skipped.
-        try {
-          const { getPrayerLocation, getSettings } = await import('@/lib/storage');
-          const loc = await getPrayerLocation();
-          if (loc) {
-            const appSettings = await getSettings();
-            const { prefetchUpcomingPrayerMonths } = await import('@/lib/prayer-api');
-            prefetchUpcomingPrayerMonths(loc.latitude, loc.longitude, appSettings.calculationMethod).catch(() => {});
-          }
-        } catch {
-          // Non-critical — cache will be populated on next online scheduling
-        }
-
         // NOTE: rescheduleAllFromStorage() is NOT called here intentionally.
         // Scheduling is handled by SettingsContext.loadSettings() which:
         // 1. Waits for channelsReadyPromise to resolve (channels exist)
@@ -612,41 +597,10 @@ export default function RootLayout() {
 
     initFirebase();
 
-    // Pre-download azkar audio files to local cache (background, non-blocking)
-    initWithTimeout(
-      async () => {
-        const NetInfo = (await import('@react-native-community/netinfo')).default;
-        const state = await NetInfo.fetch();
-        if (state.isConnected) {
-          const { preDownloadAll } = await import('@/lib/azkar-audio-cache');
-          await preDownloadAll();
-        }
-      },
-      'Azkar audio pre-download',
-      60000 // Allow up to 60s — this runs in background
-    );
-
     // Sync widget data to native storage on launch
     initWithTimeout(
       () => syncWidgetDataToNative(),
       'Widget sync',
-      5000
-    );
-
-    // Prefetch daily video for instant playback on Video of the Day screen
-    initWithTimeout(
-      async () => {
-        const { prefetchDailyVideos } = await import('@/lib/daily-video-prefetch');
-        await prefetchDailyVideos();
-      },
-      'Daily video prefetch',
-      8000
-    );
-
-    // Auto-start Live Activity if user had it enabled (iOS only)
-    initWithTimeout(
-      () => refreshLiveActivityIfEnabled(),
-      'Live Activity sync',
       5000
     );
 
@@ -671,8 +625,6 @@ export default function RootLayout() {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
         syncWidgetDataToNative().catch(() => {});
-        // Refresh Live Activity countdown when app becomes active
-        refreshLiveActivityIfEnabled().catch(() => {});
         // Verify prayer notifications exist; if none, force reschedule.
         // This catches the case where all DATE triggers have fired and nothing is left.
         ensurePrayerNotificationsExist().catch(() => {});
@@ -838,7 +790,6 @@ export default function RootLayout() {
                           <Stack.Screen name="azkar/[category]" />
                           <Stack.Screen name="settings/live-activities" options={{ headerShown: false }} />
                           <Stack.Screen name="worship-tracker" />
-                          <Stack.Screen name="smart-tracker" options={{ headerShown: false }} />
                           <Stack.Screen name="names" />
                           <Stack.Screen name="ruqya" />
                           <Stack.Screen name="hijri" />

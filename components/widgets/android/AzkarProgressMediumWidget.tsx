@@ -1,10 +1,10 @@
 // components/widgets/android/AzkarProgressMediumWidget.tsx
-// 4×2 widget: Morning/Evening progress + random zikr text
+// 4×2 widget: Morning/Evening progress + random zikr
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
@@ -18,7 +18,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
       style={{
         height: 'match_parent',
         width: 'match_parent',
-        flexDirection: 'row',
+        flexDirection: 'column',
         backgroundGradient: GRADIENTS.azkar,
         borderRadius: 20,
         padding: 12,
@@ -26,109 +26,140 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://azkar' }}
     >
-      {/* Left side: progress */}
+      {/* Header */}
       <FlexWidget
         style={{
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: 90,
-          marginRight: 10,
-        }}
-      >
-        <TextWidget
-          text="🤲"
-          style={{ fontSize: 20, marginBottom: 6 }}
-        />
-        <FlexWidget
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 4,
-          }}
-        >
-          <TextWidget
-            text={azkar.morningCompleted ? '✅' : '○'}
-            style={{ fontSize: 12, marginRight: 4 }}
-          />
-          <TextWidget
-            text="الصباح"
-            style={{
-              fontSize: 12,
-              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
-              fontFamily: FONT.amiri,
-            }}
-          />
-        </FlexWidget>
-        <FlexWidget
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          <TextWidget
-            text={azkar.eveningCompleted ? '✅' : '○'}
-            style={{ fontSize: 12, marginRight: 4 }}
-          />
-          <TextWidget
-            text="المساء"
-            style={{
-              fontSize: 12,
-              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
-              fontFamily: FONT.amiri,
-            }}
-          />
-        </FlexWidget>
-      </FlexWidget>
-
-      {/* Divider */}
-      <FlexWidget
-        style={{
-          width: 1,
-          height: 'match_parent',
-          backgroundColor: COLORS.divider,
-          marginRight: 10,
-        }}
-      />
-
-      {/* Right side: random zikr */}
-      <FlexWidget
-        style={{
-          flexDirection: 'column',
+          flexDirection: 'row',
           justifyContent: 'space-between',
-          flex: 1,
+          alignItems: 'center',
+          width: 'match_parent',
+          marginBottom: 8,
         }}
       >
-        <TextWidget
-          text="ذكر عشوائي"
-          style={{
-            fontSize: 10,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
-            marginBottom: 4,
-          }}
-        />
-        <TextWidget
-          text={truncatedZikr}
-          style={{
-            fontSize: 14,
-            color: COLORS.white,
-            fontFamily: FONT.amiri,
-            textAlign: 'right',
-          }}
-          maxLines={3}
-          truncate="END"
-        />
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ImageWidget
+            image={APP_ICON}
+            imageWidth={ICON_SIZE.header}
+            imageHeight={ICON_SIZE.header}
+            radius={6}
+          />
+          <TextWidget
+            text="الأذكار اليومية"
+            style={{
+              fontSize: 13,
+              color: COLORS.tealLight,
+              fontFamily: FONT.amiriBold,
+              marginLeft: 6,
+            }}
+          />
+        </FlexWidget>
         <TextWidget
           text={BRANDING.name}
           style={{
             fontSize: BRANDING.fontSize,
-            color: BRANDING.color,
+            color: COLORS.teal,
             fontFamily: FONT.amiri,
-            textAlign: 'right',
-            marginTop: 2,
           }}
         />
+      </FlexWidget>
+
+      {/* Content row */}
+      <FlexWidget
+        style={{
+          flexDirection: 'row',
+          flex: 1,
+          width: 'match_parent',
+        }}
+      >
+        {/* Left: progress */}
+        <FlexWidget
+          style={{
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: 90,
+            marginRight: 10,
+          }}
+        >
+          <FlexWidget
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: azkar.morningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+              borderRadius: 10,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+              marginBottom: 6,
+            }}
+          >
+            <TextWidget
+              text={azkar.morningCompleted ? '✓' : '○'}
+              style={{ fontSize: 12, color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayDark, marginRight: 4 }}
+            />
+            <TextWidget
+              text="الصباح"
+              style={{
+                fontSize: 12,
+                color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
+                fontFamily: FONT.amiri,
+              }}
+            />
+          </FlexWidget>
+          <FlexWidget
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: azkar.eveningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+              borderRadius: 10,
+              paddingHorizontal: 8,
+              paddingVertical: 4,
+            }}
+          >
+            <TextWidget
+              text={azkar.eveningCompleted ? '✓' : '○'}
+              style={{ fontSize: 12, color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayDark, marginRight: 4 }}
+            />
+            <TextWidget
+              text="المساء"
+              style={{
+                fontSize: 12,
+                color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
+                fontFamily: FONT.amiri,
+              }}
+            />
+          </FlexWidget>
+        </FlexWidget>
+
+        {/* Divider */}
+        <FlexWidget
+          style={{
+            width: 1,
+            height: 'match_parent',
+            backgroundColor: COLORS.divider,
+            marginRight: 10,
+          }}
+        />
+
+        {/* Right: random zikr */}
+        <FlexWidget
+          style={{
+            flexDirection: 'column',
+            justifyContent: 'center',
+            flex: 1,
+          }}
+        >
+          <TextWidget
+            text={truncatedZikr}
+            style={{
+              fontSize: 15,
+              color: COLORS.white,
+              fontFamily: FONT.amiri,
+              textAlign: 'right',
+            }}
+            maxLines={3}
+            truncate="END"
+          />
+        </FlexWidget>
       </FlexWidget>
     </FlexWidget>
   );

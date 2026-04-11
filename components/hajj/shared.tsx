@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import type { useColors } from '@/hooks/use-colors';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import { localizeNumber } from '@/lib/format-number';
 import { TranslatedText } from '@/components/ui/TranslatedText';
@@ -29,7 +30,7 @@ function stripTashkeel(text: string): string {
 // الألوان المشتركة
 // ========================================
 
-export const ACCENT = '#22C55E';
+export const ACCENT = '#0d8e62';
 export const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 export const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
@@ -74,6 +75,7 @@ export const DuaRitualCard: React.FC<{
   initiallyExpanded?: boolean;
 }> = ({ group, isDarkMode, colors, initiallyExpanded = false }) => {
   const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const rotateAnim = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
 
@@ -114,8 +116,9 @@ export const DuaRitualCard: React.FC<{
       {expanded && (
         <View style={s.glassOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 50 : 20}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 30 : 12}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -123,7 +126,7 @@ export const DuaRitualCard: React.FC<{
               s.glassOverlay,
               {
                 backgroundColor: isDarkMode ? 'rgba(30,30,32,0.55)' : 'rgba(255,255,255,0.50)',
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
               },
             ]}
           />
@@ -174,6 +177,7 @@ export const GlassSection: React.FC<{
   initiallyExpanded?: boolean;
 }> = ({ section, sectionIndex, isDarkMode, colors, initiallyExpanded = false }) => {
   const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
   const [expanded, setExpanded] = useState(initiallyExpanded);
   const rotateAnim = useRef(new Animated.Value(initiallyExpanded ? 1 : 0)).current;
 
@@ -221,8 +225,9 @@ export const GlassSection: React.FC<{
       {expanded && (
         <View style={s.glassOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 50 : 20}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 30 : 12}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -230,7 +235,7 @@ export const GlassSection: React.FC<{
               s.glassOverlay,
               {
                 backgroundColor: isDarkMode ? 'rgba(30,30,32,0.55)' : 'rgba(255,255,255,0.50)',
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)',
               },
             ]}
           />
@@ -286,7 +291,7 @@ export const GlassSection: React.FC<{
 // الأنماط المشتركة
 // ========================================
 
-export const s = StyleSheet.create({
+export const _s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -304,6 +309,8 @@ export const s = StyleSheet.create({
   headerTitle: {
     fontFamily: fontBold(),
     fontSize: 20,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   heroOuter: {
     marginHorizontal: 16,
@@ -353,6 +360,8 @@ export const s = StyleSheet.create({
   countText: {
     fontFamily: fontSemiBold(),
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   timeline: {
     position: 'relative',
@@ -412,6 +421,8 @@ export const s = StyleSheet.create({
   sectionBadgeText: {
     fontFamily: fontBold(),
     fontSize: 14,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   glassOuter: {
     borderRadius: 20,
@@ -434,6 +445,8 @@ export const s = StyleSheet.create({
   stepsLabelText: {
     fontFamily: fontSemiBold(),
     fontSize: 14,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   stepRow: {
     flexDirection: 'row',
@@ -453,6 +466,8 @@ export const s = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 13,
     color: '#fff',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   stepText: {
     flex: 1,
@@ -475,6 +490,8 @@ export const s = StyleSheet.create({
   duasHeaderText: {
     fontFamily: fontSemiBold(),
     fontSize: 14,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   duaBox: {
     borderRadius: 14,
@@ -555,3 +572,6 @@ export const s = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
+// backward-compat alias so external consumers can still `import { s }`
+export { _s as s };

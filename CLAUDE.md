@@ -25,7 +25,7 @@ pnpm ios            # run on iOS
 ## Key Directories
 
 | Path | Purpose |
-|------|---------|
+| ------ | --------- |
 | `app/(tabs)/` | Main tab screens (home, quran, prayer, tasbih, azkar, settings) |
 | `app/surah/` | Mushaf reader with QCF fonts |
 | `app/settings/` | Settings sub-pages |
@@ -42,13 +42,15 @@ pnpm ios            # run on iOS
 ## Theming System
 
 ### Colors & Contrast
+
 - **`hooks/use-colors.ts`** — Central color hook. Returns theme-aware colors including seasonal overlays.
 - **`lib/contrast-helper.ts`** — Automatic contrast utilities: `getContrastColor(bg)` returns black/white, `getContrastTextColor(bg)` returns appropriate text color, `ensureContrast(fg, bg, minRatio)` adjusts foreground if contrast ratio is too low.
 - **`hooks/use-contrast-colors.ts`** — Hook wrapping contrast helpers: `useContrastColors(backgroundColor)` returns `{ text, subtext, icon, border }` with WCAG-compliant contrast.
-- **`constants/quran-themes.ts`** — 17 Mushaf reading themes with `textColor` and `contrastTextColor` fields.
+- **`constants/quran-themes.ts`** — 17 Mushaf reading themes with `primary`, `background`, `secondary`, and `highlight` fields. Supports optional `name`, `iconUrl`, `id`, and `order` from admin.
 - **`lib/seasonal-theme-helper.ts`** — Resolves seasonal theme colors (Ramadan, Hajj, Mawlid, Isra) and provides `getSeasonalContrastColors()`.
 
 ### Glassmorphism
+
 - BlurView-based glass effects throughout (GlassCard, tab bar, headers, bottom sheets).
 - Light: `rgba(255,255,255,0.4)`, Dark: `rgba(30,30,32,0.55)`.
 
@@ -74,12 +76,14 @@ Uses `@react-navigation/material-top-tabs` with `react-native-pager-view` for na
 ## Internationalization (i18n)
 
 ### Setup
+
 - **`lib/i18n.ts`** — Core i18n module: `t(key)`, `setLanguage()`, `getLanguage()`, `isRTL()`, `loadSavedLanguage()`
 - **`constants/translations.ts`** — All translations (~6300 lines). Interface: `TranslationKeys`.
 - **12 languages**: ar, en, fr, de, es, tr, ur, id, ms, hi, bn, ru
 - **RTL languages**: ar, ur, fa
 
 ### Usage
+
 ```tsx
 import { t } from '@/lib/i18n';
 
@@ -94,9 +98,11 @@ const { t } = useSettings();
 ```
 
 ### Translation Namespaces
+
 `app`, `tabs`, `common`, `home`, `quran`, `azkar`, `prayer`, `tafsir`, `settings`, `onboarding`, `khatma`, `worship`, `names`, `notificationSounds`, and more.
 
 ### Adding Translations
+
 1. Add key to `TranslationKeys` interface in `constants/translations.ts`
 2. Add translation string to all 12 language blocks
 3. Use `t('namespace.key')` in components
@@ -122,8 +128,9 @@ const { t } = useSettings();
 - **Prayer names**: Use `t('prayer.fajr')`, `t('prayer.dhuhr')`, etc. — NOT `ui.prayer.*`.
 
 ### Clock Components
+
 | Component | Style | Description |
-|-----------|-------|-------------|
+| ----------- | ------- | ------------- |
 | `RectangleWidgetView` | Widget | Light card with app logo + "الصلاة القادمة", countdown boxes, adhan time |
 | `AnalogClockView` | Analog | SVG clock with Arabic numerals, green prayer-time marker, countdown below |
 | `DigitalTypographyView` | Digital | Orbitron digital font countdown, prayer name, adhan time |
@@ -131,6 +138,7 @@ const { t } = useSettings();
 | `PrayerList` | (shared) | Full 5-prayer list with notification toggles |
 
 ### Prayer-specific Fonts
+
 - **Orbitron-Bold** / **Orbitron-Regular** — Digital LCD-style font for digital clock countdown digits.
 - Registered in `app/_layout.tsx` via `useFonts()`.
 
@@ -149,6 +157,7 @@ cd admin-panel && pnpm install && pnpm dev
 ```
 
 ### Key Pages
+
 - `/app-content` — **AppContentManager**: CRUD for app content (icons, titles, labels) with 12-language editing, icon upload, live preview, import/export JSON. Firestore collection: `appContent`.
 - Other pages: dashboard, users, content, notifications, analytics, etc.
 
@@ -189,6 +198,13 @@ const textColor = getContrastTextColor(backgroundColor);
 
 **Never hardcode** text colors like `#333` or `#fff` — always derive from theme or contrast helpers.
 
+### Action Buttons on Dark Backgrounds (BackgroundWrapper / ScreenContainer pages)
+
+- All action button **text and icons** (play, share, "اقرأ في المصحف", references, etc.) MUST use `colors.text` — **never** `colors.primary`, `#0d8e62`, or any accent/green color as foreground.
+- `colors.primary` / accent green may only be used as `backgroundColor` (with white text on top).
+- This applies to: surah reading pages, ayat-kursi, daily-dua, hadith, quote, seerah, companions, hajj-umrah, tasbih-stats, and any future page using `BackgroundWrapper` or `ScreenContainer`.
+- Shared component `SurahReadingScreen` already follows this — reuse it for new surah pages.
+
 ## Notification System
 
 - **`lib/push-notifications.ts`** — Scheduling functions: `schedulePrayerNotification()`, `scheduleAzkarReminder()`, `scheduleLocalNotification()`
@@ -214,16 +230,19 @@ const textColor = getContrastTextColor(backgroundColor);
 ## Widget System
 
 ### Architecture
+
 - **`lib/widget-data.ts`** — Shared data layer: `preparePrayerWidgetData()`, `prepareAzkarWidgetData()`, `updateSharedData()`
 - **`app/widget-settings.tsx`** — Widget customization UI (colors, refresh interval, categories)
 - **`app/widgets-gallery.tsx`** — Widget preview gallery
 
 ### Native Widgets
+
 - **Android**: Kotlin Glance framework in `android/PrayerClockWidget/`, `android/AzkarWidget/`, `android/HijriCalendarWidget/`, `android/QuranAyahWidget/`
 - **iOS**: WidgetKit in `ios/PrayerClockWidget/`, `widgets/ios/`
 - Legacy Android RemoteViews in `widgets/android/`
 
 ### Data Flow
+
 App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native widgets read on refresh
 
 ## Search Behavior
@@ -255,8 +274,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 ## New Pages
 
 | Route | Purpose |
-|-------|---------|
-
+| ------- | --------- |
 | `/seerah` | Prophet's Biography — 7 expandable timeline sections |
 | `/daily-dua` | Daily dua display (126 curated duas, deterministic + random refresh) |
 | `/daily-ayah` | Verse of the Day — deterministic daily verse with sharing |
@@ -286,7 +304,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 - Store text color preference (`white` | `black`) with each background via admin panel
 - Admin panel specifies text color when adding themes/backgrounds
 - App reads `appBackgroundTextColor` from display settings and applies via `useColors()`
-- Quran themes: 17 themes in `constants/quran-themes.ts` with `textColor` and `contrastTextColor`
+- Quran themes: 17 themes in `constants/quran-themes.ts` with `primary`, `background`, `secondary`, `highlight`
 
 ## Widget Development
 - **Data layer**: `lib/widget-data.ts` — `prepareVerseWidgetData()`, `prepareDhikrWidgetData()`, `preparePrayerWidgetData()`
@@ -443,12 +461,14 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 ## Sound System
 
 ### Folder Structure
+
 - `assets/sounds/adhan/` — Adhan recordings
 - `assets/sounds/notifications/` — Notification alerts (salawat, istighfar, subhanallah)
 - `assets/sounds/adhkar/` — Adhkar narration audio
 - `assets/sounds/effects/` — UI sound effects
 
 ### Centralized Manager
+
 - **`lib/sound-manager.ts`** — Single source of truth for all sound playback
 - `playSound(source)` — plays bundled `require()` sources
 - `playSoundFromUrl(url, category, fallback?)` — plays remote sounds via cache
@@ -457,6 +477,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 - `getCachedSound(url, category)` — downloads to `cacheDirectory/sounds/` and reuses
 
 ### Admin Sound Management
+
 - **`admin-panel/src/pages/SoundManager.tsx`** — Upload/manage sounds, assign to notifications and page events
 - Route: `/sounds` in admin panel sidebar
 - Saves assignments to Firestore `appConfig/soundSettings`
@@ -653,12 +674,14 @@ Settings page organized into 8 sections (in order):
 ## Deployment Verification Protocol
 
 ### After EVERY change, verify on ALL platforms:
+
 1. Web (incognito browser)
 2. Android (fresh install via Expo Go or dev build)
 3. iOS (fresh install via Expo Go or dev build)
 4. iPhone Simulator (after reset if needed)
 
 ### Before marking any task as "complete":
+
 - [ ] Code is committed and pushed (`git push origin main`)
 - [ ] Build completed without errors
 - [ ] Manually verified on Web
@@ -666,6 +689,7 @@ Settings page organized into 8 sections (in order):
 - [ ] Manually verified on iOS
 
 ### Cache Clearing Checklist:
+
 ```bash
 # Stop all processes
 pkill -f "expo" 2>/dev/null; pkill -f "metro" 2>/dev/null
@@ -685,8 +709,9 @@ npx expo start --clear
 ```
 
 ### Common Deployment Issues:
+
 | Issue | Cause | Solution |
-|-------|-------|----------|
+| ------- | ------- | ---------- |
 | Changes in code ≠ deployed | Unpushed commits | Run `git push origin main` |
 | Hot reload shows old code | Metro cache | Run `npx expo start --clear` |
 | iOS build fails | Stale Pods | Delete ios/Pods, run `pod install` |
@@ -694,6 +719,7 @@ npx expo start --clear
 | Web shows stale content | Browser cache | Use incognito mode |
 
 ### Expo Managed Workflow Notes:
+
 - Native builds require `eas build` or `expo prebuild` for native project generation
 - `ios/` and `android/` folders only contain widget code, not full native projects
 - Use Expo Go for development testing, EAS Build for production builds

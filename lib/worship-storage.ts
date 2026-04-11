@@ -66,6 +66,7 @@ export interface DailyAzkarRecord {
   sleep: boolean;
   wakeup: boolean;
   afterPrayer: boolean;
+  zikrCount?: number;
 }
 
 // إحصائيات الصلاة
@@ -561,7 +562,7 @@ export const saveAzkarRecord = async (record: DailyAzkarRecord): Promise<void> =
  */
 export const toggleAzkar = async (
   date: string,
-  type: keyof Omit<DailyAzkarRecord, 'date'>
+  type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>
 ): Promise<boolean> => {
   try {
     let record = await getAzkarRecord(date);
@@ -574,6 +575,7 @@ export const toggleAzkar = async (
         sleep: false,
         wakeup: false,
         afterPrayer: false,
+        zikrCount: 0,
       };
     }
     
@@ -591,7 +593,7 @@ export const toggleAzkar = async (
  */
 export const markAzkarCompleted = async (
   date: string,
-  type: keyof Omit<DailyAzkarRecord, 'date'>
+  type: keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>
 ): Promise<void> => {
   try {
     let record = await getAzkarRecord(date);
@@ -603,6 +605,7 @@ export const markAzkarCompleted = async (
         sleep: false,
         wakeup: false,
         afterPrayer: false,
+        zikrCount: 0,
       };
     }
     if (!record[type]) {
@@ -611,6 +614,30 @@ export const markAzkarCompleted = async (
     }
   } catch (error) {
     console.error('Error marking azkar completed:', error);
+  }
+};
+
+/**
+ * زيادة عداد الأذكار المقروءة (ذكر واحد مكتمل = +1)
+ */
+export const incrementAzkarZikrCount = async (date: string): Promise<void> => {
+  try {
+    let record = await getAzkarRecord(date);
+    if (!record) {
+      record = {
+        date,
+        morning: false,
+        evening: false,
+        sleep: false,
+        wakeup: false,
+        afterPrayer: false,
+        zikrCount: 0,
+      };
+    }
+    record.zikrCount = (record.zikrCount || 0) + 1;
+    await saveAzkarRecord(record);
+  } catch (error) {
+    console.error('Error incrementing azkar zikr count:', error);
   }
 };
 
@@ -1018,4 +1045,92 @@ export default {
   formatDate,
   getWeekDates,
   getMonthDates,
+  getMonthlyActivityStats,
 };
+
+// ========================================
+// إحصائيات النشاط الشهري (مصدر موحّد)
+// ========================================
+
+export interface MonthlyActivityStats {
+  prayers: number;
+  quranPages: number;
+  azkar: number;
+  tasbih: number;
+}
+
+/**
+ * Single source of truth for monthly activity counts.
+ * Used by honor board, backup page, and any screen needing current-month stats.
+ */
+export async function getMonthlyActivityStats(year?: number, month?: number): Promise<MonthlyActivityStats> {
+  const now = new Date();
+  const y = year ?? now.getFullYear();
+  const m = month ?? (now.getMonth() + 1);
+  const monthPrefix = `${y}-${String(m).padStart(2, '0')}`;
+
+  const stats: MonthlyActivityStats = { prayers: 0, quranPages: 0, azkar: 0, tasbih: 0 };
+
+  // 1. Prayers — count individual prayer events (prayed or late)
+  try {
+    const prayerRecords = await getMonthPrayerRecords(y, m);
+    const prayerNames: PrayerName[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
+    for (const record of prayerRecords) {
+      for (const p of prayerNames) {
+        if (record[p] === 'prayed' || record[p] === 'late') stats.prayers++;
+      }
+    }
+  } catch {}
+
+  // 2. Quran pages — sum pagesRead for the month
+  try {
+    const quranRecords = await getAllQuranRecords();
+    for (const [date, record] of Object.entries(quranRecords)) {
+      if (date.startsWith(monthPrefix) && record && typeof record === 'object') {
+        stats.quranPages += (record as any).pagesRead || 0;
+      }
+    }
+  } catch {}
+
+  // 3. Tasbih — daily history (previous days) + type stats (today), avoid double-counting
+  try {
+    const historyRaw = await AsyncStorage.getItem('@tasbih_daily_history');
+    if (historyRaw) {
+      const history = JSON.parse(historyRaw);
+      for (const [date, dayData] of Object.entries(history)) {
+        if (date.startsWith(monthPrefix) && dayData && typeof dayData === 'object') {
+          for (const count of Object.values(dayData as Record<string, number>)) {
+            stats.tasbih += (typeof count === 'number' ? count : 0);
+          }
+        }
+      }
+    }
+
+    const typeStatsRaw = await AsyncStorage.getItem('tasbih_type_stats');
+    if (typeStatsRaw) {
+      const typeStats = JSON.parse(typeStatsRaw);
+      const historyData = historyRaw ? JSON.parse(historyRaw) : {};
+      for (const [date, dayData] of Object.entries(typeStats)) {
+        if (date.startsWith(monthPrefix) && dayData && typeof dayData === 'object') {
+          if (!historyData[date]) {
+            for (const count of Object.values(dayData as Record<string, number>)) {
+              stats.tasbih += (typeof count === 'number' ? count : 0);
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // 4. Azkar — sum zikrCount for the month
+  try {
+    const azkarRecords = await getAllAzkarRecords();
+    for (const [date, record] of Object.entries(azkarRecords)) {
+      if (date.startsWith(monthPrefix) && record && typeof record === 'object') {
+        stats.azkar += (record as any).zikrCount || 0;
+      }
+    }
+  } catch {}
+
+  return stats;
+}

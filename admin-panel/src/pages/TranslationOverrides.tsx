@@ -27,7 +27,6 @@ interface TranslationOverrideDoc {
   id: string;
   sourceText: string;
   overrides: Partial<Record<LangCode, string>>;
-  screen?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,11 +40,6 @@ const LANG_FLAGS: Record<string, string> = {
   de: '🇩🇪', es: '🇪🇸', hi: '🇮🇳', bn: '🇧🇩', id: '🇮🇩',
   ms: '🇲🇾', ru: '🇷🇺',
 };
-
-const SCREEN_OPTIONS = [
-  'all', 'hajj', 'umrah', 'seerah', 'companions', 'mawlid',
-  'ashura', 'ramadan', 'seasonal', 'azkar', 'prayer', 'quran', 'other',
-];
 
 /** Generate a stable Firestore doc ID from source text */
 function makeDocId(sourceText: string): string {
@@ -66,14 +60,12 @@ const TranslationOverrides: React.FC = () => {
   const [overrides, setOverrides] = useState<TranslationOverrideDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterScreen, setFilterScreen] = useState('all');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   // New/Edit form state
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formSourceText, setFormSourceText] = useState('');
-  const [formScreen, setFormScreen] = useState('other');
   const [formOverrides, setFormOverrides] = useState<Partial<Record<LangCode, string>>>({});
   const [autoTranslating, setAutoTranslating] = useState(false);
   const [autoTranslateProgress, setAutoTranslateProgress] = useState<Partial<Record<LangCode, string>>>({});
@@ -108,7 +100,6 @@ const TranslationOverrides: React.FC = () => {
 
   const filtered = useMemo(() => {
     return overrides.filter(item => {
-      if (filterScreen !== 'all' && item.screen !== filterScreen) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchSource = item.sourceText.toLowerCase().includes(q);
@@ -119,7 +110,7 @@ const TranslationOverrides: React.FC = () => {
       }
       return true;
     });
-  }, [overrides, searchQuery, filterScreen]);
+  }, [overrides, searchQuery]);
 
   // ─── Save override ───────────────────────────────────────────────────────
 
@@ -143,7 +134,6 @@ const TranslationOverrides: React.FC = () => {
       const docData: Omit<TranslationOverrideDoc, 'id'> = {
         sourceText: formSourceText.trim(),
         overrides: nonEmptyOverrides,
-        screen: formScreen,
         createdAt: editingId
           ? overrides.find(o => o.id === editingId)?.createdAt || now
           : now,
@@ -181,7 +171,6 @@ const TranslationOverrides: React.FC = () => {
   const handleEdit = (item: TranslationOverrideDoc) => {
     setEditingId(item.id);
     setFormSourceText(item.sourceText);
-    setFormScreen(item.screen || 'other');
     setFormOverrides({ ...item.overrides });
     setShowForm(true);
     setAutoTranslateProgress({});
@@ -229,7 +218,6 @@ const TranslationOverrides: React.FC = () => {
     setShowForm(false);
     setEditingId(null);
     setFormSourceText('');
-    setFormScreen('other');
     setFormOverrides({});
     setAutoTranslateProgress({});
   };
@@ -258,7 +246,7 @@ const TranslationOverrides: React.FC = () => {
               resetForm();
               setShowForm(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-lg hover:bg-accent-dark transition-colors"
           >
             <Plus className="w-4 h-4" />
             إضافة تعديل جديد
@@ -287,29 +275,11 @@ const TranslationOverrides: React.FC = () => {
               value={formSourceText}
               onChange={e => setFormSourceText(e.target.value)}
               rows={3}
-              className="w-full border border-gray-300 rounded-lg p-3 text-right text-lg leading-relaxed focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full border border-gray-300 rounded-lg p-3 text-right text-lg leading-relaxed focus:ring-2 focus:ring-accent focus:border-accent"
               placeholder="أدخل النص العربي المراد تعديل ترجمته..."
               aria-label="النص العربي الأصلي"
               dir="rtl"
             />
-          </div>
-
-          {/* Screen selector */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              الصفحة
-            </label>
-            <select
-              value={formScreen}
-              onChange={e => setFormScreen(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-              title="الصفحة"
-              aria-label="الصفحة"
-            >
-              {SCREEN_OPTIONS.filter(s => s !== 'all').map(screen => (
-                <option key={screen} value={screen}>{screen}</option>
-              ))}
-            </select>
           </div>
 
           {/* Auto-translate button */}
@@ -343,7 +313,7 @@ const TranslationOverrides: React.FC = () => {
                     <span className="text-xs text-blue-500">ترجمة تلقائية</span>
                   )}
                   {formOverrides[lang.code as LangCode] && (
-                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle className="w-4 h-4 text-accent" />
                   )}
                 </div>
                 <textarea
@@ -353,7 +323,7 @@ const TranslationOverrides: React.FC = () => {
                     [lang.code]: e.target.value,
                   }))}
                   rows={2}
-                  className="w-full border border-gray-200 rounded p-2 text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full border border-gray-200 rounded p-2 text-sm focus:ring-1 focus:ring-accent focus:border-accent"
                   placeholder={`ترجمة ${lang.name}...`}
                   aria-label={`ترجمة ${lang.name}`}
                   dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -367,7 +337,7 @@ const TranslationOverrides: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={!formSourceText.trim() || Object.values(formOverrides).every(v => !v?.trim())}
-              className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-6 py-2 bg-accent-dark text-white rounded-lg hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Save className="w-4 h-4" />
               {editingId ? 'تحديث' : 'حفظ'}
@@ -402,22 +372,10 @@ const TranslationOverrides: React.FC = () => {
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="بحث في النصوص والترجمات..."
             aria-label="بحث في النصوص والترجمات"
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
             dir="rtl"
           />
         </div>
-        <select
-          value={filterScreen}
-          onChange={e => setFilterScreen(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500"
-          title="تصفية حسب الصفحة"
-          aria-label="تصفية حسب الصفحة"
-        >
-          <option value="all">جميع الصفحات</option>
-          {SCREEN_OPTIONS.filter(s => s !== 'all').map(screen => (
-            <option key={screen} value={screen}>{screen}</option>
-          ))}
-        </select>
         <button
           onClick={loadOverrides}
           className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
@@ -465,9 +423,6 @@ const TranslationOverrides: React.FC = () => {
                       {item.sourceText}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                        {item.screen || 'other'}
-                      </span>
                       <span className="text-xs text-gray-400">
                         {Object.keys(item.overrides).length} لغة
                       </span>
@@ -517,7 +472,7 @@ const TranslationOverrides: React.FC = () => {
                             <span className="text-xs font-medium text-gray-600">
                               {lang.name}
                             </span>
-                            {value && <CheckCircle className="w-3 h-3 text-emerald-500 mr-auto" />}
+                            {value && <CheckCircle className="w-3 h-3 text-accent mr-auto" />}
                           </div>
                           <p
                             className="text-sm text-gray-800"

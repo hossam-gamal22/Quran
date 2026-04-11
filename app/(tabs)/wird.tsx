@@ -30,6 +30,8 @@ import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 const { width, height } = Dimensions.get('window');
 const CIRCLE_SIZE = width * 0.65;
@@ -73,15 +75,15 @@ const Dot: React.FC<DotProps> = ({ index, total, count, target }) => {
   return (
     <View
       style={[
-        styles.dot,
+        _styles.dot,
         {
           transform: [
             { translateX: x },
             { translateY: y },
           ],
         },
-        isActive && styles.dotActive,
-        isCompleted && styles.dotCompleted,
+        isActive && _styles.dotActive,
+        isCompleted && _styles.dotCompleted,
       ]}
     />
   );
@@ -95,6 +97,8 @@ export default function TasbihScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const { isDarkMode, settings, t } = useSettings();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const language = getLanguage();
   const isArabic = language === 'ar';
   
@@ -245,13 +249,13 @@ export default function TasbihScreen() {
         {/* اختيار الذكر */}
         <View style={[styles.adhkarSelector, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Pressable onPress={() => changeAdhkar('prev')} style={styles.arrowButton}>
-            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#3da87e" />
           </Pressable>
           <View style={styles.adhkarTextContainer}>
             <Text style={styles.adhkarText}>{isArabic ? currentDhikr.text : currentDhikr.transliteration}</Text>
           </View>
           <Pressable onPress={() => changeAdhkar('next')} style={styles.arrowButton}>
-            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#4ade80" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color="#3da87e" />
           </Pressable>
         </View>
 
@@ -295,7 +299,7 @@ export default function TasbihScreen() {
           </View>
           
           <Pressable onPress={handleReset} style={styles.resetButton}>
-            <MaterialCommunityIcons name="restart" size={32} color="#4ade80" />
+            <MaterialCommunityIcons name="restart" size={32} color="#3da87e" />
           </Pressable>
           
           <View style={styles.statItem}>
@@ -315,7 +319,7 @@ export default function TasbihScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -396,10 +400,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   dotActive: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#3da87e',
   },
   dotCompleted: {
-    backgroundColor: '#4ade80',
+    backgroundColor: '#3da87e',
   },
   mainCircle: {
     width: CIRCLE_SIZE,
@@ -417,7 +421,7 @@ const styles = StyleSheet.create({
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,
     borderWidth: 3,
-    borderColor: '#4ade80',
+    borderColor: '#3da87e',
   },
   innerCircle: {
     width: CIRCLE_SIZE - 40,

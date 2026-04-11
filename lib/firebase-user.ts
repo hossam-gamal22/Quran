@@ -13,6 +13,8 @@ import {
   increment 
 } from 'firebase/firestore';
 import * as Device from 'expo-device';
+import * as Application from 'expo-application';
+import * as SecureStore from 'expo-secure-store';
 import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -25,6 +27,11 @@ const STORAGE_KEYS = {
   USER_ID: '@rooh_user_id',
   FCM_TOKEN: '@rooh_fcm_token',
   FIRST_OPEN: '@rooh_first_open',
+  DISPLAY_NAME: '@rooh_display_name',
+};
+
+const SECURE_KEYS = {
+  DEVICE_ID: 'rooh_device_id',
 };
 
 // ==================== الأنواع ====================
@@ -56,24 +63,115 @@ export interface UserData {
 
 // ==================== الدوال ====================
 
-const generateUserId = (): string => {
+/**
+ * Generate a random fallback ID (for web platform or errors)
+ */
+const generateFallbackId = (): string => {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 10);
-  return `user_${timestamp}_${randomPart}`;
+  return `fallback_${timestamp}_${randomPart}`;
+};
+
+/**
+ * Get native device ID that persists across app reinstalls
+ * Priority order:
+ * 1. SecureStore (most persistent — survives reinstall via iOS Keychain)
+ * 2. AsyncStorage (preserves existing user identity — prevents duplicate Firestore docs)
+ * 3. Native device ID (new users only)
+ * 4. Fallback random ID (web/errors)
+ * 
+ * IMPORTANT: AsyncStorage is checked BEFORE native ID to prevent existing users
+ * from getting a new identity when the app upgrades to native ID support.
+ * fallback_ IDs in AsyncStorage are treated as unreliable and replaced with native IDs.
+ */
+const getDeviceId = async (): Promise<string> => {
+  try {
+    // 1. Check SecureStore first (most persistent, survives reinstall on iOS)
+    const secureId = await SecureStore.getItemAsync(SECURE_KEYS.DEVICE_ID);
+    if (secureId) {
+      // If SecureStore has a fallback_ ID and we can get a native one, upgrade it
+      if (secureId.startsWith('fallback_')) {
+        const nativeId = await getNativeDeviceId();
+        if (nativeId) {
+          await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, nativeId);
+          console.log('🔄 Upgraded fallback ID to native:', nativeId.substring(0, 20) + '...');
+          return nativeId;
+        }
+      }
+      console.log('🔐 Device ID from SecureStore:', secureId.substring(0, 20) + '...');
+      return secureId;
+    }
+
+    // 2. Check AsyncStorage FIRST (preserves existing user identity)
+    const asyncId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
+    if (asyncId) {
+      // If existing ID is a fallback_, try to upgrade to native ID
+      if (asyncId.startsWith('fallback_')) {
+        const nativeId = await getNativeDeviceId();
+        if (nativeId) {
+          await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+          await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, nativeId);
+          console.log('🔄 Upgraded fallback AsyncStorage ID to native:', nativeId.substring(0, 20) + '...');
+          return nativeId;
+        }
+      }
+      // Migrate existing non-fallback ID to SecureStore for persistence
+      await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, asyncId);
+      console.log('📦 Migrated existing ID to SecureStore:', asyncId.substring(0, 20) + '...');
+      return asyncId;
+    }
+
+    // 3. New user — try native device ID
+    const nativeId = await getNativeDeviceId();
+    if (nativeId) {
+      await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+      console.log('🆔 Native device ID saved:', nativeId.substring(0, 20) + '...');
+      return nativeId;
+    }
+
+    // 4. Last resort: generate new ID and save everywhere
+    const newId = generateFallbackId();
+    await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, newId);
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, newId);
+    console.log('🆕 Generated new fallback ID:', newId);
+    return newId;
+
+  } catch (error) {
+    console.error('❌ Error getting device ID:', error);
+    // Ultimate fallback
+    return generateFallbackId();
+  }
+};
+
+/**
+ * Get platform-specific native device ID
+ */
+const getNativeDeviceId = async (): Promise<string | null> => {
+  try {
+    if (Platform.OS === 'ios') {
+      const vendorId = await Application.getIosIdForVendorAsync();
+      if (vendorId) return `ios_${vendorId}`;
+    } else if (Platform.OS === 'android') {
+      const androidId = Application.getAndroidId();
+      if (androidId) return `android_${androidId}`;
+    }
+  } catch {}
+  return null;
 };
 
 export const getUserId = async (): Promise<string> => {
   try {
-    let userId = await AsyncStorage.getItem(STORAGE_KEYS.USER_ID);
-    if (!userId) {
-      userId = generateUserId();
-      await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userId);
-      console.log('🆔 New user ID generated:', userId);
-    }
-    return userId;
+    // Use device-based ID instead of random
+    const deviceId = await getDeviceId();
+    
+    // Also store in AsyncStorage for quick access
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, deviceId);
+    
+    return deviceId;
   } catch (error) {
     console.error('❌ Error getting user ID:', error);
-    return generateUserId();
+    return generateFallbackId();
   }
 };
 
@@ -192,10 +290,13 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
       console.log('✅ New user registered:', userId, 'from:', installSource);
     } else {
       // Existing user — update session data
+      const existingData = userDoc.data();
       await updateDoc(userRef, {
         ...userData,
         // Preserve installSource if already set (don't override on subsequent sessions)
-        ...(userDoc.data()?.installSource ? {} : { installSource }),
+        ...(existingData?.installSource ? {} : { installSource }),
+        // Don't overwrite a valid token with empty string
+        ...((!fcmToken && existingData?.fcmToken) ? { fcmToken: existingData.fcmToken } : {}),
       });
       console.log('✅ User data updated:', userId);
     }
@@ -214,6 +315,22 @@ export const updateLastActive = async (): Promise<void> => {
     await updateDoc(userRef, { lastActive: serverTimestamp() });
   } catch (error) {
     console.log('Could not update last active');
+  }
+};
+
+export const getDisplayName = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_KEYS.DISPLAY_NAME);
+  } catch {
+    return null;
+  }
+};
+
+export const setDisplayName = async (name: string): Promise<void> => {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, name.trim());
+  } catch (error) {
+    console.error('❌ Failed to save display name locally:', error);
   }
 };
 

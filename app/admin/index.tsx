@@ -57,7 +57,7 @@ export default function AdminDashboard() {
       title: t('admin.pricingTitle'),
       icon: 'cash',
       route: '/admin/pricing',
-      color: '#22C55E',
+      color: '#0d8e62',
       description: t('admin.pricingDesc'),
     },
     {

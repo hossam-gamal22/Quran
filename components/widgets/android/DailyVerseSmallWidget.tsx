@@ -1,10 +1,10 @@
 // components/widgets/android/DailyVerseSmallWidget.tsx
-// 2×2 widget: First line of verse + surah name
+// 2×2 widget: Verse preview + surah name
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
   const { verse } = data;
@@ -27,10 +27,12 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://daily-ayah' }}
     >
-      {/* Icon */}
-      <TextWidget
-        text="📖"
-        style={{ fontSize: 22 }}
+      {/* App Icon */}
+      <ImageWidget
+        image={APP_ICON}
+        imageWidth={ICON_SIZE.small}
+        imageHeight={ICON_SIZE.small}
+        radius={7}
       />
 
       {/* Verse text */}
@@ -41,29 +43,36 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
           color: COLORS.white,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 4,
         }}
         maxLines={3}
         truncate="END"
       />
 
-      {/* Surah name */}
-      <TextWidget
-        text={verse.surahName}
+      {/* Surah badge */}
+      <FlexWidget
         style={{
-          fontSize: 11,
-          color: COLORS.gold,
-          fontFamily: FONT.amiri,
-          marginTop: 4,
+          backgroundColor: COLORS.badgeBgAlt,
+          borderRadius: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 3,
         }}
-      />
+      >
+        <TextWidget
+          text={verse.surahName}
+          style={{
+            fontSize: 11,
+            color: COLORS.gold,
+            fontFamily: FONT.amiri,
+          }}
+        />
+      </FlexWidget>
 
       {/* Branding */}
       <TextWidget
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: BRANDING.color,
+          color: COLORS.teal,
           fontFamily: FONT.amiri,
         }}
       />

@@ -23,9 +23,12 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { toWesternNumerals, getSurahEnglishName } from '@/lib/quran-evidence';
+import { DarkColors } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -50,7 +53,7 @@ function getCategories(): WidgetCategory[] {
     id: 'prayer',
     title: t('widgets.prayerTimesTitle'),
     icon: 'mosque',
-    gradient: ['#22C55E', '#1d4a3a'],
+    gradient: ['#0d8e62', '#1d4a3a'],
     deepLink: 'rooh-almuslim://prayer',
     description: t('widgets.prayerTimesDesc'),
   },
@@ -58,7 +61,7 @@ function getCategories(): WidgetCategory[] {
     id: 'ayah',
     title: t('widgets.dailyAyahTitle'),
     icon: 'book-open-page-variant',
-    gradient: ['#1e3a5f', '#22C55E'],
+    gradient: ['#1e3a5f', '#0d8e62'],
     deepLink: 'rooh-almuslim://daily-ayah',
     description: t('widgets.dailyAyahDesc'),
   },
@@ -66,7 +69,7 @@ function getCategories(): WidgetCategory[] {
     id: 'dhikr',
     title: t('widgets.dailyDhikrTitle'),
     icon: 'hand-heart',
-    gradient: ['#5d4e8c', '#7c3aed'],
+    gradient: ['#4a3d73', '#7c3aed'],
     deepLink: 'rooh-almuslim://azkar',
     description: t('widgets.dailyDhikrDesc'),
   },
@@ -115,16 +118,18 @@ function handleAddWidget() {
 // -- Sub-components --
 
 function AyahPreview({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
-      colors={['#1e3a5f', '#22C55E']}
+      colors={['#1e3a5f', '#0d8e62']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
     >
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={"systemThickMaterialDark" as any} style={StyleSheet.absoluteFill}>
           <View style={styles.previewContent}>
             <AyahPreviewText size={size} />
           </View>
@@ -141,6 +146,9 @@ function AyahPreview({ size }: { size: WidgetSize }) {
 }
 
 function AyahPreviewText({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const isRTL = useIsRTL();
+  const styles = useScaledStyles(_styles, colors.fs);
   const lang = getLanguage();
   const isAr = lang === 'ar';
   const surahRef = isAr ? 'الفاتحة - آية ١' : `${getSurahEnglishName(1)} - ${t('quran.verseOfDay')} 1`;
@@ -163,22 +171,24 @@ function AyahPreviewText({ size }: { size: WidgetSize }) {
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall, !isAr && { fontSize: size === 'small' ? 9 : 11, lineHeight: size === 'small' ? 14 : 16 }]}>
         {surahRef}
       </Text>
-      <Text style={styles.previewLabel}>{t('widgets.dailyAyahTitle')}</Text>
+      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.dailyAyahTitle')}</Text>
     </>
   );
 }
 
 function PrayerPreview({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
-      colors={['#22C55E', '#1d4a3a']}
+      colors={['#0d8e62', '#1d4a3a']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
     >
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={"systemThickMaterialDark" as any} style={StyleSheet.absoluteFill}>
           <View style={styles.previewContent}>
             <PrayerPreviewText size={size} />
           </View>
@@ -195,6 +205,8 @@ function PrayerPreview({ size }: { size: WidgetSize }) {
 }
 
 function PrayerPreviewText({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
@@ -219,7 +231,7 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
           <Text style={{ fontFamily: fontBold(), fontSize: 20, color: '#fff' }}>
             {isAr ? '١٢:١٥ م' : '12:15 PM'}
           </Text>
-          <Text style={styles.previewLabel}>{t('widgets.nextPrayer')}</Text>
+          <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.nextPrayer')}</Text>
         </>
       ) : (
         <View style={{ width: '100%', gap: 4 }}>
@@ -240,7 +252,7 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
               </Text>
             </View>
           ))}
-          <Text style={styles.previewLabel}>{t('widgets.prayerTimesTitle')}</Text>
+          <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.prayerTimesTitle')}</Text>
         </View>
       )}
     </>
@@ -248,16 +260,18 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
 }
 
 function DhikrPreview({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
-      colors={['#5d4e8c', '#7c3aed']}
+      colors={['#4a3d73', '#7c3aed']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
     >
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={"systemThickMaterialDark" as any} style={StyleSheet.absoluteFill}>
           <View style={styles.previewContent}>
             <DhikrPreviewText size={size} />
           </View>
@@ -274,6 +288,9 @@ function DhikrPreview({ size }: { size: WidgetSize }) {
 }
 
 function DhikrPreviewText({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
   return (
@@ -290,12 +307,14 @@ function DhikrPreviewText({ size }: { size: WidgetSize }) {
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
         {isAr ? '٣ مرات' : `3 ${t('azkar.times')}`}
       </Text>
-      <Text style={styles.previewLabel}>{t('widgets.dailyDhikrTitle')}</Text>
+      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.dailyDhikrTitle')}</Text>
     </>
   );
 }
 
 function AzkarPreview({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
@@ -305,7 +324,7 @@ function AzkarPreview({ size }: { size: WidgetSize }) {
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
     >
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={"systemThickMaterialDark" as any} style={StyleSheet.absoluteFill}>
           <View style={styles.previewContent}>
             <AzkarPreviewText size={size} />
           </View>
@@ -322,6 +341,9 @@ function AzkarPreview({ size }: { size: WidgetSize }) {
 }
 
 function AzkarPreviewText({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
   return (
@@ -338,12 +360,14 @@ function AzkarPreviewText({ size }: { size: WidgetSize }) {
       <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
         {isAr ? 'سبحان الله العظيم' : 'SubhanAllah al-Azeem'}
       </Text>
-      <Text style={styles.previewLabel}>{t('widgets.azkarTitle')}</Text>
+      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.azkarTitle')}</Text>
     </>
   );
 }
 
 function HijriPreview({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
   return (
     <LinearGradient
@@ -353,7 +377,7 @@ function HijriPreview({ size }: { size: WidgetSize }) {
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
     >
       {Platform.OS === 'ios' ? (
-        <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill}>
+        <BlurView intensity={20} tint={"systemThickMaterialDark" as any} style={StyleSheet.absoluteFill}>
           <View style={styles.previewContent}>
             <HijriPreviewText size={size} />
           </View>
@@ -370,6 +394,9 @@ function HijriPreview({ size }: { size: WidgetSize }) {
 }
 
 function HijriPreviewText({ size }: { size: WidgetSize }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
   return (
@@ -384,7 +411,7 @@ function HijriPreviewText({ size }: { size: WidgetSize }) {
       <Text style={[styles.hijriMonth, size === 'small' && styles.hijriMonthSmall]}>
         {isAr ? 'رمضان ١٤٤٧' : 'Ramadan 1447'}
       </Text>
-      <Text style={styles.previewLabel}>{t('widgets.hijriTitle')}</Text>
+      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.hijriTitle')}</Text>
     </>
   );
 }
@@ -408,6 +435,8 @@ function WidgetThumbnail({
   isSelected: boolean;
   onPress: () => void;
 }) {
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const PreviewComponent = PREVIEW_MAP[category.id];
   return (
     <TouchableOpacity
@@ -431,6 +460,8 @@ export default function WidgetsGalleryScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const { settings } = useSettings();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const categories = getCategories();
   const [activeTab, setActiveTab] = useState('ayah');
   const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
@@ -501,9 +532,9 @@ export default function WidgetsGalleryScreen() {
               <MaterialCommunityIcons
                 name={activeCategory.icon as any}
                 size={22}
-                color="#22C55E"
+                color="#0d8e62"
               />
-              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{activeCategory.title}</Text>
+              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.title}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -517,7 +548,7 @@ export default function WidgetsGalleryScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.cardDescription, { textAlign: isRTL ? 'right' : 'left' }]}>{activeCategory.description}</Text>
+          <Text style={[styles.cardDescription, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.description}</Text>
 
           {/* Size pills */}
           <View style={[styles.sizePills, { flexDirection: 'row' }]}>
@@ -546,7 +577,7 @@ export default function WidgetsGalleryScreen() {
             style={styles.addButton}
           >
             <LinearGradient
-              colors={['#22C55E', '#22C55E']}
+              colors={['#0d8e62', '#0d8e62']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.addButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -567,8 +598,8 @@ export default function WidgetsGalleryScreen() {
             style={[styles.bottomLink, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             activeOpacity={0.7}
           >
-            <MaterialCommunityIcons name="cog-outline" size={18} color="#22C55E" />
-            <Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.widgetSettings')}</Text>
+            <MaterialCommunityIcons name="cog-outline" size={18} color="#0d8e62" />
+            <Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.widgetSettings')}</Text>
             <MaterialCommunityIcons
               name={isRTL ? 'chevron-left' : 'chevron-right'}
               size={18}
@@ -584,10 +615,10 @@ export default function WidgetsGalleryScreen() {
 
 // -- Styles --
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: DarkColors.background,
   },
 
 
@@ -603,7 +634,7 @@ const styles = StyleSheet.create({
   },
   thumbnailSelected: {
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
     opacity: 1,
   },
   thumbnailUnselected: {
@@ -692,7 +723,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.4)',
     position: 'absolute',
     bottom: 8,
-    left: 12,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
 
   // Hijri-specific
@@ -713,6 +745,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
     marginTop: 2,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   hijriMonthSmall: {
     fontSize: 14,
@@ -734,6 +768,8 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 18,
     color: '#fff',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   gearButton: {
     width: 36,
@@ -773,6 +809,8 @@ const styles = StyleSheet.create({
     fontFamily: fontMedium(),
     fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   pillTextActive: {
     color: '#fff',
@@ -795,6 +833,8 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 15,
     color: '#fff',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
 
   // Bottom link
@@ -810,5 +850,9 @@ const styles = StyleSheet.create({
     fontFamily: fontMedium(),
     fontSize: 14,
     color: 'rgba(255,255,255,0.85)',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
 });
+// Module-level alias for sub-components; main component shadows with useScaledStyles
+const styles = _styles;

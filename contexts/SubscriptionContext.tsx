@@ -77,8 +77,6 @@ interface SubscriptionContextType {
   shouldAutoShowPaywall: boolean;
   /** Call after auto-showing paywall to record timestamp */
   markPaywallAutoShown: () => void;
-  /** Re-fetch IAP products (for retry after failure) */
-  refetchProducts: () => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType>({
@@ -101,7 +99,6 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   showUpgradeBanner: false,
   shouldAutoShowPaywall: false,
   markPaywallAutoShown: () => {},
-  refetchProducts: async () => {},
 });
 
 export const useSubscription = () => useContext(SubscriptionContext);
@@ -232,29 +229,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 };
               })
             );
-            // Cache product prices for offline display
-            try {
-              const serializable = items.map((item: any) => ({
-                id: item.id,
-                plan: getPlanFromProductId(item.id, fetchedConfig) || 'monthly',
-                title: item.title || '',
-                price: item.displayPrice || '',
-                priceAmount: item.price ?? 0,
-                currency: item.currency || '',
-                description: item.description || '',
-              }));
-              await AsyncStorage.setItem('@subscription_products_cache', JSON.stringify(serializable));
-            } catch {}
           }
         } catch (e) {
           console.log('⚠️ Could not load IAP products:', e);
-          // Fallback: load cached prices if available
-          if (mounted) {
-            try {
-              const cached = await AsyncStorage.getItem('@subscription_products_cache');
-              if (cached) setProducts(JSON.parse(cached));
-            } catch {}
-          }
         }
 
         // Listen for purchase updates
@@ -288,12 +265,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         purchaseErrorSubscription.current = IAP.purchaseErrorListener(
           (error: any) => {
-            console.error('[IAP] Purchase error:', {
-              code: error.code,
-              message: error.message,
-              responseCode: (error as any).responseCode,
-              userInfo: (error as any).userInfo,
-            });
+            console.log('❌ Purchase error:', error);
             if (error.code !== 'user-cancelled') {
               Alert.alert(t('subscription.purchaseError'), t('subscription.purchaseErrorMessage'));
             }
@@ -396,12 +368,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       return true;
     } catch (error) {
-      console.error('[IAP] Purchase failed:', {
-        code: (error as any)?.code,
-        message: (error as any)?.message,
-        responseCode: (error as any)?.responseCode,
-        userInfo: (error as any)?.userInfo,
-      });
+      console.log('❌ Purchase failed:', error);
       return false;
     }
   }, [config]);
@@ -466,43 +433,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return result;
   }, [purchaseFn]);
 
-  // Re-fetch IAP products (retry after failure)
-  const refetchProducts = useCallback(async () => {
-    if (!IAP) return;
-    const platformKey = Platform.OS === 'ios' ? 'ios' : 'android';
-    const lifetimeId = config.products.lifetime[platformKey];
-    const subIds = [
-      config.products.monthly[platformKey],
-      config.products.yearly[platformKey],
-    ].filter(Boolean);
-    try {
-      const fetchPromises: Promise<any[]>[] = [];
-      if (lifetimeId) fetchPromises.push(IAP.fetchProducts({ skus: [lifetimeId], type: 'in-app' }));
-      if (subIds.length > 0) fetchPromises.push(IAP.fetchProducts({ skus: subIds, type: 'subs' }));
-      const results = await Promise.all(fetchPromises);
-      const items = results.flat().filter(Boolean);
-      if (items.length > 0) {
-        rawProductsRef.current = items;
-        setProducts(
-          items.map((item: any) => {
-            const plan = getPlanFromProductId(item.id, config);
-            return {
-              id: item.id,
-              plan: plan || 'monthly',
-              title: item.title || '',
-              price: item.displayPrice || '',
-              priceAmount: item.price ?? 0,
-              currency: item.currency || '',
-              description: item.description || '',
-            };
-          })
-        );
-      }
-    } catch (e) {
-      console.log('⚠️ refetchProducts failed:', e);
-    }
-  }, [config]);
-
   return (
     <SubscriptionContext.Provider
       value={{
@@ -526,7 +456,6 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         showUpgradeBanner: config.enabled && config.premiumBannerEnabled && !state.isPremium,
         shouldAutoShowPaywall: autoShowPaywall,
         markPaywallAutoShown: handleMarkPaywallShown,
-        refetchProducts,
       }}
     >
       {children}

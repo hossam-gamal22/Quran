@@ -6,7 +6,7 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { Paths, File, Directory } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { installSoundForNotifications, uninstallSound as uninstallNotificationSound } from './notification-sound-installer';
 
@@ -75,8 +75,8 @@ export async function isSoundDownloaded(soundId: string): Promise<boolean> {
   const downloaded = await getDownloadedSounds();
   const found = downloaded.find(s => s.id === soundId);
   if (!found) return false;
-  const file = new File(found.localUri);
-  return file.exists;
+  const info = await FileSystem.getInfoAsync(found.localUri);
+  return info.exists;
 }
 
 /**
@@ -84,26 +84,21 @@ export async function isSoundDownloaded(soundId: string): Promise<boolean> {
  */
 export async function downloadSound(sound: DownloadableSound): Promise<DownloadedSound> {
   // Ensure cache directory exists
-  const dir = new Directory(Paths.cache, 'downloaded_sounds');
-  if (!dir.exists) {
-    dir.create();
+  const dirUri = (FileSystem.cacheDirectory ?? '') + 'downloaded_sounds/';
+  const dirInfo = await FileSystem.getInfoAsync(dirUri);
+  if (!dirInfo.exists) {
+    await FileSystem.makeDirectoryAsync(dirUri, { intermediates: true });
   }
 
-  const file = new File(dir, `${sound.id}.mp3`);
-  
+  const fileUri = dirUri + `${sound.id}.mp3`;
+
   // Download the file
-  const response = await fetch(sound.url);
-  if (!response.ok) {
-    throw new Error(`Download failed with status ${response.status}`);
-  }
-  const blob = await response.blob();
-  const arrayBuffer = await blob.arrayBuffer();
-  file.write(new Uint8Array(arrayBuffer));
+  await FileSystem.downloadAsync(sound.url, fileUri);
 
   const downloaded: DownloadedSound = {
     id: sound.id,
     name: sound.name,
-    localUri: file.uri,
+    localUri: fileUri,
     downloadedAt: new Date().toISOString(),
   };
 
@@ -114,7 +109,7 @@ export async function downloadSound(sound: DownloadableSound): Promise<Downloade
 
   // Install for background notifications (copies to Library/Sounds on iOS, creates channel on Android)
   try {
-    await installSoundForNotifications(sound.id, sound.name, file.uri);
+    await installSoundForNotifications(sound.id, sound.name, fileUri);
     console.log(`[downloadable-sounds] Installed ${sound.id} for background notifications`);
   } catch (e) {
     console.warn(`[downloadable-sounds] Failed to install ${sound.id} for notifications:`, e);
@@ -132,8 +127,8 @@ export async function deleteDownloadedSound(soundId: string): Promise<void> {
   const sound = downloaded.find(s => s.id === soundId);
   if (sound) {
     try {
-      const file = new File(sound.localUri);
-      if (file.exists) file.delete();
+      const info = await FileSystem.getInfoAsync(sound.localUri);
+      if (info.exists) await FileSystem.deleteAsync(sound.localUri, { idempotent: true });
     } catch {}
   }
   

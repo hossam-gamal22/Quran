@@ -54,31 +54,31 @@ const LANGUAGES = [
 ];
 
 const CATEGORIES = [
-  { id: 'morning', name: 'أذكار الصباح', icon: '🌅', color: 'bg-amber-500' },
-  { id: 'evening', name: 'أذكار المساء', icon: '🌆', color: 'bg-purple-500' },
-  { id: 'sleep', name: 'أذكار النوم', icon: '🌙', color: 'bg-blue-500' },
-  { id: 'wakeup', name: 'أذكار الاستيقاظ', icon: '☀️', color: 'bg-emerald-500' },
-  { id: 'after_prayer', name: 'أذكار بعد الصلاة', icon: '🕌', color: 'bg-pink-500' },
-  { id: 'quran_duas', name: 'أدعية من القرآن', icon: '📖', color: 'bg-teal-500' },
-  { id: 'sunnah_duas', name: 'أدعية من السنة', icon: '⭐', color: 'bg-orange-500' },
-  { id: 'ruqya', name: 'الرقية الشرعية', icon: '🛡️', color: 'bg-indigo-500' },
-  { id: 'eating', name: 'أذكار الطعام', icon: '🍽️', color: 'bg-lime-500' },
-  { id: 'mosque', name: 'أذكار المسجد', icon: '🕌', color: 'bg-cyan-500' },
-  { id: 'house', name: 'أذكار المنزل', icon: '🏠', color: 'bg-stone-500' },
-  { id: 'travel', name: 'أذكار السفر', icon: '✈️', color: 'bg-sky-500' },
-  { id: 'emotions', name: 'أذكار المشاعر', icon: '💚', color: 'bg-rose-500' },
-  { id: 'wudu', name: 'أذكار الوضوء', icon: '💧', color: 'bg-blue-400' },
-  { id: 'nature', name: 'أذكار الطبيعة', icon: '🌿', color: 'bg-green-500' },
-  { id: 'fasting', name: 'أذكار الصيام', icon: '🌙', color: 'bg-violet-500' },
-  { id: 'protection', name: 'أذكار الحماية', icon: '🔒', color: 'bg-red-500' },
-  { id: 'prayerSupplications', name: 'أدعية الصلاة', icon: '🤲', color: 'bg-emerald-600' },
-  { id: 'salawat', name: 'الصلاة على النبي', icon: '☪️', color: 'bg-green-600' },
-  { id: 'istighfar', name: 'الاستغفار', icon: '🤲', color: 'bg-teal-600' },
-  { id: 'ayat_kursi', name: 'آية الكرسي', icon: '📜', color: 'bg-yellow-600' },
+  { id: '1', name: 'أذكار الصباح', icon: '🌅', color: 'bg-amber-500' },
+  { id: '1b', name: 'أذكار المساء', icon: '🌆', color: 'bg-purple-500' },
+  { id: '2', name: 'أذكار النوم', icon: '🌙', color: 'bg-blue-500' },
+  { id: '3', name: 'أذكار الاستيقاظ', icon: '☀️', color: 'bg-accent' },
+  { id: '27', name: 'أذكار بعد الصلاة', icon: '🕌', color: 'bg-pink-500' },
+  { id: '26', name: 'أدعية قبل السلام', icon: '📖', color: 'bg-teal-500' },
+  { id: '34', name: 'دعاء الهم والحزن', icon: '⭐', color: 'bg-orange-500' },
+  { id: '35', name: 'دعاء الكرب', icon: '🛡️', color: 'bg-indigo-500' },
+  { id: '69', name: 'أذكار الطعام', icon: '🍽️', color: 'bg-lime-500' },
+  { id: '10', name: 'دعاء الذهاب إلى المسجد', icon: '🕌', color: 'bg-cyan-500' },
+  { id: '8', name: 'الذكر عند الخروج من المنزل', icon: '🏠', color: 'bg-stone-500' },
+  { id: '96', name: 'أذكار السفر', icon: '✈️', color: 'bg-sky-500' },
+  { id: '6', name: 'الذكر قبل الوضوء', icon: '💧', color: 'bg-blue-400' },
+  { id: '80', name: 'الدعاء عند سماع الرعد', icon: '🌿', color: 'bg-green-500' },
+  { id: '73', name: 'الدعاء عند الإفطار', icon: '🌙', color: 'bg-violet-500' },
+  { id: '18', name: 'دعاء الاستفتاح', icon: '🤲', color: 'bg-accent-dark' },
+  { id: '107', name: 'الصلاة على النبي', icon: '☪️', color: 'bg-green-600' },
+  { id: '129', name: 'الاستغفار والتوبة', icon: '🤲', color: 'bg-teal-600' },
+  { id: '130', name: 'فضائل الأذكار', icon: '📜', color: 'bg-yellow-600' },
+  { id: '28', name: 'دعاء الاستخارة', icon: '🌟', color: 'bg-red-500' },
+  { id: '32', name: 'دعاء القنوت', icon: '🤲', color: 'bg-rose-500' },
 ];
 
 const SUBCATEGORIES: Record<string, { id: string; name: string }[]> = {
-  after_prayer: [
+  '27': [
     { id: 'general', name: 'عامة' },
     { id: 'after_fajr', name: 'بعد الفجر' },
     { id: 'after_fajr_maghrib', name: 'بعد الفجر والمغرب' },
@@ -449,7 +449,7 @@ const AzkarManager: React.FC = () => {
       {/* Notification */}
       {notification.show && (
         <div className={`fixed top-4 left-4 right-4 md:left-auto md:right-4 md:w-96 p-4 rounded-xl shadow-lg z-50 ${
-          notification.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
+          notification.type === 'success' ? 'bg-accent' : 'bg-red-500'
         } text-white font-medium`}>
           {notification.message}
         </div>
@@ -492,7 +492,7 @@ const AzkarManager: React.FC = () => {
           <button
             onClick={loadAzkarFromGitHub}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent-dark hover:bg-accent-dark text-white rounded-xl disabled:opacity-50 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             تحديث
@@ -500,7 +500,7 @@ const AzkarManager: React.FC = () => {
           <button
             onClick={exportToJson}
             disabled={azkarList.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-admin-surface-light hover:bg-admin-surface-light text-white rounded-xl disabled:opacity-50 transition-colors"
           >
             <Download className="w-4 h-4" />
             تصدير
@@ -533,11 +533,11 @@ const AzkarManager: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-slate-800/50 p-1 rounded-xl border border-slate-700/50">
+      <div className="flex gap-2 bg-admin-surface/50 p-1 rounded-xl border border-admin-border/50">
         <button
           onClick={() => setActiveTab('list')}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
-            activeTab === 'list' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            activeTab === 'list' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white hover:bg-admin-surface-light'
           }`}
         >
           <Search className="w-4 h-4" />
@@ -546,7 +546,7 @@ const AzkarManager: React.FC = () => {
         <button
           onClick={() => setActiveTab('audio')}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors ${
-            activeTab === 'audio' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
+            activeTab === 'audio' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white hover:bg-admin-surface-light'
           }`}
         >
           <Music className="w-4 h-4" />
@@ -559,8 +559,8 @@ const AzkarManager: React.FC = () => {
         <div className="space-y-6">
           {/* Audio Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl">
-              <p className="text-emerald-400 text-sm">مع صوت</p>
+            <div className="bg-accent/10 border border-accent/30 p-4 rounded-xl">
+              <p className="text-accent-light text-sm">مع صوت</p>
               <p className="text-2xl font-bold text-white">{stats.withAudio}</p>
             </div>
             <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl">
@@ -578,7 +578,7 @@ const AzkarManager: React.FC = () => {
           </div>
 
           {/* Audio by Category */}
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50">
             <h3 className="text-white font-medium mb-4">الصوتيات حسب الفئة</h3>
             <div className="space-y-3">
               {CATEGORIES.map(cat => {
@@ -586,12 +586,12 @@ const AzkarManager: React.FC = () => {
                 const withAudio = catAzkar.filter(z => z.audio);
                 const percentage = catAzkar.length ? Math.round((withAudio.length / catAzkar.length) * 100) : 0;
                 return (
-                  <div key={cat.id} className="bg-slate-900/50 rounded-lg p-3">
+                  <div key={cat.id} className="bg-admin-bg/50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-white">{cat.icon} {cat.name}</span>
                       <span className="text-slate-400 text-sm">{withAudio.length}/{catAzkar.length} ({percentage}%)</span>
                     </div>
-                    <div className="w-full bg-slate-700 rounded-full h-2">
+                    <div className="w-full bg-admin-surface-light rounded-full h-2">
                       <div className={`${cat.color} h-2 rounded-full transition-all`} style={{ width: `${percentage}%` }} />
                     </div>
                   </div>
@@ -601,12 +601,12 @@ const AzkarManager: React.FC = () => {
           </div>
 
           {/* Audio List - show azkar with audio for management */}
-          <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
-            <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
+          <div className="bg-admin-surface/50 rounded-xl border border-admin-border/50 overflow-hidden">
+            <div className="p-4 border-b border-admin-border/50 flex items-center justify-between">
               <h3 className="text-white font-medium">الأذكار الصوتية</h3>
               <div className="flex gap-2">
                   <select
-                  className="bg-slate-700 text-white rounded-lg px-3 py-1.5 text-sm border border-slate-600"
+                  className="bg-admin-surface-light text-white rounded-lg px-3 py-1.5 text-sm border border-admin-border"
                   value={selectedCategory}
                   onChange={e => setSelectedCategory(e.target.value)}
                   aria-label="فلتر الفئة"
@@ -619,7 +619,7 @@ const AzkarManager: React.FC = () => {
             </div>
             <div className="divide-y divide-slate-700/50 max-h-[600px] overflow-y-auto">
               {filteredList.map(zikr => (
-                <div key={zikr.id} className="p-3 hover:bg-slate-700/20 transition-colors">
+                <div key={zikr.id} className="p-3 hover:bg-admin-surface-light/20 transition-colors">
                   <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-white text-sm leading-relaxed line-clamp-2">{zikr.arabic}</p>
@@ -631,7 +631,7 @@ const AzkarManager: React.FC = () => {
                           <button
                             onClick={() => playingAudio === zikr.audio ? stopAudio() : playAudio(zikr.audio)}
                             className={`p-2 rounded-lg transition-colors ${
-                              playingAudio === zikr.audio ? 'bg-red-500 text-white' : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                              playingAudio === zikr.audio ? 'bg-red-500 text-white' : 'bg-accent/20 text-accent-light hover:bg-accent/30'
                             }`}
                             aria-label={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
                             title={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
@@ -680,15 +680,15 @@ const AzkarManager: React.FC = () => {
 
       {activeTab === 'list' && (<>
       {/* Category Filter */}
-      <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50">
+      <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border/50">
         <h3 className="text-white font-medium mb-3">توزيع الأذكار على الفئات</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button
             onClick={() => setSelectedCategory('all')}
             className={`p-3 rounded-lg transition-all ${
               selectedCategory === 'all'
-                ? 'bg-emerald-500 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                ? 'bg-accent text-white'
+                : 'bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -703,7 +703,7 @@ const AzkarManager: React.FC = () => {
               className={`p-3 rounded-lg transition-all ${
                 selectedCategory === cat.id
                   ? `${cat.color} text-white`
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  : 'bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -724,7 +724,7 @@ const AzkarManager: React.FC = () => {
           onChange={e => setSearchQuery(e.target.value)}
           aria-label="بحث في الأذكار"
           placeholder="بحث بالنص العربي أو الإنجليزي..."
-          className="w-full bg-slate-800/50 text-white px-4 py-3 pr-10 rounded-xl border border-slate-700/50 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+          className="w-full bg-admin-surface/50 text-white px-4 py-3 pr-10 rounded-xl border border-admin-border/50 focus:ring-2 focus:ring-accent focus:border-transparent"
         />
       </div>
 
@@ -735,29 +735,29 @@ const AzkarManager: React.FC = () => {
 
       {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-slate-800/50 rounded-xl border border-slate-700/50">
-          <RefreshCw className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+        <div className="flex flex-col items-center justify-center p-12 bg-admin-surface/50 rounded-xl border border-admin-border/50">
+          <RefreshCw className="w-12 h-12 text-accent animate-spin mb-4" />
           <p className="text-slate-400">جاري تحميل الأذكار...</p>
         </div>
       ) : filteredList.length === 0 ? (
-        <div className="bg-slate-800/50 rounded-xl p-12 text-center border border-slate-700/50">
+        <div className="bg-admin-surface/50 rounded-xl p-12 text-center border border-admin-border/50">
           <FileJson className="w-16 h-16 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400 text-lg mb-4">
             {azkarList.length === 0 ? 'لا توجد أذكار' : 'لا توجد نتائج'}
           </p>
           <button
             onClick={loadAzkarFromGitHub}
-            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors"
+            className="px-6 py-3 bg-accent hover:bg-accent-dark text-white rounded-xl transition-colors"
           >
             إعادة التحميل
           </button>
         </div>
       ) : (
-        <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-admin-surface/50 rounded-xl border border-admin-border/50 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-slate-700/50">
+                <tr className="bg-admin-surface-light/50">
                   <th className="text-right text-white p-3 font-medium w-16">#</th>
                   <th className="text-right text-white p-3 font-medium w-32">الفئة</th>
                   <th className="text-right text-white p-3 font-medium">النص العربي</th>
@@ -770,10 +770,10 @@ const AzkarManager: React.FC = () => {
                 {filteredList.map(zikr => {
                   const category = CATEGORIES.find(c => c.id === zikr.category);
                   return (
-                    <tr key={zikr.id} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                    <tr key={zikr.id} className="border-t border-admin-border/50 hover:bg-admin-surface-light/30 transition-colors">
                       <td className="p-3 text-slate-300 font-mono">{zikr.id}</td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 ${category?.color || 'bg-slate-600'} text-white rounded text-xs`}>
+                        <span className={`px-2 py-1 ${category?.color || 'bg-admin-surface-light'} text-white rounded text-xs`}>
                           {category?.icon} {category?.name || zikr.category}
                         </span>
                       </td>
@@ -783,7 +783,7 @@ const AzkarManager: React.FC = () => {
                         </p>
                       </td>
                       <td className="p-3">
-                        <span className="px-2 py-1 bg-slate-600 text-white rounded text-sm">
+                        <span className="px-2 py-1 bg-admin-surface-light text-white rounded text-sm">
                           {zikr.count}x
                         </span>
                       </td>
@@ -794,7 +794,7 @@ const AzkarManager: React.FC = () => {
                             className={`p-2 rounded-lg transition-colors ${
                               playingAudio === zikr.audio
                                 ? 'bg-red-500 text-white'
-                                : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                                : 'bg-accent/20 text-accent-light hover:bg-accent/30'
                             }`}
                             aria-label={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
                             title={playingAudio === zikr.audio ? 'إيقاف' : 'تشغيل'}
@@ -828,7 +828,7 @@ const AzkarManager: React.FC = () => {
                           </button>
                           <button
                             onClick={() => openEditZikr({ ...zikr, id: Math.max(0, ...azkarList.map(z => z.id)) + 1, arabic: zikr.arabic + ' (نسخة)' })}
-                            className="p-2 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors"
+                            className="p-2 text-accent-light hover:bg-accent/20 rounded-lg transition-colors"
                             aria-label="تكرار"
                             title="تكرار"
                           >
@@ -857,8 +857,8 @@ const AzkarManager: React.FC = () => {
       {/* Detail Modal */}
       {showDetailModal && selectedZikr && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-slate-700">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+          <div className="bg-admin-surface rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden border border-admin-border">
+            <div className="p-4 border-b border-admin-border flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">تفاصيل الذكر #{selectedZikr.id}</h2>
               <button onClick={() => setShowDetailModal(false)} className="text-slate-400 hover:text-white" aria-label="إغلاق" title="إغلاق">
                 <X className="w-5 h-5" />
@@ -868,8 +868,8 @@ const AzkarManager: React.FC = () => {
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] space-y-6">
               {/* Arabic Text */}
               <div>
-                <h3 className="text-emerald-400 font-medium mb-2">النص العربي</h3>
-                <p className="text-white text-xl leading-loose bg-slate-900 p-4 rounded-xl">
+                <h3 className="text-accent-light font-medium mb-2">النص العربي</h3>
+                <p className="text-white text-xl leading-loose bg-admin-bg p-4 rounded-xl">
                   {selectedZikr.arabic}
                 </p>
               </div>
@@ -877,8 +877,8 @@ const AzkarManager: React.FC = () => {
               {/* Transliteration */}
               {selectedZikr.transliteration && (
                 <div>
-                  <h3 className="text-emerald-400 font-medium mb-2">النطق</h3>
-                  <p className="text-slate-300 bg-slate-900 p-4 rounded-xl italic" dir="ltr">
+                  <h3 className="text-accent-light font-medium mb-2">النطق</h3>
+                  <p className="text-slate-300 bg-admin-bg p-4 rounded-xl italic" dir="ltr">
                     {selectedZikr.transliteration}
                   </p>
                 </div>
@@ -886,19 +886,19 @@ const AzkarManager: React.FC = () => {
 
               {/* Info Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900 p-3 rounded-xl">
+                <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">الفئة</p>
                   <p className="text-white">{CATEGORIES.find(c => c.id === selectedZikr.category)?.name}</p>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl">
+                <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">التكرار</p>
                   <p className="text-white">{selectedZikr.count} مرة</p>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl">
+                <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">المصدر</p>
                   <p className="text-white text-sm">{selectedZikr.reference || '—'}</p>
                 </div>
-                <div className="bg-slate-900 p-3 rounded-xl">
+                <div className="bg-admin-bg p-3 rounded-xl">
                   <p className="text-slate-400 text-sm">صوت</p>
                   <p className="text-white">{selectedZikr.audio ? '✅ متوفر' : '❌ غير متوفر'}</p>
                 </div>
@@ -907,8 +907,8 @@ const AzkarManager: React.FC = () => {
               {/* Benefit */}
               {selectedZikr.benefit && (
                 <div>
-                  <h3 className="text-emerald-400 font-medium mb-2">الفائدة</h3>
-                  <p className="text-amber-300 bg-slate-900 p-4 rounded-xl">
+                  <h3 className="text-accent-light font-medium mb-2">الفائدة</h3>
+                  <p className="text-amber-300 bg-admin-bg p-4 rounded-xl">
                     {typeof selectedZikr.benefit === 'string' ? selectedZikr.benefit : selectedZikr.benefit?.ar || ''}
                   </p>
                 </div>
@@ -917,14 +917,14 @@ const AzkarManager: React.FC = () => {
               {/* Audio */}
               {selectedZikr.audio && (
                 <div>
-                  <h3 className="text-emerald-400 font-medium mb-2">الصوت</h3>
-                  <div className="flex items-center gap-4 bg-slate-900 p-4 rounded-xl">
+                  <h3 className="text-accent-light font-medium mb-2">الصوت</h3>
+                  <div className="flex items-center gap-4 bg-admin-bg p-4 rounded-xl">
                     <button
                       onClick={() => playingAudio === selectedZikr.audio ? stopAudio() : playAudio(selectedZikr.audio)}
                       className={`px-6 py-3 rounded-xl font-medium transition-colors ${
                         playingAudio === selectedZikr.audio
                           ? 'bg-red-500 text-white'
-                          : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                          : 'bg-accent text-white hover:bg-accent-dark'
                       }`}
                     >
                       {playingAudio === selectedZikr.audio ? '⏹️ إيقاف' : '▶️ تشغيل'}
@@ -935,7 +935,7 @@ const AzkarManager: React.FC = () => {
 
               {/* Translations */}
               <div>
-                <h3 className="text-emerald-400 font-medium mb-3">
+                <h3 className="text-accent-light font-medium mb-3">
                   الترجمات ({Object.keys(selectedZikr.translations || {}).length} لغة)
                 </h3>
                 <div className="space-y-3">
@@ -943,7 +943,7 @@ const AzkarManager: React.FC = () => {
                     const translation = selectedZikr.translations?.[lang.code];
                     if (!translation) return null;
                     return (
-                      <div key={lang.code} className="bg-slate-900 p-4 rounded-xl">
+                      <div key={lang.code} className="bg-admin-bg p-4 rounded-xl">
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-xl">{lang.flag}</span>
                           <span className="text-slate-400 font-medium">{lang.name}</span>
@@ -964,7 +964,7 @@ const AzkarManager: React.FC = () => {
       {/* Edit Modal */}
       {showEditModal && editingZikr && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-admin-bg rounded-2xl border border-admin-border w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold text-lg">
                 {azkarList.find(z => z.id === editingZikr.id) ? 'تعديل ذكر' : 'إضافة ذكر جديد'}
@@ -975,39 +975,39 @@ const AzkarManager: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">النص العربي *</label>
-                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} dir="rtl" value={editingZikr.arabic} onChange={e => setEditingZikr({ ...editingZikr, arabic: e.target.value })} aria-label="النص العربي" placeholder="نص الذكر بالعربية" />
+                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={3} dir="rtl" value={editingZikr.arabic} onChange={e => setEditingZikr({ ...editingZikr, arabic: e.target.value })} aria-label="النص العربي" placeholder="نص الذكر بالعربية" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">النطق</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingZikr.transliteration} onChange={e => setEditingZikr({ ...editingZikr, transliteration: e.target.value })} aria-label="النطق" placeholder="Transliteration" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingZikr.transliteration} onChange={e => setEditingZikr({ ...editingZikr, transliteration: e.target.value })} aria-label="النطق" placeholder="Transliteration" />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الفئة</label>
-                  <select className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" aria-label="الفئة" title="الفئة" value={editingZikr.category} onChange={e => setEditingZikr({ ...editingZikr, category: e.target.value, subcategory: undefined })}>
+                  <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الفئة" title="الفئة" value={editingZikr.category} onChange={e => setEditingZikr({ ...editingZikr, category: e.target.value, subcategory: undefined })}>
                     {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 {SUBCATEGORIES[editingZikr.category] && (
                   <div>
                     <label className="text-slate-300 text-sm block mb-1">الفئة الفرعية</label>
-                    <select className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" aria-label="الفئة الفرعية" title="الفئة الفرعية" value={editingZikr.subcategory || 'general'} onChange={e => setEditingZikr({ ...editingZikr, subcategory: e.target.value })}>
+                    <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="الفئة الفرعية" title="الفئة الفرعية" value={editingZikr.subcategory || 'general'} onChange={e => setEditingZikr({ ...editingZikr, subcategory: e.target.value })}>
                       {SUBCATEGORIES[editingZikr.category].map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                   </div>
                 )}
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">العدد</label>
-                  <input type="number" min={1} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" aria-label="العدد" placeholder="العدد" value={editingZikr.count} onChange={e => setEditingZikr({ ...editingZikr, count: Number(e.target.value) })} />
+                  <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" aria-label="العدد" placeholder="العدد" value={editingZikr.count} onChange={e => setEditingZikr({ ...editingZikr, count: Number(e.target.value) })} />
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">المرجع</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" dir="rtl" value={editingZikr.reference} onChange={e => setEditingZikr({ ...editingZikr, reference: e.target.value })} aria-label="المرجع" placeholder="صحيح البخاري" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" dir="rtl" value={editingZikr.reference} onChange={e => setEditingZikr({ ...editingZikr, reference: e.target.value })} aria-label="المرجع" placeholder="صحيح البخاري" />
                 </div>
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الفائدة</label>
-                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} dir="rtl" value={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')} onChange={e => setEditingZikr({ ...editingZikr, benefit: e.target.value })} aria-label="الفائدة" placeholder="فائدة الذكر" />
+                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} dir="rtl" value={typeof editingZikr.benefit === 'string' ? editingZikr.benefit : (editingZikr.benefit?.ar || '')} onChange={e => setEditingZikr({ ...editingZikr, benefit: e.target.value })} aria-label="الفائدة" placeholder="فائدة الذكر" />
               </div>
 
               {/* Translate benefit to all languages */}
@@ -1022,14 +1022,14 @@ const AzkarManager: React.FC = () => {
               {/* Audio Section */}
               <div>
                 <label className="text-slate-300 text-sm block mb-2">الصوت</label>
-                <div className="bg-slate-800 rounded-lg border border-slate-700 p-3 space-y-3">
+                <div className="bg-admin-surface rounded-lg border border-admin-border p-3 space-y-3">
                   {editingZikr.audio ? (
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => playingAudio === editingZikr.audio ? stopAudio() : playAudio(editingZikr.audio)}
                         className={`p-2 rounded-lg transition-colors ${
-                          playingAudio === editingZikr.audio ? 'bg-red-500 text-white' : 'bg-emerald-500/20 text-emerald-400'
+                          playingAudio === editingZikr.audio ? 'bg-red-500 text-white' : 'bg-accent/20 text-accent-light'
                         }`}
                         aria-label={playingAudio === editingZikr.audio ? 'إيقاف' : 'تشغيل'}
                         title={playingAudio === editingZikr.audio ? 'إيقاف' : 'تشغيل'}
@@ -1037,7 +1037,7 @@ const AzkarManager: React.FC = () => {
                         {playingAudio === editingZikr.audio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                       </button>
                       <input
-                        className="flex-1 bg-slate-900 text-white rounded-lg px-3 py-1.5 border border-slate-600 font-mono text-xs"
+                        className="flex-1 bg-admin-bg text-white rounded-lg px-3 py-1.5 border border-admin-border font-mono text-xs"
                         value={editingZikr.audio}
                         onChange={e => setEditingZikr({ ...editingZikr, audio: e.target.value })}
                         aria-label="رابط الصوت"
@@ -1093,7 +1093,7 @@ const AzkarManager: React.FC = () => {
                   {LANGUAGES.filter(l => l.code !== 'ar').map(lang => (
                     <div key={lang.code}>
                       <label className="text-slate-400 text-xs block mb-1">{lang.flag} {lang.name}</label>
-                      <textarea className="w-full bg-slate-800 text-white rounded-lg px-3 py-1.5 border border-slate-700 text-sm" rows={2} dir={lang.code === 'ur' ? 'rtl' : 'ltr'} value={editingZikr.translations?.[lang.code] || ''} onChange={e => setEditingZikr({ ...editingZikr, translations: { ...editingZikr.translations, [lang.code]: e.target.value } })} aria-label={`ترجمة ${lang.name}`} placeholder={lang.name} />
+                      <textarea className="w-full bg-admin-surface text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm" rows={2} dir={lang.code === 'ur' ? 'rtl' : 'ltr'} value={editingZikr.translations?.[lang.code] || ''} onChange={e => setEditingZikr({ ...editingZikr, translations: { ...editingZikr.translations, [lang.code]: e.target.value } })} aria-label={`ترجمة ${lang.name}`} placeholder={lang.name} />
                     </div>
                   ))}
                 </div>
@@ -1101,10 +1101,10 @@ const AzkarManager: React.FC = () => {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => saveZikr(editingZikr)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+              <button onClick={() => saveZikr(editingZikr)} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark">
                 <Save className="w-4 h-4" /> حفظ
               </button>
-              <button onClick={() => setShowEditModal(false)} className="px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">إلغاء</button>
+              <button onClick={() => setShowEditModal(false)} className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">إلغاء</button>
             </div>
           </div>
         </div>

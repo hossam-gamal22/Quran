@@ -26,6 +26,8 @@ import {
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 interface DigitalTypographyViewProps {
   prayerTimes: PrayerTimes | null;
   language?: string;
@@ -40,6 +42,8 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   show24Hour = false,
 }) => {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -92,7 +96,7 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
 
   const textColor = isDarkMode ? '#fff' : '#1a1a2e';
   const mutedColor = isDarkMode ? '#A8A8AD' : '#8E8E93';
-  const accentColor = '#22C55E';
+  const accentColor = '#0d8e62';
 
   return (
     <View style={styles.wrapper}>
@@ -129,7 +133,7 @@ const DigitalTypographyView: React.FC<DigitalTypographyViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     paddingVertical: 20,

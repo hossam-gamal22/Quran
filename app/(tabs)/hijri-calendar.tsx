@@ -8,7 +8,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   FlatList, ActivityIndicator, Modal, Animated, Platform, Share,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -67,7 +69,7 @@ function getDaysInHijriMonth(hYear: number, hMonth: number): number {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function HijriCalendarScreen() {
-  const { t, settings } = useSettings();
+  const { t, settings, isDarkMode } = useSettings();
   const colors = useColors();
   const isRTL = useIsRTL();
   const today = new Date();
@@ -233,7 +235,7 @@ export default function HijriCalendarScreen() {
     .sort((a, b) => a.diff - b.diff)
     .slice(0, 8);
 
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     header: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -241,16 +243,20 @@ export default function HijriCalendarScreen() {
     title: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: '800', color: colors.foreground },
     iconBtn: { padding: 8, borderRadius: 20 },
     // Month nav
+    monthNavOuter: {
+      overflow: 'hidden' as const, borderBottomWidth: 1, borderBottomColor: colors.border,
+    },
     monthNav: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingVertical: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderBottomWidth: 1, borderBottomColor: colors.border,
+      paddingVertical: 12,
     },
-    navBtn: { padding: 10, borderRadius: 20, backgroundColor: colors.primary + '18' },
-    monthTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.primary },
+    navBtn: { padding: 10, borderRadius: 20, backgroundColor: colors.primary + '28' },
+    monthTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '800', color: colors.primaryText },
     yearText: { textAlign: 'center', fontSize: 12, color: colors.muted, marginTop: 2 },
     // Weekday headers
-    weekRow: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 8, backgroundColor: 'rgba(120,120,128,0.12)' },
-    weekDay: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: colors.primary },
+    weekRowOuter: { overflow: 'hidden' as const },
+    weekRow: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 8 },
+    weekDay: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: colors.primaryText },
     // Calendar grid
     calGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingBottom: 8 },
     dayCell: {
@@ -264,21 +270,24 @@ export default function HijriCalendarScreen() {
     dayNum: { fontSize: 14, fontWeight: '600', color: colors.foreground },
     eventDot: { width: 5, height: 5, borderRadius: 3, position: 'absolute', bottom: 3 },
     // Selected day info
-    selectedCard: {
-      margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
-      padding: 14, borderWidth: 1, borderColor: colors.border,
+    selectedCardOuter: {
+      margin: 12, borderRadius: 16, overflow: 'hidden' as const,
+      borderWidth: 1, borderColor: colors.border,
     },
-    selectedDate: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
-    selectedGreg: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
+    selectedCard: {
+      padding: 14,
+    },
+    selectedDate: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+    selectedGreg: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 2 },
     eventItem: {
       flexDirection: 'row', alignItems: 'center', marginTop: 10,
-      backgroundColor: colors.primary + '10', borderRadius: 12, padding: 10, gap: 10,
+      backgroundColor: colors.primary + '20', borderRadius: 12, padding: 10, gap: 10,
     },
     eventIcon: { fontSize: 20 },
-    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    eventName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     eventDesc: { fontSize: 12, color: colors.muted, marginTop: 2, lineHeight: 18 },
     // Section title
-    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginTop: 8, marginBottom: 6, textAlign: isRTL ? 'right' : 'left' },
+    sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginTop: 8, marginBottom: 6, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     // Upcoming events
     upcomingItem: {
       flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 16,
@@ -286,9 +295,9 @@ export default function HijriCalendarScreen() {
     },
     upcomingIcon: { fontSize: 22 },
     upcomingInfo: { flex: 1 },
-    upcomingName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
-    upcomingDesc: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 1, lineHeight: 18 },
-    upcomingDate: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginTop: 2 },
+    upcomingName: { fontSize: 14, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+    upcomingDesc: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 1, lineHeight: 18 },
+    upcomingDate: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 2 },
     upcomingDiff: {
       backgroundColor: colors.primary, borderRadius: 16,
       paddingHorizontal: 10, paddingVertical: 4,
@@ -304,17 +313,21 @@ export default function HijriCalendarScreen() {
     modalEventIcon: { fontSize: 48, textAlign: 'center', marginBottom: 8 },
     modalTitle: { fontSize: 20, fontWeight: '900', color: colors.foreground, textAlign: 'center', marginBottom: 6 },
     modalDesc: { fontSize: 15, color: colors.muted, textAlign: 'center', lineHeight: 24 },
-    modalDate: { fontSize: 13, color: colors.primary, textAlign: 'center', marginTop: 10, fontWeight: '700' },
+    modalDate: { fontSize: 13, color: colors.primaryText, textAlign: 'center', marginTop: 10, fontWeight: '700' },
     // Converter section
-    convCard: {
-      margin: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16,
-      padding: 16, borderWidth: 1, borderColor: colors.border,
+    convCardOuter: {
+      margin: 12, borderRadius: 16, overflow: 'hidden' as const,
+      borderWidth: 1, borderColor: colors.border,
     },
-    convTitle: { fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
+    convCard: {
+      padding: 16,
+    },
+    convTitle: { fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 10 },
     convRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
     convLabel: { fontSize: 13, color: colors.muted },
     convValue: { fontSize: 13, fontWeight: '700', color: colors.foreground },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   const renderCalendar = () => {
     const cells: React.ReactNode[] = [];
@@ -353,8 +366,8 @@ export default function HijriCalendarScreen() {
             <Text style={[
               s.dayNum,
               isSelected && { color: '#fff', fontWeight: '800' },
-              isTodayDay && !isSelected && { color: colors.primary, fontWeight: '800' },
-              hasEvent && !isSelected && { color: dayEvent?.color || colors.primary },
+              isTodayDay && !isSelected && { color: colors.primaryText, fontWeight: '800' },
+              hasEvent && !isSelected && { color: dayEvent?.color || colors.primaryText },
               isBlessedPeriod && !isSelected && { color: '#F5A623' },
             ]}>
               {d}
@@ -387,27 +400,39 @@ export default function HijriCalendarScreen() {
       </View>
 
       {/* Month Navigator */}
-      <View style={[s.monthNav, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
-          <IconSymbol name={isRTL ? 'chevron.left' : 'chevron.right'} size={18} color={colors.primary} />
-        </TouchableOpacity>
-        <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-          <Text style={s.monthTitle}>{HIJRI_MONTHS[hMonth - 1]} {hYear}</Text>
-          <Text style={s.yearText}>
-            {firstDayGregorian.toLocaleDateString(localeStr, { month: 'long', year: 'numeric' })}
-          </Text>
-        </Animated.View>
-        <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
-          <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={18} color={colors.primary} />
-        </TouchableOpacity>
+      <View style={s.monthNavOuter}>
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight'} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+        <View style={[s.monthNav, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <TouchableOpacity style={s.navBtn} onPress={() => navigate(1)}>
+            <IconSymbol name={isRTL ? 'chevron.left' : 'chevron.right'} size={18} color={colors.primary} />
+          </TouchableOpacity>
+          <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+            <Text style={s.monthTitle}>{HIJRI_MONTHS[hMonth - 1]} {hYear}</Text>
+            <Text style={s.yearText}>
+              {firstDayGregorian.toLocaleDateString(localeStr, { month: 'long', year: 'numeric' })}
+            </Text>
+          </Animated.View>
+          <TouchableOpacity style={s.navBtn} onPress={() => navigate(-1)}>
+            <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={18} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Weekday headers */}
-        <View style={s.weekRow}>
-          {ARABIC_DAYS.map((d, idx) => (
-            <Text key={d} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[s.weekDay, idx === 5 && { color: colors.primary }]}>{d}</Text>
-          ))}
+        <View style={s.weekRowOuter}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight'} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <View style={s.weekRow}>
+            {ARABIC_DAYS.map((d, idx) => (
+              <Text key={d} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={s.weekDay}>{d}</Text>
+            ))}
+          </View>
         </View>
 
         {/* Calendar Grid */}
@@ -416,43 +441,55 @@ export default function HijriCalendarScreen() {
         </View>
 
         {/* Selected Day Info */}
-        <View style={s.selectedCard}>
-          <Text style={s.selectedDate}>
-            {ARABIC_DAYS[selectedGregorian.getDay()]} {selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}
-          </Text>
-          <Text style={s.selectedGreg}>
-            {selectedGregorian.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </Text>
-          {selectedEvents.map(ev => (
-            <TouchableOpacity key={ev.name} style={[s.eventItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: ev.color + '12' }]} onPress={() => setSelectedEvent(ev)}>
-              <MaterialCommunityIcons name={ev.icon as any} size={20} color={ev.color || colors.primary} />
-              <Text style={[s.eventName, { color: ev.color, flex: 1, textAlign: isRTL ? 'right' : 'left' }]}>{ev.name}</Text>
-              <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={14} color={ev.color} />
-            </TouchableOpacity>
-          ))}
+        <View style={s.selectedCardOuter}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight'} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <View style={s.selectedCard}>
+            <Text style={s.selectedDate}>
+              {ARABIC_DAYS[selectedGregorian.getDay()]} {selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}
+            </Text>
+            <Text style={s.selectedGreg}>
+              {selectedGregorian.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </Text>
+            {selectedEvents.map(ev => (
+              <TouchableOpacity key={ev.name} style={[s.eventItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: ev.color + '12' }]} onPress={() => setSelectedEvent(ev)}>
+                <MaterialCommunityIcons name={ev.icon as any} size={20} color={ev.color || colors.primary} />
+                <Text style={[s.eventName, { color: ev.color, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{ev.name}</Text>
+                <IconSymbol name={isRTL ? 'chevron.right' : 'chevron.left'} size={14} color={ev.color} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Date Converter */}
         {showConverter && (
-          <View style={s.convCard}>
-            <Text style={s.convTitle}>{t('calendar.dateConverter') || 'Date Converter — Today'}</Text>
-            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={s.convLabel}>{t('calendar.gregorian') || 'Gregorian'}</Text>
-              <Text style={s.convValue}>{today.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
-            </View>
-            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={s.convLabel}>{t('calendar.hijri') || 'Hijri'}</Text>
-              <Text style={[s.convValue, { color: colors.primary }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} {ahSuffix}</Text>
-            </View>
-            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={s.convLabel}>{t('calendar.selectedDay') || 'Selected Day'}</Text>
-              <Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}</Text>
-            </View>
-            <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={s.convLabel}>{t('calendar.correspondsTo') || 'Corresponds To'}</Text>
-              <Text style={[s.convValue, { color: colors.primary }]}>
-                {selectedGregorian.toLocaleDateString(localeStr, { year: 'numeric', month: 'long', day: 'numeric' })}
-              </Text>
+          <View style={s.convCardOuter}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight'} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+            <View style={s.convCard}>
+              <Text style={s.convTitle}>{t('calendar.dateConverter') || 'Date Converter — Today'}</Text>
+              <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text style={s.convLabel}>{t('calendar.gregorian') || 'Gregorian'}</Text>
+                <Text style={s.convValue}>{today.toLocaleDateString(localeStr, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+              </View>
+              <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text style={s.convLabel}>{t('calendar.hijri') || 'Hijri'}</Text>
+                <Text style={[s.convValue, { color: colors.primaryText }]}>{todayHijri[2]} {HIJRI_MONTHS[todayHijri[1] - 1]} {todayHijri[0]} {ahSuffix}</Text>
+              </View>
+              <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text style={s.convLabel}>{t('calendar.selectedDay') || 'Selected Day'}</Text>
+                <Text style={s.convValue}>{selectedDay} {HIJRI_MONTHS[hMonth - 1]} {hYear} {ahSuffix}</Text>
+              </View>
+              <View style={[s.convRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <Text style={s.convLabel}>{t('calendar.correspondsTo') || 'Corresponds To'}</Text>
+                <Text style={[s.convValue, { color: colors.primaryText }]}>
+                  {selectedGregorian.toLocaleDateString(localeStr, { year: 'numeric', month: 'long', day: 'numeric' })}
+                </Text>
+              </View>
             </View>
           </View>
         )}

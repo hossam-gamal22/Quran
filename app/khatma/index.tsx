@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKhatma } from '../../contexts/KhatmaContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '../../hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getKhatmaStats, getPageSurah, Khatma } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
 import { UniversalHeader } from '@/components/ui';
@@ -33,6 +34,7 @@ import { localizeNumber as toArabicNumber } from '@/lib/format-number';
 export default function KhatmaListScreen() {
   const router = useRouter();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { settings, t } = useSettings();
   const isRTL = useIsRTL();
   const {
@@ -182,7 +184,7 @@ export default function KhatmaListScreen() {
                   ]}
                 />
               </View>
-              <Text style={[styles.progressText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.progressText, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {toArabicNumber(stats.progressPercentage)}٪
               </Text>
             </View>
@@ -284,7 +286,7 @@ export default function KhatmaListScreen() {
           onPress: () => router.push('/khatma/new'),
           color: '#FFFFFF',
           size: 24,
-          style: { backgroundColor: '#22C55E', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+          style: { backgroundColor: colors.primary, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
         }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
@@ -313,7 +315,7 @@ export default function KhatmaListScreen() {
             {t('khatma.noKhatmasDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -325,7 +327,7 @@ export default function KhatmaListScreen() {
       {/* Floating Action Button for Active Khatma */}
       {activeKhatma && !activeKhatma.isCompleted && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          style={[styles.fab, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={() => router.push('/khatma/wird')}
         >
           <Ionicons name="book" size={24} color="#FFFFFF" />
@@ -337,7 +339,7 @@ export default function KhatmaListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -349,6 +351,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: FONT_SIZES.md,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
 
   listContent: {
@@ -376,6 +380,8 @@ const styles = StyleSheet.create({
   khatmaName: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   activeBadge: {
     paddingHorizontal: Spacing.sm,
@@ -386,6 +392,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   completedBadge: {
     flexDirection: 'row',
@@ -399,6 +407,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   progressSection: {
     flexDirection: 'row',
@@ -420,6 +430,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     minWidth: 40,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   statsRow: {
     flexDirection: 'row',
@@ -433,9 +445,13 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: FONT_SIZES.xs,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   currentPosition: {
     flexDirection: 'row',
@@ -447,10 +463,14 @@ const styles = StyleSheet.create({
   },
   positionLabel: {
     fontSize: FONT_SIZES.sm,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   positionValue: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   statusRow: {
     flexDirection: 'row',
@@ -461,6 +481,8 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   emptyContainer: {
     flex: 1,
@@ -473,10 +495,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
     marginTop: Spacing.md,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   emptySubtitle: {
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   startButton: {
     flexDirection: 'row',
@@ -491,6 +517,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   fab: {
     position: 'absolute',
@@ -509,5 +537,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

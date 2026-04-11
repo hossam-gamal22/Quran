@@ -2,12 +2,11 @@
 // مشاركة البيانات مع الويدجت - روح المسلم
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system/legacy';
-import { Platform } from 'react-native';
 
 import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
 import { getLocalizedHijriDate } from './hijri-date';
-import { getAllAzkar } from '@/lib/azkar-api';
+import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { t, getDateLocale, getLanguage } from '@/lib/i18n';
 import { getTodayAyah, QuranAyah } from '@/lib/api/quran-cloud-api';
 
@@ -28,9 +27,6 @@ export const WIDGET_ICON_PATHS: Record<string, string> = {
   dhikr: 'assets/images/widgets/widget_dhikr.png',
   hijri: 'assets/images/widgets/widget_hijri.png',
 };
-
-// مسار مشاركة البيانات مع الويدجت
-const SHARED_GROUP_ID = 'group.com.roohmuslim.app';
 
 // ========================================
 // الأنواع
@@ -169,14 +165,14 @@ export const defaultWidgetSettings: WidgetSettings = {
     showLocation: true,
     showCompletion: true,
     colorScheme: 'auto',
-    accentColor: '#22C55E',
+    accentColor: '#0d8e62',
   },
   azkarWidget: {
     enabled: true,
     showTranslation: false,
     autoRefresh: true,
     refreshInterval: 60,
-    categories: ['morning', 'evening', 'misc'],
+    categories: ['1', '2', '3'],
   },
   hijriWidget: {
     enabled: true,
@@ -204,8 +200,6 @@ export const defaultWidgetSettings: WidgetSettings = {
 export const saveWidgetSettings = async (settings: WidgetSettings): Promise<void> => {
   try {
     await AsyncStorage.setItem(WIDGET_SETTINGS_KEY, JSON.stringify(settings));
-    // تحديث البيانات المشتركة
-    await updateSharedData();
   } catch (error) {
     console.error('Error saving widget settings:', error);
   }
@@ -312,7 +306,7 @@ export const preparePrayerWidgetData = async (
  */
 export const prepareAzkarWidgetData = async (
   language: string = 'ar',
-  categories: string[] = ['morning', 'evening', 'misc']
+  categories: string[] = ['1', '2', '3']
 ): Promise<WidgetAzkarData> => {
   const allAzkar = getAllAzkar();
   // فلترة الأذكار حسب الفئات المختارة
@@ -326,8 +320,8 @@ export const prepareAzkarWidgetData = async (
   
   // جلب النص والترجمة
   const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-  const text = language === 'ar' ? randomZikr.arabic : (randomZikr.translations?.[lang] || randomZikr.arabic);
-  const translation = language !== 'ar' ? randomZikr.translations?.['en'] : undefined;
+  const text = language === 'ar' ? stripAzkarBrackets(randomZikr.arabic) : (resolveTranslationValue(randomZikr.translations?.[lang]) || stripAzkarBrackets(randomZikr.arabic));
+  const translation = language !== 'ar' ? resolveTranslationValue(randomZikr.translations?.['en']) : undefined;
   const benefit = typeof randomZikr.benefit === 'object' && randomZikr.benefit ? (randomZikr.benefit as Record<string, string>)[lang] : undefined;
 
   // حالة إكمال الأذكار (من التخزين)
@@ -392,6 +386,15 @@ function getDailyDhikrIndex(totalAzkar: number): number {
 
 function getDhikrCategoryName(category: string): string {
   const names: Record<string, () => string> = {
+    // New numeric IDs
+    '1': () => t('azkar.morning'),
+    '1b': () => t('azkar.evening'),
+    '2': () => t('azkar.sleep'),
+    '3': () => t('azkar.wakeup'),
+    '27': () => t('prayer.afterPrayer'),
+    '26': () => t('azkar.quranDuas'),
+    '34': () => t('azkar.sunnahDuas'),
+    // Legacy string IDs (backward compat)
     morning: () => t('azkar.morning'),
     evening: () => t('azkar.evening'),
     sleep: () => t('azkar.sleep'),
@@ -480,14 +483,14 @@ export const prepareDhikrWidgetData = async (
   const zikr = allAzkar[index]!;
 
   const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-  const translation = language !== 'ar' ? (zikr.translations?.[lang] || zikr.translations?.['en']) : undefined;
+  const translation = language !== 'ar' ? (resolveTranslationValue(zikr.translations?.[lang]) || resolveTranslationValue(zikr.translations?.['en'])) : undefined;
   const benefitVal = zikr.benefit;
   const benefit = typeof benefitVal === 'string'
     ? benefitVal
     : benefitVal?.[lang] || benefitVal?.['ar'] || undefined;
 
   return {
-    arabic: zikr.arabic,
+    arabic: stripAzkarBrackets(zikr.arabic),
     translation,
     count: zikr.count,
     timesLabel: t('azkar.times'),
@@ -553,61 +556,16 @@ export const setPrayerCompleted = async (
 // ========================================
 
 /**
- * كتابة البيانات للمشاركة مع الويدجت (iOS)
- * يستخدم react-native-shared-group-preferences للكتابة إلى UserDefaults(suiteName:)
- * الويدجت يقرأ من نفس UserDefaults بنفس المفتاح
- */
-const writeToSharedContainer = async (data: SharedWidgetData): Promise<void> => {
-  if (Platform.OS !== 'ios') return;
-  
-  try {
-    const SharedGroupPreferences = require('react-native-shared-group-preferences').default;
-    await SharedGroupPreferences.setItem(
-      'widget_shared_data',
-      JSON.stringify(data),
-      'group.com.roohmuslim.app'
-    );
-  } catch (error) {
-    console.log('Shared container not available:', error);
-  }
-};
-
-/**
  * تحديث البيانات المشتركة
+ * يفوض إلى updateWidgetData من widget-data-bridge الذي يكتب إلى التخزين المشترك
+ * ويطلب تحديث الويدجت الأصلي
  */
 export const updateSharedData = async (
   prayerTimes?: PrayerTimes | null,
   location?: string
 ): Promise<void> => {
-  try {
-    const settings = await getWidgetSettings();
-    
-    const prayerData = await preparePrayerWidgetData(prayerTimes || null, location);
-    const lang = getLanguage();
-    const azkarData = await prepareAzkarWidgetData(lang, settings.azkarWidget.categories);
-    const verseData = await prepareVerseWidgetData(lang);
-    const dhikrData = await prepareDhikrWidgetData(lang);
-    const prayerCompletion = await getPrayerCompletion();
-    
-    const sharedData: SharedWidgetData = {
-      prayer: prayerData,
-      azkar: azkarData,
-      verse: verseData,
-      dhikr: dhikrData,
-      prayerCompletion,
-      settings,
-      language: lang,
-    };
-    
-    // حفظ في AsyncStorage
-    await AsyncStorage.setItem(WIDGET_DATA_KEY, JSON.stringify(sharedData));
-    
-    // كتابة للمشاركة مع الويدجت الأصلي
-    await writeToSharedContainer(sharedData);
-    
-  } catch (error) {
-    console.error('Error updating shared data:', error);
-  }
+  const { updateWidgetData } = require('./widget-data-bridge');
+  await updateWidgetData(prayerTimes, location);
 };
 
 /**
@@ -632,40 +590,12 @@ export const getSharedData = async (): Promise<SharedWidgetData | null> => {
 
 /**
  * طلب تحديث الويدجت
+ * يفوض إلى updateWidgetData من widget-data-bridge الذي يكتب البيانات
+ * ويطلب تحديث الويدجت الأصلي على Android و iOS
  */
 export const requestWidgetUpdate = async (): Promise<void> => {
-  try {
-    // تحديث البيانات المشتركة أولاً
-    await updateSharedData();
-    
-    // في React Native، نستخدم مكتبة خاصة لتحديث الويدجت
-    // مثل react-native-widget-extension أو expo-widgets
-    
-    if (Platform.OS === 'ios') {
-      // iOS: استخدام WidgetKit
-      // يتطلب مكتبة native
-      console.log('Requesting iOS widget update...');
-    } else if (Platform.OS === 'android') {
-      // Android: استخدام AppWidgetManager
-      // يتطلب مكتبة native
-      console.log('Requesting Android widget update...');
-    }
-  } catch (error) {
-    console.error('Error requesting widget update:', error);
-  }
-};
-
-/**
- * جدولة تحديث الويدجت
- */
-export const scheduleWidgetUpdates = async (): Promise<void> => {
-  const settings = await getWidgetSettings();
-  
-  if (!settings.enabled) return;
-  
-  // تحديث عند كل صلاة
-  // يتم تنفيذ هذا من خلال الإشعارات المجدولة
-  console.log('Widget updates scheduled');
+  const { updateWidgetData } = require('./widget-data-bridge');
+  await updateWidgetData();
 };
 
 // ========================================
@@ -679,7 +609,7 @@ export const getWidgetBackgroundColor = (prayer: string): string[] => {
   const colors: Record<string, string[]> = {
     fajr: ['#1a237e', '#283593'],
     sunrise: ['#ff6f00', '#ff8f00'],
-    dhuhr: ['#22C55E', '#1d4a3a'],
+    dhuhr: ['#0d8e62', '#1d4a3a'],
     asr: ['#f57c00', '#ef6c00'],
     maghrib: ['#d84315', '#bf360c'],
     isha: ['#1a1a2e', '#16213e'],
@@ -726,7 +656,6 @@ export default {
   
   // التحديث
   requestWidgetUpdate,
-  scheduleWidgetUpdates,
   
   // مساعدة
   getWidgetBackgroundColor,

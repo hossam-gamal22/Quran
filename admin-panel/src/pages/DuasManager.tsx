@@ -10,6 +10,7 @@ import { db, storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
+import { getDefaultDuas } from '../data/adhkar-defaults';
 
 interface SelectedDua {
   id: string;
@@ -108,6 +109,7 @@ export default function DuasManager() {
       await loadDuas();
     } catch (error) {
       console.error('Error saving dua:', error);
+      alert(`فشل الحفظ: ${(error as Error).message}`);
     }
   };
 
@@ -118,6 +120,7 @@ export default function DuasManager() {
       await loadDuas();
     } catch (error) {
       console.error('Error deleting dua:', error);
+      alert(`فشل الحذف: ${(error as Error).message}`);
     }
   };
 
@@ -127,6 +130,7 @@ export default function DuasManager() {
       await loadDuas();
     } catch (error) {
       console.error('Error toggling dua:', error);
+      alert(`فشل التبديل: ${(error as Error).message}`);
     }
   };
 
@@ -205,10 +209,41 @@ export default function DuasManager() {
         <div className="flex gap-2">
           <button
             onClick={() => { resetForm(); setShowForm(true); }}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            className="px-4 py-2 bg-accent-dark text-white rounded-lg hover:bg-emerald-700 transition-colors"
           >
             + إضافة دعاء
           </button>
+          {duas.length === 0 && (
+            <button
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+              onClick={async () => {
+                if (!confirm('هل تريد استيراد الأدعية الافتراضية من التطبيق؟')) return;
+                try {
+                  const defaults = getDefaultDuas();
+                  const batch = writeBatch(db);
+                  defaults.forEach((d, i) => {
+                    const docRef = doc(collection(db, 'selectedDuas'));
+                    batch.set(docRef, {
+                      arabic: d.arabic,
+                      translations: { en: d.translation },
+                      reference: d.reference,
+                      source: d.source,
+                      benefit: {},
+                      enabled: true,
+                      order: i,
+                    });
+                  });
+                  await batch.commit();
+                  await loadDuas();
+                  alert(`✅ تم استيراد ${defaults.length} دعاء`);
+                } catch (err) {
+                  alert(`❌ فشل الاستيراد: ${(err as Error).message}`);
+                }
+              }}
+            >
+              📥 استيراد الافتراضي
+            </button>
+          )}
           <button
             onClick={handleExportJSON}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -333,7 +368,7 @@ export default function DuasManager() {
                 <button
                   onClick={() => audioFileRef.current?.click()}
                   disabled={uploadingAudio}
-                  className="px-3 py-1.5 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:border-emerald-500 disabled:opacity-50"
+                  className="px-3 py-1.5 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 hover:border-accent disabled:opacity-50"
                 >
                   {uploadingAudio ? 'جاري الرفع...' : '🔊 رفع ملف صوتي'}
                 </button>
@@ -362,7 +397,7 @@ export default function DuasManager() {
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                className="px-4 py-2 bg-accent-dark text-white rounded-lg hover:bg-emerald-700 transition-colors"
               >
                 {editingDua ? 'تحديث' : 'إضافة'}
               </button>
@@ -374,7 +409,7 @@ export default function DuasManager() {
       {/* Duas List */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto" />
+          <div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full mx-auto" />
         </div>
       ) : (
         <div className="space-y-3">
@@ -404,7 +439,7 @@ export default function DuasManager() {
                     onClick={() => handleToggleEnabled(dua)}
                     className={`p-1.5 rounded-lg transition-colors ${
                       dua.enabled
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-accent-light'
                         : 'bg-gray-100 text-gray-400 dark:bg-gray-700'
                     }`}
                     aria-label={dua.enabled ? 'تعطيل' : 'تفعيل'}
@@ -422,7 +457,7 @@ export default function DuasManager() {
                   </button>
                   <button
                     onClick={() => handleEdit({ ...dua, id: '', arabic: dua.arabic + ' (نسخة)', order: duas.length })}
-                    className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-200"
+                    className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-accent-light hover:bg-emerald-200"
                     aria-label="تكرار"
                     title="تكرار"
                   >

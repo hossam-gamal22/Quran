@@ -8,11 +8,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  StatusBar,
   Dimensions,
-  Image,
-  ImageSourcePropType,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +20,8 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { setLanguage } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
@@ -30,34 +30,19 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const FLAG_IMAGES: Record<string, ImageSourcePropType> = {
-  ar: require('@/assets/images/flags/sa.png'),
-  en: require('@/assets/images/flags/us.png'),
-  fr: require('@/assets/images/flags/fr.png'),
-  de: require('@/assets/images/flags/de.png'),
-  es: require('@/assets/images/flags/es.png'),
-  tr: require('@/assets/images/flags/tr.png'),
-  ur: require('@/assets/images/flags/pk.png'),
-  id: require('@/assets/images/flags/id.png'),
-  ms: require('@/assets/images/flags/my.png'),
-  hi: require('@/assets/images/flags/in.png'),
-  bn: require('@/assets/images/flags/bd.png'),
-  ru: require('@/assets/images/flags/ru.png'),
-};
-
 const LANGUAGES = [
-  { code: 'ar', name: 'العربية', nameEn: 'Arabic', flagIcon: FLAG_IMAGES.ar, isRTL: true },
-  { code: 'en', name: 'English', nameEn: 'English', flagIcon: FLAG_IMAGES.en, isRTL: false },
-  { code: 'fr', name: 'Français', nameEn: 'French', flagIcon: FLAG_IMAGES.fr, isRTL: false },
-  { code: 'tr', name: 'Türkçe', nameEn: 'Turkish', flagIcon: FLAG_IMAGES.tr, isRTL: false },
-  { code: 'ur', name: 'اردو', nameEn: 'Urdu', flagIcon: FLAG_IMAGES.ur, isRTL: true },
-  { code: 'de', name: 'Deutsch', nameEn: 'German', flagIcon: FLAG_IMAGES.de, isRTL: false },
-  { code: 'hi', name: 'हिन्दी', nameEn: 'Hindi', flagIcon: FLAG_IMAGES.hi, isRTL: false },
-  { code: 'bn', name: 'বাংলা', nameEn: 'Bengali', flagIcon: FLAG_IMAGES.bn, isRTL: false },
-  { code: 'id', name: 'Bahasa Indonesia', nameEn: 'Indonesian', flagIcon: FLAG_IMAGES.id, isRTL: false },
-  { code: 'ms', name: 'Bahasa Melayu', nameEn: 'Malay', flagIcon: FLAG_IMAGES.ms, isRTL: false },
-  { code: 'es', name: 'Español', nameEn: 'Spanish', flagIcon: FLAG_IMAGES.es, isRTL: false },
-  { code: 'ru', name: 'Русский', nameEn: 'Russian', flagIcon: FLAG_IMAGES.ru, isRTL: false },
+  { code: 'ar', name: 'العربية', nameEn: 'Arabic', flag: '🇸🇦', isRTL: true },
+  { code: 'en', name: 'English', nameEn: 'English', flag: '🇺🇸', isRTL: false },
+  { code: 'fr', name: 'Français', nameEn: 'French', flag: '🇫🇷', isRTL: false },
+  { code: 'tr', name: 'Türkçe', nameEn: 'Turkish', flag: '🇹🇷', isRTL: false },
+  { code: 'ur', name: 'اردو', nameEn: 'Urdu', flag: '🇵🇰', isRTL: true },
+  { code: 'de', name: 'Deutsch', nameEn: 'German', flag: '🇩🇪', isRTL: false },
+  { code: 'hi', name: 'हिन्दी', nameEn: 'Hindi', flag: '🇮🇳', isRTL: false },
+  { code: 'bn', name: 'বাংলা', nameEn: 'Bengali', flag: '🇧🇩', isRTL: false },
+  { code: 'id', name: 'Bahasa Indonesia', nameEn: 'Indonesian', flag: '🇮🇩', isRTL: false },
+  { code: 'ms', name: 'Bahasa Melayu', nameEn: 'Malay', flag: '🇲🇾', isRTL: false },
+  { code: 'es', name: 'Español', nameEn: 'Spanish', flag: '🇪🇸', isRTL: false },
+  { code: 'ru', name: 'Русский', nameEn: 'Russian', flag: '🇷🇺', isRTL: false },
 ];
 
 // ترجمات شاشة اللغة — تتغير فوراً عند اختيار لغة جديدة
@@ -94,6 +79,8 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
   index,
 }) => {
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInRight.delay(index * 50).duration(400)}>
       <TouchableOpacity
@@ -104,12 +91,12 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
         }}
         activeOpacity={0.7}
       >
-        <Image source={language.flagIcon} style={styles.flag} resizeMode="contain" />
+        <Text style={styles.flagEmoji}>{language.flag}</Text>
         <View style={[styles.languageInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[styles.languageName, isSelected && styles.languageNameSelected, { textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.languageName, isSelected && styles.languageNameSelected, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {language.name}
           </Text>
-          <Text style={[styles.languageNameEn, { textAlign: isRTL ? 'right' : 'left' }]}>{language.nameEn}</Text>
+          <Text style={[styles.languageNameEn, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{language.nameEn}</Text>
         </View>
         <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>
           {isSelected && <View style={styles.radioInner} />}
@@ -125,6 +112,8 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
 
 export default function LanguageScreen() {
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { preferences, updatePreferences, goToNextStep, goToPreviousStep } = useOnboarding();
   const [selectedLanguage, setSelectedLanguage] = useState(preferences.language || 'ar');
 
@@ -160,7 +149,7 @@ export default function LanguageScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar style="light" translucent />
       
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -185,7 +174,7 @@ export default function LanguageScreen() {
 
           {/* الوصف */}
           <Animated.View entering={FadeInDown.delay(100).duration(500)} style={styles.descContainer}>
-            <MaterialCommunityIcons name="translate" size={40} color="#22C55E" />
+            <MaterialCommunityIcons name="translate" size={40} color="#0d8e62" />
             <Text style={[styles.descText, { textAlign: isSelectedRTL ? 'right' : 'left' }]}>
               {screenText.desc}
             </Text>
@@ -231,6 +220,7 @@ export default function LanguageScreen() {
                 <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
+                <View style={styles.dot} />
               </View>
             </Animated.View>
           </SafeAreaView>
@@ -244,7 +234,7 @@ export default function LanguageScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -294,7 +284,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 2,
   },
   descContainer: {
@@ -329,12 +319,10 @@ const styles = StyleSheet.create({
   },
   languageItemSelected: {
     backgroundColor: 'rgba(6,79,47,0.2)',
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
-  flag: {
-    width: 36,
-    height: 24,
-    borderRadius: 4,
+  flagEmoji: {
+    fontSize: 28,
   },
   languageInfo: {
     flex: 1,
@@ -345,7 +333,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   languageNameSelected: {
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   languageNameEn: {
     fontSize: 13,
@@ -373,13 +361,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   radioOuterSelected: {
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   bottomContainer: {
     paddingHorizontal: 24,
@@ -416,6 +404,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
 });

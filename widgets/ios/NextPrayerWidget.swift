@@ -100,7 +100,7 @@ struct PrayerWidgetProvider: IntentTimelineProvider {
     typealias Entry = PrayerWidgetEntry
     
     // App Group ID للمشاركة مع التطبيق الرئيسي
-    let appGroupId = "group.com.roohmuslim.app"
+    let appGroupId = WidgetConstants.appGroupId
     
     func placeholder(in context: Context) -> PrayerWidgetEntry {
         PrayerWidgetEntry(
@@ -210,50 +210,46 @@ struct SmallPrayerWidgetView: View {
     
     var body: some View {
         ZStack {
-            // الخلفية
-            LinearGradient(
-                gradient: Gradient(colors: [accentColor, accentColor.opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: accentColor)
             
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
+                // App icon
+                WidgetAppIcon(size: 32)
+                
                 // اسم الصلاة القادمة
-                HStack {
-                    Image(systemName: prayerIcon)
-                        .font(.system(size: 14))
-                    Text(entry.data?.nextPrayerNameAr ?? "الظهر")
-                        .font(.system(size: 16, weight: .bold))
-                }
-                .foregroundColor(.white)
+                Text(entry.data?.nextPrayerNameAr ?? "الظهر")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
                 
                 // الوقت
                 Text(entry.data?.nextPrayerTime ?? "12:15 م")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                 
                 // الوقت المتبقي
-                HStack(spacing: 4) {
-                    Image(systemName: "timer")
-                        .font(.system(size: 10))
-                    Text(entry.data?.timeRemaining ?? "2:30")
-                        .font(.system(size: 12, weight: .medium))
+                GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 10))
+                        Text(entry.data?.timeRemaining ?? "2:30")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(WidgetConstants.Colors.gold)
                 }
-                .foregroundColor(.white.opacity(0.9))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.2))
-                .cornerRadius(10)
                 
                 // التاريخ الهجري
                 if entry.settings?.prayerWidget.showHijriDate ?? true {
                     Text(entry.data?.hijriDate ?? "15 رمضان")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(.system(size: 9))
+                        .foregroundColor(.white.opacity(0.6))
                 }
             }
             .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
     
     var prayerIcon: String {
@@ -282,68 +278,77 @@ struct MediumPrayerWidgetView: View {
     
     var body: some View {
         ZStack {
-            // الخلفية
-            LinearGradient(
-                gradient: Gradient(colors: [accentColor, accentColor.opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: accentColor)
             
-            HStack(spacing: 20) {
-                // الجانب الأيسر - الصلاة القادمة
-                VStack(alignment: .leading, spacing: 8) {
-                    // العنوان
-                    HStack {
-                        Image(systemName: prayerIcon)
-                            .font(.system(size: 16))
-                        Text("الصلاة القادمة")
-                            .font(.system(size: 12, weight: .medium))
+            VStack(spacing: 0) {
+                // Header with app icon
+                HStack {
+                    WidgetAppIcon(size: 20)
+                    Text("مواقيت الصلاة")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                    Spacer()
+                    if entry.settings?.prayerWidget.showHijriDate ?? true {
+                        Text(entry.data?.hijriDate ?? "15 رمضان")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.5))
                     }
-                    .foregroundColor(.white.opacity(0.9))
-                    
-                    // اسم الصلاة
-                    Text(entry.data?.nextPrayerNameAr ?? "الظهر")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    // الوقت
-                    Text(entry.data?.nextPrayerTime ?? "12:15 م")
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    // الوقت المتبقي
-                    HStack(spacing: 4) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 12))
-                        Text("\(entry.data?.timeRemainingLabel ?? "متبقي") \(entry.data?.timeRemaining ?? "2:30")")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(10)
                 }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
                 
-                Spacer()
-                
-                // الجانب الأيمن - قائمة الصلوات
-                if entry.settings?.prayerWidget.showAllPrayers ?? true {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        ForEach(entry.data?.allPrayers ?? []) { prayer in
-                            HStack(spacing: 6) {
-                                Text(prayer.time)
-                                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                                Text(prayer.nameAr)
-                                    .font(.system(size: 11, weight: prayer.isNext ? .bold : .regular))
+                HStack(spacing: 15) {
+                    // Left: next prayer info
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(entry.data?.nextPrayerNameAr ?? "الظهر")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        Text(entry.data?.nextPrayerTime ?? "12:15 م")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "timer")
+                                    .font(.system(size: 10))
+                                Text(entry.data?.timeRemaining ?? "2:30")
+                                    .font(.system(size: 11, weight: .medium))
                             }
-                            .foregroundColor(prayer.isPassed ? .white.opacity(0.5) : prayer.isNext ? .yellow : .white.opacity(0.9))
+                            .foregroundColor(WidgetConstants.Colors.gold)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Right: all prayers list
+                    if entry.settings?.prayerWidget.showAllPrayers ?? true {
+                        VStack(alignment: .trailing, spacing: 3) {
+                            ForEach(entry.data?.allPrayers ?? []) { prayer in
+                                HStack(spacing: 6) {
+                                    Text(prayer.time)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                    Text(prayer.nameAr)
+                                        .font(.system(size: 11, weight: prayer.isNext ? .bold : .regular))
+                                }
+                                .foregroundColor(prayer.isPassed ? .white.opacity(0.35) : prayer.isNext ? WidgetConstants.Colors.gold : .white.opacity(0.8))
+                                .padding(.horizontal, prayer.isNext ? 6 : 0)
+                                .padding(.vertical, prayer.isNext ? 2 : 0)
+                                .background(prayer.isNext ? WidgetConstants.Glass.pill : Color.clear)
+                                .cornerRadius(6)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 10)
             }
-            .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
     
     var prayerIcon: String {
@@ -372,58 +377,42 @@ struct LargePrayerWidgetView: View {
     
     var body: some View {
         ZStack {
-            // الخلفية
-            LinearGradient(
-                gradient: Gradient(colors: [accentColor, accentColor.opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: accentColor)
             
-            VStack(spacing: 15) {
-                // الهيدر
+            VStack(spacing: 12) {
+                // Header with icon
                 HStack {
-                    VStack(alignment: .leading) {
-                        Text("مواقيت الصلاة")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        if entry.settings?.prayerWidget.showLocation ?? true {
-                            HStack(spacing: 4) {
-                                Image(systemName: "location.fill")
-                                    .font(.system(size: 10))
-                                Text(entry.data?.location ?? "مكة المكرمة")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(.white.opacity(0.8))
-                        }
-                    }
+                    WidgetAppIcon(size: 20)
+                    Text("مواقيت الصلاة")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
                     
                     Spacer()
                     
                     if entry.settings?.prayerWidget.showHijriDate ?? true {
-                        VStack(alignment: .trailing) {
+                        VStack(alignment: .trailing, spacing: 2) {
                             Text(entry.data?.hijriDate ?? "15 رمضان 1446")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.system(size: 11, weight: .medium))
                             Text(entry.data?.gregorianDate ?? "الأحد 2 مارس")
-                                .font(.system(size: 10))
+                                .font(.system(size: 9))
                         }
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.white.opacity(0.7))
                     }
                 }
                 .padding(.horizontal)
                 
-                // الصلاة القادمة
+                // Next prayer highlight
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("الصلاة القادمة")
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.8))
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.6))
                         
                         HStack {
                             Image(systemName: prayerIcon)
-                                .font(.system(size: 20))
+                                .font(.system(size: 18))
                             Text(entry.data?.nextPrayerNameAr ?? "الظهر")
-                                .font(.system(size: 28, weight: .bold))
+                                .font(.system(size: 24, weight: .bold))
                         }
                         .foregroundColor(.white)
                     }
@@ -432,73 +421,57 @@ struct LargePrayerWidgetView: View {
                     
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(entry.data?.nextPrayerTime ?? "12:15 م")
-                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                         
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text("\(entry.data?.timeRemainingLabel ?? "متبقي") \(entry.data?.timeRemaining ?? "2:30")")
+                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "timer")
+                                    .font(.system(size: 10))
+                                Text(entry.data?.timeRemaining ?? "2:30")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundColor(WidgetConstants.Colors.gold)
                         }
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(10)
                     }
                 }
                 .padding(.horizontal)
-                .padding(.vertical, 10)
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(15)
+                .padding(.vertical, 8)
+                .background(WidgetConstants.Glass.highlight)
+                .cornerRadius(14)
                 .padding(.horizontal)
                 
-                // قائمة جميع الصلوات
-                VStack(spacing: 8) {
+                // Prayer list
+                VStack(spacing: 6) {
                     ForEach(entry.data?.allPrayers ?? []) { prayer in
                         HStack {
-                            // علامة الإكمال
                             if entry.settings?.prayerWidget.showCompletion ?? true {
                                 let isCompleted = isPrayerCompleted(prayer.name)
                                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 14))
-                                    .frame(width: 20)
-                                    .foregroundColor(isCompleted ? .green : .white.opacity(0.3))
+                                    .font(.system(size: 13))
+                                    .frame(width: 18)
+                                    .foregroundColor(isCompleted ? .green : .white.opacity(0.25))
                             }
                             
-                            // الأيقونة
                             Image(systemName: iconForPrayer(prayer.name))
-                                .font(.system(size: 14))
-                                .frame(width: 24)
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.4) : prayer.isNext ? .yellow : .white.opacity(0.8))
+                                .font(.system(size: 13))
+                                .frame(width: 22)
+                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white.opacity(0.7))
                             
-                            // الاسم
                             Text(prayer.nameAr)
-                                .font(.system(size: 14, weight: prayer.isNext ? .bold : .regular))
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.4) : prayer.isNext ? .yellow : .white)
+                                .font(.system(size: 13, weight: prayer.isNext ? .bold : .regular))
+                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white)
                             
                             Spacer()
                             
-                            // الوقت
                             Text(prayer.time)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.4) : prayer.isNext ? .yellow : .white)
-                            
-                            // علامة الصلاة القادمة
-                            if prayer.isNext {
-                                Image(systemName: "arrow.left")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.yellow)
-                            } else if prayer.isPassed {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white)
                         }
-                        .padding(.horizontal)
-                        .padding(.vertical, 6)
-                        .background(prayer.isNext ? Color.white.opacity(0.15) : Color.clear)
-                        .cornerRadius(10)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(prayer.isNext ? WidgetConstants.Glass.pill : Color.clear)
+                        .cornerRadius(8)
                     }
                 }
                 .padding(.horizontal)
@@ -507,6 +480,10 @@ struct LargePrayerWidgetView: View {
             }
             .padding(.vertical)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
     
     var prayerIcon: String {

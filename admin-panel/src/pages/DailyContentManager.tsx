@@ -1,16 +1,20 @@
 // admin-panel/src/pages/DailyContentManager.tsx
 // إدارة المحتوى اليومي — تحكم الأدمن في آية/حديث/حكمة/فيديو اليوم
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BookOpen, MessageCircle, Lightbulb, Film, Save, ToggleLeft, ToggleRight, RefreshCw,
+  BookOpen, MessageCircle, Lightbulb, HandMetal, Save, ToggleLeft, ToggleRight, RefreshCw, Eye, Pencil,
 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
+import { getAyahOfTheDay } from '@app-data/daily-ayahs';
+import { getHadithOfTheDay } from '@app-data/daily-hadiths';
+import { getQuoteOfTheDay } from '@app-data/quotes';
+import { getDuaOfTheDay } from '@app-data/daily-duas';
 
-type ContentTab = 'ayah' | 'hadith' | 'quote' | 'story';
+type ContentTab = 'ayah' | 'hadith' | 'quote' | 'dua';
 
 interface DailyOverride {
   override: boolean;
@@ -39,17 +43,18 @@ interface QuoteOverride extends DailyOverride {
   source: string;
 }
 
-interface StoryOverride extends DailyOverride {
-  ayahText: string;
-  surahName: string;
-  videoUrls: string[];
+interface DuaOverride extends DailyOverride {
+  arabic: string;
+  translation: string;
+  reference: string;
+  translations?: Record<string, string>;
 }
 
 const TABS: { id: ContentTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
   { id: 'ayah', label: 'آية اليوم', icon: BookOpen },
   { id: 'hadith', label: 'حديث اليوم', icon: MessageCircle },
   { id: 'quote', label: 'حكمة اليوم', icon: Lightbulb },
-  { id: 'story', label: 'فيديو اليوم', icon: Film },
+  { id: 'dua', label: 'دعاء اليوم', icon: HandMetal },
 ];
 
 const getDefaultData = (tab: ContentTab): DailyOverride => {
@@ -57,8 +62,72 @@ const getDefaultData = (tab: ContentTab): DailyOverride => {
     case 'ayah': return { override: false, date: '', surah: 1, ayah: 1, text: '', surahName: '' };
     case 'hadith': return { override: false, date: '', arabic: '', translation: '', narrator: '', source: '' };
     case 'quote': return { override: false, date: '', arabic: '', translation: '', author: '', source: '' };
-    case 'story': return { override: false, date: '', ayahText: '', surahName: '', videoUrls: [] };
+    case 'dua': return { override: false, date: '', arabic: '', translation: '', reference: '' };
   }
+};
+
+/** Compute today's system default content for a given tab */
+const getTodayDefault = (tab: ContentTab): Record<string, string | number> => {
+  switch (tab) {
+    case 'ayah': {
+      const a = getAyahOfTheDay();
+      return { text: a.arabic, surahName: a.ref, surah: a.surah, ayah: a.ayah };
+    }
+    case 'hadith': {
+      const h = getHadithOfTheDay();
+      return { arabic: h.arabic, translation: h.translation, narrator: h.narrator, source: h.source };
+    }
+    case 'quote': {
+      const q = getQuoteOfTheDay();
+      return { arabic: q.arabic, translation: q.translation, author: q.author, source: q.source || '' };
+    }
+    case 'dua': {
+      const d = getDuaOfTheDay();
+      return { arabic: d.arabic, translation: d.translation, reference: d.reference };
+    }
+  }
+};
+
+/** Field labels for display */
+const FIELD_LABELS: Record<string, string> = {
+  text: 'النص', arabic: 'النص العربي', translation: 'الترجمة', surahName: 'السورة',
+  surah: 'رقم السورة', ayah: 'رقم الآية', narrator: 'الراوي', source: 'المصدر',
+  author: 'القائل', reference: 'المرجع',
+};
+
+/** Preview box showing today's default content */
+const CurrentLivePreview: React.FC<{ tab: ContentTab; onEditCurrent: () => void; isOverrideActive: boolean }> = ({ tab, onEditCurrent, isOverrideActive }) => {
+  const defaults = useMemo(() => getTodayDefault(tab), [tab]);
+
+  return (
+    <div className={`rounded-xl border p-4 mb-6 ${isOverrideActive ? 'border-admin-border/30 bg-admin-surface/30' : 'border-emerald-500/40 bg-emerald-900/10'}`}>
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={onEditCurrent}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-accent-dark/80 hover:bg-accent-dark text-white rounded-lg transition-all"
+        >
+          <Pencil size={14} />
+          تعديل المحتوى الحالي
+        </button>
+        <div className="flex items-center gap-2">
+          <Eye size={16} className={isOverrideActive ? 'text-slate-500' : 'text-emerald-400'} />
+          <span className={`text-sm font-bold ${isOverrideActive ? 'text-slate-500' : 'text-emerald-400'}`}>
+            {isOverrideActive ? 'الافتراضي التلقائي (معطّل — يوجد تحكم يدوي)' : '🟢 المحتوى الحالي للمستخدمين (الافتراضي التلقائي)'}
+          </span>
+        </div>
+      </div>
+      <div className="space-y-2" dir="rtl">
+        {Object.entries(defaults).map(([key, value]) => (
+          <div key={key} className="flex gap-2">
+            <span className="text-slate-500 text-sm min-w-[80px]">{FIELD_LABELS[key] || key}:</span>
+            <span className={`text-sm ${isOverrideActive ? 'text-slate-500' : 'text-slate-200'} ${key === 'arabic' || key === 'text' ? 'font-semibold' : ''}`}>
+              {String(value).length > 120 ? String(value).slice(0, 120) + '...' : String(value)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const DailyContentManager: React.FC = () => {
@@ -67,6 +136,12 @@ const DailyContentManager: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
+
+  /** Copy today's system defaults into the override form fields */
+  const handleEditCurrent = () => {
+    const defaults = getTodayDefault(activeTab);
+    setData(prev => ({ ...prev, ...defaults, override: true }));
+  };
 
   const loadData = async (tab: ContentTab) => {
     setIsLoading(true);
@@ -111,7 +186,7 @@ const DailyContentManager: React.FC = () => {
     if (isLoading) {
       return (
         <div className="p-8 text-center text-slate-400">
-          <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full mx-auto mb-4" />
           جاري التحميل...
         </div>
       );
@@ -125,20 +200,20 @@ const DailyContentManager: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">رقم السورة</label>
-                <input type="number" min={1} max={114} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.surah || ''} onChange={e => updateField('surah', Number(e.target.value))} placeholder="رقم السورة" aria-label="رقم السورة" />
+                <input type="number" min={1} max={114} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.surah || ''} onChange={e => updateField('surah', Number(e.target.value))} placeholder="رقم السورة" aria-label="رقم السورة" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">رقم الآية</label>
-                <input type="number" min={1} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.ayah || ''} onChange={e => updateField('ayah', Number(e.target.value))} placeholder="رقم الآية" aria-label="رقم الآية" />
+                <input type="number" min={1} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.ayah || ''} onChange={e => updateField('ayah', Number(e.target.value))} placeholder="رقم الآية" aria-label="رقم الآية" />
               </div>
             </div>
             <div>
               <label className="text-slate-300 text-sm block mb-1">نص الآية</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} value={d.text || ''} onChange={e => updateField('text', e.target.value)} placeholder="نص الآية بالعربية" dir="rtl" aria-label="نص الآية" />
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={3} value={d.text || ''} onChange={e => updateField('text', e.target.value)} placeholder="نص الآية بالعربية" dir="rtl" aria-label="نص الآية" />
             </div>
             <div>
               <label className="text-slate-300 text-sm block mb-1">اسم السورة</label>
-              <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.surahName || ''} onChange={e => updateField('surahName', e.target.value)} placeholder="مثال: البقرة" dir="rtl" aria-label="اسم السورة" />
+              <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.surahName || ''} onChange={e => updateField('surahName', e.target.value)} placeholder="مثال: البقرة" dir="rtl" aria-label="اسم السورة" />
             </div>
           </div>
         );
@@ -149,11 +224,11 @@ const DailyContentManager: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="text-slate-300 text-sm block mb-1">نص الحديث (عربي)</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} value={d.arabic || ''} onChange={e => updateField('arabic', e.target.value)} placeholder="نص الحديث بالعربية" dir="rtl" aria-label="نص الحديث" />
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={3} value={d.arabic || ''} onChange={e => updateField('arabic', e.target.value)} placeholder="نص الحديث بالعربية" dir="rtl" aria-label="نص الحديث" />
             </div>
             <div>
               <label className="text-slate-300 text-sm block mb-1">الترجمة</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} value={d.translation || ''} onChange={e => updateField('translation', e.target.value)} placeholder="Translation" aria-label="ترجمة الحديث" />
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} value={d.translation || ''} onChange={e => updateField('translation', e.target.value)} placeholder="Translation" aria-label="ترجمة الحديث" />
             </div>
             {/* Auto-translate hadith */}
             <AutoTranslateField
@@ -175,11 +250,11 @@ const DailyContentManager: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الراوي</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.narrator || ''} onChange={e => updateField('narrator', e.target.value)} placeholder="مثال: أبو هريرة" dir="rtl" aria-label="الراوي" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.narrator || ''} onChange={e => updateField('narrator', e.target.value)} placeholder="مثال: أبو هريرة" dir="rtl" aria-label="الراوي" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">المصدر</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.source || ''} onChange={e => updateField('source', e.target.value)} placeholder="مثال: صحيح البخاري" dir="rtl" aria-label="المصدر" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.source || ''} onChange={e => updateField('source', e.target.value)} placeholder="مثال: صحيح البخاري" dir="rtl" aria-label="المصدر" />
               </div>
             </div>
           </div>
@@ -191,11 +266,11 @@ const DailyContentManager: React.FC = () => {
           <div className="space-y-4">
             <div>
               <label className="text-slate-300 text-sm block mb-1">النص (عربي)</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} value={d.arabic || ''} onChange={e => updateField('arabic', e.target.value)} placeholder="نص الحكمة بالعربية" dir="rtl" aria-label="نص الحكمة" />
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={3} value={d.arabic || ''} onChange={e => updateField('arabic', e.target.value)} placeholder="نص الحكمة بالعربية" dir="rtl" aria-label="نص الحكمة" />
             </div>
             <div>
               <label className="text-slate-300 text-sm block mb-1">الترجمة</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} value={d.translation || ''} onChange={e => updateField('translation', e.target.value)} placeholder="Translation" aria-label="ترجمة الحكمة" />
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} value={d.translation || ''} onChange={e => updateField('translation', e.target.value)} placeholder="Translation" aria-label="ترجمة الحكمة" />
             </div>
             {/* Auto-translate quote */}
             <AutoTranslateField
@@ -217,51 +292,48 @@ const DailyContentManager: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-slate-300 text-sm block mb-1">المؤلف / القائل</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.author || ''} onChange={e => updateField('author', e.target.value)} placeholder="مثال: الإمام الشافعي" dir="rtl" aria-label="المؤلف" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.author || ''} onChange={e => updateField('author', e.target.value)} placeholder="مثال: الإمام الشافعي" dir="rtl" aria-label="المؤلف" />
               </div>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">المصدر</label>
-                <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.source || ''} onChange={e => updateField('source', e.target.value)} placeholder="اختياري" dir="rtl" aria-label="المصدر" />
+                <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.source || ''} onChange={e => updateField('source', e.target.value)} placeholder="اختياري" dir="rtl" aria-label="المصدر" />
               </div>
             </div>
           </div>
         );
       }
-      case 'story': {
-        const d = data as StoryOverride;
+      case 'dua': {
+        const d = data as DuaOverride;
         return (
           <div className="space-y-4">
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
-              <label className="text-emerald-400 text-sm font-medium block mb-2">🎬 رابط الفيديو الرئيسي</label>
-              <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-3 border border-slate-700 font-mono text-sm" dir="ltr"
-                value={(d.videoUrls || [])[0] || ''}
-                onChange={e => {
-                  const rest = (d.videoUrls || []).slice(1);
-                  const val = e.target.value.trim();
-                  updateField('videoUrls', val ? [val, ...rest] : rest);
-                }}
-                placeholder="https://example.com/video.mp4"
-                aria-label="رابط الفيديو الرئيسي" />
-              <p className="text-slate-500 text-xs mt-1">ألصق رابط الفيديو مباشرة هنا (MP4, YouTube, etc.)</p>
+            <div>
+              <label className="text-slate-300 text-sm block mb-1">نص الدعاء (عربي)</label>
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={3} value={d.arabic || ''} onChange={e => updateField('arabic', e.target.value)} placeholder="نص الدعاء بالعربية" dir="rtl" aria-label="نص الدعاء" />
             </div>
             <div>
-              <label className="text-slate-300 text-sm block mb-1">نص الآية (للستوري) — اختياري</label>
-              <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={3} value={d.ayahText || ''} onChange={e => updateField('ayahText', e.target.value)} placeholder="نص الآية بالعربية" dir="rtl" aria-label="نص الآية للستوري" />
+              <label className="text-slate-300 text-sm block mb-1">الترجمة</label>
+              <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} value={d.translation || ''} onChange={e => updateField('translation', e.target.value)} placeholder="Translation" aria-label="ترجمة الدعاء" />
             </div>
+            <AutoTranslateField
+              label="ترجمة تلقائية للدعاء"
+              fieldName="translations"
+              contentType="ui"
+              arabicText={d.arabic}
+              initialValues={d.translations as Record<string, string>}
+              onSave={(translations) => updateField('translations', translations)}
+            />
+            <TranslateButton
+              sourceText={d.arabic || ''}
+              sourceLang="ar"
+              contentType="ui"
+              compact
+              label="🌐 ترجمة سريعة"
+              onTranslated={(translations) => updateField('translations', { ...(d.translations as Record<string, string>), ...translations })}
+            />
             <div>
-              <label className="text-slate-300 text-sm block mb-1">اسم السورة — اختياري</label>
-              <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={d.surahName || ''} onChange={e => updateField('surahName', e.target.value)} placeholder="مثال: البقرة" dir="rtl" aria-label="اسم السورة" />
+              <label className="text-slate-300 text-sm block mb-1">المرجع / المصدر</label>
+              <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={d.reference || ''} onChange={e => updateField('reference', e.target.value)} placeholder="مثال: حصن المسلم" dir="rtl" aria-label="المرجع" />
             </div>
-            <details className="group">
-              <summary className="text-slate-400 text-xs cursor-pointer hover:text-slate-300">روابط فيديو إضافية (متقدم)</summary>
-              <div className="mt-2">
-                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 font-mono text-sm" rows={3} value={(d.videoUrls || []).slice(1).join('\n')} onChange={e => {
-                  const first = (d.videoUrls || [])[0] || '';
-                  const rest = e.target.value.split('\n').filter(Boolean);
-                  updateField('videoUrls', first ? [first, ...rest] : rest);
-                }} placeholder="رابط إضافي في كل سطر" aria-label="روابط فيديو إضافية" />
-              </div>
-            </details>
           </div>
         );
       }
@@ -273,18 +345,18 @@ const DailyContentManager: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">المحتوى اليومي</h1>
-          <p className="text-slate-400 mt-1">تحكم يدوي في آية/حديث/حكمة/فيديو اليوم — أو اتركها للاختيار التلقائي</p>
+          <p className="text-slate-400 mt-1">شاهد المحتوى الحالي للمستخدمين، وتحكم يدوياً في آية/حديث/حكمة/دعاء اليوم</p>
         </div>
       </div>
 
       {/* التبويبات */}
-      <div className="flex gap-2 border-b border-slate-700 pb-4">
+      <div className="flex gap-2 border-b border-admin-border pb-4">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-              activeTab === tab.id ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              activeTab === tab.id ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white hover:bg-admin-surface'
             }`}
           >
             <tab.icon size={18} />
@@ -294,16 +366,16 @@ const DailyContentManager: React.FC = () => {
       </div>
 
       {/* المحتوى */}
-      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/50">
+      <div className="bg-admin-surface/50 rounded-xl p-6 border border-admin-border/50">
         {/* Toggle Override */}
-        <div className="flex items-center justify-between mb-6 p-4 bg-slate-700/50 rounded-lg">
+        <div className="flex items-center justify-between mb-6 p-4 bg-admin-surface-light/50 rounded-lg">
           <div>
             <h3 className="text-white font-bold">تفعيل التحكم اليدوي</h3>
             <p className="text-slate-400 text-sm">
               {data.override ? 'المحتوى اليدوي مفعّل — سيظهر للمستخدمين' : 'المحتوى التلقائي — يتم اختياره تلقائياً'}
             </p>
           </div>
-          <button onClick={toggleOverride} className="text-emerald-400 hover:text-emerald-300" aria-label={data.override ? 'إيقاف التحكم اليدوي' : 'تفعيل التحكم اليدوي'} title="تبديل التحكم اليدوي">
+          <button onClick={toggleOverride} className="text-accent-light hover:text-emerald-300" aria-label={data.override ? 'إيقاف التحكم اليدوي' : 'تفعيل التحكم اليدوي'} title="تبديل التحكم اليدوي">
             {data.override ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
           </button>
         </div>
@@ -313,13 +385,30 @@ const DailyContentManager: React.FC = () => {
           <label className="text-slate-300 text-sm block mb-1">تاريخ محدد (اختياري — اتركه فارغاً ليكون مفعلاً دائماً)</label>
           <input
             type="date"
-            className="bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700"
+            className="bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border"
             value={data.date || ''}
             onChange={e => updateField('date', e.target.value)}
             title="تاريخ التفعيل"
             aria-label="تاريخ التفعيل"
           />
         </div>
+
+        {/* المحتوى الحالي للمستخدمين */}
+        <CurrentLivePreview
+          tab={activeTab}
+          onEditCurrent={handleEditCurrent}
+          isOverrideActive={!!data.override}
+        />
+
+        {/* حقول التحكم اليدوي */}
+        {data.override && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-900/10 p-4 mb-4">
+            <div className="flex items-center gap-2 mb-1" dir="rtl">
+              <Pencil size={16} className="text-amber-400" />
+              <span className="text-amber-400 text-sm font-bold">تحكم يدوي — هذا المحتوى سيظهر للمستخدمين بدلاً من الافتراضي</span>
+            </div>
+          </div>
+        )}
 
         {/* الحقول */}
         {renderFields()}
@@ -329,20 +418,20 @@ const DailyContentManager: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white rounded-xl transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 bg-accent-dark hover:bg-accent-dark disabled:bg-admin-surface-light text-white rounded-xl transition-all"
           >
             <Save size={18} />
             {isSaving ? 'جاري الحفظ...' : 'حفظ'}
           </button>
           <button
             onClick={() => { setData(getDefaultData(activeTab)); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600"
+            className="flex items-center gap-2 px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light"
           >
             <RefreshCw size={18} />
             إعادة تعيين
           </button>
           {saveMessage && (
-            <p className={`text-sm ${saveMessage.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>
+            <p className={`text-sm ${saveMessage.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>
               {saveMessage}
             </p>
           )}

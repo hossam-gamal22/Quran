@@ -5,32 +5,34 @@ import React from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useColors } from '@/hooks/use-colors';
+import { ScreenContainer } from '@/components/screen-container';
 
 export default function WebViewScreen() {
   const { url, html, title } = useLocalSearchParams<{ url?: string; html?: string; title?: string }>();
   const { isDarkMode } = useSettings();
+  const colors = useColors();
 
-  const bgColor = isDarkMode ? '#111827' : '#ffffff';
+  const bgColor = colors.background;
 
   const wrappedHtml = html
-    ? `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:sans-serif;padding:16px;margin:0;color:${isDarkMode ? '#e5e7eb' : '#1f2937'};background:${bgColor};direction:rtl;line-height:1.8}img{max-width:100%;border-radius:12px}h1,h2,h3{color:${isDarkMode ? '#34d399' : '#065f46'}}</style></head><body>${html}</body></html>`
+    ? `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font-family:sans-serif;padding:16px;margin:0;color:${colors.text};background:${bgColor};direction:rtl;line-height:1.8}img{max-width:100%;border-radius:12px}h1,h2,h3{color:${colors.primary}}</style></head><body>${html}</body></html>`
     : undefined;
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]} edges={['top']}>
+    <ScreenContainer edges={['top']}>
       <WebView
         source={wrappedHtml ? { html: wrappedHtml } : { uri: url || 'about:blank' }}
         style={styles.webview}
         startInLoadingState
         renderLoading={() => (
           <View style={styles.loader}>
-            <ActivityIndicator size="large" color="#22C55E" />
+            <ActivityIndicator size="large" color="#0d8e62" />
           </View>
         )}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 

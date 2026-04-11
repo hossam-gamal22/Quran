@@ -8,11 +8,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
-  Image,
   Switch,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,43 +24,32 @@ import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
-
-// Background images
-const QURAN_BG_IMAGES: Record<string, any> = {
-  quranbg1: require('@/assets/images/quran/quranbg1.png'),
-  quranbg2: require('@/assets/images/quran/quranbg2.png'),
-  quranbg3: require('@/assets/images/quran/quranbg3.png'),
-  quranbg4: require('@/assets/images/quran/quranbg4.png'),
-};
+import { Colors } from '@/constants/theme';
 
 export default function QuranSettingsScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const { settings, isDarkMode, updateDisplay, updateNotifications } = useSettings();
   const hookColors = useColors();
+  const styles = useScaledStyles(_styles, hookColors.fs);
 
   const colors = {
-    primary: '#22C55E',
+    primary: '#0d8e62',
     foreground: hookColors.text,
     muted: hookColors.textLight,
-    card: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.7)',
-    cardBorder: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
-    accent: isDarkMode ? '#4ADE80' : '#22C55E',
+    card: hookColors.card,
+    cardBorder: hookColors.border,
+    accent: isDarkMode ? '#3da87e' : '#0d8e62',
   };
 
   const currentFontAdjust = settings.display.quranFontSizeAdjust ?? 0;
-  const currentBackground = settings.display.quranBackground ?? 'quranbg1';
 
   const handleFontAdjust = (delta: number) => {
     const newVal = Math.max(-4, Math.min(8, currentFontAdjust + delta));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     updateDisplay({ quranFontSizeAdjust: newVal });
-  };
-
-  const handleBackgroundSelect = (key: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateDisplay({ quranBackground: key as any });
   };
 
   // Quran reading reminder
@@ -71,8 +59,14 @@ export default function QuranSettingsScreen() {
   const reminder24Hour = settings.notifications.quranReminder24Hour ?? true;
 
   // Custom time picker state
-  const [selectedHour, setSelectedHour] = useState(() => parseInt(reminderTime.split(':')[0]));
-  const [selectedMinute, setSelectedMinute] = useState(() => parseInt(reminderTime.split(':')[1]));
+  const [selectedHour, setSelectedHour] = useState(() => {
+    const h = parseInt(reminderTime.split(':')[0]);
+    return Number.isFinite(h) && h >= 0 && h <= 23 ? h : 20;
+  });
+  const [selectedMinute, setSelectedMinute] = useState(() => {
+    const m = parseInt(reminderTime.split(':')[1]);
+    return Number.isFinite(m) && m >= 0 && m <= 59 ? m : 0;
+  });
 
   const handleReminderToggle = (value: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -122,10 +116,10 @@ export default function QuranSettingsScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         {/* Header */}
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -151,13 +145,13 @@ export default function QuranSettingsScreen() {
           <Animated.View entering={FadeInDown.delay(50).duration(400)}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 16 }}>
               <MaterialCommunityIcons name="format-size" size={18} color={colors.foreground} />
-              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 0, marginTop: 0 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, marginTop: 0 }]}>
                 {t('settings.quranFontSettings')}
               </Text>
             </View>
             <GlassCard style={styles.card}>
               {/* Font Size */}
-              <Text style={[styles.subLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.fontSize')}</Text>
+              <Text style={[styles.subLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.fontSize')}</Text>
               <View style={styles.fontSizeRow}>
                 <TouchableOpacity
                   style={[styles.fontBtn, { backgroundColor: colors.accent + '20' }]}
@@ -198,7 +192,7 @@ export default function QuranSettingsScreen() {
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 16 }}>
               <MaterialCommunityIcons name="bell-ring-outline" size={18} color={colors.foreground} />
-              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 0, marginTop: 0 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, marginTop: 0 }]}>
                 {t('settings.quranReadingReminderSettings')}
               </Text>
             </View>
@@ -212,10 +206,10 @@ export default function QuranSettingsScreen() {
                   thumbColor={reminderEnabled ? colors.accent : '#f4f3f4'}
                 />
                 <View style={[styles.toggleTextWrap, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[styles.toggleLabel, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.toggleLabel, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.enableReminder')}
                   </Text>
-                  <Text style={[styles.toggleDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.toggleDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.quranReminderDesc')}
                   </Text>
                 </View>
@@ -226,7 +220,7 @@ export default function QuranSettingsScreen() {
                   <View style={styles.divider} />
 
                   {/* Time format toggle */}
-                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.timeFormat')}
                   </Text>
                   <View style={[styles.timeFormatRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -257,12 +251,12 @@ export default function QuranSettingsScreen() {
                   <View style={styles.divider} />
 
                   {/* Custom time picker */}
-                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.reminderTime')}
                   </Text>
                   <View style={styles.customTimeRow}>
                     <View style={styles.timePickerGroup}>
-                      <Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.hour')}</Text>
+                      <Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.hour')}</Text>
                       <View style={styles.timePickerControls}>
                         <TouchableOpacity
                           style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
@@ -287,7 +281,7 @@ export default function QuranSettingsScreen() {
                     <Text style={[styles.timeSeparator, { color: colors.foreground }]}>:</Text>
 
                     <View style={styles.timePickerGroup}>
-                      <Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.minute')}</Text>
+                      <Text style={[styles.timePickerLabel, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.minute')}</Text>
                       <View style={styles.timePickerControls}>
                         <TouchableOpacity
                           style={[styles.timePickerBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)' }]}
@@ -325,7 +319,7 @@ export default function QuranSettingsScreen() {
                   <View style={styles.divider} />
 
                   {/* Day selection */}
-                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.subLabel, { color: colors.muted, marginTop: 8, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.reminderDays')}
                   </Text>
                   <View style={styles.daysGrid}>
@@ -355,55 +349,11 @@ export default function QuranSettingsScreen() {
             </GlassCard>
           </Animated.View>
 
-          {/* ─── 3. خلفية المصحف ─── */}
-          <Animated.View entering={FadeInDown.delay(150).duration(400)}>
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 16 }}>
-              <MaterialCommunityIcons name="image-outline" size={18} color={colors.foreground} />
-              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 0, marginTop: 0 }]}>
-                {t('quran.mushafBackground')}
-              </Text>
-            </View>
-            <GlassCard style={styles.card}>
-              <View style={styles.bgGrid}>
-                {(['quranbg1', 'quranbg2', 'quranbg3', 'quranbg4'] as const).map(
-                  (key) => {
-                    const isSelected = currentBackground === key;
-                    return (
-                      <TouchableOpacity
-                        key={key}
-                        style={[
-                          styles.bgItem,
-                          isSelected && styles.bgItemSelected,
-                        ]}
-                        onPress={() => handleBackgroundSelect(key)}
-                      >
-                        <Image
-                          source={QURAN_BG_IMAGES[key]}
-                          style={styles.bgImage}
-                          resizeMode="cover"
-                        />
-                        {isSelected && (
-                          <View style={styles.bgCheck}>
-                            <MaterialCommunityIcons
-                              name="check"
-                              size={14}
-                              color="#fff"
-                            />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  }
-                )}
-              </View>
-            </GlassCard>
-          </Animated.View>
-
-          {/* ─── 4. الترجمة للغات أخرى ─── */}
+          {/* ─── 3. الترجمة للغات أخرى ─── */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 16 }}>
               <MaterialCommunityIcons name="translate" size={18} color={colors.foreground} />
-              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 0, marginTop: 0 }]}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, marginTop: 0 }]}>
                 {t('quran.translationToOtherLanguages')}
               </Text>
             </View>
@@ -418,10 +368,10 @@ export default function QuranSettingsScreen() {
                   color={colors.muted}
                 />
                 <View style={[styles.navRowContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                  <Text style={[styles.navRowTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.navRowTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.selectTranslationLanguage')}
                   </Text>
-                  <Text style={[styles.navRowDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[styles.navRowDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('settings.translationLanguageDesc')}
                   </Text>
                 </View>
@@ -438,13 +388,9 @@ export default function QuranSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
   },
   header: {
     flexDirection: 'row',
@@ -524,38 +470,6 @@ const styles = StyleSheet.create({
   fontTypeName: {
     fontSize: 14,
     fontFamily: fontRegular(),
-  },
-  // Background grid
-  bgGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
-  },
-  bgItem: {
-    width: 70,
-    height: 100,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  bgItemSelected: {
-    borderColor: '#22C55E',
-  },
-  bgImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bgCheck: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#22C55E',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   // Toggle rows
   toggleRow: {

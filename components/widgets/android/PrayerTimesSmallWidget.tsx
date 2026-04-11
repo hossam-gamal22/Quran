@@ -2,9 +2,9 @@
 // 2×2 widget: Next prayer name + time + countdown
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function PrayerTimesSmallWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
@@ -26,40 +26,49 @@ export function PrayerTimesSmallWidget({ data }: { data: SharedWidgetData }) {
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://prayer' }}
     >
-      {/* Icon + Prayer Name */}
-      <FlexWidget style={{ flexDirection: 'column', alignItems: 'center' }}>
-        <TextWidget
-          text="🕌"
-          style={{ fontSize: 26 }}
-        />
-        <TextWidget
-          text={prayerName}
-          style={{
-            fontSize: 18,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
-            marginTop: 4,
-          }}
-        />
-      </FlexWidget>
+      {/* App Icon */}
+      <ImageWidget
+        image={APP_ICON}
+        imageWidth={ICON_SIZE.small}
+        imageHeight={ICON_SIZE.small}
+        radius={7}
+      />
 
-      {/* Time + Remaining */}
-      <FlexWidget style={{ flexDirection: 'column', alignItems: 'center' }}>
-        <TextWidget
-          text={prayer.nextPrayerTime}
-          style={{
-            fontSize: 22,
-            color: COLORS.white,
-            fontFamily: FONT.amiriBold,
-          }}
-        />
+      {/* Prayer Name */}
+      <TextWidget
+        text={prayerName}
+        style={{
+          fontSize: 18,
+          color: COLORS.white,
+          fontFamily: FONT.amiriBold,
+        }}
+      />
+
+      {/* Time */}
+      <TextWidget
+        text={prayer.nextPrayerTime}
+        style={{
+          fontSize: 26,
+          color: COLORS.tealLight,
+          fontFamily: FONT.amiriBold,
+        }}
+      />
+
+      {/* Remaining badge */}
+      <FlexWidget
+        style={{
+          backgroundColor: COLORS.badgeBg,
+          borderRadius: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+        }}
+      >
         <TextWidget
           text={prayer.timeRemaining}
           style={{
             fontSize: 13,
             color: COLORS.gold,
-            fontFamily: FONT.amiri,
-            marginTop: 2,
+            fontFamily: FONT.amiriBold,
           }}
         />
       </FlexWidget>
@@ -69,7 +78,7 @@ export function PrayerTimesSmallWidget({ data }: { data: SharedWidgetData }) {
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: BRANDING.color,
+          color: COLORS.teal,
           fontFamily: FONT.amiri,
         }}
       />

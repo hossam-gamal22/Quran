@@ -176,10 +176,15 @@ export async function installSoundForNotifications(
   const destPath = dir + filename;
   
   // Copy the file to notification sounds directory
-  await FileSystem.copyAsync({
-    from: sourceUri,
-    to: destPath,
-  });
+  try {
+    await FileSystem.copyAsync({
+      from: sourceUri,
+      to: destPath,
+    });
+  } catch (e) {
+    console.error(`[notification-sound-installer] Failed to copy sound file ${soundId} from ${sourceUri}:`, e);
+    throw new Error(`Failed to install notification sound: ${soundId}`);
+  }
   
   let androidChannelId: string | undefined;
   

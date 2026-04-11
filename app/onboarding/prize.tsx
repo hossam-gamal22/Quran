@@ -8,9 +8,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  StatusBar,
   ScrollView,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,19 +30,23 @@ import Animated, {
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 const { width } = Dimensions.get('window');
 
 const ENGAGEMENT_CATEGORIES = [
   { icon: 'mosque' as const, labelKey: 'prayer', color: '#c17f59' },
   { icon: 'book-open-variant' as const, labelKey: 'quran', color: '#3a7ca5' },
-  { icon: 'hands-pray' as const, labelKey: 'azkar', color: '#22C55E' },
-  { icon: 'counter' as const, labelKey: 'tasbih', color: '#5d4e8c' },
+  { icon: 'hands-pray' as const, labelKey: 'azkar', color: '#0d8e62' },
+  { icon: 'counter' as const, labelKey: 'tasbih', color: '#4a3d73' },
 ];
 
 export default function PrizeScreen() {
-  const { goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
+  const { goToNextStep, goToPreviousStep } = useOnboarding();
   const isRTL = checkIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // Trophy bounce animation
   const trophyScale = useSharedValue(1);
@@ -77,7 +81,7 @@ export default function PrizeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar style="light" translucent />
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           {/* Header */}
@@ -96,18 +100,10 @@ export default function PrizeScreen() {
               />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.stepText}>{tOnboardingStep(3, 5)}</Text>
+              <Text style={styles.stepText}>{tOnboardingStep(3, 6)}</Text>
               <Text style={styles.headerTitle}>{tOnboarding('prizeTitle')}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.skipBtn}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                skipOnboarding();
-              }}
-            >
-              <Text style={styles.skipText}>{tOnboarding('skip')}</Text>
-            </TouchableOpacity>
+            <View style={styles.skipBtn} />
           </View>
 
           {/* Progress */}
@@ -127,7 +123,7 @@ export default function PrizeScreen() {
             <Animated.View entering={FadeIn.duration(600)} style={styles.trophyContainer}>
               <Animated.View style={trophyStyle}>
                 <View style={styles.trophyCircle}>
-                  <MaterialCommunityIcons name="trophy" size={52} color="#f59e0b" />
+                  <MaterialCommunityIcons name="trophy" size={52} color="#B57200" />
                 </View>
               </Animated.View>
             </Animated.View>
@@ -138,7 +134,7 @@ export default function PrizeScreen() {
                 <MaterialCommunityIcons name="medal" size={26} color="#CD7F32" />
               </View>
               <View style={[styles.medalCircle, { backgroundColor: 'rgba(255,215,0,0.2)', borderColor: 'rgba(255,215,0,0.4)' }]}>
-                <MaterialCommunityIcons name="trophy" size={26} color="#FFD700" />
+                <MaterialCommunityIcons name="trophy" size={26} color="#B8860B" />
               </View>
               <View style={[styles.medalCircle, { backgroundColor: 'rgba(192,192,192,0.2)', borderColor: 'rgba(192,192,192,0.4)' }]}>
                 <MaterialCommunityIcons name="medal" size={26} color="#C0C0C0" />
@@ -203,6 +199,7 @@ export default function PrizeScreen() {
                 <View style={[styles.dot, styles.dotActive]} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
+                <View style={styles.dot} />
               </View>
             </Animated.View>
           </SafeAreaView>
@@ -212,7 +209,7 @@ export default function PrizeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1 },
   gradient: { flex: 1 },
   safeArea: { flex: 1 },
@@ -256,7 +253,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 2,
   },
   content: {
@@ -387,6 +384,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
 });

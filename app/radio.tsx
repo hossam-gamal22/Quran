@@ -19,6 +19,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader, GlassCard, NativeTabs } from '@/components/ui';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
@@ -36,7 +37,7 @@ import {
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 
 export default function RadioScreenWrapper() {
   return (
@@ -48,6 +49,7 @@ export default function RadioScreenWrapper() {
 
 function RadioScreen() {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const { isDarkMode } = useSettings();
   const router = useRouter();
@@ -220,12 +222,10 @@ function RadioScreen() {
         style={({ pressed }) => [
           styles.stationCard,
           {
-            backgroundColor: isDarkMode
-              ? playing ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)'
-              : playing ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.03)',
-            borderColor: playing
-              ? ACCENT
-              : isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+            backgroundColor: playing
+              ? (isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.15)')
+              : colors.card,
+            borderColor: playing ? ACCENT : colors.border,
             transform: [{ scale: pressed ? 0.98 : 1 }],
           },
         ]}
@@ -249,7 +249,7 @@ function RadioScreen() {
             <Text
               style={[
                 styles.stationName,
-                { color: playing ? ACCENT : colors.text, textAlign: isRTL ? 'right' : 'left' },
+                { color: playing ? ACCENT : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
               ]}
               numberOfLines={1}
             >
@@ -263,7 +263,7 @@ function RadioScreen() {
                 </View>
               )}
               {!playing && item.category && (
-                <Text style={[styles.categoryBadgeText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                <Text style={[styles.categoryBadgeText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                   {getCategoryLabel(item.category)}
                 </Text>
               )}
@@ -305,7 +305,7 @@ function RadioScreen() {
       {/* Search bar (animated) */}
       <Animated.View style={[styles.searchContainer, { height: searchBarHeight, opacity: searchAnim }]}>
         <View style={[styles.searchInputWrapper, {
-          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+          backgroundColor: colors.card,
           flexDirection: isRTL ? 'row-reverse' : 'row',
         }]}>
           <MaterialCommunityIcons
@@ -318,7 +318,7 @@ function RadioScreen() {
             ref={searchInputRef}
             style={[styles.searchInput, {
               color: colors.text,
-              textAlign: isRTL ? 'right' : 'left',
+              textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
               fontFamily: fontRegular(),
             }]}
             placeholder={t('radio.searchStations')}
@@ -355,7 +355,7 @@ function RadioScreen() {
         }]}>
           <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
           <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-            <Text style={[styles.errorBannerMsg, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+            <Text style={[styles.errorBannerMsg, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
               {error}
             </Text>
           </View>
@@ -377,10 +377,10 @@ function RadioScreen() {
         }]}>
           <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
           <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-            <Text style={[styles.errorBannerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            <Text style={[styles.errorBannerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {radioState.currentStation.name}
             </Text>
-            <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {radioState.errorMessage || t('radio.connectionError')}
             </Text>
           </View>
@@ -400,7 +400,7 @@ function RadioScreen() {
             if (radioState.currentStation) handlePlayStation(radioState.currentStation);
           }}
           style={[styles.nowPlayingBar, {
-            backgroundColor: isDarkMode ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.08)',
+            backgroundColor: isDarkMode ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.15)',
             borderColor: `${ACCENT}30`,
             flexDirection: isRTL ? 'row-reverse' : 'row',
           }]}
@@ -419,10 +419,10 @@ function RadioScreen() {
             )}
           </View>
           <View style={[styles.nowPlayingInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-            <Text style={[styles.nowPlayingLabel, { color: ACCENT, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            <Text style={[styles.nowPlayingLabel, { color: ACCENT, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {t('radio.nowPlaying')}
             </Text>
-            <Text style={[styles.nowPlayingName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            <Text style={[styles.nowPlayingName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {radioState.currentStation.name}
             </Text>
           </View>
@@ -482,7 +482,7 @@ function RadioScreen() {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
-              <Text style={[styles.stationCountText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.stationCountText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {filteredStations.length} {t('radio.stationCount')}
               </Text>
             }
@@ -492,7 +492,7 @@ function RadioScreen() {
 
       {/* Fixed Banner at Bottom */}
       <View style={styles.fixedBannerContainer}>
-        <BannerAdComponent />
+        <BannerAdComponent screen="home" />
       </View>
     </ScreenContainer>
   );
@@ -509,7 +509,7 @@ function getCategoryLabel(category: RadioCategory): string {
   return map[category] || '';
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: Spacing.md,
     overflow: 'hidden',
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(34,197,94,0.15)',
+    backgroundColor: 'rgba(34,197,94,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -568,10 +568,14 @@ const styles = StyleSheet.create({
   nowPlayingLabel: {
     fontSize: 11,
     fontFamily: fontMedium(),
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   nowPlayingName: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   centerContainer: {
     flex: 1,
@@ -584,11 +588,15 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
     marginTop: 8,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   errorText: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontMedium(),
     textAlign: 'center',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   retryButton: {
     paddingHorizontal: 24,
@@ -600,18 +608,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   emptyTitle: {
     fontSize: FONT_SIZES.lg,
     fontFamily: fontSemiBold(),
     textAlign: 'center',
     marginTop: 8,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   emptyDesc: {
     fontSize: FONT_SIZES.sm,
     fontFamily: fontRegular(),
     textAlign: 'center',
     marginTop: 4,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   listWrapper: {
     flex: 1,
@@ -629,6 +643,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontFamily: fontMedium(),
     paddingVertical: 6,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   stationCard: {
     borderRadius: BorderRadius.lg,
@@ -655,6 +671,8 @@ const styles = StyleSheet.create({
   stationName: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   stationMeta: {
     alignItems: 'center',
@@ -675,10 +693,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fontMedium(),
     color: '#EF4444',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   categoryBadgeText: {
     fontSize: 12,
     fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   favButton: {
     padding: 4,
@@ -700,10 +722,14 @@ const styles = StyleSheet.create({
   errorBannerTitle: {
     fontSize: FONT_SIZES.md,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   errorBannerMsg: {
     fontSize: FONT_SIZES.sm,
     fontFamily: fontRegular(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   retryBannerBtn: {
     width: 36,
@@ -713,3 +739,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+const styles = _styles;

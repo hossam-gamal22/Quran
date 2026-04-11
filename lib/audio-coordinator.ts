@@ -41,11 +41,14 @@ class AudioCoordinator {
   private currentSource: RegisteredSource | null = null;
   private registeredSources: Map<string, RegisteredSource> = new Map();
   private listeners: Set<(source: AudioSourceType | null) => void> = new Set();
+  // Mutex: serialize concurrent requestFocus calls to prevent race conditions
+  private _focusLock: Promise<void> = Promise.resolve();
 
   /**
    * Request audio focus before playing.
    * This will stop any currently playing audio source.
-   * 
+   * Serialized via mutex to prevent concurrent calls from racing.
+   *
    * @param sourceType - The type of audio source requesting focus
    * @param callbacks - Stop/pause callbacks for when another source needs focus
    * @param sourceId - Unique identifier for this source instance
@@ -56,11 +59,30 @@ class AudioCoordinator {
     callbacks: AudioSourceCallbacks,
     sourceId?: string
   ): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      this._focusLock = this._focusLock.then(async () => {
+        const result = await this._requestFocusImpl(sourceType, callbacks, sourceId);
+        resolve(result);
+      }).catch(() => {
+        resolve(false);
+      });
+    });
+  }
+
+  private async _requestFocusImpl(
+    sourceType: AudioSourceType,
+    callbacks: AudioSourceCallbacks,
+    sourceId?: string
+  ): Promise<boolean> {
     const id = sourceId || `${sourceType}_${Date.now()}`;
     const priority = PRIORITY_MAP[sourceType] || 20;
 
-    // Stop current audio if playing (unless it's a notification sound)
-    if (this.currentSource && sourceType !== 'notification-sound') {
+    // If the same source ID is re-requesting focus, just update callbacks (no stop needed)
+    const existingSource = sourceId ? this.registeredSources.get(sourceId) : null;
+    const isSameSource = existingSource && existingSource.type === sourceType;
+
+    // Stop current audio if playing (unless it's the same source re-registering or a notification sound)
+    if (this.currentSource && sourceType !== 'notification-sound' && !isSameSource) {
       if (this.currentSource.type !== 'notification-sound') {
         console.log(`🔇 [AudioCoordinator] Stopping ${this.currentSource.type} for ${sourceType}`);
         try {
@@ -168,17 +190,23 @@ export async function playOneShotSound(
   );
 
   // Play the sound
-  const { sound: newSound } = await Audio.Sound.createAsync(
-    source,
-    { shouldPlay: true },
-    (status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        newSound.unloadAsync();
-        audioCoordinator.releaseFocus(soundId, sourceType);
+  try {
+    const { sound: newSound } = await Audio.Sound.createAsync(
+      source,
+      { shouldPlay: true },
+      (status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          newSound.unloadAsync().catch(() => {});
+          audioCoordinator.releaseFocus(soundId, sourceType);
+        }
       }
-    }
-  );
-  
-  sound = newSound;
-  return newSound;
+    );
+    
+    sound = newSound;
+    return newSound;
+  } catch (e) {
+    console.warn('[AudioCoordinator] playOneShotSound failed:', e);
+    audioCoordinator.releaseFocus(soundId, sourceType);
+    throw e;
+  }
 }

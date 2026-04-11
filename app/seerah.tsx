@@ -19,6 +19,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
@@ -41,7 +42,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // الألوان
 // ========================================
 
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
@@ -216,6 +217,7 @@ interface SectionCardProps {
 
 function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors }: SectionCardProps) {
   const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
   return (
     <View style={s.sectionOuter}>
       {/* Section header */}
@@ -225,19 +227,19 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
         android_ripple={{ color: ACCENT_LIGHT, borderless: false }}
       >
         <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-          <MaterialCommunityIcons name={section.icon} size={20} color={ACCENT} />
+          <MaterialCommunityIcons name={section.icon} size={20} color={colors.text} />
         </View>
         <View style={s.sectionTitleWrap}>
           {getLanguage() === 'ar' ? (
-            <Text style={[s.sectionTitle, { color: colors.text, textAlign: 'right' }]}>
+            <Text style={[s.sectionTitle, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}>
               {section.title}
             </Text>
           ) : getLanguage() === 'en' ? (
-            <Text style={[s.sectionTitle, { color: colors.text, textAlign: 'left' }]}>
+            <Text style={[s.sectionTitle, { color: colors.text, textAlign: 'left', writingDirection: 'ltr' }]}>
               {section.titleEn}
             </Text>
           ) : (
-            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <TranslatedText from="en" type="section" style={[s.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {section.titleEn}
             </TranslatedText>
           )}
@@ -246,7 +248,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
           <MaterialCommunityIcons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={22}
-            color={ACCENT}
+            color={colors.text}
           />
         </View>
       </Pressable>
@@ -255,8 +257,9 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
       {isExpanded && (
         <View style={[s.glassOuter, isRTL ? { marginRight: 12, marginLeft: 0 } : { marginLeft: 12, marginRight: 0 }]}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 15}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -268,7 +271,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
                   : 'rgba(6,79,47,0.04)',
                 borderColor: isDarkMode
                   ? 'rgba(255,255,255,0.08)'
-                  : 'rgba(0,0,0,0.04)',
+                  : 'rgba(0,0,0,0.08)',
               },
             ]}
           />
@@ -282,7 +285,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
                     key={pIdx}
                     style={[
                       s.paragraph,
-                      { color: colors.text, textAlign: 'right' },
+                      { color: colors.text, textAlign: 'right', writingDirection: 'rtl' },
                       pIdx < section.paragraphs.length - 1 && s.paragraphSpacing,
                     ]}
                   >
@@ -296,7 +299,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
                     key={pIdx}
                     style={[
                       s.paragraph,
-                      { color: colors.text, textAlign: 'left' },
+                      { color: colors.text, textAlign: 'left', writingDirection: 'ltr' },
                       pIdx < section.paragraphs.length - 1 && s.paragraphSpacing,
                     ]}
                   >
@@ -311,7 +314,7 @@ function SectionCard({ section, index, isExpanded, onToggle, isDarkMode, colors 
                   type="section"
                   style={[
                     s.paragraph,
-                    { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
+                    { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
                     pIdx < section.paragraphs.length - 1 && s.paragraphSpacing,
                   ]}
                 >
@@ -335,6 +338,7 @@ export default function SeerahScreen() {
   const { isDarkMode, t } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const s = useScaledStyles(_s, colors.fs);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
@@ -378,7 +382,7 @@ export default function SeerahScreen() {
         rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('seerah.title')}</Text>
+          <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('seerah.title')}</Text>
           <SectionInfoButton sectionKey="stories" />
         </View>
       </UniversalHeader>
@@ -386,8 +390,9 @@ export default function SeerahScreen() {
       {/* Hero banner */}
       <View style={s.heroOuter}>
         <BlurView
-          intensity={Platform.OS === 'ios' ? 40 : 15}
-          tint={isDarkMode ? 'dark' : 'light'}
+         
+          intensity={Platform.OS === 'ios' ? 25 : 10}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={StyleSheet.absoluteFill}
         />
         <View
@@ -401,12 +406,12 @@ export default function SeerahScreen() {
           ]}
         />
         <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="book-account" size={36} color={ACCENT} />
+          <MaterialCommunityIcons name="book-account" size={36} color={colors.text} />
           <View style={s.heroTextWrap}>
-            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('seerah.heroTitle')}
             </Text>
-            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('seerah.heroSubtitle')}
             </Text>
           </View>
@@ -421,7 +426,7 @@ export default function SeerahScreen() {
       >
         {/* Section count badge */}
         <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[s.countText, { color: ACCENT }]}>
+          <Text style={[s.countText, { color: colors.text }]}>
             {seerahSections.length} {t('seerah.chapters')}
           </Text>
         </View>
@@ -455,8 +460,9 @@ export default function SeerahScreen() {
         {/* Footer */}
         <View style={s.footerOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 15}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -470,7 +476,7 @@ export default function SeerahScreen() {
             ]}
           />
           <View style={s.footerContent}>
-            <MaterialCommunityIcons name="star-crescent" size={24} color={ACCENT} />
+            <MaterialCommunityIcons name="star-crescent" size={24} color={colors.text} />
             <TranslatedText from="ar" type="section" style={[s.footerText, { color: colors.text }]}>
               اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى نَبِيِّنَا مُحَمَّدٍ
             </TranslatedText>
@@ -495,7 +501,7 @@ export default function SeerahScreen() {
 // الأنماط
 // ========================================
 
-const s = StyleSheet.create({
+const _s = StyleSheet.create({
 
 
   // Hero
@@ -551,6 +557,8 @@ const s = StyleSheet.create({
   countText: {
     fontFamily: fontSemiBold(),
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 
   // Timeline
@@ -620,8 +628,6 @@ const s = StyleSheet.create({
     fontFamily: fontRegular(),
     fontSize: 16,
     lineHeight: 30,
-    writingDirection: 'rtl',
-    textAlign: 'right',
   },
   paragraphSpacing: {
     marginBottom: 16,

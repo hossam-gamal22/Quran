@@ -3,11 +3,13 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Share,
+  Share, Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
@@ -34,6 +36,7 @@ const THEME_LABEL_KEYS: Record<string, string> = {
 export default function HadithSifatScreen() {
   const router = useRouter();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { isDarkMode } = useSettings();
   const { t } = useTranslation();
   const isRTL = useIsRTL();
@@ -85,10 +88,10 @@ export default function HadithSifatScreen() {
 
       {/* Header */}
       <UniversalHeader
-        style={{ backgroundColor: isDarkMode ? '#1a1a2e' : '#fff', borderBottomWidth: 1, borderBottomColor: isDarkMode ? '#2a2a3e' : '#eee' }}
+        style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider }}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('hadithSifat.title')}</Text>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('home.hadithAttributes')}</Text>
           <SectionInfoButton sectionKey="marifat_allah" />
         </View>
       </UniversalHeader>
@@ -100,10 +103,14 @@ export default function HadithSifatScreen() {
       >
         {/* Intro Card */}
         <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={[styles.introCard, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.85)' : 'rgba(193,127,89,0.85)' }]}>
+          <View style={[styles.introCard, { overflow: 'hidden' }]}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'dark'} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(140,85,55,0.85)' }]} />
             <MaterialCommunityIcons name="format-quote-open" size={40} color="#fff" />
-            <Text style={styles.introTitle}>{t('hadithSifat.introTitle')}</Text>
-            <Text style={styles.introSubtitle}>{t('hadithSifat.introSubtitle')}</Text>
+            <Text style={[styles.introTitle, { color: '#fff' }]}>{t('hadithSifat.introTitle')}</Text>
+            <Text style={[styles.introSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>{t('hadithSifat.introSubtitle')}</Text>
           </View>
         </Animated.View>
 
@@ -121,7 +128,7 @@ export default function HadithSifatScreen() {
                 styles.themeChip,
                 { flexDirection: isRTL ? 'row-reverse' : 'row' },
                 selectedTheme === theme.id && { backgroundColor: theme.color },
-                selectedTheme !== theme.id && { backgroundColor: isDarkMode ? '#1a1a2e' : '#fff' },
+                selectedTheme !== theme.id && { backgroundColor: colors.surface },
                 isRTL && { transform: [{ scaleX: -1 }] },
               ]}
               onPress={() => setSelectedTheme(theme.id)}
@@ -146,7 +153,7 @@ export default function HadithSifatScreen() {
           const themeInfo = HADITH_SIFAT_THEMES.find(t => t.id === hadith.theme);
           return (
             <Animated.View key={hadith.id} entering={FadeInDown.delay(index * 50).duration(400)}>
-              <View style={[styles.hadithCard, { backgroundColor: isDarkMode ? '#1a1a2e' : '#fff' }]}>
+              <View style={[styles.hadithCard, { backgroundColor: colors.surface, borderWidth: isDarkMode ? 0 : 0.5, borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)' }]}>
                 <View style={[styles.hadithAccent, { backgroundColor: themeInfo?.color || '#c17f59' }]} />
                 <View style={styles.hadithContent}>
                 {isArabic ? (
@@ -160,24 +167,24 @@ export default function HadithSifatScreen() {
                 )}
                   <View style={styles.hadithMeta}>
                     <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <MaterialCommunityIcons name="account" size={14} color={colors.muted || '#999'} />
-                      <Text style={[styles.metaText, { color: colors.muted || '#999' }]}>{transliterateReference(hadith.narrator, language)}</Text>
+                      <MaterialCommunityIcons name="account" size={14} color={colors.muted} />
+                      <Text style={[styles.metaText, { color: colors.muted }]}>{transliterateReference(hadith.narrator, language)}</Text>
                     </View>
                     <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.muted || '#999'} />
-                      <Text style={[styles.metaText, { color: colors.muted || '#999' }]}>{transliterateReference(hadith.source, language)}</Text>
+                      <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.muted} />
+                      <Text style={[styles.metaText, { color: colors.muted }]}>{transliterateReference(hadith.source, language)}</Text>
                     </View>
                   </View>
                   <View style={[styles.hadithActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
                       onPress={() => handleToggleFav(hadith)}
                     >
                       <MaterialCommunityIcons name={favIds.has(hadith.id) ? 'heart' : 'heart-outline'} size={16} color={favIds.has(hadith.id) ? '#ef4444' : colors.text} />
                       <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('common.save')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}
+                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         shareHadith(hadith);
@@ -199,7 +206,7 @@ export default function HadithSifatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
 
   scrollView: { flex: 1 },
   scrollContent: { padding: 16 },
@@ -212,20 +219,22 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#fff',
     marginTop: 12,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   introSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     marginTop: 6,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   themesScroll: { marginBottom: 16 },
   themesContainer: {
     gap: 8,
-    paddingHorizontal: 2,
+    paddingHorizontal: 16,
   },
   themeChip: {
     flexDirection: 'row',
@@ -241,6 +250,8 @@ const styles = StyleSheet.create({
   themeChipText: {
     fontSize: 13,
     fontFamily: fontMedium(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   themeChipTextActive: {
     color: '#fff',
@@ -277,6 +288,8 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   hadithActions: {
     flexDirection: 'row',
@@ -294,5 +307,8 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 12,
     fontFamily: fontMedium(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

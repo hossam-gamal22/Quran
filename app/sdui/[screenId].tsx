@@ -32,7 +32,7 @@ export default function SDUIScreen() {
     return (
       <BackgroundWrapper>
         <SafeAreaView style={styles.container}>
-          <ActivityIndicator size="large" color="#4ADE80" style={{ marginTop: 100 }} />
+          <ActivityIndicator size="large" color="#3da87e" style={{ marginTop: 100 }} />
         </SafeAreaView>
       </BackgroundWrapper>
     );
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   backButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 12,

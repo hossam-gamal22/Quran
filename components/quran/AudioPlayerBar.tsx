@@ -13,6 +13,8 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontRegular, fontSemiBold } from '@/lib/fonts';
 function formatTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -68,11 +70,23 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   // Navigate to current surah when tapping player from outside surah page
   const navigateToSurah = useCallback(() => {
     if (currentSurah > 0) {
-      const isInSurahPage = pathname.startsWith('/surah/');
-      if (!isInSurahPage) {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        router.push(`/surah/${currentSurah}`);
-      }
+      // Don't navigate if already in Mushaf page
+      if (pathname.startsWith('/surah/')) return;
+      
+      // Don't navigate if already in surah-reading page for same surah
+      if (pathname.startsWith('/surah-reading/')) return;
+      
+      // Don't navigate if already in dedicated surah reading page for same surah
+      const dedicatedPages: Record<string, number> = {
+        '/surah-kahf': 18,
+        '/surah-yasin': 36,
+        '/surah-mulk': 67,
+      };
+      const currentPageSurah = dedicatedPages[pathname];
+      if (currentPageSurah && currentPageSurah === currentSurah) return;
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push(`/surah/${currentSurah}`);
     }
   }, [currentSurah, pathname, router]);
 
@@ -81,9 +95,11 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   }
 
   const surahName = currentSurah > 0 ? getSurahName(currentSurah) : '';
-  const primaryColor = '#22C55E';
-  const textColor = isDarkMode ? '#fff' : '#1C1C1E';
-  const textSecondary = isDarkMode ? '#A8A8AD' : '#3A3A3C';
+  const primaryColor = '#0d8e62';
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const textColor = colors.text;
+  const textSecondary = colors.textLight;
 
   const handlePress = (action: () => void) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -116,8 +132,9 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
         style={[styles.container, global && styles.globalPosition]}
       >
         <BlurView
-          intensity={Platform.OS === 'ios' ? 90 : 50}
-          tint={isDarkMode ? 'dark' : 'light'}
+         
+          intensity={Platform.OS === 'ios' ? 40 : 25}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={styles.blur}
         >
           <View
@@ -126,11 +143,11 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
               {
                 flexDirection: isRTL ? 'row-reverse' : 'row',
                 backgroundColor: isDarkMode
-                  ? 'rgba(28,28,30,0.55)'
-                  : 'rgba(255,255,255,0.6)',
+                  ? 'rgba(28,28,30,0.35)'
+                  : 'rgba(255,255,255,0.60)',
                 borderColor: isDarkMode
                   ? 'rgba(255,255,255,0.12)'
-                  : 'rgba(0,0,0,0.06)',
+                  : 'rgba(0,0,0,0.12)',
               },
             ]}
           >
@@ -177,8 +194,9 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   return (
     <View style={[styles.container, global && styles.globalPosition]}>
       <BlurView
-        intensity={Platform.OS === 'ios' ? 90 : 50}
-        tint={isDarkMode ? 'dark' : 'light'}
+       
+        intensity={Platform.OS === 'ios' ? 40 : 25}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={styles.blur}
       >
         <View
@@ -186,11 +204,11 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
             styles.inner,
             {
               backgroundColor: isDarkMode
-                ? 'rgba(28,28,30,0.45)'
-                : 'rgba(255,255,255,0.5)',
+                ? 'rgba(28,28,30,0.15)'
+                : 'rgba(255,255,255,0.60)',
               borderColor: isDarkMode
                 ? 'rgba(255,255,255,0.12)'
-                : 'rgba(0,0,0,0.06)',
+                : 'rgba(0,0,0,0.12)',
             },
           ]}
         >
@@ -273,7 +291,7 @@ export function AudioPlayerBar({ global = false }: AudioPlayerBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     borderRadius: BorderRadius.lg,
     overflow: 'hidden',

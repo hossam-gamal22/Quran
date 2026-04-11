@@ -14,7 +14,9 @@ import {
   ScrollView,
   ViewStyle,
   TextStyle,
+  StyleSheet,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -36,7 +38,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // الألوان والثوابت
 // ========================================
 
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 
 // ========================================
@@ -192,9 +194,8 @@ export default function QuestionAnswerScreen() {
     const cardStyle: ViewStyle = {
       borderRadius: BorderRadius.lg,
       borderWidth: 1,
-      padding: Spacing.md,
       marginBottom: Spacing.md,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.9)',
+      overflow: 'hidden',
       borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
     };
 
@@ -215,10 +216,10 @@ export default function QuestionAnswerScreen() {
 
     const questionTextStyle: TextStyle = {
       fontFamily: fontSemiBold(),
-      fontSize: FONT_SIZES.md,
+      fontSize: colors.fs(FONT_SIZES.md),
       lineHeight: 26,
       color: colors.text,
-      textAlign: isRTL ? 'right' : 'left',
+      textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
       flex: 1,
     };
 
@@ -248,8 +249,12 @@ export default function QuestionAnswerScreen() {
 
     const subjectTextStyle: TextStyle = {
       fontFamily: fontMedium(),
-      fontSize: FONT_SIZES.xs,
+      fontSize: colors.fs(FONT_SIZES.xs),
       color: ACCENT,
+      lineHeight: 18,
+      includeFontPadding: false,
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
     };
 
     const answerRowStyle: ViewStyle = {
@@ -264,15 +269,15 @@ export default function QuestionAnswerScreen() {
       borderRadius: 16,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'rgba(46,125,50,0.12)',
+      backgroundColor: ACCENT_LIGHT,
     };
 
     const answerTextStyle: TextStyle = {
       fontFamily: fontRegular(),
-      fontSize: FONT_SIZES.sm,
+      fontSize: colors.fs(FONT_SIZES.sm),
       lineHeight: 24,
       color: colors.text,
-      textAlign: isRTL ? 'right' : 'left',
+      textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
       flex: 1,
     };
     
@@ -284,6 +289,21 @@ export default function QuestionAnswerScreen() {
           { transform: [{ scale: pressed ? 0.98 : 1 }] },
         ]}
       >
+        {Platform.OS === 'ios' && (
+          <BlurView
+           
+            intensity={80}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' },
+          ]}
+        />
+        <View style={{ padding: Spacing.md }}>
         {/* السؤال */}
         <View style={questionRowStyle}>
           <View style={questionIconStyle}>
@@ -320,7 +340,7 @@ export default function QuestionAnswerScreen() {
             
             <View style={answerRowStyle}>
               <View style={answerIconStyle}>
-                <MaterialCommunityIcons name="check-circle" size={20} color="#2e7d32" />
+                <MaterialCommunityIcons name="check-circle" size={20} color={colors.primary} />
               </View>
               <Text style={answerTextStyle}>
                 {item.answer.trim()}
@@ -328,6 +348,7 @@ export default function QuestionAnswerScreen() {
             </View>
           </View>
         )}
+        </View>
       </Pressable>
     );
   }, [colors, isDarkMode, isRTL, expandedItems, toggleExpanded]);
@@ -348,10 +369,12 @@ export default function QuestionAnswerScreen() {
   if (error) {
     const errorTextStyle: TextStyle = {
       fontFamily: fontMedium(),
-      fontSize: FONT_SIZES.md,
+      fontSize: colors.fs(FONT_SIZES.md),
       marginTop: Spacing.md,
       textAlign: 'center',
       color: colors.textLight,
+      lineHeight: 28,
+      includeFontPadding: false,
     };
 
     const retryButtonStyle: ViewStyle = {
@@ -364,8 +387,10 @@ export default function QuestionAnswerScreen() {
 
     const retryButtonTextStyle: TextStyle = {
       fontFamily: fontSemiBold(),
-      fontSize: FONT_SIZES.md,
+      fontSize: colors.fs(FONT_SIZES.md),
       color: '#fff',
+      lineHeight: 28,
+      includeFontPadding: false,
     };
 
     return (
@@ -397,11 +422,15 @@ export default function QuestionAnswerScreen() {
     paddingVertical: Spacing.sm + 2,
     borderRadius: BorderRadius.full,
     borderWidth: 1,
+    flexShrink: 0,
   };
 
   const chipTextStyle: TextStyle = {
     fontFamily: fontSemiBold(),
-    fontSize: FONT_SIZES.sm,
+    fontSize: colors.fs(FONT_SIZES.sm),
+    lineHeight: colors.fs(FONT_SIZES.sm) * 1.6,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   };
 
   const listContentStyle: ViewStyle = {
@@ -416,19 +445,21 @@ export default function QuestionAnswerScreen() {
 
   const headerTextStyle: TextStyle = {
     fontFamily: fontRegular(),
-    fontSize: FONT_SIZES.sm,
+    fontSize: colors.fs(FONT_SIZES.sm),
     lineHeight: 22,
     opacity: 0.8,
     color: colors.textLight,
-    textAlign: isRTL ? 'right' : 'left',
+    textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
   };
 
   const emptyTextStyle: TextStyle = {
     fontFamily: fontMedium(),
-    fontSize: FONT_SIZES.md,
+    fontSize: colors.fs(FONT_SIZES.md),
     marginTop: Spacing.md,
     textAlign: 'center',
     color: colors.textLight,
+    lineHeight: 28,
+    includeFontPadding: false,
   };
 
   const footerStyle: ViewStyle = {
@@ -445,7 +476,7 @@ export default function QuestionAnswerScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={tabsContainerStyle}
-          style={[{ flexGrow: 0 }, isRTL && { transform: [{ scaleX: -1 }] }]}
+          style={[{ flexGrow: 0, zIndex: 10, backgroundColor: colors.background }, isRTL && { transform: [{ scaleX: -1 }] }]}
         >
           <View style={[chipsContainerStyle, isRTL && { transform: [{ scaleX: -1 }] }]}>
             {displayCategories.map(cat => {
@@ -457,11 +488,29 @@ export default function QuestionAnswerScreen() {
                   style={[
                     chipStyle,
                     {
-                      backgroundColor: isSelected ? ACCENT : (isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'),
+                      backgroundColor: isSelected ? ACCENT : 'transparent',
                       borderColor: isSelected ? ACCENT : (isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'),
                     },
                   ]}
                 >
+                  {!isSelected && Platform.OS === 'ios' && (
+                    <View style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: BorderRadius.full }]}>
+                      <BlurView
+                       
+                        intensity={20}
+                        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+                        style={StyleSheet.absoluteFill}
+                      />
+                    </View>
+                  )}
+                  {!isSelected && (
+                    <View
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)', borderRadius: BorderRadius.full },
+                      ]}
+                    />
+                  )}
                   <Text
                     style={[
                       chipTextStyle,
@@ -469,7 +518,6 @@ export default function QuestionAnswerScreen() {
                         color: isSelected ? '#fff' : colors.text,
                       },
                     ]}
-                    numberOfLines={1}
                   >
                     {cat.name}
                   </Text>
@@ -499,16 +547,9 @@ export default function QuestionAnswerScreen() {
           keyExtractor={item => item.id}
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={headerInfoStyle}>
-              <Text style={headerTextStyle}>
-                {t('questionAnswer.description')}
-              </Text>
-            </View>
-          }
           ListFooterComponent={
             <View style={footerStyle}>
-              <BannerAdComponent />
+              <BannerAdComponent screen="home" />
             </View>
           }
         />

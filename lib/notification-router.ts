@@ -110,7 +110,7 @@ export function handleNotificationNavigation(
 
     // ─── Surah Al-Kahf Friday reminder ───
     case 'kahf':
-      router.push('/surah-kahf' as any);
+      router.push('/surah/18' as any);
       return {
         navigated: true,
         audioUrl: data.ayahAudioUrl ? String(data.ayahAudioUrl) : undefined,
@@ -150,7 +150,7 @@ export function handleNotificationNavigation(
       return { navigated: true };
 
     case 'worship_weekly':
-      router.push('/worship-tracker/weekly' as any);
+      router.push('/worship-tracker' as any);
       return { navigated: true };
 
     // ─── Admin push — azkar category ───

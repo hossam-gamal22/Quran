@@ -66,8 +66,6 @@ export const loadAppOpenAd = async (): Promise<void> => {
 };
 
 export const showAppOpenAd = async (): Promise<boolean> => {
-  appOpenCount++;
-
   if (!adReady || !adInstance || !adConfig?.enabled || !adConfig.showAdOnAppOpen) {
     return false;
   }
@@ -128,10 +126,15 @@ export const initializeAppOpenAds = (): (() => void) => {
 
   let appState = AppState.currentState;
   const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-    if (nextState === 'background' || nextState === 'inactive') {
+    // Only record background time when leaving FROM active state
+    // (prevents overwriting during return transitions like background → inactive → active on iOS)
+    if (appState === 'active' && (nextState === 'background' || nextState === 'inactive')) {
       lastBackgroundTime = Date.now();
     }
-    if (appState.match(/inactive|background/) && nextState === 'active') {
+    // Only trigger ad on genuine background → active transitions
+    // (not brief inactive → active from notification shade, phone calls, etc.)
+    if (appState === 'background' && nextState === 'active') {
+      appOpenCount++;
       showAppOpenAd();
     }
     appState = nextState;

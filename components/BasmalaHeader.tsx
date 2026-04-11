@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 const basmalaImage = require('@/assets/images/quran/basmala.png');
 
@@ -11,6 +12,7 @@ interface BasmalaHeaderProps {
 
 export const BasmalaHeader: React.FC<BasmalaHeaderProps> = ({ style, tintColor }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const [imageError, setImageError] = useState(false);
 
   if (imageError) {
@@ -35,7 +37,7 @@ export const BasmalaHeader: React.FC<BasmalaHeaderProps> = ({ style, tintColor }
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',

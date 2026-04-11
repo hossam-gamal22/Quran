@@ -80,7 +80,7 @@ TaskManager.defineTask(TASK_NAME, async () => {
       sleepAzkar: n.sleepAzkar ?? false,
       sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
       wakeupAzkar: n.wakeupAzkar ?? false,
-      wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
+      wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
       afterPrayerAzkar: n.afterPrayerAzkar ?? false,
       dailyVerse: n.dailyVerse,
       dailyVerseTime: n.dailyVerseTime,

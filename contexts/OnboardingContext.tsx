@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router';
 import { I18nManager } from 'react-native';
 import { setLanguage, getLanguage } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
+import { saveDisplayName } from '@/lib/rewards-manager';
+import { getUserId } from '@/lib/firebase-user';
 
 // ========================================
 // الأنواع
@@ -15,6 +17,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 export type OnboardingStep = 
   | 'welcome'
   | 'prize'
+  | 'name'
   | 'language'
   | 'location'
   | 'notifications'
@@ -28,6 +31,17 @@ interface UserPreferences {
   azkarNotifications: boolean;
   salawatReminder: boolean;
   dailyVerse: boolean;
+  // New notification fields
+  afterPrayerAzkar: boolean;
+  sleepAzkar: boolean;
+  wakeupAzkar: boolean;
+  quranReadingReminder: boolean;
+  kahfFriday: boolean;
+  tasbihReminder: boolean;
+  istighfarReminder: boolean;
+  worshipDailySummary: boolean;
+  worshipWeeklyReport: boolean;
+  displayName?: string;
   country?: string;
   city?: string;
   latitude?: number;
@@ -83,6 +97,7 @@ const STEPS_ORDER: OnboardingStep[] = [
   'language',
   'welcome',
   'prize',
+  'name',
   'location',
   'notifications',
   'complete',
@@ -96,6 +111,15 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   azkarNotifications: true,
   salawatReminder: true,
   dailyVerse: true,
+  afterPrayerAzkar: true,
+  sleepAzkar: true,
+  wakeupAzkar: true,
+  quranReadingReminder: true,
+  kahfFriday: true,
+  tasbihReminder: true,
+  istighfarReminder: true,
+  worshipDailySummary: true,
+  worshipWeeklyReport: true,
 };
 
 const DEFAULT_PROGRESS: OnboardingProgress = {
@@ -285,6 +309,15 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         settings.notifications.eveningAzkar = preferences.azkarNotifications;
         settings.notifications.salawatReminder = preferences.salawatReminder;
         settings.notifications.dailyVerse = preferences.dailyVerse;
+        settings.notifications.afterPrayerAzkar = preferences.afterPrayerAzkar;
+        settings.notifications.sleepAzkar = preferences.sleepAzkar;
+        settings.notifications.wakeupAzkar = preferences.wakeupAzkar;
+        settings.notifications.quranReadingReminder = preferences.quranReadingReminder;
+        settings.notifications.kahfFriday = preferences.kahfFriday;
+        settings.notifications.tasbihReminder = preferences.tasbihReminder;
+        settings.notifications.istighfarReminder = preferences.istighfarReminder;
+        settings.notifications.worshipDailySummary = preferences.worshipDailySummary;
+        settings.notifications.worshipWeeklyReport = preferences.worshipWeeklyReport;
         
         // تطبيق إعدادات الصلاة (الموقع)
         if (preferences.locationEnabled && preferences.latitude && preferences.longitude) {
@@ -301,6 +334,16 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         await reloadSettings();
       } catch (e) {
         console.error('Error bridging onboarding preferences to app settings:', e);
+      }
+
+      // 3. حفظ اسم المستخدم في Firestore
+      if (preferences.displayName) {
+        try {
+          const userId = await getUserId();
+          await saveDisplayName(userId, preferences.displayName);
+        } catch (e) {
+          console.error('Error saving display name:', e);
+        }
       }
       
       setIsOnboardingComplete(true);
@@ -336,6 +379,15 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         settings.notifications.eveningAzkar = preferences.azkarNotifications;
         settings.notifications.salawatReminder = preferences.salawatReminder;
         settings.notifications.dailyVerse = preferences.dailyVerse;
+        settings.notifications.afterPrayerAzkar = preferences.afterPrayerAzkar;
+        settings.notifications.sleepAzkar = preferences.sleepAzkar;
+        settings.notifications.wakeupAzkar = preferences.wakeupAzkar;
+        settings.notifications.quranReadingReminder = preferences.quranReadingReminder;
+        settings.notifications.kahfFriday = preferences.kahfFriday;
+        settings.notifications.tasbihReminder = preferences.tasbihReminder;
+        settings.notifications.istighfarReminder = preferences.istighfarReminder;
+        settings.notifications.worshipDailySummary = preferences.worshipDailySummary;
+        settings.notifications.worshipWeeklyReport = preferences.worshipWeeklyReport;
         
         if (preferences.locationEnabled && preferences.latitude && preferences.longitude) {
           if (!settings.prayer) settings.prayer = {};

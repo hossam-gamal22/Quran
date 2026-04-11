@@ -53,4 +53,5 @@ export const QIBLA_STYLES = {
   },
 };
 
-export const AVAILABLE_STYLES = Object.keys(QIBLA_STYLES);
+// Curated list - excluding style7 (too faded/muted for light mode)
+export const AVAILABLE_STYLES = ['style1', 'style2', 'style3', 'style4', 'style5', 'style6', 'style8', 'style9', 'style10'];

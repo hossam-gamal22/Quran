@@ -11,6 +11,8 @@ import {
   getTimeRemaining,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 
 interface GlassWidgetPreviewProps {
@@ -24,6 +26,8 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   isDarkMode = false,
   iconSource,
 }) => {
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -80,7 +84,7 @@ export const GlassWidgetPreview: React.FC<GlassWidgetPreviewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -90,9 +94,9 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 28,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    backgroundColor: 'rgba(0,0,0,0.08)',
     borderWidth: 0.5,
-    borderColor: 'rgba(0,0,0,0.04)',
+    borderColor: 'rgba(0,0,0,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
@@ -110,7 +114,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 10,
     fontFamily: fontSemiBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
     marginBottom: 8,
   },
   countdown: {

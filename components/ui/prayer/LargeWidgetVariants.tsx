@@ -12,6 +12,8 @@ import {
   formatPrayerTime,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -31,6 +33,8 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   iconSource,
 }) => {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -125,7 +129,7 @@ const LargeWidgetVariants: React.FC<LargeWidgetVariantsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.09)',
@@ -167,7 +171,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 8,
     fontFamily: fontSemiBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
     marginTop: 3,
   },
   currentBar: {

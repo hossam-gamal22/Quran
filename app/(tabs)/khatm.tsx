@@ -9,6 +9,7 @@ import {
   Modal, TextInput, Alert, FlatList, Animated,
 } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRouter } from 'expo-router';
@@ -20,7 +21,9 @@ import {
 import { getSurahName } from '@/lib/quran-api';
 import { t, getDateLocale } from '@/lib/i18n';
 import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
+import { Platform, StyleSheet as RNStyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useSettings } from '@/contexts/SettingsContext';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -43,6 +46,7 @@ const AYAH_COUNTS: number[] = [
 
 export default function KhatmScreen() {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const router = useRouter();
   const [stats, setStats] = useState<KhatmStats | null>(null);
@@ -103,7 +107,7 @@ export default function KhatmScreen() {
 
   const current = stats?.currentKhatm;
 
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     header: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20,
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -121,7 +125,7 @@ export default function KhatmScreen() {
     progressBarFill: { height: 10, borderRadius: 5, backgroundColor: '#fff' },
     progressRow: { flexDirection: 'row', justifyContent: 'space-between' },
     progressPct: { fontSize: 24, fontWeight: '900', color: '#fff' },
-    progressDetails: { color: 'rgba(255,255,255,0.8)', fontSize: 13, textAlign: isRTL ? 'right' : 'left' },
+    progressDetails: { color: 'rgba(255,255,255,0.8)', fontSize: 13, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     viewSurahsBtn: {
       marginTop: 14, backgroundColor: 'rgba(255,255,255,0.2)',
       borderRadius: 16, paddingVertical: 10, alignItems: 'center',
@@ -130,14 +134,14 @@ export default function KhatmScreen() {
     // Stats row
     statsRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 16 },
     statCard: {
-      flex: 1, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 14, padding: 14,
+      flex: 1, borderRadius: 14, padding: 14, overflow: 'hidden',
       borderWidth: 1, borderColor: colors.border, alignItems: 'center',
     },
-    statNum: { fontSize: 26, fontWeight: '900', color: colors.primary },
+    statNum: { fontSize: 26, fontWeight: '900', color: colors.primaryText },
     statLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
     // Empty state
     emptyCard: {
-      margin: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 20, padding: 32,
+      margin: 16, borderRadius: 20, padding: 32, overflow: 'hidden',
       alignItems: 'center', borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed',
     },
     emptyEmoji: { fontSize: 52, marginBottom: 12 },
@@ -151,28 +155,28 @@ export default function KhatmScreen() {
     // History
     sectionTitle: { fontSize: 15, fontWeight: '800', color: colors.foreground, paddingHorizontal: 16, marginBottom: 8 },
     historyItem: {
-      marginHorizontal: 16, marginBottom: 10, backgroundColor: 'rgba(120,120,128,0.12)',
+      marginHorizontal: 16, marginBottom: 10, overflow: 'hidden',
       borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.border,
       flexDirection: 'row', alignItems: 'center', gap: 10,
     },
     historyInfo: { flex: 1 },
-    historyName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    historyName: { fontSize: 15, fontWeight: '700', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     historyDates: { fontSize: 12, color: colors.muted, marginTop: 3 },
     completedBadge: {
-      backgroundColor: colors.primary + '18', borderRadius: 20,
+      backgroundColor: colors.primary + '28', borderRadius: 20,
       paddingHorizontal: 10, paddingVertical: 4,
     },
-    completedBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    completedBadgeText: { fontSize: 12, fontWeight: '700', color: colors.primaryText },
     deleteBtn: { padding: 6 },
     // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
-    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 16 },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 16 },
     input: {
       backgroundColor: 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border,
       borderRadius: 14, padding: 14, fontSize: 16, color: colors.foreground,
-      textAlign: isRTL ? 'right' : 'left', marginBottom: 16,
+      textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 16,
     },
     confirmBtn: { backgroundColor: colors.primary, borderRadius: 16, padding: 16, alignItems: 'center' },
     confirmBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
@@ -188,7 +192,7 @@ export default function KhatmScreen() {
     },
     surahNum: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
     surahNumText: { fontSize: 12, fontWeight: '700' },
-    surahName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.foreground, textAlign: isRTL ? 'right' : 'left' },
+    surahName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     checkCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
     // Celebration overlay
     celebOverlay: {
@@ -196,10 +200,11 @@ export default function KhatmScreen() {
       backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999,
     },
     celebCard: {
-      backgroundColor: 'rgba(30,30,30,0.95)', borderRadius: 28, padding: 40, alignItems: 'center',
-      borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.15)',
+      backgroundColor: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)', borderRadius: 28, padding: 40, alignItems: 'center',
+      borderWidth: 0.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
     },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   return (
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="khatma">
@@ -216,14 +221,26 @@ export default function KhatmScreen() {
         {/* Stats */}
         <View style={[s.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 16 }]}>
           <View style={s.statCard}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={RNStyleSheet.absoluteFill} />
+            )}
+            <View style={[RNStyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             <Text style={s.statNum}>{stats?.totalCompleted || 0}</Text>
             <Text style={s.statLabel}>{t('khatma.completedKhatmas')}</Text>
           </View>
           <View style={s.statCard}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={RNStyleSheet.absoluteFill} />
+            )}
+            <View style={[RNStyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             <Text style={s.statNum}>{current ? stats?.completedSurahs || 0 : 0}</Text>
             <Text style={s.statLabel}>{t('khatma.markAsRead')}</Text>
           </View>
           <View style={s.statCard}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={RNStyleSheet.absoluteFill} />
+            )}
+            <View style={[RNStyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             <Text style={s.statNum}>{current ? stats?.progressPercent || 0 : 0}%</Text>
             <Text style={s.statLabel}>{t('khatma.progress')}</Text>
           </View>
@@ -232,13 +249,13 @@ export default function KhatmScreen() {
         {/* Current Khatm */}
         {current ? (
           <View style={s.progressCard}>
-            <Text style={[s.khatmName, { textAlign: isRTL ? 'right' : 'left' }]}>{current.name}</Text>
-            <Text style={[s.khatmDuration, { textAlign: isRTL ? 'right' : 'left' }]}>⏱ {getDurationText(current.startDate)}</Text>
+            <Text style={[s.khatmName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{current.name}</Text>
+            <Text style={[s.khatmDuration, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>⏱ {getDurationText(current.startDate)}</Text>
             <View style={[s.progressBarBg, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[s.progressBarFill, { width: `${stats?.progressPercent || 0}%` as any }]} />
             </View>
             <View style={[s.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[s.progressDetails, { textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[s.progressDetails, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {stats?.remainingSurahs} {t('quran.surah')} {t('khatma.pagesRemaining').split(' ')[0]}
               </Text>
               <Text style={s.progressPct}>{stats?.progressPercent}%</Text>
@@ -248,8 +265,10 @@ export default function KhatmScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={s.emptyCard}>
-            <Text style={s.emptyEmoji}></Text>
+          <View style={s.emptyCard}>            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={RNStyleSheet.absoluteFill} />
+            )}
+            <View style={[RNStyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />            <Text style={s.emptyEmoji}></Text>
             <Text style={s.emptyTitle}>{t('khatma.newKhatma')}</Text>
             <Text style={s.emptyText}>{t('khatma.khatmaCreatedMsg')}</Text>
             <TouchableOpacity style={s.startBtn} onPress={() => setShowNewModal(true)}>
@@ -261,15 +280,19 @@ export default function KhatmScreen() {
         {/* History */}
         {allKhatm.filter(k => k.isCompleted).length > 0 && (
           <>
-            <Text style={[s.sectionTitle, { marginTop: 16, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.completedKhatmas')}</Text>
+            <Text style={[s.sectionTitle, { marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('khatma.completedKhatmas')}</Text>
             {allKhatm.filter(k => k.isCompleted).map(khatm => (
               <View key={khatm.id} style={[s.historyItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={RNStyleSheet.absoluteFill} />
+                )}
+                <View style={[RNStyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(khatm.id)}>
                   <IconSymbol name="trash" size={18} color={colors.muted} />
                 </TouchableOpacity>
                 <View style={s.historyInfo}>
                   <Text style={s.historyName}>{khatm.name}</Text>
-                  <Text style={[s.historyDates, { textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[s.historyDates, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {new Date(khatm.startDate).toLocaleDateString(getDateLocale())} — {khatm.endDate ? new Date(khatm.endDate).toLocaleDateString(getDateLocale()) : ''}
                     {'  •  '}{getDurationText(khatm.startDate, khatm.endDate)}
                   </Text>
@@ -334,7 +357,7 @@ export default function KhatmScreen() {
                     {isCompleted && <IconSymbol name="checkmark" size={14} color="#fff" />}
                   </View>
                   <Text style={s.surahName}>{getSurahName(surahNum)}</Text>
-                  <View style={[s.surahNum, { backgroundColor: isCompleted ? colors.primary + '18' : 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border }]}>
+                  <View style={[s.surahNum, { backgroundColor: isCompleted ? colors.primary + '28' : 'rgba(120,120,128,0.12)', borderWidth: 1, borderColor: colors.border }]}>
                     <Text style={[s.surahNumText, { color: isCompleted ? colors.primary : colors.muted }]}>{surahNum}</Text>
                   </View>
                 </TouchableOpacity>
@@ -348,8 +371,8 @@ export default function KhatmScreen() {
       <Animated.View style={[s.celebOverlay, { opacity: celebAnim, pointerEvents: 'none' }]}>
         <View style={s.celebCard}>
           <Text style={{ fontSize: 72, marginBottom: 10 }}></Text>
-          <Text style={{ fontSize: 22, fontWeight: '900', color: colors.primary, marginBottom: 8 }}>{t('khatma.congratulations')}</Text>
-          <Text style={{ fontSize: 16, color: '#555', textAlign: 'center' }}>{t('khatma.khatmaCompleted')}</Text>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: colors.primaryText, marginBottom: 8 }}>{t('khatma.congratulations')}</Text>
+          <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center' }}>{t('khatma.khatmaCompleted')}</Text>
           <Text style={{ fontSize: 24, marginTop: 12 }}>{t('khatma.barakAllah')}</Text>
         </View>
       </Animated.View>

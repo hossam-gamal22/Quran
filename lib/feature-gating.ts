@@ -16,11 +16,6 @@ export const DEFAULT_FEATURE_GATING: FeatureGatingConfig = {
   cloud_backup: { premiumOnly: true },
   advanced_stats: { premiumOnly: true },
   custom_backgrounds: { premiumOnly: true },
-  offline_recitation: { premiumOnly: true },
-  advanced_khatma: { premiumOnly: true },
-  custom_app_icon: { premiumOnly: true },
-  premium_widgets: { premiumOnly: true },
-  watermark_free_export: { premiumOnly: true },
 };
 
 let memoryCache: FeatureGatingConfig | null = null;

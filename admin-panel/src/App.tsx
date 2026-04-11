@@ -23,7 +23,6 @@ import {
   Globe,
   Volume2,
   Image as ImageIcon,
-  Map,
   Shield,
   Trophy,
   Timer,
@@ -32,12 +31,12 @@ import {
   CalendarDays,
   Repeat,
   LayoutGrid,
-  UserPlus,
   Heart,
   Languages,
   Radio,
   ChevronDown,
   Music,
+  MessageSquare,
   AlertTriangle,
 } from 'lucide-react';
 
@@ -66,25 +65,25 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6" dir="rtl">
-          <div className="bg-slate-800 rounded-2xl p-8 max-w-2xl w-full border border-red-500/50">
+        <div className="min-h-screen bg-admin-bg flex items-center justify-center p-6" dir="rtl">
+          <div className="bg-admin-surface rounded-2xl p-8 max-w-2xl w-full border border-red-500/50">
             <div className="flex items-center gap-3 mb-4">
               <AlertTriangle className="w-8 h-8 text-red-500" />
               <h1 className="text-xl font-bold text-white">حدث خطأ في التطبيق</h1>
             </div>
-            <div className="bg-slate-900 rounded-xl p-4 mb-4 overflow-auto max-h-60">
+            <div className="bg-admin-bg rounded-xl p-4 mb-4 overflow-auto max-h-60">
               <p className="text-red-400 font-mono text-sm whitespace-pre-wrap">
                 {this.state.error?.toString()}
               </p>
               {this.state.errorInfo && (
-                <p className="text-slate-500 font-mono text-xs mt-2 whitespace-pre-wrap">
+                <p className="text-admin-muted font-mono text-xs mt-2 whitespace-pre-wrap">
                   {this.state.errorInfo.componentStack}
                 </p>
               )}
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-xl hover:bg-emerald-700 transition-colors"
+              className="btn-primary"
             >
               إعادة تحميل الصفحة
             </button>
@@ -96,6 +95,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryStat
   }
 }
 
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+
 // استيراد الصفحات
 import Dashboard from './pages/Dashboard';
 import Notifications from './pages/Notifications';
@@ -106,11 +108,9 @@ import AzkarManager from './pages/AzkarManager';
 import UsersPage from './pages/Users';
 import Subscriptions from './pages/Subscriptions';
 import Ads from './pages/Ads';
-import Pricing from './pages/Pricing';
 import WelcomeBanner from './pages/WelcomeBanner';
 import HighlightsManager from './pages/HighlightsManager';
 import NavigationUI from './pages/NavigationUI';
-import AppContentManager from './pages/AppContentManager';
 import HomePageManager from './pages/HomePageManager';
 import SoundManager from './pages/SoundManager';
 import BundledSoundsManager from './pages/BundledSoundsManager';
@@ -121,7 +121,6 @@ import QuranThemesManager from './pages/QuranThemesManager';
 import TasbihPresetsManager from './pages/TasbihPresetsManager';
 import IslamicEventsManager from './pages/IslamicEventsManager';
 import SDUIManager from './pages/SDUIManager';
-import OnboardingManager from './pages/OnboardingManager';
 import DuasManager from './pages/DuasManager';
 import FeatureGating from './pages/FeatureGating';
 import PdfTemplatesManager from './pages/PdfTemplatesManager';
@@ -130,7 +129,8 @@ import TranslationOverrides from './pages/TranslationOverrides';
 import ContentManager from './pages/ContentManager';
 import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
-import RouteGuide from './pages/RouteGuide';
+import AppIconManager from './pages/AppIconManager';
+import SuggestionsPage from './pages/Suggestions';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -211,6 +211,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Users,
     items: [
       { path: '/users', icon: Users, label: 'المستخدمين' },
+      { path: '/suggestions', icon: MessageSquare, label: 'الاقتراحات' },
       { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
       { path: '/rewards', icon: Trophy, label: 'المكافآت' },
       { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
@@ -222,7 +223,6 @@ const NAV_GROUPS: NavGroup[] = [
     icon: DollarSign,
     items: [
       { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
-      { path: '/pricing', icon: DollarSign, label: 'الأسعار' },
     ],
   },
   {
@@ -230,7 +230,6 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'الترجمة والتوطين',
     icon: Languages,
     items: [
-      { path: '/app-content', icon: Globe, label: 'محتوى التطبيق' },
       { path: '/translations', icon: Languages, label: 'إدارة الترجمات' },
     ],
   },
@@ -240,8 +239,8 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Settings,
     items: [
       { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
-      { path: '/onboarding', icon: UserPlus, label: 'شاشات التأهيل' },
       { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
+      { path: '/app-icons', icon: ImageIcon, label: 'أيقونات التطبيق' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
     ],
   },
@@ -252,7 +251,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
       { path: '/pdf-templates', icon: FileText, label: 'قوالب PDF' },
-      { path: '/route-guide', icon: Map, label: 'دليل المسارات' },
     ],
   },
 ];
@@ -277,8 +275,8 @@ const SidebarGroupItem: React.FC<{
         className={({ isActive: active }) =>
           `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm ${
             active
-              ? 'bg-emerald-500 text-white'
-              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              ? 'bg-accent text-white'
+              : 'text-slate-300 hover:bg-admin-surface hover:text-white'
           }`
         }
       >
@@ -294,8 +292,8 @@ const SidebarGroupItem: React.FC<{
         onClick={onToggle}
         className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all text-sm ${
           isActive && !isOpen
-            ? 'bg-emerald-500/20 text-emerald-400'
-            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            ? 'bg-accent/20 text-accent-light'
+            : 'text-admin-muted hover:bg-admin-surface hover:text-white'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -305,7 +303,7 @@ const SidebarGroupItem: React.FC<{
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
       {isOpen && (
-        <div className="mr-4 mt-0.5 space-y-0.5 border-r border-slate-700/50 pr-2">
+        <div className="mr-4 mt-0.5 space-y-0.5 border-r border-admin-border/50 pr-2">
           {group.items.map(item => (
             <NavLink
               key={item.path}
@@ -314,8 +312,8 @@ const SidebarGroupItem: React.FC<{
               className={({ isActive: active }) =>
                 `flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-xs ${
                   active
-                    ? 'bg-emerald-500 text-white'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-accent text-white'
+                    : 'text-admin-muted hover:bg-admin-surface hover:text-white'
                 }`
               }
             >
@@ -329,7 +327,7 @@ const SidebarGroupItem: React.FC<{
   );
 };
 
-const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void; onLogout: () => void }> = ({ isOpen, onClose, onLogout }) => {
   const location = useLocation();
   // Auto-open the group that contains the current route
   const getActiveGroupId = () => {
@@ -359,23 +357,23 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
       )}
       
       <aside 
-        className={`fixed top-0 right-0 h-full w-64 bg-slate-900 text-white z-50 transform transition-transform duration-300 lg:translate-x-0 ${
+        className={`fixed top-0 right-0 h-full w-64 bg-admin-bg text-white z-50 transform transition-transform duration-300 lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
         dir="rtl"
       >
-        <div className="p-5 border-b border-slate-700">
+        <div className="p-5 border-b border-admin-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-accent rounded-xl flex items-center justify-center">
                 <Moon className="w-6 h-6" />
               </div>
               <div>
                 <h1 className="font-bold text-lg">روح المسلم</h1>
-                <p className="text-xs text-slate-400">لوحة التحكم</p>
+                <p className="text-xs text-admin-muted">لوحة التحكم</p>
               </div>
             </div>
-            <button onClick={onClose} title="إغلاق القائمة" className="lg:hidden p-2 hover:bg-slate-800 rounded-lg">
+            <button onClick={onClose} title="إغلاق القائمة" className="lg:hidden p-2 hover:bg-admin-surface rounded-lg">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -390,8 +388,8 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
             className={({ isActive: active }) =>
               `flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-sm ${
                 active
-                  ? 'bg-emerald-500 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-accent text-white'
+                  : 'text-slate-300 hover:bg-admin-surface hover:text-white'
               }`
             }
           >
@@ -399,7 +397,7 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
             <span>لوحة التحكم</span>
           </NavLink>
 
-          <div className="border-t border-slate-800 my-2" />
+          <div className="border-t border-admin-surface my-2" />
 
           {NAV_GROUPS.map(group => (
             <SidebarGroupItem
@@ -412,8 +410,11 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700">
-          <div className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl cursor-pointer transition-all">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-admin-border">
+          <div
+            onClick={onLogout}
+            className="flex items-center gap-3 px-4 py-3 text-admin-muted hover:text-white hover:bg-admin-surface rounded-xl cursor-pointer transition-all"
+          >
             <LogOut className="w-5 h-5" />
             <span>تسجيل الخروج</span>
           </div>
@@ -425,37 +426,55 @@ const Sidebar: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, o
 
 // ==================== Main App ====================
 const App: React.FC = () => {
+  const { authenticated, loading, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  // Loading spinner while Firebase auth initializes
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center" dir="rtl">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-4 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+          <p className="text-slate-400 text-sm">جاري التحميل...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated — show login page
+  if (!authenticated) {
+    return <Login />;
+  }
+
   return (
     <Router>
-      <div className="min-h-screen bg-slate-900" dir="rtl">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="min-h-screen bg-admin-bg" dir="rtl">
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} onLogout={logout} />
 
         <div className="lg:mr-64">
-          <header className="h-16 bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 flex items-center justify-between px-6 sticky top-0 z-30">
+          <header className="h-16 bg-admin-surface/50 backdrop-blur-sm border-b border-admin-border/50 flex items-center justify-between px-6 sticky top-0 z-30">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setSidebarOpen(true)}
                 title="فتح القائمة"
-                className="lg:hidden p-2 hover:bg-slate-700 rounded-lg"
+                className="lg:hidden p-2 hover:bg-admin-surface-light rounded-lg"
               >
-                <Menu className="w-6 h-6 text-slate-400" />
+                <Menu className="w-6 h-6 text-admin-muted" />
               </button>
-              <p className="text-sm text-slate-400 hidden sm:block">مرحباً بك في لوحة التحكم</p>
+              <p className="text-sm text-admin-muted hidden sm:block">مرحباً بك في لوحة التحكم</p>
             </div>
             
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setPreviewOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-accent/20 hover:bg-accent/30 text-accent-light rounded-xl transition-colors"
               >
                 <Smartphone className="w-4 h-4" />
                 <span className="hidden sm:inline">معاينة التطبيق</span>
               </button>
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                <span className="text-emerald-400 font-bold">م</span>
+              <div className="w-10 h-10 bg-accent/20 rounded-full flex items-center justify-center">
+                <span className="text-accent-light font-bold">م</span>
               </div>
             </div>
           </header>
@@ -483,9 +502,7 @@ const App: React.FC = () => {
               <Route path="/feature-gating" element={<FeatureGating />} />
               <Route path="/rewards" element={<Rewards />} />
               <Route path="/ads" element={<Ads />} />
-              <Route path="/pricing" element={<Pricing />} />
               <Route path="/navigation-ui" element={<NavigationUI />} />
-              <Route path="/app-content" element={<AppContentManager />} />
               <Route path="/home-page" element={<HomePageManager />} />
               <Route path="/sounds" element={<SoundManager />} />
               <Route path="/bundled-sounds" element={<BundledSoundsManager />} />
@@ -493,12 +510,11 @@ const App: React.FC = () => {
               <Route path="/pdf-templates" element={<PdfTemplatesManager />} />
               <Route path="/temp-pages" element={<TempPagesManager />} />
               <Route path="/sdui" element={<SDUIManager />} />
-              <Route path="/onboarding" element={<OnboardingManager />} />
-
+              <Route path="/app-icons" element={<AppIconManager />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/suggestions" element={<SuggestionsPage />} />
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />
-              <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
@@ -518,10 +534,12 @@ const App: React.FC = () => {
   );
 };
 
-// تصدير التطبيق مع Error Boundary
+// تصدير التطبيق مع Error Boundary و Auth
 const AppWithErrorBoundary: React.FC = () => (
   <ErrorBoundary>
-    <App />
+    <AuthProvider>
+      <App />
+    </AuthProvider>
   </ErrorBoundary>
 );
 

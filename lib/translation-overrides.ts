@@ -8,7 +8,6 @@
  *   {
  *     sourceText: string,
  *     overrides: Record<LangCode, string>,
- *     screen?: string,
  *     createdAt: string,
  *     updatedAt: string,
  *   }
@@ -25,7 +24,6 @@ type LangCode = 'ar' | 'en' | 'fr' | 'de' | 'es' | 'tr' | 'ur' | 'id' | 'ms' | '
 interface TranslationOverride {
   sourceText: string;
   overrides: Partial<Record<LangCode, string>>;
-  screen?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -79,7 +77,7 @@ export async function loadTranslationOverrides(): Promise<void> {
         if (data.sourceText && data.overrides) {
           const trimmed = data.sourceText.trim();
           overridesMap.set(trimmed, data.overrides);
-          entries.push({ sourceText: trimmed, overrides: data.overrides, screen: data.screen });
+          entries.push({ sourceText: trimmed, overrides: data.overrides });
         }
       }
 

@@ -9,10 +9,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  StatusBar,
   Alert,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,10 +22,12 @@ import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSettings, NotificationSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useWorship } from '@/contexts/WorshipContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Colors, DarkColors } from '@/constants/theme';
 
 // ========================================
 // مكونات فرعية
@@ -45,7 +47,7 @@ interface SettingSwitchProps {
 
 const SettingSwitch: React.FC<SettingSwitchProps> = ({
   icon,
-  iconColor = '#22C55E',
+  iconColor = '#0d8e62',
   title,
   subtitle,
   value,
@@ -55,17 +57,18 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
   isRTL,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
-  <View style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.settingItemDark, disabled && styles.settingItemDisabled]}>
+  <View style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }, disabled && styles.settingItemDisabled]}>
     <View style={styles.settingIconBg}>
-      <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#999' : iconColor} />
+      <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#8E8E93' : iconColor} />
     </View>
     <View style={styles.settingContent}>
       <Text style={[styles.settingTitle, { color: colors.text }, disabled && styles.textDisabled]}>
         {title}
       </Text>
       {subtitle && (
-        <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {subtitle}
         </Text>
       )}
@@ -76,7 +79,7 @@ const SettingSwitch: React.FC<SettingSwitchProps> = ({
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onValueChange(val);
       }}
-      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
+      trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
       thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
       ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
       disabled={disabled}
@@ -98,7 +101,7 @@ interface TimePickerRowProps {
 
 const TimePickerRow: React.FC<TimePickerRowProps> = ({
   icon,
-  iconColor = '#22C55E',
+  iconColor = '#0d8e62',
   title,
   time,
   onTimeChange,
@@ -108,8 +111,11 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
 }) => {
   const [showPicker, setShowPicker] = useState(false);
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const parseTime = (timeStr: string): Date => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+    const parts = timeStr.split(':').map(Number);
+    const hours = Number.isFinite(parts[0]) && parts[0] >= 0 && parts[0] <= 23 ? parts[0] : 0;
+    const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
     return date;
@@ -122,7 +128,9 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
   };
 
   const formatDisplayTime = (timeStr: string): string => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
+    const parts = timeStr.split(':').map(Number);
+    const hours = Number.isFinite(parts[0]) ? parts[0] : 0;
+    const minutes = Number.isFinite(parts[1]) ? parts[1] : 0;
     const period = hours >= 12 ? (isRTL ? 'م' : 'PM') : (isRTL ? 'ص' : 'AM');
     const displayHours = hours % 12 || 12;
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
@@ -131,7 +139,7 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
   return (
     <>
       <TouchableOpacity
-        style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.settingItemDark, disabled && styles.settingItemDisabled]}
+        style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: colors.surface }, disabled && styles.settingItemDisabled]}
         onPress={() => {
           if (!disabled) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -141,7 +149,7 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
         activeOpacity={disabled ? 1 : 0.7}
       >
         <View style={styles.settingIconBg}>
-          <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#999' : iconColor} />
+          <MaterialCommunityIcons name={icon} size={22} color={disabled ? '#8E8E93' : iconColor} />
         </View>
         <View style={styles.settingContent}>
           <Text style={[styles.settingTitle, { color: colors.text }, disabled && styles.textDisabled]}>
@@ -152,7 +160,7 @@ const TimePickerRow: React.FC<TimePickerRowProps> = ({
           <Text style={[styles.timeText, { color: colors.text }, disabled && styles.textDisabled]}>
             {formatDisplayTime(time)}
           </Text>
-          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
+          <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.textLight} />
         </View>
       </TouchableOpacity>
 
@@ -183,6 +191,7 @@ export default function WorshipTrackingSettingsScreen() {
   const router = useRouter();
   const { settings, isDarkMode, updateNotifications } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { clearAllData, stats } = useWorship();
 
   const isEnabled = settings.notifications.enabled;
@@ -225,10 +234,8 @@ export default function WorshipTrackingSettingsScreen() {
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity}
     >
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+    <SafeAreaView style={[styles.container, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
       <Animated.View
@@ -255,11 +262,11 @@ export default function WorshipTrackingSettingsScreen() {
       >
         {/* Prayer Logging Reminder */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.prayerLoggingReminders')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.prayerLoggingReminders')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <SettingSwitch
               icon="bell-ring"
-              iconColor="#22C55E"
+              iconColor="#0d8e62"
               title={t('worship.prayerLoggingReminder')}
               subtitle={t('worship.prayerLoggingReminderDesc')}
               value={settings.notifications.worshipPrayerLogging}
@@ -270,7 +277,7 @@ export default function WorshipTrackingSettingsScreen() {
             />
             <SettingSwitch
               icon="mosque"
-              iconColor="#22C55E"
+              iconColor="#0d8e62"
               title={t('worship.prayerTimeAlerts')}
               subtitle={t('worship.prayerTimeAlertsDesc')}
               value={settings.notifications.prayerTimes}
@@ -284,8 +291,8 @@ export default function WorshipTrackingSettingsScreen() {
 
         {/* Daily Summary */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.dailySummary')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.dailySummary')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <SettingSwitch
               icon="clipboard-text-clock"
               iconColor="#3a7ca5"
@@ -312,8 +319,8 @@ export default function WorshipTrackingSettingsScreen() {
 
         {/* Streak & Weekly */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.streakAndReports')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.streakAndReports')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <SettingSwitch
               icon="fire"
               iconColor="#ff6b35"
@@ -327,7 +334,7 @@ export default function WorshipTrackingSettingsScreen() {
             />
             <SettingSwitch
               icon="chart-bar"
-              iconColor="#5d4e8c"
+              iconColor="#4a3d73"
               title={t('worship.weeklyReport')}
               subtitle={t('worship.weeklyReportDesc')}
               value={settings.notifications.worshipWeeklyReport}
@@ -341,11 +348,11 @@ export default function WorshipTrackingSettingsScreen() {
 
         {/* Quiet Hours */}
         <Animated.View entering={FadeInDown.delay(250).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.quietHours')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.quietHours')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <SettingSwitch
               icon="moon-waning-crescent"
-              iconColor="#5d4e8c"
+              iconColor="#4a3d73"
               title={t('worship.enableQuietHours')}
               subtitle={t('worship.enableQuietHoursDesc')}
               value={settings.notifications.worshipQuietHoursEnabled}
@@ -356,7 +363,7 @@ export default function WorshipTrackingSettingsScreen() {
             />
             <TimePickerRow
               icon="clock-start"
-              iconColor="#5d4e8c"
+              iconColor="#4a3d73"
               title={t('worship.quietHoursStart')}
               time={settings.notifications.worshipQuietHoursStart}
               onTimeChange={(val) => updateNotifications({ worshipQuietHoursStart: val })}
@@ -366,7 +373,7 @@ export default function WorshipTrackingSettingsScreen() {
             />
             <TimePickerRow
               icon="clock-end"
-              iconColor="#5d4e8c"
+              iconColor="#4a3d73"
               title={t('worship.quietHoursEnd')}
               time={settings.notifications.worshipQuietHoursEnd}
               onTimeChange={(val) => updateNotifications({ worshipQuietHoursEnd: val })}
@@ -379,8 +386,8 @@ export default function WorshipTrackingSettingsScreen() {
 
         {/* Notification Sound */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.sound')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.sound')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <SettingSwitch
               icon="volume-high"
               iconColor="#c17f59"
@@ -407,10 +414,10 @@ export default function WorshipTrackingSettingsScreen() {
 
         {/* Data Management */}
         <Animated.View entering={FadeInDown.delay(350).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.dataManagement')}</Text>
-          <View style={[styles.sectionContent, isDarkMode && styles.sectionContentDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.dataManagement')}</Text>
+          <View style={[styles.sectionContent, { backgroundColor: colors.card }]}>
             <TouchableOpacity
-              style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.settingItemDark]}
+              style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 handleExportData();
@@ -422,13 +429,13 @@ export default function WorshipTrackingSettingsScreen() {
               </View>
               <View style={styles.settingContent}>
                 <Text style={[styles.settingTitle, { color: colors.text }]}>{t('settings.exportData')}</Text>
-                <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.yourStats')}</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.yourStats')}</Text>
               </View>
-              <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
+              <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.textLight} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isDarkMode && styles.settingItemDark]}
+              style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 handleResetData();
@@ -440,7 +447,7 @@ export default function WorshipTrackingSettingsScreen() {
               </View>
               <View style={styles.settingContent}>
                 <Text style={[styles.settingTitle, { color: '#ef5350' }]}>{t('worship.clearAllData')}</Text>
-                <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('worship.clearConfirm')}</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.clearConfirm')}</Text>
               </View>
               <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color="#ef5350" />
             </TouchableOpacity>
@@ -448,9 +455,9 @@ export default function WorshipTrackingSettingsScreen() {
         </Animated.View>
 
         {/* Info */}
-        <Animated.View entering={FadeInDown.delay(400).duration(500)} style={[styles.infoCard, isDarkMode && styles.infoCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <Animated.View entering={FadeInDown.delay(400).duration(500)} style={[styles.infoCard, { backgroundColor: colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
-          <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.infoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('worship.notificationInfo')}
           </Text>
         </Animated.View>
@@ -466,13 +473,12 @@ export default function WorshipTrackingSettingsScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   containerDark: {
-    backgroundColor: '#11151c',
+    backgroundColor: DarkColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -491,19 +497,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
   },
   headerPlaceholder: {
     width: 40,
   },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
+
   textDisabled: {
-    color: '#bbb',
+    color: '#8E8E93',
   },
   scrollView: {
     flex: 1,
@@ -514,26 +514,23 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
     paddingHorizontal: 20,
     marginTop: 20,
     marginBottom: 10,
   },
   sectionContent: {
-    backgroundColor: '#fff',
     marginHorizontal: 16,
     borderRadius: 16,
     overflow: 'hidden',
   },
   sectionContentDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   settingItemDark: {
     borderBottomColor: '#2a2a3e',
@@ -555,12 +552,10 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontFamily: fontSemiBold(),
-    color: '#333',
   },
   settingSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
     marginTop: 2,
   },
   timeDisplay: {
@@ -571,7 +566,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 15,
     fontFamily: fontMedium(),
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   infoCard: {
     flexDirection: 'row',
@@ -582,15 +577,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 15,
     gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(58, 124, 165, 0.20)',
   },
   infoCardDark: {
     backgroundColor: 'rgba(58, 124, 165, 0.1)',
+    borderColor: 'rgba(58, 124, 165, 0.15)',
   },
   infoText: {
     flex: 1,
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#333',
     lineHeight: 22,
   },
   bottomSpace: {

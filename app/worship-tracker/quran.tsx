@@ -10,8 +10,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -31,8 +31,10 @@ import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getAllQuranRecords, DailyQuranRecord } from '@/lib/worship-storage';
+import { Colors, DarkColors } from '@/constants/theme';
 import { t, getDateLocale } from '@/lib/i18n';
 
 const { width } = Dimensions.get('window');
@@ -121,21 +123,22 @@ const JuzProgress: React.FC<JuzProgressProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const progress = Math.min((pagesRead / totalPages) * 100, 100);
   const isComplete = progress >= 100;
 
   return (
-    <View style={[styles.juzItem, isDarkMode && styles.juzItemDark]}>
+    <View style={[styles.juzItem, { backgroundColor: colors.card }]}>
       <View style={[styles.juzHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <Text style={[styles.juzNumber, { color: colors.text }]}>
           {t('worship.juzNumber')} {juzNumber}
         </Text>
         {isComplete && (
-          <MaterialCommunityIcons name="check-circle" size={18} color="#22C55E" />
+          <MaterialCommunityIcons name="check-circle" size={18} color="#0d8e62" />
         )}
       </View>
-      <View style={[styles.juzProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.juzProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? colors.surface : '#eee' }]}>
         <View
           style={[
             styles.juzProgressFill,
@@ -167,11 +170,12 @@ const GoalCard: React.FC<GoalCardProps> = ({
   isRTL = true,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <TouchableOpacity
       style={[
         styles.goalCard,
-        isDarkMode && styles.goalCardDark,
+        { backgroundColor: colors.card },
         isSelected && styles.goalCardSelected,
       ]}
       onPress={() => {
@@ -224,6 +228,7 @@ export default function QuranTrackerScreen() {
   
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // تحميل سجل القراءة
   useEffect(() => {
@@ -276,10 +281,8 @@ export default function QuranTrackerScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       
       {/* الهيدر */}
       <UniversalHeader
@@ -358,12 +361,12 @@ export default function QuranTrackerScreen() {
                 {todayPages}/{dailyGoal} {t('worship.pages')}
               </Text>
             </View>
-            <View style={[styles.todayProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.todayProgressBar, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? colors.surface : '#eee' }]}>
               <View style={[styles.todayProgressFill, { width: `${todayProgress}%` }]} />
             </View>
             {todayProgress >= 100 && (
               <View style={[styles.completedBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="check-circle" size={18} color="#22C55E" />
+                <MaterialCommunityIcons name="check-circle" size={18} color="#0d8e62" />
                 <Text style={styles.completedText}>{t('worship.todayGoalComplete')}</Text>
               </View>
             )}
@@ -420,7 +423,7 @@ export default function QuranTrackerScreen() {
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
-                  <MaterialCommunityIcons name="check-decagram" size={24} color="#22C55E" />
+                  <MaterialCommunityIcons name="check-decagram" size={24} color="#0d8e62" />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {quranStats?.khatmasCompleted ?? 0}
@@ -477,11 +480,11 @@ export default function QuranTrackerScreen() {
                       <Text style={[historyStyles.dateStr, { color: colors.textLight }]}>{dateStr}</Text>
                     </View>
                     <View style={historyStyles.barCol}>
-                      <View style={[historyStyles.barBg, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                        <View style={[historyStyles.barFill, { width: `${barWidth}%`, backgroundColor: barWidth >= 100 ? '#22C55E' : '#c17f59' }]} />
+                      <View style={[historyStyles.barBg, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)' }]}>
+                        <View style={[historyStyles.barFill, { width: `${barWidth}%`, backgroundColor: barWidth >= 100 ? '#0d8e62' : '#c17f59' }]} />
                       </View>
                     </View>
-                    <Text style={[historyStyles.pagesText, { color: entry.pages >= dailyGoal ? '#22C55E' : colors.text }]}>
+                    <Text style={[historyStyles.pagesText, { color: entry.pages >= dailyGoal ? '#0d8e62' : colors.text }]}>
                       {entry.pages} {t('worship.pages')}
                     </Text>
                   </View>
@@ -515,7 +518,7 @@ export default function QuranTrackerScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -524,12 +527,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
   scrollView: {
     flex: 1,
   },
@@ -539,10 +536,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
     marginBottom: 12,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   // البطاقة الرئيسية
   mainCard: {
@@ -560,16 +558,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.8)',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   progressPercent: {
     fontSize: 32,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 50,
+    includeFontPadding: false,
   },
   progressPages: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   mainStats: {
     flexDirection: 'row',
@@ -587,12 +591,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   mainStatLabel: {
     fontSize: 11,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   mainStatDivider: {
     width: 1,
@@ -614,12 +622,14 @@ const styles = StyleSheet.create({
   todayTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   todayGoal: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#666',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   todayProgressBar: {
     height: 10,
@@ -639,13 +649,15 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 12,
     padding: 10,
-    backgroundColor: '#22C55E15',
+    backgroundColor: '#0d8e6215',
     borderRadius: 10,
   },
   completedText: {
     fontSize: 13,
     fontFamily: fontMedium(),
-    color: '#22C55E',
+    color: '#0d8e62',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   // إضافة سريعة
   quickAddContainer: {
@@ -656,37 +668,38 @@ const styles = StyleSheet.create({
   quickAddButton: {
     width: 60,
     height: 70,
-    backgroundColor: '#fff',
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   quickAddButtonDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   quickAddText: {
     fontSize: 18,
     fontFamily: fontBold(),
     color: '#c17f59',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   quickAddLabel: {
     fontSize: 10,
     fontFamily: fontRegular(),
-    color: '#666',
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   // إدخال مخصص
   customInput: {
     flexDirection: 'row',
     marginHorizontal: 16,
     marginTop: 15,
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   customInputDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   customInputField: {
     flex: 1,
@@ -694,7 +707,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     fontSize: 16,
     fontFamily: fontRegular(),
-    color: '#333',
   },
   customInputButton: {
     flexDirection: 'row',
@@ -720,7 +732,6 @@ const styles = StyleSheet.create({
   },
   goalCard: {
     width: 130,
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 15,
     overflow: 'visible',
@@ -728,7 +739,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   goalCardDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   goalCardSelected: {
     borderColor: '#c17f59',
@@ -737,7 +748,8 @@ const styles = StyleSheet.create({
   goalLabel: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   goalLabelSelected: {
     color: '#c17f59',
@@ -745,9 +757,10 @@ const styles = StyleSheet.create({
   goalDescription: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 4,
     textAlign: 'right',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   goalDescriptionSelected: {
     color: '#c17f59',
@@ -772,8 +785,9 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 15,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -793,13 +807,15 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: 10,
     fontFamily: fontRegular(),
-    color: '#666',
     textAlign: 'center',
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   // نصيحة
   tipCard: {
@@ -816,24 +832,23 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   tipText: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
   },
   // الأجزاء
   juzItem: {
     width: 80,
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 10,
     alignItems: 'center',
   },
   juzItemDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   juzHeader: {
     flexDirection: 'row',
@@ -843,7 +858,8 @@ const styles = StyleSheet.create({
   juzNumber: {
     fontSize: 11,
     fontFamily: fontMedium(),
-    color: '#333',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   juzProgressBar: {
     width: '100%',
@@ -859,13 +875,14 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   juzProgressComplete: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   juzPages: {
     fontSize: 10,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 4,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   bottomSpace: {
     height: 100,
@@ -890,11 +907,15 @@ const historyStyles = StyleSheet.create({
   dayName: {
     fontSize: 12,
     fontFamily: fontSemiBold(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   dateStr: {
     fontSize: 10,
     fontFamily: fontRegular(),
     marginTop: 1,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   barCol: {
     flex: 1,
@@ -913,5 +934,8 @@ const historyStyles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontFamily: fontSemiBold(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

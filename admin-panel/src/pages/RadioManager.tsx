@@ -25,38 +25,44 @@ interface AdminRadioStation {
 }
 
 type RadioCategory =
-  | 'quran_recitation'
-  | 'quran_tafsir'
+  | 'quran'
+  | 'reciter'
+  | 'translation'
+  | 'tafsir'
+  | 'islamic'
+  | 'adhkar'
+  | 'seerah'
   | 'hadith'
-  | 'islamic_lectures'
-  | 'islamic_nasheed'
-  | 'dua_azkar'
-  | 'kids_islamic'
-  | 'multilingual'
-  | 'local_radio'
-  | 'general_islamic'
-  | 'mixed';
+  | 'ruqyah'
+  | 'kids'
+  | 'other';
 
 interface RadioConfig {
-  cacheMinutes: number;
-  enableExternalSources: boolean;
-  featuredStationsLimit: number;
-  showInactiveInApp: boolean;
+  enabled: boolean;
+  maxStationsPerSource: number;
+  cacheTTLMinutes: number;
+  featuredStationIds: string[];
+  hiddenStationIds: string[];
+  defaultCategory: RadioCategory;
+  showRadioBrowser: boolean;
+  showMp3Quran: boolean;
+  updatedAt: string;
+  updatedBy: string;
 }
 
 // ==================== Constants ====================
 const CATEGORIES: { value: RadioCategory; label: string; icon: string }[] = [
-  { value: 'quran_recitation', label: 'تلاوة القرآن', icon: '📖' },
-  { value: 'quran_tafsir', label: 'تفسير القرآن', icon: '📜' },
-  { value: 'hadith', label: 'حديث شريف', icon: '📕' },
-  { value: 'islamic_lectures', label: 'محاضرات إسلامية', icon: '🎓' },
-  { value: 'islamic_nasheed', label: 'أناشيد إسلامية', icon: '🎵' },
-  { value: 'dua_azkar', label: 'أدعية وأذكار', icon: '🤲' },
-  { value: 'kids_islamic', label: 'إسلامي للأطفال', icon: '👶' },
-  { value: 'multilingual', label: 'متعدد اللغات', icon: '🌍' },
-  { value: 'local_radio', label: 'راديو محلي', icon: '📻' },
-  { value: 'general_islamic', label: 'إسلامي عام', icon: '🕌' },
-  { value: 'mixed', label: 'منوع', icon: '🎶' },
+  { value: 'quran', label: 'تلاوة القرآن', icon: '📖' },
+  { value: 'reciter', label: 'قارئ محدد', icon: '🎙️' },
+  { value: 'translation', label: 'ترجمة القرآن', icon: '🌍' },
+  { value: 'tafsir', label: 'تفسير القرآن', icon: '📜' },
+  { value: 'islamic', label: 'محتوى إسلامي عام', icon: '🕌' },
+  { value: 'adhkar', label: 'أدعية وأذكار', icon: '🤲' },
+  { value: 'seerah', label: 'سيرة نبوية', icon: '📕' },
+  { value: 'hadith', label: 'حديث شريف', icon: '📗' },
+  { value: 'ruqyah', label: 'رقية شرعية', icon: '🛡️' },
+  { value: 'kids', label: 'إسلامي للأطفال', icon: '👶' },
+  { value: 'other', label: 'أخرى', icon: '🎶' },
 ];
 
 const FIRESTORE_COLLECTION = 'admin_radio_stations';
@@ -66,7 +72,7 @@ const EMPTY_STATION: Omit<AdminRadioStation, 'id'> = {
   name: '',
   nameEn: '',
   streamUrl: '',
-  category: 'quran_recitation',
+  category: 'quran',
   country: '',
   language: 'ar',
   imageUrl: '',
@@ -79,10 +85,16 @@ const EMPTY_STATION: Omit<AdminRadioStation, 'id'> = {
 };
 
 const DEFAULT_CONFIG: RadioConfig = {
-  cacheMinutes: 60,
-  enableExternalSources: true,
-  featuredStationsLimit: 10,
-  showInactiveInApp: false,
+  enabled: true,
+  maxStationsPerSource: 50,
+  cacheTTLMinutes: 60,
+  featuredStationIds: [],
+  hiddenStationIds: [],
+  defaultCategory: 'quran',
+  showRadioBrowser: true,
+  showMp3Quran: true,
+  updatedAt: '',
+  updatedBy: '',
 };
 
 // ==================== Component ====================
@@ -92,6 +104,7 @@ const RadioManager: React.FC = () => {
   const [editingStation, setEditingStation] = useState<AdminRadioStation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<RadioCategory | ''>('');
   const [config, setConfig] = useState<RadioConfig>(DEFAULT_CONFIG);
@@ -173,9 +186,9 @@ const RadioManager: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل تريد حذف هذه المحطة؟')) return;
     try {
       await deleteDoc(doc(db, FIRESTORE_COLLECTION, id));
+      setDeleteConfirmId(null);
       loadStations();
     } catch { /* empty */ }
   };
@@ -190,7 +203,10 @@ const RadioManager: React.FC = () => {
 
   const handleSaveConfig = async () => {
     try {
-      await setDoc(doc(db, FIRESTORE_CONFIG_DOC), config);
+      await setDoc(doc(db, FIRESTORE_CONFIG_DOC), {
+        ...config,
+        updatedAt: new Date().toISOString(),
+      });
       setSaveMsg('✅ تم حفظ الإعدادات');
       setTimeout(() => setSaveMsg(''), 3000);
     } catch (e) {
@@ -253,7 +269,7 @@ const RadioManager: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Radio className="text-emerald-400" size={28} />
+            <Radio className="text-accent-light" size={28} />
             إدارة محطات الراديو
           </h1>
           <p className="text-slate-400 mt-1">
@@ -261,23 +277,23 @@ const RadioManager: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setIsConfigOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">
+          <button onClick={() => setIsConfigOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
             ⚙️ الإعدادات
           </button>
-          <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+          <button onClick={() => openEdit()} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-xl hover:bg-emerald-700 transition-colors">
             <Plus size={18} /> إضافة محطة
           </button>
         </div>
       </div>
 
-      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>{saveMsg}</p>}
+      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>{saveMsg}</p>}
 
       {/* Search & Filter */}
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <Search size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="w-full bg-slate-800 text-white rounded-xl pr-10 pl-4 py-2.5 border border-slate-700 placeholder:text-slate-500"
+            className="w-full bg-admin-surface text-white rounded-xl pr-10 pl-4 py-2.5 border border-admin-border placeholder:text-slate-500"
             dir="rtl"
             placeholder="بحث بالاسم أو الرابط..."
             aria-label="بحث في المحطات"
@@ -286,7 +302,7 @@ const RadioManager: React.FC = () => {
           />
         </div>
         <select
-          className="bg-slate-800 text-white rounded-xl px-4 py-2.5 border border-slate-700"
+          className="bg-admin-surface text-white rounded-xl px-4 py-2.5 border border-admin-border"
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value as RadioCategory | '')}
           title="فلتر الفئات"
@@ -313,8 +329,8 @@ const RadioManager: React.FC = () => {
           {filtered.map(station => (
             <div
               key={station.id}
-              className={`bg-slate-800/50 rounded-xl p-4 border transition-all ${
-                station.isActive ? 'border-slate-700/50' : 'border-red-900/30 opacity-60'
+              className={`bg-admin-surface/50 rounded-xl p-4 border transition-all ${
+                station.isActive ? 'border-admin-border/50' : 'border-red-900/30 opacity-60'
               } ${station.isFeatured ? 'ring-1 ring-emerald-500/30' : ''}`}
             >
               <div className="flex items-center gap-4">
@@ -323,8 +339,8 @@ const RadioManager: React.FC = () => {
                   onClick={() => togglePreview(station.streamUrl)}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                     previewUrl === station.streamUrl && isPlaying
-                      ? 'bg-emerald-600 text-white animate-pulse'
-                      : 'bg-slate-700 text-slate-300 hover:bg-emerald-700 hover:text-white'
+                      ? 'bg-accent-dark text-white animate-pulse'
+                      : 'bg-admin-surface-light text-slate-300 hover:bg-accent-dark hover:text-white'
                   }`}
                   title="معاينة البث"
                   aria-label={previewUrl === station.streamUrl && isPlaying ? 'إيقاف معاينة البث' : 'معاينة البث'}
@@ -336,7 +352,7 @@ const RadioManager: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-white font-bold text-lg truncate" dir="rtl">{station.name}</p>
-                    {station.isFeatured && <span className="text-xs bg-emerald-600/20 text-emerald-400 px-2 py-0.5 rounded-full">مميزة</span>}
+                    {station.isFeatured && <span className="text-xs bg-accent-dark/20 text-accent-light px-2 py-0.5 rounded-full">مميزة</span>}
                     {!station.isActive && <span className="text-xs bg-red-600/20 text-red-400 px-2 py-0.5 rounded-full">معطلة</span>}
                   </div>
                   {station.nameEn && <p className="text-slate-400 text-sm">{station.nameEn}</p>}
@@ -350,15 +366,22 @@ const RadioManager: React.FC = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1">
-                  <button onClick={() => handleToggleActive(station)} className={`p-2 rounded-lg ${station.isActive ? 'text-emerald-400 hover:bg-emerald-900/30' : 'text-red-400 hover:bg-red-900/30'}`} title={station.isActive ? 'تعطيل' : 'تفعيل'} aria-label={station.isActive ? 'تعطيل المحطة' : 'تفعيل المحطة'}>
+                  <button onClick={() => handleToggleActive(station)} className={`p-2 rounded-lg ${station.isActive ? 'text-accent-light hover:bg-emerald-900/30' : 'text-red-400 hover:bg-red-900/30'}`} title={station.isActive ? 'تعطيل' : 'تفعيل'} aria-label={station.isActive ? 'تعطيل المحطة' : 'تفعيل المحطة'}>
                     {station.isActive ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
-                  <button onClick={() => handleToggleFeatured(station)} className={`p-2 rounded-lg ${station.isFeatured ? 'text-yellow-400 hover:bg-yellow-900/30' : 'text-slate-400 hover:bg-slate-700'}`} title={station.isFeatured ? 'إزالة من المميزة' : 'تمييز'} aria-label={station.isFeatured ? 'إزالة من المميزة' : 'تمييز المحطة'}>
+                  <button onClick={() => handleToggleFeatured(station)} className={`p-2 rounded-lg ${station.isFeatured ? 'text-yellow-400 hover:bg-yellow-900/30' : 'text-slate-400 hover:bg-admin-surface-light'}`} title={station.isFeatured ? 'إزالة من المميزة' : 'تمييز'} aria-label={station.isFeatured ? 'إزالة من المميزة' : 'تمييز المحطة'}>
                     ⭐
                   </button>
-                  <button onClick={() => openEdit(station)} className="p-2 hover:bg-slate-700 rounded-lg text-slate-400" title="تعديل" aria-label="تعديل المحطة"><Edit2 size={16} /></button>
-                  <button onClick={() => openEdit({ ...station, id: `radio_${Date.now()}`, name: station.name + ' (نسخة)', order: stations.length })} className="p-2 hover:bg-emerald-700/30 rounded-lg text-emerald-400" title="تكرار" aria-label="تكرار المحطة"><Copy size={16} /></button>
-                  <button onClick={() => handleDelete(station.id)} className="p-2 hover:bg-red-900/50 rounded-lg text-red-400" title="حذف" aria-label="حذف المحطة"><Trash2 size={16} /></button>
+                  <button onClick={() => openEdit(station)} className="p-2 hover:bg-admin-surface-light rounded-lg text-slate-400 hover:text-white transition-colors" title="تعديل" aria-label="تعديل المحطة"><Edit2 size={16} /></button>
+                  <button onClick={() => openEdit({ ...station, id: `radio_${Date.now()}`, name: station.name + ' (نسخة)', order: stations.length })} className="p-2 hover:bg-emerald-900/40 rounded-lg text-accent-light transition-colors" title="تكرار" aria-label="تكرار المحطة"><Copy size={16} /></button>
+                  {deleteConfirmId === station.id ? (
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleDelete(station.id)} className="px-2 py-1 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors">تأكيد الحذف</button>
+                      <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-1 bg-admin-surface-light text-slate-300 rounded-lg text-xs hover:bg-slate-600 transition-colors">إلغاء</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteConfirmId(station.id)} className="p-2 hover:bg-red-900/50 rounded-lg text-red-400 transition-colors" title="حذف" aria-label="حذف المحطة"><Trash2 size={16} /></button>
+                  )}
                 </div>
               </div>
             </div>
@@ -369,10 +392,10 @@ const RadioManager: React.FC = () => {
       {/* Edit Modal */}
       {isModalOpen && editingStation && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-admin-bg rounded-2xl border border-admin-border w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                <Radio size={20} className="text-emerald-400" />
+                <Radio size={20} className="text-accent-light" />
                 {editingStation.addedAt ? 'تعديل المحطة' : 'إضافة محطة جديدة'}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white" title="إغلاق" aria-label="إغلاق"><X size={20} /></button>
@@ -383,11 +406,11 @@ const RadioManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الاسم بالعربية *</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" dir="rtl" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="إذاعة القرآن الكريم" aria-label="الاسم بالعربية" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" dir="rtl" value={editingStation.name} onChange={e => setEditingStation({ ...editingStation, name: e.target.value })} placeholder="إذاعة القرآن الكريم" aria-label="الاسم بالعربية" />
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الاسم بالإنجليزية</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingStation.nameEn || ''} onChange={e => setEditingStation({ ...editingStation, nameEn: e.target.value })} placeholder="Quran Radio" aria-label="الاسم بالإنجليزية" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingStation.nameEn || ''} onChange={e => setEditingStation({ ...editingStation, nameEn: e.target.value })} placeholder="Quran Radio" aria-label="الاسم بالإنجليزية" />
                 </div>
               </div>
 
@@ -395,14 +418,14 @@ const RadioManager: React.FC = () => {
               <div>
                 <label className="text-slate-300 text-sm block mb-1">رابط البث المباشر *</label>
                 <div className="flex gap-2">
-                  <input className="flex-1 bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 font-mono text-sm" dir="ltr" value={editingStation.streamUrl} onChange={e => setEditingStation({ ...editingStation, streamUrl: e.target.value })} placeholder="https://stream.example.com/live" aria-label="رابط البث المباشر" />
+                  <input className="flex-1 bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border font-mono text-sm" dir="ltr" value={editingStation.streamUrl} onChange={e => setEditingStation({ ...editingStation, streamUrl: e.target.value })} placeholder="https://stream.example.com/live" aria-label="رابط البث المباشر" />
                   {editingStation.streamUrl && (
                     <button
                       onClick={() => togglePreview(editingStation.streamUrl)}
                       className={`px-3 py-2 rounded-lg flex items-center gap-1 text-sm ${
                         previewUrl === editingStation.streamUrl && isPlaying
                           ? 'bg-red-600 text-white'
-                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          : 'bg-accent-dark text-white hover:bg-accent-dark'
                       }`}
                     >
                       {previewUrl === editingStation.streamUrl && isPlaying ? <><Pause size={14} /> إيقاف</> : <><Play size={14} /> تشغيل</>}
@@ -415,7 +438,7 @@ const RadioManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">الفئة *</label>
-                  <select className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingStation.category} onChange={e => setEditingStation({ ...editingStation, category: e.target.value as RadioCategory })} title="الفئة" aria-label="الفئة">
+                  <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingStation.category} onChange={e => setEditingStation({ ...editingStation, category: e.target.value as RadioCategory })} title="الفئة" aria-label="الفئة">
                     {CATEGORIES.map(c => (
                       <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
                     ))}
@@ -423,7 +446,7 @@ const RadioManager: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">البلد</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" dir="rtl" value={editingStation.country || ''} onChange={e => setEditingStation({ ...editingStation, country: e.target.value })} placeholder="السعودية" aria-label="البلد" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" dir="rtl" value={editingStation.country || ''} onChange={e => setEditingStation({ ...editingStation, country: e.target.value })} placeholder="السعودية" aria-label="البلد" />
                 </div>
               </div>
 
@@ -431,18 +454,18 @@ const RadioManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">اللغة</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingStation.language || ''} onChange={e => setEditingStation({ ...editingStation, language: e.target.value })} placeholder="ar" aria-label="اللغة" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingStation.language || ''} onChange={e => setEditingStation({ ...editingStation, language: e.target.value })} placeholder="ar" aria-label="اللغة" />
                 </div>
                 <div>
                   <label className="text-slate-300 text-sm block mb-1">رابط الصورة</label>
-                  <input className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700 font-mono text-sm" dir="ltr" value={editingStation.imageUrl || ''} onChange={e => setEditingStation({ ...editingStation, imageUrl: e.target.value })} placeholder="https://..." aria-label="رابط الصورة" />
+                  <input className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border font-mono text-sm" dir="ltr" value={editingStation.imageUrl || ''} onChange={e => setEditingStation({ ...editingStation, imageUrl: e.target.value })} placeholder="https://..." aria-label="رابط الصورة" />
                 </div>
               </div>
 
               {/* Description */}
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الوصف</label>
-                <textarea className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" rows={2} dir="rtl" value={editingStation.description || ''} onChange={e => setEditingStation({ ...editingStation, description: e.target.value })} placeholder="وصف مختصر للمحطة" aria-label="الوصف" />
+                <textarea className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" rows={2} dir="rtl" value={editingStation.description || ''} onChange={e => setEditingStation({ ...editingStation, description: e.target.value })} placeholder="وصف مختصر للمحطة" aria-label="الوصف" />
               </div>
 
               {/* Toggles */}
@@ -460,7 +483,7 @@ const RadioManager: React.FC = () => {
               {/* Order */}
               <div>
                 <label className="text-slate-300 text-sm block mb-1">الترتيب</label>
-                <input type="number" min={0} className="w-32 bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={editingStation.order} onChange={e => setEditingStation({ ...editingStation, order: Number(e.target.value) })} placeholder="0" title="الترتيب" aria-label="الترتيب" />
+                <input type="number" min={0} className="w-32 bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={editingStation.order} onChange={e => setEditingStation({ ...editingStation, order: Number(e.target.value) })} placeholder="0" title="الترتيب" aria-label="الترتيب" />
               </div>
             </div>
 
@@ -468,11 +491,11 @@ const RadioManager: React.FC = () => {
               <button
                 onClick={() => handleSave(editingStation)}
                 disabled={!editingStation.name || !editingStation.streamUrl}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Save size={16} /> حفظ المحطة
               </button>
-              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">إلغاء</button>
+              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">إلغاء</button>
             </div>
           </div>
         </div>
@@ -481,36 +504,46 @@ const RadioManager: React.FC = () => {
       {/* Config Modal */}
       {isConfigOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setIsConfigOpen(false)}>
-          <div className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-admin-bg rounded-2xl border border-admin-border w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold text-lg">⚙️ إعدادات الراديو</h2>
               <button onClick={() => setIsConfigOpen(false)} className="text-slate-400 hover:text-white" title="إغلاق" aria-label="إغلاق"><X size={20} /></button>
             </div>
 
             <div className="space-y-3">
+              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                <input type="checkbox" checked={config.enabled} onChange={e => setConfig({ ...config, enabled: e.target.checked })} className="w-4 h-4 accent-emerald-500" />
+                تفعيل ميزة الراديو
+              </label>
               <div>
                 <label className="text-slate-300 text-sm block mb-1">مدة التخزين المؤقت (بالدقائق)</label>
-                <input type="number" min={5} max={1440} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={config.cacheMinutes} onChange={e => setConfig({ ...config, cacheMinutes: Number(e.target.value) })} placeholder="60" title="مدة التخزين المؤقت" aria-label="مدة التخزين المؤقت" />
+                <input type="number" min={5} max={1440} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={config.cacheTTLMinutes} onChange={e => setConfig({ ...config, cacheTTLMinutes: Number(e.target.value) })} placeholder="60" title="مدة التخزين المؤقت" aria-label="مدة التخزين المؤقت" />
               </div>
               <div>
-                <label className="text-slate-300 text-sm block mb-1">حد المحطات المميزة</label>
-                <input type="number" min={1} max={50} className="w-full bg-slate-800 text-white rounded-lg px-4 py-2 border border-slate-700" value={config.featuredStationsLimit} onChange={e => setConfig({ ...config, featuredStationsLimit: Number(e.target.value) })} placeholder="10" title="حد المحطات المميزة" aria-label="حد المحطات المميزة" />
+                <label className="text-slate-300 text-sm block mb-1">أقصى عدد محطات لكل مصدر</label>
+                <input type="number" min={1} max={200} className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={config.maxStationsPerSource} onChange={e => setConfig({ ...config, maxStationsPerSource: Number(e.target.value) })} placeholder="50" title="أقصى عدد محطات لكل مصدر" aria-label="أقصى عدد محطات لكل مصدر" />
+              </div>
+              <div>
+                <label className="text-slate-300 text-sm block mb-1">الفئة الافتراضية</label>
+                <select className="w-full bg-admin-surface text-white rounded-lg px-4 py-2 border border-admin-border" value={config.defaultCategory} onChange={e => setConfig({ ...config, defaultCategory: e.target.value as RadioCategory })} title="الفئة الافتراضية" aria-label="الفئة الافتراضية">
+                  {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.icon} {c.label}</option>)}
+                </select>
               </div>
               <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                <input type="checkbox" checked={config.enableExternalSources} onChange={e => setConfig({ ...config, enableExternalSources: e.target.checked })} className="w-4 h-4 accent-emerald-500" />
-                تفعيل المصادر الخارجية (MP3Quran, RadioBrowser)
+                <input type="checkbox" checked={config.showMp3Quran} onChange={e => setConfig({ ...config, showMp3Quran: e.target.checked })} className="w-4 h-4 accent-emerald-500" />
+                عرض محطات MP3Quran
               </label>
               <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
-                <input type="checkbox" checked={config.showInactiveInApp} onChange={e => setConfig({ ...config, showInactiveInApp: e.target.checked })} className="w-4 h-4 accent-emerald-500" />
-                عرض المحطات المعطلة في التطبيق
+                <input type="checkbox" checked={config.showRadioBrowser} onChange={e => setConfig({ ...config, showRadioBrowser: e.target.checked })} className="w-4 h-4 accent-emerald-500" />
+                عرض محطات RadioBrowser
               </label>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={handleSaveConfig} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700">
+              <button onClick={handleSaveConfig} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark">
                 <Save size={16} /> حفظ الإعدادات
               </button>
-              <button onClick={() => setIsConfigOpen(false)} className="px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">إلغاء</button>
+              <button onClick={() => setIsConfigOpen(false)} className="px-4 py-2.5 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">إلغاء</button>
             </div>
           </div>
         </div>

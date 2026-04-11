@@ -33,11 +33,9 @@ export function useColors() {
   const { themeConfig } = useThemeConfig();
   
   // Merge: hardcoded defaults → admin Firestore overrides
-  // IMPORTANT: Never override 'primary' — it is the brand color (#0d8e62) and must remain constant
   const adminOverrides = isDarkMode ? themeConfig?.dark : themeConfig?.light;
   const baseColors = isDarkMode ? DarkColorsExtended : LightColors;
-  const { primary: _adminPrimary, ...safeOverrides } = adminOverrides ?? {};
-  const colors = adminOverrides ? { ...baseColors, ...safeOverrides } : baseColors;
+  const colors = adminOverrides ? { ...baseColors, ...adminOverrides } : baseColors;
 
   // Override text colors when a background is active
   const appBg = settings.display.appBackground;

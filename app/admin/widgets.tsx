@@ -65,7 +65,7 @@ interface WidgetTemplate {
 // -----------------------------------------------------------
 
 const WIDGET_TYPES_BASE: { key: WidgetType; icon: string; color: string }[] = [
-  { key: 'ayah', icon: 'book', color: '#22C55E' },
+  { key: 'ayah', icon: 'book', color: '#0d8e62' },
   { key: 'azkar', icon: 'moon', color: '#3B82F6' },
   { key: 'hijri', icon: 'calendar', color: '#F59E0B' },
   { key: 'custom', icon: 'construct', color: '#8B5CF6' },
@@ -354,7 +354,7 @@ export default function WidgetsScreen() {
       : '';
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
             <View style={[styles.typeBadge, { backgroundColor: cfg.color + '20' }]}>
@@ -364,26 +364,26 @@ export default function WidgetsScreen() {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: item.isActive ? '#22C55E20' : '#EF444420' },
+                { backgroundColor: item.isActive ? '#0d8e6220' : '#EF444420' },
               ]}
             >
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: item.isActive ? '#22C55E' : '#EF4444' },
+                  { backgroundColor: item.isActive ? '#0d8e62' : '#EF4444' },
                 ]}
               />
               <Text
                 style={[
                   styles.statusText,
-                  { color: item.isActive ? '#22C55E' : '#EF4444' },
+                  { color: item.isActive ? '#0d8e62' : '#EF4444' },
                 ]}
               >
                 {item.isActive ? t('admin.active') : t('admin.draft')}
               </Text>
             </View>
           </View>
-          <Text style={styles.cardTitle}>{item.name}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{item.name}</Text>
           {updatedStr ? (
             <Text style={styles.cardDate}>{t('admin.lastUpdated')}: {updatedStr}</Text>
           ) : null}
@@ -402,14 +402,14 @@ export default function WidgetsScreen() {
           <TouchableOpacity
             style={[
               styles.actionBtn,
-              { backgroundColor: item.isActive ? '#EF444415' : '#22C55E15' },
+              { backgroundColor: item.isActive ? '#EF444415' : '#0d8e6215' },
             ]}
             onPress={() => handleToggleActive(item)}
           >
             <Ionicons
               name={item.isActive ? 'pause-outline' : 'play-outline'}
               size={18}
-              color={item.isActive ? '#EF4444' : '#22C55E'}
+              color={item.isActive ? '#EF4444' : '#0d8e62'}
             />
           </TouchableOpacity>
           <TouchableOpacity
@@ -447,10 +447,10 @@ export default function WidgetsScreen() {
   // ------ Main render ------
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
+    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('admin.widgetTitle')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('admin.widgetTitle')}</Text>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Ionicons name="add" size={20} color="#fff" />
           <Text style={styles.addButtonText}>{t('admin.addNew')}</Text>
@@ -480,7 +480,7 @@ export default function WidgetsScreen() {
 
       {/* Create / Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView edges={['top']} style={styles.modalContainer}>
+        <SafeAreaView edges={['top']} style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           {/* Modal header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeModal}>
@@ -500,7 +500,7 @@ export default function WidgetsScreen() {
             {/* Template name */}
             <Text style={styles.label}>{t('admin.templateName')}</Text>
             <TextInput
-              style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+              style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
               value={name}
               onChangeText={setName}
               placeholder="مثال: ويدجت الآية اليومية"
@@ -539,7 +539,7 @@ export default function WidgetsScreen() {
             {/* SVG Source */}
             <Text style={styles.label}>{t('admin.svgCode')}</Text>
             <TextInput
-              style={[styles.input, styles.svgInput, { textAlign: isRTL ? 'right' : 'left' }]}
+              style={[styles.input, styles.svgInput, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
               value={svgSource}
               onChangeText={setSvgSource}
               placeholder={'<svg ...>\n  <text id="title">{{random_ayah}}</text>\n</svg>'}
@@ -566,7 +566,7 @@ export default function WidgetsScreen() {
                   </TouchableOpacity>
                 </View>
                 <TextInput
-                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left' }]}
+                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                   value={m.nodeSelector}
                   onChangeText={(v) => updateMapping(index, 'nodeSelector', v)}
                   placeholder='مثال: #title-text'
@@ -589,7 +589,7 @@ export default function WidgetsScreen() {
 
                 <Text style={styles.mappingLabel}>{t('admin.fallbackValue')}</Text>
                 <TextInput
-                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left' }]}
+                  style={[styles.mappingInput, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                   value={m.fallback}
                   onChangeText={(v) => updateMapping(index, 'fallback', v)}
                   placeholder="قيمة احتياطية"
@@ -977,7 +977,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     overflow: 'hidden',
     alignSelf: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#eaeaea',
   },
   previewWebView: {
     flex: 1,

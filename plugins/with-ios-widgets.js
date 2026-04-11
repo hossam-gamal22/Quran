@@ -5,7 +5,6 @@
 const {
   withXcodeProject,
   withEntitlementsPlist,
-  withInfoPlist,
   IOSConfig,
 } = require('expo/config-plugins');
 const path = require('path');
@@ -13,8 +12,24 @@ const fs = require('fs');
 
 const WIDGET_EXTENSION_NAME = 'RoohAlMuslimWidgets';
 const WIDGET_BUNDLE_ID = 'com.rooh.almuslim.widgets';
-const APP_GROUP_ID = 'group.com.roohmuslim.app';
-const DEPLOYMENT_TARGET = '16.0';
+const APP_GROUP_ID = 'group.com.rooh.almuslim';
+const DEPLOYMENT_TARGET = '16.1';
+
+// Recursively copy a directory
+function copyDirectorySync(src, dest) {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirectorySync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 
 // Swift source files for the widget extension
 const WIDGET_SWIFT_FILES = [
@@ -24,6 +39,12 @@ const WIDGET_SWIFT_FILES = [
   'AzkarWidget.swift',
   'DhikrWidget.swift',
   'HijriDateWidget.swift',
+  'PrayerLiveActivity.swift',
+];
+
+// Shared Swift files compiled into BOTH main app and widget extension
+const SHARED_SWIFT_FILES = [
+  'SharedActivityAttributes.swift',
 ];
 
 /**
@@ -55,6 +76,23 @@ const withIOSWidgets = (config) => {
       if (fs.existsSync(src)) {
         fs.copyFileSync(src, dst);
       }
+    }
+
+    // Copy SharedActivityAttributes.swift into the widget extension directory
+    // so both targets compile it (sourced from plugins/live-activities-native/)
+    for (const fileName of SHARED_SWIFT_FILES) {
+      const src = path.join(projectRoot, 'plugins', 'live-activities-native', fileName);
+      const dst = path.join(widgetDir, fileName);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
+    // Copy Assets.xcassets (widget icon) from widgets/ios/ to ios/RoohAlMuslimWidgets/
+    const assetsSource = path.join(sourceDir, 'Assets.xcassets');
+    const assetsDest = path.join(widgetDir, 'Assets.xcassets');
+    if (fs.existsSync(assetsSource)) {
+      copyDirectorySync(assetsSource, assetsDest);
     }
 
     // Create widget entitlements file
@@ -96,6 +134,8 @@ const withIOSWidgets = (config) => {
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
@@ -110,7 +150,7 @@ const withIOSWidgets = (config) => {
 
     // Create PBXGroup for widget files (all files including Swift sources)
     const widgetGroup = xcodeProject.addPbxGroup(
-      [...WIDGET_SWIFT_FILES, `${WIDGET_EXTENSION_NAME}.entitlements`, 'Info.plist'],
+      [...WIDGET_SWIFT_FILES, ...SHARED_SWIFT_FILES, 'Assets.xcassets', `${WIDGET_EXTENSION_NAME}.entitlements`, 'Info.plist'],
       groupName,
       groupName
     );
@@ -196,7 +236,7 @@ const withIOSWidgets = (config) => {
     const groupChildren = objects['PBXGroup'][widgetGroup.uuid].children;
     for (const child of groupChildren) {
       const fileName = child.comment;
-      if (!WIDGET_SWIFT_FILES.includes(fileName)) continue;
+      if (!WIDGET_SWIFT_FILES.includes(fileName) && !SHARED_SWIFT_FILES.includes(fileName)) continue;
 
       const buildFileUuid = xcodeProject.generateUuid();
       objects['PBXBuildFile'][buildFileUuid] = {
@@ -212,8 +252,27 @@ const withIOSWidgets = (config) => {
       });
     }
 
-    // Add WidgetKit and SwiftUI frameworks to widget target
-    const frameworkNames = ['WidgetKit.framework', 'SwiftUI.framework'];
+    // Add Assets.xcassets to the widget target's Resources build phase
+    for (const child of groupChildren) {
+      if (child.comment === 'Assets.xcassets') {
+        const assetsBuildFileUuid = xcodeProject.generateUuid();
+        objects['PBXBuildFile'][assetsBuildFileUuid] = {
+          isa: 'PBXBuildFile',
+          fileRef: child.value,
+          fileRef_comment: 'Assets.xcassets',
+        };
+        objects['PBXBuildFile'][`${assetsBuildFileUuid}_comment`] = 'Assets.xcassets in Resources';
+
+        objects['PBXResourcesBuildPhase'][resourcesBuildPhaseUuid].files.push({
+          value: assetsBuildFileUuid,
+          comment: 'Assets.xcassets in Resources',
+        });
+        break;
+      }
+    }
+
+    // Add WidgetKit, SwiftUI, and ActivityKit frameworks to widget target
+    const frameworkNames = ['WidgetKit.framework', 'SwiftUI.framework', 'ActivityKit.framework'];
     for (const fwName of frameworkNames) {
       const fwRefUuid = xcodeProject.generateUuid();
       objects['PBXFileReference'][fwRefUuid] = {
@@ -299,7 +358,7 @@ const withIOSWidgets = (config) => {
             bs.TARGETED_DEVICE_FAMILY = '"1,2"';
             bs.CODE_SIGN_ENTITLEMENTS = `${WIDGET_EXTENSION_NAME}/${WIDGET_EXTENSION_NAME}.entitlements`;
             bs.CODE_SIGN_STYLE = 'Automatic';
-            bs.CODE_SIGN_IDENTITY = '"-"';
+            bs.DEVELOPMENT_TEAM = 'UDCBW35NWT';
             bs.INFOPLIST_FILE = `${WIDGET_EXTENSION_NAME}/Info.plist`;
             bs.LD_RUNPATH_SEARCH_PATHS = '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"';
             bs.PRODUCT_BUNDLE_IDENTIFIER = WIDGET_BUNDLE_ID;
@@ -307,6 +366,7 @@ const withIOSWidgets = (config) => {
             bs.GENERATE_INFOPLIST_FILE = 'NO';
             bs.CURRENT_PROJECT_VERSION = '1';
             bs.MARKETING_VERSION = '1.0';
+            bs.ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = 'YES';
           }
         }
       }

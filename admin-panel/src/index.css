@@ -12,3 +12,218 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   direction: rtl;
 }
+
+/* ==================== Admin Panel Component Classes ==================== */
+@layer components {
+  /* Cards & Containers */
+  .card-admin {
+    @apply bg-admin-surface rounded-2xl border border-admin-border p-6;
+  }
+  
+  .card-admin-sm {
+    @apply bg-admin-surface rounded-xl border border-admin-border p-4;
+  }
+  
+  .card-admin-hover {
+    @apply bg-admin-surface rounded-2xl border border-admin-border p-6 
+           hover:border-accent/50 transition-colors cursor-pointer;
+  }
+
+  /* Input Fields */
+  .input-admin {
+    @apply w-full bg-admin-input text-white rounded-xl border border-admin-border 
+           px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent 
+           outline-none placeholder-slate-500 transition-all;
+  }
+  
+  .input-admin-sm {
+    @apply w-full bg-admin-input text-white rounded-lg border border-admin-border 
+           px-3 py-2 text-sm focus:ring-2 focus:ring-accent focus:border-transparent 
+           outline-none placeholder-slate-500 transition-all;
+  }
+
+  .select-admin {
+    @apply bg-admin-input text-white rounded-xl border border-admin-border 
+           px-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent 
+           outline-none transition-all cursor-pointer;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-dark text-white font-medium 
+           px-6 py-3 rounded-xl transition-colors;
+  }
+  
+  .btn-primary-sm {
+    @apply bg-accent hover:bg-accent-dark text-white font-medium 
+           px-4 py-2 rounded-lg text-sm transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-admin-surface-light hover:bg-slate-600 text-slate-300 
+           font-medium px-6 py-3 rounded-xl transition-colors;
+  }
+  
+  .btn-secondary-sm {
+    @apply bg-admin-surface-light hover:bg-slate-600 text-slate-300 
+           font-medium px-4 py-2 rounded-lg text-sm transition-colors;
+  }
+  
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium 
+           px-6 py-3 rounded-xl transition-colors;
+  }
+  
+  .btn-danger-sm {
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium 
+           px-4 py-2 rounded-lg text-sm transition-colors;
+  }
+  
+  .btn-ghost {
+    @apply text-slate-400 hover:text-white hover:bg-admin-surface-light 
+           px-4 py-2 rounded-xl transition-colors;
+  }
+
+  /* Modal & Overlay */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4;
+  }
+  
+  .modal-content {
+    @apply bg-admin-surface rounded-2xl border border-admin-border 
+           w-full max-h-[90vh] overflow-hidden;
+  }
+  
+  .modal-header {
+    @apply p-6 border-b border-admin-border flex items-center justify-between;
+  }
+  
+  .modal-body {
+    @apply p-6 overflow-y-auto;
+  }
+  
+  .modal-footer {
+    @apply p-6 border-t border-admin-border flex items-center justify-end gap-3;
+  }
+
+  /* Status Badges */
+  .badge-success {
+    @apply bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .badge-error {
+    @apply bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .badge-warning {
+    @apply bg-amber-500/20 text-amber-400 px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .badge-info {
+    @apply bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm font-medium;
+  }
+  
+  .badge-neutral {
+    @apply bg-slate-500/20 text-slate-400 px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  /* Table Styles */
+  .table-admin {
+    @apply w-full;
+  }
+  
+  .table-admin thead {
+    @apply bg-admin-surface-light/50;
+  }
+  
+  .table-admin th {
+    @apply px-6 py-4 text-right text-sm font-semibold text-slate-300;
+  }
+  
+  .table-admin td {
+    @apply px-6 py-4 text-sm text-slate-300 border-t border-admin-border;
+  }
+  
+  .table-admin tbody tr:hover {
+    @apply bg-admin-surface-light/30;
+  }
+
+  /* Page Layout */
+  .page-header {
+    @apply flex items-center justify-between mb-8;
+  }
+  
+  .page-title {
+    @apply text-2xl font-bold text-white;
+  }
+  
+  .page-subtitle {
+    @apply text-slate-400 mt-1;
+  }
+
+  /* Stats Card */
+  .stat-card {
+    @apply bg-admin-surface rounded-2xl border border-admin-border p-6;
+  }
+  
+  .stat-value {
+    @apply text-3xl font-bold text-white;
+  }
+  
+  .stat-label {
+    @apply text-slate-400 text-sm mt-1;
+  }
+
+  /* Empty State */
+  .empty-state {
+    @apply bg-admin-surface rounded-2xl border border-admin-border 
+           p-12 text-center;
+  }
+  
+  .empty-state-icon {
+    @apply w-16 h-16 mx-auto text-slate-600 mb-4;
+  }
+  
+  .empty-state-title {
+    @apply text-lg font-semibold text-slate-400 mb-2;
+  }
+  
+  .empty-state-desc {
+    @apply text-slate-500 text-sm;
+  }
+
+  /* Tabs */
+  .tabs-admin {
+    @apply flex gap-2 bg-admin-surface/50 p-1 rounded-xl border border-admin-border/50;
+  }
+  
+  .tab-admin {
+    @apply px-4 py-2 rounded-lg text-sm font-medium text-slate-400 
+           hover:text-white hover:bg-admin-surface-light transition-colors;
+  }
+  
+  .tab-admin-active {
+    @apply px-4 py-2 rounded-lg text-sm font-medium bg-accent text-white;
+  }
+
+  /* Search Input */
+  .search-admin {
+    @apply w-full bg-admin-input text-white rounded-xl border border-admin-border 
+           pl-10 pr-4 py-3 focus:ring-2 focus:ring-accent focus:border-transparent 
+           outline-none placeholder-slate-500 transition-all;
+  }
+
+  /* Toggle/Switch */
+  .toggle-admin {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full 
+           transition-colors focus:outline-none focus:ring-2 focus:ring-accent;
+  }
+  
+  .toggle-admin-enabled {
+    @apply bg-accent;
+  }
+  
+  .toggle-admin-disabled {
+    @apply bg-admin-surface-light;
+  }
+}

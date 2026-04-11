@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -31,7 +32,7 @@ import { useFavorite } from '@/hooks/use-favorite';
 import { getFavorites } from '@/lib/favorites-manager';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
-const ACCENT = '#8B5CF6'; // Purple accent for quotes page
+const ACCENT = '#FFFFFF';
 
 export default function QuoteOfDayScreen() {
   const router = useRouter();
@@ -39,15 +40,19 @@ export default function QuoteOfDayScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const params = useLocalSearchParams<{ favId?: string }>();
   const [quote, setQuote] = useState<IslamicQuote>(() => getQuoteOfTheDay());
+  const [adminTranslations, setAdminTranslations] = useState<Record<string, string> | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined);
   const language = getLanguage();
   const isArabic = language === 'ar';
   const isEnglish = language === 'en';
   const translatedQuoteText = useAutoTranslate(quote.arabic, 'ar', 'section');
   const translatedQuoteTrans = useAutoTranslate(quote.translation || '', 'en', 'section');
+  // Prefer admin-provided translation for user's language, then fall back to existing logic
+  const resolvedTranslation = (!isArabic && adminTranslations?.[language]) || null;
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `quote_${quote.author}`,
@@ -83,6 +88,7 @@ export default function QuoteOfDayScreen() {
       getDailyQuoteOverride().then(({ data }) => {
         if (data) {
           setQuote({ arabic: data.arabic, translation: data.translation, author: data.author, source: data.source });
+          if ((data as any).translations) setAdminTranslations((data as any).translations);
         }
       });
     }
@@ -141,14 +147,14 @@ export default function QuoteOfDayScreen() {
           </View>
 
           {/* Quote text — Arabic for Arabic users, translation for others */}
-          <GlassCard intensity={46} style={styles.quoteCard}>
+          <GlassCard intensity={80} borderRadius={16} style={styles.quoteCard}>
             {isArabic ? (
               <Text style={[styles.arabicText, { color: colors.text }]}>
                 {quote.arabic}
               </Text>
             ) : (
               <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {isEnglish ? (quote.translation || quote.arabic) : (translatedQuoteTrans || quote.translation || quote.arabic)}
+                {resolvedTranslation || (isEnglish ? (quote.translation || quote.arabic) : (translatedQuoteTrans || quote.translation || quote.arabic))}
               </Text>
             )}
           </GlassCard>
@@ -173,12 +179,12 @@ export default function QuoteOfDayScreen() {
 
           {/* Refresh Button */}
           <TouchableOpacity
-            style={[styles.refreshButton, { backgroundColor: ACCENT, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.refreshButton, { borderColor: ACCENT + '40', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleRefresh}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <MaterialCommunityIcons name="refresh" size={20} color="#FFF" />
-            <Text style={styles.refreshText}>{t('home.anotherWisdom')}</Text>
+            <MaterialCommunityIcons name="refresh" size={20} color={ACCENT} />
+            <Text style={[styles.refreshText, { color: ACCENT }]}>{t('home.anotherWisdom')}</Text>
           </TouchableOpacity>
 
           {/* Bottom Padding */}
@@ -189,7 +195,7 @@ export default function QuoteOfDayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -234,6 +240,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   translationText: {
     fontSize: 15,
@@ -252,21 +260,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontMedium(),
     textAlign: 'center',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 30,
+    borderWidth: 1.5,
     marginTop: 20,
-    alignSelf: 'center',
   },
   refreshText: {
     fontFamily: fontSemiBold(),
     fontSize: 15,
-    color: '#FFF',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

@@ -4,6 +4,8 @@ import Svg, { G, Path, Circle } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 
 type Props = {
@@ -34,6 +36,8 @@ export default function CircularPrayerClock({
   iconSource,
 }: Props) {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   // Circle radius matching mockup proportions (r=76 in 200x200 viewBox)
   const circleRadius = size * 0.38;
   const strokeWidth = 3;
@@ -85,7 +89,7 @@ export default function CircularPrayerClock({
 
   if (useBlur) {
     return (
-      <BlurView intensity={40} tint="default" style={[styles.blurWrap, { width: size, height: size, borderRadius: size / 2 }]}>
+      <BlurView intensity={20} tint="default" style={[styles.blurWrap, { width: size, height: size, borderRadius: size / 2 }]}>
         {container}
       </BlurView>
     );
@@ -94,7 +98,7 @@ export default function CircularPrayerClock({
   return container;
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',

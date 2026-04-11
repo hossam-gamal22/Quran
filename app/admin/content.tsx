@@ -23,7 +23,7 @@ import { t } from '@/lib/i18n';
 type ContentType = 'ayah' | 'hadith' | 'tip' | 'announcement' | 'banner';
 
 const getContentTypes = (): { key: ContentType; label: string; icon: string; color: string }[] => [
-  { key: 'ayah', label: t('admin.typeAyah'), icon: 'book', color: '#22C55E' },
+  { key: 'ayah', label: t('admin.typeAyah'), icon: 'book', color: '#0d8e62' },
   { key: 'hadith', label: t('admin.typeHadith'), icon: 'document-text', color: '#3B82F6' },
   { key: 'tip', label: t('admin.typeTip'), icon: 'bulb', color: '#F59E0B' },
   { key: 'announcement', label: t('admin.typeAnnouncement'), icon: 'megaphone', color: '#EC4899' },
@@ -282,8 +282,8 @@ export default function ContentScreen() {
                     </View>
                   </View>
 
-                  <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{item.titleAr}</Text>
-                  <Text style={[styles.cardContent, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+                  <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.titleAr}</Text>
+                  <Text style={[styles.cardContent, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
                     {item.contentAr}
                   </Text>
 
@@ -366,7 +366,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (عربي) *</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.titleAr}
                 onChangeText={(value) => setFormData({ ...formData, titleAr: value })}
                 placeholder="عنوان المحتوى"
@@ -377,7 +377,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.title}
                 onChangeText={(value) => setFormData({ ...formData, title: value })}
                 placeholder="Content Title"
@@ -388,7 +388,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>المحتوى (عربي) *</Text>
               <TextInput
-                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.contentAr}
                 onChangeText={(value) => setFormData({ ...formData, contentAr: value })}
                 placeholder="نص المحتوى..."
@@ -401,7 +401,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>المحتوى (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.content}
                 onChangeText={(value) => setFormData({ ...formData, content: value })}
                 placeholder="Content text..."
@@ -414,7 +414,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.imageUrl}
                 onChangeText={(value) => setFormData({ ...formData, imageUrl: value })}
                 placeholder="https://..."
@@ -425,7 +425,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط خارجي (اختياري)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.linkUrl}
                 onChangeText={(value) => setFormData({ ...formData, linkUrl: value })}
                 placeholder="https://..."
@@ -436,7 +436,7 @@ export default function ContentScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>الأولوية (1-10)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={String(formData.priority)}
                 onChangeText={(value) =>
                   setFormData({ ...formData, priority: parseInt(value) || 1 })

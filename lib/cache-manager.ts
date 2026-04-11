@@ -25,6 +25,10 @@ const PRESERVED_KEYS = [
   '@khatma_data',
   '@worship_data',
   '@quran_tracked_pages_khatma',
+  // User identity & score — must never be cleared on update
+  '@rooh_user_id',
+  '@pending_monthly_scores',
+  '@rewards_config_cache',
 ];
 
 const PRESERVED_PREFIXES = [
@@ -32,6 +36,8 @@ const PRESERVED_PREFIXES = [
   '@khatma_',
   '@bookmark_',
   '@favorite_',
+  '@reward_applied_',
+  '@winners_processed_',
 ];
 
 function isPreservedKey(key: string): boolean {

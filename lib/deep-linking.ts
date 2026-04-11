@@ -19,9 +19,9 @@ export const DEEP_LINK_ROUTES = {
   // Widget deep links
   dailyAyah: `${URL_SCHEME}://daily-ayah`,
   hijri: `${URL_SCHEME}://hijri`,
-  azkarMorning: `${URL_SCHEME}://azkar/morning`,
-  azkarEvening: `${URL_SCHEME}://azkar/evening`,
-  azkarSleep: `${URL_SCHEME}://azkar/sleep`,
+  azkarMorning: `${URL_SCHEME}://azkar/1`,
+  azkarEvening: `${URL_SCHEME}://azkar/1b`,
+  azkarSleep: `${URL_SCHEME}://azkar/2`,
   prayer: `${URL_SCHEME}://prayer`,
   qibla: `${URL_SCHEME}://qibla`,
 

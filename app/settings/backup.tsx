@@ -8,12 +8,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   Alert,
   ActivityIndicator,
   Share,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,53 +27,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { t, getDateLocale } from '@/lib/i18n';
-
-// ========================================
-// الثوابت
-// ========================================
-
-const BACKUP_VERSION = '2.0';
-const BACKUP_FILENAME = 'rooh_muslim_backup';
-
-// Keys to exclude from backup/restore (device-specific or sensitive)
-const EXCLUDED_KEYS = [
-  '@fcm_token',
-  '@rooh_fcm_token',
-  '@device_registered',
-  '@rooh_user_id',
-  '@rooh_first_open',
-  '@app_version',
-  'auth_token',
-  'last_backup_date',
-  // Cache keys that regenerate automatically
-  '@quran_cache_timestamp',
-  '@sound_settings_cache',
-  'ads_config_cache',
-  'remote_app_config',
-  'dynamic_backgrounds',
-  'sdui_screen_configs',
-  'home_page_config',
-  'performance_data',
-  'cache_index',
-  'image_cache_index',
-  'current_session',
-  'seasonal_content_cache',
-  'seasonal_last_update',
-  'cached_api_data',
-];
-
-interface BackupData {
-  version: string;
-  createdAt: string;
-  device: string;
-  keyCount?: number;
-  data: Record<string, any>;
-}
+import {
+  BACKUP_VERSION,
+  BACKUP_FILENAME,
+  EXCLUDED_KEYS,
+  gatherBackupData,
+  restoreBackupData,
+  formatSize,
+} from '@/lib/backup-utils';
+import { getMonthlyActivityStats } from '@/lib/worship-storage';
+import type { BackupData } from '@/lib/backup-utils';
+import {
+  uploadToCloud,
+  downloadFromCloud,
+  getCloudBackupMeta,
+} from '@/lib/cloud-sync';
+import type { CloudBackupMeta } from '@/lib/cloud-sync';
+import * as Auth from '@/lib/_core/auth';
 
 interface BackupInfo {
   exists: boolean;
@@ -107,10 +83,11 @@ const ActionCard: React.FC<ActionCardProps> = ({
   isDarkMode,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <TouchableOpacity
-      style={[styles.actionCard, isDarkMode && styles.actionCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      style={[styles.actionCard, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
       onPress={() => {
         if (!isLoading) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -130,13 +107,13 @@ const ActionCard: React.FC<ActionCardProps> = ({
         )}
       </View>
       <View style={[styles.actionContent, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
-        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subtitle}</Text>
+        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
+        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subtitle}</Text>
       </View>
       <MaterialCommunityIcons
         name={isRTL ? 'chevron-left' : 'chevron-right'}
         size={24}
-        color={isDarkMode ? '#666' : '#ccc'}
+        color={colors.textLight}
       />
     </TouchableOpacity>
   );
@@ -150,10 +127,11 @@ interface InfoRowProps {
 
 const InfoRow: React.FC<InfoRowProps> = ({ label, value, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
-    <View style={[styles.infoRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-      <Text style={[styles.infoLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{label}</Text>
+    <View style={[styles.infoRow, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
+      <Text style={[styles.infoLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{label}</Text>
       <Text style={[styles.infoValue, { color: colors.text, textAlign: isRTL ? 'left' : 'right' }]}>{value}</Text>
     </View>
   );
@@ -168,9 +146,15 @@ export default function BackupScreen() {
   const router = useRouter();
   const { settings, isDarkMode, exportSettings, importSettings, reloadSettings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { resetOnboarding } = useOnboarding();
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [authUser, setAuthUser] = useState<Auth.User | null>(null);
+  const [cloudMeta, setCloudMeta] = useState<CloudBackupMeta | null>(null);
+  const [estimatedSize, setEstimatedSize] = useState<string | null>(null);
   const [lastBackup, setLastBackup] = useState<BackupInfo>({
     exists: false,
     date: null,
@@ -179,13 +163,17 @@ export default function BackupScreen() {
   const [dataStats, setDataStats] = useState({
     bookmarks: 0,
     khatmas: 0,
-    worshipDays: 0,
-    quranProgress: 0,
+    prayers: 0,
+    quranPages: 0,
+    azkar: 0,
+    tasbih: 0,
   });
 
   useEffect(() => {
     loadBackupInfo();
     loadDataStats();
+    loadAuthAndCloudMeta();
+    loadEstimatedSize();
   }, []);
 
   const loadBackupInfo = async () => {
@@ -207,62 +195,153 @@ export default function BackupScreen() {
     try {
       const bookmarks = await AsyncStorage.getItem('@quran_bookmarks');
       const khatmas = await AsyncStorage.getItem('@rooh_muslim_khatmas');
-      const worship = await AsyncStorage.getItem('worship_prayer_records');
-      const quranLastRead = await AsyncStorage.getItem('@quran_last_read');
 
       let bookmarkCount = 0;
       try { bookmarkCount = bookmarks ? JSON.parse(bookmarks).length : 0; } catch { }
       let khatmaCount = 0;
       try { khatmaCount = khatmas ? JSON.parse(khatmas).length : 0; } catch { }
-      let worshipCount = 0;
-      try { worshipCount = worship ? Object.keys(JSON.parse(worship)).length : 0; } catch { }
-      let lastPage = 0;
-      try {
-        if (quranLastRead) {
-          const parsed = JSON.parse(quranLastRead);
-          lastPage = parsed.page || parsed.lastPage || 0;
-        }
-      } catch { }
+
+      // Use the same source of truth as honor board (current month)
+      const monthlyStats = await getMonthlyActivityStats();
 
       setDataStats({
         bookmarks: bookmarkCount,
         khatmas: khatmaCount,
-        worshipDays: worshipCount,
-        quranProgress: lastPage,
+        prayers: monthlyStats.prayers,
+        quranPages: monthlyStats.quranPages,
+        azkar: monthlyStats.azkar,
+        tasbih: monthlyStats.tasbih,
       });
     } catch (error) {
       console.error('Error loading data stats:', error);
     }
   };
 
-  const gatherAllData = async (): Promise<BackupData> => {
-    const keys = await AsyncStorage.getAllKeys();
-    const data: Record<string, any> = {};
-
-    for (const key of keys) {
-      if (EXCLUDED_KEYS.includes(key)) continue;
-      try {
-        const value = await AsyncStorage.getItem(key);
-        if (value !== null) {
-          try {
-            data[key] = JSON.parse(value);
-          } catch {
-            data[key] = value;
-          }
-        }
-      } catch {
-        // Skip unreadable keys
+  const loadAuthAndCloudMeta = async () => {
+    try {
+      const user = await Auth.getUserInfo();
+      setAuthUser(user);
+      if (user?.openId) {
+        const meta = await getCloudBackupMeta(user.openId);
+        setCloudMeta(meta);
       }
+    } catch (error) {
+      console.error('Error loading auth/cloud meta:', error);
+    }
+  };
+
+  const loadEstimatedSize = async () => {
+    try {
+      const data = await gatherBackupData();
+      const jsonStr = JSON.stringify(data);
+      const bytes = new Blob([jsonStr]).size;
+      setEstimatedSize(formatSize(bytes));
+    } catch {
+      // ignore
+    }
+  };
+
+  // ========================================
+  // Cloud Sync Functions
+  // ========================================
+
+  const handleUploadToCloud = async () => {
+    if (!authUser?.openId) {
+      Alert.alert(t('backup.loginRequired'), t('backup.loginRequiredMsg'));
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const result = await uploadToCloud(authUser.openId);
+      if (result.success && result.meta) {
+        setCloudMeta(result.meta);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          t('settings.success'),
+          `${t('backup.uploadSuccess')}\n\n📦 ${result.meta.sizeFormatted} • ${result.meta.keyCount} ${t('backup.item')}`
+        );
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      console.error('Cloud upload error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('common.error'), t('backup.uploadError'));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadFromCloud = async () => {
+    if (!authUser?.openId) {
+      Alert.alert(t('backup.loginRequired'), t('backup.loginRequiredMsg'));
+      return;
     }
 
-    return {
-      version: BACKUP_VERSION,
-      createdAt: new Date().toISOString(),
-      device: Platform.OS,
-      keyCount: Object.keys(data).length,
-      data,
-    };
+    // Check if cloud backup exists
+    const meta = await getCloudBackupMeta(authUser.openId);
+    if (!meta) {
+      Alert.alert(t('backup.noCloudBackup'));
+      return;
+    }
+
+    // Conflict resolution: compare timestamps
+    const cloudDate = meta.lastSyncAt?.toDate?.() || new Date(0);
+    const localDateStr = await AsyncStorage.getItem('last_backup_date');
+    const localDate = localDateStr ? new Date(localDateStr) : new Date(0);
+    const isLocalNewer = localDate > cloudDate;
+
+    const message = isLocalNewer
+      ? t('backup.localNewerWarning')
+      : t('backup.confirmCloudRestoreMsg');
+
+    Alert.alert(
+      t('backup.confirmCloudRestore'),
+      `${message}\n\n☁️ ${cloudDate.toLocaleDateString(getDateLocale())} • ${meta.deviceName}\n📦 ${meta.sizeFormatted}`,
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('backup.restore'),
+          style: 'destructive',
+          onPress: performCloudRestore,
+        },
+      ]
+    );
   };
+
+  const performCloudRestore = async () => {
+    if (!authUser?.openId) return;
+    setIsDownloading(true);
+    try {
+      const result = await downloadFromCloud(authUser.openId);
+      if (!result) {
+        Alert.alert(t('backup.noCloudBackup'));
+        return;
+      }
+
+      await loadDataStats();
+      await reloadSettings();
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      const backupDate = new Date(result.backupDate).toLocaleDateString(getDateLocale());
+      const summary = `${t('backup.downloadSuccess')} (${backupDate})\n\n` +
+        `✅ ${result.restored} ${t('backup.keysRestored')}` +
+        (result.failed > 0 ? `\n⚠️ ${result.failed} ${t('backup.keysFailed')}` : '');
+
+      Alert.alert(t('settings.success'), summary, [
+        { text: t('common.ok'), onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      console.error('Cloud restore error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('common.error'), t('backup.downloadError'));
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const gatherAllData = gatherBackupData;
 
   const createBackup = async () => {
     setIsCreatingBackup(true);
@@ -341,66 +420,20 @@ export default function BackupScreen() {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      const backupData: BackupData = JSON.parse(content);
+      let backupData: BackupData;
+      try {
+        backupData = JSON.parse(content);
+      } catch {
+        throw new Error(t('backup.invalidBackupFile'));
+      }
 
-      // التحقق من صحة النسخة
       if (!backupData.version || !backupData.data || typeof backupData.data !== 'object') {
         throw new Error(t('backup.invalidBackupFile'));
       }
 
-      let restored = 0;
-      let failed = 0;
-      const failedKeys: string[] = [];
-
-      if (backupData.version === '2.0') {
-        // V2: Raw dump of all keys
-        const entries = Object.entries(backupData.data);
-        for (const [key, value] of entries) {
-          if (EXCLUDED_KEYS.includes(key)) continue;
-          try {
-            const strValue = typeof value === 'string' ? value : JSON.stringify(value);
-            await AsyncStorage.setItem(key, strValue);
-            restored++;
-          } catch (e) {
-            failed++;
-            failedKeys.push(key);
-            console.warn(`⚠️ Failed to restore key: ${key}`, e);
-          }
-        }
-      } else {
-        // V1 backward compatibility: old categorized format
-        const v1Map: Record<string, string> = {
-          settings: 'app_settings',
-          worship: 'worship_prayer_records',
-          khatma: '@rooh_muslim_khatmas',
-          bookmarks: '@quran_bookmarks',
-        };
-        for (const [dataKey, storageKey] of Object.entries(v1Map)) {
-          if (backupData.data[dataKey]) {
-            try {
-              await AsyncStorage.setItem(storageKey, JSON.stringify(backupData.data[dataKey]));
-              restored++;
-            } catch (e) {
-              failed++;
-              failedKeys.push(storageKey);
-              console.warn(`⚠️ Failed to restore V1 key: ${storageKey}`, e);
-            }
-          }
-        }
-        if (backupData.data.progress?.quran) {
-          try {
-            await AsyncStorage.setItem('@quran_last_read', JSON.stringify(backupData.data.progress.quran));
-            restored++;
-          } catch (e) {
-            failed++;
-            failedKeys.push('@quran_last_read');
-            console.warn('⚠️ Failed to restore V1 quran progress', e);
-          }
-        }
-      }
+      const { restored, failed, failedKeys } = await restoreBackupData(backupData);
 
       await loadDataStats();
-      // Reload settings context to apply restored settings and reschedule notifications
       await reloadSettings();
 
       if (failed > 0) {
@@ -464,8 +497,10 @@ export default function BackupScreen() {
               setDataStats({
                 bookmarks: 0,
                 khatmas: 0,
-                worshipDays: 0,
-                quranProgress: 0,
+                prayers: 0,
+                quranPages: 0,
+                azkar: 0,
+                tasbih: 0,
               });
               setLastBackup({ exists: false, date: null, size: null });
               // إعادة تعيين حالة الـ Onboarding والتوجيه لشاشة الترحيب
@@ -494,10 +529,7 @@ export default function BackupScreen() {
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
       <UniversalHeader title={t('settings.backupRestore')} />
@@ -532,23 +564,65 @@ export default function BackupScreen() {
 
         {/* Data Stats */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.savedData')}</Text>
-          <View style={[styles.statsCard, isDarkMode && styles.statsCardDark]}>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.savedData')}</Text>
+          <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
+            <InfoRow label={t('backup.quranProgress')} value={`${dataStats.quranPages} ${t('backup.page')}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.prayersCount')} value={`${dataStats.prayers}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.azkarCount')} value={`${dataStats.azkar}`} isDarkMode={isDarkMode} />
+            <InfoRow label={t('backup.tasbihCount')} value={`${dataStats.tasbih}`} isDarkMode={isDarkMode} />
             <InfoRow label={t('backup.favoritesAndBookmarks')} value={`${dataStats.bookmarks} ${t('backup.item')}`} isDarkMode={isDarkMode} />
             <InfoRow label={t('backup.khatmasLabel')} value={`${dataStats.khatmas} ${t('backup.khatmaUnit')}`} isDarkMode={isDarkMode} />
-            <InfoRow label={t('backup.worshipDays')} value={`${dataStats.worshipDays} ${t('backup.day')}`} isDarkMode={isDarkMode} />
-            <InfoRow label={t('backup.quranProgress')} value={`${t('backup.page')} ${dataStats.quranProgress}`} isDarkMode={isDarkMode} />
+            {estimatedSize && (
+              <InfoRow label={t('backup.estimatedSize')} value={estimatedSize} isDarkMode={isDarkMode} />
+            )}
           </View>
         </Animated.View>
 
-        {/* Actions */}
+        {/* Cloud Sync Section — only shown when authenticated */}
+        {authUser && (
+          <Animated.View entering={FadeInDown.delay(125).duration(500)}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.cloudSync')}</Text>
+
+            {cloudMeta && (
+              <View style={[styles.statsCard, { backgroundColor: colors.card, marginBottom: 12 }]}>
+                <InfoRow label={t('backup.cloudBackupDate')} value={formatDate(cloudMeta.lastSyncAt?.toDate?.()?.toISOString?.() || null)} isDarkMode={isDarkMode} />
+                <InfoRow label={t('backup.cloudBackupDevice')} value={cloudMeta.deviceName} isDarkMode={isDarkMode} />
+                <InfoRow label={t('backup.cloudBackupSize')} value={cloudMeta.sizeFormatted} isDarkMode={isDarkMode} />
+              </View>
+            )}
+
+            <ActionCard
+              icon="cloud-upload-outline"
+              iconColor="#fff"
+              gradientColors={['#0d9488', '#115e59']}
+              title={t('backup.uploadToCloud')}
+              subtitle={isUploading ? t('backup.uploading') : t('backup.uploadToCloudDesc')}
+              onPress={handleUploadToCloud}
+              isLoading={isUploading}
+              isDarkMode={isDarkMode}
+            />
+
+            <ActionCard
+              icon="cloud-download-outline"
+              iconColor="#fff"
+              gradientColors={['#2563eb', '#1e40af']}
+              title={t('backup.downloadFromCloud')}
+              subtitle={isDownloading ? t('backup.downloading') : t('backup.downloadFromCloudDesc')}
+              onPress={handleDownloadFromCloud}
+              isLoading={isDownloading}
+              isDarkMode={isDarkMode}
+            />
+          </Animated.View>
+        )}
+
+        {/* Local File Actions */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.actions')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.actions')}</Text>
 
           <ActionCard
-            icon="cloud-upload"
+            icon="file-export"
             iconColor="#fff"
-            gradientColors={['#22C55E', '#1d4a3a']}
+            gradientColors={['#0d8e62', '#1d4a3a']}
             title={t('backup.createBackup')}
             subtitle={t('backup.createBackupDesc')}
             onPress={createBackup}
@@ -557,7 +631,7 @@ export default function BackupScreen() {
           />
 
           <ActionCard
-            icon="cloud-download"
+            icon="file-import"
             iconColor="#fff"
             gradientColors={['#3a7ca5', '#2a5a7a']}
             title={t('backup.restoreFromBackup')}
@@ -570,7 +644,7 @@ export default function BackupScreen() {
           <ActionCard
             icon="share-variant"
             iconColor="#fff"
-            gradientColors={['#5d4e8c', '#4a3d6e']}
+            gradientColors={['#4a3d73', '#4a3d6e']}
             title={t('backup.shareSettings')}
             subtitle={t('backup.shareSettingsDesc')}
             onPress={shareBackupAsText}
@@ -580,7 +654,7 @@ export default function BackupScreen() {
 
         {/* Danger Zone */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
-          <Text style={[styles.sectionTitle, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left' }]}>{t('backup.dangerZone')}</Text>
+          <Text style={[styles.sectionTitle, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.dangerZone')}</Text>
 
           <ActionCard
             icon="delete-forever"
@@ -597,13 +671,13 @@ export default function BackupScreen() {
         <Animated.View entering={FadeInDown.delay(250).duration(500)} style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(58,124,165,0.15)' : '#e8f4fd' }]}>
           <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
           <View style={styles.infoContent}>
-            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               • {t('backup.infoIncludes')}
             </Text>
-            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               • {t('backup.infoSaveCloud')}
             </Text>
-            <Text style={[styles.infoText, { color: isDarkMode ? 'rgba(255,255,255,0.8)' : '#333', textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               • {t('backup.infoWeekly')}
             </Text>
           </View>
@@ -620,13 +694,9 @@ export default function BackupScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  containerDark: {
-    backgroundColor: '#11151c',
   },
   scrollView: {
     flex: 1,
@@ -652,7 +722,7 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#fff',
+    color: '#FAFAFA',
     marginBottom: 5,
   },
   statusSubtitle: {
@@ -664,17 +734,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
     marginTop: 20,
     marginBottom: 12,
   },
   statsCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 5,
-  },
-  statsCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   infoRow: {
     flexDirection: 'row',
@@ -687,24 +752,18 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: '#666',
   },
   infoValue: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
-  },
-  actionCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   actionIconContainer: {
     width: 50,
@@ -720,12 +779,10 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
   },
   actionSubtitle: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#999',
     marginTop: 2,
   },
   infoCard: {
@@ -743,7 +800,6 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#333',
     lineHeight: 24,
   },
   bottomSpace: {

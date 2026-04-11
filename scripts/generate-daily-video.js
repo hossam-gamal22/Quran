@@ -55,16 +55,16 @@ const RECITERS = [
 ];
 
 const PHOTO_SEARCH_TERMS = [
-  'peaceful nature landscape',
-  'calm ocean horizon',
-  'beautiful sunrise sky',
-  'serene mountain lake',
-  'golden sunset clouds',
-  'starry night sky',
-  'green forest morning',
-  'desert sand dunes',
-  'lavender field',
-  'tropical beach clear water',
+  'minimalist nature serene',
+  'calm ocean horizon minimal',
+  'beautiful sunrise sky peaceful',
+  'serene mountain lake solitude',
+  'golden sunset clouds minimal',
+  'starry night sky dark',
+  'green forest morning mist',
+  'desert dunes golden hour',
+  'lavender field dreamy',
+  'clear blue sky gradient',
 ];
 
 

@@ -21,9 +21,13 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { fontSemiBold } from '@/lib/fonts';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useSettings } from '@/contexts/SettingsContext';
 // ========================================
 // Types
 // ========================================
@@ -112,11 +116,11 @@ const TabItem: React.FC<TabItemProps> = React.memo(({
         const { x, width } = e.nativeEvent.layout;
         onLayoutCb(x, width);
       }}
-      style={[styles.tabButton, { paddingVertical: tabPaddingVertical }]}
+      style={[_styles.tabButton, { paddingVertical: tabPaddingVertical }]}
     >
       <AnimatedText
         style={[
-          styles.tabLabel,
+          _styles.tabLabel,
           { fontFamily, fontSize },
           animatedLabelStyle,
         ]}
@@ -149,6 +153,9 @@ export function SlidingTabs({
   pillBorderColor,
 }: SlidingTabsProps) {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
+  const { isDarkMode } = useSettings();
   const indicatorX = useSharedValue(0);
   const indicatorW = useSharedValue(0);
   const [layoutsReady, setLayoutsReady] = React.useState(false);
@@ -210,10 +217,14 @@ export function SlidingTabs({
     <View
       style={[
         styles.container,
-        { backgroundColor: containerBg, borderRadius, flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { borderRadius, flexDirection: isRTL ? 'row-reverse' : 'row' },
         style,
       ]}
     >
+      {Platform.OS === 'ios' && (
+        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
       {/* Sliding Pill Indicator */}
       {layoutsReady && (
         <Animated.View
@@ -264,7 +275,7 @@ export function SlidingTabs({
 // Styles
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     position: 'relative',

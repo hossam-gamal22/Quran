@@ -1,5 +1,5 @@
 // components/quran/AyahText.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Text, View, StyleSheet, Pressable } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
 import { Typography, Spacing } from '@/constants/theme';
@@ -29,6 +29,14 @@ export function AyahText({
 }: AyahTextProps) {
   const colors = useColors();
 
+  // Memoize highlight style to avoid recalculating on every render for every ayah
+  const highlightStyle = useMemo(() => ({
+    backgroundColor: colors.primary + '30',
+    borderRadius: Math.ceil(fontSize * 0.25),
+    paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
+    paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
+  }), [colors.primary, fontSize]);
+
   return (
     <View style={styles.container}>
       <Text
@@ -45,14 +53,7 @@ export function AyahText({
           <React.Fragment key={ayah.numberInSurah}>
             <Text
               onPress={() => onAyahPress?.(ayah.numberInSurah)}
-              style={[
-                highlightedAyah === ayah.numberInSurah && {
-                  backgroundColor: colors.primary + '30',
-                  borderRadius: Math.ceil(fontSize * 0.25),
-                  paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
-                  paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
-                },
-              ]}
+              style={highlightedAyah === ayah.numberInSurah ? highlightStyle : undefined}
             >
               {ayah.text}
             </Text>
@@ -61,7 +62,7 @@ export function AyahText({
                 style={[
                   styles.ayahNumber,
                   {
-                    color: colors.primary,
+                    color: colors.primaryText,
                     fontSize: fontSize * 0.7,
                   },
                 ]}

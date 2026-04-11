@@ -15,28 +15,8 @@ import { translateBenefit } from '@/lib/benefit-translations';
 
 export type Language = 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
 
-export type AzkarCategoryType = 
-  | 'morning'
-  | 'evening'
-  | 'sleep'
-  | 'wakeup'
-  | 'after_prayer'
-  | 'quran_duas'
-  | 'sunnah_duas'
-  | 'ruqya'
-  | 'eating'
-  | 'mosque'
-  | 'house'
-  | 'travel'
-  | 'emotions'
-  | 'wudu'
-  | 'nature'
-  | 'fasting'
-  | 'protection'
-  | 'prayerSupplications'
-  | 'salawat'
-  | 'istighfar'
-  | 'ayat_kursi';
+/** Category IDs are now numeric strings ("1"-"132") from Hisnul Muslim */
+export type AzkarCategoryType = string;
 
 export interface Zikr {
   id: number;
@@ -45,20 +25,21 @@ export interface Zikr {
   arabic: string;
   transliteration: string;
   translation?: Record<Language, string>;
-  translations?: Record<Language, string>;
+  translations?: Record<Language, string | { text: string; verified?: boolean }>;
   count: number;
   reference: string;
   benefit?: Record<string, string> | string;
-  audio?: string;
+  audio?: string | null;
   currentCount?: number;
 }
 
 export interface AzkarCategory {
   id: AzkarCategoryType;
-  name: Record<Language, string>;
+  name: Record<string, string>;
   icon: string;
   color: string;
   order: number;
+  audioFile?: string | null;
 }
 
 export interface ZikrProgress {
@@ -71,7 +52,7 @@ export interface ZikrProgress {
 export interface DailyProgress {
   date: string;
   categories: {
-    [key in AzkarCategoryType]?: {
+    [key: string]: {
       total: number;
       completed: number;
       azkarProgress: ZikrProgress[];
@@ -151,7 +132,7 @@ export const getCategoryById = (id: AzkarCategoryType): AzkarCategory | undefine
  * Extracts a plain string from a translation value that might be
  * either a string or { text: string; verified?: boolean }.
  */
-const resolveTranslationValue = (val: unknown): string | undefined => {
+export const resolveTranslationValue = (val: unknown): string | undefined => {
   if (!val) return undefined;
   if (typeof val === 'string') return val;
   if (typeof val === 'object' && val !== null && 'text' in val) return (val as { text: string }).text;
@@ -334,8 +315,8 @@ export const getCategoryCompletionPercentage = async (category: AzkarCategoryTyp
   const progress = await getDailyProgress();
   if (!progress || !progress.categories[category]) return 0;
   
-  const categoryProgress = progress.categories[category]!;
-  if (categoryProgress.total === 0) return 0;
+  const categoryProgress = progress.categories[category];
+  if (!categoryProgress || categoryProgress.total === 0) return 0;
   
   return Math.round((categoryProgress.completed / categoryProgress.total) * 100);
 };
@@ -412,7 +393,7 @@ export const getAzkarStats = () => {
   const allAzkar = getAllAzkar();
   const categories = getAllCategories();
   
-  const stats: Record<AzkarCategoryType, number> = {} as Record<AzkarCategoryType, number>;
+  const stats: Record<string, number> = {};
   
   categories.forEach(cat => {
     stats[cat.id] = allAzkar.filter(z => z.category === cat.id).length;
@@ -430,14 +411,47 @@ export const getAzkarStats = () => {
 // دوال مساعدة للعرض
 // ===================================================
 
-export const getMorningAzkar = (): Zikr[] => getAzkarByCategory('morning');
-export const getEveningAzkar = (): Zikr[] => getAzkarByCategory('evening');
-export const getSleepAzkar = (): Zikr[] => getAzkarByCategory('sleep');
-export const getWakeupAzkar = (): Zikr[] => getAzkarByCategory('wakeup');
-export const getAfterPrayerAzkar = (): Zikr[] => getAzkarByCategory('after_prayer');
-export const getQuranDuas = (): Zikr[] => getAzkarByCategory('quran_duas');
-export const getSunnahDuas = (): Zikr[] => getAzkarByCategory('sunnah_duas');
-export const getRuqya = (): Zikr[] => getAzkarByCategory('ruqya');
+/**
+ * Legacy category ID mapping (old string IDs → new Hisnul Muslim numeric IDs).
+ * Used for backward compatibility with worship tracking, notifications, etc.
+ */
+export const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  morning: '1',      // أذكار الصباح
+  evening: '1b',     // أذكار المساء
+  sleep: '2',        // أذكار النوم
+  wakeup: '3',       // أذكار الاستيقاظ من النوم
+  after_prayer: '27', // الأذكار بعد السلام من الصلاة
+  quran_duas: '26',  // الدعاء بعد التشهد الأخير قبل السلام
+  sunnah_duas: '34', // دعاء الهم والحزن (general duas)
+  ruqya: '34',       // (no exact match; use general supplication)
+  eating: '69',      // الدعاء قبل الطعام
+  mosque: '10',      // دعاء الذهاب إلى المسجد
+  house: '8',        // الذكر عند الخروج من المنزل
+  travel: '96',      // دعاء السفر
+  emotions: '34',    // دعاء الهم والحزن
+  wudu: '6',         // الذكر قبل الوضوء
+  nature: '80',      // الدعاء عند سماع الرعد (closest nature match)
+  fasting: '73',     // الدعاء عند الإفطار
+  protection: '34',  // دعاء الهم والحزن
+  prayerSupplications: '18', // دعاء الاستفتاح
+  salawat: '107',    // فضل الصلاة على النبي
+  istighfar: '129',  // الاستغفار و التوبة
+  ayat_kursi: '1',   // (included in morning/evening adhkar)
+};
+
+/** Resolve a category ID that might be a legacy string ID */
+export const resolveCategoryId = (id: string): string => {
+  return LEGACY_CATEGORY_MAP[id] || id;
+};
+
+export const getMorningAzkar = (): Zikr[] => getAzkarByCategory('1');
+export const getEveningAzkar = (): Zikr[] => getAzkarByCategory('1b');
+export const getSleepAzkar = (): Zikr[] => getAzkarByCategory('2');
+export const getWakeupAzkar = (): Zikr[] => getAzkarByCategory('3');
+export const getAfterPrayerAzkar = (): Zikr[] => getAzkarByCategory('27');
+export const getQuranDuas = (): Zikr[] => getAzkarByCategory('26');
+export const getSunnahDuas = (): Zikr[] => getAzkarByCategory('34');
+export const getRuqya = (): Zikr[] => getAzkarByCategory('34');
 
 /**
  * أدعية يومية متجددة — 10 أدعية مختلفة كل يوم من مجموعة السنة
@@ -543,4 +557,6 @@ export default {
   getSunnahDuas,
   getRuqya,
   fetchAzkarFromFirestore,
+  LEGACY_CATEGORY_MAP,
+  resolveCategoryId,
 };

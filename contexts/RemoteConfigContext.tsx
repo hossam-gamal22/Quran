@@ -167,4 +167,17 @@ export const useAppConfig = <K extends keyof AppConfig>(key: K): AppConfig[K] =>
   return config[key];
 };
 
+/** Subscription visibility flags controlled via Firebase Remote Config */
+export const useSubscriptionConfig = () => {
+  const { config } = useRemoteConfig();
+  return {
+    showLifetime: config.show_lifetime_purchase,
+    showYearly: config.show_yearly_plan,
+    showMonthly: config.show_monthly_plan,
+    badgeText: config.subscription_badge_text,
+    lifetimePriceOverride: config.lifetime_price_override,
+    showUpgradeBanner: config.show_upgrade_banner,
+  };
+};
+
 export default RemoteConfigContext;

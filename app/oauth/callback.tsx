@@ -1,11 +1,14 @@
 import { ThemedView } from "@/components/themed-view";
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
+import { getCloudBackupMeta, downloadFromCloud } from "@/lib/cloud-sync";
+import { isLocalDataEmpty } from "@/lib/backup-utils";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
+import { ActivityIndicator, Alert, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { t } from "@/lib/i18n";
 
 export default function OAuthCallback() {
   const router = useRouter();
@@ -18,6 +21,46 @@ export default function OAuthCallback() {
   }>();
   const [status, setStatus] = useState<"processing" | "success" | "error">("processing");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const checkAndOfferRestore = async (openId: string): Promise<void> => {
+    try {
+      const [meta, localEmpty] = await Promise.all([
+        getCloudBackupMeta(openId),
+        isLocalDataEmpty(),
+      ]);
+      if (!meta || !localEmpty) {
+        router.replace("/(tabs)");
+        return;
+      }
+      // Cloud backup exists AND local data is empty — offer restore
+      Alert.alert(
+        t('backup.confirmCloudRestore'),
+        t('backup.confirmCloudRestoreMsg'),
+        [
+          {
+            text: t('common.cancel'),
+            style: 'cancel',
+            onPress: () => router.replace("/(tabs)"),
+          },
+          {
+            text: t('backup.downloadFromCloud'),
+            onPress: async () => {
+              try {
+                await downloadFromCloud(openId);
+                console.log("[OAuth] Cloud restore completed successfully");
+              } catch (err) {
+                console.error("[OAuth] Cloud restore failed:", err);
+              }
+              router.replace("/(tabs)");
+            },
+          },
+        ],
+      );
+    } catch (err) {
+      console.error("[OAuth] Cloud backup check failed:", err);
+      router.replace("/(tabs)");
+    }
+  };
 
   useEffect(() => {
     const handleCallback = async () => {
@@ -60,9 +103,14 @@ export default function OAuthCallback() {
           }
 
           setStatus("success");
-          console.log("[OAuth] Web authentication successful, redirecting to home...");
+          console.log("[OAuth] Web authentication successful, checking cloud backup...");
+          const webUser = await Auth.getUserInfo();
           setTimeout(() => {
-            router.replace("/(tabs)");
+            if (webUser?.openId) {
+              checkAndOfferRestore(webUser.openId);
+            } else {
+              router.replace("/(tabs)");
+            }
           }, 1000);
           return;
         }
@@ -157,9 +205,14 @@ export default function OAuthCallback() {
           // User info is already in the OAuth callback response
           // No need to fetch from API
           setStatus("success");
-          console.log("[OAuth] Redirecting to home...");
+          console.log("[OAuth] Redirecting, checking cloud backup...");
+          const urlUser = await Auth.getUserInfo();
           setTimeout(() => {
-            router.replace("/(tabs)");
+            if (urlUser?.openId) {
+              checkAndOfferRestore(urlUser.openId);
+            } else {
+              router.replace("/(tabs)");
+            }
           }, 1000);
           return;
         }
@@ -210,12 +263,16 @@ export default function OAuthCallback() {
           }
 
           setStatus("success");
-          console.log("[OAuth] Authentication successful, redirecting to home...");
+          console.log("[OAuth] Authentication successful, checking cloud backup...");
 
-          // Redirect to home after a short delay
+          const exchangeUser = await Auth.getUserInfo();
           setTimeout(() => {
-            console.log("[OAuth] Executing redirect...");
-            router.replace("/(tabs)");
+            if (exchangeUser?.openId) {
+              checkAndOfferRestore(exchangeUser.openId);
+            } else {
+              console.log("[OAuth] No openId, redirecting to home...");
+              router.replace("/(tabs)");
+            }
           }, 1000);
         } else {
           console.error("[OAuth] No session token in result:", result);

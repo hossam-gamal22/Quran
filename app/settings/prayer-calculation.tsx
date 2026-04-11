@@ -8,8 +8,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +22,7 @@ import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t } from '@/lib/i18n';
 
@@ -54,6 +57,7 @@ export default function PrayerCalculationScreen() {
   const isRTL = useIsRTL();
   const { settings, isDarkMode, updatePrayer } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const METHODS = React.useMemo(() => getMethods(t), []);
   const ASR_METHODS = React.useMemo(() => getAsrMethods(t), []);
 
@@ -72,18 +76,22 @@ export default function PrayerCalculationScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         <UniversalHeader title={t('prayer.calculationMethodHeader')} />
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* طريقة حساب العصر */}
           <Animated.View entering={FadeInDown.delay(50).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.asrCalculation')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.asrCalculation')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               {ASR_METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}
@@ -91,11 +99,11 @@ export default function PrayerCalculationScreen() {
                   onPress={() => handleAsr(m.value)}
                 >
                   <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.asrJuristic === m.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -104,8 +112,12 @@ export default function PrayerCalculationScreen() {
 
           {/* طريقة الحساب */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.calculationMethodSection')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.calculationMethodSection')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               {METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}
@@ -113,11 +125,11 @@ export default function PrayerCalculationScreen() {
                   onPress={() => handleMethod(m.value)}
                 >
                   <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{m.subtitle}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.calculationMethod === m.value && (
-                    <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
+                    <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
                   )}
                 </TouchableOpacity>
               ))}
@@ -131,7 +143,7 @@ export default function PrayerCalculationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   containerDark: { backgroundColor: 'transparent' },
   scroll: { flex: 1 },
@@ -139,17 +151,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
     marginTop: 20,
     marginBottom: 10,
     paddingHorizontal: 4,
   },
   section: {
-    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 16,
     overflow: 'hidden',
   },
-  sectionDark: { backgroundColor: 'rgba(120,120,128,0.18)' },
+  sectionDark: {},
   option: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -159,6 +169,6 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(120,120,128,0.2)',
   },
   optionSelected: { backgroundColor: 'rgba(6,79,47,0.08)' },
-  optionLabel: { fontFamily: fontSemiBold(), fontSize: 15, color: '#333' },
-  optionSub: { fontFamily: fontRegular(), fontSize: 12, color: '#999', marginTop: 2 },
+  optionLabel: { fontFamily: fontSemiBold(), fontSize: 15 },
+  optionSub: { fontFamily: fontRegular(), fontSize: 12, marginTop: 2 },
 });

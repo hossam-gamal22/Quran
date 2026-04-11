@@ -21,25 +21,12 @@ interface ConfigurableNavItem {
 }
 
 interface UISettings {
-  tabBarItems: ConfigurableNavItem[];
   quranSegments: ConfigurableNavItem[];
   prayerTopSegments: ConfigurableNavItem[];
   prayerViewSegments: ConfigurableNavItem[];
-  tabBarLayout: {
-    labelFontSize: number;
-    titleVerticalOffset: number;
-    selectedBgOpacity: number;
-  };
 }
 
 const DEFAULT_UI_SETTINGS: UISettings = {
-  tabBarItems: [
-    { key: 'settings', labelAr: 'الإعدادات', labelEn: 'Settings', icon: { mode: 'sf', name: 'gearshape', selectedName: 'gearshape.fill' } },
-    { key: 'prayer', labelAr: 'الصلاة', labelEn: 'Prayer', icon: { mode: 'sf', name: 'building.columns', selectedName: 'building.columns.fill' } },
-    { key: 'tasbih', labelAr: 'تسبيح', labelEn: 'Tasbih', icon: { mode: 'sf', name: 'hand.raised', selectedName: 'hand.raised.fill' } },
-    { key: 'quran', labelAr: 'القرآن', labelEn: 'Quran', icon: { mode: 'sf', name: 'book', selectedName: 'book.fill' } },
-    { key: 'index', labelAr: 'الرئيسية', labelEn: 'Home', icon: { mode: 'sf', name: 'house', selectedName: 'house.fill' } },
-  ],
   quranSegments: [
     { key: 'surahs', labelAr: 'السور', labelEn: 'Surahs', icon: { mode: 'material', name: 'book-open-variant' } },
     { key: 'juz', labelAr: 'الأجزاء', labelEn: 'Juz', icon: { mode: 'material', name: 'bookshelf' } },
@@ -53,11 +40,6 @@ const DEFAULT_UI_SETTINGS: UISettings = {
     { key: 'list', labelAr: 'قائمة', labelEn: 'List', icon: { mode: 'material', name: 'format-list-text' } },
     { key: 'clock', labelAr: 'ساعة', labelEn: 'Clock', icon: { mode: 'material', name: 'clock-outline' } },
   ],
-  tabBarLayout: {
-    labelFontSize: 12,
-    titleVerticalOffset: 4,
-    selectedBgOpacity: 0.16,
-  },
 };
 
 const DOC_REF = doc(db, 'config', 'app-settings');
@@ -273,10 +255,6 @@ const NavigationUI: React.FC = () => {
         setData({
           ...DEFAULT_UI_SETTINGS,
           ...ui,
-          tabBarLayout: {
-            ...DEFAULT_UI_SETTINGS.tabBarLayout,
-            ...(ui.tabBarLayout || {}),
-          },
         });
       } else {
         setData(DEFAULT_UI_SETTINGS);
@@ -321,7 +299,7 @@ const NavigationUI: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Navigation2 className="w-6 h-6 text-emerald-400" />
+            <Navigation2 className="w-6 h-6 text-accent-light" />
             تخصيص التنقل والأيقونات
           </h1>
           <p className="text-sm text-gray-400 mt-1">
@@ -332,7 +310,7 @@ const NavigationUI: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={load}
-            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-admin-surface-light hover:bg-admin-surface-light flex items-center gap-2"
             aria-label="تحديث البيانات"
             title="تحديث البيانات"
           >
@@ -342,7 +320,7 @@ const NavigationUI: React.FC = () => {
           <button
             onClick={save}
             disabled={saving}
-            className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2"
+            className="px-5 py-2 rounded-lg bg-accent-dark hover:bg-accent-dark disabled:opacity-60 flex items-center gap-2"
           >
             {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
             حفظ
@@ -350,77 +328,9 @@ const NavigationUI: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-slate-800/70 border border-slate-700 rounded-lg p-4 mb-5 text-sm text-slate-300">
-        ملاحظة: عناصر الـ Bottom Navigation مقيدة افتراضيًا لاستخدام مكتبات الأيقونات فقط للحفاظ على استقرار شكل النظام، لكن باقي الأقسام تدعم PNG URL بالكامل.
+      <div className="bg-admin-surface/70 border border-admin-border rounded-lg p-4 mb-5 text-sm text-slate-300">
+        ملاحظة: يمكنك تخصيص أسماء وأيقونات أقسام القرآن والصلاة من هنا.
       </div>
-
-      <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 mb-5">
-        <h3 className="text-lg font-bold mb-4">شكل شريط التبويب السفلي</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">حجم الخط</label>
-            <input
-              type="number"
-              value={data.tabBarLayout.labelFontSize}
-              min={10}
-              max={16}
-              onChange={(e) => setData({
-                ...data,
-                tabBarLayout: {
-                  ...data.tabBarLayout,
-                  labelFontSize: Number(e.target.value || 12),
-                },
-              })}
-              className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
-              aria-label="حجم الخط"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">المسافة الرأسية بين الأيقونة والنص</label>
-            <input
-              type="number"
-              value={data.tabBarLayout.titleVerticalOffset}
-              min={0}
-              max={10}
-              onChange={(e) => setData({
-                ...data,
-                tabBarLayout: {
-                  ...data.tabBarLayout,
-                  titleVerticalOffset: Number(e.target.value || 4),
-                },
-              })}
-              className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
-              aria-label="المسافة الرأسية بين الأيقونة والنص"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">شفافية خلفية التاب المحدد</label>
-            <input
-              type="number"
-              step={0.01}
-              value={data.tabBarLayout.selectedBgOpacity}
-              min={0.05}
-              max={0.5}
-              onChange={(e) => setData({
-                ...data,
-                tabBarLayout: {
-                  ...data.tabBarLayout,
-                  selectedBgOpacity: Number(e.target.value || 0.16),
-                },
-              })}
-              className="w-full bg-gray-700 rounded px-3 py-2 text-sm"
-              aria-label="شفافية خلفية التاب المحدد"
-            />
-          </div>
-        </div>
-      </div>
-
-      <SectionEditor
-        title="Bottom Navigation"
-        items={data.tabBarItems}
-        onChange={(items) => setData({ ...data, tabBarItems: items })}
-        lockKeys={['settings', 'prayer', 'tasbih', 'quran', 'index']}
-      />
 
       <SectionEditor
         title="Quran Segments (السور / الأجزاء / استماع)"
@@ -441,7 +351,7 @@ const NavigationUI: React.FC = () => {
       />
 
       {saved && (
-        <div className="fixed bottom-6 left-6 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg">
+        <div className="fixed bottom-6 left-6 bg-accent-dark text-white px-4 py-2 rounded-lg shadow-lg">
           تم الحفظ بنجاح
         </div>
       )}

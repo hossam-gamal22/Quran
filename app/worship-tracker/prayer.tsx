@@ -10,10 +10,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
-  StatusBar,
   Modal,
   Pressable,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -40,8 +40,10 @@ import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getTranslations, getDateLocale } from '@/lib/i18n';
+import { Colors, DarkColors } from '@/constants/theme';
 import { trackPrayer } from '@/lib/firebase-analytics';
 
 const { width } = Dimensions.get('window');
@@ -59,17 +61,17 @@ const PRAYER_KEYS: { key: PrayerName; nameKey: string; icon: string }[] = [
 ];
 
 const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; labelKey: string }[] = [
-  { value: 'prayed', color: '#22C55E', icon: 'check-circle', labelKey: 'worship.onTime' },
-  { value: 'late', color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
+  { value: 'prayed', color: '#0d8e62', icon: 'check-circle', labelKey: 'worship.onTime' },
+  { value: 'late', color: '#c07b10', icon: 'clock-alert', labelKey: 'worship.late' },
   { value: 'missed', color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
-  { value: 'none', color: '#999', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
+  { value: 'none', color: '#8E8E93', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 ];
 
 const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; labelKey: string }> = {
-  prayed: { color: '#22C55E', icon: 'check-circle', labelKey: 'worship.onTime' },
-  late: { color: '#f5a623', icon: 'clock-alert', labelKey: 'worship.late' },
+  prayed: { color: '#0d8e62', icon: 'check-circle', labelKey: 'worship.onTime' },
+  late: { color: '#c07b10', icon: 'clock-alert', labelKey: 'worship.late' },
   missed: { color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
-  none: { color: '#ccc', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
+  none: { color: '#8E8E93', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 };
 
 // Day names are resolved via t('calendar.weekDays') at render time
@@ -98,6 +100,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   isAvailable,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const [menuOpen, setMenuOpen] = useState(false);
   const scale = useSharedValue(1);
@@ -136,9 +139,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
         onPress={handlePress}
         style={[
           styles.prayerItem,
-          isDarkMode && styles.prayerItemDark,
-          { borderLeftColor: isRTL ? undefined : (isAvailable ? config.color : '#555'), borderLeftWidth: isRTL ? 0 : 4, borderRightColor: isRTL ? (isAvailable ? config.color : '#555') : undefined, borderRightWidth: isRTL ? 4 : 0, flexDirection: isRTL ? 'row-reverse' : 'row' },
-          !isAvailable && { opacity: 0.5 },
+          { backgroundColor: colors.card },
+          { borderLeftColor: isRTL ? undefined : (isAvailable ? config.color : colors.textLight), borderLeftWidth: isRTL ? 0 : 4, borderRightColor: isRTL ? (isAvailable ? config.color : colors.textLight) : undefined, borderRightWidth: isRTL ? 4 : 0, flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
         <View style={[styles.prayerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -146,7 +148,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             <MaterialCommunityIcons
               name={prayer.icon as any}
               size={24}
-              color={isAvailable ? config.color : '#999'}
+              color={isAvailable ? config.color : colors.textLight}
             />
           </View>
           <View style={styles.prayerInfo}>
@@ -160,13 +162,13 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
         </View>
         
         <View style={styles.prayerRight}>
-          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : '#999'}20`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : colors.textLight}20`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons
               name={isAvailable ? config.icon as any : 'lock-clock'}
               size={18}
-              color={isAvailable ? config.color : '#999'}
+              color={isAvailable ? config.color : colors.textLight}
             />
-            <Text style={[styles.statusText, { color: isAvailable ? config.color : '#999' }]}>
+            <Text style={[styles.statusText, { color: isAvailable ? config.color : colors.textLight }]}>
               {isAvailable ? t(config.labelKey) : t('worship.notYetAvailable')}
             </Text>
             {isAvailable && (
@@ -182,7 +184,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
 
       {/* القائمة المنسدلة */}
       {menuOpen && isAvailable && (
-        <View style={[styles.dropdownMenu, isDarkMode && styles.dropdownMenuDark]}>
+        <View style={[styles.dropdownMenu, { backgroundColor: colors.card }]}>
           {STATUS_OPTIONS.map(opt => (
             <TouchableOpacity
               key={opt.value}
@@ -232,6 +234,7 @@ const WeekDay: React.FC<WeekDayProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const dayName = getTranslations().calendar.weekDays[date.getDay()];
   const dayNumber = date.getDate();
@@ -249,14 +252,14 @@ const WeekDay: React.FC<WeekDayProps> = ({
     <TouchableOpacity
       style={[
         styles.weekDay,
-        isDarkMode && styles.weekDayDark,
+        { backgroundColor: colors.surface },
         isToday && styles.weekDayToday,
         isSelected && !isToday && styles.weekDaySelected,
       ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={[
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[
         styles.weekDayName,
         { color: colors.textLight },
         (isToday || isSelected) && styles.weekDayTextToday,
@@ -270,7 +273,7 @@ const WeekDay: React.FC<WeekDayProps> = ({
       ]}>
         {dayNumber}
       </Text>
-      <View style={[styles.weekDayProgress, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.weekDayProgress, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? colors.surface : '#eee' }]}>
         <View
           style={[
             styles.weekDayProgressFill,
@@ -318,6 +321,7 @@ export default function PrayerTrackerScreen() {
   
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const isSelectedToday = useMemo(() => {
     return selectedDate.toDateString() === new Date().toDateString();
@@ -439,10 +443,8 @@ export default function PrayerTrackerScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       
       {/* الهيدر */}
       <UniversalHeader
@@ -460,8 +462,8 @@ export default function PrayerTrackerScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#22C55E']}
-            tintColor="#22C55E"
+            colors={['#0d8e62']}
+            tintColor="#0d8e62"
           />
         }
       >
@@ -574,7 +576,7 @@ export default function PrayerTrackerScreen() {
             </Text>
             <View style={styles.statsGrid}>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="check-all" size={24} color="#22C55E" />
+                <MaterialCommunityIcons name="check-all" size={24} color="#0d8e62" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.prayedOnTime ?? 0}
                 </Text>
@@ -583,7 +585,7 @@ export default function PrayerTrackerScreen() {
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="clock-alert" size={24} color="#f5a623" />
+                <MaterialCommunityIcons name="clock-alert" size={24} color="#c07b10" />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {prayerStats?.prayedLate ?? 0}
                 </Text>
@@ -618,7 +620,7 @@ export default function PrayerTrackerScreen() {
           <Animated.View entering={FadeInDown.delay(500).duration(500)}>
             <GlassCard style={styles.statsCard}>
               <View style={[styles.fajrHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="weather-sunset-up" size={22} color="#22C55E" />
+                <MaterialCommunityIcons name="weather-sunset-up" size={22} color="#0d8e62" />
                 <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 0, flex: 1 }]}>
                   {t('worship.historicalFajrTimes')}
                 </Text>
@@ -635,7 +637,7 @@ export default function PrayerTrackerScreen() {
                       key={item.date}
                       style={[
                         styles.fajrRow,
-                        isDarkMode && styles.fajrRowDark,
+                        { backgroundColor: colors.card },
                         { flexDirection: isRTL ? 'row-reverse' : 'row' },
                         index < historicalFajr.slice(0, 14).length - 1 && styles.fajrRowBorder,
                       ]}
@@ -680,7 +682,7 @@ export default function PrayerTrackerScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -689,12 +691,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
   scrollView: {
     flex: 1,
   },
@@ -717,12 +713,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   progressDate: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   progressCircle: {
     width: 64,
@@ -736,6 +736,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   progressBar: {
     height: 8,
@@ -760,12 +762,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   progressStatLabel: {
     fontSize: 12,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   progressDivider: {
     width: 1,
@@ -776,10 +782,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
     marginBottom: 12,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   prayerSectionHeader: {
     flexDirection: 'row',
@@ -791,20 +798,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: '#22C55E20',
+    backgroundColor: '#0d8e6220',
   },
   returnTodayText: {
     fontSize: 12,
     fontFamily: fontSemiBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   sectionSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     paddingHorizontal: 20,
     marginTop: -8,
     marginBottom: 12,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   weekContainer: {
     paddingHorizontal: 12,
@@ -812,33 +822,35 @@ const styles = StyleSheet.create({
   },
   weekDay: {
     width: 60,
-    backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: 'center',
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   weekDayDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   weekDayToday: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   weekDaySelected: {
-    backgroundColor: '#22C55E40',
-    borderColor: '#22C55E',
+    backgroundColor: '#0d8e6240',
+    borderColor: '#0d8e62',
     borderWidth: 1.5,
   },
   weekDayName: {
     fontSize: 10,
     fontFamily: fontMedium(),
-    color: '#666',
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   weekDayNumber: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     marginVertical: 4,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   weekDayTextToday: {
     color: '#fff',
@@ -853,17 +865,18 @@ const styles = StyleSheet.create({
   },
   weekDayProgressFill: {
     height: '100%',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 2,
   },
   weekDayProgressComplete: {
-    backgroundColor: '#4caf50',
+    backgroundColor: '#0d8e62',
   },
   weekDayCount: {
     fontSize: 10,
     fontFamily: fontMedium(),
-    color: '#666',
     marginTop: 6,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   // صلوات اليوم
   prayersContainer: {
@@ -874,13 +887,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   prayerItemDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   prayerLeft: {
     flexDirection: 'row',
@@ -898,13 +910,15 @@ const styles = StyleSheet.create({
   prayerName: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   prayerTime: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   prayerRight: {},
   statusBadge: {
@@ -918,10 +932,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontFamily: fontMedium(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   // dropdown
   dropdownMenu: {
-    backgroundColor: '#fff',
     marginHorizontal: 4,
     marginTop: -4,
     borderBottomLeftRadius: 16,
@@ -929,11 +944,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderWidth: 0.5,
     borderTopWidth: 0,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderColor: 'rgba(0,0,0,0.10)',
   },
   dropdownMenuDark: {
-    backgroundColor: '#1a1a2e',
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: DarkColors.surface,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   dropdownItem: {
     flexDirection: 'row',
@@ -945,6 +960,8 @@ const styles = StyleSheet.create({
   dropdownLabel: {
     fontSize: 15,
     fontFamily: fontMedium(),
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   // إحصائيات
   statsCard: {
@@ -955,8 +972,9 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 15,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -969,12 +987,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    color: '#666',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   fajrHeader: {
     alignItems: 'center',
@@ -985,6 +1005,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontRegular(),
     marginBottom: 12,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   fajrList: {
     gap: 0,
@@ -1007,16 +1029,22 @@ const styles = StyleSheet.create({
   fajrDayName: {
     fontSize: 12,
     fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   fajrDate: {
     fontSize: 13,
     fontFamily: fontMedium(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   fajrTime: {
     fontSize: 15,
     fontFamily: fontSemiBold(),
     flex: 1,
     textAlign: 'center',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   fajrStatusBadge: {
     flexDirection: 'row',
@@ -1029,8 +1057,11 @@ const styles = StyleSheet.create({
   fajrStatusText: {
     fontSize: 11,
     fontFamily: fontMedium(),
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   bottomSpace: {
     height: 100,
   },
 });
+const styles = _styles;

@@ -2,7 +2,7 @@
 // معاينة التطبيق مع بيانات حقيقية من Firebase
 // يعكس الشكل الفعلي للتطبيق: Glass morphism + RTL + 5 tabs
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Smartphone, X, RotateCcw, RefreshCw, Loader2 } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, collection, getDocs, query, limit } from 'firebase/firestore';
@@ -32,8 +32,8 @@ async function fetchPreviewData(): Promise<Omit<PreviewData, 'loading' | 'error'
   } catch (e) { console.log('Preview: homePageConfig fetch error', e); }
 
   try {
-    const bannerDoc = await getDoc(doc(db, 'appConfig', 'welcomeBanner'));
-    if (bannerDoc.exists()) results.welcomeBanner = bannerDoc.data();
+    const appSettingsDoc = await getDoc(doc(db, 'config', 'app-settings'));
+    if (appSettingsDoc.exists()) results.welcomeBanner = appSettingsDoc.data()?.welcomeBanner ?? null;
   } catch (e) { console.log('Preview: welcomeBanner fetch error', e); }
 
   try {
@@ -49,19 +49,19 @@ async function fetchPreviewData(): Promise<Omit<PreviewData, 'loading' | 'error'
   return results;
 }
 
+// ==================== Theme Helpers ====================
+const txt = (t: 'light' | 'dark') => t === 'dark' ? 'text-white' : 'text-gray-800';
+const sec = (t: 'light' | 'dark') => t === 'dark' ? 'text-gray-400' : 'text-gray-500';
+
 // ==================== Glass Card ====================
-function GlassCard({ children, className = '', theme, style }: { children: React.ReactNode; className?: string; theme: 'light' | 'dark'; style?: React.CSSProperties }) {
-  const bg = theme === 'dark'
-    ? 'rgba(255,255,255,0.08)'
-    : 'rgba(255,255,255,0.55)';
+function GlassCard({ children, className = '', theme }: { children: React.ReactNode; className?: string; theme: 'light' | 'dark' }) {
   return (
     <div
-      className={`rounded-2xl backdrop-blur-md ${className}`}
-      style={{
-        background: bg,
-        border: `0.5px solid ${theme === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.3)'}`,
-        ...style,
-      }}
+      className={`rounded-2xl backdrop-blur-md border-[0.5px] ${
+        theme === 'dark'
+          ? 'bg-white/[0.08] border-white/[0.12]'
+          : 'bg-white/[0.55] border-white/30'
+      } ${className}`}
     >
       {children}
     </div>
@@ -71,9 +71,15 @@ function GlassCard({ children, className = '', theme, style }: { children: React
 // ==================== Screen Renderers ====================
 
 function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
-  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
   const banner = data.welcomeBanner;
+  const bannerColor = banner?.color || '#2f7659';
+  const bannerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (bannerRef.current) {
+      bannerRef.current.style.background = `linear-gradient(135deg, ${bannerColor}, ${bannerColor}dd)`;
+    }
+  }, [bannerColor]);
 
   const quickAccess = [
     { icon: '🌅', label: 'الصباح', color: '#2f7659' },
@@ -91,11 +97,10 @@ function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark
 
   return (
     <div className="space-y-3">
-      {/* Welcome Banner */}
       {banner?.enabled !== false && (
         <div
+          ref={bannerRef}
           className="p-4 rounded-2xl text-white relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${banner?.color || '#2f7659'}, ${banner?.color || '#2f7659'}dd)` }}
         >
           <p className="text-xs opacity-80">{banner?.greeting || 'السلام عليكم'}</p>
           <p className="font-bold text-sm mt-1">{banner?.message || 'مرحباً بكم في روح المسلم'}</p>
@@ -107,7 +112,7 @@ function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark
         {quickAccess.map((item, i) => (
           <GlassCard key={i} theme={theme} className="flex-1 p-3 text-center">
             <span className="text-xl block">{item.icon}</span>
-            <p className="text-[10px] mt-1" style={{ color: secondaryColor }}>{item.label}</p>
+            <p className={`text-[10px] mt-1 ${sec(theme)}`}>{item.label}</p>
           </GlassCard>
         ))}
       </div>
@@ -116,17 +121,16 @@ function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark
       {sections.slice(0, 3).map((section: any, i: number) => (
         <GlassCard key={i} theme={theme} className="p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px]" style={{ color: secondaryColor }}>▾</span>
-            <h3 className="font-bold text-xs" style={{ color: textColor }}>{section.title || section.id}</h3>
+            <span className={`text-[10px] ${sec(theme)}`}>▾</span>
+            <h3 className={`font-bold text-xs ${txt(theme)}`}>{section.title || section.id}</h3>
           </div>
           <div className="grid grid-cols-2 gap-1.5">
             {(section.items || ['عنصر ١', 'عنصر ٢']).slice(0, 4).map((item: any, j: number) => (
               <div
                 key={j}
-                className="rounded-xl p-2 text-center"
-                style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}
+                className={`rounded-xl p-2 text-center ${theme === 'dark' ? 'bg-white/5' : 'bg-black/[0.03]'}`}
               >
-                <p className="text-[9px]" style={{ color: secondaryColor }}>{typeof item === 'string' ? item : item.title || ''}</p>
+                <p className={`text-[9px] ${sec(theme)}`}>{typeof item === 'string' ? item : item.title || ''}</p>
               </div>
             ))}
           </div>
@@ -137,23 +141,20 @@ function HomeScreen({ data, theme }: { data: PreviewData; theme: 'light' | 'dark
 }
 
 function QuranScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
-  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
-
   return (
     <div className="space-y-3">
       {/* Quran Search */}
       <GlassCard theme={theme} className="p-3 flex items-center gap-2">
-        <span className="text-xs" style={{ color: secondaryColor }}>🔍</span>
-        <span className="text-xs" style={{ color: secondaryColor }}>ابحث في القرآن...</span>
+        <span className={`text-xs ${sec(theme)}`}>🔍</span>
+        <span className={`text-xs ${sec(theme)}`}>ابحث في القرآن...</span>
       </GlassCard>
 
       {/* Last Read */}
       <GlassCard theme={theme} className="p-3">
-        <p className="text-[10px] mb-1" style={{ color: secondaryColor }}>آخر قراءة</p>
+        <p className={`text-[10px] mb-1 ${sec(theme)}`}>آخر قراءة</p>
         <div className="flex items-center justify-between">
-          <span className="text-[10px]" style={{ color: '#22C55E' }}>الصفحة ٤٥</span>
-          <p className="font-bold text-xs" style={{ color: textColor }}>سورة البقرة</p>
+          <span className="text-[10px] text-emerald-500">الصفحة ٤٥</span>
+          <p className={`font-bold text-xs ${txt(theme)}`}>سورة البقرة</p>
         </div>
       </GlassCard>
 
@@ -161,20 +162,17 @@ function QuranScreen({ theme }: { theme: 'light' | 'dark' }) {
       {['الفاتحة', 'البقرة', 'آل عمران', 'النساء', 'المائدة', 'الأنعام'].map((name, i) => (
         <GlassCard key={i} theme={theme} className="p-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px]" style={{ color: secondaryColor }}>
+            <span className={`text-[10px] ${sec(theme)}`}>
               {i === 0 ? '٧' : i === 1 ? '٢٨٦' : i === 2 ? '٢٠٠' : i === 3 ? '١٧٦' : i === 4 ? '١٢٠' : '١٦٥'} آية
             </span>
             <div className="flex items-center gap-2">
               <div>
-                <p className="font-bold text-xs text-left" style={{ color: textColor }}>{name}</p>
-                <p className="text-[9px] text-left" style={{ color: secondaryColor }}>
+                <p className={`font-bold text-xs text-left ${txt(theme)}`}>{name}</p>
+                <p className={`text-[9px] text-left ${sec(theme)}`}>
                   {i < 2 ? 'مدنية' : 'مدنية'}
                 </p>
               </div>
-              <div
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#22C55E' }}
-              >
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold bg-emerald-500/15 text-emerald-500">
                 {i + 1}
               </div>
             </div>
@@ -186,14 +184,11 @@ function QuranScreen({ theme }: { theme: 'light' | 'dark' }) {
 }
 
 function TasbihScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
-  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
-
   return (
     <div className="space-y-3 flex flex-col items-center">
       {/* Tasbih Name */}
-      <p className="font-bold text-sm" style={{ color: textColor }}>سبحان الله</p>
-      <p className="text-[10px]" style={{ color: secondaryColor }}>٣٣ مرة</p>
+      <p className={`font-bold text-sm ${txt(theme)}`}>سبحان الله</p>
+      <p className={`text-[10px] ${sec(theme)}`}>٣٣ مرة</p>
 
       {/* Counter Ring */}
       <div className="relative w-32 h-32 flex items-center justify-center my-2">
@@ -208,31 +203,25 @@ function TasbihScreen({ theme }: { theme: 'light' | 'dark' }) {
             transform="rotate(-90 64 64)"
           />
         </svg>
-        <span className="absolute text-3xl font-bold" style={{ color: textColor }}>١٥</span>
+        <span className={`absolute text-3xl font-bold ${txt(theme)}`}>١٥</span>
       </div>
 
       {/* Tap Button */}
-      <div
-        className="w-20 h-20 rounded-full flex items-center justify-center"
-        style={{ background: 'rgba(34,197,94,0.2)', border: '2px solid #22C55E' }}
-      >
-        <span className="text-2xl" style={{ color: '#22C55E' }}>📿</span>
+      <div className="w-20 h-20 rounded-full flex items-center justify-center bg-emerald-500/20 border-2 border-emerald-500">
+        <span className="text-2xl text-emerald-500">📿</span>
       </div>
 
       {/* Navigation */}
       <div className="flex items-center gap-4 mt-2">
-        <span className="text-xs" style={{ color: secondaryColor }}>→</span>
-        <span className="text-xs font-bold" style={{ color: '#22C55E' }}>١ / ٤</span>
-        <span className="text-xs" style={{ color: secondaryColor }}>←</span>
+        <span className={`text-xs ${sec(theme)}`}>→</span>
+        <span className="text-xs font-bold text-emerald-500">١ / ٤</span>
+        <span className={`text-xs ${sec(theme)}`}>←</span>
       </div>
     </div>
   );
 }
 
 function PrayerScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
-  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
-
   const prayers = [
     { name: 'الفجر', time: '٤:٥٢', active: false },
     { name: 'الشروق', time: '٦:١٥', active: false },
@@ -246,10 +235,10 @@ function PrayerScreen({ theme }: { theme: 'light' | 'dark' }) {
     <div className="space-y-3">
       {/* Next Prayer Card */}
       <GlassCard theme={theme} className="p-4 text-center">
-        <p className="text-[10px]" style={{ color: secondaryColor }}>الصلاة القادمة</p>
-        <p className="text-lg font-bold mt-1" style={{ color: '#22C55E' }}>العصر</p>
-        <p className="text-xl font-bold mt-1" style={{ color: textColor, fontFamily: 'monospace' }}>٠٢:١٥:٣٣</p>
-        <p className="text-[10px] mt-1" style={{ color: secondaryColor }}>٣:٤٥ م</p>
+        <p className={`text-[10px] ${sec(theme)}`}>الصلاة القادمة</p>
+        <p className="text-lg font-bold mt-1 text-emerald-500">العصر</p>
+        <p className={`text-xl font-bold mt-1 font-mono ${txt(theme)}`}>٠٢:١٥:٣٣</p>
+        <p className={`text-[10px] mt-1 ${sec(theme)}`}>٣:٤٥ م</p>
       </GlassCard>
 
       {/* Prayer List */}
@@ -258,17 +247,17 @@ function PrayerScreen({ theme }: { theme: 'light' | 'dark' }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className="w-5 h-5 rounded-full flex items-center justify-center"
-                style={{
-                  background: prayer.active ? 'rgba(34,197,94,0.2)' : 'transparent',
-                  border: `1.5px solid ${prayer.active ? '#22C55E' : (theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)')}`
-                }}
+                className={`w-5 h-5 rounded-full flex items-center justify-center border-[1.5px] ${
+                  prayer.active
+                    ? 'bg-emerald-500/20 border-emerald-500'
+                    : theme === 'dark' ? 'border-white/20' : 'border-black/15'
+                }`}
               >
-                {prayer.active && <span className="text-[8px]" style={{ color: '#22C55E' }}>🔔</span>}
+                {prayer.active && <span className="text-[8px] text-emerald-500">🔔</span>}
               </div>
-              <span className="text-xs" style={{ color: secondaryColor }}>{prayer.time}</span>
+              <span className={`text-xs ${sec(theme)}`}>{prayer.time}</span>
             </div>
-            <span className={`text-xs font-semibold ${prayer.active ? '' : ''}`} style={{ color: prayer.active ? '#22C55E' : textColor }}>
+            <span className={`text-xs font-semibold ${prayer.active ? 'text-emerald-500' : txt(theme)}`}>
               {prayer.name}
             </span>
           </div>
@@ -279,9 +268,6 @@ function PrayerScreen({ theme }: { theme: 'light' | 'dark' }) {
 }
 
 function SettingsScreen({ theme }: { theme: 'light' | 'dark' }) {
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
-  const secondaryColor = theme === 'dark' ? '#9ca3af' : '#6b7280';
-
   const sections = [
     { title: 'العرض', items: [{ icon: '🌍', name: 'اللغة', value: 'العربية' }, { icon: '🎨', name: 'إعدادات العرض' }] },
     { title: 'الإشعارات', items: [{ icon: '🔔', name: 'الإشعارات', toggle: true }] },
@@ -293,21 +279,21 @@ function SettingsScreen({ theme }: { theme: 'light' | 'dark' }) {
     <div className="space-y-3">
       {sections.map((section, si) => (
         <div key={si}>
-          <p className="text-[10px] font-bold mb-1.5 pr-1" style={{ color: '#22C55E' }}>{section.title}</p>
-          <GlassCard theme={theme} className="divide-y" style={{ borderColor: theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+          <p className="text-[10px] font-bold mb-1.5 pr-1 text-emerald-500">{section.title}</p>
+          <GlassCard theme={theme} className={`divide-y ${theme === 'dark' ? 'divide-white/[0.06]' : 'divide-black/[0.06]'}`}>
             {section.items.map((item: any, i: number) => (
               <div key={i} className="p-3 flex items-center justify-between">
                 <div className="flex items-center gap-1">
                   {item.toggle && (
-                    <div className="w-8 h-4 rounded-full p-0.5" style={{ background: '#22C55E' }}>
-                      <div className="w-3 h-3 bg-white rounded-full" style={{ marginRight: 'auto' }} />
+                    <div className="w-8 h-4 rounded-full p-0.5 bg-emerald-500">
+                      <div className="w-3 h-3 bg-white rounded-full mr-auto" />
                     </div>
                   )}
-                  {item.value && <span className="text-[10px]" style={{ color: secondaryColor }}>{item.value}</span>}
-                  {!item.toggle && !item.value && <span className="text-[10px]" style={{ color: secondaryColor }}>›</span>}
+                  {item.value && <span className={`text-[10px] ${sec(theme)}`}>{item.value}</span>}
+                  {!item.toggle && !item.value && <span className={`text-[10px] ${sec(theme)}`}>›</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: textColor }}>{item.name}</span>
+                  <span className={`text-xs ${txt(theme)}`}>{item.name}</span>
                   <span className="text-sm">{item.icon}</span>
                 </div>
               </div>
@@ -334,6 +320,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [currentScreen, setCurrentScreen] = useState('home');
   const [rotation, setRotation] = useState(0);
+  const deviceRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<PreviewData>({
     homeConfig: null,
     azkarCategories: [],
@@ -357,13 +344,13 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
     if (isOpen) loadData();
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (deviceRef.current) {
+      deviceRef.current.style.transform = `rotate(${rotation}deg)`;
+    }
+  }, [rotation]);
 
-  // Theme colors matching actual app
-  const bgColor = theme === 'dark' ? '#0f1724' : '#f9fafb';
-  const headerBg = theme === 'dark' ? 'rgba(15,23,36,0.85)' : 'rgba(255,255,255,0.85)';
-  const tabBarBg = theme === 'dark' ? 'rgba(16,22,33,0.95)' : 'rgba(255,255,255,0.95)';
-  const textColor = theme === 'dark' ? '#ffffff' : '#1f2937';
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -375,7 +362,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <h2 className="text-lg font-bold text-white">معاينة التطبيق</h2>
             <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">بيانات حقيقية</span>
           </div>
-          <button onClick={onClose} title="إغلاق" className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
+          <button type="button" onClick={onClose} title="إغلاق" className="p-2 hover:bg-slate-700 rounded-lg text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -386,6 +373,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <span className="text-sm text-slate-400">الجهاز:</span>
             <div className="flex bg-slate-700 rounded-lg p-1">
               <button
+                type="button"
                 onClick={() => setDevice('iphone')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   device === 'iphone' ? 'bg-slate-600 text-white' : 'text-slate-400'
@@ -394,6 +382,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                  iPhone
               </button>
               <button
+                type="button"
                 onClick={() => setDevice('android')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   device === 'android' ? 'bg-slate-600 text-white' : 'text-slate-400'
@@ -408,6 +397,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
             <span className="text-sm text-slate-400">الوضع:</span>
             <div className="flex bg-slate-700 rounded-lg p-1">
               <button
+                type="button"
                 onClick={() => setTheme('light')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   theme === 'light' ? 'bg-slate-600 text-white' : 'text-slate-400'
@@ -416,6 +406,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
                 ☀️ فاتح
               </button>
               <button
+                type="button"
                 onClick={() => setTheme('dark')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   theme === 'dark' ? 'bg-slate-600 text-white' : 'text-slate-400'
@@ -441,6 +432,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
           </div>
 
           <button
+            type="button"
             onClick={() => setRotation(r => r + 90)}
             className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 text-sm"
           >
@@ -449,6 +441,7 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
           </button>
 
           <button
+            type="button"
             onClick={loadData}
             disabled={data.loading}
             className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-sm disabled:opacity-50"
@@ -461,18 +454,17 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
         {/* Preview Area */}
         <div className="p-8 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 min-h-[600px]">
           <div
+            ref={deviceRef}
             className={`relative transition-transform duration-500 ${
-              device === 'iphone' 
-                ? 'w-[300px] h-[620px] rounded-[50px]' 
+              device === 'iphone'
+                ? 'w-[300px] h-[620px] rounded-[50px]'
                 : 'w-[290px] h-[600px] rounded-[30px]'
             } bg-black p-3 shadow-2xl`}
-            style={{ transform: `rotate(${rotation}deg)` }}
           >
-            <div 
+            <div
               className={`w-full h-full overflow-hidden ${
                 device === 'iphone' ? 'rounded-[40px]' : 'rounded-[24px]'
-              }`}
-              style={{ background: bgColor }}
+              } ${theme === 'dark' ? 'bg-[#0f1724]' : 'bg-gray-50'}`}
             >
               {/* Notch */}
               {device === 'iphone' && (
@@ -480,11 +472,11 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
               )}
 
               {/* Status Bar */}
-              <div className="flex items-center justify-between px-8 pt-4 pb-2" style={{ color: textColor }}>
+              <div className={`flex items-center justify-between px-8 pt-4 pb-2 ${txt(theme)}`}>
                 <span className="text-xs font-semibold">9:41</span>
                 <div className="flex items-center gap-1">
-                  <div className="w-6 h-3 border-2 rounded-sm" style={{ borderColor: textColor }}>
-                    <div className="w-4 h-full rounded-sm" style={{ background: textColor }} />
+                  <div className={`w-6 h-3 border-2 rounded-sm ${theme === 'dark' ? 'border-white' : 'border-gray-800'}`}>
+                    <div className={`w-4 h-full rounded-sm ${theme === 'dark' ? 'bg-white' : 'bg-gray-800'}`} />
                   </div>
                 </div>
               </div>
@@ -492,28 +484,29 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
               <div className="flex flex-col h-[calc(100%-40px)]" dir="rtl">
                 {/* App Header — Glass style */}
                 <div
-                  className="px-4 py-3 flex items-center justify-between backdrop-blur-md"
-                  style={{ background: headerBg }}
+                  className={`px-4 py-3 flex items-center justify-between backdrop-blur-md ${
+                    theme === 'dark' ? 'bg-[rgba(15,23,36,0.85)]' : 'bg-white/[0.85]'
+                  }`}
                 >
-                  <div className="text-[10px] opacity-70" style={{ color: '#22C55E' }}>
+                  <div className="text-[10px] opacity-70 text-emerald-500">
                     {data.loading ? '...' : 'بيانات حقيقية ✓'}
                   </div>
-                  <h1 className="text-sm font-bold" style={{ color: textColor }}>روح المسلم</h1>
+                  <h1 className={`text-sm font-bold ${txt(theme)}`}>روح المسلم</h1>
                 </div>
 
                 {/* Screen Content */}
-                <div className="flex-1 p-3 overflow-auto" style={{ maxHeight: '420px' }}>
+                <div className="flex-1 p-3 overflow-auto max-h-[420px]">
                   {data.loading ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                       <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                      <p className="text-sm" style={{ color: theme === 'dark' ? '#9ca3af' : '#6b7280' }}>
+                      <p className={`text-sm ${sec(theme)}`}>
                         جاري تحميل البيانات من Firebase...
                       </p>
                     </div>
                   ) : data.error ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4">
                       <p className="text-red-400 text-sm text-center">{data.error}</p>
-                      <button onClick={loadData} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm">
+                      <button type="button" onClick={loadData} className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm">
                         إعادة المحاولة
                       </button>
                     </div>
@@ -530,25 +523,27 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 
                 {/* Tab Bar — matching actual app */}
                 <div
-                  className="border-t px-2 py-2 flex items-center justify-around backdrop-blur-md"
-                  style={{
-                    background: tabBarBg,
-                    borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-                  }}
+                  className={`border-t px-2 py-2 flex items-center justify-around backdrop-blur-md ${
+                    theme === 'dark'
+                      ? 'bg-[rgba(16,22,33,0.95)] border-white/[0.08]'
+                      : 'bg-white/95 border-black/[0.08]'
+                  }`}
                 >
                   {/* RTL order: Settings(left) → Prayer → Tasbih → Quran → Home(right) */}
                   {[...PREVIEW_SCREENS].reverse().map((screen) => (
                     <button
+                      type="button"
                       key={screen.id}
                       onClick={() => setCurrentScreen(screen.id)}
                       className="flex flex-col items-center p-1.5 rounded-xl transition-colors"
                     >
                       <span className="text-lg">{screen.icon}</span>
                       <span
-                        className="text-[9px] mt-0.5 font-medium"
-                        style={{
-                          color: currentScreen === screen.id ? '#22C55E' : (theme === 'dark' ? '#6B7280' : '#9CA3AF'),
-                        }}
+                        className={`text-[9px] mt-0.5 font-medium ${
+                          currentScreen === screen.id
+                            ? 'text-emerald-500'
+                            : theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+                        }`}
                       >
                         {screen.name}
                       </span>
@@ -558,10 +553,13 @@ const MobilePreview: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isO
 
                 {/* Home Indicator */}
                 {device === 'iphone' && (
-                  <div className="flex justify-center pb-2" style={{ background: tabBarBg }}>
+                  <div className={`flex justify-center pb-2 ${
+                    theme === 'dark' ? 'bg-[rgba(16,22,33,0.95)]' : 'bg-white/95'
+                  }`}>
                     <div
-                      className="w-32 h-1 rounded-full"
-                      style={{ background: theme === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)' }}
+                      className={`w-32 h-1 rounded-full ${
+                        theme === 'dark' ? 'bg-white/20' : 'bg-black/15'
+                      }`}
                     />
                   </div>
                 )}

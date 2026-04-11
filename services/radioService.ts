@@ -136,6 +136,140 @@ async function fetchFirestoreStations(): Promise<RadioStation[]> {
   }
 }
 
+// ==================== Local Fallback Stations ====================
+
+const FALLBACK_STATIONS: RadioStation[] = [
+  {
+    id: 'fallback_cairo_quran',
+    name: 'إذاعة القرآن الكريم من القاهرة',
+    nameTranslations: { ar: 'إذاعة القرآن الكريم من القاهرة', en: 'Holy Quran Radio Cairo — FM 98.2', fr: 'Radio Sainte Coran du Caire — FM 98.2', tr: 'Kahire Kutsal Kuran Radyosu — FM 98.2' },
+    streamUrl: 'https://service.webvideocore.net/CL1olYogIrDWvwqiIKK7eCxOS4PStqG9DuEjAr2ZjZQtvS3d4y9r0cvRhvS17SGN/a_7a4vuubc6mo8.m3u8',
+    source: 'admin',
+    sourceId: 'cairo_quran',
+    category: 'quran',
+    country: 'EG',
+    language: 'ar',
+    tags: ['quran', 'cairo', 'egypt'],
+    isFeatured: true,
+    order: 1,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_saudi_quran',
+    name: 'إذاعة القرآن الكريم - السعودية',
+    nameTranslations: { ar: 'إذاعة القرآن الكريم - السعودية', en: 'Saudi Quran Radio', fr: 'Radio Coran Saoudienne', tr: 'Suudi Kuran Radyosu' },
+    streamUrl: 'https://backup.qurango.net/radio/abdulrahman_alsudaes',
+    source: 'admin',
+    sourceId: 'saudi_quran',
+    category: 'quran',
+    country: 'SA',
+    language: 'ar',
+    tags: ['quran', 'saudi'],
+    isFeatured: true,
+    order: 2,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_makkah_live',
+    name: 'إذاعة الحرم المكي',
+    nameTranslations: { ar: 'إذاعة الحرم المكي', en: 'Makkah Live', fr: 'La Mecque en direct', tr: 'Mekke Canlı' },
+    streamUrl: 'https://backup.qurango.net/radio/mix',
+    source: 'admin',
+    sourceId: 'makkah_live',
+    category: 'quran',
+    country: 'SA',
+    language: 'ar',
+    tags: ['quran', 'makkah', 'haram'],
+    isFeatured: true,
+    order: 3,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_makkah_quran',
+    name: 'إذاعة القرآن الكريم من مكة المكرمة',
+    nameTranslations: { ar: 'إذاعة القرآن الكريم من مكة المكرمة', en: 'Holy Quran Radio - Makkah' },
+    streamUrl: 'https://Qurango.net/radio/tarateel',
+    source: 'admin',
+    sourceId: 'makkah_quran',
+    category: 'quran',
+    country: 'SA',
+    language: 'ar',
+    tags: ['quran', 'makkah'],
+    order: 4,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_alafasi',
+    name: 'إذاعة مشاري العفاسي',
+    nameTranslations: { ar: 'إذاعة مشاري العفاسي', en: 'Mishary Alafasi Radio' },
+    streamUrl: 'https://backup.qurango.net/radio/mishary_alafasi',
+    source: 'admin',
+    sourceId: 'alafasi',
+    category: 'islamic',
+    country: 'KW',
+    language: 'ar',
+    tags: ['quran', 'reciter', 'alafasi'],
+    order: 5,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_shuraim',
+    name: 'إذاعة سعود الشريم',
+    nameTranslations: { ar: 'إذاعة سعود الشريم', en: 'Saud Al-Shuraim Radio' },
+    streamUrl: 'https://backup.qurango.net/radio/saud_alshuraim',
+    source: 'admin',
+    sourceId: 'shuraim',
+    category: 'islamic',
+    country: 'SA',
+    language: 'ar',
+    tags: ['quran', 'reciter', 'shuraim'],
+    order: 6,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_muaiqly',
+    name: 'إذاعة ماهر المعيقلي',
+    nameTranslations: { ar: 'إذاعة ماهر المعيقلي', en: 'Maher Al-Muaiqly Radio' },
+    streamUrl: 'https://backup.qurango.net/radio/maher_almuaiqly',
+    source: 'admin',
+    sourceId: 'muaiqly',
+    category: 'islamic',
+    country: 'SA',
+    language: 'ar',
+    tags: ['quran', 'reciter', 'muaiqly'],
+    order: 7,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_abdulbasit',
+    name: 'إذاعة عبدالباسط عبدالصمد',
+    nameTranslations: { ar: 'إذاعة عبدالباسط عبدالصمد', en: 'Abdulbasit Abdulsamad Radio' },
+    streamUrl: 'https://backup.qurango.net/radio/abdulbasit_abdulsamad_mojawwad',
+    source: 'admin',
+    sourceId: 'abdulbasit',
+    category: 'islamic',
+    country: 'EG',
+    language: 'ar',
+    tags: ['quran', 'reciter', 'abdulbasit'],
+    order: 8,
+    isOnline: true,
+  },
+  {
+    id: 'fallback_hussary',
+    name: 'إذاعة محمود خليل الحصري',
+    nameTranslations: { ar: 'إذاعة محمود خليل الحصري', en: 'Mahmoud Khalil Al-Hussary Radio' },
+    streamUrl: 'https://Qurango.net/radio/mahmoud_khalil_alhussary',
+    source: 'admin',
+    sourceId: 'hussary',
+    category: 'islamic',
+    country: 'EG',
+    language: 'ar',
+    tags: ['quran', 'reciter', 'hussary'],
+    order: 9,
+    isOnline: true,
+  },
+];
+
 // ==================== Sort ====================
 
 function sortStations(stations: RadioStation[]): RadioStation[] {
@@ -163,8 +297,12 @@ async function getCachedStations(): Promise<RadioStation[] | null> {
     const config = await getRadioConfig();
     const ttl = (config?.cacheTTLMinutes || DEFAULT_CACHE_TTL) * 60 * 1000;
 
-    if (Date.now() - ts > ttl) return null;
-    return JSON.parse(cached) as RadioStation[];
+    // If cached data is only fallback-level (≤ fallback count), use very short TTL
+    // so the app retries Firestore quickly after a transient error
+    const parsed = JSON.parse(cached) as RadioStation[];
+    const effectiveTtl = parsed.length <= FALLBACK_STATIONS.length ? 2 * 60 * 1000 : ttl;
+    if (Date.now() - ts > effectiveTtl) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -207,13 +345,19 @@ export async function fetchAllStations(forceRefresh = false): Promise<RadioStati
   // Check cache first
   if (!forceRefresh) {
     const cached = await getCachedStations();
-    if (cached) return cached;
+    if (cached && cached.length > 0) return cached;
   }
 
   const config = await getRadioConfig();
 
   // Fetch all stations from Firestore
-  const stations = await fetchFirestoreStations();
+  let stations = await fetchFirestoreStations();
+
+  // Use local fallback if Firestore returned nothing
+  if (stations.length === 0) {
+    console.log('[RadioService] Firestore empty — using local fallback stations');
+    stations = FALLBACK_STATIONS;
+  }
 
   // Apply admin config: hide stations
   const hiddenIds = new Set(config?.hiddenStationIds || []);

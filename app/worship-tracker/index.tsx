@@ -10,11 +10,13 @@ import {
   TouchableOpacity,
   RefreshControl,
   Dimensions,
-  StatusBar,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -33,7 +35,10 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { Colors, DarkColors } from '@/constants/theme';
+import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 
@@ -63,6 +68,7 @@ const StatCard: React.FC<StatCardProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -86,9 +92,13 @@ const StatCard: React.FC<StatCardProps> = ({
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
-        style={[styles.statCard, isDarkMode && styles.statCardDark]}
+        style={[styles.statCard, { backgroundColor: colors.card }]}
       >
-        <View style={[styles.statIconContainer, { backgroundColor: `${color}15` }]}>
+        <View style={[styles.statIconContainer, { overflow: 'hidden' }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <MaterialCommunityIcons name={icon} size={24} color={color} />
         </View>
         <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
@@ -138,12 +148,12 @@ const TrackerCard: React.FC<TrackerCardProps> = ({
                 <MaterialCommunityIcons name={icon} size={28} color="#fff" />
               </View>
               <View style={styles.trackerTextContainer}>
-                <Text style={[styles.trackerTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{title}</Text>
-                <Text style={[styles.trackerDescription, { textAlign: isRTL ? 'right' : 'left' }]}>{description}</Text>
+                <Text style={[styles.trackerTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{title}</Text>
+                <Text style={[styles.trackerDescription, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{description}</Text>
               </View>
             </View>
             
-            <View style={[styles.trackerRight, { flexDirection: 'row' }]}>
+            <View style={[styles.trackerRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={22} color="rgba(255,255,255,0.7)" />
               {status && (
                 <View style={styles.statusBadge}>
@@ -183,12 +193,13 @@ const QuickAction: React.FC<QuickActionProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <TouchableOpacity
       style={[
         styles.quickAction,
-        isDarkMode && styles.quickActionDark,
+        { backgroundColor: colors.card },
         isActive && { backgroundColor: `${color}30`, borderColor: color },
       ]}
       onPress={() => {
@@ -200,7 +211,7 @@ const QuickAction: React.FC<QuickActionProps> = ({
       <MaterialCommunityIcons
         name={icon}
         size={24}
-        color={isActive ? color : isDarkMode ? '#aaa' : '#666'}
+        color={isActive ? color : colors.icon}
       />
       <Text
         style={[
@@ -246,6 +257,7 @@ export default function WorshipTrackerScreen() {
   
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
 
   // حساب إحصائيات الصلاة اليوم
@@ -270,6 +282,13 @@ export default function WorshipTrackerScreen() {
     await Promise.all([refreshTodayRecords(), refreshStats()]);
     setIsRefreshing(false);
   }, [refreshTodayRecords, refreshStats]);
+
+  // Refresh when screen gains focus (e.g. returning from azkar completion)
+  useFocusEffect(
+    useCallback(() => {
+      refreshTodayRecords().catch(() => {});
+    }, [refreshTodayRecords])
+  );
 
   // التنقل
   const navigateTo = (screen: string) => {
@@ -310,12 +329,10 @@ export default function WorshipTrackerScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, { backgroundColor: settings.display.appBackground === 'none' ? (isDarkMode ? '#11151c' : '#fff') : 'transparent' }]}
+      style={styles.container}
     >
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       
       {/* الهيدر */}
       <UniversalHeader
@@ -330,7 +347,7 @@ export default function WorshipTrackerScreen() {
         }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('worship.title')}</Text>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('home.worshipTracker')}</Text>
           <SectionInfoButton sectionKey="worship" />
         </View>
       </UniversalHeader>
@@ -343,8 +360,8 @@ export default function WorshipTrackerScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#22C55E']}
-            tintColor="#22C55E"
+            colors={['#0d8e62']}
+            tintColor="#0d8e62"
           />
         }
       >
@@ -369,7 +386,7 @@ export default function WorshipTrackerScreen() {
               value={`${stats?.prayer?.percentage ?? 0}%`}
               subtitle={`${t('worship.currentStreak')}: ${stats?.prayer?.streak ?? 0} ${t('home.days')}`}
               icon="mosque"
-              color="#22C55E"
+              color="#0d8e62"
               index={0}
               onPress={() => navigateTo('prayer')}
               isDarkMode={isDarkMode}
@@ -379,7 +396,7 @@ export default function WorshipTrackerScreen() {
               value={stats?.fasting?.totalDays ?? 0}
               subtitle={`${t('worship.currentStreak')}: ${stats?.fasting?.currentStreak ?? 0} ${t('home.days')}`}
               icon="moon-waning-crescent"
-              color="#5d4e8c"
+              color="#4a3d73"
               index={1}
               onPress={() => navigateTo('fasting')}
               isDarkMode={isDarkMode}
@@ -416,7 +433,7 @@ export default function WorshipTrackerScreen() {
             <QuickAction
               icon="moon-waning-crescent"
               label={t('worship.recordFasting')}
-              color="#5d4e8c"
+              color="#4a3d73"
               isActive={todayFasting?.fasted ?? false}
               onPress={handleToggleFasting}
               isDarkMode={isDarkMode}
@@ -424,7 +441,7 @@ export default function WorshipTrackerScreen() {
             <QuickAction
               icon="weather-sunny"
               label={t('home.morningAzkar')}
-              color="#f5a623"
+              color="#c07b10"
               isActive={todayAzkar?.morning ?? false}
               onPress={handleToggleMorningAzkar}
               isDarkMode={isDarkMode}
@@ -443,14 +460,14 @@ export default function WorshipTrackerScreen() {
         {/* متتبعات العبادات */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            {t('worship.title')}
+            {t('home.worshipTracker')}
           </Text>
           <View style={styles.trackersContainer}>
             <TrackerCard
               title={t('worship.prayerTracker')}
               description={t('worship.tapToSelectStatus')}
               icon="mosque"
-              colors={['#22C55E', '#1d4a3a']}
+              colors={['#0d8e62', '#1d4a3a']}
               progress={getPrayerProgress()}
               status={getPrayedCount()}
               index={0}
@@ -461,7 +478,7 @@ export default function WorshipTrackerScreen() {
               title={t('worship.fastingTracker')}
               description={t('worship.recordFasting')}
               icon="moon-waning-crescent"
-              colors={['#5d4e8c', '#3d3260']}
+              colors={['#4a3d73', '#3d3260']}
               status={todayFasting?.fasted ? t('worship.youAreFasting') : t('worship.tapToRecord')}
               index={1}
               onPress={() => navigateTo('fasting')}
@@ -495,7 +512,7 @@ export default function WorshipTrackerScreen() {
         <Animated.View entering={FadeInDown.delay(400).duration(500)}>
           <GlassCard style={styles.tipCard}>
             <View style={[styles.tipHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#f5a623" />
+              <MaterialCommunityIcons name="lightbulb-outline" size={20} color="#c07b10" />
               <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.tipOfDay')}</Text>
             </View>
             <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
@@ -515,20 +532,12 @@ export default function WorshipTrackerScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   containerDark: {
-    backgroundColor: '#11151c',
-  },
-
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
+    backgroundColor: DarkColors.background,
   },
 
   scrollView: {
@@ -540,10 +549,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     paddingHorizontal: 20,
     marginTop: 10,
     marginBottom: 12,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   // إحصائيات
   statsContainer: {
@@ -552,14 +562,13 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: 140,
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 15,
     alignItems: 'center',
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   statCardDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   statIconContainer: {
     width: 50,
@@ -568,24 +577,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    backgroundColor: 'rgba(120,120,128,0.08)',
+    overflow: 'hidden',
   },
   statValue: {
     fontSize: 24,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   statTitle: {
     fontSize: 12,
     fontFamily: fontMedium(),
-    color: '#666',
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   statSubtitle: {
     fontSize: 10,
     fontFamily: fontRegular(),
-    color: '#999',
     marginTop: 2,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   // أفعال سريعة
   quickActionsGrid: {
@@ -595,7 +607,6 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     flex: 1,
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 15,
     alignItems: 'center',
@@ -604,14 +615,15 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   quickActionDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   quickActionLabel: {
     fontSize: 11,
     fontFamily: fontMedium(),
-    color: '#666',
     marginTop: 8,
     textAlign: 'center',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   checkBadge: {
     position: 'absolute',
@@ -661,12 +673,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   trackerDescription: {
     fontSize: 11,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   trackerRight: {
     flexDirection: 'row',
@@ -689,6 +705,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   statusBadge: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -700,6 +718,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: fontMedium(),
     color: '#fff',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   // نصيحة
   tipCard: {
@@ -716,15 +736,16 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   tipText: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
   },
   bottomSpace: {
     height: 100,
   },
 });
+const styles = _styles;

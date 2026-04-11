@@ -9,7 +9,9 @@ import {
   Switch, Platform, Alert, TextInput, Modal, ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import { BlurView } from 'expo-blur';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -43,6 +45,7 @@ interface TimePickerProps {
 
 function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }: TimePickerProps) {
   const colors = useColors();
+  const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const [hour, setHour] = useState(() => value.split(':')[0] || '07');
   const [minute, setMinute] = useState(() => value.split(':')[1] || '00');
@@ -68,7 +71,17 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
         onPress={onClose}
       >
         <TouchableOpacity activeOpacity={1}>
-          <View style={{ backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 20, padding: 24, width: 280, alignItems: 'center' }}>
+          <View style={{ borderRadius: 20, width: 280, overflow: 'hidden' }}>
+            {Platform.OS === 'ios' && (
+              <BlurView
+               
+                intensity={80}
+                tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+            <View style={{ padding: 24, alignItems: 'center' }}>
             <Text style={{ fontSize: 16, fontWeight: '800', color: colors.foreground, marginBottom: 20 }}>{title}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 }}>
               <View>
@@ -106,6 +119,7 @@ function TimePickerModal({ visible, value, title, onSave, onClose, accentColor }
               >
                 <Text style={{ color: '#fff', fontWeight: '800' }}>{t('common.save')}</Text>
               </TouchableOpacity>
+            </View>
             </View>
           </View>
         </TouchableOpacity>
@@ -218,7 +232,7 @@ export default function NotificationsCenterScreen() {
     }
   };
 
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     header: {
       paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14,
       borderBottomWidth: 1, borderBottomColor: colors.border,
@@ -237,22 +251,22 @@ export default function NotificationsCenterScreen() {
     sectionIcon: { fontSize: 20 },
     sectionTitle: { fontSize: 15, fontWeight: '900', color: colors.foreground, flex: 1 },
     sectionToggle: {},
-    card: { marginHorizontal: 12, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+    card: { marginHorizontal: 12, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
     row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 8 },
     rowDivider: { height: 0.5, backgroundColor: colors.border, marginHorizontal: 16 },
-    rowLabel: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' },
-    rowSub: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left' },
+    rowLabel: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontWeight: '600' },
+    rowSub: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    timeBtn: { backgroundColor: colors.primary + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: colors.primary + '35' },
-    timeBtnText: { fontSize: 14, fontWeight: '800', color: colors.primary },
+    timeBtn: { backgroundColor: colors.primary + '28', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 5, borderWidth: 1, borderColor: colors.primary + '40' },
+    timeBtnText: { fontSize: 14, fontWeight: '800', color: colors.primaryText },
     // Prayer row
     prayerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11, gap: 8 },
     prayerEmoji: { fontSize: 18 },
-    prayerName: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', fontWeight: '600' },
+    prayerName: { flex: 1, fontSize: 15, color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontWeight: '600' },
     // Advance row
     advanceRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingBottom: 12, flexWrap: 'wrap' },
-    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.3)' },
-    advChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    advChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, backgroundColor: 'rgba(34, 197, 94, 0.22)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.35)' },
+    advChipActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     advChipText: { fontSize: 13, fontWeight: '700', color: colors.muted },
     advChipTextActive: { color: '#fff' },
     // Radio buttons for adhan type
@@ -262,6 +276,7 @@ export default function NotificationsCenterScreen() {
     // Save indicator
     savingBadge: { position: 'absolute', top: 10, ...(isRTL ? { left: 16 } : { right: 16 }), backgroundColor: colors.success + '20', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   const PRAYERS = [
     { key: 'Fajr',    icon: 'weather-night' as const, name: t('prayer.fajr') },
@@ -292,7 +307,7 @@ export default function NotificationsCenterScreen() {
         {permissionChecked && !hasPermission && (
           <TouchableOpacity style={[s.permBanner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={handleRequestPermission}>
             <MaterialCommunityIcons name="alert" size={22} color={colors.warning} />
-            <Text style={{ flex: 1, fontSize: 13, color: colors.warning, fontWeight: '600', textAlign: isRTL ? 'right' : 'left' }}>
+            <Text style={{ flex: 1, fontSize: 13, color: colors.warning, fontWeight: '600', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
               {t('settings.enableNotifPermission')}
             </Text>
           </TouchableOpacity>
@@ -313,6 +328,15 @@ export default function NotificationsCenterScreen() {
         </View>
 
         <View style={[s.card, !settings.adhanEnabled && { opacity: 0.5 }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+             
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           {PRAYERS.map((p, idx) => (
             <View key={p.key}>
               {idx > 0 && <View style={s.rowDivider} />}
@@ -335,7 +359,7 @@ export default function NotificationsCenterScreen() {
           {/* Advance minutes */}
           <View style={s.rowDivider} />
           <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 8 }}>
               {`⏱️ ${t('settings.advanceReminder')}`}
             </Text>
           </View>
@@ -357,7 +381,7 @@ export default function NotificationsCenterScreen() {
           {/* Adhan Type Selection */}
           <View style={s.rowDivider} />
           <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, textAlign: isRTL ? 'right' : 'left', marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 8 }}>
               {`🔊 ${t('settings.adhanType')}`}
             </Text>
           </View>
@@ -383,7 +407,7 @@ export default function NotificationsCenterScreen() {
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <Text style={[s.prayerName, { fontWeight: '700' }]}>{t('settings.fullAdhan')}</Text>
-              <Text style={{ fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left' }}>
+              <Text style={{ fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                 {t('settings.fullAdhanDesc')}
               </Text>
             </View>
@@ -415,7 +439,7 @@ export default function NotificationsCenterScreen() {
             </TouchableOpacity>
             <View style={{ flex: 1 }}>
               <Text style={[s.prayerName, { fontWeight: '700' }]}>{t('settings.simpleAdhan')}</Text>
-              <Text style={{ fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left' }}>
+              <Text style={{ fontSize: 11, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                 {t('settings.simpleAdhanDesc')}
               </Text>
             </View>
@@ -440,6 +464,15 @@ export default function NotificationsCenterScreen() {
         </View>
 
         <View style={[s.card, !settings.wirdEnabled && { opacity: 0.5 }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+             
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <View style={[s.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.rowRight}>
               <TouchableOpacity
@@ -490,6 +523,15 @@ export default function NotificationsCenterScreen() {
         </View>
 
         <View style={[s.card, !settings.kahfEnabled && { opacity: 0.5 }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+             
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <View style={[s.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.rowRight}>
               <TouchableOpacity
@@ -523,6 +565,15 @@ export default function NotificationsCenterScreen() {
         </View>
 
         <View style={[s.card, !settings.dailyAyahEnabled && { opacity: 0.5 }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+             
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <View style={[s.row, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={s.rowRight}>
               <TouchableOpacity
@@ -542,8 +593,18 @@ export default function NotificationsCenterScreen() {
         </View>
 
         {/* ── Status Summary ────────────────────────────────── */}
-        <View style={{ marginHorizontal: 12, marginTop: 20, padding: 16, backgroundColor: 'rgba(120,120,128,0.12)', borderRadius: 16, borderWidth: 1, borderColor: colors.border }}>
-          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 }}>
+        <View style={{ marginHorizontal: 12, marginTop: 20, borderRadius: 16, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' }}>
+          {Platform.OS === 'ios' && (
+            <BlurView
+             
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <View style={{ padding: 16 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 10 }}>
             {t('settings.activeSummary')}
           </Text>
           {[
@@ -555,7 +616,7 @@ export default function NotificationsCenterScreen() {
             <View key={i} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: item.on ? colors.success : colors.border }} />
               <MaterialCommunityIcons name={item.icon} size={16} color={item.on ? colors.foreground : colors.muted} />
-              <Text style={{ flex: 1, fontSize: 13, color: item.on ? colors.foreground : colors.muted, textAlign: isRTL ? 'right' : 'left' }}>
+              <Text style={{ flex: 1, fontSize: 13, color: item.on ? colors.foreground : colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                 {item.label}
               </Text>
               <Text style={{ fontSize: 11, fontWeight: '700', color: item.on ? colors.success : colors.muted }}>
@@ -563,6 +624,7 @@ export default function NotificationsCenterScreen() {
               </Text>
             </View>
           ))}
+          </View>
         </View>
 
       </ScrollView>

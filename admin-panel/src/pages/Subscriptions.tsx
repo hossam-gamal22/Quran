@@ -5,6 +5,7 @@ import { db } from '../firebase';
 interface SubscriptionConfig {
   enabled: boolean;
   lifetimeEnabled: boolean;
+  premiumBannerEnabled: boolean;
   products: {
     monthly: { android: string; ios: string };
     yearly: { android: string; ios: string };
@@ -26,6 +27,7 @@ interface SubscriptionConfig {
 
 interface AdminGrantEntry {
   userId: string;
+  userName: string;
   granted: boolean;
   plan: string;
   expiresAt: string | null;
@@ -33,13 +35,19 @@ interface AdminGrantEntry {
   grantedAt: string;
 }
 
+interface UserOption {
+  id: string;
+  name: string;
+}
+
 const DEFAULT_CONFIG: SubscriptionConfig = {
   enabled: false,
   lifetimeEnabled: false,
+  premiumBannerEnabled: true,
   products: {
-    monthly: { android: 'rooh_muslim_monthly', ios: 'rooh_muslim_monthly' },
-    yearly: { android: 'rooh_muslim_yearly', ios: 'rooh_muslim_yearly' },
-    lifetime: { android: 'rooh_muslim_lifetime', ios: 'rooh_muslim_lifetime' },
+    monthly: { android: 'rooh_premium_monthly', ios: 'rooh_premium_monthly' },
+    yearly: { android: 'rooh_premium_yearly', ios: 'rooh_premium_yearly' },
+    lifetime: { android: 'rooh_premium_lifetime', ios: 'rooh_premium_lifetime' },
   },
   features: [
     'إزالة جميع الإعلانات',
@@ -73,6 +81,8 @@ export default function Subscriptions() {
   const [grantReason, setGrantReason] = useState('');
   const [grantingUser, setGrantingUser] = useState(false);
   const [grantedUsers, setGrantedUsers] = useState<AdminGrantEntry[]>([]);
+  const [allUsers, setAllUsers] = useState<UserOption[]>([]);
+
 
   useEffect(() => {
     loadConfig();
@@ -97,11 +107,18 @@ export default function Subscriptions() {
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
       const granted: AdminGrantEntry[] = [];
+      const usersList: UserOption[] = [];
       usersSnap.forEach((userDoc) => {
         const data = userDoc.data();
+        const userName = data.displayName || data.name || '';
+        // Build full user list for the picker
+        if (!data.placeholder) {
+          usersList.push({ id: userDoc.id, name: userName || userDoc.id });
+        }
         if (data.adminPremium?.granted) {
           granted.push({
             userId: userDoc.id,
+            userName: userName || userDoc.id,
             granted: true,
             plan: data.adminPremium.plan || 'yearly',
             expiresAt: data.adminPremium.expiresAt || null,
@@ -111,6 +128,7 @@ export default function Subscriptions() {
         }
       });
       setGrantedUsers(granted);
+      setAllUsers(usersList);
     } catch (error) {
       console.error('Error loading granted users:', error);
     }
@@ -182,6 +200,8 @@ export default function Subscriptions() {
     }
   };
 
+
+
   const updateProduct = (plan: 'monthly' | 'yearly' | 'lifetime', platform: 'android' | 'ios', value: string) => {
     setConfig(prev => ({
       ...prev,
@@ -214,7 +234,7 @@ export default function Subscriptions() {
   const offer = config.seasonalOffer || DEFAULT_CONFIG.seasonalOffer!;
 
   if (loading) {
-    return <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" /></div>;
+    return <div className="flex justify-center py-20"><div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full" /></div>;
   }
 
   return (
@@ -259,6 +279,22 @@ export default function Subscriptions() {
         </div>
       </div>
 
+      {/* Premium Upgrade Banner Toggle */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">بانر الترقية للبريميوم</h2>
+            <p className="text-gray-500 text-sm">إظهار/إخفاء بانر "ترقية للبريميوم" في الصفحة الرئيسية لجميع المستخدمين</p>
+          </div>
+          <button onClick={() => setConfig(prev => ({ ...prev, premiumBannerEnabled: !prev.premiumBannerEnabled }))}
+            aria-label="تفعيل بانر الترقية"
+            title="تفعيل بانر الترقية"
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${config.premiumBannerEnabled ? 'bg-amber-500 text-white' : 'bg-gray-300 text-gray-700'}`}>
+            {config.premiumBannerEnabled ? 'ظاهر' : 'مخفي'}
+          </button>
+        </div>
+      </div>
+
       {/* Product IDs */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">معرّفات المنتجات (Store IDs)</h2>
@@ -274,7 +310,7 @@ export default function Subscriptions() {
                   onChange={(e) => updateProduct(plan, 'android', e.target.value)}
                   placeholder="Android Product ID"
                   aria-label={`Android ${plan} product ID`}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent outline-none" />
               </div>
               <div>
                 <label className="text-xs text-gray-500">iOS</label>
@@ -282,7 +318,7 @@ export default function Subscriptions() {
                   onChange={(e) => updateProduct(plan, 'ios', e.target.value)}
                   placeholder="iOS Product ID"
                   aria-label={`iOS ${plan} product ID`}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent outline-none" />
               </div>
             </div>
           </div>
@@ -297,7 +333,7 @@ export default function Subscriptions() {
             <input type="text" value={feature} onChange={(e) => updateFeature(i, e.target.value)}
               placeholder="اسم الميزة"
               aria-label="اسم الميزة"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" dir="rtl" />
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-accent outline-none" dir="rtl" />
             <button onClick={() => removeFeature(i)} className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm">حذف</button>
           </div>
         ))}
@@ -316,7 +352,7 @@ export default function Subscriptions() {
               onChange={(e) => setConfig(prev => ({ ...prev, trialDays: Number(e.target.value) }))}
               placeholder="3"
               aria-label="مدة التجربة"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">عرض عند الفتح</label>
@@ -333,7 +369,7 @@ export default function Subscriptions() {
               onChange={(e) => setConfig(prev => ({ ...prev, paywallFrequency: Number(e.target.value) }))}
               placeholder="5"
               aria-label="تكرار العرض"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
           </div>
         </div>
       </div>
@@ -364,7 +400,7 @@ export default function Subscriptions() {
                 onChange={(e) => setConfig(prev => ({ ...prev, seasonalOffer: { ...offer, title: e.target.value } }))}
                 placeholder="عنوان العرض"
                 aria-label="عنوان العرض"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">نسبة الخصم %</label>
@@ -372,7 +408,7 @@ export default function Subscriptions() {
                 onChange={(e) => setConfig(prev => ({ ...prev, seasonalOffer: { ...offer, discountPercent: Number(e.target.value) } }))}
                 placeholder="0"
                 aria-label="نسبة الخصم"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">وصف العرض</label>
@@ -380,7 +416,7 @@ export default function Subscriptions() {
                 onChange={(e) => setConfig(prev => ({ ...prev, seasonalOffer: { ...offer, description: e.target.value } }))}
                 placeholder="وصف العرض"
                 aria-label="وصف العرض"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">تاريخ البداية</label>
@@ -388,7 +424,7 @@ export default function Subscriptions() {
                 onChange={(e) => setConfig(prev => ({ ...prev, seasonalOffer: { ...offer, startDate: e.target.value } }))}
                 aria-label="تاريخ البداية"
                 title="تاريخ البداية"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">تاريخ النهاية</label>
@@ -396,7 +432,7 @@ export default function Subscriptions() {
                 onChange={(e) => setConfig(prev => ({ ...prev, seasonalOffer: { ...offer, endDate: e.target.value } }))}
                 aria-label="تاريخ النهاية"
                 title="تاريخ النهاية"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
             </div>
           </div>
         )}
@@ -404,7 +440,7 @@ export default function Subscriptions() {
 
       {/* Save Config Button */}
       <button onClick={handleSave} disabled={saving}
-        className="w-full bg-emerald-600 text-white py-4 rounded-xl font-medium hover:bg-emerald-700 disabled:opacity-50 mb-8">
+        className="w-full bg-accent-dark text-white py-4 rounded-xl font-medium hover:bg-accent-dark disabled:opacity-50 mb-8">
         {saving ? 'جارٍ الحفظ...' : 'حفظ جميع الإعدادات'}
       </button>
 
@@ -415,18 +451,23 @@ export default function Subscriptions() {
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">معرّف المستخدم (User ID)</label>
-              <input type="text" value={grantUserId} onChange={(e) => setGrantUserId(e.target.value)}
-                placeholder="user_xxxxxxxxx"
-                aria-label="معرّف المستخدم"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" dir="ltr" />
+              <label className="block text-sm font-medium text-gray-700 mb-2">اختر المستخدم</label>
+              <select value={grantUserId} onChange={(e) => setGrantUserId(e.target.value)}
+                aria-label="اختر المستخدم"
+                title="اختر المستخدم"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white" dir="rtl">
+                <option value="">-- اختر مستخدم --</option>
+                {allUsers.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name !== u.id ? `${u.name} (${u.id.slice(0, 20)}...)` : u.id}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">نوع الاشتراك</label>
               <select value={grantPlan} onChange={(e) => setGrantPlan(e.target.value)}
                 aria-label="نوع الاشتراك"
                 title="نوع الاشتراك"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none bg-white">
                 <option value="monthly">شهري</option>
                 <option value="yearly">سنوي</option>
                 <option value="lifetime">مدى الحياة</option>
@@ -437,7 +478,7 @@ export default function Subscriptions() {
               <input type="date" value={grantExpiry} onChange={(e) => setGrantExpiry(e.target.value)}
                 aria-label="تاريخ الانتهاء"
                 title="تاريخ الانتهاء"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" />
               <p className="text-xs text-gray-400 mt-1">اتركه فارغاً لاشتراك بدون تاريخ انتهاء</p>
             </div>
             <div>
@@ -445,7 +486,7 @@ export default function Subscriptions() {
               <input type="text" value={grantReason} onChange={(e) => setGrantReason(e.target.value)}
                 placeholder="منحة من الإدارة"
                 aria-label="سبب المنح"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" dir="rtl" />
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none" dir="rtl" />
             </div>
           </div>
           <button onClick={handleGrantSubscription} disabled={grantingUser}
@@ -474,7 +515,20 @@ export default function Subscriptions() {
               <tbody className="divide-y divide-gray-100">
                 {grantedUsers.map((user) => (
                   <tr key={user.userId} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-800 font-mono" dir="ltr">{user.userId.slice(0, 20)}...</td>
+                    <td className="px-4 py-3 text-sm text-gray-800">
+                      <div className="font-medium">{user.userName}</div>
+                      {user.userName !== user.userId && (
+                        <div className="text-xs text-gray-400 font-mono mt-0.5 flex items-center gap-1" dir="ltr">
+                          <span>{user.userId.slice(0, 24)}...</span>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(user.userId); }}
+                            className="text-gray-400 hover:text-gray-600 shrink-0"
+                            title="نسخ المعرّف"
+                            aria-label="نسخ المعرّف"
+                          >📋</button>
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
                       {user.plan === 'monthly' ? 'شهري' : user.plan === 'yearly' ? 'سنوي' : 'مدى الحياة'}
                     </td>
@@ -498,6 +552,8 @@ export default function Subscriptions() {
           </div>
         )}
       </div>
+
+
     </>
   );
 }

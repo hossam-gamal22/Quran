@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useKhatma } from '../../contexts/KhatmaContext';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useCelebration } from '@/contexts/CelebrationContext';
 import { useColors } from '../../hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getPageSurah, getKhatmaStats } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
 import { UniversalHeader } from '@/components/ui';
@@ -26,12 +28,15 @@ import {
   BorderRadius,
   FONT_SIZES,
 } from '../../constants/theme';
+import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
 
 export default function WirdScreen() {
   const router = useRouter();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { settings, t } = useSettings();
   const isRTL = useIsRTL();
+  const { showCelebration } = useCelebration();
   const {
     activeKhatma,
     getTodayWirdInfo,
@@ -79,15 +84,16 @@ export default function WirdScreen() {
           onPress: async () => {
             setIsCompleting(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            playPageSound('khatmaComplete', EFFECT_SOUNDS.success).catch(() => {});
             
             const success = await completeTodayWird();
             
             if (success) {
-              Alert.alert(
-                t('khatma.congratulations'),
-                t('khatma.wirdCompletedMsg'),
-                [{ text: t('common.ok') }]
-              );
+              showCelebration({
+                type: 'khatma_wird',
+                title: t('celebration.wirdComplete'),
+                subtitle: t('celebration.wirdSubtitle'),
+              });
             }
             setIsCompleting(false);
           },
@@ -142,7 +148,7 @@ export default function WirdScreen() {
             {t('khatma.noActiveKhatmaDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -168,7 +174,7 @@ export default function WirdScreen() {
             {t('khatma.khatmaCompletedMsg')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleResetKhatma}
           >
             <Ionicons name="refresh" size={20} color="#FFFFFF" />
@@ -228,7 +234,7 @@ export default function WirdScreen() {
                 ]}
               />
             </View>
-            <Text style={[styles.progressText, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.progressText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {toArabicNumber(stats?.progressPercentage || 0)}٪
             </Text>
           </View>
@@ -236,7 +242,7 @@ export default function WirdScreen() {
           {/* Stats Row */}
           <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
+              <Text style={[styles.statValue, { color: colors.primaryText }]}>
                 {toArabicNumber(stats?.pagesRead || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -245,7 +251,7 @@ export default function WirdScreen() {
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
+              <Text style={[styles.statValue, { color: colors.primaryText }]}>
                 {toArabicNumber(stats?.pagesRemaining || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -254,7 +260,7 @@ export default function WirdScreen() {
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, { color: colors.primary }]}>
+              <Text style={[styles.statValue, { color: colors.primaryText }]}>
                 {toArabicNumber(stats?.daysRemaining || 0)}
               </Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -304,7 +310,7 @@ export default function WirdScreen() {
               <Text style={[styles.wirdTotalLabel, { color: colors.textSecondary }]}>
                 {t('khatma.totalWird')}
               </Text>
-              <Text style={[styles.wirdTotalValue, { color: colors.primary }]}>
+              <Text style={[styles.wirdTotalValue, { color: colors.primaryText }]}>
                 {toArabicNumber(activeKhatma.pagesPerDay)} {t('khatma.pageUnit')}
               </Text>
             </View>
@@ -321,12 +327,12 @@ export default function WirdScreen() {
                 style={[styles.pageItem, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                 onPress={() => handleOpenPage(page.number)}
               >
-                <View style={[styles.pageNumber, { backgroundColor: colors.primary + '15' }]}>
-                  <Text style={[styles.pageNumberText, { color: colors.primary }]}>
+                <View style={[styles.pageNumber, { backgroundColor: colors.primary + '25' }]}>
+                  <Text style={[styles.pageNumberText, { color: colors.primaryText }]}>
                     {toArabicNumber(page.number)}
                   </Text>
                 </View>
-                <Text style={[styles.pageSurah, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                <Text style={[styles.pageSurah, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {page.surah}
                 </Text>
                 <Ionicons name={isRTL ? 'chevron-forward' : 'chevron-back'} size={20} color={colors.textSecondary} />
@@ -354,7 +360,7 @@ export default function WirdScreen() {
       {!wirdInfo?.isCompleted && (
         <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
           <TouchableOpacity
-            style={[styles.completeButton, { backgroundColor: '#22C55E', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.completeButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleCompleteWird}
             disabled={isCompleting}
           >
@@ -374,7 +380,7 @@ export default function WirdScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -397,10 +403,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: Spacing.md,
     textAlign: 'center',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   emptySubtitle: {
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   startButton: {
     flexDirection: 'row',
@@ -415,6 +425,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   khatmaCard: {
     padding: Spacing.lg,
@@ -425,6 +437,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: Spacing.md,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   progressSection: {
     flexDirection: 'row',
@@ -446,6 +460,8 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
     minWidth: 50,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   statsRow: {
     flexDirection: 'row',
@@ -458,10 +474,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: FONT_SIZES.xl,
     fontWeight: '700',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: FONT_SIZES.xs,
     marginTop: 2,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   statDivider: {
     width: 1,
@@ -479,6 +499,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   completedBadge: {
     flexDirection: 'row',
@@ -492,6 +514,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   wirdSummary: {
     padding: Spacing.lg,
@@ -509,10 +533,14 @@ const styles = StyleSheet.create({
   },
   wirdLabel: {
     fontSize: FONT_SIZES.xs,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   wirdValue: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   wirdTotal: {
     flexDirection: 'row',
@@ -523,15 +551,21 @@ const styles = StyleSheet.create({
   },
   wirdTotalLabel: {
     fontSize: FONT_SIZES.sm,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   wirdTotalValue: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   pagesTitle: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
     marginBottom: Spacing.sm,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   pagesList: {
     gap: Spacing.sm,
@@ -553,11 +587,15 @@ const styles = StyleSheet.create({
   pageNumberText: {
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   pageSurah: {
     flex: 1,
     fontSize: FONT_SIZES.md,
     fontWeight: '500',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   quoteCard: {
     padding: Spacing.lg,
@@ -568,9 +606,13 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
     textAlign: 'center',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   quoteSource: {
     fontSize: FONT_SIZES.sm,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   bottomBar: {
     position: 'absolute',
@@ -592,5 +634,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

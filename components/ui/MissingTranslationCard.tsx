@@ -7,6 +7,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Linking, StyleSheet, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 import { fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -37,6 +38,7 @@ export function MissingTranslationCard({ pageName }: Props) {
   if (lang === 'ar') return null;
 
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const msg = MESSAGES[lang] || MESSAGES.en;
 
@@ -54,7 +56,7 @@ export function MissingTranslationCard({ pageName }: Props) {
         </Text>
       </View>
       <TouchableOpacity onPress={handlePress} style={[styles.ctaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <MaterialCommunityIcons name="email-outline" size={14} color="#22C55E" />
+        <MaterialCommunityIcons name="email-outline" size={14} color="#0d8e62" />
         <Text style={[styles.cta, { textAlign: isRTL ? 'right' : 'left' }]}>
           {msg.cta}
         </Text>
@@ -63,7 +65,7 @@ export function MissingTranslationCard({ pageName }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   card: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -91,6 +93,6 @@ const styles = StyleSheet.create({
   cta: {
     fontSize: 13,
     fontFamily: fontSemiBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
   },
 });

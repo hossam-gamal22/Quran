@@ -8,8 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,16 +19,17 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const PRAYERS = [
   { key: 'fajr', tKey: 'prayer.fajr', icon: 'weather-sunset-up', color: '#3a7ca5' },
-  { key: 'sunrise', tKey: 'prayer.sunrise', icon: 'white-balance-sunny', color: '#f5a623' },
+  { key: 'sunrise', tKey: 'prayer.sunrise', icon: 'white-balance-sunny', color: '#c07b10' },
   { key: 'dhuhr', tKey: 'prayer.dhuhr', icon: 'weather-sunny', color: '#c17f59' },
-  { key: 'asr', tKey: 'prayer.asr', icon: 'weather-sunny-alert', color: '#22C55E' },
+  { key: 'asr', tKey: 'prayer.asr', icon: 'weather-sunny-alert', color: '#0d8e62' },
   { key: 'maghrib', tKey: 'prayer.maghrib', icon: 'weather-sunset-down', color: '#e91e63' },
-  { key: 'isha', tKey: 'prayer.isha', icon: 'weather-night', color: '#5d4e8c' },
+  { key: 'isha', tKey: 'prayer.isha', icon: 'weather-night', color: '#4a3d73' },
 ] as const;
 
 export default function PrayerAdjustmentsScreen() {
@@ -37,6 +38,7 @@ export default function PrayerAdjustmentsScreen() {
   const { settings, isDarkMode, updatePrayer } = useSettings();
   const { t } = useTranslation();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const adjustments = settings.prayer.adjustments;
 
@@ -62,14 +64,14 @@ export default function PrayerAdjustmentsScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
+            <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t('prayerAdjustments.title')}</Text>
           <TouchableOpacity onPress={handleReset} style={styles.resetBtn}>
@@ -85,7 +87,7 @@ export default function PrayerAdjustmentsScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
               {PRAYERS.map((prayer) => {
                 const value = (adjustments as any)[prayer.key] || 0;
                 return (
@@ -99,18 +101,18 @@ export default function PrayerAdjustmentsScreen() {
                     <View style={[styles.stepper, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <TouchableOpacity
                         onPress={() => handleAdjust(prayer.key, -1)}
-                        style={[styles.stepperBtn, isDarkMode && styles.stepperBtnDark]}
+                        style={[styles.stepperBtn, { backgroundColor: colors.surface }]}
                       >
-                        <MaterialCommunityIcons name="minus" size={18} color={isDarkMode ? '#fff' : '#333'} />
+                        <MaterialCommunityIcons name="minus" size={18} color={colors.text} />
                       </TouchableOpacity>
                       <Text style={[styles.stepperValue, { color: colors.text }, value !== 0 && styles.stepperValueActive]}>
                         {value > 0 ? `+${value}` : value} {t('prayerAdjustments.minutesSuffix')}
                       </Text>
                       <TouchableOpacity
                         onPress={() => handleAdjust(prayer.key, 1)}
-                        style={[styles.stepperBtn, isDarkMode && styles.stepperBtnDark]}
+                        style={[styles.stepperBtn, { backgroundColor: colors.surface }]}
                       >
-                        <MaterialCommunityIcons name="plus" size={18} color={isDarkMode ? '#fff' : '#333'} />
+                        <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -126,9 +128,8 @@ export default function PrayerAdjustmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
-  containerDark: { backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,17 +138,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold(), color: '#333' },
+  headerTitle: { fontSize: 20, fontFamily: fontBold() },
   resetBtn: { padding: 4 },
   resetText: { fontFamily: fontMedium(), fontSize: 14, color: '#ef5350' },
-  textLight: { color: '#fff' },
-  textMuted: { color: '#999' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 10 },
   hint: {
     fontFamily: fontRegular(),
     fontSize: 13,
-    color: '#666',
     textAlign: 'center',
     marginVertical: 16,
   },
@@ -156,7 +154,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  sectionDark: { backgroundColor: 'rgba(120,120,128,0.18)' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,7 +177,6 @@ const styles = StyleSheet.create({
   prayerName: {
     fontFamily: fontSemiBold(),
     fontSize: 16,
-    color: '#333',
   },
   stepper: {
     flexDirection: 'row',
@@ -195,17 +191,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepperBtnDark: {
-    backgroundColor: 'rgba(120,120,128,0.24)',
-  },
   stepperValue: {
     fontFamily: fontBold(),
     fontSize: 17,
-    color: '#666',
     minWidth: 48,
     textAlign: 'center',
   },
   stepperValueActive: {
-    color: '#22C55E',
+    color: '#0d8e62',
   },
 });

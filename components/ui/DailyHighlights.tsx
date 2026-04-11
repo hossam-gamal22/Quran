@@ -29,6 +29,8 @@ import { getDuaOfTheDay } from '../../data/daily-duas';
 import { getLanguage, t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { safeIcon } from '@/lib/safe-icon';
 import { getCachedPrayerTimes, getNextPrayer } from '@/lib/prayer-times';
 const STORY_CACHE_KEY = 'story_of_day_cache';
@@ -62,6 +64,7 @@ interface DailyHighlight {
   color: string;
   imageUrl?: string;
   route: string;
+  routeType?: 'internal' | 'url' | 'html';
   htmlContent?: string;
 }
 
@@ -69,9 +72,10 @@ interface DailyHighlightsProps {
   onStoryPress?: (storyId: string) => void;
   showReorderButton?: boolean;
   onNextPrayerPress?: () => void;
+  onShareAppPress?: () => void;
 }
 
-const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton, onNextPrayerPress }) => {
+const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReorderButton, onNextPrayerPress, onShareAppPress }) => {
   const router = useRouter();
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
@@ -181,6 +185,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           color: h.color,
           imageUrl: h.imageUrl || undefined,
           route: h.route,
+          routeType: h.routeType || 'internal',
           htmlContent: h.htmlContent || undefined,
         }));
       setAdminHighlights(prev => [...mapped, ...prev.filter(p => p.id.startsWith('temp-'))]);
@@ -195,10 +200,11 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
           const isArabic = lang === 'ar';
           const tempHighlights: DailyHighlight[] = tempPages.map(tp => ({
             id: `temp-${tp.id}`,
-            title: isArabic ? tp.title : (tp.titleEn || tp.title),
+            title: tp.titles?.[lang] || (isArabic ? tp.title : (tp.titleEn || tp.title)),
             icon: tp.icon || 'file-document-outline',
-            color: tp.color || '#22C55E',
+            color: tp.color || '#0d8e62',
             route: `/temp-page/${tp.id}`,
+            routeType: 'internal',
           }));
           setAdminHighlights(prev => [
             ...prev.filter(p => !p.id.startsWith('temp-')),
@@ -232,14 +238,22 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       onNextPrayerPress();
       return;
     }
-    if (highlight.htmlContent) {
-      // Open HTML content in in-app webview
+    if (highlight.id === 'share-app') {
+      onShareAppPress?.();
+      return;
+    }
+
+    // Use routeType from admin config when available, fall back to URL detection
+    const routeType = highlight.routeType
+      || (highlight.htmlContent ? 'html' : undefined)
+      || ((highlight.route.startsWith('http://') || highlight.route.startsWith('https://')) ? 'url' : 'internal');
+
+    if (routeType === 'html' && highlight.htmlContent) {
       router.push({ pathname: '/webview', params: { html: highlight.htmlContent, title: highlight.title } } as any);
-    } else if (highlight.route.startsWith('http://') || highlight.route.startsWith('https://')) {
-      // Open URL in in-app webview
+    } else if (routeType === 'url') {
       router.push({ pathname: '/webview', params: { url: highlight.route, title: highlight.title } } as any);
     } else {
-      // Sanitize deprecated /special-surah routes → /surah/{number}
+      // Internal route — sanitize deprecated /special-surah routes
       let route = highlight.route;
       if (route.startsWith('/special-surah')) {
         const match = route.match(/[?&]surah=(\d+)/);
@@ -257,14 +271,14 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       id: 'hijri-date',
       title: `${hijriDate.day} ${hijriDate.monthName}`,
       icon: 'calendar-month',
-      color: '#22C55E',
+      color: '#1e40af',
       route: '/hijri',
     },
     {
       id: 'radio',
       title: t('radio.title'),
       icon: 'radio',
-      color: '#16a34a',
+      color: '#0d8e62',
       route: '/radio',
     },
     {
@@ -301,6 +315,13 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       icon: 'mosque',
       color: '#7c2d12',
       route: '/(tabs)/prayer',
+    },
+    {
+      id: 'share-app',
+      title: t('settings.shareApp'),
+      icon: 'share-variant',
+      color: '#0d8e62',
+      route: '',
     },
   ];
 
@@ -351,8 +372,10 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     setTempOrder(highlights.map(h => h.id));
   };
 
-  const labelColor = isDarkMode ? '#E0E0E0' : '#555';
-  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)';
+  const themeColors = useColors();
+  const styles = useScaledStyles(_styles, themeColors.fs);
+  const labelColor = themeColors.text;
+  const arrowColor = isDarkMode ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)';
 
   const scrollRef = useRef<ScrollView>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(true);
@@ -365,8 +388,15 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
     scrollX.current = contentOffset.x;
     maxScrollX.current = contentSize.width - layoutMeasurement.width;
     // With scaleX: -1, physical x=0 is visual right. Increasing x = visual left.
-    setCanScrollLeft(contentOffset.x < maxScrollX.current - 10);
-    setCanScrollRight(contentOffset.x > 10);
+    // Use functional setState to skip re-renders when value hasn't changed
+    setCanScrollLeft(prev => {
+      const next = contentOffset.x < maxScrollX.current - 10;
+      return prev === next ? prev : next;
+    });
+    setCanScrollRight(prev => {
+      const next = contentOffset.x > 10;
+      return prev === next ? prev : next;
+    });
   }, []);
 
   return (
@@ -480,15 +510,16 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
 
       {loading && (
         <View style={[styles.loadingBadge, isRTL ? { left: 12, right: undefined } : null]}>
-          <ActivityIndicator size="small" color="#22C55E" />
+          <ActivityIndicator size="small" color="#0d8e62" />
         </View>
       )}
 
       {/* Full-width reorder button */}
       {showReorderButton && (
         <BlurView
+         
           intensity={80}
-          tint={isDarkMode ? 'dark' : 'light'}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={styles.fullReorderBlur}
         >
           <TouchableOpacity
@@ -496,8 +527,8 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
             onPress={openReorderModal}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="swap-vertical" size={18} color={isDarkMode ? '#fff' : '#333'} />
-            <Text style={[styles.fullReorderBtnText, { color: isDarkMode ? '#fff' : '#333' }]}>{t('home.reorderSections')}</Text>
+            <MaterialCommunityIcons name="swap-vertical" size={18} color={themeColors.text} />
+            <Text style={[styles.fullReorderBtnText, { color: themeColors.text }]}>{t('home.reorderSections')}</Text>
           </TouchableOpacity>
         </BlurView>
       )}
@@ -511,8 +542,9 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
       >
         <View style={styles.reorderOverlay}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 90 : 50}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 40 : 25}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={styles.reorderBlur}
           >
             <View style={[
@@ -539,7 +571,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                       key={id}
                       style={[
                         styles.reorderItem,
-                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', flexDirection: isRTL ? 'row-reverse' : 'row' },
+                        { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)', flexDirection: isRTL ? 'row-reverse' : 'row' },
                       ]}
                     >
                       <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12, flex: 1 }}>
@@ -579,9 +611,13 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
                   style={[styles.reorderBtn2, styles.reorderResetBtn]}
                   onPress={resetHighlightOrder}
                 >
+                  {Platform.OS === 'ios' && (
+                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                  )}
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                   <Text style={[
                     styles.reorderBtnText,
-                    { color: isDarkMode ? '#aaa' : '#666' },
+                    { color: isDarkMode ? '#A3A3A3' : '#525252' },
                   ]}>
                     {t('common.reset')}
                   </Text>
@@ -601,7 +637,7 @@ const DailyHighlights: React.FC<DailyHighlightsProps> = ({ onStoryPress, showReo
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     marginVertical: 8,
     position: 'relative' as const,
@@ -720,7 +756,7 @@ const styles = StyleSheet.create({
     right: 12,
   },
   fullReorderBlur: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden' as const,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.2)',
@@ -799,10 +835,10 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
   },
   reorderResetBtn: {
-    backgroundColor: 'rgba(120,120,128,0.12)',
+    overflow: 'hidden',
   },
   reorderDoneBtn: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   reorderBtnText: {
     fontSize: 15,

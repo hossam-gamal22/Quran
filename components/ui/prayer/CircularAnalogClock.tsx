@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, Line, G } from 'react-native-svg';
 import { fontRegular } from '@/lib/fonts';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 interface CircularAnalogClockProps {
   size?: number;
@@ -10,6 +12,8 @@ interface CircularAnalogClockProps {
 }
 
 const CircularAnalogClock: React.FC<CircularAnalogClockProps> = ({ size = 120, timeLabel = '04:12', percent = 0.25 }) => {
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const radius = size / 2;
   const cx = radius;
   const cy = radius;
@@ -26,7 +30,7 @@ const CircularAnalogClock: React.FC<CircularAnalogClockProps> = ({ size = 120, t
       <Svg width={size} height={size}>
         <G>
           <Circle cx={cx} cy={cy} r={radius} fill={'rgba(0,0,0,0.12)'} />
-          <Circle cx={cx} cy={cy} r={radius - 6} fill={'rgba(255,255,255,0.02)'} stroke={'rgba(255,255,255,0.25)'} strokeWidth={0.5} />
+          <Circle cx={cx} cy={cy} r={radius - 6} fill={'rgba(255,255,255,0.02)'} stroke={'rgba(255,255,255,0.10)'} strokeWidth={0.5} />
           {/* minute/remaining hand */}
           <Line x1={cx} y1={cy} x2={hx} y2={hy} stroke={'#ffffff'} strokeWidth={3} strokeLinecap="round" opacity={0.95} />
           {/* small central pivot */}
@@ -40,7 +44,7 @@ const CircularAnalogClock: React.FC<CircularAnalogClockProps> = ({ size = 120, t
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   innerLabel: {
     position: 'absolute',
     alignItems: 'center',

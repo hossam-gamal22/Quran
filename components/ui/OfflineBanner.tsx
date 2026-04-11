@@ -15,6 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import { fontSemiBold, fontBold } from '@/lib/fonts';
 
@@ -41,6 +42,7 @@ export function showOfflineModal() {
 export function OfflineModal() {
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const [isOffline, setIsOffline] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -152,7 +154,7 @@ export function OfflineModal() {
 // Keep old name as alias for backward compat
 export const OfflineBanner = OfflineModal;
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -197,7 +199,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   filledButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0a7a55',
   },
   buttonText: {
     fontSize: 15,

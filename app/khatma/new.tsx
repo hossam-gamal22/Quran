@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useKhatma } from '../../contexts/KhatmaContext';
 import { useColors } from '../../hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '../../contexts/SettingsContext';
 import { KhatmaDuration } from '../../lib/khatma-storage';
 import GlassCard from '../../components/ui/GlassCard';
@@ -50,6 +51,7 @@ const WEEK_DAYS = [
 export default function NewKhatmaScreen() {
   const router = useRouter();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const { durations, createKhatma } = useKhatma();
@@ -141,7 +143,7 @@ export default function NewKhatmaScreen() {
       >
         {/* Khatma Name */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.khatmaName')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('khatma.khatmaName')}</Text>
           <TextInput
             style={[
               styles.input,
@@ -161,8 +163,8 @@ export default function NewKhatmaScreen() {
 
         {/* Duration Selection */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.khatmaDuration')}</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('khatma.khatmaDuration')}</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('khatma.chooseDuration')}
           </Text>
 
@@ -242,7 +244,7 @@ export default function NewKhatmaScreen() {
 
         {/* Reminder */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('khatma.dailyReminder')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('khatma.dailyReminder')}</Text>
           
           <TouchableOpacity
             style={[styles.reminderToggle, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
@@ -288,7 +290,7 @@ export default function NewKhatmaScreen() {
                   {t('khatma.reminderTime')}
                 </Text>
               </View>
-              <Text style={[styles.timeSelectorValue, { color: colors.primary }]}>
+              <Text style={[styles.timeSelectorValue, { color: colors.primaryText }]}>
                 {formatTime(reminderTime, isRTL)}
               </Text>
             </TouchableOpacity>
@@ -328,9 +330,9 @@ export default function NewKhatmaScreen() {
                         paddingHorizontal: 14,
                         paddingVertical: 8,
                         borderRadius: 20,
-                        backgroundColor: isSelected ? '#22C55E' : 'rgba(34, 197, 94, 0.15)',
+                        backgroundColor: isSelected ? colors.primary : colors.primary + '25',
                         borderWidth: 1,
-                        borderColor: isSelected ? '#22C55E' : 'rgba(34, 197, 94, 0.3)',
+                        borderColor: isSelected ? colors.primary : colors.primary + '4D',
                       }}
                     >
                       <Text style={{
@@ -372,7 +374,7 @@ export default function NewKhatmaScreen() {
           style={[
             styles.createButton,
             {
-              backgroundColor: selectedDuration ? '#22C55E' : colors.border,
+              backgroundColor: selectedDuration ? colors.primary : colors.border,
               flexDirection: isRTL ? 'row-reverse' : 'row',
             },
           ]}
@@ -394,7 +396,7 @@ export default function NewKhatmaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -412,10 +414,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
     marginBottom: Spacing.xs,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   sectionSubtitle: {
     fontSize: FONT_SIZES.sm,
     marginBottom: Spacing.md,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   input: {
     borderWidth: 1,
@@ -441,10 +447,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: 4,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   durationPages: {
     fontSize: FONT_SIZES.xs,
     textAlign: 'center',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   selectedCheck: {
     position: 'absolute',
@@ -472,9 +482,13 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: FONT_SIZES['2xl'],
     fontWeight: '700',
+    lineHeight: 40,
+    includeFontPadding: false,
   },
   infoLabel: {
     fontSize: FONT_SIZES.xs,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   infoDivider: {
     width: 1,
@@ -496,6 +510,8 @@ const styles = StyleSheet.create({
   reminderToggleText: {
     fontSize: FONT_SIZES.md,
     fontWeight: '500',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   toggleSwitch: {
     width: 50,
@@ -507,7 +523,6 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: BorderRadius.full,
-    backgroundColor: '#FFFFFF',
   },
   timeSelector: {
     flexDirection: 'row',
@@ -524,10 +539,14 @@ const styles = StyleSheet.create({
   timeSelectorLabel: {
     fontSize: FONT_SIZES.md,
     fontWeight: '500',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   timeSelectorValue: {
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   tipsCard: {
     padding: Spacing.lg,
@@ -541,6 +560,8 @@ const styles = StyleSheet.create({
   tipsTitle: {
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   tipsText: {
     fontSize: FONT_SIZES.sm,
@@ -566,5 +587,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

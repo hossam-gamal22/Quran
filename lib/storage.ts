@@ -37,7 +37,7 @@ const KEYS = {
   BOOKMARKS: '@quran_bookmarks',
   LAST_READ: '@quran_last_read',
   SETTINGS: '@quran_settings',
-  LAST_PRAYER_LOCATION: '@quran_prayer_location',
+  LAST_PRAYER_LOCATION: 'user_location',
   NOTIFICATION_SETTINGS: '@quran_notification_settings',
 };
 

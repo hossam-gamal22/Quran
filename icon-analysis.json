@@ -1,0 +1,969 @@
+{
+  "summary": {
+    "total": 212,
+    "materialCommunityIcons": 152,
+    "ionicons": 59,
+    "fontAwesome5": 1,
+    "valid": 212,
+    "invalid": 0
+  },
+  "icons": {
+    "MaterialCommunityIcons": {
+      "home-variant": [
+        "app/(tabs)/_layout.tsx"
+      ],
+      "book-open-variant": [
+        "app/(tabs)/_layout.tsx",
+        "app/(tabs)/favorites.tsx",
+        "app/(tabs)/notifications-center.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/ayat-universe.tsx",
+        "app/azkar/[category].tsx",
+        "app/companions.tsx",
+        "app/hadith-sifat.tsx",
+        "app/hajj-umrah.tsx",
+        "app/settings/notifications.tsx",
+        "app/surah/[id].tsx",
+        "components/hajj/shared.tsx",
+        "components/ui/DailyHighlights.tsx"
+      ],
+      "counter": [
+        "app/(tabs)/_layout.tsx",
+        "app/(tabs)/notifications-center.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx"
+      ],
+      "mosque": [
+        "app/(tabs)/_layout.tsx",
+        "app/(tabs)/index.tsx",
+        "app/(tabs)/notifications-center.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/hajj.tsx",
+        "app/settings/live-activities.tsx",
+        "app/umrah.tsx",
+        "app/widgets-gallery.tsx",
+        "components/ui/prayer/DigitalTypographyView.tsx"
+      ],
+      "cog-outline": [
+        "app/(tabs)/_layout.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/widgets-gallery.tsx"
+      ],
+      "chart-bar": [
+        "app/(tabs)/azkar.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx"
+      ],
+      "bookmark": [
+        "app/(tabs)/azkar.tsx",
+        "app/quran-bookmarks.tsx"
+      ],
+      "trash-can-outline": [
+        "app/(tabs)/favorites.tsx"
+      ],
+      "book-open-page-variant-outline": [
+        "app/(tabs)/favorites.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "image-outline": [
+        "app/(tabs)/favorites.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "share-variant-outline": [
+        "app/(tabs)/favorites.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "pencil-outline": [
+        "app/(tabs)/favorites.tsx",
+        "app/settings/notifications.tsx"
+      ],
+      "hands-pray": [
+        "app/(tabs)/favorites.tsx",
+        "app/daily-dhikr.tsx",
+        "app/hajj-umrah.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/ramadan.tsx",
+        "app/settings/notifications.tsx",
+        "components/hajj/shared.tsx"
+      ],
+      "star-crescent": [
+        "app/(tabs)/favorites.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/companions.tsx",
+        "app/hajj.tsx",
+        "app/onboarding/welcome.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/mawlid.tsx",
+        "app/seerah.tsx",
+        "app/umrah.tsx",
+        "app/worship-tracker/fasting.tsx"
+      ],
+      "heart-outline": [
+        "app/(tabs)/favorites.tsx"
+      ],
+      "close": [
+        "app/(tabs)/favorites.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tafsir-search.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/quran-bookmarks.tsx",
+        "app/radio.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/ramadan.tsx",
+        "app/settings/photo-backgrounds.tsx",
+        "app/surah/[id].tsx",
+        "app/tafsir/[surah]/[ayah].tsx",
+        "app/tasbih-stats.tsx",
+        "components/quran/AudioPlayerBar.tsx",
+        "components/ui/DynamicSplashOverlay.tsx",
+        "components/ui/GlobalAudioBar.tsx",
+        "components/ui/ShareableCard.tsx"
+      ],
+      "pencil-plus": [
+        "app/(tabs)/index.tsx"
+      ],
+      "magnify": [
+        "app/(tabs)/index.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tafsir-search.tsx",
+        "app/radio.tsx",
+        "app/settings/language.tsx"
+      ],
+      "close-circle": [
+        "app/(tabs)/index.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tafsir-search.tsx",
+        "app/radio.tsx",
+        "app/settings/language.tsx",
+        "app/worship-tracker/prayer.tsx"
+      ],
+      "view-grid-plus": [
+        "app/(tabs)/index.tsx"
+      ],
+      "book-open-page-variant": [
+        "app/(tabs)/index.tsx",
+        "app/azkar/[category].tsx",
+        "app/daily-ayah.tsx",
+        "app/daily-dhikr.tsx",
+        "app/daily-dua.tsx",
+        "app/hadith-of-day.tsx",
+        "app/quote-of-day.tsx",
+        "app/widgets-gallery.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "check": [
+        "app/(tabs)/index.tsx",
+        "app/(tabs)/prayer.tsx",
+        "app/seasonal/ashura.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/ramadan.tsx",
+        "app/settings/notifications.tsx",
+        "app/settings/photo-backgrounds.tsx",
+        "app/settings/quran.tsx",
+        "app/settings/translations.tsx",
+        "app/surah/[id].tsx",
+        "app/widget-settings.tsx",
+        "app/worship-tracker/index.tsx",
+        "app/worship-tracker/prayer.tsx",
+        "app/worship-tracker/quran.tsx",
+        "components/ui/PdfTemplatePicker.tsx"
+      ],
+      "chevron-up": [
+        "app/(tabs)/index.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx",
+        "components/quran/AudioPlayerBar.tsx",
+        "components/ui/DailyHighlights.tsx",
+        "components/ui/GlobalAudioBar.tsx"
+      ],
+      "chevron-down": [
+        "app/(tabs)/index.tsx",
+        "app/(tabs)/quran.tsx",
+        "app/hajj-umrah.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx",
+        "components/hajj/shared.tsx",
+        "components/quran/AudioPlayerBar.tsx",
+        "components/ui/DailyHighlights.tsx",
+        "components/ui/GlobalAudioBar.tsx"
+      ],
+      "clock-outline": [
+        "app/(tabs)/index.tsx",
+        "app/hajj-umrah.tsx",
+        "app/honor-board.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/settings/notifications.tsx",
+        "components/hajj/shared.tsx",
+        "components/ui/prayer/PrayerList.tsx"
+      ],
+      "alert": [
+        "app/(tabs)/notifications-center.tsx",
+        "components/ui/DynamicScreen.tsx"
+      ],
+      "weather-sunset-up": [
+        "app/(tabs)/notifications-center.tsx",
+        "app/settings/notifications.tsx",
+        "app/worship-tracker/azkar.tsx",
+        "app/worship-tracker/prayer.tsx"
+      ],
+      "weather-sunset-down": [
+        "app/(tabs)/notifications-center.tsx",
+        "app/settings/notifications.tsx",
+        "app/worship-tracker/azkar.tsx"
+      ],
+      "calendar": [
+        "app/(tabs)/notifications-center.tsx",
+        "app/seasonal/mawlid.tsx"
+      ],
+      "star-four-points": [
+        "app/(tabs)/notifications-center.tsx",
+        "app/companions.tsx",
+        "app/seasonal/index.tsx",
+        "app/seasonal/mawlid.tsx",
+        "app/seasonal/ramadan.tsx"
+      ],
+      "star": [
+        "app/(tabs)/notifications-center.tsx",
+        "app/azkar/[category].tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/mawlid.tsx",
+        "app/seasonal/ramadan.tsx"
+      ],
+      "alert-circle": [
+        "app/(tabs)/prayer.tsx",
+        "app/question-answer.tsx",
+        "components/ui/ErrorBoundary.tsx"
+      ],
+      "weather-night": [
+        "app/(tabs)/prayer.tsx"
+      ],
+      "alert-circle-outline": [
+        "app/(tabs)/qibla.tsx",
+        "app/azkar/[category].tsx",
+        "app/hijri.tsx",
+        "app/radio.tsx",
+        "app/sdui/[screenId].tsx"
+      ],
+      "refresh": [
+        "app/(tabs)/qibla.tsx",
+        "app/(tabs)/wird.tsx",
+        "app/azkar/[category].tsx",
+        "app/daily-dhikr.tsx",
+        "app/daily-dua.tsx",
+        "app/hadith-of-day.tsx",
+        "app/quote-of-day.tsx",
+        "app/radio.tsx",
+        "app/widget-settings.tsx"
+      ],
+      "account": [
+        "app/(tabs)/quran.tsx",
+        "app/companions.tsx",
+        "app/hadith-of-day.tsx",
+        "app/hadith-sifat.tsx"
+      ],
+      "check-circle": [
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/question-answer.tsx",
+        "app/seasonal/ashura.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/index.tsx",
+        "app/seasonal/ramadan.tsx",
+        "app/settings/display.tsx",
+        "app/settings/language.tsx",
+        "app/settings/live-activities.tsx",
+        "app/settings/notifications.tsx",
+        "app/settings/photo-backgrounds.tsx",
+        "app/settings/prayer-calculation.tsx",
+        "app/settings/prayer-layout.tsx",
+        "app/subscription.tsx",
+        "app/surah/[id].tsx",
+        "app/worship-tracker/fasting.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "cloud-off-outline": [
+        "app/(tabs)/quran.tsx"
+      ],
+      "radio": [
+        "app/(tabs)/quran.tsx"
+      ],
+      "bookmark-outline": [
+        "app/(tabs)/quran.tsx",
+        "app/azkar/[category].tsx",
+        "app/quran-bookmarks.tsx"
+      ],
+      "account-music": [
+        "app/(tabs)/quran.tsx"
+      ],
+      "format-size": [
+        "app/(tabs)/quran.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "minus": [
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/settings/prayer-adjustments.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "plus": [
+        "app/(tabs)/quran.tsx",
+        "app/(tabs)/tasbih.tsx",
+        "app/settings/prayer-adjustments.tsx",
+        "app/settings/quran.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "bell-ring-outline": [
+        "app/(tabs)/quran.tsx",
+        "app/settings/quran.tsx"
+      ],
+      "translate": [
+        "app/(tabs)/quran.tsx",
+        "app/daily-ayah.tsx",
+        "app/onboarding/complete.tsx",
+        "app/onboarding/language.tsx",
+        "app/settings/language.tsx",
+        "app/settings/quran.tsx",
+        "components/ui/MissingTranslationCard.tsx"
+      ],
+      "account-music-outline": [
+        "app/(tabs)/quran.tsx"
+      ],
+      "eye-outline": [
+        "app/(tabs)/quran.tsx"
+      ],
+      "microphone": [
+        "app/(tabs)/recitations.tsx"
+      ],
+      "send": [
+        "app/(tabs)/settings.tsx"
+      ],
+      "book-search": [
+        "app/(tabs)/tafsir-search.tsx"
+      ],
+      "format-list-bulleted": [
+        "app/(tabs)/tasbih.tsx"
+      ],
+      "sync": [
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx"
+      ],
+      "percent": [
+        "app/(tabs)/tasbih.tsx",
+        "app/worship-tracker/azkar.tsx"
+      ],
+      "restart": [
+        "app/(tabs)/tasbih.tsx",
+        "app/(tabs)/wird.tsx"
+      ],
+      "delete-outline": [
+        "app/(tabs)/tasbih.tsx",
+        "app/settings/photo-backgrounds.tsx",
+        "app/settings/worship-tracking.tsx"
+      ],
+      "plus-circle-outline": [
+        "app/(tabs)/tasbih.tsx",
+        "app/azkar/[category].tsx",
+        "app/widgets-gallery.tsx"
+      ],
+      "calendar-today": [
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx"
+      ],
+      "sigma": [
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx"
+      ],
+      "chart-line": [
+        "app/(tabs)/tasbih.tsx",
+        "app/tasbih-stats.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "creation": [
+        "app/ayat-universe.tsx"
+      ],
+      "share-variant": [
+        "app/ayat-universe.tsx",
+        "app/azkar/[category].tsx",
+        "app/companions.tsx",
+        "app/daily-ayah.tsx",
+        "app/hadith-sifat.tsx",
+        "app/hijri.tsx",
+        "app/seasonal/mawlid.tsx",
+        "app/story-of-day.tsx",
+        "app/surah/[id].tsx",
+        "components/ui/BrandedCapture.tsx"
+      ],
+      "headphones": [
+        "app/azkar/[category].tsx"
+      ],
+      "skip-previous": [
+        "app/azkar/[category].tsx",
+        "components/quran/AudioPlayerBar.tsx"
+      ],
+      "skip-next": [
+        "app/azkar/[category].tsx",
+        "components/quran/AudioPlayerBar.tsx"
+      ],
+      "close-circle-outline": [
+        "app/azkar/[category].tsx"
+      ],
+      "volume-high": [
+        "app/azkar/[category].tsx",
+        "app/quran-reminder.tsx",
+        "app/settings/notifications.tsx"
+      ],
+      "account-group": [
+        "app/companions.tsx"
+      ],
+      "download": [
+        "app/daily-ayah.tsx",
+        "app/settings/notifications.tsx",
+        "app/settings/photo-backgrounds.tsx",
+        "app/story-of-day.tsx",
+        "components/ui/PdfTemplatePicker.tsx"
+      ],
+      "book-heart": [
+        "app/daily-dua.tsx"
+      ],
+      "cellphone": [
+        "app/dev/icon-test.tsx"
+      ],
+      "package-variant": [
+        "app/dev/icon-test.tsx"
+      ],
+      "material-design": [
+        "app/dev/icon-test.tsx"
+      ],
+      "apple": [
+        "app/dev/icon-test.tsx"
+      ],
+      "format-quote-open": [
+        "app/hadith-of-day.tsx",
+        "app/hadith-sifat.tsx",
+        "app/seasonal/ashura.tsx"
+      ],
+      "format-list-numbered": [
+        "app/hajj-umrah.tsx",
+        "components/hajj/shared.tsx"
+      ],
+      "moon-waning-crescent": [
+        "app/hijri.tsx",
+        "app/seasonal/ramadan.tsx",
+        "components/ui/prayer/PrayerCard.tsx"
+      ],
+      "check-decagram": [
+        "app/hijri.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "trophy-outline": [
+        "app/honor-board.tsx"
+      ],
+      "trophy": [
+        "app/honor-board.tsx",
+        "app/onboarding/prize.tsx",
+        "app/worship-tracker/azkar.tsx"
+      ],
+      "check-bold": [
+        "app/onboarding/complete.tsx"
+      ],
+      "lightbulb-on": [
+        "app/onboarding/complete.tsx",
+        "app/quote-of-day.tsx",
+        "app/seasonal/ashura.tsx",
+        "app/seasonal/hajj.tsx",
+        "app/seasonal/index.tsx",
+        "app/seasonal/mawlid.tsx",
+        "app/seasonal/ramadan.tsx"
+      ],
+      "rocket-launch": [
+        "app/onboarding/complete.tsx"
+      ],
+      "city": [
+        "app/onboarding/location.tsx"
+      ],
+      "flag": [
+        "app/onboarding/location.tsx"
+      ],
+      "crosshairs-gps": [
+        "app/onboarding/location.tsx"
+      ],
+      "shield-check": [
+        "app/onboarding/location.tsx"
+      ],
+      "bell-plus": [
+        "app/onboarding/notifications.tsx"
+      ],
+      "medal": [
+        "app/onboarding/prize.tsx"
+      ],
+      "help-circle": [
+        "app/question-answer.tsx"
+      ],
+      "help-box": [
+        "app/question-answer.tsx"
+      ],
+      "account-tie": [
+        "app/quote-of-day.tsx"
+      ],
+      "calendar-check": [
+        "app/quran-reminder.tsx",
+        "app/worship-tracker/azkar.tsx",
+        "app/worship-tracker/fasting.tsx"
+      ],
+      "pause-circle": [
+        "app/radio.tsx"
+      ],
+      "stop-circle-outline": [
+        "app/radio.tsx"
+      ],
+      "wifi-off": [
+        "app/radio.tsx",
+        "components/ui/OfflineBanner.tsx"
+      ],
+      "information": [
+        "app/seasonal/ashura.tsx",
+        "app/settings/backup.tsx",
+        "app/settings/language.tsx",
+        "app/settings/notifications.tsx",
+        "app/settings/worship-tracking.tsx",
+        "components/ui/SectionInfoButton.tsx"
+      ],
+      "hand-pointing-right": [
+        "app/seasonal/index.tsx"
+      ],
+      "calendar-clock": [
+        "app/seasonal/index.tsx"
+      ],
+      "map-marker": [
+        "app/seasonal/mawlid.tsx"
+      ],
+      "dots-vertical": [
+        "app/seasonal/ramadan.tsx"
+      ],
+      "content-copy": [
+        "app/seasonal/ramadan.tsx",
+        "app/surah/[id].tsx",
+        "components/ui/ShareableCard.tsx"
+      ],
+      "book-account": [
+        "app/seerah.tsx"
+      ],
+      "information-outline": [
+        "app/settings/display.tsx",
+        "app/settings/notifications.tsx",
+        "app/widget-settings.tsx"
+      ],
+      "palette": [
+        "app/settings/display.tsx",
+        "components/ui/ShareableCard.tsx"
+      ],
+      "image-multiple": [
+        "app/settings/display.tsx",
+        "components/ui/ShareableCard.tsx"
+      ],
+      "translate-off": [
+        "app/settings/language.tsx",
+        "app/settings/translations.tsx"
+      ],
+      "loading": [
+        "app/settings/language.tsx",
+        "app/tasbih-stats.tsx",
+        "components/ui/prayer/PrayerCard.tsx"
+      ],
+      "calendar-week": [
+        "app/settings/notifications.tsx"
+      ],
+      "bell-ring": [
+        "app/settings/notifications.tsx"
+      ],
+      "bed": [
+        "app/settings/notifications.tsx"
+      ],
+      "bell-off": [
+        "app/settings/notifications.tsx"
+      ],
+      "bell": [
+        "app/settings/notifications.tsx"
+      ],
+      "vibrate": [
+        "app/settings/notifications.tsx"
+      ],
+      "content-save": [
+        "app/settings/photo-backgrounds.tsx",
+        "app/widget-settings.tsx"
+      ],
+      "cloud-download": [
+        "app/settings/photo-backgrounds.tsx"
+      ],
+      "image-off-outline": [
+        "app/settings/photo-backgrounds.tsx"
+      ],
+      "lock": [
+        "app/settings/photo-backgrounds.tsx",
+        "components/ui/PremiumGate.tsx"
+      ],
+      "brightness-6": [
+        "app/settings/photo-backgrounds.tsx"
+      ],
+      "export-variant": [
+        "app/settings/worship-tracking.tsx"
+      ],
+      "video-off-outline": [
+        "app/story-of-day.tsx"
+      ],
+      "rewind-10": [
+        "app/story-of-day.tsx"
+      ],
+      "fast-forward-10": [
+        "app/story-of-day.tsx"
+      ],
+      "crown": [
+        "app/subscription.tsx",
+        "components/ui/PremiumGate.tsx"
+      ],
+      "play-circle-outline": [
+        "app/surah/[id].tsx"
+      ],
+      "target": [
+        "app/surah/[id].tsx"
+      ],
+      "gesture-tap-hold": [
+        "app/surah/[id].tsx"
+      ],
+      "bookmark-remove": [
+        "app/surah/[id].tsx"
+      ],
+      "microphone-outline": [
+        "app/surah/[id].tsx"
+      ],
+      "widgets": [
+        "app/widget-settings.tsx"
+      ],
+      "hand-heart": [
+        "app/widgets-gallery.tsx"
+      ],
+      "calendar-month": [
+        "app/widgets-gallery.tsx"
+      ],
+      "cog": [
+        "app/widgets-gallery.tsx"
+      ],
+      "fire": [
+        "app/worship-tracker/azkar.tsx",
+        "app/worship-tracker/fasting.tsx",
+        "app/worship-tracker/prayer.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "heart": [
+        "app/worship-tracker/fasting.tsx"
+      ],
+      "lightbulb-outline": [
+        "app/worship-tracker/index.tsx",
+        "app/worship-tracker/quran.tsx"
+      ],
+      "check-all": [
+        "app/worship-tracker/prayer.tsx"
+      ],
+      "clock-alert": [
+        "app/worship-tracker/prayer.tsx"
+      ],
+      "play": [
+        "components/quran/AudioPlayerBar.tsx"
+      ],
+      "music": [
+        "components/ui/AudioPlayer.tsx"
+      ],
+      "image-plus": [
+        "components/ui/BrandedCapture.tsx"
+      ],
+      "swap-vertical": [
+        "components/ui/DailyHighlights.tsx"
+      ],
+      "reload": [
+        "components/ui/ErrorBoundary.tsx"
+      ],
+      "phone-outline": [
+        "components/ui/ErrorBoundary.tsx"
+      ],
+      "wrench": [
+        "components/ui/MaintenanceGuard.tsx"
+      ],
+      "cellphone-arrow-down": [
+        "components/ui/MaintenanceGuard.tsx"
+      ],
+      "email-outline": [
+        "components/ui/MissingTranslationCard.tsx"
+      ],
+      "palette-outline": [
+        "components/ui/PdfTemplatePicker.tsx"
+      ],
+      "file-pdf-box": [
+        "components/ui/PdfTemplatePicker.tsx"
+      ],
+      "text": [
+        "components/ui/ShareableCard.tsx"
+      ],
+      "image": [
+        "components/ui/ShareableCard.tsx"
+      ],
+      "timer-sand": [
+        "components/ui/prayer/AnalogClockView.tsx",
+        "components/ui/prayer/CountdownTimer.tsx",
+        "components/ui/prayer/DigitalTypographyView.tsx",
+        "components/ui/prayer/RectangleWidgetView.tsx"
+      ]
+    },
+    "Ionicons": {
+      "refresh": [
+        "app/admin/ads.tsx",
+        "app/khatma/wird.tsx"
+      ],
+      "save": [
+        "app/admin/ads.tsx",
+        "app/admin/app-sections.tsx",
+        "app/admin/daily-content.tsx",
+        "app/admin/settings-override.tsx",
+        "app/admin/settings.tsx"
+      ],
+      "chevron-up": [
+        "app/admin/app-sections.tsx"
+      ],
+      "chevron-down": [
+        "app/admin/app-sections.tsx",
+        "app/admin/widgets.tsx"
+      ],
+      "add-circle": [
+        "app/admin/content.tsx",
+        "app/admin/notifications.tsx",
+        "app/admin/pricing.tsx",
+        "app/admin/reciters.tsx",
+        "app/khatma/new.tsx"
+      ],
+      "pencil": [
+        "app/admin/content.tsx",
+        "app/admin/notifications.tsx",
+        "app/admin/pricing.tsx",
+        "app/admin/reciters.tsx"
+      ],
+      "trash": [
+        "app/admin/content.tsx",
+        "app/admin/notifications.tsx",
+        "app/admin/pricing.tsx",
+        "app/admin/reciters.tsx"
+      ],
+      "document-text-outline": [
+        "app/admin/content.tsx",
+        "app/khatma/index.tsx",
+        "app/khatma/new.tsx"
+      ],
+      "close": [
+        "app/admin/content.tsx",
+        "app/admin/events.tsx",
+        "app/admin/notifications.tsx",
+        "app/admin/pricing.tsx",
+        "app/admin/reciters.tsx",
+        "app/hijri.tsx",
+        "app/names.tsx"
+      ],
+      "information-circle": [
+        "app/admin/daily-content.tsx",
+        "app/hijri.tsx",
+        "app/names.tsx"
+      ],
+      "create-outline": [
+        "app/admin/events.tsx",
+        "app/admin/widgets.tsx"
+      ],
+      "trash-outline": [
+        "app/admin/events.tsx",
+        "app/admin/widgets.tsx"
+      ],
+      "add": [
+        "app/admin/events.tsx",
+        "app/admin/widgets.tsx",
+        "app/khatma/index.tsx",
+        "app/khatma/wird.tsx"
+      ],
+      "checkmark": [
+        "app/admin/events.tsx",
+        "app/khatma/new.tsx",
+        "app/khatma/wird.tsx"
+      ],
+      "people": [
+        "app/admin/index.tsx",
+        "app/admin/notifications.tsx",
+        "app/admin/subscribers.tsx"
+      ],
+      "cash": [
+        "app/admin/index.tsx",
+        "app/admin/subscribers.tsx"
+      ],
+      "today": [
+        "app/admin/index.tsx"
+      ],
+      "construct": [
+        "app/admin/index.tsx",
+        "app/admin/settings.tsx"
+      ],
+      "megaphone": [
+        "app/admin/index.tsx"
+      ],
+      "send": [
+        "app/admin/notifications.tsx"
+      ],
+      "repeat": [
+        "app/admin/notifications.tsx",
+        "app/ruqya.tsx"
+      ],
+      "stats-chart": [
+        "app/admin/notifications.tsx"
+      ],
+      "notifications-outline": [
+        "app/admin/notifications.tsx"
+      ],
+      "cash-outline": [
+        "app/admin/pricing.tsx"
+      ],
+      "person": [
+        "app/admin/reciters.tsx",
+        "app/admin/subscribers.tsx"
+      ],
+      "star": [
+        "app/admin/reciters.tsx",
+        "app/azkar-search.tsx",
+        "app/ruqya.tsx"
+      ],
+      "mic-outline": [
+        "app/admin/reciters.tsx"
+      ],
+      "warning": [
+        "app/admin/settings-override.tsx",
+        "app/admin/settings.tsx"
+      ],
+      "download": [
+        "app/admin/settings.tsx"
+      ],
+      "trending-up": [
+        "app/admin/subscribers.tsx"
+      ],
+      "people-outline": [
+        "app/admin/subscribers.tsx"
+      ],
+      "search": [
+        "app/admin/users.tsx",
+        "app/azkar-search.tsx"
+      ],
+      "cube-outline": [
+        "app/admin/widgets.tsx"
+      ],
+      "add-circle-outline": [
+        "app/admin/widgets.tsx"
+      ],
+      "close-circle": [
+        "app/admin/widgets.tsx",
+        "app/azkar-search.tsx",
+        "app/surah/[id].tsx"
+      ],
+      "save-outline": [
+        "app/admin/widgets.tsx"
+      ],
+      "rocket-outline": [
+        "app/admin/widgets.tsx"
+      ],
+      "book-outline": [
+        "app/azkar-search.tsx",
+        "app/khatma/index.tsx",
+        "app/khatma/new.tsx",
+        "app/khatma/wird.tsx",
+        "app/ruqya.tsx"
+      ],
+      "share-outline": [
+        "app/azkar-search.tsx",
+        "app/names.tsx",
+        "app/ruqya.tsx"
+      ],
+      "time-outline": [
+        "app/azkar-search.tsx",
+        "app/khatma/new.tsx"
+      ],
+      "star-outline": [
+        "app/azkar-search.tsx"
+      ],
+      "bulb-outline": [
+        "app/azkar-search.tsx",
+        "app/khatma/new.tsx"
+      ],
+      "search-outline": [
+        "app/azkar-search.tsx"
+      ],
+      "logo-ionic": [
+        "app/dev/icon-test.tsx"
+      ],
+      "ellipsis-vertical": [
+        "app/khatma/index.tsx"
+      ],
+      "checkmark-circle": [
+        "app/khatma/index.tsx",
+        "app/khatma/wird.tsx"
+      ],
+      "calendar-outline": [
+        "app/khatma/index.tsx",
+        "app/khatma/new.tsx"
+      ],
+      "book": [
+        "app/khatma/index.tsx",
+        "app/names.tsx"
+      ],
+      "trophy": [
+        "app/khatma/wird.tsx"
+      ],
+      "flag-outline": [
+        "app/khatma/wird.tsx"
+      ],
+      "arrow-back": [
+        "app/khatma/wird.tsx"
+      ],
+      "flag": [
+        "app/khatma/wird.tsx"
+      ],
+      "heart": [
+        "app/khatma/wird.tsx",
+        "app/names.tsx"
+      ],
+      "bulb": [
+        "app/names.tsx"
+      ],
+      "document-text": [
+        "app/names.tsx"
+      ],
+      "copy": [
+        "app/names.tsx"
+      ],
+      "share-social": [
+        "app/names.tsx"
+      ],
+      "logo-whatsapp": [
+        "app/names.tsx"
+      ],
+      "chevron-forward": [
+        "app/surah/[id].tsx"
+      ]
+    },
+    "FontAwesome5": {
+      "font-awesome": [
+        "app/dev/icon-test.tsx"
+      ]
+    }
+  },
+  "invalid": []
+}

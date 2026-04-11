@@ -8,9 +8,11 @@ import {
   Modal,
   Dimensions,
   Share,
+  Platform,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
@@ -18,6 +20,8 @@ import { ISLAMIC_EVENTS as DEFAULT_ISLAMIC_EVENTS, gregorianToHijri, isAyyamAlBi
 import type { IslamicEventDetails } from '../lib/hijri-date';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { getContrastTextColor } from '@/lib/contrast-helper';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -98,6 +102,7 @@ export default function HijriScreen() {
   const { isDarkMode, settings, t, currentTranslations } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const insets = useSafeAreaInsets();
 
   const today = useMemo(() => new Date(), []);
@@ -388,15 +393,15 @@ export default function HijriScreen() {
       >
         {isBlessedPeriod && day.isCurrentMonth && (
           <View style={[styles.blessedIcon, isRTL ? { left: 4, right: undefined } : null]}>
-            <MaterialCommunityIcons name="moon-waning-crescent" size={10} color="#F5A623" />
+            <MaterialCommunityIcons name="moon-waning-crescent" size={10} color={isDarkMode ? '#F5A623' : '#92630B'} />
           </View>
         )}
         <Text style={[
           styles.gregorianDayText,
           { color: colors.text, opacity },
-          day.isToday && { color: colors.primary, fontWeight: '700' },
-          isSelected && { color: colors.primary },
-          isBlessedPeriod && day.isCurrentMonth && { color: '#F5A623' },
+          day.isToday && { color: colors.primaryText, fontWeight: '700' },
+          isSelected && { color: colors.primaryText },
+          isBlessedPeriod && day.isCurrentMonth && { color: isDarkMode ? '#F5A623' : '#92630B' },
         ]}>
           {day.day}
         </Text>
@@ -404,8 +409,8 @@ export default function HijriScreen() {
           <Text style={[
             styles.hijriDayText,
             { color: colors.textLight, opacity: opacity * 0.7 },
-            day.hijriDay === 1 && { color: colors.primary, fontWeight: '600' },
-            isBlessedPeriod && day.isCurrentMonth && { color: '#F5A623', opacity: 0.7 },
+            day.hijriDay === 1 && { color: colors.primaryText, fontWeight: '600' },
+            isBlessedPeriod && day.isCurrentMonth && { color: isDarkMode ? '#F5A623' : '#92630B', opacity: 0.7 },
           ]}>
             {day.hijriDay}
           </Text>
@@ -435,7 +440,7 @@ export default function HijriScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]}
+      style={styles.container}
     >
       {/* الهيدر */}
       <UniversalHeader
@@ -450,7 +455,7 @@ export default function HijriScreen() {
         ]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('calendar.hijriCalendar')}</Text>
+          <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('home.hijriCalendar')}</Text>
           <SectionInfoButton sectionKey="worship" />
         </View>
       </UniversalHeader>
@@ -462,7 +467,7 @@ export default function HijriScreen() {
         <View style={[styles.monthNavBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {/* RTL: left arrow = previous (arrow points in direction of movement) */}
           <TouchableOpacity onPress={goToPrevMonth} style={styles.monthNavBtn} activeOpacity={0.7}>
-            <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={32} color="#fff" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={32} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.monthNavCenter}>
@@ -474,7 +479,7 @@ export default function HijriScreen() {
 
           {/* RTL: right arrow = next (arrow points in direction of movement) */}
           <TouchableOpacity onPress={goToNextMonth} style={styles.monthNavBtn} activeOpacity={0.7}>
-            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={32} color="#fff" />
+            <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={32} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -482,22 +487,22 @@ export default function HijriScreen() {
         {/* شارة الثقة — Confidence Badge */}
         {/* ============================================ */}
         {hijriResult && hijriResult.confidence === 'high' && (
-          <View style={[styles.confidenceBadge, { backgroundColor: 'rgba(34,197,94,0.12)', borderColor: 'rgba(34,197,94,0.3)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="check-decagram" size={14} color="#22C55E" />
-            <Text style={[styles.confidenceBadgeText, { color: '#22C55E', textAlign: isRTL ? 'right' : 'left' }]}>
+          <View style={[styles.confidenceBadge, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.18)' : 'rgba(34,197,94,0.12)', borderColor: isDarkMode ? 'rgba(34,197,94,0.35)' : 'rgba(34,197,94,0.25)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="check-decagram" size={14} color={colors.primary} />
+            <Text style={[styles.confidenceBadgeText, { color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('hijriCalendar.officialConfirmed')}
             </Text>
             {hijriResult.note && (
-              <Text style={[styles.confidenceSource, { color: 'rgba(34,197,94,0.7)' }]} numberOfLines={1}>
+              <Text style={[styles.confidenceSource, { color: colors.primaryText }]} numberOfLines={1}>
                 — {hijriResult.note}
               </Text>
             )}
           </View>
         )}
         {hijriResult && hijriResult.confidence === 'low' && (
-          <View style={[styles.confidenceBadge, { backgroundColor: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.3)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={14} color="#F59E0B" />
-            <Text style={[styles.confidenceBadgeText, { color: '#F59E0B', textAlign: isRTL ? 'right' : 'left' }]}>
+          <View style={[styles.confidenceBadge, { backgroundColor: isDarkMode ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', borderColor: isDarkMode ? 'rgba(245,158,11,0.3)' : 'rgba(245,158,11,0.2)' }, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={14} color={isDarkMode ? '#F59E0B' : '#92630B'} />
+            <Text style={[styles.confidenceBadgeText, { color: isDarkMode ? '#F59E0B' : '#92630B', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('hijriCalendar.estimatedDate')}
             </Text>
           </View>
@@ -512,7 +517,6 @@ export default function HijriScreen() {
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[
                 styles.weekdayText,
                 { color: colors.textLight },
-                i === 5 && { color: colors.primary }, // الجمعة
               ]}>{wd}</Text>
             </View>
           ))}
@@ -529,13 +533,17 @@ export default function HijriScreen() {
         {/* بطاقة اليوم المحدد */}
         {/* ============================================ */}
         {selectedDay && (
-          <View style={styles.selectedDayCard}>
+          <View style={[styles.selectedDayCard, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }]}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             <View style={[styles.selectedDayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.selectedDayGregorian, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                <Text style={[styles.selectedDayGregorian, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {selectedDay.day} {gregorianMonthNames[selectedDay.gregorianDate.getMonth()]} {selectedDay.gregorianDate.getFullYear()}
                 </Text>
-                <Text style={[styles.selectedDayHijri, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                <Text style={[styles.selectedDayHijri, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {selectedDay.hijriDay} {hijriMonthNames[selectedDay.hijriMonth - 1]} {selectedDay.hijriYear} {ahSuffix}
                 </Text>
               </View>
@@ -548,7 +556,7 @@ export default function HijriScreen() {
                 {selectedDay.events.map((ev, i) => (
                   <View key={i} style={[
                     styles.selectedDayEvent,
-                    { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                    { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' },
                     isRTL ? { borderRightColor: EVENT_COLORS[ev.type], borderRightWidth: 3, borderLeftWidth: 0 } : { borderLeftColor: EVENT_COLORS[ev.type] },
                     ev.type === 'blessed_period' && styles.blessedEventCard,
                   ]}>
@@ -558,7 +566,7 @@ export default function HijriScreen() {
                       <Ionicons name={EVENT_ICONS[ev.type] as any} size={18} color={EVENT_COLORS[ev.type]} />
                     )}
                     <View style={{ flex: 1 }}>
-                      <TranslatedText from={isEventSourceArabic() ? 'ar' : 'en'} type="section" style={[styles.selectedEventName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{getLocalizedEventName(ev)}</TranslatedText>
+                      <TranslatedText from={isEventSourceArabic() ? 'ar' : 'en'} type="section" style={[styles.selectedEventName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{getLocalizedEventName(ev)}</TranslatedText>
                     </View>
                   </View>
                 ))}
@@ -572,17 +580,21 @@ export default function HijriScreen() {
         {/* ============================================ */}
         {eventsInMonth.length > 0 && (
           <View style={styles.eventsSection}>
-            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('calendar.islamicEvents')}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('calendar.islamicEvents')}</Text>
             {eventsInMonth.map((ev, index) => (
               <TouchableOpacity
                 key={index}
-                style={[styles.eventCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={[styles.eventCard, { flexDirection: isRTL ? 'row-reverse' : 'row', borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
                 onPress={async () => {
                   const shareText = `🌙 ${getLocalizedEventName(ev)}\n📅 ${ev.hijriDateStr}\n📆 ${ev.gregorianDate.getDate()} ${gregorianMonthNames[ev.gregorianDate.getMonth()]} ${ev.gregorianDate.getFullYear()}\n${getLocalizedEventDesc(ev) || ''}\n\n${APP_CONFIG.getShareSignature()}`;
                   await Share.share({ message: shareText });
                 }}
                 activeOpacity={0.7}
               >
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <View style={{ width: 30, alignItems: 'center', justifyContent: 'center' }}>
                   {ev.type === 'blessed_period' ? (
                     <MaterialCommunityIcons name="moon-waning-crescent" size={22} color={EVENT_COLORS[ev.type]} />
@@ -595,16 +607,16 @@ export default function HijriScreen() {
                   )}
                 </View>
                 <View style={[styles.eventCardInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-                  <TranslatedText from={isEventSourceArabic() ? 'ar' : 'en'} type="section" style={[styles.eventCardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{getLocalizedEventName(ev)}</TranslatedText>
+                  <TranslatedText from={isEventSourceArabic() ? 'ar' : 'en'} type="section" style={[styles.eventCardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{getLocalizedEventName(ev)}</TranslatedText>
                   <View style={[styles.eventCardDates, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <Text style={[styles.eventCardDate, { color: colors.primary }]}>{ev.hijriDateStr}</Text>
+                    <Text style={[styles.eventCardDate, { color: colors.primaryText }]}>{ev.hijriDateStr}</Text>
                     <Text style={[styles.eventCardDateSep, { color: colors.textLight }]}>|</Text>
-                    <Text style={[styles.eventCardDate, { color: colors.textLight }]}>
+                    <Text style={[styles.eventCardDate, { color: colors.text }]}>
                       {ev.gregorianDate.getDate()} {gregorianMonthNames[ev.gregorianDate.getMonth()]}
                     </Text>
                   </View>
                 </View>
-                <MaterialCommunityIcons name="share-variant" size={18} color="rgba(255,255,255,0.5)" />
+                <MaterialCommunityIcons name="share-variant" size={18} color={colors.textLight} />
               </TouchableOpacity>
             ))}
           </View>
@@ -612,8 +624,12 @@ export default function HijriScreen() {
 
         {/* معلومات إضافية */}
         <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <Ionicons name="information-circle" size={20} color={Colors.info} />
-          <Text style={[styles.infoText, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.infoText, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('calendar.hijriNote')}
           </Text>
         </View>
@@ -631,15 +647,15 @@ export default function HijriScreen() {
         onRequestClose={() => setShowOffsetModal(false)}
       >
         <View style={[styles.modalOverlay, { justifyContent: 'center' }]}>
-          <View style={styles.offsetModalContent}>
+          <View style={[styles.offsetModalContent, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)' }]}>
             <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[styles.modalTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{t('hijri.adjustTitle')}</Text>
+              <Text style={[styles.modalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('hijri.adjustTitle')}</Text>
               <TouchableOpacity onPress={() => setShowOffsetModal(false)}>
-                <Ionicons name="close" size={24} color="#fff" />
+                <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.offsetDescription}>
+            <Text style={[styles.offsetDescription, { color: colors.textLight }]}>
               {t('hijri.adjustDesc')}
             </Text>
 
@@ -649,13 +665,21 @@ export default function HijriScreen() {
                   key={offset}
                   style={[
                     styles.offsetOption,
+                    { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
                     hijriOffset === offset && { backgroundColor: colors.primary, borderColor: colors.primary },
                   ]}
                   onPress={() => saveOffset(offset)}
                 >
+                  {Platform.OS === 'ios' && hijriOffset !== offset && (
+                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                  )}
+                  {hijriOffset !== offset && (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                  )}
                   <Text style={[
                     styles.offsetOptionText,
-                    hijriOffset === offset && { color: '#fff', fontWeight: '700' },
+                    { color: colors.text },
+                    hijriOffset === offset && { color: getContrastTextColor(colors.primary), fontWeight: '700' },
                   ]}>
                     {offset === 0 ? t('hijri.noAdjustment') : offset > 0 ? `+${offset} ${t('seasonal.day')}` : `${offset} ${t('seasonal.day')}`}
                   </Text>
@@ -663,7 +687,7 @@ export default function HijriScreen() {
               ))}
             </View>
 
-            <Text style={styles.offsetNote}>
+            <Text style={[styles.offsetNote, { color: colors.textLight }]}>
               {t('hijri.adjustDesc')}: {hijriOffset === 0 ? t('hijri.noAdjustment') : hijriOffset > 0 ? `+${hijriOffset} ${t('seasonal.day')}` : `${hijriOffset} ${t('seasonal.day')}`}
             </Text>
           </View>
@@ -677,7 +701,7 @@ export default function HijriScreen() {
 // الأنماط
 // ============================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
@@ -712,12 +736,14 @@ const styles = StyleSheet.create({
   monthNavTitle: {
     fontSize: Typography.sizes.xl,
     fontWeight: '700',
-    color: '#fff',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   monthNavSubtitle: {
     fontSize: Typography.sizes.sm,
-    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 
   // ---- Weekday header ----
@@ -733,8 +759,9 @@ const styles = StyleSheet.create({
   weekdayText: {
     fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 
   // ---- Calendar grid ----
@@ -774,12 +801,14 @@ const styles = StyleSheet.create({
   gregorianDayText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   hijriDayText: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.5)',
     marginTop: 1,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   eventDotsRow: {
     flexDirection: 'row',
@@ -794,12 +823,12 @@ const styles = StyleSheet.create({
 
   // ---- Selected day card ----
   selectedDayCard: {
-    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     marginTop: Spacing.md,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
   },
   selectedDayHeader: {
     flexDirection: 'row',
@@ -808,12 +837,14 @@ const styles = StyleSheet.create({
   selectedDayGregorian: {
     fontSize: Typography.sizes.md,
     fontWeight: '600',
-    color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   selectedDayHijri: {
     fontSize: Typography.sizes.sm,
-    color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   shareBtn: {
     padding: Spacing.sm,
@@ -832,12 +863,14 @@ const styles = StyleSheet.create({
   selectedEventName: {
     fontSize: Typography.sizes.sm,
     fontWeight: '600',
-    color: '#fff',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   selectedEventDesc: {
     fontSize: Typography.sizes.xs,
-    color: 'rgba(255,255,255,0.85)',
     marginTop: 2,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
 
   // ---- Events section ----
@@ -847,19 +880,20 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: Typography.sizes.lg,
     fontWeight: '600',
-    color: '#fff',
     marginBottom: Spacing.md,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   eventCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(120,120,128,0.12)',
     padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
     gap: Spacing.md,
+    overflow: 'hidden',
   },
   eventCardInfo: {
     flex: 1,
@@ -867,7 +901,8 @@ const styles = StyleSheet.create({
   eventCardName: {
     fontSize: Typography.sizes.md,
     fontWeight: '600',
-    color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   eventCardDates: {
     flexDirection: 'row',
@@ -877,15 +912,16 @@ const styles = StyleSheet.create({
   },
   eventCardDate: {
     fontSize: Typography.sizes.xs,
-    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   eventCardDateSep: {
     fontSize: Typography.sizes.xs,
-    color: 'rgba(255,255,255,0.4)',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   eventCardDesc: {
     fontSize: Typography.sizes.xs,
-    color: 'rgba(255,255,255,0.5)',
     marginTop: 3,
     lineHeight: 16,
   },
@@ -894,14 +930,14 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(120,120,128,0.1)',
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginTop: Spacing.lg,
     marginBottom: Spacing.md,
     gap: Spacing.sm,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(120,120,128,0.20)',
+    overflow: 'hidden',
   },
   infoText: {
     flex: 1,
@@ -924,7 +960,8 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: Typography.sizes.xl,
     fontWeight: '700',
-    color: '#fff',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
 
   // ---- Offset modal ----
@@ -936,7 +973,6 @@ const styles = StyleSheet.create({
   },
   offsetDescription: {
     fontSize: Typography.sizes.md,
-    color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     marginBottom: Spacing.lg,
     lineHeight: 24,
@@ -949,19 +985,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.md,
-    backgroundColor: 'rgba(120,120,128,0.15)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   offsetOptionText: {
     fontSize: Typography.sizes.md,
-    color: 'rgba(255,255,255,0.9)',
     fontWeight: '500',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   offsetNote: {
     fontSize: Typography.sizes.sm,
-    color: 'rgba(255,255,255,0.5)',
     textAlign: 'center',
   },
 
@@ -985,3 +1021,4 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+const styles = _styles;

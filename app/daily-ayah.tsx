@@ -12,6 +12,7 @@ import {
 import { fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
@@ -21,11 +22,13 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as MediaLibrary from 'expo-media-library';
 import * as Haptics from 'expo-haptics';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { useRouter, Stack } from 'expo-router';
 import { fetchTafsir, getDefaultTranslationForLanguage } from '@/lib/quran-api';
 import { getVerseQcfData } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
 import { getDailyAyahOverride } from '@/lib/daily-content-override';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useFavorite } from '@/hooks/use-favorite';
 import { transliterateReference } from '@/lib/source-transliteration';
 import { localizeNumber } from '@/lib/format-number';
@@ -34,7 +37,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import { Spacing } from '@/constants/theme';
-
+import { useAppIdentity } from '@/hooks/use-app-identity';
 import { DAILY_AYAHS } from '@/data/daily-ayahs';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -118,8 +121,9 @@ const UTHMANI_FALLBACK = 'Amiri';
 /** Small wrapper to auto-translate daily ayah English translation */
 function TranslatedAyahTrans({ trans, isEnglish, textLight }: { trans: string; isEnglish: boolean; textLight: string }) {
   const translated = useAutoTranslate(trans || '', 'en', 'quran');
+  const { fs } = useColors();
   return (
-    <Text style={{ fontSize: 14, color: textLight, textAlign: 'left', writingDirection: 'ltr' as const, fontStyle: 'italic', lineHeight: 22 }}>
+    <Text style={{ fontSize: fs(14), color: textLight, textAlign: 'left', writingDirection: 'ltr' as const, fontStyle: 'italic', lineHeight: fs(22) }}>
       {isEnglish ? trans : translated}
     </Text>
   );
@@ -148,6 +152,7 @@ const TEXT_SHADOW = {
 
 function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar' }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
+  const { logoSource } = useAppIdentity();
   const isSolidBg = bgUrl.startsWith('#');
   const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
 
@@ -167,9 +172,9 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
 
         {/* Content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-          {/* Verse text — Arabic with QCF for iOS Arabic users, UTHMANI fallback on Android (view-shot can't access QCF fonts) */}
+          {/* Verse text — Arabic with QCF for Arabic users, translation for others */}
           {isArabicCard ? (
-            Platform.OS === 'ios' && qcfGlyphs && qcfFontFamily ? (
+            qcfGlyphs && qcfFontFamily ? (
               <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
                 {qcfGlyphs.join('')}
               </Text>
@@ -187,7 +192,7 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
           {/* Ref badge */}
           <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', marginBottom: 12 }}>
             <Text style={{ color: '#FFFFFF', fontFamily: isArabicCard ? UTHMANI_FALLBACK : undefined, fontSize: 13, ...TEXT_SHADOW }}>
-              {isArabicCard ? `${ayah.ref.split(' ')[0]}: ${toArabicNumeral(ayah.ayah)}` : transliterateReference(ayah.ref, cardLang)}
+              {isArabicCard ? ayah.ref : transliterateReference(ayah.ref, cardLang)}
             </Text>
           </View>
 
@@ -199,6 +204,10 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
           )}
         </View>
 
+        {/* Branding watermark */}
+        <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <RNImage source={logoSource} style={{ width: 56, height: 56, borderRadius: 14, opacity: 0.85 }} />
+        </View>
       </View>
     </ViewShot>
   );
@@ -211,6 +220,7 @@ export default function DailyAyahVideoScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const cardRef = useRef<ViewShot>(null!);
+  const shareCardRef = useRef<IslamicShareCardHandle>(null);
   const language = getLanguage();
   const isArabic = language === 'ar';
 
@@ -225,8 +235,6 @@ export default function DailyAyahVideoScreen() {
   const [selectedBgIdx, setSelectedBgIdx] = useState(dayOfYear % natureCat.images.length);
   // Always use dark overlay — no green/colored tints
   const selectedCardStyle = CARD_STYLES[0];
-  // Full-page background image (blurred nature)
-  const pageBgUrl = natureCat.images[dayOfYear % natureCat.images.length];
   const [showTranslation, setShowTranslation] = useState(!isArabic);
   const isEnglish = language === 'en';
   const [showTafsir, setShowTafsir] = useState(false);
@@ -371,7 +379,6 @@ export default function DailyAyahVideoScreen() {
   }, []);
 
   const handleShare = useCallback(async () => {
-    if (!cardRef.current) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       if (Platform.OS === 'web') {
@@ -380,49 +387,36 @@ export default function DailyAyahVideoScreen() {
         });
         return;
       }
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1.0 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: `${t('shareService.ayahRef')}: ${currentAyah.ref}` });
-      } else {
-        await Share.share({ message: `${currentAyah.arabic}\n﴿ ${currentAyah.ref} ﴾` });
-      }
+      shareCardRef.current?.showSizePicker();
     } catch {
       Alert.alert(t('common.error'), t('common.shareError'));
     }
   }, [currentAyah]);
 
-  const s = StyleSheet.create({
-    title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2 },
-    subtitle: { fontSize: 13, color: colors.textLight },
-    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', marginBottom: 8, marginTop: 4 },
+  const _s = StyleSheet.create({
+    title: { fontSize: 20, fontWeight: '900', color: colors.text, marginBottom: 2, lineHeight: 34, includeFontPadding: false },
+    subtitle: { fontSize: 13, color: colors.textLight, lineHeight: 22, includeFontPadding: false },
+    sectionLabel: { fontSize: 13, fontWeight: '700', color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 8, marginTop: 4, lineHeight: 22, includeFontPadding: false },
     hScroll: { paddingHorizontal: 16, gap: Spacing.sm },
     chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(34, 197, 94, 0.15)', borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.3)' },
-    chipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
-    chipText: { fontSize: 13, fontWeight: '700', color: colors.textLight },
+    chipActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
+    chipText: { fontSize: 13, fontWeight: '700', color: colors.textLight, lineHeight: 22, includeFontPadding: false },
     chipTextActive: { color: '#fff' },
     cardWrap: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 16 },
-    previewCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.12)' },
+    previewCard: { borderRadius: 20, overflow: 'hidden', borderWidth: 0.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)' },
     actionsRow: { flexDirection: 'row', gap: Spacing.md, paddingHorizontal: 16, marginBottom: 16 },
     actionBtn: { flex: 1, paddingVertical: 14, borderRadius: 16, alignItems: 'center', flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, justifyContent: 'center', gap: Spacing.sm },
-    actionBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+    actionBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', lineHeight: 26, includeFontPadding: false },
     styleRow: { flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: 16, marginBottom: 12 },
     styleCircle: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, alignItems: 'center', justifyContent: 'center' },
     toggleRow: { flexDirection: isRTL ? 'row-reverse' as const : 'row' as const, alignItems: 'center', paddingHorizontal: 16, marginBottom: 8 },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   return (
     <>
     <Stack.Screen options={{ headerShown: false }} />
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
-      {/* Full-page blurred nature background */}
-      <Image
-        source={{ uri: pageBgUrl }}
-        style={StyleSheet.absoluteFill}
-        blurRadius={Platform.OS === 'ios' ? 20 : 15}
-        resizeMode="cover"
-      />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.80)' }]} />
       {/* Header */}
       <UniversalHeader
         style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}
@@ -430,7 +424,7 @@ export default function DailyAyahVideoScreen() {
       >
         <View style={{ alignItems: 'center' }}>
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Text style={s.title}>{t('quran.verseOfDay')}</Text>
+            <Text style={s.title}>{t('home.dailyVerse')}</Text>
             <SectionInfoButton sectionKey="quran_surahs" />
           </View>
           <Text style={s.subtitle}>{t('quran.shareWordsOfAllah')}</Text>
@@ -495,10 +489,10 @@ export default function DailyAyahVideoScreen() {
           style={{
             marginHorizontal: 16,
             padding: 20,
-            backgroundColor: isDarkMode ? 'rgba(50,45,35,0.6)' : 'rgba(253,248,235,0.95)',
+            backgroundColor: isDarkMode ? 'rgba(13,142,98,0.15)' : 'rgba(13,142,98,0.08)',
             borderRadius: 16,
             borderWidth: 1.5,
-            borderColor: isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)',
+            borderColor: isDarkMode ? 'rgba(13,142,98,0.3)' : 'rgba(13,142,98,0.2)',
           }}
         >
           {/* Verse text — Arabic for Arabic users, translation for others */}
@@ -513,17 +507,17 @@ export default function DailyAyahVideoScreen() {
               </Text>
             )
           ) : (
-            <Text style={{ fontSize: 20, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 34, fontFamily: fontRegular(), marginBottom: 12, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+            <Text style={{ fontSize: colors.fs(20), color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: colors.fs(34), fontFamily: fontRegular(), marginBottom: 12, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
               {verseTranslation || currentAyah.trans || currentAyah.arabic}
             </Text>
           )}
 
           {/* Surah reference — transliterated for non-Arabic */}
-          <Text style={{ fontSize: 15, color: colors.primary, textAlign: 'center', fontFamily: isArabic ? UTHMANI_FALLBACK : undefined }}>
-            {isArabic ? `${currentAyah.ref.split(' ')[0]}: ${toArabicNumeral(currentAyah.ayah)}` : transliterateReference(currentAyah.ref, language)}
+          <Text style={{ fontSize: colors.fs(15), color: colors.text, fontWeight: '600', textAlign: 'center', fontFamily: isArabic ? UTHMANI_FALLBACK : undefined }}>
+            {isArabic ? currentAyah.ref : transliterateReference(currentAyah.ref, language)}
           </Text>
 
-          <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 8, opacity: 0.6 }}>
+          <Text style={{ fontSize: colors.fs(11), color: colors.textLight, textAlign: 'center', marginTop: 8 }}>
             {t('quran.longPressToGoToVerse')}
           </Text>
 
@@ -537,13 +531,13 @@ export default function DailyAyahVideoScreen() {
           {/* Tafsir section */}
           {showTafsir && (
             <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border }}>
-              <Text style={{ fontSize: 14, fontFamily: fontSemiBold(), color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 6, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+              <Text style={{ fontSize: colors.fs(14), fontFamily: fontSemiBold(), color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', marginBottom: 6, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                 {t('home.tafsirMuyassar')}
               </Text>
               {tafsirLoading ? (
                 <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
               ) : (
-                <Text style={{ fontSize: 15, fontFamily: fontRegular(), color: colors.text, textAlign: 'right', writingDirection: 'rtl', lineHeight: 26 }}>
+                <Text style={{ fontSize: colors.fs(15), fontFamily: fontRegular(), color: colors.text, textAlign: 'right', writingDirection: 'rtl', lineHeight: colors.fs(26) }}>
                   {tafsirText || t('common.loading')}
                 </Text>
               )}
@@ -572,6 +566,18 @@ export default function DailyAyahVideoScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Premium Islamic share card (hidden, for image export) */}
+      <IslamicShareCard
+        ref={shareCardRef}
+        categoryLabel={t('quran.verseOfDay')}
+        arabicText={currentAyah.arabic}
+        qcfGlyphs={qcfGlyphs || undefined}
+        qcfFontFamily={qcfFontFamily || undefined}
+        sourceText={isArabic ? currentAyah.ref : transliterateReference(currentAyah.ref, language)}
+        translationText={!isArabic ? (verseTranslation || currentAyah.trans) : undefined}
+      />
+      <BannerAdComponent screen="daily_ayah" />
     </ScreenContainer>
     </>
   );

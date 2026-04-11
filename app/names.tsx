@@ -12,17 +12,20 @@ import {
   Alert,
   ScrollView,
   Linking,
+  Platform,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Shadows } from '../constants/theme';
+import { Colors, DarkColors, Spacing, BorderRadius, Shadows } from '../constants/theme';
 import { APP_CONFIG } from '../constants/app';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useTranslation } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
@@ -59,14 +62,6 @@ export interface AllahName {
 export const ALLAH_NAMES: AllahName[] = [
   {
     id: 1,
-    name: 'الله',
-    transliteration: 'Allah',
-    meaning: 'الإله المعبود بحق',
-    description: 'هو الاسم الأعظم الذي تفرد به الرب سبحانه، وهو أصل الأسماء الحسنى وأجمعها للمعاني، ومعناه: المألوه المعبود، ذو الألوهية والعبودية على خلقه أجمعين.',
-    evidence: '﴿اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ﴾ [البقرة: 255]',
-  },
-  {
-    id: 2,
     name: 'الرَّحْمَن',
     transliteration: 'Ar-Rahman',
     meaning: 'ذو الرحمة الواسعة',
@@ -74,7 +69,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿الرَّحْمَٰنُ عَلَى الْعَرْشِ اسْتَوَىٰ﴾ [طه: 5]',
   },
   {
-    id: 3,
+    id: 2,
     name: 'الرَّحِيم',
     transliteration: 'Ar-Raheem',
     meaning: 'الرحيم بعباده المؤمنين',
@@ -82,7 +77,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَكَانَ بِالْمُؤْمِنِينَ رَحِيمًا﴾ [الأحزاب: 43]',
   },
   {
-    id: 4,
+    id: 3,
     name: 'المَلِك',
     transliteration: 'Al-Malik',
     meaning: 'المالك لكل شيء',
@@ -90,7 +85,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿فَتَعَالَى اللَّهُ الْمَلِكُ الْحَقُّ﴾ [طه: 114]',
   },
   {
-    id: 5,
+    id: 4,
     name: 'القُدُّوس',
     transliteration: 'Al-Quddus',
     meaning: 'المنزه عن كل نقص',
@@ -98,7 +93,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿الْمَلِكُ الْقُدُّوسُ السَّلَامُ﴾ [الحشر: 23]',
   },
   {
-    id: 6,
+    id: 5,
     name: 'السَّلَام',
     transliteration: 'As-Salam',
     meaning: 'السالم من كل عيب',
@@ -106,7 +101,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿الْمَلِكُ الْقُدُّوسُ السَّلَامُ﴾ [الحشر: 23]',
   },
   {
-    id: 7,
+    id: 6,
     name: 'المُؤْمِن',
     transliteration: 'Al-Mu\'min',
     meaning: 'المصدق لرسله',
@@ -114,7 +109,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿السَّلَامُ الْمُؤْمِنُ الْمُهَيْمِنُ﴾ [الحشر: 23]',
   },
   {
-    id: 8,
+    id: 7,
     name: 'المُهَيْمِن',
     transliteration: 'Al-Muhaymin',
     meaning: 'الرقيب الحافظ',
@@ -122,7 +117,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿السَّلَامُ الْمُؤْمِنُ الْمُهَيْمِنُ﴾ [الحشر: 23]',
   },
   {
-    id: 9,
+    id: 8,
     name: 'العَزِيز',
     transliteration: 'Al-Aziz',
     meaning: 'الغالب الذي لا يُغلب',
@@ -130,7 +125,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْعَزِيزُ الْحَكِيمُ﴾ [إبراهيم: 4]',
   },
   {
-    id: 10,
+    id: 9,
     name: 'الجَبَّار',
     transliteration: 'Al-Jabbar',
     meaning: 'العظيم القاهر',
@@ -138,7 +133,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿الْعَزِيزُ الْجَبَّارُ الْمُتَكَبِّرُ﴾ [الحشر: 23]',
   },
   {
-    id: 11,
+    id: 10,
     name: 'المُتَكَبِّر',
     transliteration: 'Al-Mutakabbir',
     meaning: 'المتعالي عن صفات الخلق',
@@ -146,7 +141,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿الْعَزِيزُ الْجَبَّارُ الْمُتَكَبِّرُ﴾ [الحشر: 23]',
   },
   {
-    id: 12,
+    id: 11,
     name: 'الخَالِق',
     transliteration: 'Al-Khaliq',
     meaning: 'الموجد للأشياء من العدم',
@@ -154,7 +149,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ اللَّهُ الْخَالِقُ الْبَارِئُ الْمُصَوِّرُ﴾ [الحشر: 24]',
   },
   {
-    id: 13,
+    id: 12,
     name: 'البَارِئ',
     transliteration: 'Al-Bari\'',
     meaning: 'المنشئ للخلق',
@@ -162,7 +157,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ اللَّهُ الْخَالِقُ الْبَارِئُ الْمُصَوِّرُ﴾ [الحشر: 24]',
   },
   {
-    id: 14,
+    id: 13,
     name: 'المُصَوِّر',
     transliteration: 'Al-Musawwir',
     meaning: 'الذي صور الخلق',
@@ -170,7 +165,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ اللَّهُ الْخَالِقُ الْبَارِئُ الْمُصَوِّرُ﴾ [الحشر: 24]',
   },
   {
-    id: 15,
+    id: 14,
     name: 'الغَفَّار',
     transliteration: 'Al-Ghaffar',
     meaning: 'كثير المغفرة',
@@ -178,7 +173,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَإِنِّي لَغَفَّارٌ لِمَنْ تَابَ﴾ [طه: 82]',
   },
   {
-    id: 16,
+    id: 15,
     name: 'القَهَّار',
     transliteration: 'Al-Qahhar',
     meaning: 'الغالب على كل شيء',
@@ -186,7 +181,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْوَاحِدُ الْقَهَّارُ﴾ [الرعد: 16]',
   },
   {
-    id: 17,
+    id: 16,
     name: 'الوَهَّاب',
     transliteration: 'Al-Wahhab',
     meaning: 'كثير العطاء',
@@ -194,7 +189,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿أَمْ عِنْدَهُمْ خَزَائِنُ رَحْمَةِ رَبِّكَ الْعَزِيزِ الْوَهَّابِ﴾ [ص: 9]',
   },
   {
-    id: 18,
+    id: 17,
     name: 'الرَّزَّاق',
     transliteration: 'Ar-Razzaq',
     meaning: 'المتكفل بالرزق',
@@ -202,7 +197,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ هُوَ الرَّزَّاقُ ذُو الْقُوَّةِ الْمَتِينُ﴾ [الذاريات: 58]',
   },
   {
-    id: 19,
+    id: 18,
     name: 'الفَتَّاح',
     transliteration: 'Al-Fattah',
     meaning: 'الحاكم بين عباده',
@@ -210,7 +205,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْفَتَّاحُ الْعَلِيمُ﴾ [سبأ: 26]',
   },
   {
-    id: 20,
+    id: 19,
     name: 'العَلِيم',
     transliteration: 'Al-Alim',
     meaning: 'الذي يعلم كل شيء',
@@ -218,7 +213,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ بِكُلِّ شَيْءٍ عَلِيمٌ﴾ [البقرة: 282]',
   },
   {
-    id: 21,
+    id: 20,
     name: 'القَابِض',
     transliteration: 'Al-Qabid',
     meaning: 'الذي يقبض الأرزاق',
@@ -226,7 +221,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ يَقْبِضُ وَيَبْسُطُ﴾ [البقرة: 245]',
   },
   {
-    id: 22,
+    id: 21,
     name: 'البَاسِط',
     transliteration: 'Al-Basit',
     meaning: 'الذي يوسع الرزق',
@@ -234,7 +229,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ يَقْبِضُ وَيَبْسُطُ﴾ [البقرة: 245]',
   },
   {
-    id: 23,
+    id: 22,
     name: 'الخَافِض',
     transliteration: 'Al-Khafid',
     meaning: 'الذي يخفض الجبارين',
@@ -242,7 +237,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿خَافِضَةٌ رَافِعَةٌ﴾ [الواقعة: 3]',
   },
   {
-    id: 24,
+    id: 23,
     name: 'الرَّافِع',
     transliteration: 'Ar-Rafi\'',
     meaning: 'الذي يرفع المؤمنين',
@@ -250,7 +245,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿يَرْفَعِ اللَّهُ الَّذِينَ آمَنُوا مِنْكُمْ﴾ [المجادلة: 11]',
   },
   {
-    id: 25,
+    id: 24,
     name: 'المُعِز',
     transliteration: 'Al-Mu\'izz',
     meaning: 'الذي يعز من يشاء',
@@ -258,7 +253,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿تُعِزُّ مَنْ تَشَاءُ وَتُذِلُّ مَنْ تَشَاءُ﴾ [آل عمران: 26]',
   },
   {
-    id: 26,
+    id: 25,
     name: 'المُذِل',
     transliteration: 'Al-Muzill',
     meaning: 'الذي يذل من يشاء',
@@ -266,7 +261,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿تُعِزُّ مَنْ تَشَاءُ وَتُذِلُّ مَنْ تَشَاءُ﴾ [آل عمران: 26]',
   },
   {
-    id: 27,
+    id: 26,
     name: 'السَّمِيع',
     transliteration: 'As-Sami\'',
     meaning: 'الذي يسمع كل شيء',
@@ -274,7 +269,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّهُ هُوَ السَّمِيعُ الْعَلِيمُ﴾ [الأنفال: 61]',
   },
   {
-    id: 28,
+    id: 27,
     name: 'البَصِير',
     transliteration: 'Al-Basir',
     meaning: 'الذي يبصر كل شيء',
@@ -282,7 +277,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ بَصِيرٌ بِالْعِبَادِ﴾ [آل عمران: 15]',
   },
   {
-    id: 29,
+    id: 28,
     name: 'الحَكَم',
     transliteration: 'Al-Hakam',
     meaning: 'الحاكم العادل',
@@ -290,7 +285,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿أَفَغَيْرَ اللَّهِ أَبْتَغِي حَكَمًا﴾ [الأنعام: 114]',
   },
   {
-    id: 30,
+    id: 29,
     name: 'العَدْل',
     transliteration: 'Al-Adl',
     meaning: 'العادل في حكمه',
@@ -298,7 +293,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَتَمَّتْ كَلِمَتُ رَبِّكَ صِدْقًا وَعَدْلًا﴾ [الأنعام: 115]',
   },
   {
-    id: 31,
+    id: 30,
     name: 'اللَّطِيف',
     transliteration: 'Al-Latif',
     meaning: 'الرفيق بعباده',
@@ -306,7 +301,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ لَطِيفٌ خَبِيرٌ﴾ [الحج: 63]',
   },
   {
-    id: 32,
+    id: 31,
     name: 'الخَبِير',
     transliteration: 'Al-Khabir',
     meaning: 'العالم ببواطن الأمور',
@@ -314,7 +309,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْحَكِيمُ الْخَبِيرُ﴾ [الأنعام: 18]',
   },
   {
-    id: 33,
+    id: 32,
     name: 'الحَلِيم',
     transliteration: 'Al-Halim',
     meaning: 'الذي لا يعجل بالعقوبة',
@@ -322,7 +317,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاعْلَمُوا أَنَّ اللَّهَ غَفُورٌ حَلِيمٌ﴾ [البقرة: 235]',
   },
   {
-    id: 34,
+    id: 33,
     name: 'العَظِيم',
     transliteration: 'Al-Azim',
     meaning: 'الذي له العظمة',
@@ -330,7 +325,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْعَلِيُّ الْعَظِيمُ﴾ [البقرة: 255]',
   },
   {
-    id: 35,
+    id: 34,
     name: 'الغَفُور',
     transliteration: 'Al-Ghafur',
     meaning: 'كثير المغفرة',
@@ -338,7 +333,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَرَبُّكَ الْغَفُورُ ذُو الرَّحْمَةِ﴾ [الكهف: 58]',
   },
   {
-    id: 36,
+    id: 35,
     name: 'الشَّكُور',
     transliteration: 'Ash-Shakur',
     meaning: 'الذي يثيب على الطاعة',
@@ -346,7 +341,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ رَبَّنَا لَغَفُورٌ شَكُورٌ﴾ [فاطر: 34]',
   },
   {
-    id: 37,
+    id: 36,
     name: 'العَلِيّ',
     transliteration: 'Al-Ali',
     meaning: 'المتعالي فوق خلقه',
@@ -354,7 +349,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْعَلِيُّ الْعَظِيمُ﴾ [البقرة: 255]',
   },
   {
-    id: 38,
+    id: 37,
     name: 'الكَبِير',
     transliteration: 'Al-Kabir',
     meaning: 'العظيم الكبير',
@@ -362,7 +357,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿عَالِمُ الْغَيْبِ وَالشَّهَادَةِ الْكَبِيرُ الْمُتَعَالِ﴾ [الرعد: 9]',
   },
   {
-    id: 39,
+    id: 38,
     name: 'الحَفِيظ',
     transliteration: 'Al-Hafiz',
     meaning: 'الحافظ لكل شيء',
@@ -370,7 +365,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَرَبُّكَ عَلَىٰ كُلِّ شَيْءٍ حَفِيظٌ﴾ [سبأ: 21]',
   },
   {
-    id: 40,
+    id: 39,
     name: 'المُقِيت',
     transliteration: 'Al-Muqit',
     meaning: 'المقتدر المعطي للقوت',
@@ -378,7 +373,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَكَانَ اللَّهُ عَلَىٰ كُلِّ شَيْءٍ مُقِيتًا﴾ [النساء: 85]',
   },
   {
-    id: 41,
+    id: 40,
     name: 'الحَسِيب',
     transliteration: 'Al-Hasib',
     meaning: 'المحاسب لعباده',
@@ -386,7 +381,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَكَفَىٰ بِاللَّهِ حَسِيبًا﴾ [النساء: 6]',
   },
   {
-    id: 42,
+    id: 41,
     name: 'الجَلِيل',
     transliteration: 'Al-Jalil',
     meaning: 'ذو الجلال والعظمة',
@@ -394,7 +389,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿تَبَارَكَ اسْمُ رَبِّكَ ذِي الْجَلَالِ وَالْإِكْرَامِ﴾ [الرحمن: 78]',
   },
   {
-    id: 43,
+    id: 42,
     name: 'الكَرِيم',
     transliteration: 'Al-Karim',
     meaning: 'الكثير الخير والعطاء',
@@ -402,7 +397,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿يَا أَيُّهَا الْإِنْسَانُ مَا غَرَّكَ بِرَبِّكَ الْكَرِيمِ﴾ [الانفطار: 6]',
   },
   {
-    id: 44,
+    id: 43,
     name: 'الرَّقِيب',
     transliteration: 'Ar-Raqib',
     meaning: 'المطلع على كل شيء',
@@ -410,7 +405,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ كَانَ عَلَيْكُمْ رَقِيبًا﴾ [النساء: 1]',
   },
   {
-    id: 45,
+    id: 44,
     name: 'المُجِيب',
     transliteration: 'Al-Mujib',
     meaning: 'المستجيب لدعاء عباده',
@@ -418,7 +413,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ رَبِّي قَرِيبٌ مُجِيبٌ﴾ [هود: 61]',
   },
   {
-    id: 46,
+    id: 45,
     name: 'الوَاسِع',
     transliteration: 'Al-Wasi\'',
     meaning: 'الواسع في رحمته وعلمه',
@@ -426,7 +421,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ وَاسِعٌ عَلِيمٌ﴾ [البقرة: 247]',
   },
   {
-    id: 47,
+    id: 46,
     name: 'الحَكِيم',
     transliteration: 'Al-Hakim',
     meaning: 'ذو الحكمة البالغة',
@@ -434,7 +429,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْعَزِيزُ الْحَكِيمُ﴾ [إبراهيم: 4]',
   },
   {
-    id: 48,
+    id: 47,
     name: 'الوَدُود',
     transliteration: 'Al-Wadud',
     meaning: 'المحب لعباده المؤمنين',
@@ -442,7 +437,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْغَفُورُ الْوَدُودُ﴾ [البروج: 14]',
   },
   {
-    id: 49,
+    id: 48,
     name: 'المَجِيد',
     transliteration: 'Al-Majid',
     meaning: 'ذو المجد والشرف',
@@ -450,7 +445,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿ذُو الْعَرْشِ الْمَجِيدُ﴾ [البروج: 15]',
   },
   {
-    id: 50,
+    id: 49,
     name: 'البَاعِث',
     transliteration: 'Al-Ba\'ith',
     meaning: 'الذي يبعث الخلق',
@@ -459,7 +454,7 @@ export const ALLAH_NAMES: AllahName[] = [
   },
   // ... باقي الأسماء حتى 99
   {
-    id: 51,
+    id: 50,
     name: 'الشَّهِيد',
     transliteration: 'Ash-Shahid',
     meaning: 'المطلع على كل شيء',
@@ -467,7 +462,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ عَلَىٰ كُلِّ شَيْءٍ شَهِيدٌ﴾ [المجادلة: 6]',
   },
   {
-    id: 52,
+    id: 51,
     name: 'الحَقّ',
     transliteration: 'Al-Haqq',
     meaning: 'الثابت الوجود',
@@ -475,7 +470,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿ذَٰلِكَ بِأَنَّ اللَّهَ هُوَ الْحَقُّ﴾ [الحج: 6]',
   },
   {
-    id: 53,
+    id: 52,
     name: 'الوَكِيل',
     transliteration: 'Al-Wakil',
     meaning: 'الكفيل بأرزاق العباد',
@@ -483,7 +478,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَكَفَىٰ بِاللَّهِ وَكِيلًا﴾ [النساء: 81]',
   },
   {
-    id: 54,
+    id: 53,
     name: 'القَوِيّ',
     transliteration: 'Al-Qawi',
     meaning: 'التام القدرة',
@@ -491,7 +486,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ قَوِيٌّ عَزِيزٌ﴾ [الحج: 40]',
   },
   {
-    id: 55,
+    id: 54,
     name: 'المَتِين',
     transliteration: 'Al-Matin',
     meaning: 'الشديد القوة',
@@ -499,7 +494,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ هُوَ الرَّزَّاقُ ذُو الْقُوَّةِ الْمَتِينُ﴾ [الذاريات: 58]',
   },
   {
-    id: 56,
+    id: 55,
     name: 'الوَلِيّ',
     transliteration: 'Al-Wali',
     meaning: 'الناصر لعباده',
@@ -507,7 +502,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿اللَّهُ وَلِيُّ الَّذِينَ آمَنُوا﴾ [البقرة: 257]',
   },
   {
-    id: 57,
+    id: 56,
     name: 'الحَمِيد',
     transliteration: 'Al-Hamid',
     meaning: 'المستحق للحمد',
@@ -515,7 +510,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْوَلِيُّ الْحَمِيدُ﴾ [الشورى: 28]',
   },
   {
-    id: 58,
+    id: 57,
     name: 'المُحْصِي',
     transliteration: 'Al-Muhsi',
     meaning: 'الذي أحصى كل شيء',
@@ -523,7 +518,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَأَحْصَىٰ كُلَّ شَيْءٍ عَدَدًا﴾ [الجن: 28]',
   },
   {
-    id: 59,
+    id: 58,
     name: 'المُبْدِئ',
     transliteration: 'Al-Mubdi\'',
     meaning: 'الذي بدأ الخلق',
@@ -531,7 +526,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّهُ هُوَ يُبْدِئُ وَيُعِيدُ﴾ [البروج: 13]',
   },
   {
-    id: 60,
+    id: 59,
     name: 'المُعِيد',
     transliteration: 'Al-Mu\'id',
     meaning: 'الذي يعيد الخلق',
@@ -539,7 +534,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّهُ هُوَ يُبْدِئُ وَيُعِيدُ﴾ [البروج: 13]',
   },
   {
-    id: 61,
+    id: 60,
     name: 'المُحْيِي',
     transliteration: 'Al-Muhyi',
     meaning: 'الذي يحيي الموتى',
@@ -547,7 +542,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ الَّذِي أَحْيَاهَا لَمُحْيِي الْمَوْتَىٰ﴾ [فصلت: 39]',
   },
   {
-    id: 62,
+    id: 61,
     name: 'المُمِيت',
     transliteration: 'Al-Mumit',
     meaning: 'الذي يميت الأحياء',
@@ -555,7 +550,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ يُحْيِي وَيُمِيتُ وَإِلَيْهِ تُرْجَعُونَ﴾ [يونس: 56]',
   },
   {
-    id: 63,
+    id: 62,
     name: 'الحَيّ',
     transliteration: 'Al-Hayy',
     meaning: 'الدائم الحياة',
@@ -563,7 +558,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ﴾ [البقرة: 255]',
   },
   {
-    id: 64,
+    id: 63,
     name: 'القَيُّوم',
     transliteration: 'Al-Qayyum',
     meaning: 'القائم بذاته المقيم لغيره',
@@ -571,7 +566,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ﴾ [البقرة: 255]',
   },
   {
-    id: 65,
+    id: 64,
     name: 'الوَاجِد',
     transliteration: 'Al-Wajid',
     meaning: 'الغني الذي لا يفتقر',
@@ -579,7 +574,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'من أسماء الله الثابتة في السنة',
   },
   {
-    id: 66,
+    id: 65,
     name: 'المَاجِد',
     transliteration: 'Al-Majid',
     meaning: 'العظيم المجد',
@@ -587,7 +582,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿ذُو الْعَرْشِ الْمَجِيدُ﴾ [البروج: 15]',
   },
   {
-    id: 67,
+    id: 66,
     name: 'الوَاحِد',
     transliteration: 'Al-Wahid',
     meaning: 'الفرد الذي لا نظير له',
@@ -595,7 +590,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَإِلَٰهُكُمْ إِلَٰهٌ وَاحِدٌ﴾ [البقرة: 163]',
   },
   {
-    id: 68,
+    id: 67,
     name: 'الأَحَد',
     transliteration: 'Al-Ahad',
     meaning: 'المتفرد بالكمال',
@@ -603,7 +598,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿قُلْ هُوَ اللَّهُ أَحَدٌ﴾ [الإخلاص: 1]',
   },
   {
-    id: 69,
+    id: 68,
     name: 'الصَّمَد',
     transliteration: 'As-Samad',
     meaning: 'المقصود في الحوائج',
@@ -611,7 +606,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿اللَّهُ الصَّمَدُ﴾ [الإخلاص: 2]',
   },
   {
-    id: 70,
+    id: 69,
     name: 'القَادِر',
     transliteration: 'Al-Qadir',
     meaning: 'القادر على كل شيء',
@@ -619,7 +614,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَهُوَ الْقَاهِرُ فَوْقَ عِبَادِهِ وَهُوَ الْحَكِيمُ الْخَبِيرُ﴾ [الأنعام: 18]',
   },
   {
-    id: 71,
+    id: 70,
     name: 'المُقْتَدِر',
     transliteration: 'Al-Muqtadir',
     meaning: 'التام القدرة',
@@ -627,7 +622,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿فِي مَقْعَدِ صِدْقٍ عِنْدَ مَلِيكٍ مُقْتَدِرٍ﴾ [القمر: 55]',
   },
   {
-    id: 72,
+    id: 71,
     name: 'المُقَدِّم',
     transliteration: 'Al-Muqaddim',
     meaning: 'الذي يقدم ما يشاء',
@@ -635,7 +630,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'من أسماء الله الثابتة في السنة',
   },
   {
-    id: 73,
+    id: 72,
     name: 'المُؤَخِّر',
     transliteration: 'Al-Mu\'akhkhir',
     meaning: 'الذي يؤخر ما يشاء',
@@ -643,7 +638,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'من أسماء الله الثابتة في السنة',
   },
   {
-    id: 74,
+    id: 73,
     name: 'الأَوَّل',
     transliteration: 'Al-Awwal',
     meaning: 'الذي ليس قبله شيء',
@@ -651,7 +646,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ الْأَوَّلُ وَالْآخِرُ﴾ [الحديد: 3]',
   },
   {
-    id: 75,
+    id: 74,
     name: 'الآخِر',
     transliteration: 'Al-Akhir',
     meaning: 'الذي ليس بعده شيء',
@@ -659,7 +654,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿هُوَ الْأَوَّلُ وَالْآخِرُ﴾ [الحديد: 3]',
   },
   {
-    id: 76,
+    id: 75,
     name: 'الظَّاهِر',
     transliteration: 'Az-Zahir',
     meaning: 'الذي ليس فوقه شيء',
@@ -667,7 +662,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَالظَّاهِرُ وَالْبَاطِنُ﴾ [الحديد: 3]',
   },
   {
-    id: 77,
+    id: 76,
     name: 'البَاطِن',
     transliteration: 'Al-Batin',
     meaning: 'الذي ليس دونه شيء',
@@ -675,7 +670,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَالظَّاهِرُ وَالْبَاطِنُ﴾ [الحديد: 3]',
   },
   {
-    id: 78,
+    id: 77,
     name: 'الوَالِي',
     transliteration: 'Al-Wali',
     meaning: 'المالك المتصرف',
@@ -683,7 +678,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَمَا لَهُمْ مِنْ دُونِهِ مِنْ وَالٍ﴾ [الرعد: 11]',
   },
   {
-    id: 79,
+    id: 78,
     name: 'المُتَعَالِ',
     transliteration: 'Al-Muta\'ali',
     meaning: 'المتعالي عن صفات الخلق',
@@ -691,7 +686,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿عَالِمُ الْغَيْبِ وَالشَّهَادَةِ الْكَبِيرُ الْمُتَعَالِ﴾ [الرعد: 9]',
   },
   {
-    id: 80,
+    id: 79,
     name: 'البَرّ',
     transliteration: 'Al-Barr',
     meaning: 'الكثير البر والإحسان',
@@ -699,7 +694,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّهُ هُوَ الْبَرُّ الرَّحِيمُ﴾ [الطور: 28]',
   },
   {
-    id: 81,
+    id: 80,
     name: 'التَّوَّاب',
     transliteration: 'At-Tawwab',
     meaning: 'الذي يقبل التوبة',
@@ -707,7 +702,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّهُ هُوَ التَّوَّابُ الرَّحِيمُ﴾ [البقرة: 37]',
   },
   {
-    id: 82,
+    id: 81,
     name: 'المُنْتَقِم',
     transliteration: 'Al-Muntaqim',
     meaning: 'الذي ينتقم من العصاة',
@@ -715,7 +710,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّا مِنَ الْمُجْرِمِينَ مُنْتَقِمُونَ﴾ [السجدة: 22]',
   },
   {
-    id: 83,
+    id: 82,
     name: 'العَفُوّ',
     transliteration: 'Al-\'Afuw',
     meaning: 'الكثير العفو',
@@ -723,7 +718,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ كَانَ عَفُوًّا غَفُورًا﴾ [النساء: 43]',
   },
   {
-    id: 84,
+    id: 83,
     name: 'الرَّؤُوف',
     transliteration: 'Ar-Ra\'uf',
     meaning: 'الشديد الرحمة',
@@ -731,7 +726,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ بِالنَّاسِ لَرَءُوفٌ رَحِيمٌ﴾ [البقرة: 143]',
   },
   {
-    id: 85,
+    id: 84,
     name: 'مَالِكُ المُلْك',
     transliteration: 'Malik Al-Mulk',
     meaning: 'مالك الملك كله',
@@ -739,7 +734,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿قُلِ اللَّهُمَّ مَالِكَ الْمُلْكِ﴾ [آل عمران: 26]',
   },
   {
-    id: 86,
+    id: 85,
     name: 'ذُو الجَلَالِ وَالإِكْرَام',
     transliteration: 'Dhul-Jalali wal-Ikram',
     meaning: 'صاحب العظمة والكرم',
@@ -747,7 +742,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿تَبَارَكَ اسْمُ رَبِّكَ ذِي الْجَلَالِ وَالْإِكْرَامِ﴾ [الرحمن: 78]',
   },
   {
-    id: 87,
+    id: 86,
     name: 'المُقْسِط',
     transliteration: 'Al-Muqsit',
     meaning: 'العادل في حكمه',
@@ -755,7 +750,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَأَقْسِطُوا إِنَّ اللَّهَ يُحِبُّ الْمُقْسِطِينَ﴾ [الحجرات: 9]',
   },
   {
-    id: 88,
+    id: 87,
     name: 'الجَامِع',
     transliteration: 'Al-Jami\'',
     meaning: 'الذي يجمع الخلائق',
@@ -763,7 +758,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿إِنَّ اللَّهَ جَامِعُ الْمُنَافِقِينَ وَالْكَافِرِينَ﴾ [النساء: 140]',
   },
   {
-    id: 89,
+    id: 88,
     name: 'الغَنِيّ',
     transliteration: 'Al-Ghani',
     meaning: 'المستغني عن كل شيء',
@@ -771,7 +766,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَاللَّهُ الْغَنِيُّ وَأَنْتُمُ الْفُقَرَاءُ﴾ [محمد: 38]',
   },
   {
-    id: 90,
+    id: 89,
     name: 'المُغْنِي',
     transliteration: 'Al-Mughni',
     meaning: 'الذي يغني من يشاء',
@@ -779,7 +774,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَأَنَّهُ هُوَ أَغْنَىٰ وَأَقْنَىٰ﴾ [النجم: 48]',
   },
   {
-    id: 91,
+    id: 90,
     name: 'المَانِع',
     transliteration: 'Al-Mani\'',
     meaning: 'الذي يمنع ما يشاء',
@@ -787,7 +782,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'من أسماء الله الثابتة في السنة',
   },
   {
-    id: 92,
+    id: 91,
     name: 'الضَّارّ',
     transliteration: 'Ad-Darr',
     meaning: 'الذي يضر من يشاء',
@@ -795,7 +790,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'لا يُطلق إلا مع اسم النافع: الضار النافع',
   },
   {
-    id: 93,
+    id: 92,
     name: 'النَّافِع',
     transliteration: 'An-Nafi\'',
     meaning: 'الذي ينفع من يشاء',
@@ -803,7 +798,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: 'لا يُطلق إلا مع اسم الضار: الضار النافع',
   },
   {
-    id: 94,
+    id: 93,
     name: 'النُّور',
     transliteration: 'An-Nur',
     meaning: 'نور السماوات والأرض',
@@ -811,7 +806,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿اللَّهُ نُورُ السَّمَاوَاتِ وَالْأَرْضِ﴾ [النور: 35]',
   },
   {
-    id: 95,
+    id: 94,
     name: 'الهَادِي',
     transliteration: 'Al-Hadi',
     meaning: 'الذي يهدي من يشاء',
@@ -819,7 +814,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَإِنَّ اللَّهَ لَهَادِ الَّذِينَ آمَنُوا إِلَىٰ صِرَاطٍ مُسْتَقِيمٍ﴾ [الحج: 54]',
   },
   {
-    id: 96,
+    id: 95,
     name: 'البَدِيع',
     transliteration: 'Al-Badi\'',
     meaning: 'المبدع على غير مثال',
@@ -827,7 +822,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿بَدِيعُ السَّمَاوَاتِ وَالْأَرْضِ﴾ [البقرة: 117]',
   },
   {
-    id: 97,
+    id: 96,
     name: 'البَاقِي',
     transliteration: 'Al-Baqi',
     meaning: 'الدائم الوجود',
@@ -835,7 +830,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَيَبْقَىٰ وَجْهُ رَبِّكَ ذُو الْجَلَالِ وَالْإِكْرَامِ﴾ [الرحمن: 27]',
   },
   {
-    id: 98,
+    id: 97,
     name: 'الوَارِث',
     transliteration: 'Al-Warith',
     meaning: 'الباقي بعد فناء الخلق',
@@ -843,7 +838,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَإِنَّا لَنَحْنُ نُحْيِي وَنُمِيتُ وَنَحْنُ الْوَارِثُونَ﴾ [الحجر: 23]',
   },
   {
-    id: 99,
+    id: 98,
     name: 'الرَّشِيد',
     transliteration: 'Ar-Rashid',
     meaning: 'المرشد إلى الصواب',
@@ -851,7 +846,7 @@ export const ALLAH_NAMES: AllahName[] = [
     evidence: '﴿وَإِنْ يُرِدْكَ بِخَيْرٍ فَلَا رَادَّ لِفَضْلِهِ﴾ [يونس: 107]',
   },
   {
-    id: 100,
+    id: 99,
     name: 'الصَّبُور',
     transliteration: 'As-Sabur',
     meaning: 'الذي لا يعجل بالعقوبة',
@@ -899,6 +894,7 @@ export default function AllahNamesScreen() {
   const router = useRouter();
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { t, language } = useTranslation();
   const currentLang = settings.language || 'ar';
   
@@ -922,7 +918,15 @@ export default function AllahNamesScreen() {
     try {
       const saved = await AsyncStorage.getItem('allah_names_favorites');
       if (saved) {
-        setFavorites(JSON.parse(saved));
+        let ids: number[] = JSON.parse(saved);
+        // Migrate old IDs (2-100) to new range (1-99) after "Allah" entry removal
+        const migrated = await AsyncStorage.getItem('allah_names_favorites_migrated_v2');
+        if (!migrated && ids.some(id => id > 99)) {
+          ids = ids.filter(id => id > 1).map(id => id - 1);
+          await AsyncStorage.setItem('allah_names_favorites', JSON.stringify(ids));
+          await AsyncStorage.setItem('allah_names_favorites_migrated_v2', 'true');
+        }
+        setFavorites(ids);
       }
     } catch (error) {
       console.error('Error loading favorites:', error);
@@ -1005,7 +1009,7 @@ export default function AllahNamesScreen() {
   // عرض عنصر الشبكة
   const renderGridItem = ({ item }: { item: AllahName }) => (
     <TouchableOpacity
-      style={styles.gridItem}
+      style={[styles.gridItem, { backgroundColor: colors.card }]}
       onPress={() => openNameDetails(item)}
       onLongPress={() => openShareModal(item)}
       activeOpacity={0.7}
@@ -1027,7 +1031,7 @@ export default function AllahNamesScreen() {
   // عرض عنصر القائمة
   const renderListItem = ({ item }: { item: AllahName }) => (
     <TouchableOpacity
-      style={[styles.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+      style={[styles.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: colors.card }]}
       onPress={() => openNameDetails(item)}
       onLongPress={() => openShareModal(item)}
       activeOpacity={0.7}
@@ -1038,27 +1042,35 @@ export default function AllahNamesScreen() {
         </View>
         
         <View style={styles.listItemContent}>
-          <Text style={[styles.listItemName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{currentLang === 'ar' ? item.name : item.transliteration}</Text>
+          <Text style={[styles.listItemName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{currentLang === 'ar' ? item.name : item.transliteration}</Text>
           <Text style={[styles.listItemMeaning, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{getNameMeaning(item, currentLang)}</Text>
         </View>
       </View>
       
       <View style={[styles.listItemActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
-          style={styles.listItemAction}
+          style={[styles.listItemAction, { overflow: 'hidden' }]}
           onPress={() => openShareModal(item)}
         >
-          <Ionicons name="share-outline" size={20} color={colors.primary || Colors.primary} />
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <Ionicons name="share-outline" size={20} color={colors.icon} />
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={styles.listItemAction}
+          style={[styles.listItemAction, { overflow: 'hidden' }]}
           onPress={() => toggleFavorite(item.id)}
         >
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <Ionicons
             name={favorites.includes(item.id) ? 'heart' : 'heart-outline'}
             size={20}
-            color={favorites.includes(item.id) ? (colors.error || Colors.error) : colors.textLight}
+            color={favorites.includes(item.id) ? (colors.error || Colors.error) : colors.icon}
           />
         </TouchableOpacity>
       </View>
@@ -1070,34 +1082,50 @@ export default function AllahNamesScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && { backgroundColor: '#11151c' }, settings.display.appBackground !== 'none' && { backgroundColor: 'transparent' }]}
+      style={styles.container}
     >
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       {/* الرأس */}
       <View style={[styles.header, { backgroundColor: 'transparent', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <BackButton color={isDarkMode ? '#fff' : Colors.text} style={[styles.headerBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]} />
+        <BackButton color={colors.text} style={[styles.headerBtn, { backgroundColor: isDarkMode ? colors.primary + '26' : colors.primary + '35' }]} />
         
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('names.title')}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('home.namesOfAllah')}</Text>
           <SectionInfoButton sectionKey="names" />
         </View>
         
-        <View style={{ width: 130 }}>
-          <NativeTabs
-            tabs={[
-              { key: 'grid', label: t('names.gridView') },
-              { key: 'list', label: t('names.listView') },
-            ]}
-            selected={viewMode}
-            onSelect={(key) => setViewMode(key as 'grid' | 'list')}
-            indicatorColor="#22C55E"
-          />
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <TouchableOpacity
+            onPress={() => { setViewMode('grid'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            style={{
+              width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: viewMode === 'grid' ? colors.text : colors.surfaceVariant,
+            }}
+          >
+            <MaterialCommunityIcons name={viewMode === 'grid' ? 'view-grid' : 'view-grid-outline'} size={20} color={viewMode === 'grid' ? colors.background : colors.icon} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => { setViewMode('list'); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            style={{
+              width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: viewMode === 'list' ? colors.text : colors.surfaceVariant,
+            }}
+          >
+            <MaterialCommunityIcons name={viewMode === 'list' ? 'view-list' : 'view-list-outline'} size={20} color={viewMode === 'list' ? colors.background : colors.icon} />
+          </TouchableOpacity>
         </View>
       </View>
       
       {/* بطاقة المعلومات */}
-      <View style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <Ionicons name="information-circle" size={24} color={colors.primary || Colors.primary} />
+      <View style={[styles.infoCard, {
+        flexDirection: isRTL ? 'row-reverse' : 'row',
+        backgroundColor: colors.hasBgOverride ? colors.card : isDarkMode ? colors.primary + '15' : '#d5ece0',
+        borderWidth: 1.5,
+        borderColor: colors.hasBgOverride ? colors.border : isDarkMode ? colors.primary + '25' : '#9ecdb3',
+      }]}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0d8e62' }}>
+          <Ionicons name="information" size={22} color="#FFFFFF" />
+        </View>
         <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('names.introHadith')}
         </Text>
@@ -1125,14 +1153,18 @@ export default function AllahNamesScreen() {
         onRequestClose={() => setShowModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.detailsModal}>
+          <View style={[styles.detailsModal, { overflow: 'hidden' }]}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,20,20,0.75)' : 'rgba(255,255,255,0.85)' }]} />
             {/* الرأس */}
-            <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
               <TouchableOpacity onPress={() => setShowModal(false)}>
-                <Ionicons name="close" size={24} color="#A8A8AD" />
+                <Ionicons name="close" size={24} color={colors.icon} />
               </TouchableOpacity>
               
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: colors.icon }]}>
                 {selectedName?.id} / 99
               </Text>
               
@@ -1151,7 +1183,7 @@ export default function AllahNamesScreen() {
                   <Ionicons
                     name={selectedName && favorites.includes(selectedName.id) ? 'heart' : 'heart-outline'}
                     size={22}
-                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : '#A8A8AD'}
+                    color={selectedName && favorites.includes(selectedName.id) ? Colors.error : colors.icon}
                   />
                 </TouchableOpacity>
               </View>
@@ -1161,64 +1193,66 @@ export default function AllahNamesScreen() {
               <ScrollView showsVerticalScrollIndicator={false}>
                 {/* الاسم */}
                 <View style={styles.nameSection}>
-                  <Text style={styles.bigName}>{currentLang === 'ar' ? selectedName.name : selectedName.transliteration}</Text>
+                  <Text style={[styles.bigName, { color: colors.primaryText }]}>{currentLang === 'ar' ? selectedName.name : selectedName.transliteration}</Text>
                 </View>
                 
                 {/* المعنى */}
-                <View style={styles.meaningSection}>
+                <View style={[styles.meaningSection, { borderBottomColor: colors.border }]}>
                   <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.gold + '25', alignItems: 'center', justifyContent: 'center' }}>
                       <Ionicons name="bulb" size={18} color={Colors.gold} />
                     </View>
-                    <Text style={styles.sectionTitle}>{t('names.meaning')}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('names.meaning')}</Text>
                   </View>
-                  <Text style={[styles.meaningText, { writingDirection: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left' }]}>{getNameMeaning(selectedName, currentLang)}</Text>
+                  <Text style={[styles.meaningText, { writingDirection: isRTL ? 'rtl' : 'ltr', textAlign: isRTL ? 'right' : 'left', color: colors.text }]}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 {/* الشرح */}
-                <View style={styles.descriptionSection}>
+                <View style={[styles.descriptionSection, { borderBottomColor: colors.border }]}>
                   <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary + '25', alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.primary + '30', alignItems: 'center', justifyContent: 'center' }}>
                       <Ionicons name="document-text" size={18} color={Colors.primary} />
                     </View>
-                    <Text style={styles.sectionTitle}>{t('names.explanation')}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('names.explanation')}</Text>
                   </View>
-                  <TranslatedText from="ar" type="section" style={styles.descriptionText}>{selectedName.description}</TranslatedText>
+                  <TranslatedText from="ar" type="section" style={[styles.descriptionText, { color: colors.textLight }]}>{selectedName.description}</TranslatedText>
                 </View>
                 
                 {/* الدليل */}
                 {selectedName.evidence && (
-                  <View style={styles.evidenceSection}>
+                  <View style={[styles.evidenceSection, { backgroundColor: colors.glass }]}>
                     <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                       <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.secondary + '25', alignItems: 'center', justifyContent: 'center' }}>
                         <Ionicons name="book" size={18} color={Colors.secondary} />
                       </View>
-                      <Text style={styles.sectionTitle}>{t('names.evidence')}</Text>
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('names.evidence')}</Text>
                     </View>
-                    <EvidenceText evidence={selectedName.evidence} style={styles.evidenceText} />
+                    <EvidenceText evidence={selectedName.evidence} style={[styles.evidenceText, { color: colors.textLight }]} />
                   </View>
                 )}
 
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: Colors.secondary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                  onPress={() => handleCopyName(selectedName)}
-                >
-                  <Ionicons name="copy" size={20} color="#FFF" />
-                  <Text style={styles.actionBtnText}>{t('common.copy')}</Text>
-                </TouchableOpacity>
+                <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
+                  <TouchableOpacity
+                    style={[styles.actionBtn, { backgroundColor: Colors.secondary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                    onPress={() => handleCopyName(selectedName)}
+                  >
+                    <Ionicons name="copy" size={18} color="#FFF" />
+                    <Text style={styles.actionBtnText}>{t('common.copy')}</Text>
+                  </TouchableOpacity>
+                </View>
               </ScrollView>
             )}
             
             {/* أزرار التنقل */}
-            <View style={[styles.navigationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.navigationRow, { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border }]}>
               <TouchableOpacity style={[styles.navBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={goToPreviousName}>
-                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={Colors.primary} />
-                <Text style={styles.navBtnText}>{t('common.previous')}</Text>
+                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={24} color={colors.primaryText} />
+                <Text style={[styles.navBtnText, { color: colors.primaryText }]}>{t('common.previous')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={[styles.navBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={goToNextName}>
-                <Text style={styles.navBtnText}>{t('common.next')}</Text>
-                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={Colors.primary} />
+                <Text style={[styles.navBtnText, { color: colors.primaryText }]}>{t('common.next')}</Text>
+                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={24} color={colors.primaryText} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1237,19 +1271,23 @@ export default function AllahNamesScreen() {
           activeOpacity={1}
           onPress={() => setShowShareModal(false)}
         >
-          <View style={styles.shareModalContent}>
+          <View style={[styles.shareModalContent, { overflow: 'hidden' }]}>
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,20,20,0.75)' : 'rgba(255,255,255,0.85)' }]} />
             <View style={[styles.shareModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={styles.shareModalTitle}>{t('names.shareHeader')}</Text>
+              <Text style={[styles.shareModalTitle, { color: colors.text }]}>{t('names.shareHeader')}</Text>
               <TouchableOpacity onPress={() => setShowShareModal(false)}>
-                <Ionicons name="close" size={24} color="#A8A8AD" />
+                <Ionicons name="close" size={24} color={colors.icon} />
               </TouchableOpacity>
             </View>
             
             {selectedName && (
               <>
                 <View style={styles.sharePreview}>
-                  <Text style={styles.sharePreviewName}>{selectedName.name}</Text>
-                  <Text style={styles.sharePreviewMeaning}>{getNameMeaning(selectedName, currentLang)}</Text>
+                  <Text style={[styles.sharePreviewName, { color: colors.primaryText }]}>{selectedName.name}</Text>
+                  <Text style={[styles.sharePreviewMeaning, { color: colors.textLight }]}>{getNameMeaning(selectedName, currentLang)}</Text>
                 </View>
                 
                 <View style={[styles.shareOptions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1260,7 +1298,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="share-social" size={24} color={Colors.primary} />
                     </View>
-                    <Text style={styles.shareOptionText}>{t('common.share')}</Text>
+                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('common.share')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1270,7 +1308,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="copy" size={24} color={Colors.secondary} />
                     </View>
-                    <Text style={styles.shareOptionText}>{t('common.copy')}</Text>
+                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('common.copy')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1292,7 +1330,7 @@ export default function AllahNamesScreen() {
                     <View style={styles.shareOptionIcon}>
                       <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
                     </View>
-                    <Text style={styles.shareOptionText}>{t('names.whatsapp')}</Text>
+                    <Text style={[styles.shareOptionText, { color: colors.text }]}>{t('names.whatsapp')}</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -1309,7 +1347,7 @@ export default function AllahNamesScreen() {
                         color={Colors.error}
                       />
                     </View>
-                    <Text style={styles.shareOptionText}>
+                    <Text style={[styles.shareOptionText, { color: colors.text }]}>
                       {favorites.includes(selectedName.id) ? t('common.removeFromFavorites') : t('common.addToFavorites')}
                     </Text>
                   </TouchableOpacity>
@@ -1327,10 +1365,10 @@ export default function AllahNamesScreen() {
 // ===============================
 // الأنماط
 // ===============================
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#11151c',
+    backgroundColor: 'transparent',
   },
   
   // الرأس
@@ -1353,6 +1391,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fontBold(),
     color: Colors.text,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   
   // بطاقة المعلومات
@@ -1361,7 +1401,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     margin: Spacing.md,
     padding: Spacing.md,
-    backgroundColor: Colors.primary + '10',
     borderRadius: BorderRadius.lg,
     gap: Spacing.sm,
   },
@@ -1369,7 +1408,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: Colors.text,
     lineHeight: 22,
   },
   
@@ -1384,7 +1422,6 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH,
     height: ITEM_WIDTH,
     margin: Spacing.xs,
-    backgroundColor: 'rgba(120,120,128,0.15)',
     borderRadius: BorderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1405,6 +1442,8 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 10,
     fontFamily: fontBold(),
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   gridItemName: {
     fontSize: 20,
@@ -1412,6 +1451,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
     paddingHorizontal: 4,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   favoriteIndicator: {
     position: 'absolute',
@@ -1425,7 +1466,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.md,
-    backgroundColor: 'rgba(120,120,128,0.15)',
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.sm,
   },
@@ -1447,6 +1487,8 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontFamily: fontBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   listItemContent: {
     flex: 1,
@@ -1455,11 +1497,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Amiri-Bold',
     color: Colors.text,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   listItemMeaning: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#A8A8AD',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   listItemActions: {
     flexDirection: 'row',
@@ -1469,7 +1514,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1481,7 +1525,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   detailsModal: {
-    backgroundColor: 'rgba(30,30,30,0.95)',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     maxHeight: '85%',
@@ -1499,6 +1542,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontBold(),
     color: '#A8A8AD',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   modalHeaderActions: {
     flexDirection: 'row',
@@ -1517,18 +1562,22 @@ const styles = StyleSheet.create({
   nameSection: {
     alignItems: 'center',
     paddingVertical: Spacing.xl,
-    backgroundColor: Colors.primary + '08',
+    backgroundColor: Colors.primary + '15',
   },
   bigName: {
     fontSize: 48,
     fontFamily: 'Amiri-Bold',
     color: Colors.primary,
+    lineHeight: 72,
+    includeFontPadding: false,
   },
   transliteration: {
     fontSize: 16,
     fontFamily: fontRegular(),
     color: '#A8A8AD',
     marginTop: Spacing.xs,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   
   // الأقسام
@@ -1537,16 +1586,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
+    overflow: 'visible' as const,
   },
   sectionTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
     color: '#FFFFFF',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   
   meaningSection: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
   meaningText: {
@@ -1554,24 +1608,30 @@ const styles = StyleSheet.create({
     fontFamily: fontSemiBold(),
     color: '#FFFFFF',
     textAlign: 'center',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   
   descriptionSection: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
   },
   descriptionText: {
     fontSize: 15,
     fontFamily: fontRegular(),
-    color: '#E0E0E0',
+    color: '#A3A3A3',
     lineHeight: 26,
     textAlign: 'right',
     writingDirection: 'rtl',
   },
   
   evidenceSection: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg + 4,
+    paddingBottom: Spacing.lg,
     backgroundColor: Colors.secondary + '08',
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.md,
@@ -1580,7 +1640,7 @@ const styles = StyleSheet.create({
   evidenceText: {
     fontSize: 16,
     fontFamily: 'Amiri-Regular',
-    color: '#E0E0E0',
+    color: '#A3A3A3',
     textAlign: 'center',
     lineHeight: 28,
   },
@@ -1595,16 +1655,19 @@ const styles = StyleSheet.create({
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: 14,
-    gap: Spacing.xs,
-    backgroundColor: 'rgba(120,120,128,0.18)',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: 14,
+    borderRadius: 24,
+    gap: Spacing.sm,
+    minWidth: 140,
   },
   actionBtnText: {
     color: '#FFF',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: fontSemiBold(),
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   
   // أزرار التنقل
@@ -1625,6 +1688,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontSemiBold(),
     color: Colors.primary,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   
   // نافذة المشاركة
@@ -1634,7 +1699,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   shareModalContent: {
-    backgroundColor: 'rgba(30,30,30,0.95)',
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     padding: Spacing.lg,
@@ -1650,11 +1714,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fontBold(),
     color: '#FFFFFF',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   sharePreview: {
     alignItems: 'center',
     padding: Spacing.lg,
-    backgroundColor: Colors.primary + '08',
+    backgroundColor: Colors.primary + '15',
     borderRadius: BorderRadius.lg,
     marginBottom: Spacing.lg,
   },
@@ -1662,12 +1728,16 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: 'Amiri-Bold',
     color: Colors.primary,
+    lineHeight: 50,
+    includeFontPadding: false,
   },
   sharePreviewMeaning: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: '#A8A8AD',
     marginTop: Spacing.xs,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   shareOptions: {
     flexDirection: 'row',
@@ -1689,5 +1759,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontRegular(),
     color: '#FFFFFF',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

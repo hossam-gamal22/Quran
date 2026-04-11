@@ -25,6 +25,9 @@ struct RoohMuslimWidgetBundle: WidgetBundle {
         
         // ويدجت ذكر اليوم
         DhikrWidget()
+        
+        // الأنشطة الحالية — Dynamic Island + Lock Screen (iOS 16.1+)
+        PrayerLiveActivity()
     }
 }
 
@@ -98,6 +101,75 @@ struct WidgetConstants {
         static let wakeup = Color(hex: "#2f7659")
         static let afterPrayer = Color(hex: "#c17f59")
         static let misc = Color(hex: "#2f7659")
+    }
+    
+    /// ألوان الزجاج المتجمد
+    struct Glass {
+        static let bg = Color(hex: "#081827").opacity(0.7)
+        static let bgLight = Color(hex: "#081827").opacity(0.6)
+        static let border = Color.white.opacity(0.15)
+        static let highlight = Color.white.opacity(0.1)
+        static let card = Color.white.opacity(0.08)
+        static let pill = Color.white.opacity(0.12)
+    }
+}
+
+// ========================================
+// خلفية زجاجية مشتركة
+// ========================================
+
+/// خلفية الويدجت بتأثير الزجاج المتجمد
+struct GlassWidgetBackground: View {
+    var accentColor: Color = WidgetConstants.Colors.primary
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    Color(hex: "#0a1e30").opacity(0.95),
+                    Color(hex: "#081827").opacity(0.95)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // Glass highlight overlay
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    accentColor.opacity(0.15),
+                    Color.clear
+                ]),
+                startPoint: .topLeading,
+                endPoint: .center
+            )
+        }
+    }
+}
+
+/// أيقونة التطبيق للويدجت
+struct WidgetAppIcon: View {
+    var size: CGFloat = 32
+    
+    var body: some View {
+        Image("WidgetIcon")
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.25))
+    }
+}
+
+/// حبة زجاجية (pill) مشتركة
+struct GlassPill<Content: View>: View {
+    var color: Color = WidgetConstants.Glass.pill
+    @ViewBuilder var content: Content
+    
+    var body: some View {
+        content
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color)
+            .cornerRadius(8)
     }
 }
 

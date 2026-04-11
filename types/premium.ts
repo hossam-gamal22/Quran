@@ -8,12 +8,7 @@ export type PremiumFeatureKey =
   | 'sound_downloads'
   | 'cloud_backup'
   | 'advanced_stats'
-  | 'custom_backgrounds'
-  | 'offline_recitation'
-  | 'advanced_khatma'
-  | 'custom_app_icon'
-  | 'premium_widgets'
-  | 'watermark_free_export';
+  | 'custom_backgrounds';
 
 /** إعدادات ميزة واحدة */
 export interface FeatureGateEntry {

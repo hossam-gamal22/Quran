@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 import { Styled } from '../components/Styled';
+import { fetchActiveDevices, fetchActiveUsersLifetimeEngagement, type LifetimeEngagement } from '../utils/user-query';
 import {
   BarChart3,
   Users,
@@ -13,7 +12,8 @@ import {
   Download,
   Loader2,
   Activity,
-  Target
+  Target,
+  TrendingUp
 } from 'lucide-react';
 
 interface AppStats {
@@ -54,6 +54,14 @@ const DEFAULT_STATS: AppStats = {
   totalPrayers: 0,
 };
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  SA: '🇸🇦', EG: '🇪🇬', AE: '🇦🇪', MA: '🇲🇦', DZ: '🇩🇿', TN: '🇹🇳',
+  IQ: '🇮🇶', SY: '🇸🇾', JO: '🇯🇴', LB: '🇱🇧', KW: '🇰🇼', QA: '🇶🇦',
+  BH: '🇧🇭', OM: '🇴🇲', YE: '🇾🇪', ID: '🇮🇩', PK: '🇵🇰', TR: '🇹🇷',
+  IN: '🇮🇳', BD: '🇧🇩', MY: '🇲🇾', GB: '🇬🇧', US: '🇺🇸', DE: '🇩🇪',
+  FR: '🇫🇷', RU: '🇷🇺', SG: '🇸🇬',
+};
+
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month');
@@ -61,44 +69,47 @@ const Analytics: React.FC = () => {
   const [topCountries, setTopCountries] = useState<CountryStat[]>([]);
   const [topAzkar, setTopAzkar] = useState<AzkarStat[]>([]);
   const [platforms, setPlatforms] = useState<PlatformStats>({ ios: 0, android: 0 });
+  const [lifetime, setLifetime] = useState<LifetimeEngagement>({ totalAzkar: 0, totalQuran: 0, totalPrayers: 0 });
 
+  // Single SSOT load — both demographics + engagement
   useEffect(() => {
-    loadAnalytics();
-  }, [dateRange]);
+    loadDeviceStats();
+  }, []);
 
-  const loadAnalytics = async () => {
-    setIsLoading(true);
+  const loadDeviceStats = async () => {
     try {
-      // Load main stats from config/analytics doc
-      const statsSnap = await getDoc(doc(db, 'config', 'analytics'));
-      if (statsSnap.exists()) {
-        const data = statsSnap.data();
-        setStats({ ...DEFAULT_STATS, ...data.stats });
-        if (data.topCountries) setTopCountries(data.topCountries);
-        if (data.topAzkar) setTopAzkar(data.topAzkar);
-        if (data.platforms) setPlatforms(data.platforms);
-      }
+      // SSOT: unified query — all active devices with valid FCM tokens, deduplicated
+      const { users, stats: deviceStats } = await fetchActiveDevices();
 
-      // Also try loading from stats collection for aggregated data
-      const statsCollection = await getDocs(collection(db, 'stats'));
-      if (!statsCollection.empty) {
-        let totalUsers = 0;
-        let activeUsers = 0;
-        statsCollection.forEach(docSnap => {
-          const d = docSnap.data();
-          if (d.totalUsers) totalUsers += d.totalUsers;
-          if (d.activeUsers) activeUsers += d.activeUsers;
-        });
-        if (totalUsers > 0) {
-          setStats(prev => ({
-            ...prev,
-            totalUsers: totalUsers || prev.totalUsers,
-            activeUsers: activeUsers || prev.activeUsers,
-          }));
-        }
-      }
+      const sortedCountries = Object.entries(deviceStats.byCountry)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([code, count]) => ({
+          country: code,
+          flag: COUNTRY_FLAGS[code] || '🌍',
+          users: count,
+          percentage: deviceStats.total > 0 ? Math.round((count / deviceStats.total) * 100) : 0,
+        }));
+
+      setStats({
+        totalUsers: deviceStats.total,
+        activeUsers: deviceStats.active,
+        avgSessionDuration: 0,
+        retentionRate: deviceStats.retentionRate,
+        // Monthly engagement — aggregated from user docs (zero extra reads)
+        totalAzkar: deviceStats.monthlyAzkar,
+        totalQuran: deviceStats.monthlyQuran,
+        totalPrayers: deviceStats.monthlyPrayers,
+      });
+      setPlatforms({ ios: deviceStats.ios, android: deviceStats.android });
+      if (sortedCountries.length > 0) setTopCountries(sortedCountries);
+
+      // Lifetime engagement — from users/{uid}/stats/lifetime subcollection
+      const userIds = users.map(u => u.id);
+      const lifetimeData = await fetchActiveUsersLifetimeEngagement(userIds);
+      setLifetime(lifetimeData);
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      console.error('Error loading device stats:', error);
     } finally {
       setIsLoading(false);
     }
@@ -151,18 +162,12 @@ const Analytics: React.FC = () => {
             <option value="month">آخر 30 يوم</option>
             <option value="year">آخر سنة</option>
           </select>
-          <button onClick={exportData} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+          <button onClick={exportData} className="flex items-center gap-2 px-4 py-2 bg-accent-dark text-white rounded-lg hover:bg-accent-dark">
             <Download className="w-4 h-4" />
             تصدير
           </button>
         </div>
       </div>
-
-      {stats.totalUsers === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-          لم يتم العثور على بيانات تحليلية. سيتم تحديث الإحصائيات تلقائياً عند بدء استخدام التطبيق.
-        </div>
-      )}
 
       {/* Main Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -215,36 +220,80 @@ const Analytics: React.FC = () => {
         </div>
       </div>
 
-      {/* Engagement Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Moon className="w-5 h-5 text-purple-600" />
+      {/* Engagement Stats — SSOT: strictly from active users only */}
+      <div>
+        <h2 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-emerald-600" />
+          تفاعل المستخدمين النشطين
+          <span className="text-xs font-normal text-gray-400 mr-1">(بيانات نقية — المستخدمين الحاليين فقط)</span>
+        </h2>
+
+        {/* Monthly Engagement */}
+        <p className="text-sm text-gray-500 mb-2 font-medium">📅 هذا الشهر</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-purple-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Moon className="w-5 h-5 text-purple-600" />
+              </div>
+              <span className="text-gray-600">الأذكار المقروءة</span>
             </div>
-            <span className="text-gray-600">الأذكار المقروءة</span>
+            <p className="text-3xl font-bold text-gray-800">{stats.totalAzkar.toLocaleString()}</p>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalAzkar.toLocaleString()}</p>
+
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-emerald-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <BookOpen className="w-5 h-5 text-emerald-600" />
+              </div>
+              <span className="text-gray-600">صفحات القرآن</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">{stats.totalQuran.toLocaleString()}</p>
+          </div>
+
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-blue-100">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Clock className="w-5 h-5 text-blue-600" />
+              </div>
+              <span className="text-gray-600">الصلوات المسجلة</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-800">{stats.totalPrayers.toLocaleString()}</p>
+          </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <BookOpen className="w-5 h-5 text-emerald-600" />
+        {/* Lifetime Engagement */}
+        <p className="text-sm text-gray-500 mb-2 font-medium">📊 إجمالي (كل الأوقات)</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 p-5 rounded-xl shadow-sm border">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-purple-50 rounded-lg">
+                <Moon className="w-5 h-5 text-purple-400" />
+              </div>
+              <span className="text-gray-500">الأذكار المقروءة</span>
             </div>
-            <span className="text-gray-600">صفحات القرآن</span>
+            <p className="text-3xl font-bold text-gray-700">{lifetime.totalAzkar.toLocaleString()}</p>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalQuran.toLocaleString()}</p>
-        </div>
 
-        <div className="bg-white p-5 rounded-xl shadow-sm border">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
+          <div className="bg-gray-50 p-5 rounded-xl shadow-sm border">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <BookOpen className="w-5 h-5 text-emerald-400" />
+              </div>
+              <span className="text-gray-500">صفحات القرآن</span>
             </div>
-            <span className="text-gray-600">الصلوات المسجلة</span>
+            <p className="text-3xl font-bold text-gray-700">{lifetime.totalQuran.toLocaleString()}</p>
           </div>
-          <p className="text-3xl font-bold text-gray-800">{stats.totalPrayers.toLocaleString()}</p>
+
+          <div className="bg-gray-50 p-5 rounded-xl shadow-sm border">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <Clock className="w-5 h-5 text-blue-400" />
+              </div>
+              <span className="text-gray-500">الصلوات المسجلة</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-700">{lifetime.totalPrayers.toLocaleString()}</p>
+          </div>
         </div>
       </div>
 

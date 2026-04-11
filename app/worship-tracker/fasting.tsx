@@ -9,10 +9,9 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Dimensions,
-  StatusBar,
   Alert,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -36,18 +35,18 @@ import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t, getTranslations } from '@/lib/i18n';
-
-const { width } = Dimensions.get('window');
+import { Colors, DarkColors } from '@/constants/theme';
 
 // ========================================
 // الثوابت
 // ========================================
 
 const FASTING_TYPES: { key: DailyFastingRecord['type']; nameKey: string; descKey: string; color: string }[] = [
-  { key: 'voluntary', nameKey: 'worship.voluntary', descKey: 'worship.voluntaryDesc', color: '#5d4e8c' },
-  { key: 'ramadan', nameKey: 'worship.ramadan', descKey: 'worship.ramadanDesc', color: '#22C55E' },
+  { key: 'voluntary', nameKey: 'worship.voluntary', descKey: 'worship.voluntaryDesc', color: '#4a3d73' },
+  { key: 'ramadan', nameKey: 'worship.ramadan', descKey: 'worship.ramadanDesc', color: '#0d8e62' },
   { key: 'makeup', nameKey: 'worship.makeup', descKey: 'worship.makeupDesc', color: '#c17f59' },
   { key: 'vow', nameKey: 'worship.vow', descKey: 'worship.vowDesc', color: '#3a7ca5' },
 ];
@@ -145,6 +144,7 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <View style={styles.typeSelector}>
@@ -156,7 +156,7 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
           <TouchableOpacity
             style={[
               styles.typeItem,
-              isDarkMode && styles.typeItemDark,
+              { backgroundColor: colors.card },
               selectedType === type.key && {
                 borderColor: type.color,
                 backgroundColor: `${type.color}15`,
@@ -173,12 +173,12 @@ const TypeSelector: React.FC<TypeSelectorProps> = ({
             <View style={styles.typeInfo}>
               <Text style={[
                 styles.typeName,
-                { color: colors.text },
+                { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
                 selectedType === type.key && { color: type.color },
               ]}>
                 {t(type.nameKey)}
               </Text>
-              <Text style={[styles.typeDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.typeDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t(type.descKey)}
               </Text>
             </View>
@@ -210,6 +210,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   if (day === 0) {
     return <View style={styles.calendarDayEmpty} />;
   }
@@ -218,7 +219,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
     <TouchableOpacity
       style={[
         styles.calendarDay,
-        isDarkMode && styles.calendarDayDark,
+        { backgroundColor: colors.surface },
         isRamadan && !isFasted && !isToday && styles.calendarDayRamadan,
         isToday && styles.calendarDayToday,
         isFasted && styles.calendarDayFasted,
@@ -230,7 +231,7 @@ const CalendarDay: React.FC<CalendarDayProps> = ({
       <Text style={[
         styles.calendarDayText,
         { color: colors.text },
-        isRamadan && !isFasted && !isToday && { color: '#22C55E' },
+        isRamadan && !isFasted && !isToday && { color: '#0d8e62' },
         isToday && styles.calendarDayTextToday,
         isFasted && styles.calendarDayTextFasted,
       ]}>
@@ -258,22 +259,23 @@ const SunnahCard: React.FC<SunnahCardProps> = ({
   isDarkMode = false,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   return (
     <Animated.View entering={FadeInDown.delay(index * 80).duration(400)}>
-      <View style={[styles.sunnahCard, isDarkMode && styles.sunnahCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.sunnahCard, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={styles.sunnahIconBg}>
           <MaterialCommunityIcons
             name={item.icon as any}
             size={24}
-            color="#5d4e8c"
+            color="#4a3d73"
           />
         </View>
         <View style={[styles.sunnahInfo]}>
-          <Text style={[styles.sunnahName, { color: colors.text }]}>
+          <Text style={[styles.sunnahName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t(item.nameKey)}
           </Text>
-          <Text style={[styles.sunnahDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.sunnahDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t(item.descKey)}
           </Text>
         </View>
@@ -308,6 +310,7 @@ export default function FastingTrackerScreen() {
   
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // حساب أيام رمضان في الشهر الميلادي المعروض
   const ramadanDaysInMonth = useMemo(() => {
@@ -491,10 +494,8 @@ export default function FastingTrackerScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       
       {/* الهيدر */}
       <UniversalHeader
@@ -512,8 +513,8 @@ export default function FastingTrackerScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            colors={['#5d4e8c']}
-            tintColor="#5d4e8c"
+            colors={['#4a3d73']}
+            tintColor="#4a3d73"
           />
         }
       >
@@ -543,13 +544,13 @@ export default function FastingTrackerScreen() {
         {/* الإحصائيات */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
           <GlassCard style={styles.statsCard}>
-            <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.statsTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('worship.yourStats')}
             </Text>
             <View style={[styles.statsGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
-                  <MaterialCommunityIcons name="calendar-check" size={24} color="#22C55E" />
+                  <MaterialCommunityIcons name="calendar-check" size={24} color="#0d8e62" />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.totalDays ?? 0}
@@ -560,7 +561,7 @@ export default function FastingTrackerScreen() {
               </View>
               <View style={styles.statItem}>
                 <View style={styles.statIconBg}>
-                  <MaterialCommunityIcons name="star-crescent" size={24} color="#5d4e8c" />
+                  <MaterialCommunityIcons name="star-crescent" size={24} color="#4a3d73" />
                 </View>
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {fastingStats?.ramadanDays ?? 0}
@@ -597,20 +598,20 @@ export default function FastingTrackerScreen() {
 
         {/* التقويم */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-          <View style={[styles.calendarCard, isDarkMode && styles.calendarCardDark]}>
+          <View style={[styles.calendarCard, { backgroundColor: colors.card }]}>
             <View style={[styles.calendarHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={goToPrevMonth} style={styles.calendarNav}>
-                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
+                <MaterialCommunityIcons name={isRTL ? 'chevron-right' : 'chevron-left'} size={28} color={colors.text} />
               </TouchableOpacity>
               <Text style={[styles.calendarTitle, { color: colors.text }]}>
                 {getTranslations().calendar.months[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </Text>
               <TouchableOpacity onPress={goToNextMonth} style={styles.calendarNav}>
-                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color={isDarkMode ? '#fff' : '#333'} />
+                <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={28} color={colors.text} />
               </TouchableOpacity>
             </View>
             
-            <View style={styles.calendarWeekHeader}>
+            <View style={[styles.calendarWeekHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {getTranslations().calendar.weekDays.map((day: string, i: number) => (
                 <Text key={i} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.calendarWeekDay, { color: colors.textLight }]}>
                   {day}
@@ -618,7 +619,7 @@ export default function FastingTrackerScreen() {
               ))}
             </View>
             
-            <View style={styles.calendarGrid}>
+            <View style={[styles.calendarGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {calendarData.map((day, index) => {
                 const isFutureDay = day > 0 && new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day) > new Date();
                 return (
@@ -641,11 +642,11 @@ export default function FastingTrackerScreen() {
             
             <View style={[styles.calendarLegend, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <View style={[styles.legendDot, { backgroundColor: '#5d4e8c' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#4a3d73' }]} />
                 <Text style={[styles.legendText, { color: colors.textLight }]}>{t('worship.fastingDay')}</Text>
               </View>
               <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <View style={[styles.legendDot, { backgroundColor: '#22C55E' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#0d8e62' }]} />
                 <Text style={[styles.legendText, { color: colors.textLight }]}>{t('calendar.today')}</Text>
               </View>
               {ramadanDaysInMonth.length > 0 && (
@@ -686,7 +687,7 @@ export default function FastingTrackerScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -695,12 +696,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
   scrollView: {
     flex: 1,
   },
@@ -710,10 +705,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     paddingHorizontal: 20,
     marginTop: 20,
     marginBottom: 12,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   // زر الصيام
   fastingButton: {
@@ -730,12 +726,16 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     color: '#fff',
     marginTop: 15,
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   fastingButtonSubtext: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
     marginTop: 5,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   // نوع الصيام
   typeSelector: {
@@ -745,7 +745,6 @@ const styles = StyleSheet.create({
   typeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     borderWidth: 2,
@@ -753,7 +752,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   typeItemDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   typeIndicator: {
     width: 4,
@@ -766,14 +765,15 @@ const styles = StyleSheet.create({
   typeName: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   typeDescription: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 2,
-    textAlign: 'right',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   // الإحصائيات
   statsCard: {
@@ -784,8 +784,9 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
     marginBottom: 15,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -805,24 +806,25 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    color: '#666',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   // التقويم
   calendarCard: {
     marginHorizontal: 16,
     marginTop: 10,
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)',
   },
   calendarCardDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -840,10 +842,10 @@ const styles = StyleSheet.create({
   calendarTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   calendarWeekHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 10,
   },
@@ -852,15 +854,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     fontFamily: fontMedium(),
-    color: '#666',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   calendarGrid: {
-    flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
   },
   calendarDay: {
-    width: (width - 72) / 7,
+    width: '14.28%',
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
@@ -868,15 +870,15 @@ const styles = StyleSheet.create({
   },
   calendarDayDark: {},
   calendarDayEmpty: {
-    width: (width - 72) / 7,
+    width: '14.28%',
     height: 40,
   },
   calendarDayToday: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 12,
   },
   calendarDayFasted: {
-    backgroundColor: '#5d4e8c20',
+    backgroundColor: '#4a3d7320',
     borderRadius: 12,
   },
   calendarDayRamadan: {
@@ -888,13 +890,14 @@ const styles = StyleSheet.create({
   calendarDayText: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#333',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   calendarDayTextToday: {
     color: '#fff',
   },
   calendarDayTextFasted: {
-    color: '#5d4e8c',
+    color: '#4a3d73',
   },
   fastingDot: {
     position: 'absolute',
@@ -902,7 +905,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#5d4e8c',
+    backgroundColor: '#4a3d73',
   },
   calendarLegend: {
     flexDirection: 'row',
@@ -926,7 +929,8 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   calendarHint: {
     fontSize: 11,
@@ -934,6 +938,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 10,
     opacity: 0.7,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   // أيام السنة
   sunnahList: {
@@ -943,19 +949,18 @@ const styles = StyleSheet.create({
   sunnahCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     gap: 15,
   },
   sunnahCardDark: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: DarkColors.surface,
   },
   sunnahIconBg: {
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: '#5d4e8c15',
+    backgroundColor: '#4a3d7315',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -965,16 +970,18 @@ const styles = StyleSheet.create({
   sunnahName: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   sunnahDescription: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 2,
-    textAlign: 'right',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   bottomSpace: {
     height: 100,
   },
 });
+const styles = _styles;

@@ -140,7 +140,7 @@ export default function UsersScreen() {
           <Text style={styles.statLabel}>مميز</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statNumber, { color: '#22C55E' }]}>{stats.active7d}</Text>
+          <Text style={[styles.statNumber, { color: '#0d8e62' }]}>{stats.active7d}</Text>
           <Text style={styles.statLabel}>نشط (٧ أيام)</Text>
         </View>
       </View>

@@ -228,8 +228,8 @@ export default function NotificationsScreen() {
                 </View>
               </View>
 
-              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left' }]}>{item.titleAr}</Text>
-              <Text style={[styles.cardBody, { textAlign: isRTL ? 'right' : 'left' }]}>{item.bodyAr}</Text>
+              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.titleAr}</Text>
+              <Text style={[styles.cardBody, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.bodyAr}</Text>
 
               <View style={styles.cardMeta}>
                 <View style={styles.metaItem}>
@@ -285,7 +285,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (عربي) *</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.titleAr}
                 onChangeText={(value) => setFormData({ ...formData, titleAr: value })}
                 placeholder="عنوان الإشعار"
@@ -296,7 +296,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>العنوان (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.title}
                 onChangeText={(value) => setFormData({ ...formData, title: value })}
                 placeholder="Notification Title"
@@ -307,7 +307,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>النص (عربي) *</Text>
               <TextInput
-                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.bodyAr}
                 onChangeText={(value) => setFormData({ ...formData, bodyAr: value })}
                 placeholder="نص الإشعار..."
@@ -320,7 +320,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>النص (إنجليزي)</Text>
               <TextInput
-                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, styles.textArea, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.body}
                 onChangeText={(value) => setFormData({ ...formData, body: value })}
                 placeholder="Notification body..."
@@ -333,7 +333,7 @@ export default function NotificationsScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>رابط الصورة (اختياري)</Text>
               <TextInput
-                style={[styles.input, { textAlign: isRTL ? 'right' : 'left' }]}
+                style={[styles.input, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
                 value={formData.imageUrl}
                 onChangeText={(value) => setFormData({ ...formData, imageUrl: value })}
                 placeholder="https://..."

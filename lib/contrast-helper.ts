@@ -108,8 +108,8 @@ export function getContrastPalette(backgroundColor: string) {
     icon: light ? '#3A3A3C' : '#FFFFFF',
     iconMuted: light ? '#8E8E93' : 'rgba(255,255,255,0.7)',
     border: light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)',
-    divider: light ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.06)',
-    overlay: light ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.06)',
+    divider: light ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.06)',
+    overlay: light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
     cardBg: light ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.08)',
     isLight: light,
   };

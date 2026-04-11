@@ -377,7 +377,7 @@ export default function HomePageManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+        <RefreshCw className="w-8 h-8 text-accent-light animate-spin" />
       </div>
     );
   }
@@ -398,8 +398,8 @@ export default function HomePageManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-            <Home className="w-6 h-6 text-emerald-400" />
+          <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
+            <Home className="w-6 h-6 text-accent-light" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">إدارة الصفحة الرئيسية</h1>
@@ -415,7 +415,7 @@ export default function HomePageManager() {
               ? 'bg-green-500 text-white'
               : saveStatus === 'error'
               ? 'bg-red-500 text-white'
-              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              : 'bg-accent hover:bg-accent-dark text-white'
           } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {isSaving ? (
@@ -434,18 +434,18 @@ export default function HomePageManager() {
       {/* Theme Settings Banner */}
       <Link
         to="/quran-themes"
-        className="flex items-center justify-between p-4 bg-gradient-to-l from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-2xl hover:border-emerald-500/40 transition-all group"
+        className="flex items-center justify-between p-4 bg-gradient-to-l from-emerald-500/10 to-emerald-600/5 border border-accent/20 rounded-2xl hover:border-accent/40 transition-all group"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-            <Palette className="w-5 h-5 text-emerald-400" />
+          <div className="w-10 h-10 bg-accent/20 rounded-xl flex items-center justify-center">
+            <Palette className="w-5 h-5 text-accent-light" />
           </div>
           <div>
             <p className="text-white font-medium">المظهر والألوان</p>
             <p className="text-slate-400 text-sm">لتعديل ثيمات القرآن والألوان، اذهب إلى صفحة ثيمات القرآن</p>
           </div>
         </div>
-        <ExternalLink className="w-5 h-5 text-emerald-400 group-hover:translate-x-[-4px] transition-transform" />
+        <ExternalLink className="w-5 h-5 text-accent-light group-hover:translate-x-[-4px] transition-transform" />
       </Link>
 
       {/* ==================== Collapsible Sections ==================== */}
@@ -453,14 +453,14 @@ export default function HomePageManager() {
         {tabs.map(tab => {
           const isExpanded = expandedSections.has(tab.key);
           return (
-            <div key={tab.key} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+            <div key={tab.key} className="bg-admin-surface rounded-2xl border border-admin-border overflow-hidden">
               {/* Section Header */}
               <button
                 onClick={() => toggleSection(tab.key)}
-                className="w-full flex items-center justify-between p-4 hover:bg-slate-700/30 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-admin-surface-light/30 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400">
+                  <div className="w-10 h-10 bg-accent/20 rounded-xl flex items-center justify-center text-accent-light">
                     {tab.icon}
                   </div>
                   <div className="text-right">
@@ -477,17 +477,17 @@ export default function HomePageManager() {
 
               {/* Section Content */}
               {isExpanded && (
-                <div className="border-t border-slate-700 p-4">
+                <div className="border-t border-admin-border p-4">
                   {/* ===== Highlights ===== */}
                   {tab.key === 'highlights' && (
                     <div className="space-y-4">
                       {/* Preview */}
-                      <div className="bg-slate-900 rounded-2xl p-6">
+                      <div className="bg-admin-bg rounded-2xl p-6">
                         <h4 className="text-slate-400 text-sm mb-3">معاينة الترتيب</h4>
                         <div className="flex gap-5 overflow-x-auto pb-2" dir="rtl">
                           {sortedHighlights.filter(h => h.enabled).map(h => (
                             <Styled key={h.id} className="flex flex-col items-center gap-2 flex-shrink-0" css={{ width: 70 }}>
-                              <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl border-[3px] border-emerald-600 bg-slate-800">
+                              <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl border-[3px] border-emerald-600 bg-admin-surface">
                                 {h.icon}
                               </div>
                               <span className="text-slate-300 text-[11px] text-center leading-tight truncate w-full">
@@ -503,8 +503,8 @@ export default function HomePageManager() {
                         {sortedHighlights.map((item, index) => (
                           <div
                             key={item.id}
-                            className={`bg-slate-900 rounded-xl border transition-all ${
-                              item.enabled ? 'border-slate-700' : 'border-slate-800 opacity-60'
+                            className={`bg-admin-bg rounded-xl border transition-all ${
+                              item.enabled ? 'border-admin-border' : 'border-slate-800 opacity-60'
                             }`}
                           >
                             <div className="flex items-center gap-3 p-3">
@@ -512,14 +512,14 @@ export default function HomePageManager() {
                                 <button onClick={() => moveHighlight(item.id, 'up')} disabled={index === 0} className="text-slate-500 hover:text-white disabled:opacity-20" title="تحريك لأعلى"><ArrowUp className="w-3.5 h-3.5" /></button>
                                 <button onClick={() => moveHighlight(item.id, 'down')} disabled={index === sortedHighlights.length - 1} className="text-slate-500 hover:text-white disabled:opacity-20" title="تحريك لأسفل"><ArrowDown className="w-3.5 h-3.5" /></button>
                               </div>
-                              <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl flex-shrink-0">{item.icon}</div>
+                              <div className="w-10 h-10 rounded-full bg-admin-surface-light flex items-center justify-center text-xl flex-shrink-0">{item.icon}</div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-white font-medium text-sm">{item.name}</p>
                                 <p className="text-[10px] text-slate-500">{item.builtIn ? '🔒 مدمج' : '✨ مخصص'}</p>
                               </div>
-                              <input type="text" value={item.name} onChange={(e) => updateHighlight(item.id, 'name', e.target.value)} className="bg-slate-700 text-white rounded-lg px-2 py-1 border border-slate-600 text-xs w-28 focus:border-emerald-500 focus:outline-none" placeholder="اسم العنصر" dir="rtl" />
+                              <input type="text" value={item.name} onChange={(e) => updateHighlight(item.id, 'name', e.target.value)} className="bg-admin-surface-light text-white rounded-lg px-2 py-1 border border-admin-border text-xs w-28 focus:border-accent focus:outline-none" placeholder="اسم العنصر" dir="rtl" />
                               <button onClick={() => updateHighlight(item.id, 'enabled', !item.enabled)} title={item.enabled ? 'إخفاء' : 'إظهار'}>
-                                {item.enabled ? <Eye className="w-4 h-4 text-emerald-400" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
+                                {item.enabled ? <Eye className="w-4 h-4 text-accent-light" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
                               </button>
                             </div>
                           </div>
@@ -539,10 +539,10 @@ export default function HomePageManager() {
                             <div
                               onClick={() => updateQuickAccess(item.id, 'enabled', !item.enabled)}
                               className={`flex flex-col items-center p-3 rounded-2xl border-2 transition-all hover:scale-105 ${
-                                item.enabled ? 'bg-slate-800 border-emerald-500/50 shadow-lg shadow-emerald-500/10' : 'bg-slate-900 border-slate-700'
+                                item.enabled ? 'bg-admin-surface border-accent/50 shadow-lg shadow-emerald-500/10' : 'bg-admin-bg border-admin-border'
                               }`}
                             >
-                              <div className="absolute -top-2 -right-2 w-5 h-5 bg-slate-700 rounded-full flex items-center justify-center text-[10px] text-white font-bold">{index + 1}</div>
+                              <div className="absolute -top-2 -right-2 w-5 h-5 bg-admin-surface-light rounded-full flex items-center justify-center text-[10px] text-white font-bold">{index + 1}</div>
                               <div className="w-12 h-12 rounded-full flex items-center justify-center mb-2" style={{ backgroundColor: item.color + '30' }}>
                                 <span className="text-2xl" style={{ color: item.color }}>
                                   {item.icon === 'compass' && '🧭'}
@@ -559,13 +559,13 @@ export default function HomePageManager() {
                                 </span>
                               </div>
                               <p className="text-white text-xs font-medium text-center leading-tight line-clamp-2">{item.nameAr}</p>
-                              <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${item.enabled ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+                              <div className={`absolute top-1 left-1 w-2 h-2 rounded-full ${item.enabled ? 'bg-emerald-400' : 'bg-admin-surface-light'}`} />
                             </div>
 
                             {/* Reorder on hover */}
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'up'); }} disabled={index === 0} className="p-1 bg-slate-700 rounded-md text-white hover:bg-slate-600 disabled:opacity-30" title="تحريك لليمين"><ArrowUp className="w-3 h-3 rotate-90" /></button>
-                              <button onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'down'); }} disabled={index === sortedQuickAccess.length - 1} className="p-1 bg-slate-700 rounded-md text-white hover:bg-slate-600 disabled:opacity-30" title="تحريك لليسار"><ArrowDown className="w-3 h-3 -rotate-90" /></button>
+                              <button onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'up'); }} disabled={index === 0} className="p-1 bg-admin-surface-light rounded-md text-white hover:bg-admin-surface-light disabled:opacity-30" title="تحريك لليمين"><ArrowUp className="w-3 h-3 rotate-90" /></button>
+                              <button onClick={(e) => { e.stopPropagation(); moveQuickAccess(item.id, 'down'); }} disabled={index === sortedQuickAccess.length - 1} className="p-1 bg-admin-surface-light rounded-md text-white hover:bg-admin-surface-light disabled:opacity-30" title="تحريك لليسار"><ArrowDown className="w-3 h-3 -rotate-90" /></button>
                             </div>
 
                             {/* Color picker */}
@@ -588,7 +588,7 @@ export default function HomePageManager() {
                       {/* Add Custom Item Button */}
                       <button
                         onClick={() => setShowCustomModal(true)}
-                        className="w-full flex items-center justify-center gap-2 py-3 bg-slate-900 border-2 border-dashed border-slate-600 rounded-2xl text-slate-400 hover:border-emerald-500 hover:text-emerald-400 transition-all"
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-admin-bg border-2 border-dashed border-admin-border rounded-2xl text-slate-400 hover:border-accent hover:text-accent-light transition-all"
                       >
                         <Plus className="w-5 h-5" />
                         <span className="text-sm font-medium">إضافة عنصر مخصص (Custom URL)</span>
@@ -601,7 +601,7 @@ export default function HomePageManager() {
                           <span>مفعّل</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-slate-600" />
+                          <div className="w-2 h-2 rounded-full bg-admin-surface-light" />
                           <span>معطّل</span>
                         </div>
                       </div>
@@ -612,23 +612,23 @@ export default function HomePageManager() {
                   {tab.key === 'sections' && (
                     <div className="space-y-2">
                       {sortedSections.map((section, index) => (
-                        <div key={section.id} className={`bg-slate-900 rounded-xl border transition-all ${section.enabled ? 'border-slate-700' : 'border-slate-800 opacity-60'}`}>
+                        <div key={section.id} className={`bg-admin-bg rounded-xl border transition-all ${section.enabled ? 'border-admin-border' : 'border-slate-800 opacity-60'}`}>
                           <div className="flex items-center gap-3 p-3">
                             <div className="flex flex-col gap-0.5">
                               <button onClick={() => moveSection(section.id, 'up')} disabled={index === 0} className="text-slate-500 hover:text-white disabled:opacity-20" title="تحريك لأعلى"><ArrowUp className="w-3.5 h-3.5" /></button>
                               <button onClick={() => moveSection(section.id, 'down')} disabled={index === sortedSections.length - 1} className="text-slate-500 hover:text-white disabled:opacity-20" title="تحريك لأسفل"><ArrowDown className="w-3.5 h-3.5" /></button>
                             </div>
-                            <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold">{index + 1}</div>
+                            <div className="w-7 h-7 rounded-lg bg-admin-surface-light flex items-center justify-center text-slate-300 text-xs font-bold">{index + 1}</div>
                             <div className="flex-1 min-w-0">
                               <p className="text-white font-medium text-sm">{section.name}</p>
                               <p className="text-[10px] text-slate-500">{section.id}</p>
                             </div>
                             <div className="flex gap-2">
-                              <input type="text" value={section.titleAr} onChange={(e) => updateSection(section.id, 'titleAr', e.target.value)} className="bg-slate-700 text-white rounded-lg px-2 py-1 border border-slate-600 text-xs w-28 focus:border-emerald-500 focus:outline-none" placeholder="العنوان بالعربي" dir="rtl" />
-                              <input type="text" value={section.titleEn} onChange={(e) => updateSection(section.id, 'titleEn', e.target.value)} className="bg-slate-700 text-white rounded-lg px-2 py-1 border border-slate-600 text-xs w-28 focus:border-emerald-500 focus:outline-none" placeholder="English title" dir="ltr" />
+                              <input type="text" value={section.titleAr} onChange={(e) => updateSection(section.id, 'titleAr', e.target.value)} className="bg-admin-surface-light text-white rounded-lg px-2 py-1 border border-admin-border text-xs w-28 focus:border-accent focus:outline-none" placeholder="العنوان بالعربي" dir="rtl" />
+                              <input type="text" value={section.titleEn} onChange={(e) => updateSection(section.id, 'titleEn', e.target.value)} className="bg-admin-surface-light text-white rounded-lg px-2 py-1 border border-admin-border text-xs w-28 focus:border-accent focus:outline-none" placeholder="English title" dir="ltr" />
                             </div>
                             <button onClick={() => updateSection(section.id, 'enabled', !section.enabled)} title={section.enabled ? 'إخفاء القسم' : 'إظهار القسم'}>
-                              {section.enabled ? <Eye className="w-4 h-4 text-emerald-400" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
+                              {section.enabled ? <Eye className="w-4 h-4 text-accent-light" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
                             </button>
                           </div>
                         </div>
@@ -640,8 +640,8 @@ export default function HomePageManager() {
                   {tab.key === 'daily' && (
                     <div className="space-y-5">
                       {/* Story of the Day */}
-                      <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
-                        <div className="p-4 border-b border-slate-700">
+                      <div className="bg-admin-bg rounded-xl border border-admin-border overflow-hidden">
+                        <div className="p-4 border-b border-admin-border">
                           <h4 className="text-white font-semibold flex items-center gap-2">
                             <span>▶️</span> فيديو اليوم
                           </h4>
@@ -649,29 +649,29 @@ export default function HomePageManager() {
                         <div className="p-4 space-y-3">
                           <div className="flex items-center gap-4">
                             <label className="text-sm text-slate-300">الوضع:</label>
-                            <div className="flex bg-slate-700 rounded-lg p-1">
-                              <button onClick={() => updateDailyContent('storyMode', 'auto')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.storyMode === 'auto' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}>تلقائي</button>
-                              <button onClick={() => updateDailyContent('storyMode', 'manual')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.storyMode === 'manual' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}>يدوي</button>
+                            <div className="flex bg-admin-surface-light rounded-lg p-1">
+                              <button onClick={() => updateDailyContent('storyMode', 'auto')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.storyMode === 'auto' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'}`}>تلقائي</button>
+                              <button onClick={() => updateDailyContent('storyMode', 'manual')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.storyMode === 'manual' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'}`}>يدوي</button>
                             </div>
                           </div>
                           {config.dailyContent.storyMode === 'auto' && (
-                            <p className="text-slate-400 text-sm bg-slate-700/50 rounded-lg p-3">✅ الوضع التلقائي — يتم اختيار الآية تلقائياً بناءً على يوم السنة.</p>
+                            <p className="text-slate-400 text-sm bg-admin-surface-light/50 rounded-lg p-3">✅ الوضع التلقائي — يتم اختيار الآية تلقائياً بناءً على يوم السنة.</p>
                           )}
                           {config.dailyContent.storyMode === 'manual' && (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-sm text-slate-400 mb-1">رقم السورة</label>
-                                  <input type="number" min={1} max={114} value={config.dailyContent.storyVerse?.surah || ''} onChange={(e) => updateDailyContent('storyVerse', { surah: parseInt(e.target.value) || 1, ayah: config.dailyContent.storyVerse?.ayah || 1 })} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="1-114" />
+                                  <input type="number" min={1} max={114} value={config.dailyContent.storyVerse?.surah || ''} onChange={(e) => updateDailyContent('storyVerse', { surah: parseInt(e.target.value) || 1, ayah: config.dailyContent.storyVerse?.ayah || 1 })} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none" placeholder="1-114" />
                                 </div>
                                 <div>
                                   <label className="block text-sm text-slate-400 mb-1">رقم الآية</label>
-                                  <input type="number" min={1} value={config.dailyContent.storyVerse?.ayah || ''} onChange={(e) => updateDailyContent('storyVerse', { surah: config.dailyContent.storyVerse?.surah || 1, ayah: parseInt(e.target.value) || 1 })} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="رقم الآية" />
+                                  <input type="number" min={1} value={config.dailyContent.storyVerse?.ayah || ''} onChange={(e) => updateDailyContent('storyVerse', { surah: config.dailyContent.storyVerse?.surah || 1, ayah: parseInt(e.target.value) || 1 })} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none" placeholder="رقم الآية" />
                                 </div>
                               </div>
                               <div>
                                 <label className="block text-sm text-slate-400 mb-1">نص مخصص (اختياري)</label>
-                                <textarea value={config.dailyContent.storyCustomText} onChange={(e) => updateDailyContent('storyCustomText', e.target.value)} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none resize-y h-20" placeholder="نص مخصص يظهر في الستوري..." dir="rtl" />
+                                <textarea value={config.dailyContent.storyCustomText} onChange={(e) => updateDailyContent('storyCustomText', e.target.value)} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none resize-y h-20" placeholder="نص مخصص يظهر في الستوري..." dir="rtl" />
                               </div>
                             </div>
                           )}
@@ -679,8 +679,8 @@ export default function HomePageManager() {
                       </div>
 
                       {/* Verse of the Day */}
-                      <div className="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
-                        <div className="p-4 border-b border-slate-700">
+                      <div className="bg-admin-bg rounded-xl border border-admin-border overflow-hidden">
+                        <div className="p-4 border-b border-admin-border">
                           <h4 className="text-white font-semibold flex items-center gap-2">
                             <span>📖</span> آية اليوم
                           </h4>
@@ -688,29 +688,29 @@ export default function HomePageManager() {
                         <div className="p-4 space-y-3">
                           <div className="flex items-center gap-4">
                             <label className="text-sm text-slate-300">الوضع:</label>
-                            <div className="flex bg-slate-700 rounded-lg p-1">
-                              <button onClick={() => updateDailyContent('verseMode', 'auto')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.verseMode === 'auto' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}>تلقائي</button>
-                              <button onClick={() => updateDailyContent('verseMode', 'manual')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.verseMode === 'manual' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white'}`}>يدوي</button>
+                            <div className="flex bg-admin-surface-light rounded-lg p-1">
+                              <button onClick={() => updateDailyContent('verseMode', 'auto')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.verseMode === 'auto' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'}`}>تلقائي</button>
+                              <button onClick={() => updateDailyContent('verseMode', 'manual')} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${config.dailyContent.verseMode === 'manual' ? 'bg-accent text-white' : 'text-slate-400 hover:text-white'}`}>يدوي</button>
                             </div>
                           </div>
                           {config.dailyContent.verseMode === 'auto' && (
-                            <p className="text-slate-400 text-sm bg-slate-700/50 rounded-lg p-3">✅ الوضع التلقائي — يتم اختيار آية يومية من api.alquran.cloud.</p>
+                            <p className="text-slate-400 text-sm bg-admin-surface-light/50 rounded-lg p-3">✅ الوضع التلقائي — يتم اختيار آية يومية من api.alquran.cloud.</p>
                           )}
                           {config.dailyContent.verseMode === 'manual' && (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <label className="block text-sm text-slate-400 mb-1">رقم السورة</label>
-                                  <input type="number" min={1} max={114} value={config.dailyContent.verse?.surah || ''} onChange={(e) => updateDailyContent('verse', { surah: parseInt(e.target.value) || 1, ayah: config.dailyContent.verse?.ayah || 1 })} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="1-114" />
+                                  <input type="number" min={1} max={114} value={config.dailyContent.verse?.surah || ''} onChange={(e) => updateDailyContent('verse', { surah: parseInt(e.target.value) || 1, ayah: config.dailyContent.verse?.ayah || 1 })} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none" placeholder="1-114" />
                                 </div>
                                 <div>
                                   <label className="block text-sm text-slate-400 mb-1">رقم الآية</label>
-                                  <input type="number" min={1} value={config.dailyContent.verse?.ayah || ''} onChange={(e) => updateDailyContent('verse', { surah: config.dailyContent.verse?.surah || 1, ayah: parseInt(e.target.value) || 1 })} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="رقم الآية" />
+                                  <input type="number" min={1} value={config.dailyContent.verse?.ayah || ''} onChange={(e) => updateDailyContent('verse', { surah: config.dailyContent.verse?.surah || 1, ayah: parseInt(e.target.value) || 1 })} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none" placeholder="رقم الآية" />
                                 </div>
                               </div>
                               <div>
                                 <label className="block text-sm text-slate-400 mb-1">نص مخصص (اختياري)</label>
-                                <textarea value={config.dailyContent.verseCustomText} onChange={(e) => updateDailyContent('verseCustomText', e.target.value)} className="w-full bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none resize-y h-20" placeholder="نص الآية المخصص..." dir="rtl" />
+                                <textarea value={config.dailyContent.verseCustomText} onChange={(e) => updateDailyContent('verseCustomText', e.target.value)} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none resize-y h-20" placeholder="نص الآية المخصص..." dir="rtl" />
                               </div>
                             </div>
                           )}
@@ -728,16 +728,16 @@ export default function HomePageManager() {
       {/* ==================== Custom Item Modal ==================== */}
       {showCustomModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCustomModal(false)}>
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-md mx-4 overflow-hidden" dir="rtl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-admin-surface rounded-2xl border border-admin-border w-full max-w-md mx-4 overflow-hidden" dir="rtl" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-700">
+            <div className="flex items-center justify-between p-5 border-b border-admin-border">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                  <LinkIcon className="w-5 h-5 text-emerald-400" />
+                <div className="w-10 h-10 bg-accent/20 rounded-xl flex items-center justify-center">
+                  <LinkIcon className="w-5 h-5 text-accent-light" />
                 </div>
                 <h3 className="text-white font-bold text-lg">إضافة عنصر مخصص</h3>
               </div>
-              <button onClick={() => setShowCustomModal(false)} className="p-2 hover:bg-slate-700 rounded-lg transition-colors" title="إغلاق">
+              <button onClick={() => setShowCustomModal(false)} className="p-2 hover:bg-admin-surface-light rounded-lg transition-colors" title="إغلاق">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -746,43 +746,43 @@ export default function HomePageManager() {
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-sm text-slate-300 mb-1.5">الاسم بالعربي *</label>
-                <input type="text" value={customForm.nameAr} onChange={(e) => setCustomForm(f => ({ ...f, nameAr: e.target.value }))} className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="مثال: موقع المسجد" dir="rtl" />
+                <input type="text" value={customForm.nameAr} onChange={(e) => setCustomForm(f => ({ ...f, nameAr: e.target.value }))} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none" placeholder="مثال: موقع المسجد" dir="rtl" />
               </div>
               <div>
                 <label className="block text-sm text-slate-300 mb-1.5">الاسم بالإنجليزي</label>
-                <input type="text" value={customForm.nameEn} onChange={(e) => setCustomForm(f => ({ ...f, nameEn: e.target.value }))} className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="e.g. Mosque website" dir="ltr" />
+                <input type="text" value={customForm.nameEn} onChange={(e) => setCustomForm(f => ({ ...f, nameEn: e.target.value }))} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none" placeholder="e.g. Mosque website" dir="ltr" />
               </div>
               <div>
                 <label className="block text-sm text-slate-300 mb-1.5">الرابط / المسار *</label>
-                <input type="text" value={customForm.route} onChange={(e) => setCustomForm(f => ({ ...f, route: e.target.value }))} className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none font-mono text-sm" placeholder="/webview?url=https://example.com" dir="ltr" />
-                <p className="text-[11px] text-slate-500 mt-1">للروابط الخارجية: <span className="text-emerald-400 font-mono">/webview?url=https://...</span>  ·  للصفحات الداخلية: <span className="text-emerald-400 font-mono">/page-name</span></p>
+                <input type="text" value={customForm.route} onChange={(e) => setCustomForm(f => ({ ...f, route: e.target.value }))} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none font-mono text-sm" placeholder="/webview?url=https://example.com" dir="ltr" />
+                <p className="text-[11px] text-slate-500 mt-1">للروابط الخارجية: <span className="text-accent-light font-mono">/webview?url=https://...</span>  ·  للصفحات الداخلية: <span className="text-accent-light font-mono">/page-name</span></p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm text-slate-300 mb-1.5">الأيقونة</label>
-                  <input type="text" value={customForm.icon} onChange={(e) => setCustomForm(f => ({ ...f, icon: e.target.value }))} className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none" placeholder="link" dir="ltr" />
+                  <input type="text" value={customForm.icon} onChange={(e) => setCustomForm(f => ({ ...f, icon: e.target.value }))} className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none" placeholder="link" dir="ltr" />
                 </div>
                 <div>
                   <label className="block text-sm text-slate-300 mb-1.5">اللون</label>
                   <div className="flex items-center gap-2">
-                    <input type="color" value={customForm.color} onChange={(e) => setCustomForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-slate-600 cursor-pointer" title="اختر لون" />
-                    <input type="text" value={customForm.color} onChange={(e) => setCustomForm(f => ({ ...f, color: e.target.value }))} className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none font-mono text-sm" dir="ltr" placeholder="#0f987f" />
+                    <input type="color" value={customForm.color} onChange={(e) => setCustomForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded-lg border border-admin-border cursor-pointer" title="اختر لون" />
+                    <input type="text" value={customForm.color} onChange={(e) => setCustomForm(f => ({ ...f, color: e.target.value }))} className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none font-mono text-sm" dir="ltr" placeholder="#0f987f" />
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center gap-3 p-5 border-t border-slate-700">
+            <div className="flex items-center gap-3 p-5 border-t border-admin-border">
               <button
                 onClick={addCustomItem}
                 disabled={!customForm.nameAr.trim() || !customForm.route.trim()}
-                className="flex-1 flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-accent hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 إضافة
               </button>
-              <button onClick={() => setShowCustomModal(false)} className="px-6 py-3 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600 transition-colors">
+              <button onClick={() => setShowCustomModal(false)} className="px-6 py-3 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light transition-colors">
                 إلغاء
               </button>
             </div>

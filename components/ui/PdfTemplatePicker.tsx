@@ -54,7 +54,7 @@ const PALETTES: Record<PdfTemplate, {
 }> = {
   emerald: {
     pageBg: '#0a1f1a',
-    headerGrad: ['#052e23', '#22C55E'],
+    headerGrad: ['#052e23', '#0d8e62'],
     sectionBg1: 'rgba(15,152,127,0.15)',
     sectionBorder1: 'rgba(15,152,127,0.3)',
     sectionTitle1: '#4eecc4',
@@ -66,7 +66,7 @@ const PALETTES: Record<PdfTemplate, {
     duaText: '#f0ece0',
     textColor: 'rgba(232,240,237,0.7)',
     accentLine: '#c9a84c',
-    accent: '#22C55E',
+    accent: '#0d8e62',
   },
   royal: {
     pageBg: '#0f0e1e',
@@ -296,8 +296,9 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
         >
           {Platform.OS === 'ios' && (
             <BlurView
+             
               intensity={80}
-              tint={isDarkMode ? 'dark' : 'light'}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
             />
           )}
@@ -339,7 +340,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                         style={[
                           styles.card,
                           {
-                            borderColor: isActive ? p.accent : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                            borderColor: isActive ? p.accent : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)',
                             borderWidth: isActive ? 2.5 : 1,
                             backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#fafafa',
                           },
@@ -376,7 +377,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                         style={[
                           styles.card,
                           {
-                            borderColor: isActive ? ct.headerGradTo : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                            borderColor: isActive ? ct.headerGradTo : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)',
                             borderWidth: isActive ? 2.5 : 1,
                             backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#fafafa',
                           },
@@ -413,8 +414,8 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                       styles.card,
                       {
                         borderColor: selected.startsWith('custom_bg:')
-                          ? '#22C55E'
-                          : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                          ? '#0d8e62'
+                          : isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)',
                         borderWidth: selected.startsWith('custom_bg:') ? 2.5 : 1,
                         backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : '#fafafa',
                       },
@@ -434,7 +435,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                       <Text style={[styles.cardDesc, { color: colors.textLight }]}>{t('pdfExport.bgFromApp')}</Text>
                     </View>
                     {selected.startsWith('custom_bg:') && (
-                      <View style={[styles.check, { backgroundColor: '#22C55E' }, isRTL ? { right: 6, left: undefined } : null]}>
+                      <View style={[styles.check, { backgroundColor: '#0d8e62' }, isRTL ? { right: 6, left: undefined } : null]}>
                         <MaterialCommunityIcons name="check" size={14} color="#fff" />
                       </View>
                     )}
@@ -459,7 +460,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                             style={[
                               styles.bgThumb,
                               {
-                                borderColor: isActive ? '#22C55E' : 'transparent',
+                                borderColor: isActive ? '#0d8e62' : 'transparent',
                                 borderWidth: isActive ? 2.5 : 0,
                               },
                               isRTL && { transform: [{ scaleX: -1 }] },
@@ -468,7 +469,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                             <Image source={bg.source} style={styles.bgThumbImage} />
                             <Text style={[styles.bgThumbLabel, { color: colors.text }]}>{bg.name_ar}</Text>
                             {isActive && (
-                              <View style={[styles.bgCheck, { backgroundColor: '#22C55E' }, isRTL ? { right: 4, left: undefined } : null]}>
+                              <View style={[styles.bgCheck, { backgroundColor: '#0d8e62' }, isRTL ? { right: 4, left: undefined } : null]}>
                                 <MaterialCommunityIcons name="check" size={10} color="#fff" />
                               </View>
                             )}
@@ -491,7 +492,7 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                           Linking.openURL(u.url);
                           onClose();
                         }}
-                        style={[styles.uploadRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                        style={[styles.uploadRow, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                       >
                         <MaterialCommunityIcons name="file-pdf-box" size={24} color="#ef4444" />
                         <View style={{ flex: 1 }}>
@@ -507,21 +508,21 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                 {/* Linked PDF for selected template */}
                 {linkedPdf && (
                   <View style={[styles.uploadsSection, { marginTop: 4 }]}>
-                    <Text style={[styles.uploadsTitle, { color: '#22C55E' }]}>{t('pdfExport.readyCopyForStyle')}</Text>
+                    <Text style={[styles.uploadsTitle, { color: '#0d8e62' }]}>{t('pdfExport.readyCopyForStyle')}</Text>
                     <Pressable
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         Linking.openURL(linkedPdf.url);
                         onClose();
                       }}
-                      style={[styles.uploadRow, { backgroundColor: 'rgba(34,197,94,0.1)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.3)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                      style={[styles.uploadRow, { backgroundColor: 'rgba(34,197,94,0.18)', borderWidth: 1, borderColor: 'rgba(34,197,94,0.35)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     >
-                      <MaterialCommunityIcons name="file-pdf-box" size={24} color="#22C55E" />
+                      <MaterialCommunityIcons name="file-pdf-box" size={24} color="#0d8e62" />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.uploadName, { color: colors.text }]}>{linkedPdf.name}</Text>
                         {linkedPdf.description ? <Text style={[styles.uploadDesc, { color: colors.textLight }]}>{linkedPdf.description}</Text> : null}
                       </View>
-                      <MaterialCommunityIcons name="download" size={20} color="#22C55E" />
+                      <MaterialCommunityIcons name="download" size={20} color="#0d8e62" />
                     </Pressable>
                   </View>
                 )}
@@ -536,11 +537,11 @@ export function PdfTemplatePicker({ visible, onClose, onSelect, pageType }: Prop
                 {
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                   backgroundColor: (() => {
-                    if (selected.startsWith('custom_bg:')) return '#22C55E';
+                    if (selected.startsWith('custom_bg:')) return '#0d8e62';
                     const palette = PALETTES[selected as keyof typeof PALETTES];
                     if (palette) return palette.accent;
                     const ct = customTemplates.find(t => t.id === selected);
-                    return ct?.headerGradTo || '#22C55E';
+                    return ct?.headerGradTo || '#0d8e62';
                   })(),
                   opacity: exporting || (selected.startsWith('custom_bg:') && !selectedBg) ? 0.5 : 1,
                 },
@@ -647,7 +648,7 @@ const styles = StyleSheet.create({
   },
   templates: {
     gap: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: 16,
     paddingBottom: 4,
   },
   card: {

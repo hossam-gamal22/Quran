@@ -10,7 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { schedulePrayerNotifications } from './prayer-notifications';
 import { fetchTafsir } from './quran-api';
 import { getAyahAudioUrl } from './quran-cache';
-import { fetchPrayerTimesByCoords, fetchMonthlyPrayerTimes } from './prayer-api';
+import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
 import { getReminderChannelId } from '../services/notifications/channels';
@@ -50,7 +50,6 @@ interface DiagEntry {
   ts: string; // ISO timestamp
   total: number;
   prayer: number;
-  iosBudgetRemaining?: number; // remaining iOS 64-cap after scheduling
   warn?: string; // non-empty if something went wrong
   sounds: Record<string, string>; // category → channelId
 }
@@ -123,12 +122,12 @@ export const DEFAULT_ALL_NOTIF: AllNotificationSettings = {
   prayers: { Fajr: true, Dhuhr: true, Asr: true, Maghrib: true, Isha: true },
   adhanAdvanceMinutes: 0, // Always zero — adhan fires at exact prayer time
   wirdEnabled: false,
-  wirdMorningTime: '06:00',
-  wirdEveningTime: '17:45',
+  wirdMorningTime: '07:00',
+  wirdEveningTime: '17:00',
   kahfEnabled: false,
-  kahfTime: '07:00',
+  kahfTime: '14:00',
   dailyAyahEnabled: false,
-  dailyAyahTime: '13:00',
+  dailyAyahTime: '06:30',
 };
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
@@ -203,7 +202,6 @@ export async function scheduleWirdNotifications(
         data: { type: 'wird', period: 'morning', soundType, iconType: 'morning' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && morningAttachments && { attachments: morningAttachments }),
-        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -228,7 +226,6 @@ export async function scheduleWirdNotifications(
         data: { type: 'wird', period: 'evening', soundType, iconType: 'evening' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && eveningAttachments && { attachments: eveningAttachments }),
-        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -283,7 +280,6 @@ export async function scheduleDailyAyahNotification(
         data: { type: 'daily_ayah', soundType, iconType: 'quran' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && quranAttachments && { attachments: quranAttachments }),
-        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -492,7 +488,6 @@ export async function scheduleKahfReminder(): Promise<void> {
           },
           ...(Platform.OS === 'android' && { channelId: kahfChannelId }),
           ...(Platform.OS === 'ios' && kahfAttachments && { attachments: kahfAttachments }),
-          ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -573,11 +568,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   worshipDailySummaryTime?: string;
   worshipStreakAlerts?: boolean;
   worshipWeeklyReport?: boolean;
-  worshipWeeklyReportTime?: string;
-  // Quiet hours
-  worshipQuietHoursEnabled?: boolean;
-  worshipQuietHoursStart?: string;
-  worshipQuietHoursEnd?: string;
   // Friday Surah Al-Kahf reminder
   kahfReminder?: boolean;
   kahfTime?: string;
@@ -665,29 +655,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     const SCHEDULE_DAYS_AHEAD = 7;
     const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7]; // Sun-Sat
 
-    // ─── iOS 64-notification budget tracking ─────────────────────────────
-    // iOS silently drops notifications beyond 64. We track remaining budget
-    // and skip lower-priority categories when exhausted.
-    // Android has no hard limit, so budget is effectively unlimited.
-    const IOS_NOTIFICATION_LIMIT = 64;
-    let iosBudgetRemaining = Platform.OS === 'ios' ? IOS_NOTIFICATION_LIMIT : Infinity;
-
-    // ─── Quiet Hours Helper ──────────────────────────────────────────────
-    // Returns true if the given hour:minute falls inside the quiet window.
-    // Handles overnight ranges (e.g. 23:00 → 06:00) correctly.
-    const isInQuietHours = (hour: number, minute: number): boolean => {
-      if (!notifSettings.worshipQuietHoursEnabled) return false;
-      const { worshipQuietHoursStart = '23:00', worshipQuietHoursEnd = '06:00' } = notifSettings;
-      const [sH, sM] = worshipQuietHoursStart.split(':').map(Number);
-      const [eH, eM] = worshipQuietHoursEnd.split(':').map(Number);
-      const t = hour * 60 + minute;
-      const s = sH * 60 + sM;
-      const e = eH * 60 + eM;
-      return s <= e
-        ? t >= s && t < e          // same-day range (e.g. 01:00 → 05:00)
-        : t >= s || t < e;         // overnight range (e.g. 23:00 → 06:00)
-    };
-
     const scheduleWithDays = async (
       baseId: string,
       content: Notifications.NotificationContentInput,
@@ -717,7 +684,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
         ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
         ...(Platform.OS === 'ios' && iosAttachments && { attachments: iosAttachments }),
-        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       };
 
       const selectedDays = days && days.length > 0 && days.length < 7 ? days : null;
@@ -726,18 +692,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
       try {
         for (let dayOffset = 0; dayOffset < SCHEDULE_DAYS_AHEAD; dayOffset++) {
-          // iOS budget guard — stop scheduling when limit reached
-          if (iosBudgetRemaining <= 0) {
-            console.log(`[notifications-manager] ⚠️ iOS budget exhausted, skipping ${baseId} d+${dayOffset}+`);
-            break;
-          }
-
           const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour, minute, 0, 0);
           // Skip dates in the past
           if (triggerDate <= now) continue;
-
-          // Quiet hours enforcement — skip non-prayer notifications during quiet window
-          if (isInQuietHours(hour, minute)) continue;
 
           // If specific days selected, check weekday (JS: 0=Sun..6=Sat → our format: 1=Sun..7=Sat)
           if (selectedDays) {
@@ -757,7 +714,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             },
           });
           scheduledCount++;
-          iosBudgetRemaining--;
         }
         console.log(`🔔 Scheduled ${baseId} × ${scheduledCount} (${hour}:${String(minute).padStart(2,'0')}, channel: ${resolvedChannelId})`);
       } catch (err) {
@@ -808,10 +764,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // entire reschedule. Log the failure and continue with other categories.
     let prayerScheduleWarning = '';
     try {
-      const prayerCount = await schedulePrayerNotifications(prayerSettings);
-      // Subtract prayer notifications from iOS budget
-      iosBudgetRemaining -= prayerCount;
-      console.log(`[notifications-manager] Prayer used ${prayerCount} slots, iOS budget remaining: ${iosBudgetRemaining}`);
+      await schedulePrayerNotifications(prayerSettings);
     } catch (prayerErr: any) {
       prayerScheduleWarning = `Prayer scheduling failed: ${prayerErr?.message || prayerErr}`;
       console.error(`[notifications-manager] ⚠️ ${prayerScheduleWarning}`);
@@ -840,134 +793,22 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     }
 
     // Schedule evening wird if enabled
-    // Uses dynamic Maghrib-based timing (Maghrib - 15min) when location is
-    // available. Falls back to static eveningAzkarTime ?? '17:45' when:
-    //  - User has multi-time override (eveningAzkarTimes)
-    //  - No saved location
-    //  - Prayer API + cache both fail
     if (notifSettings.eveningAzkar) {
+      const eveningTimes = getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '18:00');
       const eveningText = getNotifText('evening', t('settings.eveningWirdTitle'), t('settings.eveningWirdBody'), lang);
-      const hasMultiTimeOverride = notifSettings.eveningAzkarTimes && notifSettings.eveningAzkarTimes.length > 0;
-
-      let usedDynamic = false;
-      if (!hasMultiTimeOverride) {
-        try {
-          const location = await getPrayerLocation();
-          if (location) {
-            const appSettings = await getSettings();
-            const today = new Date();
-            const EVENING_SCHEDULE_DAYS = SCHEDULE_DAYS_AHEAD; // 7
-
-            // Build months-needed map (same pattern as after-prayer azkar / prayer-notifications)
-            const lastDay = new Date(today);
-            lastDay.setDate(lastDay.getDate() + EVENING_SCHEDULE_DAYS - 1);
-            const currentMonth = today.getMonth() + 1;
-            const currentYear = today.getFullYear();
-
-            const monthlyData = await fetchMonthlyPrayerTimes(
-              location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
-            );
-            let nextMonthData: any[] | null = null;
-            if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
-              nextMonthData = await fetchMonthlyPrayerTimes(
-                location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
-              );
-            }
-
-            // Cancel old evening wird notifications AFTER successful fetch (deferred-cancel pattern)
-            for (let d = 0; d < EVENING_SCHEDULE_DAYS; d++) {
-              try { await Notifications.cancelScheduledNotificationAsync(`wird_evening_f${d}`); } catch {}
-            }
-            // Also cancel legacy multi-time identifiers
-            try { await Notifications.cancelScheduledNotificationAsync('wird_evening'); } catch {}
-            try { await Notifications.cancelScheduledNotificationAsync('wird_evening_t0'); } catch {}
-
-            const resolvedChannelId = getReminderChannelId(azkarSound);
-            const eveningAttachments = await getNotificationIconAttachment('evening');
-            let eveningScheduled = 0;
-
-            for (let dayOffset = 0; dayOffset < EVENING_SCHEDULE_DAYS; dayOffset++) {
-              if (iosBudgetRemaining <= 0) break;
-
-              const targetDate = new Date(today);
-              targetDate.setDate(today.getDate() + dayOffset);
-
-              const isNextMonth = targetDate.getMonth() + 1 !== currentMonth || targetDate.getFullYear() !== currentYear;
-              const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
-              const dayData = source[targetDate.getDate() - 1];
-              if (!dayData) continue;
-
-              const maghribStr = dayData.timings?.Maghrib;
-              if (!maghribStr) continue;
-              const cleaned = maghribStr.replace(/\s*\([^)]*\)\s*/, '').trim();
-              const [mH, mM] = cleaned.split(':').map(Number);
-              if (!Number.isFinite(mH) || !Number.isFinite(mM)) continue;
-
-              // Maghrib minus 15 minutes
-              const triggerDate = new Date(
-                targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(),
-                mH, mM - 15, 0, 0
-              );
-
-              if (triggerDate.getTime() <= Date.now() + 60_000) continue;
-              if (isInQuietHours(triggerDate.getHours(), triggerDate.getMinutes())) continue;
-
-              // Check day-of-week filter
-              if (notifSettings.azkarDays && notifSettings.azkarDays.length > 0 && notifSettings.azkarDays.length < 7) {
-                const jsDay = triggerDate.getDay(); // 0=Sun
-                const ourDay = jsDay === 0 ? 1 : jsDay + 1; // 1=Sun..7=Sat
-                if (!notifSettings.azkarDays.includes(ourDay)) continue;
-              }
-
-              const identifier = `wird_evening_f${dayOffset}`;
-              await Notifications.scheduleNotificationAsync({
-                identifier,
-                content: {
-                  title: dirText(eveningText.title),
-                  body: dirText(eveningText.body),
-                  sound: resolveNotificationSound(azkarSound, notifSettings.sound),
-                  data: { type: 'wird', period: 'evening', soundType: azkarSound, iconType: 'evening' },
-                  ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
-                  ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
-                  ...(Platform.OS === 'android' && !notifSettings.vibration && { vibrate: [0] }),
-                  ...(Platform.OS === 'ios' && eveningAttachments && { attachments: eveningAttachments }),
-                  ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-                },
-                trigger: {
-                  type: Notifications.SchedulableTriggerInputTypes.DATE,
-                  date: triggerDate,
-                  ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
-                },
-              });
-              eveningScheduled++;
-              iosBudgetRemaining--;
-            }
-
-            usedDynamic = true;
-            console.log(`🌅 Scheduled evening wird (dynamic Maghrib-15min) × ${eveningScheduled}`);
-          }
-        } catch (dynamicErr) {
-          console.warn('⚠️ Dynamic evening adhkar failed, falling back to static:', dynamicErr);
-        }
-      }
-
-      // Fallback: static scheduling (user multi-time override, no location, or API failure)
-      if (!usedDynamic) {
-        const eveningTimes = getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '17:45');
-        await scheduleMultiTime(
-          'wird_evening',
-          {
-            title: eveningText.title,
-            body: eveningText.body,
-            sound: resolveNotificationSound(azkarSound, notifSettings.sound),
-            data: { type: 'wird', period: 'evening', soundType: azkarSound, iconType: 'evening' },
-          },
-          eveningTimes,
-          notifSettings.azkarDays,
-          'azkar',
-          azkarSound,
-        );
-      }
+      await scheduleMultiTime(
+        'wird_evening',
+        {
+          title: eveningText.title,
+          body: eveningText.body,
+          sound: resolveNotificationSound(azkarSound, notifSettings.sound),
+          data: { type: 'wird', period: 'evening', soundType: azkarSound, iconType: 'evening' },
+        },
+        eveningTimes,
+        notifSettings.azkarDays,
+        'azkar',
+        azkarSound,
+      );
     }
 
     // Schedule sleep azkar if enabled
@@ -991,7 +832,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule wakeup azkar if enabled
     if (notifSettings.wakeupAzkar) {
-      const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00');
+      const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '05:30');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
       await scheduleMultiTime(
         'wird_wakeup',
@@ -1018,7 +859,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         if (location) {
           const appSettings = await getSettings();
           const today = new Date();
-          const AFTER_PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 2 : 7;
+          const AFTER_PRAYER_SCHEDULE_DAYS = 7;
           const lastDay = new Date(today);
           lastDay.setDate(lastDay.getDate() + AFTER_PRAYER_SCHEDULE_DAYS - 1);
 
@@ -1026,6 +867,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           const currentYear = today.getFullYear();
 
           // Fetch monthly prayer times using same approach as prayer-notifications
+          const { fetchMonthlyPrayerTimes } = await import('./prayer-api');
           const monthlyData = await fetchMonthlyPrayerTimes(
             location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
           );
@@ -1047,12 +889,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             }
           }
 
-          // Use fresh Date.now() per iteration instead of a stale captured `now`.
-          // This mirrors the pattern in prayer-notifications.ts to avoid races
-          // where a prayer becomes past during the async scheduling loop.
-          // Bug 3 fix: use 'default' channel so post-prayer plays system sound,
-          // not the azkar custom sound (which was leaking via azkarSoundType).
-          const afterPrayerChannelId = 'default';
+          const now = new Date();
+          const afterPrayerChannelId = getReminderChannelId(notifSettings.azkarSoundType || 'general_reminder');
           const afterPrayerAttachments = await getNotificationIconAttachment('prayer_beads');
           let scheduledCount = 0;
 
@@ -1066,18 +904,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             if (!dayData) continue;
 
             for (const pKey of afterPrayerKeys) {
-              // iOS budget guard
-              if (iosBudgetRemaining <= 0) break;
-
               const timeStr = dayData.timings[pKey as keyof typeof dayData.timings];
               if (!timeStr) continue;
               const cleaned = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
               const [hours, minutes] = cleaned.split(':').map(Number);
               const triggerDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), hours, minutes + 5, 0, 0);
-              // Bug 2 fix: use fresh Date.now() (not stale `now`) + 60-second buffer.
-              // Android's AlarmManager silently drops triggers that are too close to
-              // the current time. This mirrors MIN_SCHEDULE_BUFFER_MS in prayer-notifications.ts.
-              if (triggerDate.getTime() <= Date.now() + 60_000) continue;
+              if (triggerDate <= now) continue;
 
               const identifier = dayOffset === 0
                 ? `after_prayer_azkar_${pKey.toLowerCase()}`
@@ -1089,15 +921,11 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
                   content: {
                     title: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).title),
                     body: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).body),
-                    // Bug 3 fix: hardcode `true` (system default sound) so post-prayer
-                    // notifications don't inherit the azkar custom sound. The old code
-                    // passed azkarSoundType which caused iOS to play e.g. salawat.mp3.
-                    sound: true,
-                    data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: 'default', iconType: 'prayer_beads' },
+                    sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
+                    data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: notifSettings.azkarSoundType || 'general_reminder', iconType: 'prayer_beads' },
                     ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
                     ...(Platform.OS === 'android' && { channelId: afterPrayerChannelId }),
                     ...(Platform.OS === 'ios' && afterPrayerAttachments && { attachments: afterPrayerAttachments }),
-                    ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
                   },
                   trigger: {
                     type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1106,13 +934,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
                   },
                 });
                 scheduledCount++;
-                iosBudgetRemaining--;
               } catch (e) {
                 console.warn(`Failed to schedule after_prayer_azkar ${pKey} d+${dayOffset}:`, e);
               }
             }
           }
-          console.log(`🔔 Scheduled ${scheduledCount} after-prayer azkar notifications (${AFTER_PRAYER_SCHEDULE_DAYS} days, iOS budget: ${iosBudgetRemaining})`);
+          console.log(`🔔 Scheduled ${scheduledCount} after-prayer azkar notifications (${AFTER_PRAYER_SCHEDULE_DAYS} days)`);
         }
       } catch (e) {
         console.warn('Failed to schedule after-prayer azkar:', e);
@@ -1131,7 +958,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 3) Schedule daily ayah
     if (notifSettings.dailyVerse) {
-      const dailyTimes = getTimesArray(notifSettings.dailyVerseTimes, notifSettings.dailyVerseTime, '13:00');
+      const dailyTimes = getTimesArray(notifSettings.dailyVerseTimes, notifSettings.dailyVerseTime, '08:00');
       const dayIndex = new Date().getDay();
       const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
       
@@ -1171,7 +998,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 4) Schedule salawat reminder
     if (notifSettings.salawatReminder) {
-      const salawatTimes = getTimesArray(notifSettings.salawatReminderTimes, notifSettings.salawatReminderTime, '17:00');
+      const salawatTimes = getTimesArray(notifSettings.salawatReminderTimes, notifSettings.salawatReminderTime, '09:00');
       const salawatText = getNotifText('salawat', t('settings.salawatTitle'), t('settings.salawatBody'), lang);
       await scheduleMultiTime(
         'salawat_reminder',
@@ -1195,7 +1022,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 5) Schedule tasbih reminder
     if (notifSettings.tasbihReminder) {
-      const tasbihTimes = getTimesArray(notifSettings.tasbihReminderTimes, notifSettings.tasbihReminderTime, '21:00');
+      const tasbihTimes = getTimesArray(notifSettings.tasbihReminderTimes, notifSettings.tasbihReminderTime, '15:00');
       const tasbihText = getNotifText('tasbih', t('settings.tasbihReminderTitle'), t('settings.tasbihReminderBody'), lang);
       await scheduleMultiTime(
         'tasbih_reminder',
@@ -1219,7 +1046,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 6) Schedule istighfar reminder
     if (notifSettings.istighfarReminder) {
-      const istighfarTimes = getTimesArray(notifSettings.istighfarReminderTimes, notifSettings.istighfarReminderTime, '19:00');
+      const istighfarTimes = getTimesArray(notifSettings.istighfarReminderTimes, notifSettings.istighfarReminderTime, '12:00');
       const istighfarText = getNotifText('istighfar', t('settings.istighfarTitle'), t('settings.istighfarBody'), lang);
       await scheduleMultiTime(
         'istighfar_reminder',
@@ -1285,7 +1112,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 8) Schedule Quran reading reminder
     if (notifSettings.quranReadingReminder) {
-      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '15:00');
+      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '20:00');
       // quranReminderDays uses 0=Sat..6=Fri, convert to 1=Sun..7=Sat
       const qDays = notifSettings.quranReminderDays;
       const convertedDays = qDays && qDays.length > 0 && qDays.length < 7
@@ -1318,7 +1145,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // 9) Schedule worship tracking notifications
     // Daily summary
     if (notifSettings.worshipDailySummary) {
-      const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '21:30');
+      const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
       const worshipSoundType = notifSettings.soundType || 'general_reminder';
       await scheduleWithDays(
         'worship_daily_summary',
@@ -1340,7 +1167,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Weekly report (every Friday — schedule next 4 Fridays as DATE triggers)
     if (notifSettings.worshipWeeklyReport) {
-      const weeklyTime = parseTime(notifSettings.worshipWeeklyReportTime || notifSettings.worshipDailySummaryTime || '21:00');
+      const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
       const worshipWeeklySoundType = notifSettings.soundType || 'general_reminder';
       const worshipWeeklyChannelId = getReminderChannelId(worshipWeeklySoundType);
       const worshipWeeklyAttachments = await getNotificationIconAttachment('reminder');
@@ -1370,7 +1197,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
               data: { type: 'worship_weekly', iconType: 'reminder' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
               ...(Platform.OS === 'ios' && worshipWeeklyAttachments && { attachments: worshipWeeklyAttachments }),
-              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1388,8 +1214,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 10) Schedule Friday Surah Al-Kahf reminder (next 4 Fridays as DATE triggers)
     if (notifSettings.kahfReminder) {
-      // Use user-set kahfTime if available, otherwise fallback to 07:00
-      let kahfHour = 7;
+      // Use user-set kahfTime if available, otherwise fallback to 14:00
+      let kahfHour = 14;
       let kahfMinute = 0;
       if (notifSettings.kahfTime) {
         const [uH, uM] = notifSettings.kahfTime.split(':').map(Number);
@@ -1437,7 +1263,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
               },
               ...(Platform.OS === 'android' && { channelId: kahfChannelId }),
               ...(Platform.OS === 'ios' && kahfAttachments && { attachments: kahfAttachments }),
-              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1503,7 +1328,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         ts: new Date().toISOString(),
         total: allScheduled.length,
         prayer: prayerNotifs.length,
-        iosBudgetRemaining: Platform.OS === 'ios' ? iosBudgetRemaining : undefined,
         warn: diagWarnings.length > 0 ? diagWarnings.join('; ') : undefined,
         sounds: {
           adhan: adhanSound,
@@ -1518,12 +1342,6 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   } catch (error) {
     console.error('Error scheduling notifications from settings:', error);
   } finally {
-    // Post-reschedule verification — log total scheduled count for debugging
-    try {
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      console.log(`[Budget] Total iOS scheduled: ${scheduled.length}${Platform.OS === 'ios' ? ' / 64 limit' : ''}`);
-    } catch (_) {}
-
     // Release mutex — always runs even on error
     _isScheduling = false;
 
@@ -1575,7 +1393,6 @@ export async function scheduleRefreshReminder(): Promise<void> {
           data: { type: 'refresh_reminder', iconType: 'reminder' },
           ...(Platform.OS === 'android' && { channelId: 'general' }),
           ...(Platform.OS === 'ios' && refreshAttachments && { attachments: refreshAttachments }),
-          ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1664,7 +1481,7 @@ export async function rescheduleAllFromStorage(): Promise<void> {
       sleepAzkar: n.sleepAzkar ?? false,
       sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
       wakeupAzkar: n.wakeupAzkar ?? false,
-      wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
+      wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
       afterPrayerAzkar: n.afterPrayerAzkar ?? false,
       dailyVerse: n.dailyVerse,
       dailyVerseTime: n.dailyVerseTime,
@@ -1706,7 +1523,6 @@ export async function rescheduleAllFromStorage(): Promise<void> {
       worshipDailySummaryTime: n.worshipDailySummaryTime,
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
-      worshipWeeklyReportTime: n.worshipWeeklyReportTime,
       kahfReminder: n.kahfReminder,
     });
     console.log('🔄 Rescheduled notifications from storage (app foreground)');
@@ -1804,7 +1620,6 @@ export async function sendTestNotification(
       ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
       ...(Platform.OS === 'android' && opts.vibration === false && { vibrate: [0] }),
       ...(Platform.OS === 'ios' && testAttachments && { attachments: testAttachments }),
-      ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -1846,8 +1661,6 @@ export interface NotificationDefaultsConfig {
   customReminder?: NotificationCategoryDefaults;
   quranReading?: NotificationCategoryDefaults;
   kahfFriday?: NotificationCategoryDefaults;
-  worshipDaily?: NotificationCategoryDefaults;
-  worshipWeekly?: NotificationCategoryDefaults;
 }
 
 const DEFAULTS_CACHE_KEY = '@notif_defaults_cache';
@@ -1915,8 +1728,6 @@ const CATEGORY_TIMES_MAP: Record<keyof NotificationDefaultsConfig, { times: stri
   customReminder: { times: 'customReminderTimes', single: 'customReminderTime', sound: 'customReminderSoundType', days: 'customReminderDays' },
   quranReading: { times: 'quranReadingReminderTimes', single: 'quranReadingReminderTime', sound: 'quranReminderSoundType', days: 'quranReminderDays' },
   kahfFriday: { times: 'kahfTimes', single: 'kahfTime' },
-  worshipDaily: { times: 'worshipDailySummaryTimes', single: 'worshipDailySummaryTime' },
-  worshipWeekly: { times: 'worshipWeeklyReportTimes', single: 'worshipWeeklyReportTime' },
 };
 
 // Map category keys to their corresponding boolean settings keys for enabled state
@@ -1932,8 +1743,6 @@ const CATEGORY_ENABLED_MAP: Partial<Record<keyof NotificationDefaultsConfig, str
   wakeupAzkar: 'wakeupAzkar',
   dailyVerse: 'dailyVerse',
   customReminder: 'customReminder',
-  worshipDaily: 'worshipDailySummary',
-  worshipWeekly: 'worshipWeeklyReport',
 };
 
 /**

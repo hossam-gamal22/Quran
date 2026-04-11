@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { t } from '@/lib/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +36,7 @@ import {
 } from '@/lib/azkar-api';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { TranslatedText } from '@/components/ui/TranslatedText';
@@ -42,8 +44,8 @@ import { transliterateReference } from '@/lib/source-transliteration';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { useIsRTL } from '@/hooks/use-is-rtl';
-import { Spacing } from '@/constants/theme';
-import { stripVerseNumbers } from '@/lib/basmala-utils';
+import { Colors, DarkColors, Spacing } from '@/constants/theme';
+import { stripVerseNumbers, stripAzkarBrackets } from '@/lib/basmala-utils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -58,6 +60,7 @@ export default function RuqyaScreen() {
   const flatListRef = useRef<FlatList>(null);
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const darkMode = isDarkMode;
   const language = (settings.language || 'ar') as Language;
   const isArabic = language === 'ar';
@@ -197,7 +200,7 @@ export default function RuqyaScreen() {
   const shareRuqya = async (item: Zikr) => {
     try {
       const translation = getZikrTranslation(item, language);
-      const message = `${item.arabic}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
+      const message = `${stripAzkarBrackets(item.arabic)}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
       
       await Share.share({ message });
     } catch (error) {
@@ -243,7 +246,7 @@ export default function RuqyaScreen() {
 
   const renderSingleItem = ({ item, index }: { item: Zikr; index: number }) => {
     return (
-      <View style={[styles.singleItemContainer, { width }]}>
+      <View style={[styles.singleItemContainer, { width }, isRTL && { transform: [{ scaleX: -1 }] }]}>
         <ScrollView 
           contentContainerStyle={styles.singleItemScroll}
           showsVerticalScrollIndicator={false}
@@ -252,12 +255,16 @@ export default function RuqyaScreen() {
             style={[
               styles.ruqyaCard,
               {
-                backgroundColor: darkMode ? '#1F2937' : '#FFFFFF',
                 opacity: fadeAnim,
                 transform: [{ scale: scaleAnim }],
+                borderColor: colors.glassBorder,
               },
             ]}
           >
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             {/* أزرار الإجراءات */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
@@ -267,7 +274,7 @@ export default function RuqyaScreen() {
                 <Ionicons
                   name={favorites[item.id] ? 'heart' : 'heart-outline'}
                   size={24}
-                  color={favorites[item.id] ? '#EF4444' : (darkMode ? '#9CA3AF' : '#6B7280')}
+                  color={favorites[item.id] ? '#EF4444' : colors.icon}
                 />
               </TouchableOpacity>
 
@@ -278,7 +285,7 @@ export default function RuqyaScreen() {
                 <Ionicons
                   name="share-outline"
                   size={22}
-                  color={darkMode ? '#9CA3AF' : '#6B7280'}
+                  color={colors.icon}
                 />
               </TouchableOpacity>
             </View>
@@ -298,7 +305,7 @@ export default function RuqyaScreen() {
                 paddingTop: 6,
                 paddingBottom: 4,
               } : {};
-              const displayText = hasVerseBrackets ? stripVerseNumbers(item.arabic) : item.arabic;
+              const displayText = hasVerseBrackets ? stripVerseNumbers(stripAzkarBrackets(item.arabic)) : stripAzkarBrackets(item.arabic);
               return isArabic ? (
                 <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }, quranStyle]}>
                   {displayText}
@@ -350,7 +357,7 @@ export default function RuqyaScreen() {
 
             {/* المرجع */}
             <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Ionicons name="book-outline" size={14} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+              <Ionicons name="book-outline" size={14} color={colors.icon} />
               <Text style={[styles.referenceText, { color: colors.textLight }]}>
                 {transliterateReference(item.reference, language)}
               </Text>
@@ -370,7 +377,7 @@ export default function RuqyaScreen() {
       <TouchableOpacity
         style={[
           styles.listItem,
-          { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { flexDirection: isRTL ? 'row-reverse' : 'row', borderColor: colors.glassBorder },
         ]}
         onPress={() => {
           setCurrentIndex(index);
@@ -378,6 +385,10 @@ export default function RuqyaScreen() {
         }}
         activeOpacity={0.7}
       >
+        {Platform.OS === 'ios' && (
+          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
         <View style={[styles.listItemNumber]}>
           <Text style={styles.listItemNumberText}>{index + 1}</Text>
         </View>
@@ -387,7 +398,7 @@ export default function RuqyaScreen() {
             style={[styles.listItemArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}
             numberOfLines={2}
           >
-            {(item.arabic?.includes('﴿') || item.arabic?.includes('﴾')) ? stripVerseNumbers(item.arabic) : item.arabic}
+            {(item.arabic?.includes('﴾') || item.arabic?.includes('﴿')) ? stripVerseNumbers(stripAzkarBrackets(item.arabic)) : stripAzkarBrackets(item.arabic)}
           </Text>
           <Text style={[styles.listItemReference, { color: colors.textLight }]}>
             {transliterateReference(item.reference, language)}
@@ -400,7 +411,7 @@ export default function RuqyaScreen() {
               <Text style={styles.listCountText}>{item.count}×</Text>
             </View>
           )}
-          <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+          <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.icon} />
         </View>
       </TouchableOpacity>
     );
@@ -430,13 +441,17 @@ export default function RuqyaScreen() {
       >
         {/* Header */}
         <View
-          style={[styles.header, { paddingTop: insets.top, backgroundColor: 'rgba(120,120,128,0.15)' }]}
+          style={[styles.header, { paddingTop: insets.top }]}
         >
+          {Platform.OS === 'ios' && (
+            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+          )}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
           <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <BackButton color={darkMode ? '#F9FAFB' : '#1F2937'} />
+            <BackButton color={colors.text} />
             
             <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+              <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                 {t('azkar.ruqya')}
               </Text>
               <SectionInfoButton sectionKey="ruqya" />
@@ -444,10 +459,10 @@ export default function RuqyaScreen() {
             
             <View style={[styles.headerActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity onPress={toggleViewMode} style={styles.headerButton}>
-                <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+                <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity onPress={shareAll} style={styles.headerButton}>
-                <Ionicons name="share-outline" size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+                <Ionicons name="share-outline" size={22} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
@@ -459,11 +474,11 @@ export default function RuqyaScreen() {
                 <View
                   style={[
                     styles.progressBarFill,
-                    { width: `${((currentIndex + 1) / ruqyaList.length) * 100}%`, backgroundColor: darkMode ? '#A78BFA' : '#6366F1' },
+                    { width: `${((currentIndex + 1) / ruqyaList.length) * 100}%`, backgroundColor: darkMode ? '#FFFFFF' : '#0f987f' },
                   ]}
                 />
               </View>
-              <Text style={[styles.progressText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.progressText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {currentIndex + 1} / {ruqyaList.length}
               </Text>
             </View>
@@ -481,6 +496,7 @@ export default function RuqyaScreen() {
               horizontal
               pagingEnabled
               showsHorizontalScrollIndicator={false}
+              style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
               onMomentumScrollEnd={(e) => {
                 const index = Math.round(e.nativeEvent.contentOffset.x / width);
                 setCurrentIndex(index);
@@ -494,7 +510,11 @@ export default function RuqyaScreen() {
             />
 
             {/* شريط العداد والتنقل */}
-            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.bottomBar, { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               <TouchableOpacity
                 onPress={goToPrevious}
                 disabled={currentIndex === 0}
@@ -503,7 +523,7 @@ export default function RuqyaScreen() {
                 <Ionicons
                   name={isRTL ? 'chevron-forward' : 'chevron-back'}
                   size={28}
-                  color={currentIndex === 0 ? '#9CA3AF' : '#6366F1'}
+                  color={currentIndex === 0 ? colors.muted : '#6366F1'}
                 />
               </TouchableOpacity>
 
@@ -555,7 +575,7 @@ export default function RuqyaScreen() {
 // الأنماط
 // =====================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -569,6 +589,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingBottom: 16,
+    overflow: 'hidden',
   },
   headerTop: {
     flexDirection: 'row',
@@ -623,7 +644,7 @@ const styles = StyleSheet.create({
   ruqyaCard: {
     borderRadius: 20,
     padding: 20,
-    backgroundColor: 'rgba(120,120,128,0.12)',
+    overflow: 'hidden',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
   },
@@ -683,6 +704,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#6366F1',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   benefitStarWrapper: {
     alignItems: 'center',
@@ -699,6 +722,7 @@ const styles = StyleSheet.create({
   },
   benefitContainer: {
     alignItems: 'center',
+    alignSelf: 'stretch',
     padding: 12,
     paddingTop: 22,
     borderRadius: 12,
@@ -707,6 +731,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
+    flexShrink: 1,
+    writingDirection: 'rtl',
   },
   referenceContainer: {
     flexDirection: 'row',
@@ -716,6 +742,8 @@ const styles = StyleSheet.create({
   },
   referenceText: {
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 
   // Bottom Bar
@@ -726,7 +754,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
+    borderTopColor: 'rgba(0,0,0,0.10)',
+    overflow: 'hidden',
   },
   navButton: {
     padding: 12,
@@ -758,7 +787,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 16,
-    backgroundColor: 'rgba(120,120,128,0.12)',
+    overflow: 'hidden',
     borderWidth: 0.5,
     borderColor: 'rgba(255,255,255,0.08)',
     gap: Spacing.md,
@@ -785,9 +814,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textAlign: 'right',
     writingDirection: 'rtl',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   listItemReference: {
     fontSize: 12,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   listItemActions: {
     flexDirection: 'row',
@@ -806,3 +839,4 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
 });
+const styles = _styles;

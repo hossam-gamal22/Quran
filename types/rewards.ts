@@ -43,4 +43,12 @@ export interface RewardsConfig {
 export interface MonthlyEngagement {
   month: string; // YYYY-MM
   score: number;
+  activities?: {
+    app_open?: number;
+    azkar?: number;
+    quran?: number;
+    prayer?: number;
+    tasbih?: number;
+    khatma?: number;
+  };
 }

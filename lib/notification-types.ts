@@ -20,6 +20,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
     maghrib: true,
     isha: true,
   },
-  advanceMinutes: 5,
+  advanceMinutes: 0,
   adhanSound: false,
+  adhanSoundType: 'makkah',
 };

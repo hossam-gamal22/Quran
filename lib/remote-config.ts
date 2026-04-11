@@ -44,6 +44,14 @@ export interface AppConfig {
 
   // Branding (admin-replaceable)
   app_logo_url: string;
+
+  // Subscription visibility (admin-controlled via Firebase Console)
+  show_lifetime_purchase: boolean;
+  show_yearly_plan: boolean;
+  show_monthly_plan: boolean;
+  subscription_badge_text: string;
+  lifetime_price_override: string;
+  show_upgrade_banner: boolean;
 }
 
 // ==================== Default Values ====================
@@ -73,6 +81,13 @@ const DEFAULT_CONFIG: AppConfig = {
   default_madhab: 'shafi',
 
   app_logo_url: '',
+
+  show_lifetime_purchase: false,
+  show_yearly_plan: true,
+  show_monthly_plan: true,
+  subscription_badge_text: 'أفضل قيمة',
+  lifetime_price_override: '',
+  show_upgrade_banner: false,
 };
 
 // ==================== Initialize Remote Config ====================
@@ -162,6 +177,13 @@ export const getAllConfig = (): AppConfig => {
     default_madhab: getConfigValue('default_madhab'),
 
     app_logo_url: getConfigValue('app_logo_url'),
+
+    show_lifetime_purchase: getConfigValue('show_lifetime_purchase'),
+    show_yearly_plan: getConfigValue('show_yearly_plan'),
+    show_monthly_plan: getConfigValue('show_monthly_plan'),
+    subscription_badge_text: getConfigValue('subscription_badge_text'),
+    lifetime_price_override: getConfigValue('lifetime_price_override'),
+    show_upgrade_banner: getConfigValue('show_upgrade_banner'),
   };
 };
 

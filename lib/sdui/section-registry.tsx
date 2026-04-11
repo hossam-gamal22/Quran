@@ -7,20 +7,7 @@ import { t } from '@/lib/i18n';
 import type {
   SDUISectionType,
   BaseSectionConfig,
-  WelcomeBannerSection,
-  QuickActionsSection,
-  HighlightsGridSection,
-  FeaturedContentSection,
   HTMLBlockSection,
-  PrayerTimesSection,
-  DailyAyahSection,
-  AzkarCategoriesSection,
-  KhatmaProgressSection,
-  WorshipStatsSection,
-  SeasonalBannerSection,
-  CustomCardsSection,
-  ImageCarouselSection,
-  AnnouncementSection,
   SpacerSection,
 } from './types';
 import { fontRegular } from '@/lib/fonts';
@@ -53,7 +40,7 @@ export type SectionComponent<T extends BaseSectionConfig = BaseSectionConfig> =
 function SectionLoadingFallback() {
   return (
     <View style={styles.loadingContainer}>
-      <ActivityIndicator size="small" color="#4ADE80" />
+      <ActivityIndicator size="small" color="#3da87e" />
     </View>
   );
 }
@@ -133,25 +120,8 @@ type SectionRegistryEntry = {
 };
 
 const sectionRegistry: Partial<Record<SDUISectionType, SectionRegistryEntry>> = {
-  // Built-in simple sections
   spacer: { component: SpacerSectionComponent },
   html_block: { component: HTMLBlockSectionComponent },
-  
-  // These will be implemented as we build out the SDUI system
-  // For now they all use placeholder
-  welcome_banner: { component: PlaceholderSection },
-  quick_actions: { component: PlaceholderSection },
-  highlights_grid: { component: PlaceholderSection },
-  featured_content: { component: PlaceholderSection },
-  prayer_times: { component: PlaceholderSection },
-  daily_ayah: { component: PlaceholderSection },
-  azkar_categories: { component: PlaceholderSection },
-  khatma_progress: { component: PlaceholderSection },
-  worship_stats: { component: PlaceholderSection },
-  seasonal_banner: { component: PlaceholderSection },
-  custom_cards: { component: PlaceholderSection },
-  image_carousel: { component: PlaceholderSection },
-  announcement: { component: PlaceholderSection },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

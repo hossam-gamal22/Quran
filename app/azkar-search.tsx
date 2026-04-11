@@ -9,12 +9,20 @@ import {
   StyleSheet,
   TextInput,
   FlatList,
-  SectionList,
+  ScrollView,
   TouchableOpacity,
   Keyboard,
   Animated,
   Share,
+  LayoutAnimation,
+  UIManager,
+  Platform,
 } from 'react-native';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,9 +31,13 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
+import { Colors, DarkColors } from '@/constants/theme';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { transliterateReference } from '@/lib/source-transliteration';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import {
   Zikr,
   Language,
@@ -52,6 +64,8 @@ export default function AzkarSearchScreen() {
   const inputRef = useRef<TextInput>(null);
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const darkMode = isDarkMode;
   const language = (settings.language || 'ar') as Language;
   const isBenefitsMode = mode === 'benefits';
@@ -63,6 +77,11 @@ export default function AzkarSearchScreen() {
   const [favorites, setFavorites] = useState<Record<number, boolean>>({});
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  // true = expanded, undefined/false = collapsed (default collapsed)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  // Main category IDs shown on the primary azkar page (in order)
+  const MAIN_CAT_ORDER = ['1', '1b', '2', '3', '27'];
 
   // Group benefits by category for SectionList
   const benefitSections = useMemo(() => {
@@ -71,12 +90,22 @@ export default function AzkarSearchScreen() {
       if (!grouped[z.category]) grouped[z.category] = [];
       grouped[z.category].push(z);
     }
-    return Object.entries(grouped).map(([catId, data]) => {
+    const sections = Object.entries(grouped).map(([catId, data]) => {
       const cat = getCategoryById(catId as any);
       const title = cat ? getCategoryName(cat, language) : catId;
       const color = cat?.color || '#10B981';
       return { title, color, catId, data };
     });
+    // Sort: main categories first (in their defined order), then the rest
+    sections.sort((a, b) => {
+      const aIdx = MAIN_CAT_ORDER.indexOf(a.catId);
+      const bIdx = MAIN_CAT_ORDER.indexOf(b.catId);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return 0;
+    });
+    return sections;
   }, [allAzkarWithBenefits, language]);
 
   // الأنيميشن
@@ -210,6 +239,15 @@ export default function AzkarSearchScreen() {
   };
 
   // ==========================
+  // القسم القابل للطي
+  // ==========================
+
+  const toggleSection = (catId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedSections(prev => ({ ...prev, [catId]: !prev[catId] }));
+  };
+
+  // ==========================
   // المشاركة
   // ==========================
 
@@ -237,7 +275,7 @@ export default function AzkarSearchScreen() {
         <TouchableOpacity
           style={[
             styles.resultCard,
-            { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+            { backgroundColor: darkMode ? DarkColors.surfaceVariant : Colors.surface },
           ]}
           onPress={() => navigateToZikr(item)}
           activeOpacity={0.7}
@@ -251,15 +289,15 @@ export default function AzkarSearchScreen() {
 
           {/* النص العربي */}
           <Text
-            style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
+            style={[styles.arabicText, { color: colors.text }]}
             numberOfLines={3}
           >
-            {item.arabic}
+            {stripAzkarBrackets(item.arabic)}
           </Text>
 
           {/* الترجمة */}
           <Text
-            style={[styles.translation, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}
+            style={[styles.translation, { color: colors.textLight }]}
             numberOfLines={2}
           >
             {getZikrTranslation(item, language)}
@@ -268,8 +306,8 @@ export default function AzkarSearchScreen() {
           {/* الإجراءات */}
           <View style={[styles.resultActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Ionicons name="book-outline" size={12} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-              <Text style={[styles.referenceText, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
+              <Ionicons name="book-outline" size={12} color={colors.textLight} />
+              <Text style={[styles.referenceText, { color: colors.textLight }]}>
                 {transliterateReference(item.reference, language)}
               </Text>
             </View>
@@ -282,7 +320,7 @@ export default function AzkarSearchScreen() {
                 <Ionicons
                   name={favorites[item.id] ? 'heart' : 'heart-outline'}
                   size={20}
-                  color={favorites[item.id] ? '#EF4444' : (darkMode ? '#6B7280' : '#9CA3AF')}
+                  color={favorites[item.id] ? '#EF4444' : (colors.textLight)}
                 />
               </TouchableOpacity>
 
@@ -293,67 +331,13 @@ export default function AzkarSearchScreen() {
                 <Ionicons
                   name="share-outline"
                   size={20}
-                  color={darkMode ? '#6B7280' : '#9CA3AF'}
+                  color={colors.textLight}
                 />
               </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
       </Animated.View>
-    );
-  };
-
-  // ==========================
-  // رندر ذكر مع الفضل
-  // ==========================
-
-  const renderBenefitItem = ({ item }: { item: Zikr }) => {
-    const cat = getCategoryById(item.category);
-    const categoryName = cat ? getCategoryName(cat, language) : '';
-    const benefit = getZikrBenefit(item, language);
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.resultCard,
-          { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
-        ]}
-        onPress={() => navigateToZikr(item)}
-        activeOpacity={0.7}
-      >
-        {/* التصنيف */}
-        <View style={[styles.categoryBadge, { backgroundColor: (cat?.color || '#10B981') + '20', alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[styles.categoryBadgeText, { color: cat?.color || '#10B981' }]}>
-            {categoryName}
-          </Text>
-        </View>
-
-        {/* النص — translated for non-Arabic */}
-        <Text
-          style={[styles.arabicText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
-          numberOfLines={3}
-        >
-          {getZikrTranslation(item, language)}
-        </Text>
-
-        {/* الفضل */}
-        {benefit ? (
-          <View style={[styles.benefitBox, { backgroundColor: (cat?.color || '#10B981') + '12', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Ionicons name="star" size={14} color={cat?.color || '#10B981'} />
-            <Text style={[styles.benefitText, { color: cat?.color || '#10B981', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-              {benefit}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* المرجع */}
-        <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <Ionicons name="book-outline" size={12} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-          <Text style={[styles.referenceText, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
-            {transliterateReference(item.reference, language)}
-          </Text>
-        </View>
-      </TouchableOpacity>
     );
   };
 
@@ -366,12 +350,12 @@ export default function AzkarSearchScreen() {
       key={index}
       style={[
         styles.recentItem,
-        { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF', flexDirection: isRTL ? 'row-reverse' : 'row' },
+        { backgroundColor: darkMode ? DarkColors.surfaceVariant : Colors.surface, flexDirection: isRTL ? 'row-reverse' : 'row' },
       ]}
       onPress={() => handleSearch(search)}
     >
-      <Ionicons name="time-outline" size={18} color={darkMode ? '#6B7280' : '#9CA3AF'} />
-      <Text style={[styles.recentText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+      <Ionicons name="time-outline" size={18} color={colors.textLight} />
+      <Text style={[styles.recentText, { color: colors.text }]}>
         {search}
       </Text>
     </TouchableOpacity>
@@ -390,23 +374,23 @@ export default function AzkarSearchScreen() {
         {/* Header مع البحث */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
           <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <BackButton color={darkMode ? '#F9FAFB' : '#1F2937'} />
+            <BackButton color={colors.text} />
 
             {isBenefitsMode ? (
-              <Text style={[styles.benefitsHeaderTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+              <Text style={[styles.benefitsHeaderTitle, { color: colors.text }]}>
                 {t('azkarSearch.virtueOfAzkar')}
               </Text>
             ) : (
               <View style={[
                 styles.searchContainer,
-                { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' },
+                { backgroundColor: darkMode ? DarkColors.surfaceVariant : Colors.surface },
               ]}>
-                <Ionicons name="search" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+                <Ionicons name="search" size={20} color={colors.textLight} />
                 <TextInput
                   ref={inputRef}
-                  style={[styles.searchInput, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}
+                  style={[styles.searchInput, { color: colors.text }]}
                   placeholder={t('azkar.searchPlaceholder')}
-                  placeholderTextColor={darkMode ? '#6B7280' : '#9CA3AF'}
+                  placeholderTextColor={colors.textLight}
                   value={query}
                   onChangeText={handleSearch}
                   autoCapitalize="none"
@@ -414,7 +398,7 @@ export default function AzkarSearchScreen() {
                 />
                 {query.length > 0 && (
                   <TouchableOpacity onPress={() => handleSearch('')}>
-                    <Ionicons name="close-circle" size={20} color={darkMode ? '#6B7280' : '#9CA3AF'} />
+                    <Ionicons name="close-circle" size={20} color={colors.textLight} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -424,46 +408,150 @@ export default function AzkarSearchScreen() {
 
         {/* المحتوى */}
         {isBenefitsMode ? (
-          // وضع فضل الأذكار - عرض الأذكار مجمعة حسب التصنيف
-          <SectionList
-            sections={benefitSections}
-            renderItem={renderBenefitItem}
-            renderSectionHeader={({ section }) => (
-              <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
-                <View style={[styles.sectionHeaderDot, { backgroundColor: (section as any).color }]} />
-                <Text style={[styles.sectionHeaderText, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-                  {section.title}
+          // وضع فضل الأذكار - عرض الأذكار مجمعة حسب التصنيف مع أقسام قابلة للطي
+          <ScrollView
+            contentContainerStyle={styles.benefitsContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header with Stats */}
+            <View style={[styles.statsHeader, { backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.08)' }]}>
+              <View style={styles.statsIconWrapper}>
+                <Ionicons name="sparkles" size={24} color="#10B981" />
+              </View>
+              <View style={styles.statsTextWrapper}>
+                <Text style={[styles.statsTitle, { color: colors.text }]}>
+                  {t('azkarSearch.virtueOfAzkar')}
                 </Text>
-                <Text style={[styles.sectionHeaderCount, { color: darkMode ? '#6B7280' : '#9CA3AF' }]}>
-                  ({section.data.length})
+                <Text style={[styles.statsSubtitle, { color: colors.textLight }]}>
+                  {language === 'ar' 
+                    ? `${allAzkarWithBenefits.length} ذكر في ${benefitSections.length} قسم`
+                    : `${allAzkarWithBenefits.length} adhkar in ${benefitSections.length} categories`
+                  }
                 </Text>
               </View>
-            )}
-            keyExtractor={item => item.id.toString()}
-            contentContainerStyle={styles.resultsContainer}
-            showsVerticalScrollIndicator={false}
-            stickySectionHeadersEnabled
-            ListHeaderComponent={
-              <Text style={[styles.resultsCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
-                {`${allAzkarWithBenefits.length} ${t('azkarSearch.hasVirtue')}`}
-              </Text>
-            }
-            ListEmptyComponent={
+            </View>
+
+            {/* Collapsible Sections */}
+            {benefitSections.map((section) => {
+              const isExpanded = expandedSections[section.catId];
+              const secColor = section.color;
+              
+              return (
+                <View key={section.catId} style={styles.sectionWrapper}>
+                  {/* Section Header - Tappable */}
+                  <TouchableOpacity
+                    style={[
+                      styles.sectionHeader, 
+                      { 
+                        flexDirection: isRTL ? 'row-reverse' : 'row', 
+                        backgroundColor: darkMode ? secColor + '18' : secColor + '12',
+                        borderColor: secColor + '30',
+                      }
+                    ]}
+                    onPress={() => toggleSection(section.catId)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.sectionHeaderLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <View style={[styles.sectionHeaderDot, { backgroundColor: secColor }]} />
+                      <Text style={[styles.sectionHeaderText, { color: darkMode ? '#fff' : '#1a1a1a' }]}>
+                        {section.title}
+                      </Text>
+                      <View style={[styles.sectionBadge, { backgroundColor: secColor + '25' }]}>
+                        <Text style={[styles.sectionBadgeText, { color: secColor }]}>
+                          {section.data.length}
+                        </Text>
+                      </View>
+                    </View>
+                    <Ionicons 
+                      name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                      size={20} 
+                      color={secColor} 
+                    />
+                  </TouchableOpacity>
+
+                  {/* Section Content - Collapsible */}
+                  {isExpanded && (
+                    <View style={styles.sectionContent}>
+                      {section.data.map((item) => {
+                        const benefit = getZikrBenefit(item, language);
+                        const catColor = secColor;
+
+                        return (
+                          <TouchableOpacity
+                            key={item.id}
+                            style={[
+                              styles.benefitCard,
+                              { 
+                                backgroundColor: darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.85)',
+                                borderColor: darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                              },
+                            ]}
+                            onPress={() => navigateToZikr(item)}
+                            activeOpacity={0.7}
+                          >
+                            {/* الفضل في الأعلى */}
+                            {benefit ? (
+                              <View style={[styles.benefitHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                                <View style={[styles.benefitIconCircle, { backgroundColor: catColor + '20' }]}>
+                                  <Ionicons name="sparkles" size={16} color={catColor} />
+                                </View>
+                                <Text 
+                                  style={[
+                                    styles.benefitHeaderText, 
+                                    { 
+                                      color: catColor, 
+                                      textAlign: isRTL ? 'right' : 'left',
+                                      writingDirection: 'rtl',
+                                    }
+                                  ]}
+                                  numberOfLines={2}
+                                >
+                                  {benefit}
+                                </Text>
+                              </View>
+                            ) : null}
+
+                            {/* النص العربي */}
+                            <Text
+                              style={[styles.benefitArabicText, { color: colors.text }]}
+                              numberOfLines={3}
+                            >
+                              {stripAzkarBrackets(item.arabic)}
+                            </Text>
+
+                            {/* المرجع في الأسفل */}
+                            <View style={[styles.benefitFooter, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                              <Ionicons name="book-outline" size={13} color={colors.textLight} />
+                              <Text style={[styles.benefitReference, { color: colors.textLight }]}>
+                                {transliterateReference(item.reference, language)}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+
+            {/* Empty State */}
+            {benefitSections.length === 0 && (
               <View style={styles.emptyContainer}>
                 <Ionicons name="star-outline" size={64} color={darkMode ? '#374151' : '#D1D5DB'} />
-                <Text style={[styles.emptyTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>
                   {t('azkarSearch.noAzkarWithVirtue')}
                 </Text>
               </View>
-            }
-          />
+            )}
+          </ScrollView>
         ) : query.length < 2 ? (
           // البحث الأخير
           <View style={styles.recentContainer}>
             {recentSearches.length > 0 && (
               <>
                 <View style={[styles.recentHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <Text style={[styles.recentTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+                  <Text style={[styles.recentTitle, { color: colors.text }]}>
                     {t('azkarSearch.recentSearches')}
                   </Text>
                   <TouchableOpacity onPress={clearRecentSearches}>
@@ -480,11 +568,11 @@ export default function AzkarSearchScreen() {
 
             {/* نصائح البحث */}
             <View style={styles.tipsContainer}>
-              <Ionicons name="bulb-outline" size={24} color="#F59E0B" />
-              <Text style={[styles.tipsTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+              <Ionicons name="bulb-outline" size={24} color={darkMode ? '#F59E0B' : '#B57200'} />
+              <Text style={[styles.tipsTitle, { color: colors.text }]}>
                 {t('azkarSearch.searchTips')}
               </Text>
-              <Text style={[styles.tipsText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              <Text style={[styles.tipsText, { color: colors.textLight }]}>
                 {language === 'ar'
                   ? '• ابحث بالنص العربي أو الترجمة\n• استخدم كلمات مفتاحية مثل "الصباح" أو "النوم"\n• يمكنك البحث بالمرجع مثل "البخاري"'
                   : '• Search in Arabic or translation\n• Use keywords like "morning" or "sleep"\n• You can search by reference like "Bukhari"'}
@@ -495,10 +583,10 @@ export default function AzkarSearchScreen() {
           // لا توجد نتائج
           <View style={styles.emptyContainer}>
             <Ionicons name="search-outline" size={64} color={darkMode ? '#374151' : '#D1D5DB'} />
-            <Text style={[styles.emptyTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>
               {t('azkar.noResults')}
             </Text>
-            <Text style={[styles.emptyText, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+            <Text style={[styles.emptyText, { color: colors.textLight }]}>
               {`${t('azkarSearch.noAzkarMatch')} "${query}"`}
             </Text>
           </View>
@@ -512,7 +600,7 @@ export default function AzkarSearchScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
-              <Text style={[styles.resultsCount, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
+              <Text style={[styles.resultsCount, { color: colors.textLight }]}>
                 {`${results.length} ${t('common.result')}`}
               </Text>
             }
@@ -528,7 +616,7 @@ export default function AzkarSearchScreen() {
 // الأنماط
 // ==========================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -565,6 +653,8 @@ const styles = StyleSheet.create({
   resultsCount: {
     fontSize: 14,
     marginBottom: 12,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   resultCard: {
     borderRadius: 16,
@@ -582,6 +672,8 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: 12,
     fontWeight: '600',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   arabicText: {
     fontSize: 18,
@@ -608,6 +700,8 @@ const styles = StyleSheet.create({
   },
   referenceText: {
     fontSize: 12,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -630,10 +724,14 @@ const styles = StyleSheet.create({
   recentTitle: {
     fontSize: 16,
     fontWeight: '600',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   clearText: {
     fontSize: 14,
     color: '#EF4444',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   recentList: {
     gap: 8,
@@ -647,6 +745,8 @@ const styles = StyleSheet.create({
   },
   recentText: {
     fontSize: 14,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
 
   // النصائح
@@ -660,6 +760,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 12,
     marginBottom: 8,
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   tipsText: {
     fontSize: 14,
@@ -679,37 +781,132 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   emptyText: {
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   benefitsHeaderTitle: {
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
-  benefitBox: {
+  // Benefits Container
+  benefitsContainer: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  // Stats Header - New design
+  statsHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
-    gap: 8,
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    gap: 12,
   },
-  benefitText: {
+  statsIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsTextWrapper: {
     flex: 1,
+  },
+  statsTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 26,
+    includeFontPadding: false,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  statsSubtitle: {
     fontSize: 13,
     lineHeight: 20,
+    includeFontPadding: false,
+    marginTop: 2,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
+  // Section Wrapper
+  sectionWrapper: {
+    marginBottom: 12,
+  },
+  sectionContent: {
+    paddingTop: 8,
+  },
+  // Benefit Card Styles
+  benefitCard: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 0.5,
+  },
+  benefitHeader: {
+    alignItems: 'flex-start',
+    gap: 10,
+    marginBottom: 12,
+  },
+  benefitIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  benefitHeaderText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 22,
+  },
+  benefitArabicText: {
+    fontSize: 17,
+    fontWeight: '500',
+    lineHeight: 30,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    marginBottom: 12,
+  },
+  benefitFooter: {
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(128,128,128,0.15)',
+  },
+  benefitReference: {
+    fontSize: 12,
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  // Section Header - Collapsible
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-    marginBottom: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    gap: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  sectionHeaderLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   sectionHeaderDot: {
     width: 10,
@@ -717,11 +914,28 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   sectionHeaderText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  sectionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 6,
+    marginRight: 6,
+  },
+  sectionBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   sectionHeaderCount: {
     fontSize: 13,
     fontWeight: '500',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 });

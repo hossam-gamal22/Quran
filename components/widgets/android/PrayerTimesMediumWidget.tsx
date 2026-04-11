@@ -1,10 +1,10 @@
 // components/widgets/android/PrayerTimesMediumWidget.tsx
-// 4×2 widget: All 5 prayer times in a row, next highlighted
+// 4×2 widget: All 5 prayer times with next prayer highlighted
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
@@ -30,23 +30,32 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
           justifyContent: 'space-between',
           alignItems: 'center',
           width: 'match_parent',
-          marginBottom: 8,
-          paddingHorizontal: 4,
+          marginBottom: 6,
+          paddingHorizontal: 2,
         }}
       >
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ImageWidget
+            image={APP_ICON}
+            imageWidth={ICON_SIZE.header}
+            imageHeight={ICON_SIZE.header}
+            radius={6}
+          />
+          <TextWidget
+            text="مواقيت الصلاة"
+            style={{
+              fontSize: 13,
+              color: COLORS.tealLight,
+              fontFamily: FONT.amiriBold,
+              marginLeft: 6,
+            }}
+          />
+        </FlexWidget>
         <TextWidget
-          text="🕌 مواقيت الصلاة"
+          text={prayer.hijriDate}
           style={{
-            fontSize: 13,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
-          }}
-        />
-        <TextWidget
-          text={BRANDING.name}
-          style={{
-            fontSize: BRANDING.fontSize,
-            color: BRANDING.color,
+            fontSize: 10,
+            color: COLORS.gray,
             fontFamily: FONT.amiri,
           }}
         />
@@ -73,8 +82,8 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: isNext ? COLORS.teal : '#00000000',
-                borderRadius: 12,
-                paddingHorizontal: 8,
+                borderRadius: 14,
+                paddingHorizontal: 10,
                 paddingVertical: 6,
               }}
             >
@@ -82,14 +91,14 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 text={p.nameAr}
                 style={{
                   fontSize: 12,
-                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.grayLight,
+                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.whiteMuted,
                   fontFamily: FONT.amiriBold,
                 }}
               />
               <TextWidget
                 text={p.time}
                 style={{
-                  fontSize: 13,
+                  fontSize: 14,
                   color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.whiteAlt,
                   fontFamily: FONT.amiri,
                   marginTop: 2,
@@ -100,12 +109,12 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
         })}
       </FlexWidget>
 
-      {/* Hijri date footer */}
+      {/* Branding */}
       <TextWidget
-        text={prayer.hijriDate}
+        text={BRANDING.name}
         style={{
-          fontSize: 10,
-          color: COLORS.gray,
+          fontSize: BRANDING.fontSize,
+          color: COLORS.teal,
           fontFamily: FONT.amiri,
           textAlign: 'center',
           marginTop: 4,

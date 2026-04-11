@@ -12,6 +12,8 @@ import {
   getTimeRemaining,
 } from '@/lib/prayer-times';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -29,6 +31,8 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   iconSource,
 }) => {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -66,7 +70,7 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   const bgColor = isDarkMode ? 'rgba(30,30,32,0.09)' : 'rgba(0,0,0,0.09)';
   const countdownColor = isDarkMode ? '#e0e0e0' : '#081827';
   const labelColor = isDarkMode ? '#aaa' : '#081827';
-  const greenColor = '#22C55E';
+  const greenColor = '#0d8e62';
 
   return (
     <View style={styles.wrapper}>
@@ -96,7 +100,7 @@ const RectangleWidgetView: React.FC<RectangleWidgetViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: 10,
     paddingVertical: 10,

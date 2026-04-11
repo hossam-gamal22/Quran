@@ -8,8 +8,6 @@ import { Shield, Save, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 interface FeatureGateEntry {
   premiumOnly: boolean;
-  label: string;
-  description: string;
 }
 
 type PremiumFeatureKey =
@@ -25,33 +23,21 @@ type FeatureGatingConfig = Record<PremiumFeatureKey, FeatureGateEntry>;
 const DEFAULT_CONFIG: FeatureGatingConfig = {
   ad_removal: {
     premiumOnly: true,
-    label: 'إزالة الإعلانات',
-    description: 'إزالة جميع الإعلانات من التطبيق',
   },
   exclusive_themes: {
     premiumOnly: true,
-    label: 'ثيمات حصرية',
-    description: 'ثيمات قراءة حصرية للمشتركين',
   },
   sound_downloads: {
     premiumOnly: true,
-    label: 'تحميل الأصوات',
-    description: 'تحميل الأصوات والتلاوات',
   },
   cloud_backup: {
     premiumOnly: true,
-    label: 'نسخ احتياطي سحابي',
-    description: 'نسخ احتياطي واسترجاع من السحابة',
   },
   advanced_stats: {
     premiumOnly: true,
-    label: 'إحصائيات متقدمة',
-    description: 'إحصائيات تفصيلية للعبادات',
   },
   custom_backgrounds: {
     premiumOnly: true,
-    label: 'خلفيات مخصصة',
-    description: 'رفع واستخدام خلفيات مخصصة',
   },
 };
 
@@ -63,6 +49,15 @@ const FEATURE_KEYS: PremiumFeatureKey[] = [
   'advanced_stats',
   'custom_backgrounds',
 ];
+
+const FEATURE_LABELS: Record<PremiumFeatureKey, string> = {
+  ad_removal: 'إزالة الإعلانات',
+  exclusive_themes: 'ثيمات حصرية',
+  sound_downloads: 'تحميل الأصوات',
+  cloud_backup: 'نسخ احتياطي سحابي',
+  advanced_stats: 'إحصائيات متقدمة',
+  custom_backgrounds: 'خلفيات مخصصة',
+};
 
 export default function FeatureGating() {
   const [config, setConfig] = useState<FeatureGatingConfig>(DEFAULT_CONFIG);
@@ -114,7 +109,7 @@ export default function FeatureGating() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
@@ -135,7 +130,7 @@ export default function FeatureGating() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:opacity-50 transition-colors"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? 'جاري الحفظ...' : saved ? 'تم الحفظ ✓' : 'حفظ'}
@@ -170,7 +165,7 @@ export default function FeatureGating() {
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-slate-800">{feature.label}</h3>
+                    <h3 className="font-bold text-slate-800">{FEATURE_LABELS[key]}</h3>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                         feature.premiumOnly
@@ -181,7 +176,6 @@ export default function FeatureGating() {
                       {feature.premiumOnly ? '🔒 بريميوم' : '🆓 مجاني'}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-500 mt-1">{feature.description}</p>
                 </div>
                 <button
                   onClick={() => toggleFeature(key)}
@@ -192,7 +186,7 @@ export default function FeatureGating() {
                   {feature.premiumOnly ? (
                     <ToggleRight className="w-10 h-10 text-amber-500" />
                   ) : (
-                    <ToggleLeft className="w-10 h-10 text-emerald-500" />
+                    <ToggleLeft className="w-10 h-10 text-accent" />
                   )}
                 </button>
               </div>

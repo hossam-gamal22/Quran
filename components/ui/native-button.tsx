@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 
 // ========================================
 // Native Button Props
@@ -113,6 +115,8 @@ export const NativeButton: React.FC<NativeButtonProps> = ({
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   
   // إذا كان هناك لون مخصص، استخدمه
   const backgroundColor = customColor || colors.primary;
@@ -197,6 +201,8 @@ export const NativeTintedButton: React.FC<NativeButtonProps> = ({
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     if (disabled) return;
@@ -266,6 +272,8 @@ export const NativeFilledButton: React.FC<NativeButtonProps> = ({
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     if (disabled) return;
@@ -334,6 +342,8 @@ export const NativeTextButton: React.FC<NativeButtonProps> = ({
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     if (disabled) return;
@@ -401,6 +411,8 @@ export const NativeToggleSwitch: React.FC<NativeToggleSwitchProps> = ({
   disabled = false,
 }) => {
   const colors = isDarkMode ? SYSTEM_COLORS.dark : SYSTEM_COLORS.light;
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     if (disabled) return;
@@ -417,7 +429,7 @@ export const NativeToggleSwitch: React.FC<NativeToggleSwitchProps> = ({
         {
           backgroundColor: enabled
             ? 'rgba(6,79,47,0.55)'
-            : (isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(120,120,128,0.18)'),
+            : (isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(120,120,128,0.18)'),
           borderWidth: 1,
           borderColor: enabled
             ? 'rgba(6,79,47,0.5)'
@@ -445,7 +457,7 @@ export const NativeToggleSwitch: React.FC<NativeToggleSwitchProps> = ({
 // Styles
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   buttonBase: {
     flexDirection: 'row',
     justifyContent: 'center',

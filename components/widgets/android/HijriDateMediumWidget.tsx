@@ -1,10 +1,10 @@
 // components/widgets/android/HijriDateMediumWidget.tsx
-// 4×2 widget: Full Hijri date + Gregorian date + location
+// 4×2 widget: Hijri + Gregorian date
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
@@ -20,7 +20,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
       style={{
         height: 'match_parent',
         width: 'match_parent',
-        flexDirection: 'row',
+        flexDirection: 'column',
         backgroundGradient: GRADIENTS.hijri,
         borderRadius: 20,
         padding: 14,
@@ -28,93 +28,126 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://hijri' }}
     >
-      {/* Left: large day number */}
+      {/* Header */}
       <FlexWidget
         style={{
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          width: 80,
-        }}
-      >
-        <TextWidget
-          text="🌙"
-          style={{ fontSize: 18 }}
-        />
-        <TextWidget
-          text={day}
-          style={{
-            fontSize: 36,
-            color: COLORS.gold,
-            fontFamily: FONT.amiriBold,
-          }}
-        />
-      </FlexWidget>
-
-      {/* Divider */}
-      <FlexWidget
-        style={{
-          width: 1,
-          height: 'match_parent',
-          backgroundColor: COLORS.divider,
-          marginHorizontal: 10,
-        }}
-      />
-
-      {/* Right: month + gregorian */}
-      <FlexWidget
-        style={{
-          flexDirection: 'column',
+          flexDirection: 'row',
           justifyContent: 'space-between',
-          flex: 1,
+          alignItems: 'center',
+          width: 'match_parent',
+          marginBottom: 6,
         }}
       >
-        <TextWidget
-          text="التقويم الهجري"
-          style={{
-            fontSize: 11,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
-          }}
-        />
-        <FlexWidget style={{ flexDirection: 'column' }}>
-          <TextWidget
-            text={monthYear}
-            style={{
-              fontSize: 16,
-              color: COLORS.white,
-              fontFamily: FONT.amiriBold,
-            }}
+        <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <ImageWidget
+            image={APP_ICON}
+            imageWidth={ICON_SIZE.header}
+            imageHeight={ICON_SIZE.header}
+            radius={6}
           />
           <TextWidget
-            text={gregorian}
+            text="التقويم الهجري"
             style={{
               fontSize: 13,
-              color: COLORS.gray,
-              fontFamily: FONT.amiri,
-              marginTop: 2,
+              color: COLORS.tealLight,
+              fontFamily: FONT.amiriBold,
+              marginLeft: 6,
             }}
           />
-          {prayer.location ? (
-            <TextWidget
-              text={`📍 ${prayer.location}`}
-              style={{
-                fontSize: 10,
-                color: COLORS.grayDark,
-                fontFamily: FONT.amiri,
-                marginTop: 2,
-              }}
-            />
-          ) : null}
         </FlexWidget>
         <TextWidget
           text={BRANDING.name}
           style={{
             fontSize: BRANDING.fontSize,
-            color: BRANDING.color,
+            color: COLORS.teal,
             fontFamily: FONT.amiri,
           }}
         />
+      </FlexWidget>
+
+      {/* Content row */}
+      <FlexWidget
+        style={{
+          flexDirection: 'row',
+          flex: 1,
+          width: 'match_parent',
+        }}
+      >
+        {/* Left: large day number */}
+        <FlexWidget
+          style={{
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            width: 80,
+          }}
+        >
+          <TextWidget
+            text={day}
+            style={{
+              fontSize: 40,
+              color: COLORS.gold,
+              fontFamily: FONT.amiriBold,
+            }}
+          />
+        </FlexWidget>
+
+        {/* Divider */}
+        <FlexWidget
+          style={{
+            width: 1,
+            height: 'match_parent',
+            backgroundColor: COLORS.divider,
+            marginHorizontal: 10,
+          }}
+        />
+
+        {/* Right: month + gregorian */}
+        <FlexWidget
+          style={{
+            flexDirection: 'column',
+            justifyContent: 'center',
+            flex: 1,
+          }}
+        >
+          <TextWidget
+            text={monthYear}
+            style={{
+              fontSize: 17,
+              color: COLORS.white,
+              fontFamily: FONT.amiriBold,
+            }}
+          />
+          <FlexWidget
+            style={{
+              backgroundColor: COLORS.cardBg,
+              borderRadius: 10,
+              paddingHorizontal: 10,
+              paddingVertical: 3,
+              marginTop: 6,
+            }}
+          >
+            <TextWidget
+              text={gregorian}
+              style={{
+                fontSize: 13,
+                color: COLORS.gray,
+                fontFamily: FONT.amiri,
+              }}
+            />
+          </FlexWidget>
+          {prayer.location ? (
+            <TextWidget
+              text={prayer.location}
+              style={{
+                fontSize: 11,
+                color: COLORS.grayDark,
+                fontFamily: FONT.amiri,
+                marginTop: 4,
+              }}
+            />
+          ) : null}
+        </FlexWidget>
       </FlexWidget>
     </FlexWidget>
   );

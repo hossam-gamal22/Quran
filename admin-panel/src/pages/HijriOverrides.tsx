@@ -96,6 +96,7 @@ const HijriOverrides: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -174,9 +175,9 @@ const HijriOverrides: React.FC = () => {
   // ============================================
 
   const handleDelete = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا التعديل؟')) return;
     try {
       await deleteDoc(doc(db, 'hijri_overrides', id));
+      setDeleteConfirmId(null);
       await fetchOverrides();
     } catch (err) {
       console.error('Error deleting override:', err);
@@ -239,14 +240,14 @@ const HijriOverrides: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Globe className="w-7 h-7 text-emerald-400" />
+            <Globe className="w-7 h-7 text-accent-light" />
             تعديلات التاريخ الهجري
           </h1>
           <p className="text-slate-400 mt-1">إدارة رؤية الهلال وتعديلات التواريخ حسب الدولة</p>
         </div>
         <button
           onClick={() => { resetForm(); setEditingId(null); setShowForm(true); }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-xl transition-colors"
         >
           <Plus className="w-4 h-4" />
           إضافة تعديل
@@ -263,7 +264,7 @@ const HijriOverrides: React.FC = () => {
               setEditingId(null);
               setShowForm(true);
             }}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors text-sm"
+            className="px-4 py-2 bg-admin-surface hover:bg-admin-surface-light text-slate-300 rounded-lg border border-admin-border transition-colors text-sm"
           >
             <Calendar className="w-4 h-4 inline ml-2" />
             {preset.label}
@@ -274,12 +275,12 @@ const HijriOverrides: React.FC = () => {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+          <div className="bg-admin-surface rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">
                 {editingId ? 'تعديل' : 'إضافة تعديل جديد'}
               </h2>
-              <button onClick={() => { setShowForm(false); setEditingId(null); }} className="text-slate-400 hover:text-white">
+              <button onClick={() => { setShowForm(false); setEditingId(null); }} className="text-slate-400 hover:text-white" aria-label="إغلاق">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -291,7 +292,8 @@ const HijriOverrides: React.FC = () => {
                 <select
                   value={form.countryCode}
                   onChange={e => setForm(prev => ({ ...prev, countryCode: e.target.value }))}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="اختر الدولة"
                 >
                   {COUNTRIES.map(c => (
                     <option key={c.code} value={c.code}>{c.name} ({c.en})</option>
@@ -306,7 +308,8 @@ const HijriOverrides: React.FC = () => {
                   type="number"
                   value={form.hijriYear}
                   onChange={e => setForm(prev => ({ ...prev, hijriYear: parseInt(e.target.value) || 1447 }))}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="السنة الهجرية"
                 />
               </div>
 
@@ -316,7 +319,8 @@ const HijriOverrides: React.FC = () => {
                 <select
                   value={form.hijriMonth}
                   onChange={e => setForm(prev => ({ ...prev, hijriMonth: parseInt(e.target.value) }))}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="الشهر الهجري"
                 >
                   {HIJRI_MONTHS.map(m => (
                     <option key={m.num} value={m.num}>{m.ar} ({m.en})</option>
@@ -334,8 +338,8 @@ const HijriOverrides: React.FC = () => {
                       onClick={() => setForm(prev => ({ ...prev, monthLength: len as 29 | 30 }))}
                       className={`flex-1 py-2 rounded-lg border transition-colors ${
                         form.monthLength === len
-                          ? 'bg-emerald-500 border-emerald-500 text-white'
-                          : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-emerald-500'
+                          ? 'bg-accent border-accent text-white'
+                          : 'bg-admin-surface-light border-admin-border text-slate-300 hover:border-accent'
                       }`}
                     >
                       {len} يوم
@@ -351,7 +355,8 @@ const HijriOverrides: React.FC = () => {
                   type="date"
                   value={form.hijriStartGregorian}
                   onChange={e => setForm(prev => ({ ...prev, hijriStartGregorian: e.target.value }))}
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
+                  aria-label="تاريخ البداية"
                 />
               </div>
 
@@ -363,7 +368,7 @@ const HijriOverrides: React.FC = () => {
                   value={form.source}
                   onChange={e => setForm(prev => ({ ...prev, source: e.target.value }))}
                   placeholder="مثال: دار الإفتاء المصرية"
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
                 />
               </div>
 
@@ -375,7 +380,7 @@ const HijriOverrides: React.FC = () => {
                   value={form.sourceUrl}
                   onChange={e => setForm(prev => ({ ...prev, sourceUrl: e.target.value }))}
                   placeholder="https://..."
-                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                  className="w-full bg-admin-surface-light text-white rounded-lg px-4 py-2 border border-admin-border"
                   dir="ltr"
                 />
               </div>
@@ -383,8 +388,10 @@ const HijriOverrides: React.FC = () => {
               {/* Verified Toggle */}
               <div className="flex items-center gap-3">
                 <button
+                  type="button"
                   onClick={() => setForm(prev => ({ ...prev, isVerified: !prev.isVerified }))}
-                  className={`w-12 h-6 rounded-full transition-colors ${form.isVerified ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                  className={`w-12 h-6 rounded-full transition-colors ${form.isVerified ? 'bg-accent' : 'bg-admin-surface-light'}`}
+                  aria-label={form.isVerified ? 'موثق رسمياً' : 'غير موثق'}
                 >
                   <div className={`w-5 h-5 rounded-full bg-white transition-transform ${form.isVerified ? 'translate-x-6' : 'translate-x-0.5'}`} />
                 </button>
@@ -399,14 +406,14 @@ const HijriOverrides: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={saving || !form.hijriStartGregorian || !form.source}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
               >
                 <Check className="w-4 h-4" />
                 {saving ? 'جاري الحفظ...' : editingId ? 'تحديث' : 'نشر'}
               </button>
               <button
                 onClick={() => { setShowForm(false); setEditingId(null); }}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
+                className="px-4 py-2 bg-admin-surface-light hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
               >
                 إلغاء
               </button>
@@ -425,11 +432,11 @@ const HijriOverrides: React.FC = () => {
           <p className="text-slate-500 text-sm mt-1">أضف تعديلاً لرؤية الهلال حسب الدولة</p>
         </div>
       ) : (
-        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 overflow-hidden">
+        <div className="bg-admin-surface/50 rounded-2xl border border-admin-border/50 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm" dir="rtl">
               <thead>
-                <tr className="bg-slate-800 text-slate-400 border-b border-slate-700">
+                <tr className="bg-admin-surface text-slate-400 border-b border-admin-border">
                   <th className="text-right px-4 py-3">الدولة</th>
                   <th className="text-right px-4 py-3">الشهر</th>
                   <th className="text-right px-4 py-3">السنة</th>
@@ -442,7 +449,7 @@ const HijriOverrides: React.FC = () => {
               </thead>
               <tbody>
                 {overrides.map(ov => (
-                  <tr key={ov.id} className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
+                  <tr key={ov.id} className="border-b border-admin-border/50 hover:bg-admin-surface/30 transition-colors">
                     <td className="px-4 py-3 text-white font-medium">
                       {getCountryName(ov.countryCode)}
                       <span className="text-xs text-slate-500 mr-1">({ov.countryCode})</span>
@@ -461,7 +468,7 @@ const HijriOverrides: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <span className="text-slate-300 text-xs">{ov.source}</span>
                         {ov.sourceUrl && (
-                          <a href={ov.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:text-emerald-300">
+                          <a href={ov.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-accent-light hover:text-emerald-300" aria-label="رابط المصدر">
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}
@@ -469,7 +476,7 @@ const HijriOverrides: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       {ov.isVerified ? (
-                        <ShieldCheck className="w-5 h-5 text-emerald-400 mx-auto" />
+                        <ShieldCheck className="w-5 h-5 text-accent-light mx-auto" />
                       ) : (
                         <Shield className="w-5 h-5 text-slate-500 mx-auto" />
                       )}
@@ -478,18 +485,25 @@ const HijriOverrides: React.FC = () => {
                       <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleEdit(ov)}
-                          className="p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors"
+                          className="p-1.5 hover:bg-admin-surface-light rounded-lg text-slate-400 hover:text-white transition-colors"
                           title="تعديل"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(ov.id)}
-                          className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                          title="حذف"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {deleteConfirmId === ov.id ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => handleDelete(ov.id)} className="px-2 py-1 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors">تأكيد</button>
+                            <button onClick={() => setDeleteConfirmId(null)} className="px-2 py-1 bg-admin-surface-light text-slate-300 rounded-lg text-xs hover:bg-slate-600 transition-colors">إلغاء</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirmId(ov.id)}
+                            className="p-1.5 hover:bg-red-500/20 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                            title="حذف"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -501,11 +515,11 @@ const HijriOverrides: React.FC = () => {
       )}
 
       {/* Info card */}
-      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6" dir="rtl">
+      <div className="bg-admin-surface/50 rounded-2xl border border-admin-border/50 p-6" dir="rtl">
         <h3 className="text-lg font-bold text-white mb-3">كيف يعمل النظام</h3>
         <div className="space-y-3 text-sm text-slate-400">
           <div className="flex items-start gap-3">
-            <span className="w-6 h-6 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">1</span>
+            <span className="w-6 h-6 bg-accent/20 text-accent-light rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">1</span>
             <p><strong className="text-slate-300">تعديل المشرف (الأولوية القصوى):</strong> التعديلات المضافة هنا تُطبق فوراً على جميع المستخدمين في الدولة المحددة.</p>
           </div>
           <div className="flex items-start gap-3">
@@ -517,7 +531,7 @@ const HijriOverrides: React.FC = () => {
             <p><strong className="text-slate-300">أخبار Google:</strong> في أيام 28-30 من الشهر، يُبحث في الأخبار عن إعلانات رؤية الهلال.</p>
           </div>
           <div className="flex items-start gap-3">
-            <span className="w-6 h-6 bg-slate-500/20 text-slate-400 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">4</span>
+            <span className="w-6 h-6 bg-admin-muted/20 text-slate-400 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">4</span>
             <p><strong className="text-slate-300">الحساب الفلكي:</strong> الملاذ الأخير — حساب تقديري قد يختلف عن الإعلان الرسمي.</p>
           </div>
         </div>

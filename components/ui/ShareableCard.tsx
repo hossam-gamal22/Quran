@@ -13,11 +13,13 @@ import {
   ImageBackground,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import ViewShot from 'react-native-view-shot';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
 import { shareText, shareImage, copyText } from '@/lib/share-service';
@@ -50,13 +52,13 @@ interface ShareableCardProps {
 const CARD_COLORS = THEME_CARD_COLORS;
 
 const APP_BACKGROUNDS = [
-  require('@/assets/images/backgrounds/background1.png'),
-  require('@/assets/images/backgrounds/background2.png'),
-  require('@/assets/images/backgrounds/background3.png'),
-  require('@/assets/images/backgrounds/background4.png'),
-  require('@/assets/images/backgrounds/background5.png'),
-  require('@/assets/images/backgrounds/background6.png'),
-  require('@/assets/images/backgrounds/background7.png'),
+  require('@/assets/images/backgrounds/background1.webp'),
+  require('@/assets/images/backgrounds/background2.webp'),
+  require('@/assets/images/backgrounds/background3.webp'),
+  require('@/assets/images/backgrounds/background4.webp'),
+  require('@/assets/images/backgrounds/background5.webp'),
+  require('@/assets/images/backgrounds/background6.webp'),
+  require('@/assets/images/backgrounds/background7.webp'),
 ];
 
 export function ShareableCard({
@@ -157,7 +159,7 @@ export function ShareableCard({
     Alert.alert(t('common.copied'), t('common.textCopiedSuccess'));
   };
 
-  const selectedCardColor = CARD_COLORS[selectedColor] || '#22C55E';
+  const selectedCardColor = CARD_COLORS[selectedColor] || '#0d8e62';
   const selectedImage = APP_BACKGROUNDS[selectedBackground];
 
   const randomizeColor = () => {
@@ -248,9 +250,11 @@ export function ShareableCard({
               {t('common.share')}
             </Text>
             <TouchableOpacity onPress={onClose}>
-              <View style={[styles.closeBtn, {
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
-              }]}>
+              <View style={[styles.closeBtn, { overflow: 'hidden' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <MaterialCommunityIcons name="close" size={16} color={isDarkMode ? '#A8A8AD' : '#6c6c70'} />
               </View>
             </TouchableOpacity>
@@ -278,11 +282,11 @@ export function ShareableCard({
           {/* Background Mode */}
           <View style={[styles.modeActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeBackground}>
-              <MaterialCommunityIcons name="image-multiple" size={18} color="#22C55E" />
+              <MaterialCommunityIcons name="image-multiple" size={18} color="#0d8e62" />
               <Text style={styles.modeButtonText}>{t('common.randomBackground')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.modeButton, { flexDirection: isRTL ? 'row-reverse' : 'row' }]} onPress={randomizeColor}>
-              <MaterialCommunityIcons name="palette" size={18} color="#22C55E" />
+              <MaterialCommunityIcons name="palette" size={18} color="#0d8e62" />
               <Text style={styles.modeButtonText}>{t('common.randomColor')}</Text>
             </TouchableOpacity>
           </View>
@@ -309,25 +313,29 @@ export function ShareableCard({
           {/* Share Actions */}
           <View style={[styles.actions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleCopy}>
-              <View style={[styles.actionIcon, {
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
-              }]}>
+              <View style={[styles.actionIcon, { overflow: 'hidden' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <MaterialCommunityIcons name="content-copy" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
               <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.copy')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsText}>
-              <View style={[styles.actionIcon, {
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.24)' : 'rgba(120,120,128,0.12)',
-              }]}>
+              <View style={[styles.actionIcon, { overflow: 'hidden' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <MaterialCommunityIcons name="text" size={22} color={isDarkMode ? '#fff' : '#000'} />
               </View>
               <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.text')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtn} onPress={handleShareAsImage}>
-              <View style={[styles.actionIcon, { backgroundColor: '#22C55E' }]}>
+              <View style={[styles.actionIcon, { backgroundColor: '#0d8e62' }]}>
                 <MaterialCommunityIcons name="image" size={22} color="#fff" />
               </View>
               <Text style={[styles.actionLabel, { color: isDarkMode ? '#fff' : '#000' }]}>{t('common.image')}</Text>
@@ -459,7 +467,7 @@ const styles = StyleSheet.create({
   modeButtonText: {
     fontSize: 12,
     fontFamily: fontSemiBold(),
-    color: '#22C55E',
+    color: '#0d8e62',
   },
   colorPicker: {
     flexDirection: 'row',

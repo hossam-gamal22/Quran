@@ -250,13 +250,13 @@ export const subscribeToCompanionsContent = (
 // ─── Seasonal content helpers ───────────────────────────────────────────
 
 export const fetchSeasonalContent = (page: SeasonalPageType) =>
-  fetchContent<CMSSeasonalContent>(`seasonalContent/${page}`, `seasonal_${page}`);
+  fetchContent<CMSSeasonalContent>(`seasonalContent_${page}`, `seasonal_${page}`);
 
 export const subscribeToSeasonalContent = (
   page: SeasonalPageType,
   onUpdate: (data: CMSSeasonalContent) => void,
   onError?: (error: Error) => void
-) => subscribeToContent<CMSSeasonalContent>(`seasonalContent/${page}`, `seasonal_${page}`, onUpdate, onError);
+) => subscribeToContent<CMSSeasonalContent>(`seasonalContent_${page}`, `seasonal_${page}`, onUpdate, onError);
 
 // ========================================
 // React Hooks for CMS content

@@ -5,10 +5,12 @@ import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useColors } from '@/hooks/use-colors';
 
 export default function OnboardingIndex() {
   const router = useRouter();
   const { isLoading, isOnboardingComplete, currentStep } = useOnboarding();
+  const colors = useColors();
   const hasNavigated = useRef(false);
 
   useEffect(() => {
@@ -24,8 +26,8 @@ export default function OnboardingIndex() {
 
   // شاشة التحميل أثناء التحقق والتوجيه
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#22C55E" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
 }
@@ -35,6 +37,5 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
 });

@@ -8,13 +8,13 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   RefreshControl,
   Dimensions,
   Modal,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -28,8 +28,11 @@ import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
+import { getHijriDate, hijriToGregorian } from '@/lib/hijri-date';
+
 import TranslatedText from '@/components/ui/TranslatedText';
 import { useSeasonalCMS } from '@/lib/content-api';
 
@@ -39,9 +42,11 @@ const { width } = Dimensions.get('window');
 // الثوابت
 // ========================================
 
-const HAJJ_COLOR = '#8B4513';
-const HAJJ_GRADIENT = ['#8B4513', '#5D2E0C'];
-const DHUL_HIJJAH_COLOR = '#DAA520';
+const HAJJ_COLOR = '#5D4037';
+const HAJJ_GRADIENT = ['#5D4037', '#3E2723'];
+const ARAFAH_COLOR = '#1565C0';
+const EID_COLOR = '#C62828';
+const GREEN_ACCENT = '#2E7D32';
 
 // أيام الحج ومناسكه
 const HAJJ_DAYS = [
@@ -208,6 +213,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
   index,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const { t } = useSettings();
   const isArabicLang = getLanguage() === 'ar';
@@ -216,7 +222,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
       <TouchableOpacity
         style={[
           styles.hajjDayCard,
-          isDarkMode && styles.hajjDayCardDark,
+          { backgroundColor: colors.card },
           isActive && styles.hajjDayCardActive,
           dayInfo.isSpecial && styles.hajjDayCardSpecial,
           dayInfo.isEid && styles.hajjDayCardEid,
@@ -237,26 +243,32 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
             dayInfo.isEid && styles.dayNumberEid,
           ]}
         >
-          <Text style={styles.dayNumberText}>{dayInfo.day}</Text>
-          <Text style={styles.dayNumberLabel}>{t('seasonal.hajj.dhulHijjah')}</Text>
+          <Text style={[
+            styles.dayNumberText,
+            (isActive || dayInfo.isSpecial || dayInfo.isEid) && { color: '#fff' },
+          ]}>{dayInfo.day}</Text>
+          <Text style={[
+            styles.dayNumberLabel,
+            (isActive || dayInfo.isSpecial || dayInfo.isEid) && { color: 'rgba(255,255,255,0.85)' },
+          ]}>{t('seasonal.hajj.dhulHijjah')}</Text>
         </View>
 
         {/* المحتوى */}
         <View style={styles.dayContent}>
           <View style={[styles.dayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {isArabicLang ? (
-              <Text style={[styles.dayName, { color: colors.text }]}>{dayInfo.name}</Text>
+              <Text style={[styles.dayName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.name}</Text>
             ) : (
-              <Text style={[styles.dayName, { color: colors.text }]}>{dayInfo.nameEn || dayInfo.name}</Text>
+              <Text style={[styles.dayName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.nameEn || dayInfo.name}</Text>
             )}
             {isCompleted && (
-              <MaterialCommunityIcons name="check-circle" size={20} color="#22C55E" />
+              <MaterialCommunityIcons name="check-circle" size={20} color="#0d8e62" />
             )}
           </View>
           {isArabicLang ? (
-            <Text style={[styles.dayDescription, { color: colors.textLight }]}>{dayInfo.description}</Text>
+            <Text style={[styles.dayDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.description}</Text>
           ) : (
-            <TranslatedText style={[styles.dayDescription, { color: colors.textLight }]}>{dayInfo.description}</TranslatedText>
+            <TranslatedText style={[styles.dayDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.description}</TranslatedText>
           )}
           <View style={[styles.ritualsPreview, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {dayInfo.rituals.slice(0, 3).map((ritual) => (
@@ -264,7 +276,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
                 <MaterialCommunityIcons
                   name={ritual.icon as any}
                   size={14}
-                  color={dayInfo.isSpecial ? '#DAA520' : HAJJ_COLOR}
+                  color={dayInfo.isSpecial ? ARAFAH_COLOR : HAJJ_COLOR}
                 />
               </View>
             ))}
@@ -280,7 +292,7 @@ const HajjDayCard: React.FC<HajjDayCardProps> = ({
         <MaterialCommunityIcons
           name={isRTL ? 'chevron-left' : 'chevron-right'}
           size={24}
-          color={isDarkMode ? '#666' : '#ccc'}
+          color={colors.icon}
         />
       </TouchableOpacity>
     </Animated.View>
@@ -301,30 +313,50 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
   isDarkMode,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { t } = useSettings();
+  const isRTL = useIsRTL();
+
+  // Get current Hijri year for Gregorian conversion
+  const hijriYear = useMemo(() => getHijriDate().year, []);
+
+  // Compute Gregorian dates for each of the 10 days of Dhul Hijjah
+  const gregorianDates = useMemo(() => {
+    return FIRST_TEN_DAYS.map((day) => {
+      try {
+        const gDate = hijriToGregorian(hijriYear, 12, day.day);
+        return { day: gDate.getDate(), month: gDate.getMonth() + 1 };
+      } catch {
+        return null;
+      }
+    });
+  }, [hijriYear]);
+
   return (
-    <View style={[styles.tenDaysContainer, isDarkMode && styles.tenDaysContainerDark]}>
+    <View style={[styles.tenDaysContainer, { backgroundColor: colors.card }]}>
       <Text style={[styles.tenDaysTitle, { color: colors.text }]}>
         {t('seasonal.hajj.tenDaysTitle')}
       </Text>
       <Text style={[styles.tenDaysSubtitle, { color: colors.textLight }]}>
         {t('seasonal.hajj.tenDaysSubtitle')}
       </Text>
-      <View style={styles.tenDaysGrid}>
-        {FIRST_TEN_DAYS.map((day) => {
+      <View style={[styles.tenDaysGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        {FIRST_TEN_DAYS.map((day, index) => {
           const isCompleted = completedDays.includes(day.day);
           const isCurrent = day.day === currentDay;
           const isArafah = day.day === 9;
           const isEid = day.day === 10;
+          const gDate = gregorianDates[index];
+          const hasHighlight = isCompleted || isCurrent || isArafah || isEid;
 
           return (
             <TouchableOpacity
               key={day.day}
               style={[
                 styles.tenDayItem,
-                isDarkMode && styles.tenDayItemDark,
+                { backgroundColor: colors.surface },
                 isCompleted && styles.tenDayItemCompleted,
-                isCurrent && styles.tenDayItemCurrent,
+                isCurrent && !isArafah && !isEid && styles.tenDayItemCurrent,
                 isArafah && styles.tenDayItemArafah,
                 isEid && styles.tenDayItemEid,
               ]}
@@ -337,13 +369,23 @@ const TenDaysProgress: React.FC<TenDaysProgressProps> = ({
                 style={[
                   styles.tenDayNumber,
                   { color: colors.text },
-                  (isCompleted || isCurrent || isArafah || isEid) && styles.tenDayNumberActive,
+                  hasHighlight && styles.tenDayNumberActive,
                 ]}
               >
                 {day.day}
               </Text>
+              {gDate && (
+                <Text
+                  style={[
+                    styles.tenDayGregorian,
+                    { color: hasHighlight ? 'rgba(255,255,255,0.8)' : colors.textLight },
+                  ]}
+                >
+                  {gDate.day}/{gDate.month}
+                </Text>
+              )}
               {isCompleted && (
-                <MaterialCommunityIcons name="check" size={12} color="#fff" />
+                <MaterialCommunityIcons name="check" size={10} color="#fff" />
               )}
               {isArafah && !isCompleted && (
                 <MaterialCommunityIcons name="star" size={10} color="#fff" />
@@ -365,12 +407,13 @@ interface DuaCardProps {
 
 const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View entering={FadeInRight.delay(index * 80).duration(400)}>
       <TouchableOpacity
-        style={[styles.duaCard, isDarkMode && styles.duaCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+        style={[styles.duaCard, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
@@ -382,17 +425,17 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
         </View>
         <View style={styles.duaContent}>
           {isArabicLang ? (
-            <Text style={[styles.duaTitle, { color: colors.text }]}>{dua.title}</Text>
+            <Text style={[styles.duaTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.title}</Text>
           ) : (
-            <TranslatedText style={[styles.duaTitle, { color: colors.text }]}>{dua.title}</TranslatedText>
+            <TranslatedText style={[styles.duaTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.title}</TranslatedText>
           )}
           {isArabicLang ? (
-            <Text style={[styles.duaOccasion, { color: colors.textLight }]}>{dua.occasion}</Text>
+            <Text style={[styles.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.occasion}</Text>
           ) : (
-            <TranslatedText style={[styles.duaOccasion, { color: colors.textLight }]}>{dua.occasion}</TranslatedText>
+            <TranslatedText style={[styles.duaOccasion, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua.occasion}</TranslatedText>
           )}
         </View>
-        <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={isDarkMode ? '#666' : '#ccc'} />
+        <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={20} color={colors.icon} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -412,6 +455,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
   isDarkMode,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const { t } = useSettings();
   const isArabicLang = getLanguage() === 'ar';
@@ -422,11 +466,11 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
       <View style={styles.modalOverlay}>
         <Animated.View
           entering={FadeIn.duration(300)}
-          style={[styles.ritualModal, isDarkMode && styles.ritualModalDark]}
+          style={[styles.ritualModal, { backgroundColor: colors.card }]}
         >
           {/* Header */}
           <View
-            style={[styles.ritualModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: dayInfo.isSpecial ? 'rgba(218,165,32,0.85)' : `${HAJJ_GRADIENT[0]}CC` }]}
+            style={[styles.ritualModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: dayInfo.isSpecial ? `${ARAFAH_COLOR}DD` : `${HAJJ_GRADIENT[0]}CC` }]}
           >
             <View style={styles.ritualModalDay}>
               <Text style={styles.ritualModalDayNumber}>{dayInfo.day}</Text>
@@ -434,14 +478,14 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             </View>
             <View style={styles.ritualModalInfo}>
               {isArabicLang ? (
-                <Text style={styles.ritualModalName}>{dayInfo.name}</Text>
+                <Text style={[styles.ritualModalName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.name}</Text>
               ) : (
-                <Text style={styles.ritualModalName}>{dayInfo.nameEn || dayInfo.name}</Text>
+                <Text style={[styles.ritualModalName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.nameEn || dayInfo.name}</Text>
               )}
               {isArabicLang ? (
-                <Text style={styles.ritualModalDesc}>{dayInfo.description}</Text>
+                <Text style={[styles.ritualModalDesc, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.description}</Text>
               ) : (
-                <TranslatedText style={styles.ritualModalDesc}>{dayInfo.description}</TranslatedText>
+                <TranslatedText style={[styles.ritualModalDesc, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dayInfo.description}</TranslatedText>
               )}
             </View>
             <TouchableOpacity style={styles.modalCloseButton} onPress={onClose}>
@@ -451,28 +495,28 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
 
           <ScrollView style={styles.ritualModalContent} showsVerticalScrollIndicator={false}>
             {/* المناسك */}
-            <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+            <Text style={[styles.ritualSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('seasonal.hajj.ritualsAndDeeds')}
             </Text>
             {dayInfo.rituals.map((ritual, index) => (
               <Animated.View
                 key={ritual.id}
                 entering={FadeInRight.delay(index * 100).duration(400)}
-                style={[styles.ritualItem, isDarkMode && styles.ritualItemDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={[styles.ritualItem, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               >
                 <View style={styles.ritualItemIcon}>
                   <MaterialCommunityIcons name={ritual.icon as any} size={24} color={HAJJ_COLOR} />
                 </View>
                 <View style={styles.ritualItemContent}>
                   {isArabicLang ? (
-                    <Text style={[styles.ritualItemTitle, { color: colors.text }]}>{ritual.title}</Text>
+                    <Text style={[styles.ritualItemTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{ritual.title}</Text>
                   ) : (
-                    <TranslatedText style={[styles.ritualItemTitle, { color: colors.text }]}>{ritual.title}</TranslatedText>
+                    <TranslatedText style={[styles.ritualItemTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{ritual.title}</TranslatedText>
                   )}
                   {isArabicLang ? (
-                    <Text style={[styles.ritualItemDesc, { color: colors.textLight }]}>{ritual.description}</Text>
+                    <Text style={[styles.ritualItemDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{ritual.description}</Text>
                   ) : (
-                    <TranslatedText style={[styles.ritualItemDesc, { color: colors.textLight }]}>{ritual.description}</TranslatedText>
+                    <TranslatedText style={[styles.ritualItemDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{ritual.description}</TranslatedText>
                   )}
                 </View>
               </Animated.View>
@@ -481,20 +525,20 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             {/* الفضائل */}
             {dayInfo.virtues && (
               <>
-                <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+                <Text style={[styles.ritualSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {t('seasonal.hajj.virtuesSection')}
                 </Text>
                 <View style={styles.virtuesStarWrapper}>
                   <View style={styles.virtuesStarCircle}>
-                    <MaterialCommunityIcons name="star" size={16} color="#DAA520" />
+                    <MaterialCommunityIcons name="star" size={16} color={ARAFAH_COLOR} />
                   </View>
-                  <View style={[styles.virtuesCard, isDarkMode && styles.virtuesCardDark]}>
+                  <View style={[styles.virtuesCard, { backgroundColor: colors.card }]}>
                     {dayInfo.virtues.map((virtue, index) => (
                       <View key={index} style={[styles.virtueItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         {isArabicLang ? (
-                          <Text style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</Text>
+                          <Text style={[styles.virtueText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{virtue}</Text>
                         ) : (
-                          <TranslatedText style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</TranslatedText>
+                          <TranslatedText style={[styles.virtueText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{virtue}</TranslatedText>
                         )}
                       </View>
                     ))}
@@ -506,15 +550,15 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
             {/* الأدعية */}
             {dayInfo.duas && (
               <>
-                <Text style={[styles.ritualSectionTitle, { color: colors.text }]}>
+                <Text style={[styles.ritualSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {t('seasonal.hajj.duasSection')}
                 </Text>
                 {dayInfo.duas.map((dua, index) => (
-                  <View key={index} style={[styles.duaBox, isDarkMode && styles.duaBoxDark]}>
+                  <View key={index} style={[styles.duaBox, { backgroundColor: colors.card }]}>
                     {isArabicLang ? (
-                      <Text style={[styles.duaBoxText, { color: colors.text }]}>{dua}</Text>
+                      <Text style={[styles.duaBoxText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua}</Text>
                     ) : (
-                      <TranslatedText style={[styles.duaBoxText, { color: colors.text }]}>{dua}</TranslatedText>
+                      <TranslatedText style={[styles.duaBoxText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{dua}</TranslatedText>
                     )}
                   </View>
                 ))}
@@ -538,8 +582,10 @@ export default function HajjScreen() {
   const router = useRouter();
   const { isDarkMode, settings, t } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const language = getLanguage();
   const isArabic = language === 'ar';
+  const insets = useSafeAreaInsets();
   const { currentSeason, refreshSeasonalData } = useSeasonal();
   const { seasonalProgress, markDayCompleted } = useSeasonalProgress();
 
@@ -576,14 +622,11 @@ export default function HajjScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor={HAJJ_COLOR}
-      />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${HAJJ_COLOR}CC` }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -591,20 +634,15 @@ export default function HajjScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{t('seasonal.hajj.title')}</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('seasonal.hajj.title')}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>
             {isHajjSeason ? `${t('seasonal.hajj.headerSubtitleWithDay')} ${currentDay}` : t('seasonal.hajj.headerSubtitle')}
           </Text>
         </View>
         <View style={styles.headerPlaceholder} />
-
-        {/* زخرفة الكعبة */}
-        <View style={[styles.kaabaDecoration, isRTL ? null : { right: 20, left: undefined }]}>
-          <MaterialCommunityIcons name="star-crescent" size={80} color="rgba(255,255,255,0.15)" />
-        </View>
       </View>
 
       <ScrollView
@@ -630,8 +668,24 @@ export default function HajjScreen() {
           />
         </Animated.View>
 
+        {/* مفتاح الألوان */}
+        <View style={[styles.legendRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.legendDot, { backgroundColor: ARAFAH_COLOR }]} />
+            <Text style={[styles.legendText, { color: colors.textLight }]}>عرفة</Text>
+          </View>
+          <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.legendDot, { backgroundColor: EID_COLOR }]} />
+            <Text style={[styles.legendText, { color: colors.textLight }]}>العيد</Text>
+          </View>
+          <View style={[styles.legendItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.legendDot, { backgroundColor: GREEN_ACCENT }]} />
+            <Text style={[styles.legendText, { color: colors.textLight }]}>مكتمل</Text>
+          </View>
+        </View>
+
         {/* أيام الحج */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('seasonal.hajj.ritualsSection')}
         </Text>
         {HAJJ_DAYS.map((dayInfo, index) => (
@@ -647,7 +701,7 @@ export default function HajjScreen() {
         ))}
 
         {/* أدعية الحج */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('seasonal.hajj.hajjDuasSection')}
         </Text>
         <View style={styles.duasContainer}>
@@ -664,11 +718,11 @@ export default function HajjScreen() {
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#DAA520" />
+          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(192,123,16,0.12)' : '#fff8e1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#F57F17" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.hajj.tipTitle')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight }]}>
+              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.hajj.tipTitle')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('seasonal.hajj.tipText')}
               </Text>
             </View>
@@ -700,29 +754,29 @@ export default function HajjScreen() {
         >
           <Animated.View
             entering={FadeIn.duration(300)}
-            style={[styles.duaModal, isDarkMode && styles.duaModalDark]}
+            style={[styles.duaModal, { backgroundColor: colors.card }]}
           >
             <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {isArabic ? (
-                <Text style={[styles.duaModalTitle, { color: colors.text }]}>{selectedDua?.title}</Text>
+                <Text style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.title}</Text>
               ) : (
-                <TranslatedText style={[styles.duaModalTitle, { color: colors.text }]}>{selectedDua?.title || ''}</TranslatedText>
+                <TranslatedText style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.title || ''}</TranslatedText>
               )}
               <TouchableOpacity onPress={() => setSelectedDua(null)} activeOpacity={0.7} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             {isArabic ? (
-              <Text style={[styles.duaModalArabic, { color: colors.text }]}>{selectedDua?.arabic}</Text>
+              <Text style={[styles.duaModalArabic, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.arabic}</Text>
             ) : (
-              <TranslatedText style={[styles.duaModalArabic, { color: colors.text }]}>{selectedDua?.arabic || ''}</TranslatedText>
+              <TranslatedText style={[styles.duaModalArabic, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.arabic || ''}</TranslatedText>
             )}
             <View style={[styles.duaModalOccasion, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name="clock-outline" size={16} color={HAJJ_COLOR} />
               {isArabic ? (
-                <Text style={[styles.duaModalOccasionText, { color: colors.textLight }]}>{selectedDua?.occasion}</Text>
+                <Text style={[styles.duaModalOccasionText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.occasion}</Text>
               ) : (
-                <TranslatedText style={[styles.duaModalOccasionText, { color: colors.textLight }]}>{selectedDua?.occasion || ''}</TranslatedText>
+                <TranslatedText style={[styles.duaModalOccasionText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{selectedDua?.occasion || ''}</TranslatedText>
               )}
             </View>
           </Animated.View>
@@ -737,21 +791,17 @@ export default function HajjScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
+  headerWrapper: {},
+  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingTop: 10,
-    overflow: 'hidden',
+    paddingVertical: 14,
   },
   backButton: {
     width: 40,
@@ -762,30 +812,28 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
     alignItems: 'center',
+    overflow: 'visible',
   },
   headerTitle: {
     fontSize: 24,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 36,
   },
   headerSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
+    lineHeight: 22,
   },
   headerPlaceholder: {
     width: 40,
   },
   kaabaDecoration: {
     position: 'absolute',
-    bottom: -10,
+    bottom: 0,
     left: 20,
-  },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
+    overflow: 'hidden',
   },
   scrollView: {
     flex: 1,
@@ -796,24 +844,18 @@ const styles = StyleSheet.create({
 
   // العشر الأوائل
   tenDaysContainer: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
   },
-  tenDaysContainerDark: {
-    backgroundColor: '#1a1a2e',
-  },
   tenDaysTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     textAlign: 'center',
   },
   tenDaysSubtitle: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 16,
@@ -825,42 +867,41 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tenDayItem: {
-    width: 50,
-    height: 50,
+    width: 56,
+    height: 64,
     borderRadius: 12,
-    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  tenDayItemDark: {
-    backgroundColor: '#2a2a3e',
+    gap: 2,
   },
   tenDayItemCompleted: {
-    backgroundColor: '#22C55E',
+    backgroundColor: GREEN_ACCENT,
   },
   tenDayItemCurrent: {
     backgroundColor: HAJJ_COLOR,
   },
   tenDayItemArafah: {
-    backgroundColor: '#DAA520',
+    backgroundColor: ARAFAH_COLOR,
   },
   tenDayItemEid: {
-    backgroundColor: '#e91e63',
+    backgroundColor: EID_COLOR,
   },
   tenDayNumber: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
   },
   tenDayNumberActive: {
     color: '#fff',
+  },
+  tenDayGregorian: {
+    fontSize: 9,
+    fontFamily: fontRegular(),
   },
 
   // العناوين
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     marginTop: 20,
     marginBottom: 12,
   },
@@ -869,13 +910,9 @@ const styles = StyleSheet.create({
   hajjDayCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-  },
-  hajjDayCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   hajjDayCardActive: {
     borderWidth: 2,
@@ -883,17 +920,17 @@ const styles = StyleSheet.create({
   },
   hajjDayCardSpecial: {
     borderWidth: 2,
-    borderColor: '#DAA520',
+    borderColor: ARAFAH_COLOR,
   },
   hajjDayCardEid: {
     borderWidth: 2,
-    borderColor: '#e91e63',
+    borderColor: EID_COLOR,
   },
   dayNumber: {
     width: 60,
     height: 60,
     borderRadius: 14,
-    backgroundColor: `${HAJJ_COLOR}15`,
+    backgroundColor: `${HAJJ_COLOR}20`,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -901,10 +938,10 @@ const styles = StyleSheet.create({
     backgroundColor: HAJJ_COLOR,
   },
   dayNumberSpecial: {
-    backgroundColor: '#DAA520',
+    backgroundColor: ARAFAH_COLOR,
   },
   dayNumberEid: {
-    backgroundColor: '#e91e63',
+    backgroundColor: EID_COLOR,
   },
   dayNumberText: {
     fontSize: 22,
@@ -928,12 +965,10 @@ const styles = StyleSheet.create({
   dayName: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
   },
   dayDescription: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 4,
   },
   ritualsPreview: {
@@ -952,7 +987,6 @@ const styles = StyleSheet.create({
   moreRituals: {
     fontSize: 12,
     fontFamily: fontMedium(),
-    color: '#999',
     alignSelf: 'center',
   },
 
@@ -963,47 +997,40 @@ const styles = StyleSheet.create({
   duaCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 14,
-  },
-  duaCardDark: {
-    backgroundColor: '#1a1a2e',
+    borderRadius: 16,
+    padding: 16,
   },
   duaIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: `${HAJJ_COLOR}15`,
     alignItems: 'center',
     justifyContent: 'center',
   },
   duaContent: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: 14,
   },
   duaTitle: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
+    lineHeight: 24,
   },
   duaOccasion: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#999',
+    marginTop: 2,
+    lineHeight: 20,
   },
 
   // النصيحة
   tipCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff8e1',
     borderRadius: 16,
     padding: 16,
     marginTop: 20,
     gap: 12,
-  },
-  tipCardDark: {
-    backgroundColor: '#2a2a1e',
   },
   tipContent: {
     flex: 1,
@@ -1011,12 +1038,10 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
   },
   tipText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
     marginTop: 4,
   },
@@ -1028,13 +1053,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   ritualModal: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '85%',
-  },
-  ritualModalDark: {
-    backgroundColor: '#1a1a2e',
   },
   ritualModalHeader: {
     flexDirection: 'row',
@@ -1090,20 +1111,15 @@ const styles = StyleSheet.create({
   ritualSectionTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
     marginTop: 16,
     marginBottom: 12,
   },
   ritualItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
-  },
-  ritualItemDark: {
-    backgroundColor: '#2a2a3e',
   },
   ritualItemIcon: {
     width: 46,
@@ -1119,12 +1135,10 @@ const styles = StyleSheet.create({
   ritualItemTitle: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   ritualItemDesc: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 2,
   },
   virtuesStarWrapper: {
@@ -1134,20 +1148,19 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(218,165,32,0.15)',
+    backgroundColor: `${ARAFAH_COLOR}20`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: -18,
     zIndex: 1,
   },
   virtuesCard: {
-    backgroundColor: '#fffde7',
     borderRadius: 14,
     padding: 14,
     paddingTop: 26,
-  },
-  virtuesCardDark: {
-    backgroundColor: '#2a2a1e',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    alignSelf: 'stretch',
   },
   virtueItem: {
     flexDirection: 'row',
@@ -1156,24 +1169,19 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   virtueText: {
-    fontSize: 13,
-    fontFamily: fontRegular(),
-    color: '#666',
+    fontSize: 15,
+    fontFamily: fontMedium(),
     flex: 1,
+    lineHeight: 24,
   },
   duaBox: {
-    backgroundColor: '#f5f5f5',
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
   },
-  duaBoxDark: {
-    backgroundColor: '#2a2a3e',
-  },
   duaBoxText: {
     fontSize: 16,
     fontFamily: fontMedium(),
-    color: '#333',
     textAlign: 'center',
     lineHeight: 28,
   },
@@ -1190,14 +1198,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   duaModal: {
-    backgroundColor: '#fff',
     borderRadius: 24,
     padding: 24,
     width: '100%',
     maxWidth: 400,
-  },
-  duaModalDark: {
-    backgroundColor: '#1a1a2e',
   },
   duaModalHeader: {
     flexDirection: 'row',
@@ -1208,12 +1212,10 @@ const styles = StyleSheet.create({
   duaModalTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
   },
   duaModalArabic: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
     textAlign: 'center',
     writingDirection: 'rtl',
     lineHeight: 36,
@@ -1228,7 +1230,28 @@ const styles = StyleSheet.create({
   duaModalOccasionText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
+  },
+
+  // مفتاح الألوان
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 8,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendText: {
+    fontSize: 11,
+    fontFamily: fontRegular(),
   },
 
   bottomSpace: {

@@ -13,6 +13,8 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTim
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 const PRESS_SPRING = { damping: 18, stiffness: 240, mass: 0.7 };
 
 // ========================================
@@ -31,13 +33,44 @@ interface GlassCardProps {
 export function GlassCard({
   children,
   style,
-  intensity = 60,
+  intensity = 80,
   borderRadius = BorderRadius.xl,
   noBorder = false,
   noShadow = false,
 }: GlassCardProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
+
+  // Extract padding + content-layout props from style and apply them INSIDE
+  // the overflow:hidden wrapper so content is properly padded & laid out.
+  const flatStyle = StyleSheet.flatten(style) || {};
+  const {
+    padding, paddingHorizontal, paddingVertical,
+    paddingTop, paddingBottom, paddingLeft, paddingRight,
+    paddingStart, paddingEnd,
+    alignItems, justifyContent, flexDirection, gap,
+    rowGap, columnGap, flexWrap,
+    ...outerStyle
+  } = flatStyle as ViewStyle & Record<string, any>;
+  const innerContentStyle: ViewStyle = {};
+  if (padding !== undefined) innerContentStyle.padding = padding;
+  if (paddingHorizontal !== undefined) innerContentStyle.paddingHorizontal = paddingHorizontal;
+  if (paddingVertical !== undefined) innerContentStyle.paddingVertical = paddingVertical;
+  if (paddingTop !== undefined) innerContentStyle.paddingTop = paddingTop;
+  if (paddingBottom !== undefined) innerContentStyle.paddingBottom = paddingBottom;
+  if (paddingLeft !== undefined) innerContentStyle.paddingLeft = paddingLeft;
+  if (paddingRight !== undefined) innerContentStyle.paddingRight = paddingRight;
+  if (paddingStart !== undefined) innerContentStyle.paddingStart = paddingStart;
+  if (paddingEnd !== undefined) innerContentStyle.paddingEnd = paddingEnd;
+  if (alignItems !== undefined) innerContentStyle.alignItems = alignItems;
+  if (justifyContent !== undefined) innerContentStyle.justifyContent = justifyContent;
+  if (flexDirection !== undefined) innerContentStyle.flexDirection = flexDirection;
+  if (gap !== undefined) innerContentStyle.gap = gap;
+  if (rowGap !== undefined) innerContentStyle.rowGap = rowGap;
+  if (columnGap !== undefined) innerContentStyle.columnGap = columnGap;
+  if (flexWrap !== undefined) innerContentStyle.flexWrap = flexWrap;
 
   if (Platform.OS === 'web') {
     return (
@@ -46,13 +79,13 @@ export function GlassCard({
           styles.container,
           {
             backgroundColor: isDarkMode
-              ? 'rgba(30, 30, 32, 0.8)'
-              : 'rgba(255, 255, 255, 0.78)',
+              ? 'rgba(30, 30, 30, 0.55)'
+              : 'rgba(255, 255, 255, 0.65)',
             borderRadius,
-            borderWidth: noBorder ? 0 : 0.5,
+            borderWidth: noBorder ? 0 : StyleSheet.hairlineWidth,
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.12)'
-              : 'rgba(0,0,0,0.06)',
+              ? 'rgba(255, 255, 255, 0.15)'
+              : 'rgba(0, 0, 0, 0.12)',
             // @ts-ignore — web-only CSS props
             backdropFilter: 'blur(40px)',
             WebkitBackdropFilter: 'blur(40px)',
@@ -69,33 +102,35 @@ export function GlassCard({
   return (
     <View
       style={[
-        styles.container,
-        { borderRadius, overflow: 'hidden' },
+        { borderRadius },
         !noShadow && (isDarkMode ? styles.shadowDark : styles.shadowLight),
-        style,
+        outerStyle,
       ]}
     >
-      <BlurView
-        intensity={intensity}
-        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
-        style={[StyleSheet.absoluteFill, { borderRadius }]}
-      />
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: isDarkMode
-              ? 'rgba(30, 30, 32, 0.55)'
-              : 'rgba(255, 255, 255, 0.4)',
-            borderRadius,
-            borderWidth: noBorder ? 0 : 0.5,
-            borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.12)'
-              : 'rgba(0,0,0,0.06)',
-          },
-        ]}
-      />
-      <View style={styles.content}>{children}</View>
+      <View style={{ borderRadius, overflow: 'hidden', flex: 1 }}>
+        <BlurView
+         
+          intensity={intensity}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+          style={[StyleSheet.absoluteFill, { borderRadius }]}
+        />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: isDarkMode
+                ? 'rgba(30, 30, 30, 0.40)'
+                : 'rgba(255, 255, 255, 0.60)',
+              borderRadius,
+              borderWidth: noBorder ? 0 : StyleSheet.hairlineWidth,
+              borderColor: isDarkMode
+                ? 'rgba(255, 255, 255, 0.50)'
+                : 'rgba(0, 0, 0, 0.12)',
+            },
+          ]}
+        />
+        <View style={[styles.content, innerContentStyle]}>{children}</View>
+      </View>
     </View>
   );
 }
@@ -138,12 +173,12 @@ export function GlassButton({
 
   const variantColors = {
     default: {
-      bg: isDarkMode ? 'rgba(120, 120, 128, 0.24)' : 'rgba(120, 120, 128, 0.12)',
-      text: isDarkMode ? '#fff' : '#000',
+      bg: isDarkMode ? 'rgba(23, 23, 23, 0.9)' : 'rgba(245, 245, 245, 0.9)',
+      text: isDarkMode ? '#FAFAFA' : '#171717',
     },
     primary: {
-      bg: isDarkMode ? 'rgba(6, 79, 47, 0.85)' : '#22C55E',
-      text: '#fff',
+      bg: isDarkMode ? 'rgba(6, 79, 47, 0.85)' : '#0d8e62',
+      text: '#FFFFFF',
     },
     destructive: {
       bg: isDarkMode ? 'rgba(255, 59, 48, 0.24)' : 'rgba(255, 59, 48, 0.12)',
@@ -187,7 +222,7 @@ export function GlassButton({
             backgroundColor: v.bg,
             paddingVertical: s.paddingV,
             paddingHorizontal: s.paddingH,
-            borderRadius: size === 'large' ? 16 : size === 'medium' ? 12 : 10,
+            borderRadius: size === 'large' ? 20 : size === 'medium' ? 16 : 12,
             opacity: disabled ? 0.4 : 1,
             minHeight: 44,
           },
@@ -236,12 +271,14 @@ export function GlassToggle({
   onToggle,
   label,
   icon,
-  iconColor = '#22C55E',
+  iconColor = '#0d8e62',
   subtitle,
   disabled = false,
 }: GlassToggleProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const toggleContent = (
     <View style={[styles.toggleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { padding: 14, position: 'relative', zIndex: 1 }]}>
@@ -255,7 +292,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleLabel,
-              { color: isDarkMode ? '#fff' : '#000', textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {label}
@@ -265,7 +302,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleSubtitle,
-              { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' },
             ]}
           >
             {subtitle}
@@ -280,8 +317,8 @@ export function GlassToggle({
         }}
         disabled={disabled}
         trackColor={{
-          false: isDarkMode ? '#39393D' : '#E9E9EB',
-          true: '#22C55E',
+          false: isDarkMode ? '#262626' : '#E5E5E5',
+          true: '#0d8e62',
         }}
         thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
         ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
@@ -297,15 +334,15 @@ export function GlassToggle({
           overflow: 'hidden',
           marginBottom: 8,
           backgroundColor: isDarkMode
-            ? 'rgba(30, 30, 32, 0.55)'
-            : 'rgba(255, 255, 255, 0.4)',
-          borderWidth: 0.5,
+            ? 'rgba(30, 30, 30, 0.35)'
+            : 'rgba(255, 255, 255, 0.55)',
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: isDarkMode
-            ? 'rgba(255,255,255,0.12)'
+            ? 'rgba(255,255,255,0.60)'
             : 'rgba(0,0,0,0.06)',
           // @ts-ignore — web-only CSS props
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
         } as any]}
       >
         {toggleContent}
@@ -316,8 +353,9 @@ export function GlassToggle({
   return (
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 8 }}>
       <BlurView
-        intensity={30}
-        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
+       
+        intensity={80}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={StyleSheet.absoluteFill}
       />
       <View
@@ -325,12 +363,12 @@ export function GlassToggle({
           StyleSheet.absoluteFill,
           {
             backgroundColor: isDarkMode
-              ? 'rgba(30, 30, 32, 0.45)'
-              : 'rgba(255, 255, 255, 0.35)',
-            borderWidth: 0.5,
+              ? 'rgba(30, 30, 30, 0.45)'
+              : 'rgba(255, 255, 255, 0.60)',
+            borderWidth: StyleSheet.hairlineWidth,
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.1)'
-              : 'rgba(0,0,0,0.05)',
+              ? 'rgba(255,255,255,0.60)'
+              : 'rgba(0,0,0,0.06)',
             borderRadius: 14,
           },
         ]}
@@ -357,7 +395,7 @@ interface GlassListItemProps {
 
 export function GlassListItem({
   icon,
-  iconColor = '#22C55E',
+  iconColor = '#0d8e62',
   title,
   subtitle,
   value,
@@ -368,6 +406,8 @@ export function GlassListItem({
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const pressScale = useSharedValue(1);
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const pressStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pressScale.value }],
@@ -394,22 +434,22 @@ export function GlassListItem({
         style={[styles.listItem, { flexDirection: isRTL ? 'row-reverse' : 'row', position: 'relative', zIndex: 1 }]}
       >
         {icon && (
-          <View style={styles.listItemIcon}> 
+          <View style={styles.listItemIcon}>
             <MaterialCommunityIcons name={icon as any} size={20} color={iconColor} />
           </View>
         )}
         <View style={styles.listItemContent}>
-          <Text style={[styles.listItemTitle, { color: isDarkMode ? '#fff' : '#000', textAlign: isRTL ? 'right' : 'left' }]}> 
+          <Text style={[styles.listItemTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
             {title}
           </Text>
           {subtitle && (
-            <Text style={[styles.listItemSubtitle, { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}> 
+            <Text style={[styles.listItemSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
               {subtitle}
             </Text>
           )}
         </View>
         {value && (
-          <Text style={[styles.listItemValue, { color: isDarkMode ? '#A8A8AD' : '#A8A8AD' }]}> 
+          <Text style={[styles.listItemValue, { color: colors.textLight }]}>
             {value}
           </Text>
         )}
@@ -433,15 +473,15 @@ export function GlassListItem({
           overflow: 'hidden',
           marginBottom: 4,
           backgroundColor: isDarkMode
-            ? 'rgba(30, 30, 32, 0.55)'
-            : 'rgba(255, 255, 255, 0.4)',
-          borderWidth: 0.5,
+            ? 'rgba(30, 30, 30, 0.35)'
+            : 'rgba(255, 255, 255, 0.55)',
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: isDarkMode
-            ? 'rgba(255,255,255,0.12)'
+            ? 'rgba(255,255,255,0.60)'
             : 'rgba(0,0,0,0.06)',
           // @ts-ignore — web-only CSS props
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
         } as any]}
       >
         {itemContent}
@@ -452,8 +492,9 @@ export function GlassListItem({
   return (
     <View style={{ borderRadius: 14, overflow: 'hidden', marginBottom: 4 }}>
       <BlurView
-        intensity={30}
-        tint={(isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight') as any}
+       
+        intensity={80}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={StyleSheet.absoluteFill}
       />
       <View
@@ -461,12 +502,12 @@ export function GlassListItem({
           StyleSheet.absoluteFill,
           {
             backgroundColor: isDarkMode
-              ? 'rgba(30, 30, 32, 0.45)'
-              : 'rgba(255, 255, 255, 0.35)',
-            borderWidth: 0.5,
+              ? 'rgba(30, 30, 30, 0.45)'
+              : 'rgba(255, 255, 255, 0.60)',
+            borderWidth: StyleSheet.hairlineWidth,
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.1)'
-              : 'rgba(0,0,0,0.05)',
+              ? 'rgba(255,255,255,0.60)'
+              : 'rgba(0,0,0,0.06)',
             borderRadius: 14,
           },
         ]}
@@ -489,11 +530,13 @@ interface GlassSectionProps {
 export function GlassSection({ title, children, style }: GlassSectionProps) {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   return (
     <View style={[styles.section, style]}>
       {title && (
-        <Text style={[styles.sectionTitle, { color: isDarkMode ? '#A8A8AD' : '#6c6c70', textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
           {title}
         </Text>
       )}
@@ -502,15 +545,17 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
           styles.sectionContent,
           {
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.1)'
+              ? 'rgba(255,255,255,0.60)'
               : 'rgba(0,0,0,0.06)',
+            borderWidth: StyleSheet.hairlineWidth,
           },
         ]}
       >
         {Platform.OS !== 'web' ? (
           <BlurView
-            intensity={40}
-            tint={isDarkMode ? 'systemChromeMaterialDark' : 'systemChromeMaterialLight'}
+           
+            intensity={80}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
         ) : null}
@@ -519,8 +564,8 @@ export function GlassSection({ title, children, style }: GlassSectionProps) {
             StyleSheet.absoluteFill,
             {
               backgroundColor: isDarkMode
-                ? 'rgba(30, 30, 32, 0.55)'
-                : 'rgba(255, 255, 255, 0.4)',
+                ? 'rgba(30, 30, 30, 0.45)'
+                : 'rgba(255, 255, 255, 0.60)',
               borderRadius: 16,
             },
           ]}
@@ -552,8 +597,11 @@ const SegmentItem: React.FC<{
   isDarkMode: boolean;
   onPress: () => void;
   onLayoutCb: (x: number, width: number) => void;
-}> = React.memo(({ seg, activeProgress, isDarkMode, onPress, onLayoutCb }) => {  const isRTL = useIsRTL();  const activeColor = isDarkMode ? '#fff' : '#000';
-  const inactiveColor = isDarkMode ? '#A8A8AD' : '#6c6c70';
+}> = React.memo(({ seg, activeProgress, isDarkMode, onPress, onLayoutCb }) => {  const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
+  const activeColor = colors.text;
+  const inactiveColor = colors.textLight;
 
   const animatedLabelStyle = useAnimatedStyle(() => ({
     color: interpolateColor(activeProgress.value, [0, 1], [inactiveColor, activeColor]),
@@ -604,6 +652,8 @@ const SegmentIcon: React.FC<{
   activeColor: string;
   inactiveColor: string;
 }> = React.memo(({ icon, activeProgress, activeColor, inactiveColor }) => {
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   if (icon.startsWith('img:')) {
     const uri = icon.slice(4).trim();
     if (!uri) return null;
@@ -654,6 +704,8 @@ const SegmentIcon: React.FC<{
 
 export function GlassSegmentedControl({ segments, selected, onSelect }: GlassSegmentProps) {
   const { isDarkMode } = useSettings();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const indicatorX = useSharedValue(0);
   const indicatorW = useSharedValue(0);
@@ -723,8 +775,9 @@ export function GlassSegmentedControl({ segments, selected, onSelect }: GlassSeg
           <View style={styles.segmentPillOuter}>
             {Platform.OS !== 'web' ? (
               <BlurView
-                intensity={Platform.OS === 'ios' ? 40 : 25}
-                tint="light"
+               
+                intensity={Platform.OS === 'ios' ? 25 : 15}
+                tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
                 style={styles.segmentPillBlur}
               >
                 <View
@@ -772,12 +825,12 @@ export function GlassSegmentedControl({ segments, selected, onSelect }: GlassSeg
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
-  container: { overflow: 'hidden' },
+const _styles = StyleSheet.create({
+  container: {},
   content: { position: 'relative', zIndex: 1 },
   
   shadowLight: {
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -786,9 +839,9 @@ const styles = StyleSheet.create({
   shadowDark: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.20,
+    shadowRadius: 16,
+    elevation: 4,
   },
 
   // Toggle
@@ -895,7 +948,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: 'rgba(255,255,255,0.60)',
   },
   segmentPillInner: {
     flex: 1,

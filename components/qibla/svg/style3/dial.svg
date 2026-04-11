@@ -13,7 +13,7 @@
         stroke-width: 2px;
       }
       .st3 {
-        fill: #fff;
+        fill: #1C1C1E;
         font-family: Helvetica-Bold, Helvetica;
         font-size: 24px;
         font-weight: 700;

@@ -9,9 +9,11 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  StatusBar,
   Alert,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { fontBold, fontMedium } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -24,6 +26,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const ICONS = [
@@ -51,6 +54,7 @@ export default function CustomDhikrScreen() {
   const [selectedIcon, setSelectedIcon] = useState('hand-heart');
   const [count, setCount] = useState('33');
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const handleSave = async () => {
     if (!name.trim() || !text.trim()) {
@@ -92,14 +96,14 @@ export default function CustomDhikrScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={isDarkMode ? '#fff' : '#333'} />
+            <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t('tasbih.customDhikr')}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
@@ -110,8 +114,12 @@ export default function CustomDhikrScreen() {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* اختيار الأيقونة */}
           <Animated.View entering={FadeInDown.delay(50).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('azkar.iconSection')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark, styles.iconGrid]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('azkar.iconSection')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }, styles.iconGrid]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               {ICONS.map((icon) => (
                 <TouchableOpacity
                   key={icon}
@@ -124,7 +132,7 @@ export default function CustomDhikrScreen() {
                   <MaterialCommunityIcons
                     name={icon as any}
                     size={24}
-                    color={selectedIcon === icon ? '#22C55E' : isDarkMode ? '#aaa' : '#666'}
+                    color={selectedIcon === icon ? '#0d8e62' : colors.textLight}
                   />
                 </TouchableOpacity>
               ))}
@@ -133,10 +141,14 @@ export default function CustomDhikrScreen() {
 
           {/* اسم الذِكر */}
           <Animated.View entering={FadeInDown.delay(100).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('azkar.dhikrName')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('azkar.dhikrName')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               <TextInput
-                style={[styles.input, isDarkMode && styles.inputDark]}
+                style={[styles.input, { backgroundColor: colors.surface, color: colors.text }]}
                 placeholder={t('azkar.dhikrNamePlaceholder')}
                 placeholderTextColor="#999"
                 value={name}
@@ -148,10 +160,14 @@ export default function CustomDhikrScreen() {
 
           {/* نص الذِكر */}
           <Animated.View entering={FadeInDown.delay(150).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('azkar.dhikrTextSection')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('azkar.dhikrTextSection')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               <TextInput
-                style={[styles.input, styles.textArea, isDarkMode && styles.inputDark]}
+                style={[styles.input, styles.textArea, { backgroundColor: colors.surface, color: colors.text }]}
                 placeholder={t('azkar.dhikrTextPlaceholder')}
                 placeholderTextColor="#999"
                 value={text}
@@ -166,10 +182,14 @@ export default function CustomDhikrScreen() {
 
           {/* عدد التكرار */}
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('azkar.repeatCount')}</Text>
-            <View style={[styles.section, isDarkMode && styles.sectionDark]}>
+            <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('azkar.repeatCount')}</Text>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={20} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
               <TextInput
-                style={[styles.input, isDarkMode && styles.inputDark]}
+                style={[styles.input, { backgroundColor: colors.surface, color: colors.text }]}
                 placeholder="33"
                 placeholderTextColor="#999"
                 value={count}
@@ -187,7 +207,7 @@ export default function CustomDhikrScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   containerDark: { backgroundColor: 'transparent' },
   header: {
@@ -198,7 +218,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold(), color: '#333' },
+  headerTitle: { fontSize: 20, fontFamily: fontBold() },
   saveBtn: {
     backgroundColor: 'rgba(6,79,47,0.85)',
     paddingHorizontal: 16,
@@ -206,24 +226,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   saveText: { fontFamily: fontBold(), fontSize: 14, color: '#fff' },
-  textLight: { color: '#fff' },
-  textMuted: { color: '#999' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 10 },
   sectionTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#666',
     marginTop: 20,
     marginBottom: 10,
     paddingHorizontal: 4,
   },
   section: {
-    backgroundColor: 'rgba(120,120,128,0.12)',
     borderRadius: 16,
     overflow: 'hidden',
   },
-  sectionDark: { backgroundColor: 'rgba(120,120,128,0.18)' },
+  sectionDark: {},
   iconGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -241,12 +257,11 @@ const styles = StyleSheet.create({
   iconOptionSelected: {
     backgroundColor: 'rgba(6,79,47,0.15)',
     borderWidth: 2,
-    borderColor: '#22C55E',
+    borderColor: '#0d8e62',
   },
   input: {
     fontFamily: fontMedium(),
     fontSize: 16,
-    color: '#333',
     padding: 16,
   },
   inputDark: { color: '#fff' },

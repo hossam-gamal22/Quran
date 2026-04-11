@@ -14,6 +14,7 @@ import Animated, {
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 // ========================================
@@ -38,6 +39,8 @@ export interface NativeTabsProps {
   style?: ViewStyle;
   /** Height of the indicator line (ignored in native segmented mode) */
   indicatorHeight?: number;
+  /** Minimal/transparent background style */
+  transparent?: boolean;
 }
 
 // ========================================
@@ -65,10 +68,12 @@ function IOSNativeTabs({
   onSelect,
   indicatorColor,
   style,
+  transparent,
 }: NativeTabsProps) {
   const colors = useColors();
-  const { settings } = useSettings();
-  const isDark = settings?.theme === 'dark';
+  const iosStyles = useScaledStyles(_iosStyles, colors.fs);
+  const { isDarkMode } = useSettings();
+  const isDark = isDarkMode || colors.hasBgOverride;
   const activeColor = indicatorColor ?? colors.primary;
   const isRTL = useIsRTL();
   const displayTabs = useMemo(() => isRTL ? [...tabs].reverse() : tabs, [tabs, isRTL]);
@@ -76,12 +81,15 @@ function IOSNativeTabs({
   const values = useMemo(() => displayTabs.map((t) => t.label), [displayTabs]);
 
   if (!SegmentedControl) {
-    // Fallback if native control unavailable
-    return <AndroidMaterialTabs tabs={tabs} selected={selected} onSelect={onSelect} indicatorColor={indicatorColor} style={style} />;
+    return <AndroidMaterialTabs tabs={tabs} selected={selected} onSelect={onSelect} indicatorColor={indicatorColor} style={style} transparent={transparent} />;
   }
 
+  const bgColor = transparent
+    ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+    : (isDark ? 'rgba(30,30,32,0.85)' : 'rgba(235,235,235,0.92)');
+
   return (
-    <View style={[iosStyles.container, style]}>
+    <View style={[iosStyles.outerClip, { backgroundColor: bgColor }, style]}>
       <SegmentedControl
         values={values}
         selectedIndex={selectedIndex >= 0 ? selectedIndex : 0}
@@ -93,30 +101,32 @@ function IOSNativeTabs({
           }
         }}
         appearance={isDark ? 'dark' : 'light'}
-        activeFontStyle={iosStyles.activeFont}
+        activeFontStyle={{ ...iosStyles.activeFont, color: '#FFFFFF' }}
         fontStyle={iosStyles.inactiveFont}
         tintColor={activeColor}
+        backgroundColor={bgColor}
         style={iosStyles.segmented}
       />
     </View>
   );
 }
 
-const iosStyles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+const _iosStyles = StyleSheet.create({
+  outerClip: {
+    borderRadius: 9,
+    overflow: 'hidden',
   },
   segmented: {
-    height: 36,
+    height: 40,
+    margin: -2,
   },
   activeFont: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fontBold(),
     fontWeight: '700',
   },
   inactiveFont: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: fontSemiBold(),
     fontWeight: '600',
   },
@@ -132,10 +142,12 @@ function AndroidMaterialTabs({
   onSelect,
   indicatorColor,
   style,
+  transparent,
 }: NativeTabsProps) {
   const colors = useColors();
-  const { settings } = useSettings();
-  const isDark = settings?.theme === 'dark';
+  const m3Styles = useScaledStyles(_m3Styles, colors.fs);
+  const { isDarkMode } = useSettings();
+  const isDark = isDarkMode || colors.hasBgOverride;
   const activeColor = indicatorColor ?? colors.primary;
   const isRTL = useIsRTL();
 
@@ -149,6 +161,14 @@ function AndroidMaterialTabs({
     }
   }, [selected, tabs]);
 
+  // Transparent/minimal background colors
+  const bgColor = transparent
+    ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
+    : (isDark ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.92)');
+  const borderColor = transparent
+    ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
+    : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)');
+
   return (
     <View style={[m3Styles.container, style]}>
       <View
@@ -156,8 +176,8 @@ function AndroidMaterialTabs({
           m3Styles.segmentRow,
           {
             flexDirection: isRTL ? 'row-reverse' : 'row',
-            borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)',
-            backgroundColor: isDark ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.92)',
+            borderColor: borderColor,
+            backgroundColor: bgColor,
           },
         ]}
       >
@@ -177,7 +197,7 @@ function AndroidMaterialTabs({
                 m3Styles.segment,
                 {
                   backgroundColor: isActive
-                    ? activeColor + (isDark ? 'CC' : '22')
+                    ? activeColor
                     : 'transparent',
                   borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
                   borderLeftWidth: !isRTL && !isFirst ? StyleSheet.hairlineWidth : 0,
@@ -194,12 +214,14 @@ function AndroidMaterialTabs({
                   m3Styles.segmentText,
                   {
                     color: isActive
-                      ? (isDark ? '#fff' : activeColor)
+                      ? '#fff'
                       : (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)'),
                     fontFamily: isActive ? fontBold() : fontSemiBold(),
                   },
                 ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
                 {tab.label}
               </Text>
@@ -211,16 +233,14 @@ function AndroidMaterialTabs({
   );
 }
 
-const m3Styles = StyleSheet.create({
+const _m3Styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 4,
-    paddingVertical: 6,
+    // No padding — let the segmented row fill the container fully
   },
   segmentRow: {
     flexDirection: 'row',
     borderRadius: 12,
     borderWidth: 1,
-    overflow: 'hidden',
   },
   segment: {
     flex: 1,
@@ -229,7 +249,8 @@ const m3Styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentText: {
-    fontSize: 14,
+    fontSize: 13,
+    paddingHorizontal: 4,
   },
 });
 

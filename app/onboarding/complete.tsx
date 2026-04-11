@@ -7,9 +7,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
   Dimensions,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,6 +30,8 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { tOnboarding } from '@/constants/onboarding-translations';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 const { width, height } = Dimensions.get('window');
 
 // ========================================
@@ -39,6 +41,8 @@ const { width, height } = Dimensions.get('window');
 export default function CompleteScreen() {
   const { completeOnboarding, preferences } = useOnboarding();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   
   // أنيميشن النجمة
   const starScale = useSharedValue(0);
@@ -82,7 +86,7 @@ export default function CompleteScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar style="light" translucent />
       
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         {/* كونفيتي */}
@@ -93,7 +97,7 @@ export default function CompleteScreen() {
           fadeOut={true}
           explosionSpeed={300}
           fallSpeed={2500}
-          colors={['#22C55E', '#3a7ca5', '#f5a623', '#c17f59', '#5d4e8c']}
+          colors={['#0d8e62', '#3a7ca5', '#c07b10', '#c17f59', '#4a3d73']}
         />
 
         <SafeAreaView style={styles.safeArea}>
@@ -140,7 +144,7 @@ export default function CompleteScreen() {
                   <MaterialCommunityIcons
                     name={preferences.locationEnabled ? 'map-marker-check' : 'map-marker-off'}
                     size={20}
-                    color={preferences.locationEnabled ? '#22C55E' : '#999'}
+                    color={preferences.locationEnabled ? '#0d8e62' : '#999'}
                   />
                 </View>
                 <Text style={styles.summaryLabel}>{tOnboarding('locationLabel')}</Text>
@@ -154,7 +158,7 @@ export default function CompleteScreen() {
                   <MaterialCommunityIcons
                     name={preferences.notificationsEnabled ? 'bell-check' : 'bell-off'}
                     size={20}
-                    color={preferences.notificationsEnabled ? '#f5a623' : '#999'}
+                    color={preferences.notificationsEnabled ? '#c07b10' : '#999'}
                   />
                 </View>
                 <Text style={styles.summaryLabel}>{tOnboarding('notificationsLabel')}</Text>
@@ -166,7 +170,7 @@ export default function CompleteScreen() {
 
             {/* نصيحة */}
             <Animated.View entering={FadeInUp.delay(1000).duration(600)} style={[styles.tipContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="lightbulb-on" size={20} color="#f5a623" />
+              <MaterialCommunityIcons name="lightbulb-on" size={20} color="#c07b10" />
               <Text style={styles.tipText}>
                 {tOnboarding('canChangeSettings')}
               </Text>
@@ -202,7 +206,7 @@ export default function CompleteScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -231,7 +235,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 15,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   title: {
     fontSize: 32,

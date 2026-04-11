@@ -7,12 +7,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -22,6 +23,7 @@ import { UniversalHeader } from '@/components/ui';
 export default function TermsOfUseScreen() {
   const { isDarkMode, t, settings } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isArabic = lang === 'ar';
@@ -48,10 +50,7 @@ export default function TermsOfUseScreen() {
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#11151c' : '#fff'}
-      />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       <UniversalHeader title={t('settings.termsOfService')} />
 
@@ -127,15 +126,14 @@ export default function TermsOfUseScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5' },
-  containerDark: { backgroundColor: '#11151c' },
+const _styles = StyleSheet.create({
+  container: { flex: 1 },
 
   scrollView: { flex: 1 },
   scrollContent: { padding: 20 },
-  lastUpdated: { fontSize: 13, fontFamily: fontRegular(), color: '#999', marginBottom: 20, textAlign: 'center' },
-  sectionTitle: { fontSize: 18, fontFamily: fontBold(), color: '#333', marginTop: 20, marginBottom: 10 },
-  paragraph: { fontSize: 15, fontFamily: fontRegular(), color: '#555', lineHeight: 26, marginBottom: 10 },
+  lastUpdated: { fontSize: 13, fontFamily: fontRegular(), marginBottom: 20, textAlign: 'center' },
+  sectionTitle: { fontSize: 18, fontFamily: fontBold(), marginTop: 20, marginBottom: 10 },
+  paragraph: { fontSize: 15, fontFamily: fontRegular(), lineHeight: 26, marginBottom: 10 },
   bold: { fontFamily: fontBold() },
   bottomSpace: { height: 60 },
 });

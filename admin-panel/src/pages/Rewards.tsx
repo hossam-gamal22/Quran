@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Save, Loader2, Settings, History, Users, Gift, Bell } from 'lucide-react';
+import { Trophy, Save, Loader2, Settings, History, Users, Gift, Bell, AlertTriangle } from 'lucide-react';
 import { sendPrizeNotification } from '../services/pushNotifications';
 
 interface ScoreWeights {
@@ -53,6 +53,11 @@ interface LeaderboardUser {
   month: string;
   lastActive?: string;
   selected: boolean;
+  hidden: boolean;
+  deviceName?: string;
+  deviceBrand?: string;
+  installSource?: string;
+  fcmToken?: string;
 }
 
 const DEFAULT_CONFIG: RewardsConfig = {
@@ -85,7 +90,7 @@ const WEIGHT_LABELS: Record<string, string> = {
 
 const getCurrentMonth = () => {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-v2`;
 };
 
 export default function Rewards() {
@@ -96,6 +101,9 @@ export default function Rewards() {
   const [loadingBoard, setLoadingBoard] = useState(false);
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'leaderboard' | 'settings' | 'history'>('leaderboard');
+  const [showHidden, setShowHidden] = useState(false);
+  const [mergeSource, setMergeSource] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -120,12 +128,14 @@ export default function Rewards() {
     try {
       const currentMonth = getCurrentMonth();
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('monthlyEngagement.score', 'desc'), limit(20));
+      const q = query(usersRef, orderBy('monthlyEngagement.score', 'desc'), limit(50));
       const snapshot = await getDocs(q);
 
       const users: LeaderboardUser[] = [];
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
+        // Only skip placeholders — admin sees ALL real users
+        if (data.placeholder) return;
         const engagement = data.monthlyEngagement;
         if (engagement && engagement.month === currentMonth && engagement.score > 0) {
           users.push({
@@ -137,6 +147,11 @@ export default function Rewards() {
             month: engagement.month,
             lastActive: data.lastActive?.toDate?.()?.toLocaleDateString('ar-EG') || '',
             selected: false,
+            hidden: !!data.hiddenFromLeaderboard,
+            deviceName: data.deviceName,
+            deviceBrand: data.deviceBrand,
+            installSource: data.installSource,
+            fcmToken: data.fcmToken,
           });
         }
       });
@@ -173,6 +188,76 @@ export default function Rewards() {
     setLeaderboard(prev =>
       prev.map(u => (u.id === userId ? { ...u, selected: !u.selected } : u))
     );
+  };
+
+  const toggleUserVisibility = async (userId: string) => {
+    const user = leaderboard.find(u => u.id === userId);
+    if (!user) return;
+    const newHidden = !user.hidden;
+    try {
+      await updateDoc(doc(db, 'users', userId), { hiddenFromLeaderboard: newHidden });
+      setLeaderboard(prev =>
+        prev.map(u => (u.id === userId ? { ...u, hidden: newHidden } : u))
+      );
+    } catch (err) {
+      console.error('Error toggling user visibility:', err);
+    }
+  };
+
+  /**
+   * Merge duplicate user: transfers score from source → target, deletes source doc
+   */
+  const mergeUsers = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    setMerging(true);
+    try {
+      const sourceRef = doc(db, 'users', sourceId);
+      const targetRef = doc(db, 'users', targetId);
+      const [sourceSnap, targetSnap] = await Promise.all([getDoc(sourceRef), getDoc(targetRef)]);
+      
+      if (!sourceSnap.exists() || !targetSnap.exists()) {
+        alert('أحد المستخدمين غير موجود');
+        return;
+      }
+
+      const sourceData = sourceSnap.data();
+      const targetData = targetSnap.data();
+      const sourceEngagement = sourceData.monthlyEngagement || {};
+      const targetEngagement = targetData.monthlyEngagement || {};
+
+      // Merge scores if same month
+      if (sourceEngagement.month && sourceEngagement.month === targetEngagement.month) {
+        const mergedScore = (targetEngagement.score || 0) + (sourceEngagement.score || 0);
+        const mergedActivities = { ...(targetEngagement.activities || {}) };
+        for (const [key, count] of Object.entries(sourceEngagement.activities || {})) {
+          mergedActivities[key] = (mergedActivities[key] || 0) + (count as number);
+        }
+        await updateDoc(targetRef, {
+          'monthlyEngagement.score': mergedScore,
+          'monthlyEngagement.activities': mergedActivities,
+        });
+      } else if (sourceEngagement.score > (targetEngagement.score || 0)) {
+        // Source has more recent/higher data — copy it
+        await updateDoc(targetRef, { monthlyEngagement: sourceEngagement });
+      }
+
+      // Mark source as placeholder (soft delete) so it never shows again
+      await updateDoc(sourceRef, { 
+        placeholder: true, 
+        mergedInto: targetId, 
+        mergedAt: new Date().toISOString(),
+        hiddenFromLeaderboard: true,
+      });
+
+      alert(`✅ تم دمج "${sourceData.displayName || sourceId}" في "${targetData.displayName || targetId}"`);
+      setMergeSource(null);
+      loadLeaderboard();
+    } catch (err) {
+      console.error('Error merging users:', err);
+      alert('حدث خطأ أثناء الدمج');
+    } finally {
+      setMerging(false);
+    }
   };
 
   const confirmWinners = async () => {
@@ -288,7 +373,7 @@ export default function Rewards() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saving ? 'جاري الحفظ...' : saved ? 'تم الحفظ ✓' : 'حفظ'}
@@ -343,6 +428,15 @@ export default function Rewards() {
               >
                 اختيار تلقائي
               </button>
+              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer mr-auto">
+                <input
+                  type="checkbox"
+                  checked={showHidden}
+                  onChange={() => setShowHidden(v => !v)}
+                  className="w-4 h-4 accent-slate-500"
+                />
+                عرض المخفيين ({leaderboard.filter(u => u.hidden).length})
+              </label>
             </div>
           </div>
 
@@ -353,23 +447,43 @@ export default function Rewards() {
             </div>
           ) : (
             <>
+              {mergeSource && (
+                <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-orange-500 shrink-0" />
+                  <div className="flex-1 text-sm text-orange-700">
+                    <strong>وضع الدمج:</strong> اضغط "← دمج هنا" على المستخدم الذي تريد نقل النقاط إليه.
+                    المستخدم المصدر: <strong>{leaderboard.find(u => u.id === mergeSource)?.displayName}</strong>
+                  </div>
+                  <button
+                    onClick={() => setMergeSource(null)}
+                    className="px-3 py-1 text-xs bg-slate-200 rounded-lg hover:bg-slate-300"
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              )}
               <div className="bg-white rounded-xl border overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-right text-sm text-slate-500">#</th>
                       <th className="px-4 py-3 text-right text-sm text-slate-500">المستخدم</th>
+                      <th className="px-4 py-3 text-right text-sm text-slate-500">الجهاز</th>
                       <th className="px-4 py-3 text-right text-sm text-slate-500">نقاط</th>
                       <th className="px-4 py-3 text-right text-sm text-slate-500">المنصة</th>
                       <th className="px-4 py-3 text-right text-sm text-slate-500">آخر نشاط</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-500">إخفاء</th>
+                      <th className="px-4 py-3 text-center text-sm text-slate-500">دمج</th>
                       <th className="px-4 py-3 text-center text-sm text-slate-500">فائز</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {leaderboard.map((user, i) => (
+                    {leaderboard
+                      .filter(u => showHidden || !u.hidden)
+                      .map((user, i) => (
                       <tr
                         key={user.id}
-                        className={`border-t ${user.selected ? 'bg-amber-50' : ''} ${
+                        className={`border-t ${user.selected ? 'bg-amber-50' : ''} ${user.hidden ? 'opacity-50' : ''} ${
                           i < 3 ? 'font-medium' : ''
                         }`}
                       >
@@ -377,14 +491,67 @@ export default function Rewards() {
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium">{user.displayName}</div>
+                          <div className="text-sm font-medium">
+                            {user.displayName}
+                            {user.hidden && <span className="text-xs text-red-400 mr-2">(مخفي)</span>}
+                          </div>
                           {user.email && (
                             <div className="text-xs text-slate-400">{user.email}</div>
                           )}
+                          <div className="text-[10px] text-slate-300 font-mono truncate max-w-[140px]" title={user.id}>{user.id}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-xs text-slate-600">{user.deviceBrand || ''} {user.deviceName || '-'}</div>
+                          <div className="text-[10px] text-slate-400">{user.installSource || '-'}</div>
                         </td>
                         <td className="px-4 py-3 font-bold text-amber-600">{user.score}</td>
                         <td className="px-4 py-3 text-sm text-slate-500">{user.platform || '-'}</td>
                         <td className="px-4 py-3 text-sm text-slate-500">{user.lastActive || '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => toggleUserVisibility(user.id)}
+                            className={`px-2 py-1 text-xs rounded-lg transition-colors ${
+                              user.hidden
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                            title={user.hidden ? 'إظهار في لوحة الشرف' : 'إخفاء من لوحة الشرف'}
+                          >
+                            {user.hidden ? 'إظهار' : 'إخفاء'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {mergeSource === null ? (
+                            <button
+                              onClick={() => setMergeSource(user.id)}
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                              title="اختيار كمصدر للدمج"
+                            >
+                              دمج
+                            </button>
+                          ) : mergeSource === user.id ? (
+                            <button
+                              onClick={() => setMergeSource(null)}
+                              className="px-2 py-1 text-xs bg-slate-200 text-slate-600 rounded-lg"
+                              title="إلغاء الدمج"
+                            >
+                              إلغاء
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (confirm(`دمج نقاط "${leaderboard.find(u => u.id === mergeSource)?.displayName}" في "${user.displayName}"؟\nسيتم حذف المستخدم المكرر.`)) {
+                                  mergeUsers(mergeSource, user.id);
+                                }
+                              }}
+                              disabled={merging}
+                              className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors disabled:opacity-50"
+                              title={`دمج في ${user.displayName}`}
+                            >
+                              {merging ? '...' : '← دمج هنا'}
+                            </button>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <input
                             type="checkbox"

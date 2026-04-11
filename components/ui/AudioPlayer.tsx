@@ -15,6 +15,7 @@ import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 interface AudioPlayerProps {
   audioUrl?: string;
@@ -32,6 +33,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const isRTL = useIsRTL();
   const globalAudio = useGlobalAudio();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -184,7 +186,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     backgroundColor: 'rgba(6, 79, 47, 0.1)',
     borderRadius: BorderRadius.md,
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 2,
   },
   controls: {

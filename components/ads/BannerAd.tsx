@@ -1,6 +1,7 @@
 // components/ads/BannerAd.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAds } from '@/lib/ads-context';
 import { AdScreenKey } from '@/lib/ads-config';
 import { BANNER_APPEARANCE_DELAY, recordBannerShown } from '@/lib/smart-ad-manager';
@@ -28,6 +29,7 @@ interface BannerAdComponentProps {
 
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey }) => {
   const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
+  const insets = useSafeAreaInsets();
   const [adLoaded, setAdLoaded] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -60,7 +62,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
         <GoogleBannerAd
           unitId={slotUnitId}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
@@ -79,7 +81,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim }]}>
+    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
       <GoogleBannerAd
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}

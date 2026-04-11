@@ -37,7 +37,7 @@ interface IslamicEvent {
 }
 
 const EVENT_TYPES = [
-  { key: 'holiday', label: 'عطلة', color: '#22C55E' },
+  { key: 'holiday', label: 'عطلة', color: '#0d8e62' },
   { key: 'fasting', label: 'صيام', color: '#3B82F6' },
   { key: 'special', label: 'مناسبة خاصة', color: '#8B5CF6' },
   { key: 'observance', label: 'مناسبة', color: '#F59E0B' },
@@ -59,7 +59,7 @@ const EMPTY_EVENT: Omit<IslamicEvent, 'id'> = {
   descriptionAr: '',
   type: 'holiday',
   importance: 'major',
-  color: '#22C55E',
+  color: '#0d8e62',
 };
 
 export default function EventsScreen() {

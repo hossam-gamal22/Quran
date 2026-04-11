@@ -20,6 +20,7 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import { t, getLanguage } from '@/lib/i18n';
 import { TranslatedText } from '@/components/ui/TranslatedText';
@@ -43,7 +44,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 // الألوان
 // ========================================
 
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 const ACCENT_BORDER = 'rgba(6,79,47,0.30)';
 
@@ -580,6 +581,7 @@ interface CategoryTabProps {
 }
 
 function CategoryTab({ category, isActive, onPress, isDarkMode, colors }: CategoryTabProps) {
+  const s = useScaledStyles(_s, colors.fs);
   return (
     <Pressable
       onPress={onPress}
@@ -588,9 +590,7 @@ function CategoryTab({ category, isActive, onPress, isDarkMode, colors }: Catego
         {
           backgroundColor: isActive
             ? ACCENT
-            : isDarkMode
-              ? 'rgba(255,255,255,0.08)'
-              : 'rgba(0,0,0,0.05)',
+            : colors.card,
           borderColor: isActive ? ACCENT : 'transparent',
         },
       ]}
@@ -598,7 +598,7 @@ function CategoryTab({ category, isActive, onPress, isDarkMode, colors }: Catego
       <MaterialCommunityIcons
         name={category.icon}
         size={16}
-        color={isActive ? '#fff' : colors.textLight}
+        color={isActive ? '#fff' : colors.icon}
       />
       <Text
         style={[
@@ -626,11 +626,13 @@ function getCompanionName(companion: Companion): string {
 
 function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCardProps) {
   const isRTL = useIsRTL();
+  const s = useScaledStyles(_s, colors.fs);
   return (
     <Pressable onPress={onPress} style={s.cardOuter}>
       <BlurView
-        intensity={Platform.OS === 'ios' ? 40 : 15}
-        tint={isDarkMode ? 'dark' : 'light'}
+       
+        intensity={Platform.OS === 'ios' ? 25 : 10}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={StyleSheet.absoluteFill}
       />
       <View
@@ -641,17 +643,17 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
               ? 'rgba(255,255,255,0.06)'
               : 'rgba(255,255,255,0.70)',
             borderColor: isDarkMode
-              ? 'rgba(255,255,255,0.10)'
-              : 'rgba(0,0,0,0.06)',
+              ? 'rgba(255,255,255,0.60)'
+              : 'rgba(0,0,0,0.10)',
           },
         ]}
       />
       <View style={[s.cardContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[s.cardAvatar, { backgroundColor: ACCENT_LIGHT }]}>
-          <MaterialCommunityIcons name="account" size={24} color="#fff" />
+          <MaterialCommunityIcons name="account" size={24} color={colors.text} />
         </View>
         <View style={s.cardTextWrap}>
-          <Text style={[s.cardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+          <Text style={[s.cardName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
             {getCompanionName(companion)}
           </Text>
           {getLanguage() === 'ar' ? (
@@ -663,7 +665,7 @@ function CompanionCard({ companion, onPress, isDarkMode, colors }: CompanionCard
               {companion.briefEn}
             </Text>
           ) : (
-            <TranslatedText from="en" type="section" style={[s.cardBrief, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+            <TranslatedText from="en" type="section" style={[s.cardBrief, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
               {companion.briefEn}
             </TranslatedText>
           )}
@@ -687,6 +689,7 @@ interface StoryDetailProps {
 function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMode, colors }: StoryDetailProps) {
   const isRTL = useIsRTL();
   const { t } = useTranslation();
+  const s = useScaledStyles(_s, colors.fs);
   return (
     <View style={s.detailContainer}>
       {/* Detail header */}
@@ -733,8 +736,9 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         {/* Name hero */}
         <View style={s.detailHeroOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 15}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -749,7 +753,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
           />
           <View style={s.detailHeroContent}>
             <View style={[s.detailAvatarLarge, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="account" size={36} color="#fff" />
+              <MaterialCommunityIcons name="account" size={36} color={colors.text} />
             </View>
             <Text style={[s.detailName, { color: colors.text }]}>
               {getCompanionName(companion)}
@@ -777,16 +781,17 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="book-open-variant" size={18} color="#fff" />
+              <MaterialCommunityIcons name="book-open-variant" size={18} color={colors.text} />
             </View>
-            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('companions.story')}
             </Text>
           </View>
           <View style={s.detailGlassOuter}>
             <BlurView
-              intensity={Platform.OS === 'ios' ? 40 : 15}
-              tint={isDarkMode ? 'dark' : 'light'}
+             
+              intensity={Platform.OS === 'ios' ? 25 : 10}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
             />
             <View
@@ -795,10 +800,10 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 {
                   backgroundColor: isDarkMode
                     ? 'rgba(6,79,47,0.08)'
-                    : 'rgba(6,79,47,0.04)',
+                    : 'rgba(6,79,47,0.08)',
                   borderColor: isDarkMode
                     ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.04)',
+                    : 'rgba(0,0,0,0.08)',
                 },
               ]}
             />
@@ -840,16 +845,17 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         <View style={s.detailSectionOuter}>
           <View style={[s.detailSectionHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <View style={[s.sectionIconWrap, { backgroundColor: ACCENT_LIGHT }]}>
-              <MaterialCommunityIcons name="star-four-points" size={18} color="#fff" />
+              <MaterialCommunityIcons name="star-four-points" size={18} color={colors.text} />
             </View>
-            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.detailSectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('companions.virtues')}
             </Text>
           </View>
           <View style={s.detailGlassOuter}>
             <BlurView
-              intensity={Platform.OS === 'ios' ? 40 : 15}
-              tint={isDarkMode ? 'dark' : 'light'}
+             
+              intensity={Platform.OS === 'ios' ? 25 : 10}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
               style={StyleSheet.absoluteFill}
             />
             <View
@@ -858,10 +864,10 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 {
                   backgroundColor: isDarkMode
                     ? 'rgba(6,79,47,0.08)'
-                    : 'rgba(6,79,47,0.04)',
+                    : 'rgba(6,79,47,0.08)',
                   borderColor: isDarkMode
                     ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(0,0,0,0.04)',
+                    : 'rgba(0,0,0,0.08)',
                 },
               ]}
             />
@@ -870,7 +876,7 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
                 const lang = getLanguage();
                 return (
                   <View key={idx} style={[s.virtueRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <MaterialCommunityIcons name="star-four-points" size={14} color="#fff" style={s.virtueIcon} />
+                    <MaterialCommunityIcons name="star-four-points" size={14} color={colors.text} style={s.virtueIcon} />
                     {lang === 'ar' || lang === 'en' ? (
                       <Text style={[s.virtueText, { color: colors.text, textAlign: lang === 'ar' ? 'right' : 'left', writingDirection: lang === 'ar' ? 'rtl' : 'ltr' }]}>
                         {virtue}
@@ -890,8 +896,9 @@ function StoryDetail({ companion, onBack, onShare, onToggleFav, isFav, isDarkMod
         {/* Footer dua */}
         <View style={s.detailFooterOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 15}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -938,6 +945,7 @@ export default function CompanionsScreen() {
   const { t } = useTranslation();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const s = useScaledStyles(_s, colors.fs);
   const [activeCategory, setActiveCategory] = useState<CategoryKey>('ashara');
   const [selectedCompanion, setSelectedCompanion] = useState<Companion | null>(null);
   const [companionFav, setCompanionFav] = useState(false);
@@ -1062,7 +1070,7 @@ export default function CompanionsScreen() {
         rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, style: { backgroundColor: 'rgba(34, 197, 94, 0.15)' } }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('companions.title')}</Text>
+          <Text style={{ fontSize: colors.fs(18), fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('companions.title')}</Text>
           <SectionInfoButton sectionKey="stories" />
         </View>
       </UniversalHeader>
@@ -1070,8 +1078,9 @@ export default function CompanionsScreen() {
       {/* Hero banner */}
       <View style={s.heroOuter}>
         <BlurView
-          intensity={Platform.OS === 'ios' ? 40 : 15}
-          tint={isDarkMode ? 'dark' : 'light'}
+         
+          intensity={Platform.OS === 'ios' ? 25 : 10}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={StyleSheet.absoluteFill}
         />
         <View
@@ -1085,12 +1094,12 @@ export default function CompanionsScreen() {
           ]}
         />
         <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="account-group" size={36} color="#fff" />
+          <MaterialCommunityIcons name="account-group" size={36} color={colors.text} />
           <View style={s.heroTextWrap}>
-            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('companions.heroTitle')}
             </Text>
-            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('companions.heroSubtitle')}
             </Text>
           </View>
@@ -1117,7 +1126,7 @@ export default function CompanionsScreen() {
       >
         {/* Count badge */}
         <View style={[s.countBadge, { backgroundColor: ACCENT_LIGHT, alignSelf: isRTL ? 'flex-end' : 'flex-start' }]}>
-          <Text style={[s.countText, { color: ACCENT }]}>
+          <Text style={[s.countText, { color: colors.text }]}>
             {filteredCompanions.length} {t('companions.companionsCount')}
           </Text>
         </View>
@@ -1135,8 +1144,9 @@ export default function CompanionsScreen() {
         {/* Footer */}
         <View style={s.footerOuter}>
           <BlurView
-            intensity={Platform.OS === 'ios' ? 40 : 15}
-            tint={isDarkMode ? 'dark' : 'light'}
+           
+            intensity={Platform.OS === 'ios' ? 25 : 10}
+            tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
             style={StyleSheet.absoluteFill}
           />
           <View
@@ -1150,7 +1160,7 @@ export default function CompanionsScreen() {
             ]}
           />
           <View style={s.footerContent}>
-            <MaterialCommunityIcons name="star-crescent" size={24} color="#fff" />
+            <MaterialCommunityIcons name="star-crescent" size={24} color={colors.text} />
             <Text style={[s.footerText, { color: colors.text }]}>
               {t('companions.footerDua')}
             </Text>
@@ -1175,7 +1185,7 @@ export default function CompanionsScreen() {
 // الأنماط
 // ========================================
 
-const s = StyleSheet.create({
+const _s = StyleSheet.create({
 
 
   // Hero
@@ -1232,6 +1242,8 @@ const s = StyleSheet.create({
   categoryTabText: {
     fontFamily: fontSemiBold(),
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 
   // List
@@ -1255,9 +1267,9 @@ const s = StyleSheet.create({
   countText: {
     fontFamily: fontSemiBold(),
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
-
-  // Companion card
   cardOuter: {
     borderRadius: 18,
     overflow: 'hidden',
@@ -1318,6 +1330,8 @@ const s = StyleSheet.create({
     fontSize: 18,
     flex: 1,
     textAlign: 'center',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   detailShareBtn: {
     width: 38,
@@ -1367,6 +1381,8 @@ const s = StyleSheet.create({
     fontFamily: fontRegular(),
     fontSize: 14,
     textAlign: 'center',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   detailBrief: {
     fontFamily: fontRegular(),

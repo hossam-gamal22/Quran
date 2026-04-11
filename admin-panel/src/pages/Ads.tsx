@@ -353,7 +353,7 @@ export default function Ads() {
                 value={settings.bannerAdId.android}
                 onChange={(e) => updateAdId('bannerAdId', 'android', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -364,7 +364,7 @@ export default function Ads() {
                 value={settings.bannerAdId.ios}
                 onChange={(e) => updateAdId('bannerAdId', 'ios', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -386,7 +386,7 @@ export default function Ads() {
                 value={settings.interstitialAdId.android}
                 onChange={(e) => updateAdId('interstitialAdId', 'android', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -397,7 +397,7 @@ export default function Ads() {
                 value={settings.interstitialAdId.ios}
                 onChange={(e) => updateAdId('interstitialAdId', 'ios', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -419,7 +419,7 @@ export default function Ads() {
                 value={settings.appOpenAdId.android}
                 onChange={(e) => updateAdId('appOpenAdId', 'android', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -430,7 +430,7 @@ export default function Ads() {
                 value={settings.appOpenAdId.ios}
                 onChange={(e) => updateAdId('appOpenAdId', 'ios', e.target.value)}
                 placeholder="ca-app-pub-xxxxxxxx/xxxxxxxxxx"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                 dir="ltr"
               />
             </div>
@@ -490,21 +490,21 @@ export default function Ads() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
               onClick={() => setSettings({ ...settings, interstitialMode: 'pages' })}
-              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'pages' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'pages' ? 'border-accent bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
             >
               <div className="font-medium text-gray-800 mb-1">كل عدد صفحات</div>
               <div className="text-sm text-gray-500">إظهار إعلان بعد عدد معين من الصفحات</div>
             </button>
             <button
               onClick={() => setSettings({ ...settings, interstitialMode: 'time' })}
-              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'time' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'time' ? 'border-accent bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
             >
               <div className="font-medium text-gray-800 mb-1">كل فترة زمنية</div>
               <div className="text-sm text-gray-500">إظهار إعلان كل عدد دقائق</div>
             </button>
             <button
               onClick={() => setSettings({ ...settings, interstitialMode: 'session' })}
-              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'session' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+              className={`p-4 rounded-xl border-2 transition-all text-right ${settings.interstitialMode === 'session' ? 'border-accent bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}
             >
               <div className="font-medium text-gray-800 mb-1">لكل جلسة</div>
               <div className="text-sm text-gray-500">عدد محدد من الإعلانات لكل فتح للتطبيق</div>
@@ -523,7 +523,7 @@ export default function Ads() {
                 min="1"
                 max="50"
                 aria-label="عدد الصفحات بين الإعلانات"
-                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
               />
               <span className="text-gray-600">صفحة</span>
             </div>
@@ -542,7 +542,7 @@ export default function Ads() {
                 min="1"
                 max="60"
                 aria-label="الفاصل الزمني بالدقائق"
-                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
               />
               <span className="text-gray-600">دقيقة</span>
             </div>
@@ -561,7 +561,7 @@ export default function Ads() {
                 min="1"
                 max="20"
                 aria-label="الحد الأقصى للإعلانات لكل جلسة"
-                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
               />
               <span className="text-gray-600">إعلان لكل فتح للتطبيق</span>
             </div>
@@ -578,7 +578,7 @@ export default function Ads() {
             </div>
             <button
               onClick={() => setSettings({ ...settings, delayFirstAd: !settings.delayFirstAd })}
-              className={`px-4 py-2 rounded-lg font-medium ${settings.delayFirstAd ? 'bg-emerald-500 text-white' : 'bg-gray-300 text-gray-700'}`}
+              className={`px-4 py-2 rounded-lg font-medium ${settings.delayFirstAd ? 'bg-accent text-white' : 'bg-gray-300 text-gray-700'}`}
             >
               {settings.delayFirstAd ? 'مفعّل' : 'معطّل'}
             </button>
@@ -593,7 +593,7 @@ export default function Ads() {
                 min="5"
                 max="300"
                 aria-label="تأخير أول إعلان بالثواني"
-                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
               />
               <span className="text-gray-600">ثانية</span>
             </div>
@@ -610,7 +610,7 @@ export default function Ads() {
           </div>
           <button
             onClick={() => setShowAddSlot(!showAddSlot)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white hover:bg-accent-dark transition-colors text-sm font-medium"
           >
             <Plus size={16} />
             إضافة موضع
@@ -630,7 +630,7 @@ export default function Ads() {
                   onChange={(e) => setNewSlotKey(e.target.value)}
                   placeholder="ad_page_name"
                   aria-label="معرّف الموضع الإعلاني"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm font-mono"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm font-mono"
                   dir="ltr"
                 />
               </div>
@@ -642,7 +642,7 @@ export default function Ads() {
                   onChange={(e) => setNewSlotLabel(e.target.value)}
                   placeholder="بانر الصفحة"
                   aria-label="اسم الموضع الإعلاني"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm"
                 />
               </div>
               <div>
@@ -650,7 +650,7 @@ export default function Ads() {
                 <select
                   value={newSlotType}
                   onChange={(e) => setNewSlotType(e.target.value as 'banner' | 'interstitial')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm"
                   aria-label="نوع الإعلان"
                   title="نوع الإعلان"
                 >
@@ -663,7 +663,7 @@ export default function Ads() {
                 <select
                   value={newSlotPosition}
                   onChange={(e) => setNewSlotPosition(e.target.value as 'top' | 'bottom')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-sm"
                   aria-label="موقع الإعلان"
                   title="موقع الإعلان"
                 >
@@ -679,7 +679,7 @@ export default function Ads() {
                   <button
                     key={sKey}
                     onClick={() => setNewSlotScreens(prev => prev.includes(sKey) ? prev.filter(s => s !== sKey) : [...prev, sKey])}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${newSlotScreens.includes(sKey) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${newSlotScreens.includes(sKey) ? 'bg-accent text-white border-accent' : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'}`}
                   >
                     {sLabel}
                   </button>
@@ -690,7 +690,7 @@ export default function Ads() {
               <button
                 onClick={addCustomSlot}
                 disabled={!newSlotKey.trim() || !newSlotLabel.trim()}
-                className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
+                className="px-5 py-2 bg-accent-dark text-white rounded-lg hover:bg-accent-dark disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-medium"
               >
                 إضافة
               </button>
@@ -759,7 +759,7 @@ export default function Ads() {
                         onChange={(e) => updateSlot(key, 'adUnitId.android', e.target.value)}
                         placeholder="ca-app-pub-xxx/yyy"
                         aria-label="Android Ad Unit ID"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-mono"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-xs font-mono"
                         dir="ltr"
                       />
                     </div>
@@ -771,7 +771,7 @@ export default function Ads() {
                         onChange={(e) => updateSlot(key, 'adUnitId.ios', e.target.value)}
                         placeholder="ca-app-pub-xxx/yyy"
                         aria-label="iOS Ad Unit ID"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-xs font-mono"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none text-xs font-mono"
                         dir="ltr"
                       />
                     </div>
@@ -780,7 +780,7 @@ export default function Ads() {
                       <select
                         value={slot.type}
                         onChange={(e) => updateSlot(key, 'type', e.target.value)}
-                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-accent outline-none"
                         aria-label="نوع الإعلان"
                         title="نوع الإعلان"
                       >
@@ -791,7 +791,7 @@ export default function Ads() {
                       <select
                         value={slot.position || 'bottom'}
                         onChange={(e) => updateSlot(key, 'position', e.target.value)}
-                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                        className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-accent outline-none"
                         aria-label="موقع الإعلان"
                         title="موقع الإعلان"
                       >
@@ -807,7 +807,7 @@ export default function Ads() {
                             onChange={(e) => updateSlot(key, 'label', e.target.value)}
                             placeholder="اسم الموضع"
                             aria-label="اسم الموضع"
-                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 outline-none"
+                            className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-accent outline-none"
                             title="اسم الموضع"
                           />
                         </>
@@ -821,7 +821,7 @@ export default function Ads() {
                           <button
                             key={sKey}
                             onClick={() => toggleSlotScreen(key, sKey)}
-                            className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${(slot.screens || []).includes(sKey) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-400'}`}
+                            className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${(slot.screens || []).includes(sKey) ? 'bg-accent text-white border-accent' : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-400'}`}
                           >
                             {sLabel}
                           </button>
@@ -861,7 +861,7 @@ export default function Ads() {
       <button
         onClick={handleSave}
         disabled={saving}
-        className={`w-full py-4 rounded-xl font-medium text-lg transition-colors ${saving ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+        className={`w-full py-4 rounded-xl font-medium text-lg transition-colors ${saving ? 'bg-gray-400 text-gray-200 cursor-not-allowed' : 'bg-accent-dark text-white hover:bg-accent-dark'}`}
       >
         {saving ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
       </button>

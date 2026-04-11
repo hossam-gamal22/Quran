@@ -50,7 +50,7 @@ export interface HighlightItemConfig {
   icon: string;
   color: string;
   route: string;
-  routeType: 'internal' | 'url' | 'html';
+  routeType?: 'internal' | 'url' | 'html';
   imageUrl?: string;
   htmlContent?: string;
   order: number;
@@ -91,6 +91,16 @@ export interface UICustomizationConfig {
   };
 }
 
+export interface ShareModalConfig {
+  enabled: boolean;
+  titleAr: string;
+  descriptionAr: string;
+  shareMessageAr: string;
+  shareUrlFallback: string;
+  shareUrlIos?: string;
+  shareUrlAndroid?: string;
+}
+
 export interface RemoteAppConfig {
   name: string;
   nameEn: string;
@@ -108,6 +118,7 @@ export interface RemoteAppConfig {
     android: string;
     ios: string;
   };
+  latestVersion?: string;
   storeUrlIos?: string;
   storeUrlAndroid?: string;
   features: {
@@ -119,10 +130,12 @@ export interface RemoteAppConfig {
     names: boolean;
     ruqyah: boolean;
     hijri: boolean;
+    showNotificationTroubleshooter?: boolean;
   };
   welcomeBanner?: WelcomeBannerConfig;
   highlights?: HighlightItemConfig[];
   uiCustomization?: UICustomizationConfig;
+  shareModal?: ShareModalConfig;
 }
 
 const DEFAULT_UI_CUSTOMIZATION: UICustomizationConfig = {
@@ -207,8 +220,18 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
     names: true,
     ruqyah: true,
     hijri: true,
+    showNotificationTroubleshooter: false,
   },
   uiCustomization: DEFAULT_UI_CUSTOMIZATION,
+  shareModal: {
+    enabled: true,
+    titleAr: 'انشر الخير مع روح المسلم',
+    descriptionAr: 'كل من شارك هذا التطبيق كان له مثل أجر من انتفع به — اجعله صدقة جارية تعود عليك وعلى من تحب',
+    shareMessageAr: 'حمّل تطبيق روح المسلم — صلوات، أذكار، قرآن وأوقات الصلاة',
+    shareUrlFallback: 'https://roohmuslim.app',
+    shareUrlIos: '',
+    shareUrlAndroid: '',
+  },
 };
 
 // جلب الإعدادات من Firebase
@@ -806,14 +829,24 @@ export const subscribeToHomePageConfig = (
 
 // ==================== الصفحات المؤقتة ====================
 
+export interface TempPageBlock {
+  id: string;
+  icon: string;
+  text: string;
+  translations?: Record<string, string>;
+}
+
 export interface TempPage {
   id: string;
   title: string;
   titleEn?: string;
+  titles?: Record<string, string>;
   icon: string;
   color: string;
+  contentMode?: 'html' | 'blocks';
   htmlContent: string;
   htmlContentEn?: string;
+  blocks?: TempPageBlock[];
   startDate: string;
   endDate: string;
   isPermanent?: boolean;

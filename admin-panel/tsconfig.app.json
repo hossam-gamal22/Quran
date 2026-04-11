@@ -17,8 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@app-lib/*": ["../lib/*"]
+      "@app-lib/*": ["../lib/*"],
+      "@app-data/*": ["../data/*"]
     }
   },
-  "include": ["src", "../lib/unifiedTranslator.ts"]
+  "include": ["src", "../lib/unifiedTranslator.ts", "../data/daily-ayahs.ts", "../data/daily-hadiths.ts", "../data/daily-duas.ts", "../data/quotes.ts"]
 }

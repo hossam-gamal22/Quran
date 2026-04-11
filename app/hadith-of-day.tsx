@@ -20,20 +20,22 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { BrandedCapture, type BrandedCaptureHandle } from '@/components/ui/BrandedCapture';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { getHadithOfTheDay, getRandomHadith, type DailyHadith, getNarratorDisplay, getSourceDisplay } from '@/data/daily-hadiths';
 import { getDailyHadithOverride } from '@/lib/daily-content-override';
 import { useFavorite } from '@/hooks/use-favorite';
 import { getFavorites } from '@/lib/favorites-manager';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
-const ACCENT = '#6366F1'; // Indigo accent for hadith page
+const ACCENT = '#FFFFFF';
 
 export default function HadithOfDayScreen() {
   const router = useRouter();
@@ -41,16 +43,20 @@ export default function HadithOfDayScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const params = useLocalSearchParams<{ favId?: string }>();
   const [hadith, setHadith] = useState<DailyHadith>(() => getHadithOfTheDay());
+  const [adminTranslations, setAdminTranslations] = useState<Record<string, string> | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number | undefined>(undefined);
   const language = getLanguage();
   const isArabic = language === 'ar';
   const isEnglish = language === 'en';
   const translatedHadith = useAutoTranslate(hadith.translation || hadith.arabic, isArabic ? 'ar' : 'en', 'hadith');
+  // Prefer admin-provided translation for user's language, then fall back to existing logic
+  const resolvedTranslation = (!isArabic && adminTranslations?.[language]) || null;
   const [showTranslation, setShowTranslation] = useState(!isArabic);
-  const brandedRef = useRef<BrandedCaptureHandle>(null);
+  const brandedRef = useRef<IslamicShareCardHandle>(null);
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `hadith_${hadith.narrator}_${hadith.source}`,
@@ -86,6 +92,7 @@ export default function HadithOfDayScreen() {
       getDailyHadithOverride().then(({ data }) => {
         if (data) {
           setHadith({ arabic: data.arabic, translation: data.translation, narrator: data.narrator, source: data.source });
+          if ((data as any).translations) setAdminTranslations((data as any).translations);
         }
       });
     }
@@ -152,7 +159,7 @@ export default function HadithOfDayScreen() {
           ]}
         >
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 20, color: colors.text, fontFamily: fontBold() }} numberOfLines={1}>
+            <Text style={{ fontSize: colors.fs(20), color: colors.text, fontFamily: fontBold() }} numberOfLines={1}>
               {t('home.hadithOfDay')}
             </Text>
             <SectionInfoButton sectionKey="duas_hadith" />
@@ -171,40 +178,30 @@ export default function HadithOfDayScreen() {
             </View>
           </View>
 
-          {/* Branded image capture */}
-          <BrandedCapture ref={brandedRef} title={t('home.hadithOfDay')}>
-            <View style={styles.hadithCardInner}>
-              {isArabic ? (
-                <Text style={[styles.arabicText, { color: colors.text }]}>
-                  {hadith.arabic}
-                </Text>
-              ) : (
-                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                  {isEnglish ? (hadith.translation || hadith.arabic) : translatedHadith}
-                </Text>
-              )}
-              <Text style={[styles.referenceCaptureText, { color: ACCENT }]}>
-                📜 {getNarratorDisplay(hadith.narrator, isArabic)} — {getSourceDisplay(hadith.source, isArabic)}
-              </Text>
-            </View>
-          </BrandedCapture>
+          {/* Premium Islamic share card */}
+          <IslamicShareCard
+            ref={brandedRef}
+            categoryLabel={t('home.hadithOfDay')}
+            arabicText={hadith.arabic}
+            sourceText={`${getNarratorDisplay(hadith.narrator, true)} — ${getSourceDisplay(hadith.source, true)}`}
+          />
 
           {/* Hadith card */}
-          <GlassCard intensity={46} style={styles.hadithCard}>
+          <GlassCard intensity={80} style={styles.hadithCard}>
             {isArabic ? (
               <Text style={[styles.arabicText, { color: colors.text }]}>
                 {hadith.arabic}
               </Text>
             ) : (
               <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {isEnglish ? (hadith.translation || hadith.arabic) : translatedHadith}
+                {resolvedTranslation || (isEnglish ? (hadith.translation || hadith.arabic) : translatedHadith)}
               </Text>
             )}
           </GlassCard>
 
           {/* Translation — only shown for Arabic users who want to see English */}
           {isArabic && showTranslation && hadith.translation && (
-            <GlassCard intensity={46} style={styles.translationCard}>
+            <GlassCard intensity={80} style={styles.translationCard}>
               <Text style={[styles.translationLabel, { color: ACCENT }]}>{t('azkar.translation')}</Text>
               <Text style={[styles.translationText, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
                 {hadith.translation}
@@ -243,12 +240,13 @@ export default function HadithOfDayScreen() {
           {/* Bottom Padding */}
           <View style={{ height: 20 }} />
         </ScrollView>
+        <BannerAdComponent screen="hadith" />
       </BackgroundWrapper>
     </>
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -293,6 +291,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   translationText: {
     fontSize: 15,
@@ -311,6 +311,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontMedium(),
     textAlign: 'center',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   refreshButton: {
     flexDirection: 'row',
@@ -325,6 +327,8 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 15,
     fontWeight: '600',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
 
   actionRow: {
@@ -346,6 +350,8 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 13,
     fontWeight: '500',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   hadithCardInner: {
     padding: 24,
@@ -362,5 +368,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 16,
     textAlign: 'center',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

@@ -8,8 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -58,6 +59,7 @@ export default function TranslationsScreen() {
   const isRTL = useIsRTL();
   const { settings, isDarkMode, updateDisplay } = useSettings();
   const themeColors = useColors();
+  const styles = useScaledStyles(_styles, themeColors.fs);
 
   const selectedEdition = settings.display.showTranslation
     ? settings.display.translationEdition || 'none'
@@ -66,7 +68,7 @@ export default function TranslationsScreen() {
   const colors = {
     foreground: themeColors.foreground,
     muted: themeColors.muted,
-    accent: isDarkMode ? '#4ADE80' : '#22C55E',
+    accent: isDarkMode ? '#3da87e' : '#0d8e62',
     divider: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
   };
 
@@ -92,10 +94,10 @@ export default function TranslationsScreen() {
     <BackgroundWrapper
       backgroundKey={settings.display.appBackground}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
         {/* Header */}
         <UniversalHeader title={t('settings.quranTranslations')} />
@@ -114,7 +116,7 @@ export default function TranslationsScreen() {
               <MaterialCommunityIcons name="translate-off" size={28} color={colors.muted} />
             </View>
             <View style={styles.editionInfo}>
-              <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>{t('settings.noTranslationOption')}</Text>
+              <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.noTranslationOption')}</Text>
             </View>
             {selectedEdition === 'none' && (
               <MaterialCommunityIcons name="check" size={22} color={colors.accent} />
@@ -134,10 +136,10 @@ export default function TranslationsScreen() {
                     <Text style={styles.flagEmoji}>{LANGUAGE_FLAGS[lang] || ''}</Text>
                   </View>
                   <View style={styles.editionInfo}>
-                    <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text style={[styles.editionLang, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                       {LANGUAGE_NAMES[lang]?.[isRTL ? 'ar' : 'en'] || lang}
                     </Text>
-                    <Text style={[styles.editionName, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+                    <Text style={[styles.editionName, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                       {ed.name}
                     </Text>
                   </View>
@@ -156,7 +158,7 @@ export default function TranslationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   containerDark: { backgroundColor: 'transparent' },
   scrollContent: {

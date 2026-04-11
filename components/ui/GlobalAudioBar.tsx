@@ -12,9 +12,12 @@ import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useQuran } from '@/contexts/QuranContext';
 import { t } from '@/lib/i18n';
+import { getSurahName } from '@/lib/quran-api';
 import { FONT_SIZES, BorderRadius, Spacing } from '@/constants/theme';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 function formatTime(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
@@ -24,16 +27,21 @@ function formatTime(ms: number): string {
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const ACCENT = '#22C55E';
+const ACCENT = '#0d8e62';
 
 export function GlobalAudioBar() {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { state, togglePlayPause, stop, seekTo, next, previous, playbackSpeed, setPlaybackSpeed } = useGlobalAudio();
-  const { playbackState, togglePlayPause: quranToggle, stopPlayback: quranStop, playNext: quranNext, playPrevious: quranPrev, seekTo: quranSeek, surahs } = useQuran();
+  const { playbackState, togglePlayPause: quranToggle, stopPlayback: quranStop, playNext: quranNext, playPrevious: quranPrev, seekTo: quranSeek } = useQuran();
   const router = useRouter();
   const pathname = usePathname();
   const [minimized, setMinimized] = useState(false);
+
+  const textColor = colors.text;
+  const textSecondary = colors.textLight;
 
   const cycleSpeed = useCallback(() => {
     const idx = SPEEDS.indexOf(playbackSpeed);
@@ -63,7 +71,7 @@ export function GlobalAudioBar() {
   if (isRadio && pathname === '/radio') return null;
 
   // Resolve display properties based on source
-  const surahName = isQuran ? (surahs.find(s => s.number === playbackState.currentSurah)?.name || '') : '';
+  const surahName = isQuran ? getSurahName(playbackState.currentSurah) : '';
   const displayTitle = isQuran ? `${surahName} - ${t('quran.ayah')} ${playbackState.currentAyah}` : isRadio ? state.trackTitle : state.trackTitle;
   const displayIcon: 'book-open-variant' | 'headphones' | 'radio' = isQuran ? 'book-open-variant' : isRadio ? 'radio' : 'headphones';
   const isPlaying = isQuran ? playbackState.isPlaying : state.isPlaying;
@@ -100,7 +108,22 @@ export function GlobalAudioBar() {
   };
 
   const navigateToSurah = () => {
-    if (isQuran && playbackState.currentSurah > 0 && !pathname.startsWith('/surah/')) {
+    if (isQuran && playbackState.currentSurah > 0) {
+      // Don't navigate if already in Mushaf page
+      if (pathname.startsWith('/surah/')) return;
+      
+      // Don't navigate if already in surah-reading page for same surah
+      if (pathname.startsWith('/surah-reading/')) return;
+      
+      // Don't navigate if already in dedicated surah reading page for same surah
+      const dedicatedPages: Record<string, number> = {
+        '/surah-kahf': 18,
+        '/surah-yasin': 36,
+        '/surah-mulk': 67,
+      };
+      const currentPageSurah = dedicatedPages[pathname];
+      if (currentPageSurah && currentPageSurah === playbackState.currentSurah) return;
+      
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push(`/surah/${playbackState.currentSurah}`);
     }
@@ -118,9 +141,6 @@ export function GlobalAudioBar() {
     }
   };
 
-  const textColor = isDarkMode ? '#fff' : '#1C1C1E';
-  const textSecondary = isDarkMode ? '#A8A8AD' : '#3A3A3C';
-
   if (minimized) {
     return (
       <Pressable
@@ -129,22 +149,23 @@ export function GlobalAudioBar() {
         style={[styles.container, styles.globalPosition]}
       >
         <BlurView
-          intensity={Platform.OS === 'ios' ? 90 : 50}
-          tint={isDarkMode ? 'dark' : 'light'}
+         
+          intensity={Platform.OS === 'ios' ? 35 : 20}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={styles.blur}
         >
           <View
             style={[
               styles.miniPill,
               {
-                backgroundColor: isDarkMode ? 'rgba(28,28,30,0.55)' : 'rgba(255,255,255,0.6)',
-                borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
                 flexDirection: isRTL ? 'row-reverse' : 'row',
               },
             ]}
           >
             <Pressable onPress={() => handlePress(handleStop)} hitSlop={8} style={styles.closeCircle}>
-              <MaterialCommunityIcons name="close" size={14} color="#fff" />
+              <MaterialCommunityIcons name="close" size={14} color={textColor} />
             </Pressable>
 
             <Pressable
@@ -181,23 +202,24 @@ export function GlobalAudioBar() {
   return (
     <Pressable onPress={navigateToSource} style={[styles.container, styles.globalPosition]}>
       <BlurView
-        intensity={Platform.OS === 'ios' ? 90 : 50}
-        tint={isDarkMode ? 'dark' : 'light'}
+       
+        intensity={Platform.OS === 'ios' ? 35 : 20}
+        tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
         style={styles.blur}
       >
         <View
           style={[
             styles.expanded,
             {
-              backgroundColor: isDarkMode ? 'rgba(28,28,30,0.55)' : 'rgba(255,255,255,0.6)',
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+              backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
             },
           ]}
         >
           {/* Header row */}
           <View style={[styles.headerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <Pressable onPress={() => handlePress(handleStop)} hitSlop={8} style={styles.closeCircle}>
-              <MaterialCommunityIcons name="close" size={14} color="#fff" />
+              <MaterialCommunityIcons name="close" size={14} color={textColor} />
             </Pressable>
             <View style={[styles.titleContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <MaterialCommunityIcons name={displayIcon} size={16} color={ACCENT} />
@@ -239,7 +261,7 @@ export function GlobalAudioBar() {
                 value={currentPosition}
                 onSlidingComplete={(v) => handleSeek(v)}
                 minimumTrackTintColor={ACCENT}
-                maximumTrackTintColor={isDarkMode ? '#3A3A3C' : '#D1D1D6'}
+                maximumTrackTintColor={colors.border}
                 thumbTintColor={ACCENT}
               />
               <Text style={[styles.time, { color: textSecondary }]}>{formatTime(currentDuration)}</Text>
@@ -291,7 +313,7 @@ export function GlobalAudioBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     overflow: 'hidden',
     borderRadius: BorderRadius.lg,

@@ -2,27 +2,32 @@
 // Shared constants and types for Android widgets
 
 export const COLORS = {
-  // Primary backgrounds (deep teal/navy gradients)
-  bg: '#081827',
-  bgAlt: '#0c2235',
-  bgCard: '#0f2a3e',
+  // Primary backgrounds — fully opaque, no wallpaper bleed
+  bg: '#0a1929',
+  bgLight: '#0f2137',
+  bgCard: '#132d46',
+  bgCardLight: '#183552',
   // Accent colors
-  teal: '#22C55E',
-  tealLight: '#14b899',
-  green: '#22c55e',
-  greenDark: '#16a34a',
-  gold: '#d4a853',
-  goldLight: '#f0d48a',
+  teal: '#0d9668',
+  tealLight: '#14c78a',
+  tealDark: '#0a7a54',
+  green: '#10b981',
+  gold: '#f0c654',
+  goldDark: '#d4a853',
   // Text
   white: '#ffffff',
-  whiteAlt: '#f0f4f8',
-  gray: '#9ca3af',
-  grayLight: '#d1d5db',
-  grayDark: '#4b5563',
+  whiteAlt: '#eef2f7',
+  whiteMuted: '#c8d6e5',
+  gray: '#8899a6',
+  grayLight: '#b8c7d6',
+  grayDark: '#4a5e6f',
   // Decorative
-  divider: '#1a3a50',
-  overlay: '#0e2030',
-  brandBg: '#0a1e30',
+  divider: '#1e3a52',
+  // Solid card backgrounds (inner elements)
+  cardBg: '#14304a',
+  cardBgAlt: '#1a3a56',
+  badgeBg: '#0d3d2e',
+  badgeBgAlt: '#1a2744',
 } as const;
 
 type HexColor = `#${string}`;
@@ -32,13 +37,13 @@ type GradientDef = {
   orientation: 'TOP_BOTTOM' | 'TR_BL' | 'RIGHT_LEFT' | 'BR_TL' | 'BOTTOM_TOP' | 'BL_TR' | 'LEFT_RIGHT' | 'TL_BR';
 };
 
-// Gradient presets for different widget types
+// Fully opaque gradients — solid backgrounds, no wallpaper bleed-through
 export const GRADIENTS: Record<string, GradientDef> = {
-  prayer: { from: '#081827', to: '#0c2e3a', orientation: 'TOP_BOTTOM' },
-  verse: { from: '#0f1a2e', to: '#081827', orientation: 'TOP_BOTTOM' },
-  dhikr: { from: '#081a20', to: '#0a1e30', orientation: 'TOP_BOTTOM' },
-  azkar: { from: '#0a1628', to: '#081827', orientation: 'TOP_BOTTOM' },
-  hijri: { from: '#1a1a0a', to: '#0f1a2e', orientation: 'TOP_BOTTOM' },
+  prayer: { from: '#0c2440', to: '#081620', orientation: 'TOP_BOTTOM' },
+  verse: { from: '#0e1f38', to: '#091428', orientation: 'TOP_BOTTOM' },
+  dhikr: { from: '#0a2030', to: '#071520', orientation: 'TOP_BOTTOM' },
+  azkar: { from: '#0c1e36', to: '#081422', orientation: 'TOP_BOTTOM' },
+  hijri: { from: '#0f2238', to: '#091828', orientation: 'TOP_BOTTOM' },
 };
 
 export const FONT = {
@@ -48,6 +53,15 @@ export const FONT = {
 
 export const BRANDING = {
   name: 'رُوح المسلم',
-  fontSize: 9,
+  fontSize: 10,
   color: COLORS.teal,
+} as const;
+
+// App icon for widget display
+export const APP_ICON = require('@/assets/images/icons/icon.png');
+
+// Icon sizes in dp
+export const ICON_SIZE = {
+  small: 28,
+  header: 22,
 } as const;

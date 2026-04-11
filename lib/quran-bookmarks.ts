@@ -17,19 +17,19 @@ export interface ColoredBookmark {
 export const BOOKMARK_COLORS: Record<BookmarkColor, string> = {
   yellow: '#F5C518',
   red: '#FF6B6B',
-  green: '#4CAF50',
+  green: '#0d8e62',
 };
 
 export const BOOKMARK_BG_COLORS: Record<BookmarkColor, string> = {
   yellow: 'rgba(245, 197, 24, 0.22)',
   red: 'rgba(255, 107, 107, 0.22)',
-  green: 'rgba(76, 175, 80, 0.22)',
+  green: 'rgba(13, 142, 98, 0.22)',
 };
 
 export const BOOKMARK_BORDER_COLORS: Record<BookmarkColor, string> = {
   yellow: 'rgba(245, 197, 24, 0.45)',
   red: 'rgba(255, 107, 107, 0.45)',
-  green: 'rgba(76, 175, 80, 0.45)',
+  green: 'rgba(13, 142, 98, 0.45)',
 };
 
 export const BOOKMARK_COLOR_LABELS: Record<BookmarkColor, string> = {

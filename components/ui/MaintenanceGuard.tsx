@@ -8,6 +8,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useSettings } from '@/contexts/SettingsContext';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 
 function isVersionLessThan(current: string, min: string): boolean {
   const c = current.split('.').map(Number);
@@ -22,6 +24,8 @@ function isVersionLessThan(current: string, min: string): boolean {
 export function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const { config } = useAppConfig();
   const { t } = useSettings();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   // Maintenance mode
   if (config.maintenanceMode) {
@@ -59,7 +63,7 @@ export function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

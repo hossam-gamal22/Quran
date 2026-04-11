@@ -29,6 +29,8 @@ import type {
 } from '@/lib/sdui/types';
 import { useSeasonal } from '@/contexts/SeasonalContext';
 import { trackEvent } from '@/lib/analytics';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Types
@@ -136,6 +138,8 @@ export function DynamicScreen({
   const router = useRouter();
   const { isDarkMode } = useSettings();
   const { currentSeason } = useSeasonal();
+  const _themeColors = useColors();
+  const styles = useScaledStyles(_styles, _themeColors.fs);
   
   const [refreshing, setRefreshing] = useState(false);
   const fadeAnim = useState(() => new Animated.Value(0))[0];
@@ -145,7 +149,7 @@ export function DynamicScreen({
     background: isDarkMode ? '#0F0F0F' : '#F7F7F7',
     text: isDarkMode ? '#FFFFFF' : '#1C1C1E',
     textSecondary: isDarkMode ? '#A1A1AA' : '#6B7280',
-    accent: isDarkMode ? '#4ADE80' : '#22C55E',
+    accent: isDarkMode ? '#3da87e' : '#0d8e62',
   }), [isDarkMode]);
 
   // Animate content on load
@@ -316,7 +320,7 @@ export function DynamicScreen({
 // Styles
 // ═══════════════════════════════════════════════════════════════════════════
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },

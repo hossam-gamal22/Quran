@@ -19,7 +19,7 @@ import { db } from '@/config/firebase';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 interface DailyOverride {
-  enabled: boolean;
+  override: boolean;
   arabicText: string;
   translation?: string;
   source?: string;
@@ -27,48 +27,53 @@ interface DailyOverride {
   ayahNumber?: number;
 }
 
-interface DailyContentConfig {
-  ayah: DailyOverride;
-  hadith: DailyOverride;
-  dua: DailyOverride;
-  dhikr: DailyOverride;
-  quote: DailyOverride;
-  updatedAt?: string;
-}
-
-const DEFAULT_CONFIG: DailyContentConfig = {
-  ayah: { enabled: false, arabicText: '' },
-  hadith: { enabled: false, arabicText: '' },
-  dua: { enabled: false, arabicText: '' },
-  dhikr: { enabled: false, arabicText: '' },
-  quote: { enabled: false, arabicText: '' },
-};
+const DEFAULT_SECTION: DailyOverride = { override: false, arabicText: '' };
 
 const CONTENT_SECTIONS = [
-  { key: 'ayah' as const, title: 'آية اليوم', icon: 'book', color: '#22C55E', hasReference: true },
+  { key: 'ayah' as const, title: 'آية اليوم', icon: 'book', color: '#0d8e62', hasReference: true },
   { key: 'hadith' as const, title: 'حديث اليوم', icon: 'document-text', color: '#3B82F6', hasReference: false },
   { key: 'dua' as const, title: 'دعاء اليوم', icon: 'hand-left', color: '#8B5CF6', hasReference: false },
-  { key: 'dhikr' as const, title: 'ذكر اليوم', icon: 'repeat', color: '#F59E0B', hasReference: false },
   { key: 'quote' as const, title: 'حكمة اليوم', icon: 'chatbubble-ellipses', color: '#EC4899', hasReference: false },
 ];
 
+type SectionKey = typeof CONTENT_SECTIONS[number]['key'];
+
 export default function DailyContentScreen() {
   const isRTL = useIsRTL();
-  const [config, setConfig] = useState<DailyContentConfig>(DEFAULT_CONFIG);
+  const [sections, setSections] = useState<Record<SectionKey, DailyOverride>>({
+    ayah: { ...DEFAULT_SECTION },
+    hadith: { ...DEFAULT_SECTION },
+    dua: { ...DEFAULT_SECTION },
+    quote: { ...DEFAULT_SECTION },
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadConfig();
+    loadAll();
   }, []);
 
-  const loadConfig = async () => {
+  const loadAll = async () => {
     try {
       setIsLoading(true);
-      const snap = await getDoc(doc(db, 'appConfig', 'dailyContent'));
-      if (snap.exists()) {
-        setConfig({ ...DEFAULT_CONFIG, ...snap.data() as DailyContentConfig });
+      const loaded: Record<string, DailyOverride> = {};
+      for (const s of CONTENT_SECTIONS) {
+        const snap = await getDoc(doc(db, 'dailyContent', s.key));
+        if (snap.exists()) {
+          const d = snap.data();
+          loaded[s.key] = {
+            override: d.override ?? false,
+            arabicText: d.arabic || d.text || d.arabicText || '',
+            translation: d.translation || '',
+            source: d.source || d.narrator || d.reference || '',
+            surahNumber: d.surah,
+            ayahNumber: d.ayah,
+          };
+        } else {
+          loaded[s.key] = { ...DEFAULT_SECTION };
+        }
       }
+      setSections(prev => ({ ...prev, ...loaded }));
     } catch {
       Alert.alert('خطأ', 'فشل تحميل الإعدادات');
     } finally {
@@ -79,10 +84,35 @@ export default function DailyContentScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await setDoc(doc(db, 'appConfig', 'dailyContent'), {
-        ...config,
-        updatedAt: new Date().toISOString(),
-      });
+      for (const s of CONTENT_SECTIONS) {
+        const sd = sections[s.key];
+        // Build the Firestore document matching the web admin schema
+        const firestoreData: Record<string, unknown> = {
+          override: sd.override,
+          updatedAt: new Date().toISOString(),
+        };
+        if (s.key === 'ayah') {
+          firestoreData.surah = sd.surahNumber || 1;
+          firestoreData.ayah = sd.ayahNumber || 1;
+          firestoreData.text = sd.arabicText;
+          firestoreData.surahName = '';
+        } else if (s.key === 'hadith') {
+          firestoreData.arabic = sd.arabicText;
+          firestoreData.translation = sd.translation || '';
+          firestoreData.narrator = sd.source || '';
+          firestoreData.source = sd.source || '';
+        } else if (s.key === 'dua') {
+          firestoreData.arabic = sd.arabicText;
+          firestoreData.translation = sd.translation || '';
+          firestoreData.reference = sd.source || '';
+        } else if (s.key === 'quote') {
+          firestoreData.arabic = sd.arabicText;
+          firestoreData.translation = sd.translation || '';
+          firestoreData.author = '';
+          firestoreData.source = sd.source || '';
+        }
+        await setDoc(doc(db, 'dailyContent', s.key), firestoreData, { merge: true });
+      }
       Alert.alert('تم', 'تم حفظ إعدادات المحتوى اليومي');
     } catch {
       Alert.alert('خطأ', 'فشل الحفظ');
@@ -91,10 +121,10 @@ export default function DailyContentScreen() {
     }
   };
 
-  const updateSection = (key: keyof DailyContentConfig, field: string, value: any) => {
-    setConfig(prev => ({
+  const updateSection = (key: SectionKey, field: string, value: any) => {
+    setSections(prev => ({
       ...prev,
-      [key]: { ...(prev[key] as DailyOverride), [field]: value },
+      [key]: { ...prev[key], [field]: value },
     }));
   };
 
@@ -116,7 +146,7 @@ export default function DailyContentScreen() {
         </View>
 
         {CONTENT_SECTIONS.map(section => {
-          const sectionData = config[section.key] as DailyOverride;
+          const sectionData = sections[section.key];
           return (
             <View key={section.key} style={styles.section}>
               {/* Section Header */}
@@ -128,13 +158,13 @@ export default function DailyContentScreen() {
                   <Text style={styles.sectionTitle}>{section.title}</Text>
                 </View>
                 <Switch
-                  value={sectionData.enabled}
-                  onValueChange={v => updateSection(section.key, 'enabled', v)}
+                  value={sectionData.override}
+                  onValueChange={v => updateSection(section.key, 'override', v)}
                   trackColor={{ true: section.color }}
                 />
               </View>
 
-              {sectionData.enabled && (
+              {sectionData.override && (
                 <View style={{ marginTop: Spacing.sm }}>
                   <Text style={styles.inputLabel}>النص العربي *</Text>
                   <TextInput

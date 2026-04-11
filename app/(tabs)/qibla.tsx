@@ -24,16 +24,16 @@ import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
-  useSharedValue,
   useAnimatedStyle,
-  withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import { useCompassHeading } from '@/hooks/use-compass-heading';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from '@/lib/qiblaAssets';
 // Removed: interstitial ads on qibla style change to reduce user frustration
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -77,7 +77,7 @@ const COMPASS_SIZE = Math.min(SCREEN_WIDTH * 0.82, 360);
 const POINTER_SIZE = COMPASS_SIZE * 0.72;
 const KAABA_SIZE = 90;
 const THUMBNAIL_SIZE = 62;
-const QIBLA_STYLE_KEY = '@qibla_style';
+const QIBLA_STYLE_KEY = '@qibla_style_v2';
 
 // ---------------------------------------------------------------------------
 // Network connectivity check
@@ -164,27 +164,27 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 // ---------------------------------------------------------------------------
 const QiblaScreen = () => {
   const insets = useSafeAreaInsets();
-  const { settings, t } = useSettings();
+  const { settings, t, isDarkMode } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const [qiblaBearing, setQiblaBearing] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const [guidance, setGuidance] = useState('');
-  const [currentStyleId, setCurrentStyleId] = useState('style1');
+  const [currentStyleId, setCurrentStyleId] = useState('style10');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const isAlignedRef = useRef(false);
+  const styleSwitcherRef = useRef<ScrollView>(null);
 
-
-
-  // Cumulative heading to avoid 360→0 wrap-around jitter
-  const headingCumulative = useSharedValue(0);
-  const targetCumulative = useRef(0); // true target (never read from animated value)
-  const lastHeading = useRef(0);
+  // High-frequency compass heading (Magnetometer + Accelerometer @ 60Hz)
+  const { headingCumulative, accuracy: compassAccuracy } = useCompassHeading();
 
   const activeAssets =
     QIBLA_STYLES[currentStyleId as keyof typeof QIBLA_STYLES] ||
     QIBLA_STYLES.style1;
+  
+  const hasScrolledRef = useRef(false);
 
   // Load saved style
   useEffect(() => {
@@ -195,6 +195,14 @@ const QiblaScreen = () => {
     });
   }, []);
 
+  // Scroll to end when ScrollView layout is ready (RTL behavior - start from right)
+  const handleScrollViewLayout = useCallback(() => {
+    if (!hasScrolledRef.current && styleSwitcherRef.current) {
+      styleSwitcherRef.current.scrollToEnd({ animated: false });
+      hasScrolledRef.current = true;
+    }
+  }, []);
+
   const handleStyleChange = useCallback(async (styleId: string) => {
     if (styleId === currentStyleId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -202,9 +210,8 @@ const QiblaScreen = () => {
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
   }, [currentStyleId]);
 
-  // ------ Location + Heading ------
+  // ------ Location + Qibla Bearing ------
   useEffect(() => {
-    let headingSub: Location.LocationSubscription | null = null;
     let mounted = true;
 
     (async () => {
@@ -253,29 +260,7 @@ const QiblaScreen = () => {
           setQiblaBearing(bearing ?? calculateQiblaBearingLocal(lat, lng));
         }
 
-        // 4. Subscribe to compass heading via expo-location
-        //    This returns magHeading (0-360, degrees from magnetic North)
-        //    This is the SAME data source the built-in iOS/Android compass uses.
-        headingSub = await Location.watchHeadingAsync((headingData) => {
-          if (!mounted) return;
-          const newHeading = headingData.trueHeading >= 0
-            ? headingData.trueHeading  // Use true north if available
-            : headingData.magHeading;  // Fall back to magnetic north
-
-          // --- Cumulative heading to prevent 360→0 jump ---
-          let delta = newHeading - lastHeading.current;
-          if (delta > 180) delta -= 360;
-          if (delta < -180) delta += 360;
-          lastHeading.current = newHeading;
-
-          // Track target separately from animated value to prevent drift
-          targetCumulative.current += delta;
-          headingCumulative.value = withSpring(targetCumulative.current, {
-            damping: 28,
-            stiffness: 170,
-            mass: 1,
-          });
-        });
+        // Heading is now handled by useCompassHeading hook (60Hz Magnetometer+Accelerometer)
       } catch (err) {
         console.warn('Qibla init error:', err);
         if (mounted) setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
@@ -284,7 +269,6 @@ const QiblaScreen = () => {
 
     return () => {
       mounted = false;
-      headingSub?.remove();
     };
   }, [retryKey]);
 
@@ -370,7 +354,7 @@ const QiblaScreen = () => {
     return (
       <BackgroundWrapper {...bgProps}>
       <View style={styles.centeredLoading}>
-        <ActivityIndicator size="large" color="#22C55E" />
+        <ActivityIndicator size="large" color="#0d8e62" />
         <Text style={[styles.loadingText, { color: colors.text }]}>{t('qibla.findingDirection') || 'Finding Qibla Direction...'}</Text>
       </View>
       </BackgroundWrapper>
@@ -413,8 +397,8 @@ const QiblaScreen = () => {
       {/* 1. Guidance text */}
       <View style={styles.guidanceContainer}>
         <BlurView
-          intensity={30}
-          tint="dark"
+          intensity={80}
+          tint={"systemThickMaterialDark" as any}
           style={[styles.guidanceBlur, isAligned && styles.guidanceActive]}
         >
           <Text
@@ -425,14 +409,32 @@ const QiblaScreen = () => {
         </BlurView>
       </View>
 
+      {/* Calibration banner — shown when compass accuracy is low */}
+      {compassAccuracy === 'low' && (
+        <View style={styles.calibrationBanner}>
+          <MaterialCommunityIcons name="compass-off" size={16} color="#FFA726" />
+          <Text style={styles.calibrationText}>
+            {t('qibla.calibrate') || 'حرّك هاتفك بشكل ∞ لمعايرة البوصلة'}
+          </Text>
+        </View>
+      )}
+
       {/* 2. Style Switcher */}
       <View style={styles.styleSwitcherWrap}>
-        <BlurView intensity={40} tint="dark" style={styles.styleSwitcherBlur}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.styleSwitcherScroll, { flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1, justifyContent: 'flex-start' }]}
-          >
+        <BlurView 
+          intensity={isDarkMode ? 20 : 60} 
+          tint={isDarkMode ? 'systemThickMaterialDark' : 'systemChromeMaterialLight'} 
+          style={[styles.styleSwitcherBlur, { backgroundColor: isDarkMode ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.7)' }]}
+        >
+          {/* Thumbnails container with border */}
+          <View style={[styles.thumbnailsContainer, { borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]}>
+            <ScrollView
+              ref={styleSwitcherRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.styleSwitcherScroll}
+              onContentSizeChange={handleScrollViewLayout}
+            >
             {AVAILABLE_STYLES.map((styleId) => {
               const isActive = currentStyleId === styleId;
               const assets =
@@ -482,7 +484,15 @@ const QiblaScreen = () => {
                 </TouchableOpacity>
               );
             })}
-          </ScrollView>
+            </ScrollView>
+          </View>
+          {/* Swipe hint */}
+          <View style={styles.swipeHintContainer}>
+            <MaterialCommunityIcons name="gesture-swipe-horizontal" size={16} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
+            <Text style={[styles.swipeHintText, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }]}>
+              {t('qibla.swipeToChange') || 'اسحب للتبديل بين الأنماط'}
+            </Text>
+          </View>
         </BlurView>
       </View>
 
@@ -559,7 +569,7 @@ const QiblaScreen = () => {
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: 'transparent',
@@ -578,13 +588,13 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
   },
   subtitleText: {
-    color: '#aaa',
+    color: '#A3A3A3',
     fontSize: 16,
     fontFamily: fontRegular(),
     marginTop: 2,
   },
   coordsText: {
-    color: '#777',
+    color: '#8E8E93',
     fontSize: 12,
     fontFamily: fontRegular(),
     marginTop: 2,
@@ -625,7 +635,7 @@ const styles = StyleSheet.create({
   },
   guidanceActive: {
     backgroundColor: 'rgba(6, 79, 47, 0.2)',
-    shadowColor: '#22C55E',
+    shadowColor: '#0d8e62',
     shadowOpacity: 0.7,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
@@ -642,6 +652,24 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
   },
+  calibrationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    marginHorizontal: 24,
+    marginBottom: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 167, 38, 0.15)',
+  },
+  calibrationText: {
+    color: '#FFA726',
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+  },
   styleSwitcherWrap: {
     paddingHorizontal: 12,
     paddingTop: 4,
@@ -650,20 +678,26 @@ const styles = StyleSheet.create({
   styleSwitcherBlur: {
     borderRadius: 18,
     paddingVertical: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
     overflow: 'hidden',
   },
   styleSwitcherScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     gap: 8,
+  },
+  thumbnailsContainer: {
+    borderWidth: 1,
+    borderRadius: 14,
+    marginHorizontal: 4,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   styleThumbnail: {
     width: THUMBNAIL_SIZE,
     height: THUMBNAIL_SIZE,
     borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(200,200,200,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2.5,
@@ -671,8 +705,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   styleThumbnailActive: {
-    borderColor: '#22C55E',
-    backgroundColor: 'rgba(6,79,47,0.15)',
+    borderColor: '#0d8e62',
+    backgroundColor: 'rgba(13,142,98,0.25)',
   },
   activeDot: {
     position: 'absolute',
@@ -681,6 +715,18 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: '#2ECC71',
+  },
+  swipeHintContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  swipeHintText: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
   },
   centeredLoading: {
     flex: 1,
@@ -700,7 +746,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,

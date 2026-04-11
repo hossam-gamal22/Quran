@@ -33,13 +33,15 @@ import {
   ACCENT,
   ACCENT_LIGHT,
   ACCENT_BORDER,
-  s,
+  s as _s,
 } from '@/components/hajj/shared';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 export default function HajjScreen() {
   const router = useRouter();
   const { isDarkMode } = useSettings();
   const colors = useColors();
+  const s = useScaledStyles(_s, colors.fs);
   const isRTL = useIsRTL();
   const [activeTab, setActiveTab] = useState<'rituals' | 'duas'>('rituals');
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -93,7 +95,7 @@ export default function HajjScreen() {
         rightActions={[{ icon: 'file-pdf-box', onPress: handleExportPDF, color: colors.text }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('hajjUmrah.hajjRituals')}</Text>
+          <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text, lineHeight: 30, includeFontPadding: false }} numberOfLines={1}>{t('hajjUmrah.hajj')}</Text>
           <SectionInfoButton sectionKey="hajj_umrah" />
         </View>
       </UniversalHeader>
@@ -101,18 +103,19 @@ export default function HajjScreen() {
       {/* Hero banner */}
       <View style={s.heroOuter}>
         <BlurView
-          intensity={Platform.OS === 'ios' ? 40 : 15}
-          tint={isDarkMode ? 'dark' : 'light'}
+         
+          intensity={Platform.OS === 'ios' ? 25 : 10}
+          tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={StyleSheet.absoluteFill}
         />
         <View style={[s.heroOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.15)' : 'rgba(6,79,47,0.08)' }]} />
         <View style={[s.heroContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <MaterialCommunityIcons name="mosque" size={36} color={ACCENT} />
           <View style={s.heroTextWrap}>
-            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {activeTab === 'rituals' ? t('hajjUmrah.hajjGuide') : t('hajjUmrah.hajjDuas')}
             </Text>
-            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[s.heroSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {activeTab === 'rituals'
                 ? t('hajjUmrah.hajjGuideDesc')
                 : t('hajjUmrah.duasDesc')}
@@ -165,7 +168,7 @@ export default function HajjScreen() {
 
         {/* Footer */}
         <View style={s.footerOuter}>
-          <BlurView intensity={Platform.OS === 'ios' ? 40 : 15} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+          <BlurView intensity={Platform.OS === 'ios' ? 25 : 10} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
           <View style={[s.footerOverlay, { backgroundColor: isDarkMode ? 'rgba(6,79,47,0.12)' : 'rgba(6,79,47,0.06)' }]} />
           <View style={s.footerContent}>
             <MaterialCommunityIcons name="star-crescent" size={24} color={ACCENT} />

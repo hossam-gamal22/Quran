@@ -5,7 +5,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(curl -sL -o /Users/hossamgamal/Desktop/MobileApps/Quran/assets/images/surah-ornament.png https://raw.githubusercontent.com/m4hmoud-atef/Skoon-Flutter-Islamic-App/main/assets/images/888-02.png)",
-      "Bash(curl -sL -o /Users/hossamgamal/Desktop/MobileApps/Quran/assets/images/basmala.png https://raw.githubusercontent.com/m4hmoud-atef/Skoon-Flutter-Islamic-App/main/assets/images/Basmala.png)"
+      "Bash(curl -sL -o /Users/hossamgamal/Desktop/MobileApps/Quran/assets/images/basmala.png https://raw.githubusercontent.com/m4hmoud-atef/Skoon-Flutter-Islamic-App/main/assets/images/Basmala.png)",
+      "Bash(git -C /Users/hossamgamal/Desktop/MobileApps/Quran ls-files --others --ignored --exclude-standard)",
+      "Bash(git -C /Users/hossamgamal/Desktop/MobileApps/Quran ls-files)",
+      "Bash(grep -E \"\\\\.\\(aab|apk\\)$\")",
+      "Bash(git -C /Users/hossamgamal/Desktop/MobileApps/Quran ls-files -- public/)"
     ]
   }
 }

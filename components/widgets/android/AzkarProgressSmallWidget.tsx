@@ -1,15 +1,13 @@
 // components/widgets/android/AzkarProgressSmallWidget.tsx
-// 2×2 widget: Morning/Evening azkar completion
+// 2×2 widget: Morning/Evening azkar completion tracker
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
-  const morningIcon = azkar.morningCompleted ? '✅' : '○';
-  const eveningIcon = azkar.eveningCompleted ? '✅' : '○';
 
   return (
     <FlexWidget
@@ -26,28 +24,35 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://azkar' }}
     >
-      <TextWidget
-        text="🤲 الأذكار"
-        style={{
-          fontSize: 14,
-          color: COLORS.tealLight,
-          fontFamily: FONT.amiriBold,
-        }}
+      <ImageWidget
+        image={APP_ICON}
+        imageWidth={ICON_SIZE.small}
+        imageHeight={ICON_SIZE.small}
+        radius={7}
       />
 
-      <FlexWidget style={{ flexDirection: 'column', alignItems: 'center' }}>
+      <FlexWidget style={{ flexDirection: 'column', alignItems: 'center', width: 'match_parent' }}>
         {/* Morning */}
         <FlexWidget
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
+            backgroundColor: azkar.morningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
             marginBottom: 6,
+            width: 'match_parent',
           }}
         >
           <TextWidget
-            text={morningIcon}
-            style={{ fontSize: 14, marginRight: 6 }}
+            text={azkar.morningCompleted ? '✓' : '○'}
+            style={{
+              fontSize: 14,
+              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayDark,
+              marginRight: 6,
+            }}
           />
           <TextWidget
             text="أذكار الصباح"
@@ -65,11 +70,20 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
+            backgroundColor: azkar.eveningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+            borderRadius: 12,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            width: 'match_parent',
           }}
         >
           <TextWidget
-            text={eveningIcon}
-            style={{ fontSize: 14, marginRight: 6 }}
+            text={azkar.eveningCompleted ? '✓' : '○'}
+            style={{
+              fontSize: 14,
+              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayDark,
+              marginRight: 6,
+            }}
           />
           <TextWidget
             text="أذكار المساء"
@@ -86,7 +100,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: BRANDING.color,
+          color: COLORS.teal,
           fontFamily: FONT.amiri,
         }}
       />

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel — Hossam Gamal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+  <!-- ===== Login Screen ===== -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <span class="logo">⚡</span>
+      <h1>Admin Panel</h1>
+      <p class="hint" id="login-hint">Enter your admin password</p>
+      <div class="form-group">
+        <label for="password-input">Password</label>
+        <input type="password" id="password-input" class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button id="login-btn" class="btn-admin btn-primary-admin btn-full">
+        Login
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== Setup Screen (first time) ===== -->
+  <div id="setup-screen" class="login-screen hidden">
+    <div class="login-card">
+      <span class="logo">🔐</span>
+      <h1>Set Admin Password</h1>
+      <p class="hint">This is your first time. Create a password to secure the admin panel.</p>
+      <div class="form-group">
+        <label for="setup-password">New Password</label>
+        <input type="password" id="setup-password" class="form-input" placeholder="Choose a strong password" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label for="setup-confirm">Confirm Password</label>
+        <input type="password" id="setup-confirm" class="form-input" placeholder="Confirm password" autocomplete="new-password">
+      </div>
+      <button id="setup-btn" class="btn-admin btn-primary-admin btn-full">
+        Set Password & Continue
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== Dashboard ===== -->
+  <div id="dashboard" class="dashboard hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>⚡ Admin <span class="badge">Panel</span></h2>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" data-view="pages" class="active">
+          <span class="icon">📄</span> Pages
+        </a>
+        <a href="#" data-view="create">
+          <span class="icon">➕</span> Create New
+        </a>
+        <a href="#" data-view="ads">
+          <span class="icon">📢</span> Ads.txt
+        </a>
+        <a href="#" data-view="domains">
+          <span class="icon">🌐</span> Domains
+        </a>
+        <a href="#" data-view="settings">
+          <span class="icon">⚙️</span> Settings
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/" class="site-link" target="_blank">↗ View Live Site</a>
+        <button class="logout-btn" id="logout-btn">Sign Out</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- ===== Pages List View ===== -->
+      <div id="view-pages">
+        <div class="page-header">
+          <h1>Your Pages</h1>
+          <div class="actions">
+            <button class="btn-admin btn-primary-admin" onclick="switchView('create')">
+              ➕ New Page
+            </button>
+          </div>
+        </div>
+        <div id="pages-list" class="pages-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- ===== Create New View ===== -->
+      <div id="view-create" class="hidden">
+        <div class="page-header">
+          <h1>Choose a Template</h1>
+        </div>
+        <p class="text-muted mb-lg">Select a template to start building your new page.</p>
+        <div class="template-grid" id="template-grid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- ===== Editor View ===== -->
+      <div id="view-editor" class="hidden">
+        <div class="editor-topbar">
+          <div class="left">
+            <button class="back-btn" onclick="switchView('pages')">←</button>
+            <span class="page-name" id="editor-title">Edit Page</span>
+          </div>
+          <div class="right">
+            <div class="toggle-group">
+              <button class="toggle" id="publish-toggle" onclick="togglePublish()" aria-label="Toggle publish status"></button>
+              <span class="toggle-label" id="publish-label">Draft</span>
+            </div>
+            <button class="btn-admin btn-ghost btn-sm" id="preview-btn" onclick="openPreview()">
+              👁 Preview
+            </button>
+            <button class="btn-admin btn-primary-admin" id="save-btn" onclick="savePage()">
+              💾 Save
+            </button>
+          </div>
+        </div>
+
+        <div class="editor-container">
+          <div class="editor-form" id="editor-form">
+            <!-- Populated dynamically by JS based on template -->
+          </div>
+          <div class="editor-preview">
+            <span class="preview-label">Live Preview</span>
+            <iframe id="preview-frame" title="Page preview"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Ads.txt View ===== -->
+      <div id="view-ads" class="hidden">
+        <div class="page-header">
+          <h1>Ads.txt Manager</h1>
+          <div class="actions">
+            <button class="btn-admin btn-ghost" id="download-ads-btn" title="Download app-ads.txt">📥 Download File</button>
+            <button class="btn-admin btn-primary-admin" id="save-ads-btn">💾 Save</button>
+          </div>
+        </div>
+
+        <div class="domain-card">
+          <h3>📄 What is app-ads.txt?</h3>
+          <p class="text-muted mb-md">
+            The <code>app-ads.txt</code> file tells ad networks which publishers are authorized to sell your ad inventory.
+            It helps prevent ad fraud and is required by Google AdMob. The file must be hosted at the root of your
+            developer website (e.g., <code>hossamgamal.web.app/app-ads.txt</code>).
+          </p>
+          <p class="text-muted text-sm">
+            Format: <code>domain, publisher-id, relationship, certification-id</code>
+          </p>
+        </div>
+
+        <div id="ads-apps-container">
+          <!-- Populated by JS: per-app grouped entries -->
+        </div>
+        <button class="add-field-btn" id="add-ads-app-btn" style="margin-bottom:20px">+ Add App</button>
+
+        <div class="domain-card">
+          <h3>👁 Raw Preview</h3>
+          <p class="text-muted mb-sm text-sm">This is what your <code>app-ads.txt</code> file will look like:</p>
+          <pre class="command-block ads-preview" id="ads-raw-preview"></pre>
+        </div>
+
+        <div class="domain-card">
+          <h3>🚀 Deploy Instructions</h3>
+          <p class="text-muted mb-sm">
+            After saving, click <strong>"Download File"</strong> to get the updated <code>app-ads.txt</code>.
+            Replace the file in your <code>hosting/</code> folder and redeploy:
+          </p>
+          <div class="command-block">npx firebase-tools deploy --only hosting --project rooh-almuslim</div>
+          <p class="text-muted-sm mt-sm">
+            Or save here to store in Firestore — changes are preserved even without redeploying.
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== Domains View ===== -->
+      <div id="view-domains" class="hidden">
+        <div class="page-header">
+          <h1>Custom Domains</h1>
+        </div>
+
+        <div class="domain-card">
+          <h3>🌍 Connect a Custom Domain to Firebase Hosting</h3>
+          <p class="text-muted mb-md">
+            Follow these steps to connect your own domain (e.g., <code>yourdomain.com</code>) to your site.
+          </p>
+
+          <div class="step">
+            <span class="step-num">1</span>
+            <div class="step-text">
+              <strong>Open Firebase Console</strong><br>
+              Go to <a href="https://console.firebase.google.com/project/rooh-almuslim/hosting" target="_blank" rel="noopener">Firebase Hosting Console</a> → Click <strong>"Add custom domain"</strong>
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-num">2</span>
+            <div class="step-text">
+              <strong>Enter Your Domain</strong><br>
+              Type your domain name (e.g., <code>hossamgamal.com</code> or <code>www.hossamgamal.com</code>)
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-num">3</span>
+            <div class="step-text">
+              <strong>Verify Ownership</strong><br>
+              Firebase will give you a TXT record. Add it to your domain's DNS settings at your registrar (GoDaddy, Namecheap, etc.)
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-num">4</span>
+            <div class="step-text">
+              <strong>Configure DNS Records</strong><br>
+              Add the A records Firebase provides, pointing to their IP addresses. Remove any existing A records for that domain.
+            </div>
+          </div>
+
+          <div class="step">
+            <span class="step-num">5</span>
+            <div class="step-text">
+              <strong>Wait for SSL</strong><br>
+              Firebase automatically provisions a free SSL certificate. This can take up to 24 hours.
+            </div>
+          </div>
+        </div>
+
+        <div class="domain-card">
+          <h3>💻 Or Use Firebase CLI</h3>
+          <p class="text-muted mb-sm">Run this command in your project directory:</p>
+          <div class="command-block">npx firebase-tools hosting:channel:deploy --project rooh-almuslim</div>
+          <p class="text-muted-sm mt-sm">
+            For custom domain setup via CLI, see the
+            <a href="https://firebase.google.com/docs/hosting/custom-domain" target="_blank" rel="noopener">Firebase Hosting docs</a>.
+          </p>
+        </div>
+
+        <div class="domain-card">
+          <h3>📋 Your Current Sites</h3>
+          <div class="sites-list">
+            <div class="site-row site-row-bordered">
+              <div>
+                <strong class="text-white">hossamgamal.web.app</strong>
+                <span class="status-badge status-published ml-xs">Active</span>
+              </div>
+              <a href="https://hossamgamal.web.app" target="_blank" rel="noopener" class="btn-admin btn-ghost btn-sm">↗ Visit</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Settings View ===== -->
+      <div id="view-settings" class="hidden">
+        <div class="page-header">
+          <h1>Settings</h1>
+        </div>
+
+        <div class="settings-card">
+          <h3>🔒 Change Admin Password</h3>
+          <div class="form-group">
+            <label for="current-pw">Current Password</label>
+            <input type="password" id="current-pw" class="form-input" placeholder="Enter current password" autocomplete="current-password">
+          </div>
+          <div class="form-group">
+            <label for="new-pw">New Password</label>
+            <input type="password" id="new-pw" class="form-input" placeholder="Enter new password" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="confirm-pw">Confirm New Password</label>
+            <input type="password" id="confirm-pw" class="form-input" placeholder="Confirm new password" autocomplete="new-password">
+          </div>
+          <button class="btn-admin btn-primary-admin" id="change-pw-btn">Update Password</button>
+        </div>
+
+        <div class="settings-card">
+          <h3>📦 Export All Pages</h3>
+          <p class="text-muted mb-sm text-sm">
+            Download all your page data as a JSON file for backup.
+          </p>
+          <button class="btn-admin btn-ghost" id="export-btn">📥 Export JSON</button>
+        </div>
+
+        <div class="settings-card">
+          <h3>📤 Import Pages</h3>
+          <p class="text-muted mb-sm text-sm">
+            Restore pages from a previously exported JSON backup.
+          </p>
+          <input type="file" id="import-file" accept=".json" class="hidden" title="Import JSON backup" aria-label="Import JSON backup">
+          <button class="btn-admin btn-ghost" onclick="document.getElementById('import-file').click()">📂 Choose File</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

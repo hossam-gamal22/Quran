@@ -1,9 +1,10 @@
 // lib/widget-data-bridge.ts
 // Unified bridge: writes widget data to platform-specific shared storage
-// iOS: UserDefaults via App Group (group.com.roohmuslim.app)
+// iOS: UserDefaults via App Group (group.com.rooh.almuslim)
 // Android: AsyncStorage (read by react-native-android-widget task handler)
 
-import { Platform } from 'react-native';
+import React from 'react';
+import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   preparePrayerWidgetData,
@@ -13,36 +14,152 @@ import {
   getPrayerCompletion,
   getWidgetSettings,
   type SharedWidgetData,
-  type WidgetPrayerData,
 } from './widget-data';
-import { getLocalizedHijriDate } from './hijri-date';
 import { getLanguage } from './i18n';
 import { type PrayerTimes } from './prayer-times';
 
-const APP_GROUP = 'group.com.roohmuslim.app';
+const APP_GROUP = 'group.com.rooh.almuslim';
 const WIDGET_DATA_KEY = 'widget_shared_data';
 
 /**
- * Write data to iOS App Group UserDefaults via SharedGroupPreferences.
+ * Trigger native widget reload on both platforms.
+ * iOS: WidgetCenter.shared.reloadAllTimelines() via WidgetReloadModule
+ * Android: requestWidgetUpdate via react-native-android-widget (renders immediately)
+ */
+async function triggerNativeWidgetReload(sharedData?: SharedWidgetData): Promise<void> {
+  if (Platform.OS === 'ios') {
+    try {
+      const { WidgetReloadModule } = NativeModules;
+      if (WidgetReloadModule?.reloadAllTimelines) {
+        await WidgetReloadModule.reloadAllTimelines();
+        if (__DEV__) console.log('✅ WidgetKit reloadAllTimelines triggered');
+      }
+    } catch (e) {
+      if (__DEV__) console.warn('⚠️ WidgetKit reload failed:', e);
+    }
+  } else if (Platform.OS === 'android' && sharedData) {
+    try {
+      const { requestWidgetUpdate } = require('react-native-android-widget');
+
+      const widgetNames = [
+        'PrayerTimesSmall', 'PrayerTimesMedium',
+        'DailyVerseSmall', 'DailyVerseMedium',
+        'DailyDhikrSmall', 'DailyDhikrMedium',
+        'AzkarProgressSmall', 'AzkarProgressMedium',
+        'HijriDateSmall', 'HijriDateMedium',
+      ];
+
+      await Promise.allSettled(
+        widgetNames.map((widgetName) =>
+          requestWidgetUpdate({
+            widgetName,
+            renderWidget: () => {
+              const element = renderWidgetByName(widgetName, sharedData);
+              return element;
+            },
+            widgetNotFound: () => {
+              // Widget not on home screen — nothing to do
+            },
+          })
+        )
+      );
+      if (__DEV__) console.log('✅ Android widget update requested');
+    } catch {
+      // react-native-android-widget not available (Expo Go / web)
+    }
+  }
+}
+
+/**
+ * Write JSON string to the App Group container file as fallback.
+ * iOS only — the Swift widget reader (loadSharedRawData) reads UserDefaults first,
+ * then falls back to this JSON file.
+ */
+async function writeAppGroupFallbackFile(jsonString: string): Promise<void> {
+  if (Platform.OS !== 'ios') return;
+  try {
+    const { WidgetReloadModule } = NativeModules;
+    if (WidgetReloadModule?.writeSharedDataFile) {
+      await WidgetReloadModule.writeSharedDataFile(jsonString);
+      if (__DEV__) console.log('✅ App Group fallback JSON file written');
+    }
+  } catch (e) {
+    if (__DEV__) console.warn('⚠️ App Group fallback file write failed:', e);
+  }
+}
+
+/**
+ * Write data to iOS App Group UserDefaults via SharedGroupPreferences + fallback JSON file,
+ * with AsyncStorage copy for in-app gallery previews.
  * On Android, writes to AsyncStorage (react-native-android-widget reads it in the task handler).
  */
 async function writeToSharedStorage(key: string, value: string): Promise<void> {
   if (Platform.OS === 'ios') {
+    let sharedGroupOk = false;
+
+    // Primary: UserDefaults via App Group (read by WidgetKit extension)
     try {
       const SharedGroupPreferences = require('react-native-shared-group-preferences').default;
       await SharedGroupPreferences.setItem(key, value, APP_GROUP);
+      sharedGroupOk = true;
     } catch (e) {
-      // Fallback: write to AsyncStorage (native bridge may not be available in Expo Go)
+      console.warn('⚠️ SharedGroupPreferences write failed:', e);
+    }
+
+    // Secondary: JSON file in App Group container (fallback for widget reads)
+    await writeAppGroupFallbackFile(value);
+
+    // Always keep AsyncStorage copy for in-app widget gallery previews
+    try {
       await AsyncStorage.setItem(key, value);
+    } catch {
+      // Non-critical
+    }
+
+    if (__DEV__ && sharedGroupOk) {
+      console.log('✅ Widget data written to App Group UserDefaults:', APP_GROUP);
     }
   } else {
-    // Android: react-native-android-widget reads from AsyncStorage
+    // Android: AsyncStorage is the primary storage
     await AsyncStorage.setItem(key, value);
   }
 }
 
 /**
- * Aggregate all widget data and write to shared storage.
+ * Render the correct widget component for a given widget name using the provided data.
+ */
+function renderWidgetByName(widgetName: string, data: SharedWidgetData): React.ReactElement | null {
+  const { PrayerTimesSmallWidget } = require('@/components/widgets/android/PrayerTimesSmallWidget');
+  const { PrayerTimesMediumWidget } = require('@/components/widgets/android/PrayerTimesMediumWidget');
+  const { DailyVerseSmallWidget } = require('@/components/widgets/android/DailyVerseSmallWidget');
+  const { DailyVerseMediumWidget } = require('@/components/widgets/android/DailyVerseMediumWidget');
+  const { DailyDhikrSmallWidget } = require('@/components/widgets/android/DailyDhikrSmallWidget');
+  const { DailyDhikrMediumWidget } = require('@/components/widgets/android/DailyDhikrMediumWidget');
+  const { AzkarProgressSmallWidget } = require('@/components/widgets/android/AzkarProgressSmallWidget');
+  const { AzkarProgressMediumWidget } = require('@/components/widgets/android/AzkarProgressMediumWidget');
+  const { HijriDateSmallWidget } = require('@/components/widgets/android/HijriDateSmallWidget');
+  const { HijriDateMediumWidget } = require('@/components/widgets/android/HijriDateMediumWidget');
+
+  const map: Record<string, React.FC<{ data: SharedWidgetData }>> = {
+    PrayerTimesSmall: PrayerTimesSmallWidget,
+    PrayerTimesMedium: PrayerTimesMediumWidget,
+    DailyVerseSmall: DailyVerseSmallWidget,
+    DailyVerseMedium: DailyVerseMediumWidget,
+    DailyDhikrSmall: DailyDhikrSmallWidget,
+    DailyDhikrMedium: DailyDhikrMediumWidget,
+    AzkarProgressSmall: AzkarProgressSmallWidget,
+    AzkarProgressMedium: AzkarProgressMediumWidget,
+    HijriDateSmall: HijriDateSmallWidget,
+    HijriDateMedium: HijriDateMediumWidget,
+  };
+
+  const Component = map[widgetName];
+  if (!Component) return null;
+  return React.createElement(Component, { data });
+}
+
+/**
+ * Aggregate all widget data and write to shared storage, then refresh all Android widgets.
  * Call this on: app startup, prayer time change, midnight, language change, foreground.
  */
 export async function updateWidgetData(prayerTimes?: PrayerTimes | null, location?: string): Promise<void> {
@@ -70,50 +187,11 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
 
     const json = JSON.stringify(sharedData);
 
-    // Write to shared storage (iOS UserDefaults + Android AsyncStorage)
+    // Write to shared storage (UserDefaults + fallback file + AsyncStorage on iOS, AsyncStorage on Android)
     await writeToSharedStorage(WIDGET_DATA_KEY, json);
 
-    // Also keep AsyncStorage copy for in-app previews (widget gallery)
-    if (Platform.OS === 'ios') {
-      await AsyncStorage.setItem(WIDGET_DATA_KEY, json);
-    }
-
-    // Request native widget refresh
-    if (Platform.OS === 'android') {
-      try {
-        const { requestWidgetUpdate } = require('react-native-android-widget');
-        const { widgetTaskHandler } = require('./android-widget-task-handler');
-
-        // requestWidgetUpdate needs a renderWidget callback
-        const widgetNames = [
-          'PrayerTimesSmall', 'PrayerTimesMedium',
-          'DailyVerseSmall', 'DailyVerseMedium',
-          'DailyDhikrSmall', 'DailyDhikrMedium',
-          'AzkarProgressSmall', 'AzkarProgressMedium',
-          'HijriDateSmall', 'HijriDateMedium',
-        ];
-
-        await Promise.allSettled(
-          widgetNames.map((widgetName) =>
-            requestWidgetUpdate({
-              widgetName,
-              renderWidget: async (widgetInfo: any) => {
-                // Use a promise to capture the rendered widget
-                let rendered: any = null;
-                await widgetTaskHandler({
-                  widgetInfo,
-                  widgetAction: 'WIDGET_UPDATE',
-                  renderWidget: (component: any) => { rendered = component; },
-                });
-                return rendered;
-              },
-            })
-          )
-        );
-      } catch {
-        // react-native-android-widget not available (Expo Go / web)
-      }
-    }
+    // Trigger native widget refresh on both platforms
+    await triggerNativeWidgetReload(sharedData);
 
     if (__DEV__) console.log('✅ Widget data synced to shared storage');
   } catch (error) {
@@ -135,7 +213,6 @@ export function scheduleMidnightRefresh(onRefresh?: () => void): () => void {
   const timer = setTimeout(() => {
     updateWidgetData().catch(() => {});
     onRefresh?.();
-    // Reschedule for next midnight
     scheduleMidnightRefresh(onRefresh);
   }, msUntilMidnight);
 

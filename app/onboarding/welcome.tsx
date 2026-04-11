@@ -8,9 +8,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  StatusBar,
   Image,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,6 +30,8 @@ import Animated, {
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { tOnboarding } from '@/constants/onboarding-translations';
 import { t, isRTL as isRTLCheck } from '@/lib/i18n';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,9 +41,9 @@ const { width, height } = Dimensions.get('window');
 
 const DEFAULT_FEATURES = [
   { icon: 'book-open-variant', labelKey: 'featureQuran', color: '#3a7ca5' },
-  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#22C55E' },
+  { icon: 'hands-pray', labelKey: 'featureAdhkar', color: '#0d8e62' },
   { icon: 'mosque', labelKey: 'featurePrayer', color: '#c17f59' },
-  { icon: 'compass', labelKey: 'featureQibla', color: '#5d4e8c' },
+  { icon: 'compass', labelKey: 'featureQibla', color: '#4a3d73' },
 ];
 
 // ========================================
@@ -49,8 +51,10 @@ const DEFAULT_FEATURES = [
 // ========================================
 
 export default function WelcomeScreen() {
-  const { goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
+  const { goToNextStep, goToPreviousStep } = useOnboarding();
   const isRTL = isRTLCheck();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const logoSource = isRTL
     ? require('@/assets/images/icons/App-icon.png')
     : require('@/assets/images/icons/App-icon_en.png');
@@ -88,26 +92,19 @@ export default function WelcomeScreen() {
     goToNextStep();
   };
 
-  const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    skipOnboarding();
-  };
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar style="light" translucent />
       
       <View
         style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}
       >
-        {/* الهيدر: رجوع + تخطي */}
+        {/* الهيدر: رجوع */}
         <SafeAreaView edges={['top']} style={[styles.topBar, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); goToPreviousStep(); }}>
             <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
-            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
-          </TouchableOpacity>
+          <View style={styles.skipButton} />
         </SafeAreaView>
 
         {/* الزخرفة الخلفية */}
@@ -183,6 +180,7 @@ export default function WelcomeScreen() {
               <View style={styles.dot} />
               <View style={styles.dot} />
               <View style={styles.dot} />
+              <View style={styles.dot} />
             </View>
           </Animated.View>
         </SafeAreaView>
@@ -195,7 +193,7 @@ export default function WelcomeScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -338,6 +336,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
 });

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { fontBold, fontRegular, arabicBodyStyle } from '@/lib/fonts';
 
 interface SectionInfoButtonProps {
@@ -21,6 +23,7 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
   const [visible, setVisible] = useState(false);
   const { isDarkMode, t, settings } = useSettings();
   const colors = useColors();
+  const infoStyles = useScaledStyles(_infoStyles, colors.fs);
 
   const title = t(`sectionInfo.${sectionKey}.title`) || '';
   const body = t(`sectionInfo.${sectionKey}.body`) || '';
@@ -37,7 +40,7 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
         <MaterialCommunityIcons
           name={icon as any}
           size={size}
-          color={color || colors.textLight}
+          color={color || (isDarkMode ? colors.textLight : '#555555')}
         />
       </TouchableOpacity>
 
@@ -49,11 +52,15 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
       >
         <Pressable style={infoStyles.overlay} onPress={() => setVisible(false)}>
           <Pressable
-            style={[infoStyles.card, { backgroundColor: isDarkMode ? '#1c1c1e' : '#fff' }]}
+            style={[infoStyles.card]}
             onPress={(e) => e.stopPropagation()}
           >
+            {Platform.OS === 'ios' && (
+              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            )}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
             <View style={infoStyles.iconWrap}>
-              <MaterialCommunityIcons name="information" size={40} color="#22C55E" />
+              <MaterialCommunityIcons name="information" size={40} color="#0d8e62" />
             </View>
             {title ? (
               <Text style={[infoStyles.title, { color: colors.text }]}>{title}</Text>
@@ -73,7 +80,7 @@ export const SectionInfoButton: React.FC<SectionInfoButtonProps> = ({
   );
 };
 
-const infoStyles = StyleSheet.create({
+const _infoStyles = StyleSheet.create({
   btn: {
     padding: 4,
   },
@@ -90,6 +97,7 @@ const infoStyles = StyleSheet.create({
     paddingVertical: 28,
     paddingHorizontal: 24,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   iconWrap: {
     width: 72,
@@ -114,7 +122,7 @@ const infoStyles = StyleSheet.create({
   },
   okBtn: {
     marginTop: 24,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 48,

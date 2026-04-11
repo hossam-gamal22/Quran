@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   supportText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
+    color: '#737373',
   },
   dua: {
     fontSize: 16,

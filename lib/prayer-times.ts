@@ -266,7 +266,9 @@ export const applyAdjustments = (
   adjustments: PrayerAdjustments
 ): PrayerTimes => {
   const adjustTime = (time: string, minutes: number): string => {
-    const [hours, mins] = time.split(':').map(Number);
+    const parts = time.split(':').map(Number);
+    const hours = Number.isFinite(parts[0]) ? parts[0] : 0;
+    const mins = Number.isFinite(parts[1]) ? parts[1] : 0;
     const date = new Date();
     date.setHours(hours, mins + minutes, 0, 0);
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -288,7 +290,9 @@ export const applyAdjustments = (
  * تحويل الوقت النصي إلى كائن Date
  */
 export const timeStringToDate = (timeString: string, baseDate: Date = new Date()): Date => {
-  const [hours, minutes] = timeString.split(':').map(Number);
+  const parts = timeString.split(':').map(Number);
+  const hours = Number.isFinite(parts[0]) && parts[0] >= 0 && parts[0] <= 23 ? parts[0] : 0;
+  const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
   const date = new Date(baseDate);
   date.setHours(hours, minutes, 0, 0);
   return date;
@@ -298,7 +302,9 @@ export const timeStringToDate = (timeString: string, baseDate: Date = new Date()
  * تنسيق الوقت للعرض (12 ساعة)
  */
 export const formatTime12h = (timeString: string): string => {
-  const [hours, minutes] = timeString.split(':').map(Number);
+  const parts = timeString.split(':').map(Number);
+  const hours = Number.isFinite(parts[0]) ? parts[0] : 0;
+  const minutes = Number.isFinite(parts[1]) ? parts[1] : 0;
   const lang = getLanguage();
   const amPm: Record<string, [string, string]> = {
     ar: ['ص', 'م'],

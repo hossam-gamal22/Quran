@@ -8,12 +8,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   RefreshControl,
   Share,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,8 +22,10 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
+// theme constants removed — using useColors() hook instead
 import TranslatedText from '@/components/ui/TranslatedText';
 
 // ========================================
@@ -83,8 +85,8 @@ const SALAWAT = [
 const RECOMMENDED_ACTIONS = [
   { id: 'salawat', icon: 'heart', title: 'الإكثار من الصلاة على النبي ﷺ', color: '#e91e63' },
   { id: 'seerah', icon: 'book-open-variant', title: 'قراءة السيرة النبوية', color: '#3a7ca5' },
-  { id: 'sunnah', icon: 'star', title: 'اتباع سنته ﷺ', color: '#f5a623' },
-  { id: 'akhlaq', icon: 'account-heart', title: 'التخلق بأخلاقه ﷺ', color: '#22C55E' },
+  { id: 'sunnah', icon: 'star', title: 'اتباع سنته ﷺ', color: '#c07b10' },
+  { id: 'akhlaq', icon: 'account-heart', title: 'التخلق بأخلاقه ﷺ', color: '#0d8e62' },
 ];
 
 // ========================================
@@ -99,22 +101,27 @@ interface ProphetNameCardProps {
 
 const ProphetNameCard: React.FC<ProphetNameCardProps> = ({ item, index, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isArabic = getLanguage() === 'ar';
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 80).duration(400)}
-      style={[styles.nameCard, isDarkMode && styles.nameCardDark]}
+      style={styles.nameCardOuter}
     >
-      {isArabic ? (
-        <Text style={[styles.nameText, isDarkMode && styles.textLight]}>{item.name}</Text>
-      ) : (
-        <TranslatedText style={[styles.nameText, isDarkMode && styles.textLight]}>{item.name}</TranslatedText>
-      )}
-      {isArabic ? (
-        <Text style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</Text>
-      ) : (
-        <TranslatedText style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</TranslatedText>
-      )}
+      <View style={[styles.nameCard, { backgroundColor: isDarkMode ? 'rgba(46,139,87,0.1)' : 'rgba(46,139,87,0.06)', borderColor: isDarkMode ? 'rgba(46,139,87,0.2)' : 'rgba(46,139,87,0.12)' }]}>
+        <View style={[styles.nameDecoLine, { backgroundColor: MAWLID_COLOR }]} />
+        {isArabic ? (
+          <Text style={[styles.nameText, { color: colors.text }]}>{item.name}</Text>
+        ) : (
+          <TranslatedText style={[styles.nameText, { color: colors.text }]}>{item.name}</TranslatedText>
+        )}
+        <View style={[styles.nameDivider, { backgroundColor: isDarkMode ? 'rgba(46,139,87,0.2)' : 'rgba(46,139,87,0.15)' }]} />
+        {isArabic ? (
+          <Text style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</Text>
+        ) : (
+          <TranslatedText style={[styles.meaningText, { color: colors.textLight }]}>{item.meaning}</TranslatedText>
+        )}
+      </View>
     </Animated.View>
   );
 };
@@ -127,13 +134,14 @@ interface QualityCardProps {
 
 const QualityCard: React.FC<QualityCardProps> = ({ quality, index, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isArabic = getLanguage() === 'ar';
   return (
     <Animated.View
       entering={FadeInDown.delay(index * 60).duration(400)}
       style={styles.qualityCardContainer}
     >
-      <View style={[styles.qualityCard, isDarkMode && styles.qualityCardDark]}>
+      <View style={[styles.qualityCard, { backgroundColor: colors.card }]}>
         <View style={styles.qualityIcon}>
           <MaterialCommunityIcons name={quality.icon as any} size={28} color={MAWLID_COLOR} />
         </View>
@@ -161,16 +169,17 @@ interface SalawatCardProps {
 
 const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode, index }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const isArabicLang = getLanguage() === 'ar';
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
-      <View style={[styles.salawatCard, isDarkMode && styles.salawatCardDark]}>
+      <View style={[styles.salawatCard, { backgroundColor: colors.card }]}>
         <View style={[styles.salawatHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {isArabicLang ? (
-            <Text style={[styles.salawatTitle, { color: colors.text }]}>{salawat.title}</Text>
+            <Text style={[styles.salawatTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{salawat.title}</Text>
           ) : (
-            <TranslatedText style={[styles.salawatTitle, { color: colors.text }]}>{salawat.title}</TranslatedText>
+            <TranslatedText style={[styles.salawatTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{salawat.title}</TranslatedText>
           )}
           <TouchableOpacity
             style={styles.shareButton}
@@ -189,7 +198,7 @@ const SalawatCard: React.FC<SalawatCardProps> = ({ salawat, onShare, isDarkMode,
         )}
         <View style={styles.salawatVirtueWrapper}>
           <View style={styles.salawatVirtueStarCircle}>
-            <MaterialCommunityIcons name="star" size={14} color="#f5a623" />
+            <MaterialCommunityIcons name="star" size={14} color="#c07b10" />
           </View>
           <View style={styles.salawatVirtue}>
             {isArabicLang ? (
@@ -214,7 +223,9 @@ export default function MawlidScreen() {
   const { isDarkMode, settings } = useSettings();
   const { t } = useTranslation();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isArabicLang = getLanguage() === 'ar';
+  const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [salawatCount, setSalawatCount] = useState(0);
 
@@ -260,8 +271,8 @@ export default function MawlidScreen() {
   const recommendedActions = useMemo(() => [
     { id: 'salawat', icon: 'heart', title: t('seasonal.mawlid.actionSalawat'), color: '#e91e63' },
     { id: 'seerah', icon: 'book-open-variant', title: t('seasonal.mawlid.actionSeerah'), color: '#3a7ca5' },
-    { id: 'sunnah', icon: 'star', title: t('seasonal.mawlid.actionSunnah'), color: '#f5a623' },
-    { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#22C55E' },
+    { id: 'sunnah', icon: 'star', title: t('seasonal.mawlid.actionSunnah'), color: '#c07b10' },
+    { id: 'akhlaq', icon: 'account-heart', title: t('seasonal.mawlid.actionAkhlaq'), color: '#0d8e62' },
   ], [t]);
 
   const handleRefresh = useCallback(async () => {
@@ -288,11 +299,11 @@ export default function MawlidScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={MAWLID_COLOR} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: `${MAWLID_COLOR}CC` }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -300,21 +311,13 @@ export default function MawlidScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{t('seasonal.mawlid.title')}</Text>
-          <Text style={styles.headerSubtitle}>{t('seasonal.mawlid.birthDate')}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('seasonal.mawlid.title')}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>{t('seasonal.mawlid.birthDate')}</Text>
         </View>
         <View style={styles.headerPlaceholder} />
-
-        {/* زخرفة */}
-        <MaterialCommunityIcons
-          name="star-four-points"
-          size={80}
-          color="rgba(255,255,255,0.15)"
-          style={[styles.headerDecoration, isRTL ? null : { right: 20, left: undefined }]}
-        />
       </View>
 
       <ScrollView
@@ -363,7 +366,7 @@ export default function MawlidScreen() {
 
         {/* عداد الصلاة على النبي */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={[styles.counterCard, isDarkMode && styles.counterCardDark]}>
+          <View style={[styles.counterCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.counterLabel, { color: colors.textLight }]}>
               {t('seasonal.mawlid.counterLabel')}
             </Text>
@@ -377,7 +380,7 @@ export default function MawlidScreen() {
         </Animated.View>
 
         {/* أسماء النبي ﷺ */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.namesSection')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.namesSection')}</Text>
         <View style={styles.namesGrid}>
           {prophetNames.map((item, index) => (
             <ProphetNameCard key={item.name} item={item} index={index} isDarkMode={isDarkMode} />
@@ -385,7 +388,7 @@ export default function MawlidScreen() {
         </View>
 
         {/* صفات النبي ﷺ */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.qualitiesSection')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.qualitiesSection')}</Text>
         <View style={styles.qualitiesGrid}>
           {prophetQualities.map((quality, index) => (
             <QualityCard key={quality.title} quality={quality} index={index} isDarkMode={isDarkMode} />
@@ -393,7 +396,7 @@ export default function MawlidScreen() {
         </View>
 
         {/* صيغ الصلاة على النبي */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('seasonal.mawlid.salawatSection')}
         </Text>
         {salawatList.map((salawat, index) => (
@@ -407,8 +410,8 @@ export default function MawlidScreen() {
         ))}
 
         {/* الأعمال المستحبة */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.mawlid.todaySection')}</Text>
-        <View style={[styles.actionsCard, isDarkMode && styles.actionsCardDark]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.todaySection')}</Text>
+        <View style={[styles.actionsCard, { backgroundColor: colors.card }]}>
           {recommendedActions.map((action, index) => (
             <Animated.View
               key={action.id}
@@ -419,9 +422,9 @@ export default function MawlidScreen() {
                 <MaterialCommunityIcons name={action.icon as any} size={22} color={action.color} />
               </View>
               {isArabicLang ? (
-                <Text style={[styles.actionTitle, { color: colors.text }]}>{action.title}</Text>
+                <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{action.title}</Text>
               ) : (
-                <TranslatedText style={[styles.actionTitle, { color: colors.text }]}>{action.title}</TranslatedText>
+                <TranslatedText style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{action.title}</TranslatedText>
               )}
             </Animated.View>
           ))}
@@ -429,11 +432,11 @@ export default function MawlidScreen() {
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(600).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#f5a623" />
+          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(192,123,16,0.12)' : '#fff8e1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#c07b10" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.mawlid.reminder')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight }]}>
+              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.reminder')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('seasonal.mawlid.reminderText')}
               </Text>
             </View>
@@ -451,21 +454,17 @@ export default function MawlidScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
+  headerWrapper: {},
+  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingTop: 10,
-    overflow: 'hidden',
+    paddingVertical: 14,
   },
   backButton: {
     width: 40,
@@ -476,16 +475,19 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
     alignItems: 'center',
+    overflow: 'visible',
   },
   headerTitle: {
     fontSize: 22,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 34,
   },
   headerSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
+    lineHeight: 22,
   },
   headerPlaceholder: {
     width: 40,
@@ -495,12 +497,7 @@ const styles = StyleSheet.create({
     top: 10,
     left: 20,
   },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
+
   scrollView: {
     flex: 1,
   },
@@ -526,12 +523,10 @@ const styles = StyleSheet.create({
   prophetName: {
     fontSize: 28,
     fontFamily: fontBold(),
-    color: '#333',
   },
   prophetFullName: {
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 4,
   },
   prophetInfo: {
@@ -547,24 +542,18 @@ const styles = StyleSheet.create({
   prophetInfoText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
   },
 
   // عداد الصلاة
   counterCard: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 20,
     marginTop: 16,
     alignItems: 'center',
   },
-  counterCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   counterLabel: {
     fontSize: 16,
     fontFamily: fontMedium(),
-    color: '#666',
     marginBottom: 12,
   },
   counterButton: {
@@ -592,7 +581,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     marginTop: 24,
     marginBottom: 12,
   },
@@ -601,25 +589,48 @@ const styles = StyleSheet.create({
   namesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -4,
+    marginHorizontal: -5,
+  },
+  nameCardOuter: {
+    width: '50%',
+    padding: 5,
   },
   nameCard: {
-    width: '33.33%',
-    padding: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    overflow: 'hidden',
   },
-  nameCardDark: {},
+  nameDecoLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
   nameText: {
-    fontSize: 18,
+    fontSize: 22,
     fontFamily: fontBold(),
-    color: MAWLID_COLOR,
     textAlign: 'center',
+    lineHeight: 34,
+    includeFontPadding: false,
+  },
+  nameDivider: {
+    width: 32,
+    height: 2,
+    borderRadius: 1,
+    marginVertical: 6,
   },
   meaningText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
     textAlign: 'center',
-    marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
 
   // صفات النبي
@@ -633,13 +644,9 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   qualityCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
-  },
-  qualityCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   qualityIcon: {
     width: 56,
@@ -653,25 +660,19 @@ const styles = StyleSheet.create({
   qualityTitle: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   qualityDesc: {
     fontSize: 11,
     fontFamily: fontRegular(),
-    color: '#666',
     textAlign: 'center',
     marginTop: 4,
   },
 
   // صيغ الصلاة
   salawatCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-  },
-  salawatCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   salawatHeader: {
     flexDirection: 'row',
@@ -682,7 +683,6 @@ const styles = StyleSheet.create({
   salawatTitle: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
   },
   shareButton: {
     width: 36,
@@ -695,7 +695,6 @@ const styles = StyleSheet.create({
   salawatArabic: {
     fontSize: 18,
     fontFamily: fontMedium(),
-    color: '#333',
     textAlign: 'center',
     writingDirection: 'rtl',
     lineHeight: 32,
@@ -726,17 +725,12 @@ const styles = StyleSheet.create({
   salawatVirtueText: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
   },
 
   // الأعمال
   actionsCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 8,
-  },
-  actionsCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   actionItem: {
     flexDirection: 'row',
@@ -754,21 +748,16 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 14,
     fontFamily: fontMedium(),
-    color: '#333',
     flex: 1,
   },
 
   // النصيحة
   tipCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff8e1',
     borderRadius: 16,
     padding: 16,
     marginTop: 24,
     gap: 12,
-  },
-  tipCardDark: {
-    backgroundColor: '#2a2a1e',
   },
   tipContent: {
     flex: 1,
@@ -776,12 +765,10 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
   },
   tipText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
     marginTop: 4,
   },

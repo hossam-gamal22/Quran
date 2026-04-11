@@ -7,11 +7,11 @@ const { withSettingsGradle } = require("expo/config-plugins");
  */
 module.exports = function withAndroidGradleFix(config) {
   return withSettingsGradle(config, (config) => {
-    const contents = config.modResults.contents;
+    let contents = config.modResults.contents;
 
     // Only add if not already present
     if (contents.includes("pluginManagement") && !contents.includes("repositories {")) {
-      config.modResults.contents = contents.replace(
+      contents = contents.replace(
         "pluginManagement {",
         `pluginManagement {
   repositories {
@@ -23,6 +23,13 @@ module.exports = function withAndroidGradleFix(config) {
       );
     }
 
+    // Fix rootProject.name: Arabic characters break autolinking BuildConfig
+    contents = contents.replace(
+      /rootProject\.name\s*=\s*'[^']*'/,
+      "rootProject.name = 'rooh-almuslim'"
+    );
+
+    config.modResults.contents = contents;
     return config;
   });
 };

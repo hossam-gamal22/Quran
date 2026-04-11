@@ -15,6 +15,7 @@ import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 import { APP_BACKGROUNDS, BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -53,11 +54,13 @@ export interface BrandedCaptureHandle {
 }
 
 interface BrandedCaptureProps {
-  children: React.ReactNode;
+  children: React.ReactNode | ((textColor: string) => React.ReactNode);
   excludeBranding?: boolean;
   isPremium?: boolean;
   title?: string;
   onCapture?: (uri: string) => void;
+  /** Only show story (9:16) size option */
+  storyOnly?: boolean;
 }
 
 const CAPTURE_WIDTH = 375;
@@ -65,13 +68,16 @@ const PREVIEW_MAX_H = 240;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCaptureProps>(
-  ({ children, excludeBranding = false, isPremium = false, title, onCapture }, ref) => {
+  ({ children, excludeBranding = false, isPremium = false, title, onCapture, storyOnly = false }, ref) => {
     const viewShotRef = useRef<ViewShot>(null);
     const colors = useColors();
     const { isDarkMode, t } = useSettings();
+    const { logoSource } = useAppIdentity();
     const isRTL = useIsRTL();
 
-    const [selectedSize, setSelectedSize] = useState<ImageSizeKey>('portrait');
+    // If storyOnly, always use story size
+    const availableSizes = storyOnly ? IMAGE_SIZE_OPTIONS.filter(o => o.key === 'story') : IMAGE_SIZE_OPTIONS;
+    const [selectedSize, setSelectedSize] = useState<ImageSizeKey>(storyOnly ? 'story' : 'portrait');
     const [showPicker, setShowPicker] = useState(false);
     const [capturing, setCapturing] = useState(false);
 
@@ -151,10 +157,13 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
       showSizePicker: () => setShowPicker(true),
     }));
 
+    // Resolve render prop - always pass current txtColor
+    const resolvedChildren = typeof children === 'function' ? children(txtColor) : children;
+
     if (excludeBranding || isPremium) {
       return (
         <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
-          {children}
+          {resolvedChildren}
         </ViewShot>
       );
     }
@@ -200,36 +209,54 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
       }
     };
 
-
+    // ─── Logo sizes per aspect ratio (adjustable here) ───
+    const LOGO_SIZES: Record<ImageSizeKey, number> = {
+      portrait: 100,  // 4:5
+      story: 200,     // 9:16
+    };
+    const logoSize = LOGO_SIZES[selectedSize];
 
     // ─── Shared content renderer (used by capture & preview) ───
     // Content and logo flow naturally in a column. Scale is applied to the
     // entire contentCard so that visual size == layout size (no overflow).
-    const renderInner = () => (
-      <View style={{
-        flex: 1,
-        width: '100%',
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}>
-        {title ? <Text style={[styles.titleText, { color: txtColor }]}>{title}</Text> : null}
-        {/* Scaled content card — the entire card scales so layout matches visual */}
+    const renderInner = () => {
+      // Support render prop pattern for dynamic text color
+      const renderedChildren = typeof children === 'function' ? children(txtColor) : children;
+      
+      return (
         <View style={{
-          maxWidth: '100%',
-          borderRadius: 20,
-          padding: 14,
-          backgroundColor: txtColor === '#FFFFFF' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.04)',
-          transform: [{ scale: contentScale }],
+          flex: 1,
+          width: '100%',
+          paddingHorizontal: 20,
+          paddingTop: 24,
+          paddingBottom: 32,
+          justifyContent: 'center',
+          alignItems: 'center',
         }}>
-          <View style={{ alignItems: 'center' }}>
-            {children}
+          {title ? <Text style={[styles.titleText, { color: txtColor }]}>{title}</Text> : null}
+          {/* Scaled content card — the entire card scales so layout matches visual */}
+          <View style={{
+            maxWidth: '100%',
+            borderRadius: 20,
+            padding: 14,
+            backgroundColor: txtColor === '#FFFFFF' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+            transform: [{ scale: contentScale }],
+          }}>
+            <View style={{ alignItems: 'center' }}>
+              {renderedChildren}
+            </View>
+          </View>
+          {/* Logo — size changes per aspect ratio */}
+          <View style={{ marginTop: 10, alignItems: 'center' }}>
+            <Image
+              source={logoSource}
+              style={{ width: logoSize, height: logoSize, borderRadius: Math.round(logoSize / 5) }}
+              resizeMode="contain"
+            />
           </View>
         </View>
-      </View>
-    );
+      );
+    };
 
     // ─── Background wrapper ───
     const renderWithBg = (inner: React.ReactNode, style?: object) => {
@@ -309,7 +336,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
             />
             <View style={[styles.sheet, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
               <View style={styles.dragHandle} />
-              <Text style={[styles.sheetTitle, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>
+              <Text style={[styles.sheetTitle, { color: colors.text }]}>
                 {t('common.shareImage')}
               </Text>
 
@@ -319,8 +346,9 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                 contentContainerStyle={{ paddingBottom: 8 }}
               >
                 {/* ── Size tabs ── */}
-                <View style={[styles.segmented, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-                  {IMAGE_SIZE_OPTIONS.map(opt => {
+                {availableSizes.length > 1 && (
+                <View style={[styles.segmented, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)' }]}>
+                  {availableSizes.map(opt => {
                     const active = selectedSize === opt.key;
                     return (
                       <TouchableOpacity
@@ -339,7 +367,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                       >
                         <Text style={[
                           styles.segLabel,
-                          { color: active ? '#22C55E' : (isDark ? '#9CA3AF' : '#6B7280') },
+                          { color: active ? '#0d8e62' : (colors.textLight) },
                           active && { fontFamily: fontBold() },
                         ]}>
                           {opt.label}
@@ -348,6 +376,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                     );
                   })}
                 </View>
+                )}
 
                 {/* ── Live preview — shows real content ── */}
                 <View style={styles.previewArea}>
@@ -357,7 +386,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                     overflow: 'hidden',
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)',
                   }}>
                     <View style={{
                       width: CAPTURE_WIDTH,
@@ -368,21 +397,21 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                       {renderWithBg(renderInner())}
                     </View>
                   </View>
-                  <Text style={[styles.dimText, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>
+                  <Text style={[styles.dimText, { color: colors.textLight }]}>
                     {sizeConfig.width} × {sizeConfig.height}
                   </Text>
                 </View>
 
                 {/* ── Font size controls ── */}
-                <View style={[styles.fontRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={[styles.fontRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                   <TouchableOpacity
                     onPress={() => setFontScaleIdx(i => Math.min(FONT_SCALES.length - 1, i + 1))}
                     style={[styles.fontBtn, fontScaleIdx >= FONT_SCALES.length - 1 && { opacity: 0.3 }]}
                     disabled={fontScaleIdx >= FONT_SCALES.length - 1}
                   >
-                    <Text style={[styles.fontBtnLg, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>{isRTL ? 'أ+' : 'A+'}</Text>
+                    <Text style={[styles.fontBtnLg, { color: colors.text }]}>{isRTL ? 'أ+' : 'A+'}</Text>
                   </TouchableOpacity>
-                  <Text style={[styles.fontLabel, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                  <Text style={[styles.fontLabel, { color: colors.textLight }]}>
                     {t('settings.fontSize')}
                   </Text>
                   <TouchableOpacity
@@ -390,12 +419,12 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                     style={[styles.fontBtn, fontScaleIdx <= 0 && { opacity: 0.3 }]}
                     disabled={fontScaleIdx <= 0}
                   >
-                    <Text style={[styles.fontBtnSm, { color: isDark ? '#F9FAFB' : '#1F2937' }]}>{isRTL ? 'أ-' : 'A-'}</Text>
+                    <Text style={[styles.fontBtnSm, { color: colors.text }]}>{isRTL ? 'أ-' : 'A-'}</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* ── Colors ── */}
-                <Text style={[styles.sectionLabel, { color: isDark ? '#9CA3AF' : '#6B7280', textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
+                <Text style={[styles.sectionLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
                   {t('common.colors')}
                 </Text>
                 <View style={[styles.colorRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -411,9 +440,9 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                           styles.swatch,
                           { backgroundColor: item.color },
                           item.color === '#FAFAFA' && { borderWidth: 1, borderColor: '#D1D5DB' },
-                          active && { borderWidth: 3, borderColor: '#22C55E' },
+                          active && { borderWidth: 3, borderColor: '#0d8e62' },
                         ]} />
-                        <Text style={[styles.swatchText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                        <Text style={[styles.swatchText, { color: colors.textLight }]}>
                           {t(item.labelKey)}
                         </Text>
                       </TouchableOpacity>
@@ -422,7 +451,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                 </View>
 
                 {/* ── Gradients ── */}
-                <Text style={[styles.sectionLabel, { color: isDark ? '#9CA3AF' : '#6B7280', marginTop: 12, textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
+                <Text style={[styles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
                   {t('common.gradients')}
                 </Text>
                 <View style={[styles.colorRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -436,11 +465,11 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                       >
                         <LinearGradient
                           colors={item.colors}
-                          style={[styles.swatch, active && { borderWidth: 3, borderColor: '#22C55E' }]}
+                          style={[styles.swatch, active && { borderWidth: 3, borderColor: '#0d8e62' }]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                         />
-                        <Text style={[styles.swatchText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                        <Text style={[styles.swatchText, { color: colors.textLight }]}>
                           {t(item.labelKey)}
                         </Text>
                       </TouchableOpacity>
@@ -452,24 +481,24 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                     {customBgUri ? (
                       <Image
                         source={{ uri: customBgUri }}
-                        style={[styles.swatch, bgType === 'custom' && { borderWidth: 3, borderColor: '#22C55E' }]}
+                        style={[styles.swatch, bgType === 'custom' && { borderWidth: 3, borderColor: '#0d8e62' }]}
                       />
                     ) : (
                       <View style={[styles.swatch, {
                         backgroundColor: isDark ? '#374151' : '#E5E7EB',
                         alignItems: 'center', justifyContent: 'center',
                       }]}>
-                        <MaterialCommunityIcons name="image-plus" size={20} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                        <MaterialCommunityIcons name="image-plus" size={20} color={colors.textLight} />
                       </View>
                     )}
-                    <Text style={[styles.swatchText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                    <Text style={[styles.swatchText, { color: colors.textLight }]}>
                       {t('common.image')}
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* ── App backgrounds ── */}
-                <Text style={[styles.sectionLabel, { color: isDark ? '#9CA3AF' : '#6B7280', marginTop: 12, textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
+                <Text style={[styles.sectionLabel, { color: colors.textLight, marginTop: 12, textAlign: isRTL ? 'right' : 'left', paddingLeft: isRTL ? 4 : 0, paddingRight: isRTL ? 0 : 4 }]}>
                   {t('common.appBackgrounds')}
                 </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[{ marginBottom: 8 }, isRTL && { transform: [{ scaleX: -1 }] }]} contentContainerStyle={{ gap: 12, paddingHorizontal: 12 }}>
@@ -485,11 +514,11 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
                           source={bg.source}
                           style={[
                             styles.appBgThumb,
-                            active && { borderWidth: 3, borderColor: '#22C55E' },
+                            active && { borderWidth: 3, borderColor: '#0d8e62' },
                           ]}
                           resizeMode="cover"
                         />
-                        <Text style={[styles.swatchText, { color: isDark ? '#9CA3AF' : '#6B7280' }]}>
+                        <Text style={[styles.swatchText, { color: colors.textLight }]}>
                           {bg.name_ar}
                         </Text>
                       </TouchableOpacity>
@@ -672,7 +701,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 32,

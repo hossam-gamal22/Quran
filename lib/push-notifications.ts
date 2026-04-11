@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
-import { getAndroidChannelForSoundSync } from './notification-sound-installer';
+import { getAdhanChannelId, getReminderChannelId } from '../services/notifications/channels';
 
 // ==================== Types ====================
 
@@ -58,9 +58,8 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       return false;
     }
 
-    // Android channels are now set up in services/notifications/channels.ts
-    // via setupNotificationChannels() called from app/_layout.tsx
-    // This ensures user-selected sounds are applied correctly
+    // Android channels are pre-created at startup in services/notifications/channels.ts
+    // via initializeAllNotificationChannels() called from app/_layout.tsx
 
     return true;
   } catch (error) {
@@ -70,62 +69,8 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 };
 
 // ==================== Android Channels ====================
-// NOTE: Android channels are now centralized in services/notifications/channels.ts
-// The setupNotificationChannels() function there handles all channel creation
-// with user-selected sounds. This prevents the immutability conflict where
-// channels created here with default sounds would override user preferences.
-
-/**
- * Create or get a dynamic Android notification channel for a specific sound.
- * Android channels are immutable after creation — so we create one per sound type.
- * 
- * For custom downloaded sounds, returns the pre-created channel from notification-sound-installer.
- * For bundled sounds, creates a channel with the sound name.
- * 
- * Returns the channelId to use when scheduling the notification.
- */
-export const getOrCreateSoundChannel = async (
-  baseChannel: string,
-  soundType?: string,
-): Promise<string> => {
-  if (Platform.OS !== 'android') return baseChannel;
-  if (!soundType || soundType === 'default' || soundType === 'general_reminder') return baseChannel;
-
-  // Check if this is a custom installed sound (downloaded from Firebase)
-  // Custom sounds have channels created during installation with ID: custom_sound_{soundId}
-  const customChannelId = getAndroidChannelForSoundSync(soundType);
-  if (customChannelId) {
-    console.log(`[push-notifications] Using custom channel ${customChannelId} for sound ${soundType}`);
-    return customChannelId;
-  }
-
-  // For bundled sounds, create a channel with the sound name
-  const channelId = `${baseChannel}_${soundType}`;
-  // Android raw resources referenced WITHOUT file extension
-  const soundFile = soundType;
-
-  // Channel names for user display
-  const channelNames: Record<string, string> = {
-    'prayer-times': t('notifications.prayerTimesChannel'),
-    azkar: t('notifications.azkarChannel'),
-    'daily-ayah': t('notifications.dailyVerseChannel'),
-    general: t('notifications.generalChannel'),
-  };
-
-  try {
-    await Notifications.setNotificationChannelAsync(channelId, {
-      name: `${channelNames[baseChannel] || baseChannel} (${soundType})`,
-      importance: Notifications.AndroidImportance.HIGH,
-      sound: soundFile,
-      vibrationPattern: [0, 250, 250, 250],
-    });
-  } catch (e) {
-    console.warn(`Failed to create channel ${channelId}:`, e);
-    return baseChannel; // fallback to default channel
-  }
-
-  return channelId;
-};
+// Channels are pre-created at startup in services/notifications/channels.ts
+// Use getAdhanChannelId() / getReminderChannelId() to resolve the correct channel.
 
 // ==================== FCM Token Functions ====================
 
@@ -250,35 +195,38 @@ export const scheduleLocalNotification = async (
   trigger: Notifications.NotificationTriggerInput,
   options?: { sound?: boolean; vibration?: boolean }
 ): Promise<string> => {
-  // Extract channelId from trigger (if present) and move it to content
-  let channelId: string | undefined;
-  if (trigger && typeof trigger === 'object' && 'channelId' in trigger) {
-    channelId = (trigger as any).channelId;
-    const { channelId: _, ...triggerWithoutChannel } = trigger as any;
-    trigger = triggerWithoutChannel;
-  }
-
   const soundEnabled = options?.sound !== false;
   const vibrationEnabled = options?.vibration !== false;
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: dirText(notification.title),
-      body: dirText(notification.body),
-      data: notification.data,
-      sound: soundEnabled ? 'default' : undefined,
-      ...(Platform.OS === 'android' && channelId && { channelId }),
-      ...(Platform.OS === 'android' && !vibrationEnabled && { vibrate: [0] }),
-    },
-    trigger,
-  });
-  return id;
+  // Mirror channelId from trigger into content for Android belt-and-suspenders
+  const triggerChannelId = trigger && typeof trigger === 'object' && 'channelId' in trigger
+    ? (trigger as { channelId?: string }).channelId
+    : undefined;
+
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: dirText(notification.title),
+        body: dirText(notification.body),
+        data: notification.data,
+        sound: soundEnabled ? 'default' : undefined,
+        ...(Platform.OS === 'android' && !vibrationEnabled && { vibrate: [0] }),
+        ...(Platform.OS === 'android' && triggerChannelId && { channelId: triggerChannelId }),
+      },
+      trigger,
+    });
+    return id;
+  } catch (e) {
+    console.warn('[PushNotifications] scheduleLocalNotification failed:', e);
+    return '';
+  }
 };
 
 export const schedulePrayerNotification = async (
   prayerName: string,
   prayerTime: Date,
-  minutesBefore: number = 0
+  minutesBefore: number = 0,
+  soundKey?: string,
 ): Promise<string> => {
   const triggerDate = new Date(prayerTime);
   triggerDate.setMinutes(triggerDate.getMinutes() - minutesBefore);
@@ -287,7 +235,7 @@ export const schedulePrayerNotification = async (
   if (triggerDate <= new Date()) return '';
 
   const notification: PushNotificationData = {
-    title: minutesBefore > 0 
+    title: minutesBefore > 0
       ? `⏰ ${prayerName} ${t('notifications.afterMinutes').replace('{0}', String(minutesBefore))}`
       : `🕌 ${t('notifications.prayerTimeArrived')} ${prayerName}`,
     body: minutesBefore > 0
@@ -299,13 +247,14 @@ export const schedulePrayerNotification = async (
   return scheduleLocalNotification(notification, {
     type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: triggerDate,
-    channelId: 'prayer-times',
+    channelId: getAdhanChannelId(soundKey),
   });
 };
 
 export const scheduleAzkarReminder = async (
   azkarType: 'morning' | 'evening' | 'sleep',
-  time: Date
+  time: Date,
+  soundKey?: string,
 ): Promise<string> => {
   // Don't schedule if time is in the past
   if (time <= new Date()) return '';
@@ -325,7 +274,7 @@ export const scheduleAzkarReminder = async (
   return scheduleLocalNotification(notification, {
     type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: time,
-    channelId: 'azkar',
+    channelId: getReminderChannelId(soundKey),
   });
 };
 

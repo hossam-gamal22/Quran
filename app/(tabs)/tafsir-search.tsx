@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
@@ -202,13 +203,13 @@ export default function TafsirSearchScreen() {
     const surahName = getSurahName(item.surah.number);
     return (
       <TouchableOpacity
-        style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
+        style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
         onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
         activeOpacity={0.8}
       >
         <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[s.surahBadge, { backgroundColor: colors.primary + '30' }]}>
-            <Text style={[s.surahBadgeText, { color: colors.primary }]}>
+            <Text style={[s.surahBadgeText, { color: colors.primaryText }]}>
               {surahName} ({item.surah.number}:{item.numberInSurah})
             </Text>
           </View>
@@ -221,7 +222,7 @@ export default function TafsirSearchScreen() {
         </Text>
         <View style={[s.resultFooter, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity
-            style={[s.tafsirBtn, { backgroundColor: '#22C55E' }]}
+            style={[s.tafsirBtn, { backgroundColor: '#0d8e62' }]}
             onPress={() => handleOpenTafsir(item.surah.number, item.numberInSurah)}
           >
             <Text style={s.tafsirBtnText}>{t('tafsirSearch.tafsirBtn')}</Text>
@@ -231,23 +232,23 @@ export default function TafsirSearchScreen() {
     );
   }, [colors, query, searchLang, handleOpenTafsir]);
 
-  const s = StyleSheet.create({
+  const _s = StyleSheet.create({
     header: {
       paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
       borderBottomWidth: 1.5, borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
     },
-    title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', marginBottom: 14 },
+    title: { fontSize: 22, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 14 },
     // Search bar
     searchRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
     inputWrap: {
       flex: 1, flexDirection: 'row', alignItems: 'center',
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 14, borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderRadius: 14, borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.15)',
       paddingHorizontal: 14,
     },
-    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', backgroundColor: 'transparent' },
+    input: { flex: 1, height: 46, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', backgroundColor: 'transparent' },
     clearBtn: { padding: 4 },
     searchBtn: {
-      backgroundColor: '#22C55E', borderRadius: 14,
+      backgroundColor: '#0d8e62', borderRadius: 14,
       paddingHorizontal: 18, justifyContent: 'center',
     },
     searchBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
@@ -255,23 +256,23 @@ export default function TafsirSearchScreen() {
     langRow: { flexDirection: 'row', gap: 10 },
     langBtn: {
       flex: 1, paddingVertical: 9, borderRadius: 12, alignItems: 'center',
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.15)',
     },
-    langBtnActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    langBtnActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     langBtnText: { fontSize: 14, fontWeight: '700', color: colors.text },
     langBtnTextActive: { color: '#fff' },
     // Tafsir edition chips
     editionRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingVertical: 6 },
     editionChip: {
       paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.15)',
     },
-    editionChipActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    editionChipActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     editionChipText: { fontSize: 14, fontWeight: '700', color: colors.text },
     editionChipTextActive: { color: '#fff' },
-    editionLabel: { fontSize: 14, fontWeight: '600', color: colors.text, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left' },
+    editionLabel: { fontSize: 14, fontWeight: '600', color: colors.text, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     // Results
-    resultCount: { fontSize: 14, fontWeight: '600', color: colors.text, textAlign: isRTL ? 'right' : 'left', paddingHorizontal: 16, paddingVertical: 8 },
+    resultCount: { fontSize: 14, fontWeight: '600', color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 16, paddingVertical: 8 },
     resultCard: {
       marginHorizontal: 14, marginVertical: 6, borderRadius: 16,
       padding: 16, borderWidth: 1,
@@ -279,9 +280,9 @@ export default function TafsirSearchScreen() {
     resultHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
     surahBadge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
     surahBadgeText: { fontSize: 13, fontWeight: '700' },
-    juzBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
+    juzBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' },
     juzBadgeText: { fontSize: 13, fontWeight: '600', color: colors.text },
-    resultText: { textAlign: isRTL ? 'right' : 'left', lineHeight: 30, marginBottom: 10 },
+    resultText: { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 30, marginBottom: 10 },
     resultFooter: { flexDirection: 'row', justifyContent: 'flex-end' },
     tafsirBtn: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7 },
     tafsirBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
@@ -297,25 +298,26 @@ export default function TafsirSearchScreen() {
       paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.text },
-    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)' },
+    closeBtn: { padding: 8, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)' },
     modalContent: { padding: 20, paddingBottom: 60 },
-    ayahRef: { fontSize: 14, color: colors.primary, textAlign: isRTL ? 'right' : 'left', fontWeight: '700', marginBottom: 10 },
+    ayahRef: { fontSize: 14, color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', fontWeight: '700', marginBottom: 10 },
     arabicBox: {
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderRadius: 14, padding: 16,
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', borderRadius: 14, padding: 16,
       borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)', marginBottom: 16,
     },
-    arabicText: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 42 },
+    arabicText: { fontSize: 22, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 42 },
     editionTabsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
     editionTab: {
       paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+      backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', borderWidth: 1.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.15)',
     },
-    editionTabActive: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+    editionTabActive: { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
     editionTabText: { fontSize: 14, fontWeight: '700', color: colors.text },
     editionTabTextActive: { color: '#fff' },
-    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 10 },
-    tafsirText: { fontSize: 17, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 32 },
+    tafsirTitle: { fontSize: 15, fontWeight: '800', color: colors.primaryText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 10 },
+    tafsirText: { fontSize: 17, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', lineHeight: 32 },
   });
+  const s = useScaledStyles(_s, colors.fs);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -403,13 +405,13 @@ export default function TafsirSearchScreen() {
               keyExtractor={item => `surah_${item.numberInSurah}`}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
+                  style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }]}
                   onPress={() => handleOpenTafsir(surahTafsirResult.surahNumber, item.numberInSurah)}
                   activeOpacity={0.8}
                 >
                   <View style={[s.resultHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <View style={[s.surahBadge, { backgroundColor: colors.primary + '30' }]}>
-                      <Text style={[s.surahBadgeText, { color: colors.primary }]}>
+                      <Text style={[s.surahBadgeText, { color: colors.primaryText }]}>
                         {t('quran.ayah')} {item.numberInSurah}
                       </Text>
                     </View>
@@ -418,7 +420,7 @@ export default function TafsirSearchScreen() {
                     {item.arabicText}
                   </Text>
                   {item.tafsirText ? (
-                    <Text style={{ color: colors.textLight, fontSize: 14, lineHeight: 24, marginTop: 8, textAlign: isRTL ? 'right' : 'left' }} numberOfLines={3}>
+                    <Text style={{ color: colors.textLight, fontSize: 14, lineHeight: 24, marginTop: 8, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }} numberOfLines={3}>
                       {item.tafsirText}
                     </Text>
                   ) : null}

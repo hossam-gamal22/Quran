@@ -3,12 +3,12 @@
 // آخر تحديث: 2026-03-04
 
 import { db } from './firebase-config';
-import { 
-  doc, 
-  updateDoc, 
-  increment, 
-  collection, 
-  addDoc, 
+import {
+  doc,
+  updateDoc,
+  increment,
+  collection,
+  addDoc,
   serverTimestamp,
   setDoc,
   getDoc
@@ -16,12 +16,38 @@ import {
 import { getUserId } from './firebase-user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateMonthlyScore } from './rewards-manager';
+import Constants from 'expo-constants';
 
 // ==================== الثوابت ====================
 
 const STATS_DOC_PATH = 'stats/global';
 const ACTIVITY_COLLECTION = 'activity';
 const LOCAL_STATS_KEY = '@rooh_local_stats';
+
+/** Get current app version for per-version stats doc */
+const getVersionDocPath = (): string => {
+  const version = Constants.expoConfig?.version || '1.0.0';
+  return `stats/${version}`;
+};
+
+/** Update both global and per-version stats docs simultaneously */
+const updateStatsDoc = async (ref: ReturnType<typeof doc>, fields: Record<string, any>): Promise<void> => {
+  try {
+    await updateDoc(ref, fields);
+  } catch {
+    // Doc may not exist yet (race with initializeGlobalStats) — create with merge
+    await setDoc(ref, { ...fields, lastUpdated: serverTimestamp() }, { merge: true });
+  }
+};
+
+const updateStatsDual = async (fields: Record<string, any>): Promise<void> => {
+  const globalRef = doc(db, STATS_DOC_PATH);
+  const versionRef = doc(db, getVersionDocPath());
+  await Promise.all([
+    updateStatsDoc(globalRef, fields),
+    updateStatsDoc(versionRef, fields),
+  ]);
+};
 
 // ==================== الأنواع ====================
 
@@ -86,20 +112,29 @@ const saveLocalStats = async (stats: LocalStats): Promise<void> => {
  */
 export const initializeGlobalStats = async (): Promise<void> => {
   try {
+    const initialData = {
+      totalAzkarRead: 0,
+      totalQuranPages: 0,
+      totalPrayers: 0,
+      totalTasbih: 0,
+      totalAppOpens: 0,
+      lastUpdated: serverTimestamp(),
+    };
+
     const statsRef = doc(db, STATS_DOC_PATH);
-    const statsDoc = await getDoc(statsRef);
-    
-    if (!statsDoc.exists()) {
-      await setDoc(statsRef, {
-        totalAzkarRead: 0,
-        totalQuranPages: 0,
-        totalPrayers: 0,
-        totalTasbih: 0,
-        totalAppOpens: 0,
-        lastUpdated: serverTimestamp(),
-      });
-      console.log('✅ Global stats initialized');
-    }
+    const versionRef = doc(db, getVersionDocPath());
+
+    const [globalDoc, versionDoc] = await Promise.all([
+      getDoc(statsRef),
+      getDoc(versionRef),
+    ]);
+
+    const promises: Promise<void>[] = [];
+    if (!globalDoc.exists()) promises.push(setDoc(statsRef, initialData));
+    if (!versionDoc.exists()) promises.push(setDoc(versionRef, initialData));
+    if (promises.length > 0) await Promise.all(promises);
+
+    console.log('✅ Global stats initialized');
   } catch (error) {
     console.error('❌ Error initializing global stats:', error);
   }
@@ -117,21 +152,22 @@ export const trackAppOpen = async (): Promise<void> => {
     localStats.appOpens += 1;
     await saveLocalStats(localStats);
     
-    // تحديث Firebase
-    await updateDoc(doc(db, STATS_DOC_PATH), {
+    // Update monthly engagement score FIRST (saves locally even if Firestore fails)
+    updateMonthlyScore(userId, 'app_open').catch(e => console.warn('⚠️ Monthly score update failed (app_open):', e));
+    
+    // تحديث Firebase (global + per-version)
+    await updateStatsDual({
       totalAppOpens: increment(1),
       lastUpdated: serverTimestamp(),
-    });
+    }).catch(() => {});
     
     // تسجيل النشاط
     await addDoc(collection(db, ACTIVITY_COLLECTION), {
       type: 'app_open',
       userId,
+      description: 'فتح التطبيق',
       timestamp: serverTimestamp(),
-    });
-    
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'app_open').catch(() => {});
+    }).catch(() => {});
     
     console.log('📊 App open tracked');
   } catch (error) {
@@ -155,11 +191,14 @@ export const trackAzkarRead = async (
     localStats.azkarRead += 1;
     await saveLocalStats(localStats);
     
-    // تحديث Firebase
-    await updateDoc(doc(db, STATS_DOC_PATH), {
+    // Update monthly engagement score FIRST (saves locally even if Firestore fails)
+    updateMonthlyScore(userId, 'azkar').catch(e => console.warn('⚠️ Monthly score update failed (azkar):', e));
+    
+    // تحديث Firebase (global + per-version)
+    await updateStatsDual({
       totalAzkarRead: increment(1),
       lastUpdated: serverTimestamp(),
-    });
+    }).catch(() => {});
     
     // تسجيل النشاط
     await addDoc(collection(db, ACTIVITY_COLLECTION), {
@@ -168,11 +207,9 @@ export const trackAzkarRead = async (
       azkarId,
       category,
       language,
+      description: `قراءة ذكر — ${category}`,
       timestamp: serverTimestamp(),
-    });
-    
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'azkar').catch(() => {});
+    }).catch(() => {});
     
     console.log('📿 Azkar read tracked:', azkarId);
   } catch (error) {
@@ -196,11 +233,14 @@ export const trackQuranPage = async (
     localStats.quranPages += 1;
     await saveLocalStats(localStats);
     
-    // تحديث Firebase
-    await updateDoc(doc(db, STATS_DOC_PATH), {
+    // Update monthly engagement score FIRST (saves locally even if Firestore fails)
+    updateMonthlyScore(userId, 'quran').catch(e => console.warn('⚠️ Monthly score update failed (quran):', e));
+    
+    // تحديث Firebase (global + per-version)
+    await updateStatsDual({
       totalQuranPages: increment(1),
       lastUpdated: serverTimestamp(),
-    });
+    }).catch(() => {});
     
     // تسجيل النشاط
     await addDoc(collection(db, ACTIVITY_COLLECTION), {
@@ -209,11 +249,9 @@ export const trackQuranPage = async (
       surahId,
       surahName,
       ayahNumber,
+      description: `قراءة ${surahName}`,
       timestamp: serverTimestamp(),
-    });
-    
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'quran').catch(() => {});
+    }).catch(() => {});
     
     console.log('📖 Quran page tracked:', surahName);
   } catch (error) {
@@ -235,11 +273,14 @@ export const trackPrayer = async (
     localStats.prayers += 1;
     await saveLocalStats(localStats);
     
-    // تحديث Firebase
-    await updateDoc(doc(db, STATS_DOC_PATH), {
+    // Update monthly engagement score FIRST (saves locally even if Firestore fails)
+    updateMonthlyScore(userId, 'prayer').catch(e => console.warn('⚠️ Monthly score update failed (prayer):', e));
+    
+    // تحديث Firebase (global + per-version)
+    await updateStatsDual({
       totalPrayers: increment(1),
       lastUpdated: serverTimestamp(),
-    });
+    }).catch(() => {});
     
     // تسجيل النشاط
     await addDoc(collection(db, ACTIVITY_COLLECTION), {
@@ -247,11 +288,9 @@ export const trackPrayer = async (
       userId,
       prayerName,
       onTime,
+      description: `تسجيل صلاة ${prayerName}`,
       timestamp: serverTimestamp(),
-    });
-    
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'prayer').catch(() => {});
+    }).catch(() => {});
     
     console.log('🕌 Prayer tracked:', prayerName);
   } catch (error) {
@@ -275,11 +314,15 @@ export const trackTasbih = async (
     localStats.tasbihCount += count;
     await saveLocalStats(localStats);
     
-    // تحديث Firebase
-    await updateDoc(doc(db, STATS_DOC_PATH), {
+    // Update monthly engagement score FIRST (saves locally even if Firestore fails)
+    // Use actual tap count (not cumulative round number) so 100 taps = 100 in honor board
+    updateMonthlyScore(userId, 'tasbih', count).catch(e => console.warn('⚠️ Monthly score update failed (tasbih):', e));
+    
+    // تحديث Firebase (global + per-version)
+    await updateStatsDual({
       totalTasbih: increment(count),
       lastUpdated: serverTimestamp(),
-    });
+    }).catch(() => {});
     
     // تسجيل النشاط
     await addDoc(collection(db, ACTIVITY_COLLECTION), {
@@ -288,11 +331,9 @@ export const trackTasbih = async (
       count,
       zikrText: zikrText.substring(0, 50), // أول 50 حرف فقط
       totalRounds,
+      description: `تسبيح ${count} مرة`,
       timestamp: serverTimestamp(),
-    });
-    
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'tasbih', totalRounds).catch(() => {});
+    }).catch(() => {});
     
     console.log('📿 Tasbih tracked:', count);
   } catch (error) {
@@ -320,11 +361,11 @@ export const trackKhatmaProgress = async (
       surahId,
       surahName,
       progressPercent,
+      description: `تقدم في الختمة — ${surahName} (${progressPercent}%)`,
       timestamp: serverTimestamp(),
     });
     
-    // Update monthly engagement score
-    updateMonthlyScore(userId, 'khatma').catch(() => {});
+    // Khatma activity tracked for analytics only (not for honor board points — overlaps with quran pages)
     
     console.log('📚 Khatma progress tracked:', progressPercent + '%');
   } catch (error) {

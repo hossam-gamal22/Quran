@@ -7,11 +7,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  StatusBar,
   ActivityIndicator,
   Alert,
   Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +22,8 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 // ========================================
 // المكون الرئيسي
@@ -29,6 +31,8 @@ import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translation
 
 export default function LocationScreen() {
   const isRTL = checkIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { preferences, updatePreferences, goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
   
   const [isLoading, setIsLoading] = useState(false);
@@ -136,7 +140,7 @@ export default function LocationScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a1a2e" />
+      <StatusBar style="light" translucent />
       
       <View style={[styles.gradient, { backgroundColor: '#1a1a2e' }]}>
         <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -146,7 +150,7 @@ export default function LocationScreen() {
               <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
             </TouchableOpacity>
             <View style={styles.headerContent}>
-              <Text style={styles.stepText}>{tOnboardingStep(4, 5)}</Text>
+              <Text style={styles.stepText}>{tOnboardingStep(5, 6)}</Text>
               <Text style={styles.headerTitle}>{tOnboarding('location')}</Text>
             </View>
             <TouchableOpacity style={styles.skipBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); skipOnboarding(); }}>
@@ -194,11 +198,11 @@ export default function LocationScreen() {
             {locationInfo && (
               <Animated.View entering={FadeIn.delay(500).duration(500)} style={styles.locationCard}>
                 <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="city" size={24} color="#22C55E" />
+                  <MaterialCommunityIcons name="city" size={24} color="#0d8e62" />
                   <Text style={styles.locationText}>{locationInfo.city}</Text>
                 </View>
                 <View style={[styles.locationRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                  <MaterialCommunityIcons name="flag" size={24} color="#22C55E" />
+                  <MaterialCommunityIcons name="flag" size={24} color="#0d8e62" />
                   <Text style={styles.locationText}>{locationInfo.country}</Text>
                 </View>
               </Animated.View>
@@ -227,7 +231,7 @@ export default function LocationScreen() {
 
             {/* ملاحظة */}
             <Animated.View entering={FadeInDown.delay(600).duration(500)} style={[styles.noteContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="shield-check" size={20} color="#22C55E" />
+              <MaterialCommunityIcons name="shield-check" size={20} color="#0d8e62" />
               <Text style={styles.noteText}>
                 {tOnboarding('privacyNote')}
               </Text>
@@ -263,6 +267,7 @@ export default function LocationScreen() {
                 <View style={styles.dot} />
                 <View style={styles.dot} />
                 <View style={styles.dot} />
+                <View style={styles.dot} />
                 <View style={[styles.dot, styles.dotActive]} />
                 <View style={styles.dot} />
               </View>
@@ -278,7 +283,7 @@ export default function LocationScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -334,7 +339,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     borderRadius: 2,
   },
   content: {
@@ -355,7 +360,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 10,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   title: {
     fontSize: 26,
@@ -470,6 +475,6 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     width: 24,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
 });

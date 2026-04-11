@@ -165,20 +165,11 @@ struct SmallDhikrWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [getDhikrCategoryColor(category), getDhikrCategoryColor(category).opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: getDhikrCategoryColor(category))
             
             VStack(spacing: 6) {
-                HStack {
-                    Image(systemName: getDhikrCategoryIcon(category))
-                        .font(.system(size: 12))
-                    Text("ذكر اليوم")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.8))
+                // App icon
+                WidgetAppIcon(size: 32)
                 
                 Spacer()
                 
@@ -192,21 +183,23 @@ struct SmallDhikrWidgetView: View {
                 Spacer()
                 
                 if (entry.data?.count ?? 1) > 1 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "repeat")
-                            .font(.system(size: 10))
-                        Text("\(entry.data?.count ?? 1) \(entry.data?.timesLabel ?? "مرات")")
-                            .font(.system(size: 10, weight: .medium))
+                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 9))
+                            Text("\(entry.data?.count ?? 1) \(entry.data?.timesLabel ?? "مرات")")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(WidgetConstants.Colors.gold)
                     }
-                    .foregroundColor(.white.opacity(0.8))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(8)
                 }
             }
             .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -223,63 +216,68 @@ struct MediumDhikrWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [getDhikrCategoryColor(category), getDhikrCategoryColor(category).opacity(0.7)]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: getDhikrCategoryColor(category))
             
-            HStack(spacing: 15) {
-                // Left side: category & count
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: getDhikrCategoryIcon(category))
-                            .font(.system(size: 14))
-                        Text(entry.data?.categoryName ?? "أذكار")
-                            .font(.system(size: 12, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    WidgetAppIcon(size: 20)
+                    Text("ذكر اليوم")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
                     Spacer()
-                    
-                    if (entry.data?.count ?? 1) > 1 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "repeat")
-                                .font(.system(size: 10))
-                            Text("\(entry.data?.count ?? 1)×")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Color.white.opacity(0.2))
-                        .cornerRadius(10)
-                    }
-                }
-                .frame(maxWidth: 90)
-                
-                // Right side: dhikr text & benefit
-                VStack(alignment: .trailing, spacing: 8) {
-                    Text(entry.data?.arabic ?? "سبحان الله")
-                        .font(.system(size: 15, weight: .medium))
-                        .multilineTextAlignment(.trailing)
-                        .lineLimit(3)
-                        .foregroundColor(.white)
-                        .environment(\.layoutDirection, .rightToLeft)
-                    
-                    if entry.settings?.showBenefit ?? true,
-                       let benefit = entry.data?.benefit, !benefit.isEmpty {
-                        Text(benefit)
-                            .font(.system(size: 10))
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
+                    GlassPill {
+                        Text(entry.data?.categoryName ?? "أذكار")
+                            .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.white.opacity(0.7))
-                            .environment(\.layoutDirection, .rightToLeft)
                     }
                 }
+                .padding(.horizontal)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                
+                HStack(spacing: 12) {
+                    // Right: dhikr text
+                    VStack(alignment: .trailing, spacing: 6) {
+                        Text(entry.data?.arabic ?? "سبحان الله")
+                            .font(.system(size: 15, weight: .medium))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(3)
+                            .foregroundColor(.white)
+                            .environment(\.layoutDirection, .rightToLeft)
+                        
+                        if entry.settings?.showBenefit ?? true,
+                           let benefit = entry.data?.benefit, !benefit.isEmpty {
+                            Text(benefit)
+                                .font(.system(size: 10))
+                                .multilineTextAlignment(.trailing)
+                                .lineLimit(2)
+                                .foregroundColor(.white.opacity(0.5))
+                                .environment(\.layoutDirection, .rightToLeft)
+                        }
+                    }
+                    
+                    // Left: count
+                    if (entry.data?.count ?? 1) > 1 {
+                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "repeat")
+                                    .font(.system(size: 9))
+                                Text("\(entry.data?.count ?? 1)×")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(WidgetConstants.Colors.gold)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom, 10)
             }
-            .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 

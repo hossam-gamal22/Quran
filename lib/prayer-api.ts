@@ -249,45 +249,6 @@ export async function fetchMonthlyPrayerTimes(
   }
 }
 
-/**
- * Pre-cache upcoming months of prayer times so that background scheduling
- * works reliably offline. Call once on app startup when online.
- *
- * iOS:     current + next month   (covers the 7-day scheduling window)
- * Android: current + next 2 months (covers the 30-day scheduling window)
- */
-export async function prefetchUpcomingPrayerMonths(
-  latitude: number,
-  longitude: number,
-  method: number = 4,
-): Promise<void> {
-  const { Platform } = require('react-native');
-  const monthsToCache = Platform.OS === 'android' ? 3 : 2;
-  const now = new Date();
-
-  for (let offset = 0; offset < monthsToCache; offset++) {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const month = d.getMonth() + 1;
-    const year = d.getFullYear();
-    const cacheKey = prayerCacheKey(latitude, longitude, month, year, method);
-
-    // Only fetch if not already cached — avoids redundant API calls
-    const existing = await getCachedPrayerTimes(cacheKey);
-    if (existing) {
-      console.log(`[prayer-api] ✅ Pre-cache hit for ${month}/${year} (${existing.length} days)`);
-      continue;
-    }
-
-    try {
-      await fetchMonthlyPrayerTimes(latitude, longitude, month, year, method);
-      console.log(`[prayer-api] 📥 Pre-cached prayer times for ${month}/${year}`);
-    } catch {
-      // Offline — silently skip; next app open with internet will populate
-      console.log(`[prayer-api] ⏭️ Pre-cache skipped for ${month}/${year} (offline)`);
-    }
-  }
-}
-
 export async function fetchHijriDate(date?: Date): Promise<{
   hijri: PrayerTimesResponse['date']['hijri'];
   gregorian: PrayerTimesResponse['date']['gregorian'];

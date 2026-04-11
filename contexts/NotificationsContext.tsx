@@ -23,7 +23,10 @@ import {
   clearBadge,
   NotificationSettings,
 } from '@/lib/push-notifications';
+import { db } from '@/lib/firebase-config';
+import { doc, updateDoc, increment } from 'firebase/firestore';
 import { getAyahSoundUri } from '@/lib/notification-sound-cache';
+import { handleNotificationNavigation } from '@/lib/notification-router';
 import { useRouter } from 'expo-router';
 
 // ==================== Types ====================
@@ -124,6 +127,34 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
 
   // Setup listeners
   useEffect(() => {
+    // Clean up any existing listeners before creating new ones
+    notificationListener.current?.remove();
+    responseListener.current?.remove();
+
+    // Helper: safely play audio and clean up
+    const playAndCleanup = async (uri: string, label: string) => {
+      let soundObj: Audio.Sound | null = null;
+      try {
+        if (!uri) return;
+        const { sound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true }
+        );
+        soundObj = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            sound.unloadAsync().catch(() => {});
+          }
+        });
+      } catch (e) {
+        console.warn(`Failed to play ${label} audio:`, e);
+        // Clean up on error to prevent memory leak
+        if (soundObj) {
+          try { await soundObj.unloadAsync(); } catch {}
+        }
+      }
+    };
+
     // Notification received while app is foregrounded
     notificationListener.current = addNotificationReceivedListener(
       async (notification) => {
@@ -132,10 +163,7 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
         // Play ayah audio when custom reminder with ayah content arrives in foreground
         if (data?.type === 'custom' && data?.contentType === 'ayah') {
           try {
-            // Try to use cached sound first, fallback to URL
             let audioUri = String(data.ayahAudioUrl || '');
-            
-            // If we have surah/ayah/reciter info, try to get cached version
             if (data.surah && data.ayah && data.reciter) {
               const cached = await getAyahSoundUri(
                 Number(data.surah),
@@ -145,37 +173,14 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
               audioUri = cached.uri;
               console.log(`📱 Playing ayah from ${cached.isLocal ? 'cache' : 'network'}: ${audioUri}`);
             }
-            
-            if (!audioUri) return;
-            
-            const { sound } = await Audio.Sound.createAsync(
-              { uri: audioUri },
-              { shouldPlay: true }
-            );
-            sound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded && status.didJustFinish) {
-                sound.unloadAsync();
-              }
-            });
+            await playAndCleanup(audioUri, 'ayah notification');
           } catch (e) {
             console.warn('Failed to play ayah audio from notification:', e);
           }
         }
         // Play first ayah audio when Kahf Friday reminder arrives in foreground
         if (data?.type === 'kahf' && data?.ayahAudioUrl) {
-          try {
-            const { sound } = await Audio.Sound.createAsync(
-              { uri: String(data.ayahAudioUrl) },
-              { shouldPlay: true }
-            );
-            sound.setOnPlaybackStatusUpdate((status) => {
-              if (status.isLoaded && status.didJustFinish) {
-                sound.unloadAsync();
-              }
-            });
-          } catch (e) {
-            console.warn('Failed to play Kahf ayah audio from notification:', e);
-          }
+          await playAndCleanup(String(data.ayahAudioUrl), 'Kahf ayah');
         }
       }
     );
@@ -183,72 +188,22 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
     // User interacted with notification
     responseListener.current = addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
-      
-      // Handle deep-link URL from admin notifications
-      if (data?.actionUrl && typeof data.actionUrl === 'string') {
-        const url = data.actionUrl;
-        // Only navigate to internal routes (starts with /)
-        if (url.startsWith('/')) {
-          router.push(url as any);
-          return;
-        }
+      const notifId = response.notification.request.identifier;
+
+      // Track notification open in Firestore
+      if (data?.notificationDocId) {
+        updateDoc(doc(db, 'notifications', data.notificationDocId as string), {
+          openedCount: increment(1),
+        }).catch(() => {});
       }
 
-      // Handle navigation based on notification type
-      if (data?.type === 'prayer') {
-        router.push('/(tabs)/prayer');
-      } else if (data?.type === 'azkar') {
-        router.push(`/azkar/${data.category}`);
-      } else if (data?.type === 'quran') {
-        router.push('/(tabs)/quran');
-      } else if (data?.type === 'seasonal') {
-        router.push('/seasonal');
-      } else if (data?.type === 'custom') {
-        // Navigate to ayah if custom reminder has surah/ayah data
-        if (data?.contentType === 'ayah' && data?.surah && data?.ayah) {
-          router.push(`/surah/${data.surah}?ayah=${data.ayah}` as any);
-          // Play ayah audio after navigation
-          if (data?.ayahAudioUrl) {
-            setTimeout(async () => {
-              try {
-                const { sound } = await Audio.Sound.createAsync(
-                  { uri: String(data.ayahAudioUrl) },
-                  { shouldPlay: true }
-                );
-                sound.setOnPlaybackStatusUpdate((status) => {
-                  if (status.isLoaded && status.didJustFinish) {
-                    sound.unloadAsync();
-                  }
-                });
-              } catch (e) {
-                console.warn('Failed to play ayah audio:', e);
-              }
-            }, 1500);
-          }
-        } else if (data?.contentType === 'surah' && data?.surah) {
-          router.push(`/surah/${data.surah}` as any);
-        }
-      } else if (data?.type === 'kahf') {
-        // Open Surah Al-Kahf in Mushaf reader
-        router.push('/surah/18' as any);
-        // Play first ayah audio after navigation
-        if (data?.ayahAudioUrl) {
-          setTimeout(async () => {
-            try {
-              const { sound } = await Audio.Sound.createAsync(
-                { uri: String(data.ayahAudioUrl) },
-                { shouldPlay: true }
-              );
-              sound.setOnPlaybackStatusUpdate((status) => {
-                if (status.isLoaded && status.didJustFinish) {
-                  sound.unloadAsync();
-                }
-              });
-            } catch (e) {
-              console.warn('Failed to play Kahf ayah audio:', e);
-            }
-          }, 1500);
-        }
+      const result = handleNotificationNavigation(data, router, notifId);
+
+      // Play audio after navigation transition (e.g. Kahf ayah, custom ayah)
+      if (result.audioUrl) {
+        setTimeout(() => {
+          playAndCleanup(result.audioUrl!, result.audioLabel || 'notification tap');
+        }, 1500);
       }
     });
 

@@ -16,6 +16,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
 import { localizeNumber } from '@/lib/format-number';
@@ -33,6 +34,7 @@ export default function LiveActivitiesSettingsScreen() {
   const { isDarkMode, t } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const [enabled, setEnabled] = useState(false);
   const [style, setStyle] = useState<LiveActivityStyle>('prayer_times');
   const [supported, setSupported] = useState(true);
@@ -79,28 +81,28 @@ export default function LiveActivitiesSettingsScreen() {
           {/* Toggle */}
           <GlassCard style={styles.card}>
             <View style={[styles.toggleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <Text style={[styles.toggleLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.toggleLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('liveActivities.enable')}
               </Text>
               <Switch
                 value={enabled}
                 onValueChange={handleToggle}
-                trackColor={{ false: '#767577', true: '#22C55E' }}
+                trackColor={{ false: '#767577', true: '#0d8e62' }}
                 thumbColor="#fff"
               />
             </View>
-            <Text style={[styles.description, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.description, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('liveActivities.description')}
             </Text>
             {!supported && Platform.OS === 'ios' && (
-              <Text style={[styles.compatibility, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left' }]}>
+              <Text style={[styles.compatibility, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('liveActivities.notSupported')}
               </Text>
             )}
           </GlassCard>
 
           {/* Style picker */}
-          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{t('liveActivities.styleTitle')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('liveActivities.styleTitle')}</Text>
           {LIVE_ACTIVITY_STYLES.map((s) => {
             const isActive = style === s.id;
             return (
@@ -110,25 +112,25 @@ export default function LiveActivitiesSettingsScreen() {
                 activeOpacity={0.7}
                 style={{ marginBottom: 8 }}
               >
-                <GlassCard style={[styles.styleCard, isActive && { borderColor: '#22C55E', borderWidth: 2 }]}>
+                <GlassCard style={[styles.styleCard, isActive && { borderColor: '#0d8e62', borderWidth: 2 }]}>
                   <View style={[styles.styleRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <View style={[styles.styleIcon, { backgroundColor: isActive ? 'rgba(34,197,94,0.15)' : 'rgba(34, 197, 94, 0.08)' }]}>
+                    <View style={[styles.styleIcon, { backgroundColor: isActive ? 'rgba(34,197,94,0.22)' : 'rgba(34, 197, 94, 0.12)' }]}>
                       <MaterialCommunityIcons
                         name={(STYLE_ICONS[s.id] || 'clock-outline') as any}
                         size={24}
-                        color={isActive ? '#22C55E' : colors.text}
+                        color={isActive ? '#0d8e62' : colors.text}
                       />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.styleName, { color: isActive ? '#22C55E' : colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                      <Text style={[styles.styleName, { color: isActive ? '#0d8e62' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                         {s.nameAr}
                       </Text>
-                      <Text style={[styles.styleDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left' }]}>
+                      <Text style={[styles.styleDesc, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                         {s.descAr}
                       </Text>
                     </View>
                     {isActive && (
-                      <MaterialCommunityIcons name="check-circle" size={22} color="#22C55E" />
+                      <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
                     )}
                   </View>
                 </GlassCard>
@@ -137,15 +139,15 @@ export default function LiveActivitiesSettingsScreen() {
           })}
 
           {/* Preview */}
-          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', marginTop: 16 }]}>{t('liveActivities.preview')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 16 }]}>{t('liveActivities.preview')}</Text>
           <GlassCard style={styles.previewCard}>
             <View style={styles.previewContent}>
               <View style={[styles.previewHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <MaterialCommunityIcons name="mosque" size={20} color="#22C55E" />
+                <MaterialCommunityIcons name="mosque" size={20} color="#0d8e62" />
                 <Text style={[styles.previewAppName, { color: colors.text }]}>{t('common.appName')}</Text>
               </View>
               <Text style={[styles.previewPrayer, { color: colors.text }]}>{t('liveActivities.previewNextPrayer')}</Text>
-              <Text style={[styles.previewTime, { color: '#22C55E' }]}>{localizeNumber('02:30:15')}</Text>
+              <Text style={[styles.previewTime, { color: '#0d8e62' }]}>{localizeNumber('02:30:15')}</Text>
               {style === 'prayer_times_sunrise' && (
                 <Text style={[styles.previewExtra, { color: colors.muted }]}>{t('liveActivities.previewSunrise')}</Text>
               )}
@@ -165,7 +167,7 @@ export default function LiveActivitiesSettingsScreen() {
                 ].map((p, i) => (
                   <View key={p.key} style={styles.previewTimeItem}>
                     <Text style={[styles.previewTimeLabel, { color: colors.muted }]}>{t(`prayer.${p.key}`)}</Text>
-                    <Text style={[styles.previewTimeVal, { color: i === 3 ? '#22C55E' : colors.text }]}>
+                    <Text style={[styles.previewTimeVal, { color: i === 3 ? '#0d8e62' : colors.text }]}>
                       {p.time}
                     </Text>
                   </View>
@@ -181,7 +183,7 @@ export default function LiveActivitiesSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
   card: { padding: 20, marginBottom: 16 },
   toggleRow: {

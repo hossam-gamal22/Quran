@@ -30,6 +30,8 @@ import {
 } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 
 const { width } = Dimensions.get('window');
 
@@ -52,6 +54,8 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
 }) => {
   const { t } = useSettings();
   const isRTL = useIsRTL();
+  const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -116,9 +120,9 @@ export const PrayerCard: React.FC<PrayerCardProps> = ({
             <MaterialCommunityIcons
               name="loading"
               size={40}
-              color={isDarkMode ? '#fff' : '#22C55E'}
+              color={isDarkMode ? '#fff' : '#0d8e62'}
             />
-            <Text style={[styles.loadingText, isDarkMode && styles.textLight]}>
+            <Text style={[styles.loadingText, { color: colors.text }]}>
               {t('common.loading')}
             </Text>
           </View>
@@ -198,6 +202,8 @@ interface CountdownDigitProps {
 }
 
 const CountdownDigit: React.FC<CountdownDigitProps> = ({ value, label }) => {
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   return (
     <View style={styles.digitContainer}>
       <Text style={styles.digitValue}>
@@ -208,7 +214,7 @@ const CountdownDigit: React.FC<CountdownDigitProps> = ({ value, label }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginVertical: 10,
@@ -236,11 +242,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
     fontFamily: fontRegular(),
-  },
-  textLight: {
-    color: '#fff',
   },
   content: {
     padding: 20,
@@ -300,7 +302,7 @@ const styles = StyleSheet.create({
   },
   remainingLabel: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.8)',
     fontFamily: fontRegular(),
     marginBottom: 8,
   },
@@ -326,7 +328,7 @@ const styles = StyleSheet.create({
   },
   digitLabel: {
     fontSize: 10,
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.8)',
     fontFamily: fontRegular(),
     marginTop: -5,
   },

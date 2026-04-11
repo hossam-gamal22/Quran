@@ -1,10 +1,10 @@
 // components/widgets/android/DailyDhikrSmallWidget.tsx
-// 2×2 widget: Dhikr text (truncated)
+// 2×2 widget: Dhikr text + count badge
 
 import React from 'react';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING } from './shared';
+import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
 
 export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
   const { dhikr } = data;
@@ -27,10 +27,13 @@ export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
       clickAction="OPEN_APP"
       clickActionData={{ uri: 'rooh-almuslim://daily-dhikr' }}
     >
-      <TextWidget
-        text="📿"
-        style={{ fontSize: 22 }}
+      <ImageWidget
+        image={APP_ICON}
+        imageWidth={ICON_SIZE.small}
+        imageHeight={ICON_SIZE.small}
+        radius={7}
       />
+
       <TextWidget
         text={truncated}
         style={{
@@ -38,27 +41,36 @@ export function DailyDhikrSmallWidget({ data }: { data: SharedWidgetData }) {
           color: COLORS.white,
           fontFamily: FONT.amiri,
           textAlign: 'center',
-          marginTop: 4,
         }}
         maxLines={3}
         truncate="END"
       />
+
       {dhikr.count > 0 && (
-        <TextWidget
-          text={`${dhikr.count}×`}
+        <FlexWidget
           style={{
-            fontSize: 12,
-            color: COLORS.tealLight,
-            fontFamily: FONT.amiriBold,
-            marginTop: 2,
+            backgroundColor: COLORS.badgeBg,
+            borderRadius: 10,
+            paddingHorizontal: 10,
+            paddingVertical: 3,
           }}
-        />
+        >
+          <TextWidget
+            text={`${dhikr.count}×`}
+            style={{
+              fontSize: 12,
+              color: COLORS.tealLight,
+              fontFamily: FONT.amiriBold,
+            }}
+          />
+        </FlexWidget>
       )}
+
       <TextWidget
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: BRANDING.color,
+          color: COLORS.teal,
           fontFamily: FONT.amiri,
         }}
       />

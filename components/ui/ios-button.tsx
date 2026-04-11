@@ -17,6 +17,8 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 // ========================================
 // أنماط وأنواع الأزرار
 // ========================================
@@ -55,8 +57,8 @@ interface IOSToggleProps extends Omit<TouchableOpacityProps, 'style'> {
 // ========================================
 
 const COLOR_MAP = {
-  green: '#22C55E',
-  greenLight: '#4ade80',
+  green: '#0d8e62',
+  greenLight: '#3da87e',
   red: '#ef4444',
   blue: '#3b82f6',
   gray: '#999',
@@ -102,6 +104,8 @@ export const IOSButton: React.FC<IOSButtonProps> = ({
   const sizeConfig = SIZE_MAP[size];
   const accentColor = customColor || getColorValue(color);
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     if (haptic) {
@@ -115,7 +119,7 @@ export const IOSButton: React.FC<IOSButtonProps> = ({
       case 'primary':
         return accentColor;
       case 'secondary':
-        return isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
+        return isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)';
       case 'tertiary':
         return `${accentColor}20`;
       case 'glass':
@@ -205,6 +209,8 @@ export const IOSToggle: React.FC<IOSToggleProps> = ({
   size = 'medium',
 }) => {
   const toggleConfig = TOGGLE_SIZE_MAP[size];
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -212,7 +218,7 @@ export const IOSToggle: React.FC<IOSToggleProps> = ({
   };
 
   return (
-    <BlurView intensity={60} style={[
+    <BlurView intensity={80} style={[
       styles.toggleGlassContainer,
       {
         width: toggleConfig.width,
@@ -266,6 +272,8 @@ export const GlassButton: React.FC<{
   style?: ViewStyle;
   isDarkMode?: boolean;
 }> = ({ children, onPress, intensity = 60, style, isDarkMode }) => {
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   return (
     <BlurView intensity={intensity} style={[styles.glassContainer, style]}>
       <TouchableOpacity
@@ -299,7 +307,7 @@ function getColorValue(color: ButtonColor): string {
 export const IOSButtonColors = {
   getPrimary: (isDarkMode: boolean) => ({ bg: COLOR_MAP.green, text: '#fff' }),
   getSecondary: (isDarkMode: boolean) => ({
-    bg: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+    bg: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
     text: isDarkMode ? '#fff' : '#333',
   }),
   getTertiary: (accentColor: string) => ({ bg: `${accentColor}20`, text: accentColor }),
@@ -310,7 +318,7 @@ export const IOSButtonColors = {
 // Styles
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   buttonBase: {
     justifyContent: 'center',
     alignItems: 'center',

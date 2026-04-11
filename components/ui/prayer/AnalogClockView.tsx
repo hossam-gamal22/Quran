@@ -26,6 +26,8 @@ import {
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 const { width } = Dimensions.get('window');
 
 interface AnalogClockViewProps {
@@ -46,6 +48,8 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   show24Hour = false,
 }) => {
   const isRTL = useIsRTL();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
   const [timeRemaining, setTimeRemaining] = useState<{
     hours: number;
     minutes: number;
@@ -157,7 +161,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   const borderColor = isDarkMode ? '#3a4050' : '#e0e0e0';
   const textColor = isDarkMode ? '#fff' : '#333';
   const mutedColor = isDarkMode ? '#A8A8AD' : '#8E8E93';
-  const accentColor = '#22C55E';
+  const accentColor = '#0d8e62';
 
   return (
     <View style={styles.wrapper}>
@@ -266,7 +270,7 @@ const AnalogClockView: React.FC<AnalogClockViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     paddingVertical: 10,

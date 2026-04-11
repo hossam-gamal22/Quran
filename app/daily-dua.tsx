@@ -19,13 +19,14 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { BrandedCapture, type BrandedCaptureHandle } from '@/components/ui/BrandedCapture';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { getDuaOfTheDay, getRandomDua, type DailyDua } from '@/data/daily-duas';
 import { getDailyDuaOverride } from '@/lib/daily-content-override';
 import { useFavorite } from '@/hooks/use-favorite';
@@ -35,7 +36,7 @@ import { transliterateReference } from '@/lib/source-transliteration';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
-const ACCENT = '#7c3aed';
+const ACCENT = '#FFFFFF';
 
 export default function DailyDuaScreen() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function DailyDuaScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   // Block all ads during dua reading
   useSacredContext('dua_reading');
@@ -56,7 +58,7 @@ export default function DailyDuaScreen() {
   const translatedDua = useAutoTranslate(dua.translation || dua.arabic, isArabic ? 'ar' : 'en', 'section');
   const translatedReference = useAutoTranslate(dua.reference || '', 'ar', 'section');
   const [showTranslation, setShowTranslation] = useState(!isArabic);
-  const brandedRef = useRef<BrandedCaptureHandle>(null);
+  const brandedRef = useRef<IslamicShareCardHandle>(null);
 
   const { saved: isFav, toggle: toggleFav } = useFavorite(
     `dua_${dua.reference}`,
@@ -146,20 +148,20 @@ export default function DailyDuaScreen() {
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
         opacity={settings.display.backgroundOpacity ?? 1}
-        style={[styles.container, { backgroundColor: settings.display.appBackground !== 'none' ? 'transparent' : (isDarkMode ? '#111827' : '#F3F4F6') }]}
+        style={styles.container}
       >
         {/* Header */}
         <UniversalHeader
-          backColor={isDarkMode ? '#F9FAFB' : '#1F2937'}
+          backColor={colors.text}
           style={{ paddingTop: insets.top }}
           rightActions={[
-            { icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : (isDarkMode ? '#F9FAFB' : '#1F2937') },
-            { icon: 'share-variant', onPress: handleShare, color: isDarkMode ? '#F9FAFB' : '#1F2937' },
+            { icon: isFav ? 'heart' : 'heart-outline', onPress: toggleFav, color: isFav ? '#ef4444' : colors.text },
+            { icon: 'share-variant', onPress: handleShare, color: colors.text },
           ]}
         >
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
             <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {t('azkar.duaOfDay')}
+              {t('home.dailyDua')}
             </Text>
             <SectionInfoButton sectionKey="duas_hadith" />
           </View>
@@ -177,26 +179,16 @@ export default function DailyDuaScreen() {
             </View>
           </View>
 
-          {/* Branded image capture */}
-          <BrandedCapture ref={brandedRef} title={t('azkar.duaOfDay')}>
-            <View style={styles.duaCardInner}>
-              {isArabic ? (
-                <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
-                  {dua.arabic}
-                </Text>
-              ) : (
-                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                  {isEnglish ? (dua.translation || dua.arabic) : translatedDua}
-                </Text>
-              )}
-              <Text style={[styles.referenceCaptureText, { color: ACCENT }]}>
-                📖 {transliterateReference(dua.reference, language)}
-              </Text>
-            </View>
-          </BrandedCapture>
+          {/* Premium Islamic share card */}
+          <IslamicShareCard
+            ref={brandedRef}
+            categoryLabel={t('azkar.duaOfDay')}
+            arabicText={dua.arabic}
+            sourceText={transliterateReference(dua.reference, language)}
+          />
 
           {/* Visible dua card */}
-          <GlassCard intensity={46} style={styles.duaCard}>
+          <GlassCard intensity={80} borderRadius={20} style={styles.duaCard}>
             {isArabic ? (
               <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }]}>
                 {dua.arabic}
@@ -210,7 +202,7 @@ export default function DailyDuaScreen() {
 
           {/* Translation — only shown for Arabic users who want to see English */}
           {isArabic && showTranslation && dua.translation && (
-            <GlassCard intensity={46} style={styles.translationCard}>
+            <GlassCard intensity={80} borderRadius={16} style={styles.translationCard}>
               <Text style={[styles.translationLabel, { color: ACCENT }]}>{t('azkar.translation')}</Text>
               <Text style={[styles.translationText, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
                 {dua.translation}
@@ -249,12 +241,14 @@ export default function DailyDuaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: { flex: 1 },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   content: { flex: 1 },
   contentContainer: {
@@ -295,6 +289,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   translationText: {
     fontSize: 16,
@@ -311,6 +307,8 @@ const styles = StyleSheet.create({
   referenceText: {
     fontSize: 14,
     fontWeight: '500',
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   refreshButton: {
     flexDirection: 'row',
@@ -325,11 +323,15 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 15,
     fontWeight: '600',
+    lineHeight: 26,
+    includeFontPadding: false,
   },
 
   footerText: {
     textAlign: 'center',
     fontSize: 13,
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   actionRow: {
     flexDirection: 'row',
@@ -350,6 +352,8 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 13,
     fontWeight: '500',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   duaCardInner: {
     padding: 24,
@@ -366,5 +370,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 16,
     textAlign: 'center',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
 });
+const styles = _styles;

@@ -30,7 +30,7 @@ import {
 import { db, storage } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { convertToPng } from '../utils/imageUpload';
+import { processImage } from '../utils/imageUpload';
 import { Styled } from '../components/Styled';
 import TranslateButton from '../components/TranslateButton';
 
@@ -181,7 +181,7 @@ const ROUTE_OPTIONS = [
   { value: '/surah/18', label: 'سورة الكهف' },
   { value: '/surah/36', label: 'سورة يس' },
   { value: '/surah/67', label: 'سورة الملك' },
-  { value: '/surah/2?ayah=255', label: 'آية الكرسي' },
+  { value: '/ayat-kursi', label: 'آية الكرسي' },
   { value: '/seasonal/ramadan', label: 'صفحة رمضان' },
   { value: '/seasonal/hajj', label: 'صفحة الحج' },
   { value: '/seasonal/mawlid', label: 'صفحة المولد' },
@@ -291,7 +291,7 @@ function MultiLangInput({
               type="text"
               value={values[lang.code] || ''}
               onChange={(e) => updateLang(lang.code, e.target.value)}
-              className="flex-1 bg-slate-700 text-white rounded-xl px-4 py-2.5 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
+              className="flex-1 bg-admin-surface-light text-white rounded-xl px-4 py-2.5 border border-admin-border focus:border-accent focus:outline-none text-sm"
               placeholder={`${lang.name}${lang.code === 'ar' && required ? ' (مطلوب)' : ''}`}
               dir={lang.rtl ? 'rtl' : 'ltr'}
             />
@@ -303,7 +303,7 @@ function MultiLangInput({
       <div className="flex items-center gap-2 mb-2">
         <button
           onClick={copyArabicToAll}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-emerald-400 rounded-lg border border-slate-600 transition-colors"
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-admin-surface-light hover:bg-admin-surface-light text-accent-light rounded-lg border border-admin-border transition-colors"
         >
           <Copy className="w-3 h-3" />
           🌐 نسخ العربي لكل اللغات
@@ -327,7 +327,7 @@ function MultiLangInput({
       </button>
 
       {showOthers && (
-        <div className="space-y-2 border border-slate-700 rounded-xl p-3 bg-slate-800/50">
+        <div className="space-y-2 border border-admin-border rounded-xl p-3 bg-admin-surface/50">
           {OTHER_LANGS.map(lang => (
             <div key={lang.code} className="flex items-center gap-2">
               <span className="text-lg flex-shrink-0 w-8 text-center">{lang.flag}</span>
@@ -336,7 +336,7 @@ function MultiLangInput({
                 type="text"
                 value={values[lang.code] || ''}
                 onChange={(e) => updateLang(lang.code, e.target.value)}
-                className="flex-1 bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:border-emerald-500 focus:outline-none text-sm"
+                className="flex-1 bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border focus:border-accent focus:outline-none text-sm"
                 placeholder={lang.name}
                 dir={lang.rtl ? 'rtl' : 'ltr'}
               />
@@ -391,6 +391,30 @@ export default function HighlightsManager() {
   }, []);
 
   const handleSave = async () => {
+    // Validate all highlights before saving
+    const errors: string[] = [];
+    highlights.forEach((h, i) => {
+      const name = h.titles?.ar || h.title || `هايلايت #${i + 1}`;
+      if (!(h.titles?.ar || h.title)) {
+        errors.push(`"${name}" — العنوان العربي مطلوب`);
+      }
+      if (h.type === 'temp_page') {
+        if (!h.tempPageId) {
+          errors.push(`"${name}" — يجب اختيار صفحة مؤقتة`);
+        }
+      } else if (h.routeType === 'html') {
+        if (!h.htmlContent?.trim()) {
+          errors.push(`"${name}" — محتوى HTML مطلوب`);
+        }
+      } else if (!h.route?.trim()) {
+        errors.push(`"${name}" — الرابط/المسار مطلوب`);
+      }
+    });
+    if (errors.length > 0) {
+      alert(`لا يمكن الحفظ:\n\n${errors.join('\n')}`);
+      return;
+    }
+
     setIsSaving(true);
     setSaveStatus('idle');
     try {
@@ -424,6 +448,9 @@ export default function HighlightsManager() {
   };
 
   const removeHighlight = (id: string) => {
+    const item = highlights.find(h => h.id === id);
+    const name = item?.titles?.ar || item?.title || 'هذا الهايلايت';
+    if (!window.confirm(`هل أنت متأكد من حذف "${name}"؟`)) return;
     setHighlights(prev => prev.filter(h => h.id !== id).map((h, i) => ({ ...h, order: i })));
     if (expandedId === id) setExpandedId(null);
   };
@@ -464,11 +491,26 @@ export default function HighlightsManager() {
   const handleIconUpload = async (id: string, file: File) => {
     setUploadingId(id);
     try {
-      const pngBlob = await convertToPng(file);
       const isSvg = file.type === 'image/svg+xml';
-      const ext = isSvg ? 'svg' : 'png';
+      let blob: Blob;
+      let ext: string;
+      let contentType: string;
+
+      if (isSvg) {
+        // Upload SVG directly — preserve vector quality, skip PNG conversion
+        blob = file;
+        ext = 'svg';
+        contentType = 'image/svg+xml';
+      } else {
+        // Use processImage for all other formats (smart resize/compress)
+        const result = await processImage(file);
+        blob = result.blob;
+        ext = result.ext;
+        contentType = result.contentType;
+      }
+
       const storageRef = ref(storage, `highlights/icons/${id}.${ext}`);
-      await uploadBytes(storageRef, pngBlob, { contentType: isSvg ? 'image/svg+xml' : 'image/png' });
+      await uploadBytes(storageRef, blob, { contentType });
       const url = await getDownloadURL(storageRef);
       updateHighlight(id, 'imageUrl', url);
     } catch (err) {
@@ -481,7 +523,7 @@ export default function HighlightsManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+        <RefreshCw className="w-8 h-8 text-accent-light animate-spin" />
       </div>
     );
   }
@@ -519,7 +561,7 @@ export default function HighlightsManager() {
                 ? 'bg-green-500 text-white'
                 : saveStatus === 'error'
                 ? 'bg-red-500 text-white'
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                : 'bg-accent hover:bg-accent-dark text-white'
             } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSaving ? (
@@ -537,14 +579,14 @@ export default function HighlightsManager() {
       </div>
 
       {/* Info */}
-      <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+      <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
         <p className="text-sm text-slate-400">
-          الهايلايتس المُضافة من هنا تظهر <strong className="text-emerald-400">قبل</strong> الهايلايتس الافتراضية (التاريخ الهجري، الأذكار، آية اليوم...). يمكنك إضافة روابط داخلية، روابط خارجية، أو محتوى HTML يُعرض داخل التطبيق. العناصر المثبتة تظهر دائماً في المقدمة.
+          الهايلايتس المُضافة من هنا تظهر <strong className="text-accent-light">قبل</strong> الهايلايتس الافتراضية (التاريخ الهجري، الأذكار، آية اليوم...). يمكنك إضافة روابط داخلية، روابط خارجية، أو محتوى HTML يُعرض داخل التطبيق. العناصر المثبتة تظهر دائماً في المقدمة.
         </p>
       </div>
 
       {sorted.length === 0 ? (
-        <div className="bg-slate-800 rounded-2xl p-12 border border-slate-700 text-center">
+        <div className="bg-admin-surface rounded-2xl p-12 border border-admin-border text-center">
           <CircleDot className="w-12 h-12 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-400">لا توجد هايلايتس مخصصة حالياً</p>
           <p className="text-slate-500 text-sm mt-1">اضغط "إضافة هايلايت" لإنشاء واحد جديد</p>
@@ -574,9 +616,9 @@ export default function HighlightsManager() {
 
       {/* Enhanced Preview */}
       {previewItems.length > 0 && (
-        <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+        <div className="bg-admin-surface rounded-2xl p-6 border border-admin-border">
           <h3 className="text-white font-semibold mb-4">معاينة الهايلايتس (كما ستظهر في التطبيق)</h3>
-          <div className="bg-slate-900 rounded-2xl p-6">
+          <div className="bg-admin-bg rounded-2xl p-6">
             <div className="flex gap-5 overflow-x-auto pb-4" dir="rtl">
               {previewItems.map(h => (
                 <div key={h.id} className="flex flex-col items-center gap-2 flex-shrink-0 relative w-[70px]">
@@ -610,7 +652,7 @@ export default function HighlightsManager() {
               ))}
               {['📅 الهجري', '🤲 أذكار', '📖 آية', '▶️ ستوري', '🕌 صلاة'].map((label, i) => (
                 <div key={`builtin-${i}`} className="flex flex-col items-center gap-2 flex-shrink-0 opacity-40 w-[70px]">
-                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl border-[3px] border-slate-600 bg-slate-700">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl border-[3px] border-admin-border bg-admin-surface-light">
                     {label.split(' ')[0]}
                   </div>
                   <span className="text-slate-500 text-[11px] text-center">{label.split(' ')[1]}</span>
@@ -666,10 +708,10 @@ function HighlightRow({
   };
 
   return (
-    <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+    <div className="bg-admin-surface rounded-2xl border border-admin-border overflow-hidden">
       {/* Collapsed row */}
       <div
-        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-slate-700/50 transition-colors"
+        className="flex items-center gap-4 p-4 cursor-pointer hover:bg-admin-surface-light/50 transition-colors"
         onClick={onToggleExpand}
       >
         <div className="flex flex-col gap-1">
@@ -734,7 +776,7 @@ function HighlightRow({
           title="Toggle highlight visibility"
         >
           {item.isVisible ? (
-            <Eye className="w-5 h-5 text-emerald-400" />
+            <Eye className="w-5 h-5 text-accent-light" />
           ) : (
             <EyeOff className="w-5 h-5 text-slate-500" />
           )}
@@ -754,7 +796,7 @@ function HighlightRow({
 
       {/* Expanded form */}
       {isExpanded && (
-        <div className="border-t border-slate-700 p-6 space-y-5">
+        <div className="border-t border-admin-border p-6 space-y-5">
           {/* نوع الهايلايت */}
           <div>
             <label className="block text-sm text-slate-400 mb-2">نوع الهايلايت</label>
@@ -763,8 +805,8 @@ function HighlightRow({
                 onClick={() => onUpdate(item.id, 'type', 'builtin')}
                 className={`p-3 rounded-xl border text-sm flex items-center gap-2 transition-all ${
                   item.type === 'builtin'
-                    ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                    ? 'border-accent bg-accent/20 text-white'
+                    : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                 }`}
               >
                 <Smartphone className="w-4 h-4" />
@@ -775,7 +817,7 @@ function HighlightRow({
                 className={`p-3 rounded-xl border text-sm flex items-center gap-2 transition-all ${
                   item.type === 'temp_page'
                     ? 'border-blue-500 bg-blue-500/20 text-white'
-                    : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                    : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                 }`}
               >
                 <FileText className="w-4 h-4" />
@@ -789,14 +831,14 @@ function HighlightRow({
             <div>
               <label className="block text-sm text-slate-400 mb-2">اختر الصفحة المؤقتة</label>
               {tempPages.length === 0 ? (
-                <p className="text-sm text-slate-500 bg-slate-700 rounded-xl p-3">
+                <p className="text-sm text-slate-500 bg-admin-surface-light rounded-xl p-3">
                   لا توجد صفحات مؤقتة. أنشئ صفحة من قسم "الصفحات المؤقتة" أولاً.
                 </p>
               ) : (
                 <select
                   value={item.tempPageId || ''}
                   onChange={(e) => onUpdate(item.id, 'tempPageId', e.target.value)}
-                  className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-blue-500 focus:outline-none"
+                  className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-blue-500 focus:outline-none"
                   dir="rtl"
                   aria-label="Select temporary page"
                 >
@@ -828,21 +870,20 @@ function HighlightRow({
 
           {/* Visibility & Pinned toggles */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+            <div className="bg-admin-surface-light/50 rounded-xl p-4 border border-admin-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {item.isVisible ? <Eye className="w-4 h-4 text-emerald-400" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
+                  {item.isVisible ? <Eye className="w-4 h-4 text-accent-light" /> : <EyeOff className="w-4 h-4 text-slate-500" />}
                   <span className="text-sm text-white">مرئي</span>
                 </div>
                 <button
+                  type="button"
                   onClick={() => onUpdate(item.id, 'isVisible', !item.isVisible)}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    item.isVisible ? 'bg-emerald-500' : 'bg-slate-600'
+                    item.isVisible ? 'bg-accent' : 'bg-admin-surface-light'
                   }`}
                   aria-label="Toggle visibility"
                   title="Toggle visibility"
-                  role="switch"
-                  aria-checked={item.isVisible ? "true" : "false"}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isVisible ? 'right-0.5' : 'right-[22px]'
@@ -851,21 +892,20 @@ function HighlightRow({
               </div>
             </div>
 
-            <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+            <div className="bg-admin-surface-light/50 rounded-xl p-4 border border-admin-border">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Pin className={`w-4 h-4 ${item.isPinned ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
                   <span className="text-sm text-white">تثبيت في المقدمة</span>
                 </div>
                 <button
+                  type="button"
                   onClick={() => onUpdate(item.id, 'isPinned', !item.isPinned)}
                   className={`relative w-11 h-6 rounded-full transition-colors ${
-                    item.isPinned ? 'bg-amber-500' : 'bg-slate-600'
+                    item.isPinned ? 'bg-amber-500' : 'bg-admin-surface-light'
                   }`}
                   aria-label="Toggle pin to top"
                   title="Toggle pin to top"
-                  role="switch"
-                  aria-checked={item.isPinned ? "true" : "false"}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
                     item.isPinned ? 'right-0.5' : 'right-[22px]'
@@ -876,7 +916,7 @@ function HighlightRow({
           </div>
 
           {/* Visibility Schedule */}
-          <div className="bg-slate-700/50 rounded-xl p-4 border border-slate-600">
+          <div className="bg-admin-surface-light/50 rounded-xl p-4 border border-admin-border">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-slate-400" />
@@ -887,8 +927,8 @@ function HighlightRow({
                   onClick={() => handleScheduleToggle(false)}
                   className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
                     !scheduleEnabled
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500'
-                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
+                      ? 'bg-accent/20 text-accent-light border border-accent'
+                      : 'bg-admin-surface-light text-slate-400 border border-admin-border hover:border-slate-500'
                   }`}
                 >
                   دائماً مرئي
@@ -898,7 +938,7 @@ function HighlightRow({
                   className={`text-xs px-3 py-1.5 rounded-lg transition-all ${
                     scheduleEnabled
                       ? 'bg-amber-500/20 text-amber-400 border border-amber-500'
-                      : 'bg-slate-700 text-slate-400 border border-slate-600 hover:border-slate-500'
+                      : 'bg-admin-surface-light text-slate-400 border border-admin-border hover:border-slate-500'
                   }`}
                 >
                   جدولة المدة
@@ -914,7 +954,7 @@ function HighlightRow({
                     type="datetime-local"
                     value={item.visibleFrom || ''}
                     onChange={(e) => onUpdate(item.id, 'visibleFrom', e.target.value || undefined)}
-                    className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:border-amber-500 focus:outline-none text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border focus:border-amber-500 focus:outline-none text-sm"
                     dir="ltr"
                     aria-label="Visible from date and time"
                   />
@@ -925,7 +965,7 @@ function HighlightRow({
                     type="datetime-local"
                     value={item.visibleUntil || ''}
                     onChange={(e) => onUpdate(item.id, 'visibleUntil', e.target.value || undefined)}
-                    className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 border border-slate-600 focus:border-amber-500 focus:outline-none text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-lg px-3 py-2 border border-admin-border focus:border-amber-500 focus:outline-none text-sm"
                     dir="ltr"
                     aria-label="Visible until date and time"
                   />
@@ -952,8 +992,8 @@ function HighlightRow({
                         onClick={() => onUpdate(item.id, 'routeType', opt.value)}
                         className={`p-3 rounded-xl border text-sm flex items-center gap-2 transition-all ${
                           item.routeType === opt.value
-                            ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                            : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                            ? 'border-accent bg-accent/20 text-white'
+                            : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                         }`}
                       >
                         <Icon className="w-4 h-4" />
@@ -974,8 +1014,8 @@ function HighlightRow({
                         onClick={() => onUpdate(item.id, 'route', r.value)}
                         className={`p-2 rounded-lg border text-xs transition-all ${
                           item.route === r.value
-                            ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                            : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                            ? 'border-accent bg-accent/20 text-white'
+                            : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                         }`}
                       >
                         {r.label}
@@ -986,7 +1026,7 @@ function HighlightRow({
                     type="text"
                     value={item.route}
                     onChange={(e) => onUpdate(item.id, 'route', e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none font-mono text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none font-mono text-sm"
                     placeholder="/custom/route"
                     dir="ltr"
                   />
@@ -1000,7 +1040,7 @@ function HighlightRow({
                     type="text"
                     value={item.route}
                     onChange={(e) => onUpdate(item.id, 'route', e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none font-mono text-sm"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none font-mono text-sm"
                     placeholder="https://example.com"
                     dir="ltr"
                   />
@@ -1017,7 +1057,7 @@ function HighlightRow({
                           const el = document.getElementById(`html-preview-${item.id}`);
                           if (el) el.classList.toggle('hidden');
                         }}
-                        className="text-xs px-2 py-1 rounded bg-slate-600 text-slate-300 hover:bg-slate-500"
+                        className="text-xs px-2 py-1 rounded bg-admin-surface-light text-slate-300 hover:bg-admin-muted"
                       >
                         معاينة ↕
                       </button>
@@ -1026,19 +1066,19 @@ function HighlightRow({
                   <textarea
                     value={item.htmlContent}
                     onChange={(e) => onUpdate(item.id, 'htmlContent', e.target.value)}
-                    className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 border border-slate-600 focus:border-emerald-500 focus:outline-none font-mono text-sm h-40 resize-y"
+                    className="w-full bg-admin-surface-light text-white rounded-xl px-4 py-3 border border-admin-border focus:border-accent focus:outline-none font-mono text-sm h-40 resize-y"
                     placeholder="<h1>عنوان</h1><p>محتوى...</p>"
                     dir="ltr"
                     aria-label="HTML content for highlight page"
                   />
                   <div
                     id={`html-preview-${item.id}`}
-                    className="mt-2 border border-slate-600 rounded-xl overflow-hidden hidden"
+                    className="mt-2 border border-admin-border rounded-xl overflow-hidden hidden"
                   >
-                    <div className="text-xs bg-slate-700 px-3 py-1 text-slate-400 border-b border-slate-600">معاينة</div>
+                    <div className="text-xs bg-admin-surface-light px-3 py-1 text-slate-400 border-b border-admin-border">معاينة</div>
                     <iframe
                       srcDoc={`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{font-family:sans-serif;padding:16px;color:#e2e8f0;background:#1e293b;direction:rtl}img{max-width:100%}h1,h2,h3{color:#34d399}</style></head><body>${item.htmlContent || ''}</body></html>`}
-                      className="w-full h-64 bg-slate-800"
+                      className="w-full h-64 bg-admin-surface"
                       sandbox="allow-same-origin"
                       title="معاينة HTML"
                     />
@@ -1058,8 +1098,8 @@ function HighlightRow({
                   onClick={() => onUpdate(item.id, 'icon', opt.value)}
                   className={`p-2 rounded-lg border text-center text-xs transition-all ${
                     item.icon === opt.value
-                      ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                      : 'border-slate-600 bg-slate-700 text-slate-300 hover:border-slate-500'
+                      ? 'border-accent bg-accent/20 text-white'
+                      : 'border-admin-border bg-admin-surface-light text-slate-300 hover:border-slate-500'
                   }`}
                 >
                   <span className="text-lg block">{opt.label.split(' ')[0]}</span>
@@ -1069,7 +1109,7 @@ function HighlightRow({
             </div>
 
             <div className="flex items-center gap-3 mt-3">
-              <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl cursor-pointer border border-slate-600 transition-colors text-sm">
+              <label className="flex items-center gap-2 px-4 py-2 bg-admin-surface-light hover:bg-admin-surface-light text-slate-300 rounded-xl cursor-pointer border border-admin-border transition-colors text-sm">
                 <Upload className="w-4 h-4" />
                 رفع أيقونة مخصصة
                 <input
@@ -1083,11 +1123,11 @@ function HighlightRow({
                 />
               </label>
               {uploadingId === item.id && (
-                <RefreshCw className="w-4 h-4 text-emerald-400 animate-spin" />
+                <RefreshCw className="w-4 h-4 text-accent-light animate-spin" />
               )}
               {item.imageUrl && (
                 <div className="flex items-center gap-2">
-                  <img src={item.imageUrl} alt="icon" className="w-8 h-8 rounded-full object-cover border border-slate-600" />
+                  <img src={item.imageUrl} alt="icon" className="w-8 h-8 rounded-full object-cover border border-admin-border" />
                   <button
                     onClick={() => onUpdate(item.id, 'imageUrl', '')}
                     className="text-xs text-red-400 hover:text-red-300"
@@ -1110,7 +1150,7 @@ function HighlightRow({
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs transition-all ${
                     item.color === c.value
                       ? 'border-white ring-2 ring-white/30'
-                      : 'border-slate-600 hover:border-slate-500'
+                      : 'border-admin-border hover:border-slate-500'
                   }`}
                 >
                   <Styled className="w-4 h-4 rounded-full" css={{ backgroundColor: c.value }} />
@@ -1123,14 +1163,14 @@ function HighlightRow({
                 type="color"
                 value={item.color}
                 onChange={(e) => onUpdate(item.id, 'color', e.target.value)}
-                className="w-8 h-8 rounded-lg border border-slate-600 cursor-pointer"
+                className="w-8 h-8 rounded-lg border border-admin-border cursor-pointer"
                 aria-label="Choose highlight color"
               />
               <input
                 type="text"
                 value={item.color}
                 onChange={(e) => onUpdate(item.id, 'color', e.target.value)}
-                className="bg-slate-700 text-white rounded-lg px-3 py-1.5 w-28 border border-slate-600 text-sm font-mono"
+                className="bg-admin-surface-light text-white rounded-lg px-3 py-1.5 w-28 border border-admin-border text-sm font-mono"
                 dir="ltr"
                 aria-label="Highlight color hex value"
                 placeholder="#000000"

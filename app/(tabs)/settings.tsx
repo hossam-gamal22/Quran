@@ -1,7 +1,7 @@
 // app/(tabs)/settings.tsx
 // صفحة الإعدادات الرئيسية - روح المسلم
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
-  StatusBar,
   Alert,
   Linking,
   Share,
@@ -18,6 +17,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -28,12 +28,16 @@ import Constants from 'expo-constants';
 
 import { useSettings, Language } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
 import { db } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { getStoreUrls } from '@/lib/app-config-api';
+import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
+import ShareAppModal from '@/components/ui/ShareAppModal';
+import { getDisplayName, setDisplayName, getUserId } from '@/lib/firebase-user';
+import { saveDisplayName } from '@/lib/rewards-manager';
 
 // ========================================
 // مكونات فرعية
@@ -55,7 +59,7 @@ interface SettingItemProps {
 
 const SettingItem: React.FC<SettingItemProps> = ({
   icon,
-  iconColor = '#22C55E',
+  iconColor = '#0d8e62',
   title,
   subtitle,
   value,
@@ -67,9 +71,11 @@ const SettingItem: React.FC<SettingItemProps> = ({
   colors,
 }) => {
   const isRTL = useIsRTL();
+  const { isDarkMode } = useSettings();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <TouchableOpacity
-      style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.text === '#FFFFFF' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
+      style={[styles.settingItem, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}
       onPress={() => {
         if (onPress) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -85,11 +91,11 @@ const SettingItem: React.FC<SettingItemProps> = ({
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={[styles.settingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+          <Text style={[styles.settingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {title}
           </Text>
           {subtitle && (
-            <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.settingSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {subtitle}
             </Text>
           )}
@@ -109,9 +115,9 @@ const SettingItem: React.FC<SettingItemProps> = ({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onSwitchChange?.(val);
           }}
-          trackColor={{ false: colors.text === '#FFFFFF' ? '#39393D' : '#E9E9EB', true: '#22C55E' }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
           thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-          ios_backgroundColor={colors.text === '#FFFFFF' ? '#39393D' : '#E9E9EB'}
+          ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
         />
       )}
 
@@ -140,13 +146,15 @@ const SettingSection: React.FC<SettingSectionProps> = ({
   colors,
 }) => {
   const isRTL = useIsRTL();
+  const { isDarkMode } = useSettings();
+  const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInDown.delay(index * 80).duration(400)}>
-      <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+      <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
         {title}
       </Text>
       <View style={[styles.sectionContent, {
-        backgroundColor: colors.text === '#FFFFFF'
+        backgroundColor: isDarkMode
           ? 'rgba(255,255,255,0.08)'
           : 'rgba(120,120,128,0.12)',
       }]}>
@@ -171,20 +179,17 @@ export default function SettingsScreen() {
     resetSettings,
   } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
 
   const appVersion = Constants.expoConfig?.version || '1.0.0';
 
+  // مشاركة التطبيق — modal
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+
   // مشاركة التطبيق
-  const handleShare = async () => {
+  const handleShare = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await Share.share({
-        message: `${t('settings.shareApp')}\nhttps://roohmuslim.app`,
-        title: t('common.appName'),
-      });
-    } catch (error) {
-      console.error('Error sharing:', error);
-    }
+    setShareModalVisible(true);
   };
 
   // تقييم التطبيق
@@ -200,15 +205,51 @@ export default function SettingsScreen() {
   };
 
   // التواصل معنا
-  const handleContact = () => {
+  const handleContact = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL(`mailto:support@roohmuslim.app?subject=${encodeURIComponent(t('common.appName'))}`);
+    try {
+      const config = await fetchAppConfig();
+      const email = config.contact?.email || 'hossamgamal290@gmail.com';
+      Linking.openURL(`mailto:${email}?subject=${encodeURIComponent(t('common.appName'))}`).catch(() => {});
+    } catch {
+      Linking.openURL(`mailto:hossamgamal290@gmail.com?subject=${encodeURIComponent(t('common.appName'))}`).catch(() => {});
+    }
   };
 
   // اقتراح ميزة جديدة
   const [suggestModalVisible, setSuggestModalVisible] = useState(false);
   const [suggestionText, setSuggestionText] = useState('');
   const [sendingSuggestion, setSendingSuggestion] = useState(false);
+
+  // اسم المستخدم
+  const [displayName, setDisplayNameState] = useState('');
+  const [nameModalVisible, setNameModalVisible] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [savingName, setSavingName] = useState(false);
+
+  useEffect(() => {
+    getDisplayName().then((name) => {
+      if (name) setDisplayNameState(name);
+    });
+  }, []);
+
+  const handleSaveName = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setSavingName(true);
+    try {
+      await setDisplayName(trimmed);
+      const userId = await getUserId();
+      await saveDisplayName(userId, trimmed);
+      setDisplayNameState(trimmed);
+      setNameModalVisible(false);
+      Alert.alert(t('settings.nameSaved'));
+    } catch (error) {
+      console.error('Error saving name:', error);
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const handleSuggestFeature = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -223,10 +264,13 @@ export default function SettingsScreen() {
     }
     setSendingSuggestion(true);
     try {
+      const userId = await getUserId();
       const docRef = await addDoc(collection(db, 'suggestions'), {
         text: suggestionText.trim(),
         platform: Platform.OS,
         language: settings.language,
+        userName: displayName || '',
+        userId: userId || '',
         createdAt: serverTimestamp(),
       });
       console.log('✅ Suggestion saved with ID:', docRef.id);
@@ -245,16 +289,14 @@ export default function SettingsScreen() {
       backgroundKey={settings.display.appBackground}
       backgroundUrl={settings.display.appBackgroundUrl}
       opacity={settings.display.backgroundOpacity ?? 1}
-      style={[styles.container, isDarkMode && styles.containerDark]}
+      style={[styles.container]}
     >
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-      />
+      <StatusBar style={colors.statusBarStyle} />
 
       {/* الهيدر */}
       <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+        <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
           {t('settings.title')}
         </Text>
       </Animated.View>
@@ -264,6 +306,51 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+
+        {/* الملف الشخصي - Welcome Header */}
+        <Animated.View entering={FadeInDown.delay(0).duration(400)}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setNameInput(displayName);
+              setNameModalVisible(true);
+            }}
+            style={[styles.profileHeader, {
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              backgroundColor: isDarkMode
+                ? 'rgba(255,255,255,0.08)'
+                : 'rgba(120,120,128,0.12)',
+            }]}
+          >
+            <View style={[styles.profileAvatar, { backgroundColor: '#0d8e62' + '20' }]}>
+              <MaterialCommunityIcons name="account-circle" size={52} color="#0d8e62" />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.profileName, {
+                color: colors.text,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }]}>
+                {displayName
+                  ? t('settings.welcomeUser').replace('{name}', displayName)
+                  : t('home.welcome')}
+              </Text>
+              <Text style={[styles.profileEditHint, {
+                color: colors.textLight,
+                textAlign: isRTL ? 'right' : 'left',
+                writingDirection: isRTL ? 'rtl' : 'ltr',
+              }]}>
+                {t('settings.editName')}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name={isRTL ? 'chevron-left' : 'chevron-right'}
+              size={22}
+              color={colors.textLight}
+            />
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* 1. العرض (Display) */}
         <SettingSection title={t('settings.display')} index={0} colors={colors}>
@@ -287,7 +374,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.notifications')} index={1} colors={colors}>
           <SettingItem
             icon="bell"
-            iconColor="#22C55E"
+            iconColor="#0d8e62"
             title={t('settings.notifications')}
             showArrow={false}
             showSwitch
@@ -297,7 +384,7 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon="bell-cog"
-            iconColor="#f5a623"
+            iconColor="#c07b10"
             title={t('settings.prayerAndAzkarAlerts')}
             onPress={() => router.push('/settings/notifications')}
             colors={colors}
@@ -323,7 +410,7 @@ export default function SettingsScreen() {
           {Platform.OS === 'ios' && (
             <SettingItem
               icon="cellphone-screenshot"
-              iconColor="#22C55E"
+              iconColor="#0d8e62"
               title={t('settings.liveActivities')}
               onPress={() => router.push('/settings/live-activities')}
               colors={colors}
@@ -335,7 +422,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.backupSection')} index={3} colors={colors}>
           <SettingItem
             icon="cloud-upload"
-            iconColor="#5d4e8c"
+            iconColor="#4a3d73"
             title={t('settings.backupRestore')}
             onPress={() => router.push('/settings/backup')}
             colors={colors}
@@ -346,9 +433,16 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.subscription')} index={4} colors={colors}>
           <SettingItem
             icon="crown"
-            iconColor="#FFD700"
+            iconColor="#B8860B"
             title={t('settings.premium')}
             onPress={() => router.push('/subscription')}
+            colors={colors}
+          />
+          <SettingItem
+            icon="trophy"
+            iconColor="#B8860B"
+            title={t('honor.title')}
+            onPress={() => router.push('/honor-board')}
             colors={colors}
           />
         </SettingSection>
@@ -357,7 +451,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.shareAppSection')} index={5} colors={colors}>
           <SettingItem
             icon="share-variant"
-            iconColor="#22C55E"
+            iconColor="#0d8e62"
             title={t('settings.shareApp')}
             showArrow={false}
             onPress={handleShare}
@@ -369,7 +463,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.about')} index={6} colors={colors}>
           <SettingItem
             icon="information"
-            iconColor="#5d4e8c"
+            iconColor="#4a3d73"
             title={t('settings.about')}
             value={`v${appVersion}`}
             onPress={() => router.push('/settings/about')}
@@ -395,7 +489,7 @@ export default function SettingsScreen() {
         <SettingSection title={t('settings.usefulLinks')} index={7} colors={colors}>
           <SettingItem
             icon="star"
-            iconColor="#f5a623"
+            iconColor="#c07b10"
             title={t('settings.rateApp')}
             showArrow={false}
             onPress={handleRate}
@@ -411,7 +505,7 @@ export default function SettingsScreen() {
           />
           <SettingItem
             icon="lightbulb-on-outline"
-            iconColor="#FFD700"
+            iconColor={isDarkMode ? '#FFD700' : '#B8860B'}
             title={t('settings.suggestFeature')}
             showArrow={false}
             onPress={handleSuggestFeature}
@@ -440,7 +534,7 @@ export default function SettingsScreen() {
           />
           <View style={[
             styles.suggestCard,
-            { backgroundColor: isDarkMode ? '#1e1e20' : '#fff' }
+            { backgroundColor: isDarkMode ? '#1a2a22' : '#ffffff' }
           ]}>
             <Text style={[
               styles.suggestTitle,
@@ -497,6 +591,81 @@ export default function SettingsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* مودال تعديل الاسم */}
+      <Modal
+        visible={nameModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNameModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.suggestOverlay}
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setNameModalVisible(false)}
+          />
+          <View style={[styles.suggestCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.suggestTitle, { color: colors.text }]}>
+              {t('settings.editName')}
+            </Text>
+            <TextInput
+              style={[
+                styles.nameInput,
+                {
+                  color: colors.text,
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                }
+              ]}
+              placeholder={t('settings.enterName')}
+              placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'}
+              value={nameInput}
+              onChangeText={(text) => setNameInput(text.slice(0, 30))}
+              maxLength={30}
+              textAlign={isRTL ? 'right' : 'left'}
+              autoFocus
+            />
+            <View style={[styles.suggestButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <TouchableOpacity
+                style={[
+                  styles.suggestBtn,
+                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }
+                ]}
+                onPress={() => setNameModalVisible(false)}
+              >
+                <Text style={{ color: colors.text, fontSize: 15, fontFamily: fontSemiBold() }}>
+                  {t('common.cancel')}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.suggestBtn,
+                  styles.suggestBtnSend,
+                  { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                  savingName && { opacity: 0.6 }
+                ]}
+                onPress={handleSaveName}
+                disabled={savingName || !nameInput.trim()}
+              >
+                <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontFamily: fontSemiBold() }}>
+                  {t('settings.saved')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Share App Modal */}
+      <ShareAppModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+      />
+
     </SafeAreaView>
     </BackgroundWrapper>
   );
@@ -506,7 +675,7 @@ export default function SettingsScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -520,12 +689,51 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontFamily: fontBold(),
+    lineHeight: 44,
+    includeFontPadding: false,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingVertical: 8,
+  },
+  // الملف الشخصي
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginBottom: 4,
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+  },
+  profileAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileName: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    lineHeight: 30,
+    includeFontPadding: false,
+  },
+  profileEditHint: {
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  nameInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    fontSize: 16,
+    fontFamily: fontRegular(),
+    marginBottom: 16,
   },
   // الأقسام
   sectionTitle: {
@@ -534,6 +742,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 18,
     marginBottom: 8,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   sectionContent: {
     marginHorizontal: 16,
@@ -558,16 +768,22 @@ const styles = StyleSheet.create({
   settingTitle: {
     fontSize: 16,
     fontFamily: fontSemiBold(),
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   settingSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
     marginTop: 2,
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   settingValue: {
     fontSize: 14,
     fontFamily: fontMedium(),
     marginHorizontal: 8,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   bottomSpace: {
     height: 100,
@@ -595,12 +811,16 @@ const styles = StyleSheet.create({
     fontFamily: fontBold(),
     textAlign: 'center',
     marginBottom: 4,
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   suggestSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
     textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   suggestInput: {
     borderWidth: 1,
@@ -625,6 +845,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   suggestBtnSend: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
 });
+const styles = _styles;

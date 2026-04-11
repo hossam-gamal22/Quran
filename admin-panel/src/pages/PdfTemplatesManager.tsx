@@ -363,7 +363,7 @@ export default function PdfTemplatesManager() {
           aria-label={label}
           value={value.startsWith('rgba') || value.startsWith('#') ? (value.startsWith('#') ? value : '#000000') : '#000000'}
           onChange={(e) => onChange(e.target.value)}
-          className="w-8 h-8 rounded cursor-pointer border border-slate-600"
+          className="w-8 h-8 rounded cursor-pointer border border-admin-border"
         />
       </div>
       <div className="flex-1">
@@ -374,7 +374,7 @@ export default function PdfTemplatesManager() {
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-slate-700 text-white text-xs px-2 py-1 rounded border border-slate-600 focus:border-emerald-500 outline-none"
+          className="w-full bg-admin-surface-light text-white text-xs px-2 py-1 rounded border border-admin-border focus:border-accent outline-none"
           dir="ltr"
         />
       </div>
@@ -383,7 +383,7 @@ export default function PdfTemplatesManager() {
 
   /* ─── Mini live preview ─── */
   const MiniPreview = ({ t }: { t: Omit<CustomTemplate, 'id' | 'createdAt'> }) => (
-    <Styled className="rounded-lg overflow-hidden border border-slate-600 w-full max-w-[200px]" css={{ background: t.pageBg }}>
+    <Styled className="rounded-lg overflow-hidden border border-admin-border w-full max-w-[200px]" css={{ background: t.pageBg }}>
       {/* Header */}
       <Styled className="py-3 px-3 text-center" css={{ background: `linear-gradient(135deg, ${t.headerGradFrom}, ${t.headerGradTo})`, borderBottom: `2px solid ${t.headerBorderColor}` }}>
         <div className="text-white text-[10px] font-bold">مناسك الحج</div>
@@ -419,7 +419,7 @@ export default function PdfTemplatesManager() {
     const update = (key: string, val: string | boolean) => setForm(prev => ({ ...prev, [key]: val }));
 
     return (
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700 space-y-6">
+      <div className="bg-admin-surface rounded-xl p-6 border border-admin-border space-y-6">
         {/* Name & Description */}
         <div className="grid grid-cols-2 gap-4">
           <div>
@@ -429,7 +429,7 @@ export default function PdfTemplatesManager() {
               onChange={(e) => update('name', e.target.value)}
               aria-label="اسم القالب"
               placeholder="مثال: ذهبي فاخر"
-              className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+              className="w-full bg-admin-surface-light text-white px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
             />
           </div>
           <div>
@@ -439,7 +439,7 @@ export default function PdfTemplatesManager() {
               onChange={(e) => update('description', e.target.value)}
               aria-label="الوصف"
               placeholder="وصف مختصر للقالب"
-              className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+              className="w-full bg-admin-surface-light text-white px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
             />
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function PdfTemplatesManager() {
           <div className="flex-1 space-y-4">
             {/* Page Background */}
             <div>
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2 flex items-center gap-1">
+              <h4 className="text-sm font-semibold text-accent-light mb-2 flex items-center gap-1">
                 <Palette className="w-4 h-4" /> خلفية الصفحة
               </h4>
               <ColorField label="لون الخلفية" value={form.pageBg} onChange={(v) => update('pageBg', v)} />
@@ -457,7 +457,7 @@ export default function PdfTemplatesManager() {
 
             {/* Header */}
             <div>
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2">الرأس (Header)</h4>
+              <h4 className="text-sm font-semibold text-accent-light mb-2">الرأس (Header)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <ColorField label="تدرج - من" value={form.headerGradFrom} onChange={(v) => update('headerGradFrom', v)} />
                 <ColorField label="تدرج - إلى" value={form.headerGradTo} onChange={(v) => update('headerGradTo', v)} />
@@ -468,7 +468,7 @@ export default function PdfTemplatesManager() {
 
             {/* Sections */}
             <div>
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2">الأقسام (الفردية)</h4>
+              <h4 className="text-sm font-semibold text-accent-light mb-2">الأقسام (الفردية)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <ColorField label="خلفية القسم" value={form.sectionBg} onChange={(v) => update('sectionBg', v)} />
                 <ColorField label="حد القسم" value={form.sectionBorder} onChange={(v) => update('sectionBorder', v)} />
@@ -479,7 +479,7 @@ export default function PdfTemplatesManager() {
 
             {/* Alt sections */}
             <div>
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2">الأقسام (الزوجية)</h4>
+              <h4 className="text-sm font-semibold text-accent-light mb-2">الأقسام (الزوجية)</h4>
               <div className="grid grid-cols-2 gap-2">
                 <ColorField label="خلفية بديلة" value={form.sectionAltBg} onChange={(v) => update('sectionAltBg', v)} />
                 <ColorField label="حد بديل" value={form.sectionAltBorder} onChange={(v) => update('sectionAltBorder', v)} />
@@ -489,7 +489,7 @@ export default function PdfTemplatesManager() {
 
             {/* Dua & Text */}
             <div>
-              <h4 className="text-sm font-semibold text-emerald-400 mb-2">الأدعية والنصوص</h4>
+              <h4 className="text-sm font-semibold text-accent-light mb-2">الأدعية والنصوص</h4>
               <div className="grid grid-cols-2 gap-2">
                 <ColorField label="خلفية الدعاء" value={form.duaBg} onChange={(v) => update('duaBg', v)} />
                 <ColorField label="حد الدعاء" value={form.duaBorder} onChange={(v) => update('duaBorder', v)} />
@@ -507,14 +507,14 @@ export default function PdfTemplatesManager() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pt-4 border-t border-slate-700">
-          <button onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
+        <div className="flex gap-3 justify-end pt-4 border-t border-admin-border">
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light transition-colors">
             إلغاء
           </button>
           <button
             onClick={() => onSave(form)}
             disabled={!form.name.trim() || isSaving}
-            className="px-6 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 rounded-lg bg-accent-dark text-white hover:bg-accent transition-colors disabled:opacity-50 flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {isSaving ? 'جارٍ الحفظ...' : existingId ? 'تحديث' : 'إضافة'}
@@ -528,7 +528,7 @@ export default function PdfTemplatesManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-emerald-500" />
+        <RefreshCw className="w-8 h-8 animate-spin text-accent" />
       </div>
     );
   }
@@ -548,7 +548,7 @@ export default function PdfTemplatesManager() {
         </div>
 
         {saveStatus === 'success' && (
-          <div className="flex items-center gap-2 bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-lg">
+          <div className="flex items-center gap-2 bg-accent/20 text-accent-light px-4 py-2 rounded-lg">
             <CheckCircle2 className="w-4 h-4" /> تم الحفظ بنجاح
           </div>
         )}
@@ -560,11 +560,11 @@ export default function PdfTemplatesManager() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-admin-surface rounded-xl p-1 w-fit">
         <button
           onClick={() => setActiveTab('templates')}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-            activeTab === 'templates' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+            activeTab === 'templates' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Palette className="w-4 h-4" /> قوالب الألوان ({templates.length})
@@ -572,7 +572,7 @@ export default function PdfTemplatesManager() {
         <button
           onClick={() => setActiveTab('uploads')}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-            activeTab === 'uploads' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+            activeTab === 'uploads' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Upload className="w-4 h-4" /> ملفات PDF مرفوعة ({uploads.length})
@@ -580,7 +580,7 @@ export default function PdfTemplatesManager() {
         <button
           onClick={() => setActiveTab('themepdfs')}
           className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-            activeTab === 'themepdfs' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+            activeTab === 'themepdfs' ? 'bg-accent-dark text-white' : 'text-slate-400 hover:text-white'
           }`}
         >
           <Link2 className="w-4 h-4" /> ربط PDF بالأنماط ({Object.keys(themePdfAssignments).length}/{THEME_NAMES.length})
@@ -594,7 +594,7 @@ export default function PdfTemplatesManager() {
           {!showNewForm && !editingTemplate && (
             <button
               onClick={() => setShowNewForm(true)}
-              className="w-full py-4 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 hover:text-emerald-400 hover:border-emerald-500 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-4 border-2 border-dashed border-admin-border rounded-xl text-slate-400 hover:text-accent-light hover:border-accent transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-5 h-5" /> إضافة قالب جديد
             </button>
@@ -618,7 +618,7 @@ export default function PdfTemplatesManager() {
           )}
 
           {/* Built-in templates info */}
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border">
             <div className="flex items-center gap-2 text-slate-300 mb-2">
               <AlertCircle className="w-4 h-4 text-amber-400" />
               <span className="text-sm font-medium">القوالب المدمجة</span>
@@ -631,12 +631,12 @@ export default function PdfTemplatesManager() {
           {/* Existing custom templates */}
           <div className="grid gap-4">
             {templates.map(t => (
-              <div key={t.id} className="bg-slate-800 rounded-xl p-5 border border-slate-700 flex items-start gap-5">
+              <div key={t.id} className="bg-admin-surface rounded-xl p-5 border border-admin-border flex items-start gap-5">
                 <MiniPreview t={t} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
                     <h3 className="text-lg font-bold text-white">{t.name}</h3>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${t.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600 text-slate-400'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${t.isActive ? 'bg-accent/20 text-accent-light' : 'bg-admin-surface-light text-slate-400'}`}>
                       {t.isActive ? 'مفعّل' : 'معطّل'}
                     </span>
                   </div>
@@ -646,13 +646,13 @@ export default function PdfTemplatesManager() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <button onClick={() => handleToggleActive(t)} className={`p-2 rounded-lg transition-colors ${t.isActive ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title={t.isActive ? 'تعطيل' : 'تفعيل'} aria-label={t.isActive ? 'تعطيل القالب' : 'تفعيل القالب'}>
+                  <button onClick={() => handleToggleActive(t)} className={`p-2 rounded-lg transition-colors ${t.isActive ? 'bg-accent/20 text-accent-light hover:bg-accent/30' : 'bg-admin-surface-light text-slate-400 hover:bg-admin-surface-light'}`} title={t.isActive ? 'تعطيل' : 'تفعيل'} aria-label={t.isActive ? 'تعطيل القالب' : 'تفعيل القالب'}>
                     <Eye className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setEditingTemplate(t)} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors" title="تعديل" aria-label="تعديل القالب">
+                  <button onClick={() => setEditingTemplate(t)} className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors" title="تعديل" aria-label="تعديل القالب">
                     <Palette className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDeleteTemplate(t.id)} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors" title="حذف القالب" aria-label="حذف القالب">
+                  <button onClick={() => handleDeleteTemplate(t.id)} className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors" title="حذف القالب" aria-label="حذف القالب">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -674,9 +674,9 @@ export default function PdfTemplatesManager() {
       {activeTab === 'uploads' && (
         <div className="space-y-4">
           {/* Upload area */}
-          <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
+          <div className="bg-admin-surface rounded-xl p-6 border border-admin-border">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <Upload className="w-5 h-5 text-emerald-400" /> رفع ملف PDF جاهز
+              <Upload className="w-5 h-5 text-accent-light" /> رفع ملف PDF جاهز
             </h3>
             <p className="text-sm text-slate-400 mb-4">
               ارفع ملف PDF مصمم جاهز ليُعرض كبديل للتصدير التلقائي. يمكنك تحديد الصفحة التي يخص بها الملف.
@@ -685,10 +685,10 @@ export default function PdfTemplatesManager() {
               {PAGE_TYPES.map(pt => (
                 <label
                   key={pt.key}
-                  className="flex items-center gap-3 p-4 bg-slate-700 rounded-xl border border-slate-600 hover:border-emerald-500 cursor-pointer transition-colors group"
+                  className="flex items-center gap-3 p-4 bg-admin-surface-light rounded-xl border border-admin-border hover:border-accent cursor-pointer transition-colors group"
                 >
-                  <div className="w-10 h-10 bg-slate-600 rounded-lg flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                    <Upload className="w-5 h-5 text-slate-300 group-hover:text-emerald-400" />
+                  <div className="w-10 h-10 bg-admin-surface-light rounded-lg flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+                    <Upload className="w-5 h-5 text-slate-300 group-hover:text-accent-light" />
                   </div>
                   <div className="flex-1">
                     <span className="text-sm font-medium text-white block">{pt.label}</span>
@@ -707,7 +707,7 @@ export default function PdfTemplatesManager() {
               ))}
             </div>
             {uploadingPdf && (
-              <div className="mt-4 flex items-center gap-2 text-emerald-400 text-sm">
+              <div className="mt-4 flex items-center gap-2 text-accent-light text-sm">
                 <RefreshCw className="w-4 h-4 animate-spin" /> جارٍ رفع الملف...
               </div>
             )}
@@ -716,7 +716,7 @@ export default function PdfTemplatesManager() {
           {/* Uploaded files list */}
           <div className="space-y-3">
             {uploads.map(u => (
-              <div key={u.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+              <div key={u.id} className="bg-admin-surface rounded-xl border border-admin-border overflow-hidden">
                 <div className="p-4 flex items-center gap-4">
                   <div className="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
                     <FileText className="w-6 h-6 text-red-400" />
@@ -724,11 +724,11 @@ export default function PdfTemplatesManager() {
                   <div className="flex-1 min-w-0">
                     <h4 className="text-white font-medium truncate">{u.name}</h4>
                     <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
-                      <span className="bg-slate-700 px-2 py-0.5 rounded">
+                      <span className="bg-admin-surface-light px-2 py-0.5 rounded">
                         {PAGE_TYPES.find(p => p.key === u.pageType)?.label || u.pageType}
                       </span>
                       {u.templateId && (
-                        <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
+                        <span className="bg-accent/20 text-accent-light px-2 py-0.5 rounded">
                           🎨 {u.templateId === 'emerald' ? 'زمردي' : u.templateId === 'royal' ? 'ملكي' : u.templateId === 'classic' ? 'كلاسيكي' : templates.find(t => t.id === u.templateId)?.name || u.templateId}
                         </span>
                       )}
@@ -737,7 +737,7 @@ export default function PdfTemplatesManager() {
                           🌐 {u.languages.join(', ')}
                         </span>
                       ) : (
-                        <span className="bg-slate-600/50 text-slate-300 px-2 py-0.5 rounded">
+                        <span className="bg-admin-surface-light/50 text-slate-300 px-2 py-0.5 rounded">
                           🌐 جميع اللغات
                         </span>
                       )}
@@ -746,13 +746,13 @@ export default function PdfTemplatesManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setExpandedUpload(expandedUpload === u.id ? null : u.id)} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors" title={expandedUpload === u.id ? 'طي التفاصيل' : 'عرض التفاصيل'} aria-label={expandedUpload === u.id ? 'طي التفاصيل' : 'عرض التفاصيل'}>
+                    <button onClick={() => setExpandedUpload(expandedUpload === u.id ? null : u.id)} className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light transition-colors" title={expandedUpload === u.id ? 'طي التفاصيل' : 'عرض التفاصيل'} aria-label={expandedUpload === u.id ? 'طي التفاصيل' : 'عرض التفاصيل'}>
                       {expandedUpload === u.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
-                    <a href={u.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors" title="تنزيل الملف" aria-label="تنزيل الملف">
+                    <a href={u.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-accent/20 hover:text-accent-light transition-colors" title="تنزيل الملف" aria-label="تنزيل الملف">
                       <Download className="w-4 h-4" />
                     </a>
-                    <button onClick={() => handleDeleteUpload(u)} className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors" title="حذف الملف" aria-label="حذف الملف">
+                    <button onClick={() => handleDeleteUpload(u)} className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors" title="حذف الملف" aria-label="حذف الملف">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -760,7 +760,7 @@ export default function PdfTemplatesManager() {
 
                 {/* Expanded edit */}
                 {expandedUpload === u.id && (
-                  <div className="px-4 pb-4 pt-2 border-t border-slate-700 space-y-3">
+                  <div className="px-4 pb-4 pt-2 border-t border-admin-border space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-slate-400 block mb-1">اسم العرض</label>
@@ -769,7 +769,7 @@ export default function PdfTemplatesManager() {
                           title="اسم العرض"
                           aria-label="اسم العرض"
                           onChange={(e) => handleUpdateUploadMeta(u.id, { name: e.target.value })}
-                          className="w-full bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full bg-admin-surface-light text-white text-sm px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
                         />
                       </div>
                       <div>
@@ -779,7 +779,7 @@ export default function PdfTemplatesManager() {
                           aria-label="الوصف"
                           onChange={(e) => handleUpdateUploadMeta(u.id, { description: e.target.value })}
                           placeholder="وصف الملف"
-                          className="w-full bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full bg-admin-surface-light text-white text-sm px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
                         />
                       </div>
                     </div>
@@ -791,7 +791,7 @@ export default function PdfTemplatesManager() {
                           aria-label="نوع الصفحة"
                           value={u.pageType}
                           onChange={(e) => handleUpdateUploadMeta(u.id, { pageType: e.target.value as UploadedPdf['pageType'] })}
-                          className="w-full bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full bg-admin-surface-light text-white text-sm px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
                         >
                           {PAGE_TYPES.map(pt => <option key={pt.key} value={pt.key}>{pt.label}</option>)}
                         </select>
@@ -803,7 +803,7 @@ export default function PdfTemplatesManager() {
                           aria-label="النمط المرتبط"
                           value={u.templateId || ''}
                           onChange={(e) => handleUpdateUploadMeta(u.id, { templateId: e.target.value || undefined })}
-                          className="w-full bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-emerald-500 outline-none"
+                          className="w-full bg-admin-surface-light text-white text-sm px-3 py-2 rounded-lg border border-admin-border focus:border-accent outline-none"
                         >
                           <option value="">— بدون ربط (عام) —</option>
                           <option value="emerald">زمردي (مدمج)</option>
@@ -821,8 +821,8 @@ export default function PdfTemplatesManager() {
                           onClick={() => handleUpdateUploadMeta(u.id, { languages: [] })}
                           className={`text-xs px-3 py-1 rounded-lg transition-colors ${
                             !u.languages || u.languages.length === 0
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              ? 'bg-accent-dark text-white'
+                              : 'bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light'
                           }`}
                         >
                           جميع اللغات
@@ -831,8 +831,8 @@ export default function PdfTemplatesManager() {
                           onClick={() => handleUpdateUploadMeta(u.id, { languages: u.languages && u.languages.length > 0 ? u.languages : ['ar'] })}
                           className={`text-xs px-3 py-1 rounded-lg transition-colors ${
                             u.languages && u.languages.length > 0
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              ? 'bg-accent-dark text-white'
+                              : 'bg-admin-surface-light text-slate-300 hover:bg-admin-surface-light'
                           }`}
                         >
                           لغات محددة
@@ -854,8 +854,8 @@ export default function PdfTemplatesManager() {
                                 }}
                                 className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
                                   isSelected
-                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                    : 'bg-slate-700 border-slate-600 text-slate-400 hover:border-slate-500'
+                                    ? 'bg-accent/20 border-accent text-accent-light'
+                                    : 'bg-admin-surface-light border-admin-border text-slate-400 hover:border-slate-500'
                                 }`}
                               >
                                 {lang.label}
@@ -868,7 +868,7 @@ export default function PdfTemplatesManager() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => { navigator.clipboard.writeText(u.url); }}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-accent-light transition-colors"
                       >
                         <Copy className="w-3.5 h-3.5" /> نسخ الرابط
                       </button>
@@ -893,9 +893,9 @@ export default function PdfTemplatesManager() {
       {activeTab === 'themepdfs' && (
         <div className="space-y-4">
           {/* Info */}
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border">
             <div className="flex items-center gap-2 text-slate-300 mb-2">
-              <Link2 className="w-4 h-4 text-emerald-400" />
+              <Link2 className="w-4 h-4 text-accent-light" />
               <span className="text-sm font-medium">ربط ملفات PDF بأنماط القرآن</span>
             </div>
             <p className="text-xs text-slate-400">
@@ -909,11 +909,11 @@ export default function PdfTemplatesManager() {
               const assignment = themePdfAssignments[idx];
               const isUploading = uploadingThemePdf === idx;
               return (
-                <div key={idx} className="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <div key={idx} className="bg-admin-surface rounded-xl border border-admin-border p-4">
                   <div className="flex items-center gap-4">
                     {/* Theme color swatch */}
                     <Styled
-                      className="w-12 h-12 rounded-xl border-2 border-slate-600 flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                      className="w-12 h-12 rounded-xl border-2 border-admin-border flex-shrink-0 flex items-center justify-center text-xs font-bold"
                       css={{ backgroundColor: THEME_COLORS[idx], color: idx >= 5 && idx <= 8 || idx === 10 ? '#fff' : '#333' }}
                     >
                       {idx + 1}
@@ -924,7 +924,7 @@ export default function PdfTemplatesManager() {
                       <h4 className="text-white font-medium">{themeName}</h4>
                       {assignment ? (
                         <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded flex items-center gap-1">
+                          <span className="bg-accent/20 text-accent-light px-2 py-0.5 rounded flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> مرتبط
                           </span>
                           <span className="truncate max-w-[200px]">{assignment.fileName}</span>
@@ -939,7 +939,7 @@ export default function PdfTemplatesManager() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {isUploading ? (
-                        <div className="flex items-center gap-2 text-emerald-400 text-sm">
+                        <div className="flex items-center gap-2 text-accent-light text-sm">
                           <RefreshCw className="w-4 h-4 animate-spin" /> جارٍ الرفع...
                         </div>
                       ) : (
@@ -947,7 +947,7 @@ export default function PdfTemplatesManager() {
                           <label className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
                             assignment
                               ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
-                              : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                              : 'bg-accent-dark text-white hover:bg-accent'
                           }`}>
                             {assignment ? (
                               <><Replace className="w-4 h-4" /> استبدال</>
@@ -969,7 +969,7 @@ export default function PdfTemplatesManager() {
                                 href={assignment.pdfUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-400 transition-colors"
+                                className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-accent/20 hover:text-accent-light transition-colors"
                                 title="تنزيل PDF النمط"
                                 aria-label="تنزيل PDF النمط"
                               >
@@ -977,7 +977,7 @@ export default function PdfTemplatesManager() {
                               </a>
                               <button
                                 onClick={() => { navigator.clipboard.writeText(assignment.pdfUrl); }}
-                                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
+                                className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
                                 title="نسخ الرابط"
                                 aria-label="نسخ الرابط"
                               >
@@ -985,7 +985,7 @@ export default function PdfTemplatesManager() {
                               </button>
                               <button
                                 onClick={() => handleDeleteThemePdf(idx)}
-                                className="p-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                                className="p-2 rounded-lg bg-admin-surface-light text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition-colors"
                                 title="حذف PDF النمط"
                                 aria-label="حذف PDF النمط"
                               >
@@ -1003,9 +1003,9 @@ export default function PdfTemplatesManager() {
           </div>
 
           {/* Stats summary */}
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 flex items-center justify-between">
+          <div className="bg-admin-surface/50 rounded-xl p-4 border border-admin-border flex items-center justify-between">
             <span className="text-sm text-slate-400">
-              الأنماط المرتبطة: <span className="text-emerald-400 font-bold">{Object.keys(themePdfAssignments).length}</span> من <span className="text-white">{THEME_NAMES.length}</span>
+              الأنماط المرتبطة: <span className="text-accent-light font-bold">{Object.keys(themePdfAssignments).length}</span> من <span className="text-white">{THEME_NAMES.length}</span>
             </span>
             {Object.keys(themePdfAssignments).length > 0 && (
               <span className="text-xs text-slate-500">

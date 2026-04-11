@@ -5,8 +5,10 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,11 +18,12 @@ import * as Haptics from 'expo-haptics';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
-const GREEN = '#22C55E';
+const GREEN = '#0d8e62';
 const DAILY_STATS_KEY = 'tasbih_daily_stats';
 const TYPE_STATS_KEY = 'tasbih_type_stats';
 
@@ -33,6 +36,7 @@ export default function TasbihStatsScreen() {
   const { settings } = useSettings();
   const isRTL = useIsRTL();
   const C = useColors();
+  const s = useScaledStyles(_s, C.fs);
   const isDarkMode = settings?.theme === 'dark';
 
   // Stats data
@@ -93,14 +97,14 @@ export default function TasbihStatsScreen() {
       opacity={settings?.display?.backgroundOpacity ?? 1}
       style={{ flex: 1, backgroundColor: 'transparent' }}
     >
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
         <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <TouchableOpacity onPress={goToTasbih} style={s.headerBtn}>
-            <MaterialCommunityIcons name="counter" size={22} color={GREEN} />
+            <MaterialCommunityIcons name="counter" size={22} color={C.text} />
           </TouchableOpacity>
-          <Text style={[s.headerTitle, { color: C.text }]}>{t('tasbih.statsList')}</Text>
+          <Text style={[s.headerTitle, { color: C.text }]}>{t('home.tasbihLog')}</Text>
           <TouchableOpacity onPress={handleClose} style={s.headerBtn}>
             <MaterialCommunityIcons name="close" size={22} color={C.text} />
           </TouchableOpacity>
@@ -108,7 +112,7 @@ export default function TasbihStatsScreen() {
 
         {isLoading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <MaterialCommunityIcons name="loading" size={32} color={GREEN} />
+            <MaterialCommunityIcons name="loading" size={32} color={C.text} />
           </View>
         ) : (
           <ScrollView
@@ -121,20 +125,28 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
+                  { overflow: 'hidden' },
                 ]}
               >
-                <MaterialCommunityIcons name="calendar-today" size={28} color={GREEN} />
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <MaterialCommunityIcons name="calendar-today" size={28} color={C.text} />
                 <Text style={[s.statValue, { color: C.text }]}>{totalToday}</Text>
                 <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.todaysCount')}</Text>
               </View>
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
+                  { overflow: 'hidden' },
                 ]}
               >
-                <MaterialCommunityIcons name="sync" size={28} color={GREEN} />
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <MaterialCommunityIcons name="sync" size={28} color={C.text} />
                 <Text style={[s.statValue, { color: C.text }]}>{rounds}</Text>
                 <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.completedRounds')}</Text>
               </View>
@@ -144,20 +156,28 @@ export default function TasbihStatsScreen() {
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
+                  { overflow: 'hidden' },
                 ]}
               >
-                <MaterialCommunityIcons name="sigma" size={28} color={GREEN} />
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <MaterialCommunityIcons name="sigma" size={28} color={C.text} />
                 <Text style={[s.statValue, { color: C.text }]}>{allTimeTotal}</Text>
                 <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.allTimeTotal')}</Text>
               </View>
               <View
                 style={[
                   s.statCard,
-                  { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(6,79,47,0.08)' },
+                  { overflow: 'hidden' },
                 ]}
               >
-                <MaterialCommunityIcons name="chart-line" size={28} color={GREEN} />
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <MaterialCommunityIcons name="chart-line" size={28} color={C.text} />
                 <Text style={[s.statValue, { color: C.text }]}>{avgPerDay}</Text>
                 <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.dailyAverage')}</Text>
               </View>
@@ -167,7 +187,7 @@ export default function TasbihStatsScreen() {
             {(typeStats[todayISO] || typeStats[new Date().toDateString()]) &&
               Object.keys(typeStats[todayISO] || typeStats[new Date().toDateString()] || {}).length > 0 && (
                 <>
-                  <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left' }]}>
+                  <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                     {t('tasbih.todayBreakdown')}
                   </Text>
                   {Object.entries(typeStats[todayISO] || typeStats[new Date().toDateString()] || {})
@@ -179,14 +199,16 @@ export default function TasbihStatsScreen() {
                           s.statsRow,
                           {
                             flexDirection: isRTL ? 'row-reverse' : 'row',
-                            backgroundColor: isDarkMode
-                              ? 'rgba(255,255,255,0.04)'
-                              : 'rgba(120,120,128,0.06)',
+                            overflow: 'hidden',
                           },
                         ]}
                       >
-                        <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt}</Text>
-                        <Text style={[s.statsRowDate, { color: C.text, textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                        {Platform.OS === 'ios' && (
+                          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                        )}
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                        <Text style={[s.statsRowVal, { color: C.text }]}>{cnt}</Text>
+                        <Text style={[s.statsRowDate, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                           {text.length > 30 ? text.slice(0, 28) + '…' : text}
                         </Text>
                       </View>
@@ -195,9 +217,13 @@ export default function TasbihStatsScreen() {
               )}
 
             {/* Last 7 days */}
-            <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left' }]}>{t('tasbih.last7Days')}</Text>
+            <Text style={[s.sectionLabel, { color: C.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.last7Days')}</Text>
             {Object.entries(dailyStats).length === 0 ? (
-              <View style={[s.emptyState, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(120,120,128,0.06)' }]}>
+              <View style={[s.emptyState, { overflow: 'hidden' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                 <MaterialCommunityIcons name="chart-bar" size={40} color={C.textLight} style={{ opacity: 0.5 }} />
                 <Text style={[s.emptyText, { color: C.textLight }]}>{t('tasbih.noDataYet')}</Text>
                 <Text style={[s.emptySubtext, { color: C.textLight }]}>{t('tasbih.startTasbihHint')}</Text>
@@ -214,14 +240,16 @@ export default function TasbihStatsScreen() {
                       style={[
                         s.statsRow,
                         {
-                          backgroundColor: isDarkMode
-                            ? 'rgba(255,255,255,0.04)'
-                            : 'rgba(120,120,128,0.06)',
+                          overflow: 'hidden',
                           flexDirection: 'column',
                           alignItems: 'stretch',
                         },
                       ]}
                     >
+                      {Platform.OS === 'ios' && (
+                        <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                      )}
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                       <View
                         style={{
                           flexDirection: isRTL ? 'row-reverse' : 'row',
@@ -229,7 +257,7 @@ export default function TasbihStatsScreen() {
                           alignItems: 'center',
                         }}
                       >
-                        <Text style={[s.statsRowVal, { color: GREEN }]}>{cnt} {t('tasbih.dhikrUnit')}</Text>
+                        <Text style={[s.statsRowVal, { color: C.text }]}>{cnt} {t('tasbih.dhikrUnit')}</Text>
                         <Text style={[s.statsRowDate, { color: C.textLight }]}>{date}</Text>
                       </View>
                       {dayTypeStats && Object.keys(dayTypeStats).length > 0 && (
@@ -250,7 +278,7 @@ export default function TasbihStatsScreen() {
                                   style={{
                                     fontSize: 11,
                                     fontFamily: fontMedium(),
-                                    color: GREEN,
+                                    color: C.text,
                                     opacity: 0.8,
                                   }}
                                 >
@@ -291,7 +319,7 @@ export default function TasbihStatsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const _s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,6 +337,8 @@ const s = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -325,16 +355,22 @@ const s = StyleSheet.create({
   statValue: {
     fontSize: 28,
     fontFamily: fontBold(),
+    lineHeight: 44,
+    includeFontPadding: false,
   },
   statLabel: {
     fontSize: 12,
     fontFamily: fontMedium(),
     textAlign: 'center',
+    lineHeight: 20,
+    includeFontPadding: false,
   },
   sectionLabel: {
     fontSize: 14,
     fontFamily: fontSemiBold(),
     marginBottom: 8,
+    lineHeight: 24,
+    includeFontPadding: false,
   },
   statsRow: {
     flexDirection: 'row',
@@ -347,10 +383,14 @@ const s = StyleSheet.create({
   statsRowVal: {
     fontSize: 15,
     fontFamily: fontBold(),
+    lineHeight: 26,
+    includeFontPadding: false,
   },
   statsRowDate: {
     fontSize: 13,
     fontFamily: fontRegular(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   emptyState: {
     padding: 32,
@@ -363,12 +403,16 @@ const s = StyleSheet.create({
     fontFamily: fontSemiBold(),
     marginTop: 8,
     textAlign: 'center',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
   emptySubtext: {
     fontSize: 13,
     fontFamily: fontRegular(),
     opacity: 0.7,
     textAlign: 'center',
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   goButton: {
     flexDirection: 'row',
@@ -383,5 +427,7 @@ const s = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontSemiBold(),
     color: '#fff',
+    lineHeight: 28,
+    includeFontPadding: false,
   },
 });

@@ -1,6 +1,8 @@
 // lib/app-config-context.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import { Platform } from 'react-native';
 import { getAppConfig, subscribeToAppConfig, RemoteAppConfig } from './app-config-api';
+import { checkAndNotifyUpdate } from './app-update-checker';
 
 interface AppConfigContextType {
   config: RemoteAppConfig;
@@ -62,6 +64,16 @@ export const AppConfigProvider = ({ children }: { children: ReactNode }) => {
     try {
       const remoteConfig = await getAppConfig();
       setConfig(remoteConfig);
+
+      // Check for app updates and notify user if a new version is available
+      if (Platform.OS !== 'web') {
+        checkAndNotifyUpdate(
+          remoteConfig.latestVersion,
+          remoteConfig.storeUrlIos,
+          remoteConfig.storeUrlAndroid,
+          remoteConfig.downloadLinks,
+        ).catch(() => {}); // Fire-and-forget, don't block config loading
+      }
     } catch (error) {
       console.error('Error loading config:', error);
     } finally {

@@ -1,5 +1,6 @@
 import { View, type ViewProps, StyleSheet } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { cn } from "@/lib/utils";
 import BackgroundWrapper from "@/components/ui/BackgroundWrapper";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -42,6 +43,7 @@ export function ScreenContainer({
       className={cn("flex-1", safeAreaClassName)}
       style={styles.safeArea}
     >
+      <StatusBar style={colors.statusBarStyle} />
       {screenKey && <DynamicScreenAds screen={screenKey} position="top" />}
       <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
         {children}
@@ -59,7 +61,8 @@ export function ScreenContainer({
         blurEnabled={settings.display.blurEnabled}
         blurIntensity={settings.display.blurIntensity}
         dimEnabled={settings.display.dimEnabled}
-        style={[styles.container, { backgroundColor: 'transparent' }]}
+        dimOpacity={(settings.display as any).dimOpacity}
+        style={[styles.container]}
         {...props}
       >
         {content}
@@ -82,7 +85,6 @@ export function ScreenContainer({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFAF8', // light background fallback
   },
   safeArea: {
     flex: 1,

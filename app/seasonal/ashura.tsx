@@ -8,11 +8,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   RefreshControl,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +22,7 @@ import { useSeasonal, useSeasonalProgress } from '@/contexts/SeasonalContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getLanguage } from '@/lib/i18n';
 import TranslatedText from '@/components/ui/TranslatedText';
@@ -30,8 +31,9 @@ import TranslatedText from '@/components/ui/TranslatedText';
 // الثوابت
 // ========================================
 
-const ASHURA_COLOR = '#4A4A4A';
-const ASHURA_GRADIENT = ['#4A4A4A', '#2C2C2C'];
+const ASHURA_COLOR_LIGHT = '#4A4A4A';
+const ASHURA_COLOR_DARK = '#9E9E9E';
+const getAshuraColor = (isDark: boolean) => isDark ? ASHURA_COLOR_DARK : ASHURA_COLOR_LIGHT;
 
 const ASHURA_INFO = {
   title: 'يوم عاشوراء',
@@ -119,7 +121,9 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
   index,
 }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { t } = useSettings();
+  const ashuraColor = getAshuraColor(isDarkMode);
   const isRTL = useIsRTL();
   const nameMap: Record<string, string> = {
     tasua: t('seasonal.ashura.tasua'),
@@ -136,9 +140,9 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
       <TouchableOpacity
         style={[
           styles.fastingCard,
-          isDarkMode && styles.fastingCardDark,
+          { backgroundColor: colors.card },
           day.isMain && styles.fastingCardMain,
-          isFasted && styles.fastingCardFasted,
+          isFasted && { backgroundColor: isDarkMode ? 'rgba(13,142,98,0.15)' : '#e8f5e9' },
           { flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
         onPress={() => {
@@ -147,10 +151,38 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
         }}
         activeOpacity={0.8}
       >
+        {/* Checkbox first in JSX so row-reverse puts it on RIGHT in RTL */}
+        <View
+          style={[
+            styles.fastingCheckbox,
+            { borderColor: colors.border },
+            isFasted && styles.fastingCheckboxChecked,
+          ]}
+        >
+          {isFasted && <MaterialCommunityIcons name="check" size={20} color="#fff" />}
+        </View>
+
+        <View style={styles.fastingContent}>
+          <View style={[styles.fastingHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Text style={[styles.fastingName, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+              {nameMap[day.id] || day.name}
+            </Text>
+            {day.recommended && (
+              <View style={styles.recommendedBadge}>
+                <Text style={styles.recommendedText}>{t('seasonal.ashura.recommended')}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.fastingVirtue, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            {virtueMap[day.id] || day.virtue}
+          </Text>
+        </View>
+
         <View
           style={[
             styles.fastingDayNumber,
-            day.isMain && styles.fastingDayNumberMain,
+            { backgroundColor: colors.surface },
+            day.isMain && { backgroundColor: ashuraColor },
             isFasted && styles.fastingDayNumberFasted,
           ]}
         >
@@ -173,31 +205,6 @@ const FastingDayCard: React.FC<FastingDayCardProps> = ({
             {t('seasonal.ashura.muharram')}
           </Text>
         </View>
-
-        <View style={styles.fastingContent}>
-          <View style={[styles.fastingHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Text style={[styles.fastingName, { color: colors.text }]}>
-              {nameMap[day.id] || day.name}
-            </Text>
-            {day.recommended && (
-              <View style={styles.recommendedBadge}>
-                <Text style={styles.recommendedText}>{t('seasonal.ashura.recommended')}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[styles.fastingVirtue, { color: colors.textLight }]}>
-            {virtueMap[day.id] || day.virtue}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.fastingCheckbox,
-            isFasted && styles.fastingCheckboxChecked,
-          ]}
-        >
-          {isFasted && <MaterialCommunityIcons name="check" size={20} color="#fff" />}
-        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -211,7 +218,9 @@ interface VirtueCardProps {
 
 const VirtueCard: React.FC<VirtueCardProps> = ({ virtue, isDarkMode, index }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { t } = useSettings();
+  const ashuraColor = getAshuraColor(isDarkMode);
   const isRTL = useIsRTL();
   const titleMap: Record<string, string> = {
     'calendar-remove': t('seasonal.ashura.virtueExpiation'),
@@ -228,13 +237,15 @@ const VirtueCard: React.FC<VirtueCardProps> = ({ virtue, isDarkMode, index }) =>
   return (
     <Animated.View
       entering={FadeInDown.delay(100 + index * 80).duration(400)}
-      style={[styles.virtueCard, isDarkMode && styles.virtueCardDark]}
+      style={styles.virtueCardOuter}
     >
-      <View style={styles.virtueIcon}>
-        <MaterialCommunityIcons name={virtue.icon as any} size={24} color={ASHURA_COLOR} />
+      <View style={[styles.virtueCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.virtueIcon, { backgroundColor: `${ashuraColor}15` }]}>
+          <MaterialCommunityIcons name={virtue.icon as any} size={28} color={ashuraColor} />
+        </View>
+        <Text style={[styles.virtueTitle, { color: colors.text }]}>{titleMap[virtue.icon] || virtue.title}</Text>
+        <Text style={[styles.virtueDesc, { color: colors.textLight }]}>{descMap[virtue.icon] || virtue.description}</Text>
       </View>
-      <Text style={[styles.virtueTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{titleMap[virtue.icon] || virtue.title}</Text>
-      <Text style={[styles.virtueDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{descMap[virtue.icon] || virtue.description}</Text>
     </Animated.View>
   );
 };
@@ -248,8 +259,10 @@ interface ActionItemProps {
 
 const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, isDarkMode }) => {
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { t } = useSettings();
   const isRTL = useIsRTL();
+  const ashuraColor = getAshuraColor(isDarkMode);
   const titleMap: Record<string, string> = {
     fast_9: t('seasonal.ashura.actionFast9'),
     fast_10: t('seasonal.ashura.actionFast10'),
@@ -266,8 +279,8 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
     <TouchableOpacity
       style={[
         styles.actionItem,
-        isDarkMode && styles.actionItemDark,
-        isCompleted && styles.actionItemCompleted,
+        { backgroundColor: colors.card, borderBottomColor: colors.border },
+        isCompleted && { backgroundColor: isDarkMode ? 'rgba(13,142,98,0.12)' : '#f0fff4' },
         { flexDirection: isRTL ? 'row-reverse' : 'row' },
       ]}
       onPress={() => {
@@ -276,19 +289,19 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
       }}
       activeOpacity={0.7}
     >
-      <View style={[styles.actionIcon, isCompleted && styles.actionIconCompleted]}>
+      <View style={[styles.actionIcon, { backgroundColor: `${ashuraColor}15` }, isCompleted && styles.actionIconCompleted]}>
         <MaterialCommunityIcons
           name={action.icon as any}
           size={22}
-          color={isCompleted ? '#fff' : ASHURA_COLOR}
+          color={isCompleted ? '#fff' : ashuraColor}
         />
       </View>
       <View style={styles.actionContent}>
-        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>{titleMap[action.id] || action.title}</Text>
-        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{subMap[action.id] || action.subtitle}</Text>
+        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{titleMap[action.id] || action.title}</Text>
+        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subMap[action.id] || action.subtitle}</Text>
       </View>
       {isCompleted && (
-        <MaterialCommunityIcons name="check-circle" size={24} color="#22C55E" />
+        <MaterialCommunityIcons name="check-circle" size={24} color="#0d8e62" />
       )}
     </TouchableOpacity>
   );
@@ -305,7 +318,10 @@ export default function AshuraScreen() {
   const { currentSeason, refreshSeasonalData } = useSeasonal();
   const { seasonalProgress, markDayCompleted } = useSeasonalProgress();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const isArabic = getLanguage() === 'ar';
+  const insets = useSafeAreaInsets();
+  const ashuraColor = getAshuraColor(isDarkMode);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [fastedDays, setFastedDays] = useState<number[]>([]);
@@ -340,11 +356,11 @@ export default function AshuraScreen() {
 
   return (
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
-    <SafeAreaView style={[styles.container, isDarkMode && styles.containerDark, { backgroundColor: 'transparent' }]} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={ASHURA_COLOR} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: `${ASHURA_COLOR}CC`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
@@ -352,11 +368,11 @@ export default function AshuraScreen() {
             router.back();
           }}
         >
-          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color="#fff" />
+          <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>{t('seasonal.ashura.title')}</Text>
-          <Text style={styles.headerSubtitle}>{t('seasonal.ashura.subtitle')}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('seasonal.ashura.title')}</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.textLight }]}>{t('seasonal.ashura.subtitle')}</Text>
         </View>
         <View style={styles.headerPlaceholder} />
       </View>
@@ -369,15 +385,15 @@ export default function AshuraScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor="#fff"
-            colors={[ASHURA_COLOR]}
+            tintColor={colors.text}
+            colors={[getAshuraColor(isDarkMode)]}
           />
         }
       >
         {/* بطاقة الحديث */}
         <Animated.View entering={FadeIn.duration(500)}>
-          <View style={[styles.hadithCard, isDarkMode && styles.hadithCardDark]}>
-            <MaterialCommunityIcons name="format-quote-open" size={24} color={ASHURA_COLOR} />
+          <View style={[styles.hadithCard, { backgroundColor: colors.card }]}>
+            <MaterialCommunityIcons name="format-quote-open" size={24} color={getAshuraColor(isDarkMode)} />
             {isArabic ? (
               <Text style={[styles.hadithText, { color: colors.text }]}>{ASHURA_INFO.hadith}</Text>
             ) : (
@@ -391,16 +407,16 @@ export default function AshuraScreen() {
 
         {/* الوصف */}
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
-          <View style={[styles.descCard, isDarkMode && styles.descCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.descCard, { backgroundColor: isDarkMode ? 'rgba(58,124,165,0.12)' : '#e3f2fd', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="information" size={20} color="#3a7ca5" />
-            <Text style={[styles.descText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+            <Text style={[styles.descText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {t('seasonal.ashura.description')}
             </Text>
           </View>
         </Animated.View>
 
         {/* أيام الصيام */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.ashura.fastingDays')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.fastingDays')}</Text>
         {FASTING_DAYS.map((day, index) => (
           <FastingDayCard
             key={day.id}
@@ -413,16 +429,16 @@ export default function AshuraScreen() {
         ))}
 
         {/* الفضائل */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.ashura.virtues')}</Text>
-        <View style={styles.virtuesGrid}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.virtues')}</Text>
+        <View style={[styles.virtuesGrid, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {VIRTUES.map((virtue, index) => (
             <VirtueCard key={virtue.title} virtue={virtue} isDarkMode={isDarkMode} index={index} />
           ))}
         </View>
 
         {/* الأعمال المستحبة */}
-        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('seasonal.ashura.recommendedActions')}</Text>
-        <View style={[styles.actionsCard, isDarkMode && styles.actionsCardDark]}>
+        <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.recommendedActions')}</Text>
+        <View style={[styles.actionsCard, { backgroundColor: colors.card }]}>
           {RECOMMENDED_ACTIONS.map((action) => (
             <ActionItem
               key={action.id}
@@ -436,11 +452,11 @@ export default function AshuraScreen() {
 
         {/* نصيحة */}
         <Animated.View entering={FadeInDown.delay(500).duration(500)}>
-          <View style={[styles.tipCard, isDarkMode && styles.tipCardDark, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#f5a623" />
+          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(192,123,16,0.12)' : '#fff8e1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <MaterialCommunityIcons name="lightbulb-on" size={24} color="#c07b10" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: colors.text }]}>{t('seasonal.ashura.tip')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight }]}>
+              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.tip')}</Text>
+              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('seasonal.ashura.tipText')}
               </Text>
             </View>
@@ -458,20 +474,17 @@ export default function AshuraScreen() {
 // الأنماط
 // ========================================
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  containerDark: {
-    backgroundColor: '#11151c',
-  },
+  headerWrapper: {},
+  
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    paddingTop: 10,
+    paddingVertical: 14,
   },
   backButton: {
     width: 40,
@@ -482,26 +495,24 @@ const styles = StyleSheet.create({
   headerContent: {
     flex: 1,
     alignItems: 'center',
+    overflow: 'visible',
   },
   headerTitle: {
     fontSize: 24,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 36,
   },
   headerSubtitle: {
     fontSize: 14,
     fontFamily: fontRegular(),
     color: 'rgba(255,255,255,0.8)',
+    lineHeight: 22,
   },
   headerPlaceholder: {
     width: 40,
   },
-  textLight: {
-    color: '#fff',
-  },
-  textMuted: {
-    color: '#999',
-  },
+
   scrollView: {
     flex: 1,
   },
@@ -511,18 +522,13 @@ const styles = StyleSheet.create({
 
   // بطاقة الحديث
   hadithCard: {
-    backgroundColor: '#fff',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
   },
-  hadithCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   hadithText: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     textAlign: 'center',
     lineHeight: 32,
     marginVertical: 16,
@@ -530,34 +536,27 @@ const styles = StyleSheet.create({
   hadithSource: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#999',
   },
 
   // الوصف
   descCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e3f2fd',
     borderRadius: 12,
     padding: 14,
     marginTop: 16,
     gap: 10,
   },
-  descCardDark: {
-    backgroundColor: '#1a2a3a',
-  },
   descText: {
     flex: 1,
     fontSize: 14,
     fontFamily: fontRegular(),
-    color: '#333',
   },
 
   // العناوين
   sectionTitle: {
     fontSize: 18,
     fontFamily: fontBold(),
-    color: '#333',
     marginTop: 24,
     marginBottom: 12,
   },
@@ -566,44 +565,36 @@ const styles = StyleSheet.create({
   fastingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
   },
-  fastingCardDark: {
-    backgroundColor: '#1a1a2e',
-  },
   fastingCardMain: {
     borderWidth: 2,
-    borderColor: ASHURA_COLOR,
+    borderColor: ASHURA_COLOR_LIGHT,
   },
   fastingCardFasted: {
-    backgroundColor: '#e8f5e9',
   },
   fastingDayNumber: {
     width: 56,
     height: 56,
     borderRadius: 14,
-    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   fastingDayNumberMain: {
-    backgroundColor: ASHURA_COLOR,
+    backgroundColor: ASHURA_COLOR_LIGHT,
   },
   fastingDayNumberFasted: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   fastingDayNumberText: {
     fontSize: 20,
     fontFamily: fontBold(),
-    color: '#333',
   },
   fastingDayNumberLabel: {
     fontSize: 9,
     fontFamily: fontRegular(),
-    color: '#666',
   },
   fastingDayNumberTextLight: {
     color: '#fff',
@@ -620,10 +611,9 @@ const styles = StyleSheet.create({
   fastingName: {
     fontSize: 16,
     fontFamily: fontBold(),
-    color: '#333',
   },
   recommendedBadge: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -636,7 +626,6 @@ const styles = StyleSheet.create({
   fastingVirtue: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     marginTop: 4,
   },
   fastingCheckbox: {
@@ -644,13 +633,12 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#ddd',
     alignItems: 'center',
     justifyContent: 'center',
   },
   fastingCheckboxChecked: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
+    backgroundColor: '#0d8e62',
+    borderColor: '#0d8e62',
   },
 
   // الفضائل
@@ -659,64 +647,60 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginHorizontal: -6,
   },
-  virtueCard: {
+  virtueCardOuter: {
     width: '50%',
     padding: 6,
   },
-  virtueCardDark: {},
+  virtueCard: {
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    minHeight: 150,
+  },
   virtueIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: `${ASHURA_COLOR}15`,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   virtueTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
+    textAlign: 'center',
+    lineHeight: 24,
   },
   virtueDesc: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#666',
-    marginTop: 4,
+    marginTop: 6,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   // الأعمال المستحبة
   actionsCard: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     overflow: 'hidden',
-  },
-  actionsCardDark: {
-    backgroundColor: '#1a1a2e',
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  actionItemDark: {
-    borderBottomColor: '#2a2a3e',
   },
   actionItemCompleted: {
-    backgroundColor: '#f0fff4',
   },
   actionIcon: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: `${ASHURA_COLOR}15`,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionIconCompleted: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#0d8e62',
   },
   actionContent: {
     flex: 1,
@@ -725,25 +709,19 @@ const styles = StyleSheet.create({
   actionTitle: {
     fontSize: 15,
     fontFamily: fontBold(),
-    color: '#333',
   },
   actionSubtitle: {
     fontSize: 12,
     fontFamily: fontRegular(),
-    color: '#999',
   },
 
   // النصيحة
   tipCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff8e1',
     borderRadius: 16,
     padding: 16,
     marginTop: 24,
     gap: 12,
-  },
-  tipCardDark: {
-    backgroundColor: '#2a2a1e',
   },
   tipContent: {
     flex: 1,
@@ -751,12 +729,10 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 14,
     fontFamily: fontBold(),
-    color: '#333',
   },
   tipText: {
     fontSize: 13,
     fontFamily: fontRegular(),
-    color: '#666',
     lineHeight: 22,
     marginTop: 4,
   },

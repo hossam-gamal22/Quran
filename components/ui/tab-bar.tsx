@@ -27,6 +27,8 @@ import * as Haptics from "expo-haptics";
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { t } from '@/lib/i18n';
+import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useColors } from '@/hooks/use-colors';
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
 const SPRING_CONFIG = { damping: 20, stiffness: 260, mass: 0.6 };
@@ -81,6 +83,8 @@ const AnimatedTabIcon: React.FC<AnimatedTabIconProps> = React.memo(
   ({ tab, activeProgress, activeColor, inactiveColor }) => {
     const [color, setColor] = React.useState(inactiveColor);
     const [iconName, setIconName] = React.useState(tab.icon);
+    const { fs } = useColors();
+    const styles = useScaledStyles(_styles, fs);
 
     useDerivedValue(() => {
       const c = interpolateColor(
@@ -130,6 +134,8 @@ interface CustomTabBarProps {
 export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { fs } = useColors();
+  const styles = useScaledStyles(_styles, fs);
 
   const indicatorX = useSharedValue(0);
   const indicatorW = useSharedValue(60);
@@ -193,7 +199,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
               {
                 backgroundColor: isDark
                   ? "rgba(255,255,255,0.12)"
-                  : "rgba(0,0,0,0.06)",
+                  : "rgba(0,0,0,0.10)",
               },
             ]}
           />
@@ -245,7 +251,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <BlurView
           intensity={isDark ? 50 : 80}
-          tint={isDark ? "dark" : "light"}
+          tint={(isDark ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
           style={[
             styles.blurContainer,
             {
@@ -276,7 +282,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   container: {
     position: "absolute",
     bottom: 0,

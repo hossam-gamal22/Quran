@@ -71,24 +71,25 @@ const DEFAULT_NAMES: Record<string, string>[] = [
   { ar: 'لافندر', en: 'Lavender' },
 ];
 
+// ⚠️ CRITICAL: These colors MUST match the contrast-tuned QURAN_THEMES in constants/quran-themes.ts
 const DEFAULT_THEMES: QuranTheme[] = [
-  { primary: '#2C1810', background: '#F5E6D3', secondary: '#8B7355', highlight: '#D4AF37' },
-  { primary: '#1B4332', background: '#E8F5E9', secondary: '#2D6A4F', highlight: '#40916C' },
-  { primary: '#3E2723', background: '#EFEBE9', secondary: '#6D4C41', highlight: '#8D6E63' },
-  { primary: '#212121', background: '#FFFFFF', secondary: '#616161', highlight: '#4CAF50' },
-  { primary: '#1A237E', background: '#E3F2FD', secondary: '#283593', highlight: '#5C6BC0' },
-  { primary: '#B0BEC5', background: '#0D1B2A', secondary: '#78909C', highlight: '#1B5E20' },
-  { primary: '#CFD8DC', background: '#1A2332', secondary: '#90A4AE', highlight: '#42A5F5' },
-  { primary: '#E0E0E0', background: '#1E1E1E', secondary: '#9E9E9E', highlight: '#69F0AE' },
-  { primary: '#CE93D8', background: '#1A1025', secondary: '#AB47BC', highlight: '#EA80FC' },
-  { primary: '#424242', background: '#F5F5F5', secondary: '#757575', highlight: '#26A69A' },
-  { primary: '#FAFAFA', background: '#000000', secondary: '#BDBDBD', highlight: '#4CAF50' },
-  { primary: '#1565C0', background: '#E3F2FD', secondary: '#42A5F5', highlight: '#64B5F6' },
-  { primary: '#2E7D32', background: '#E8F5E9', secondary: '#4CAF50', highlight: '#81C784' },
-  { primary: '#4E342E', background: '#FFF3E0', secondary: '#8D6E63', highlight: '#FFAB91' },
-  { primary: '#00695C', background: '#E0F2F1', secondary: '#26A69A', highlight: '#80CBC4' },
-  { primary: '#F57F17', background: '#FFFDE7', secondary: '#FBC02D', highlight: '#FFF176' },
-  { primary: '#4A148C', background: '#F3E5F5', secondary: '#7B1FA2', highlight: '#CE93D8' },
+  { primary: '#1A1000', background: '#FFF8F0', secondary: '#6B4E2A', highlight: '#FFC936' }, // 0 — كلاسيك
+  { primary: '#1A2410', background: '#FEFAE0', secondary: '#3D4A22', highlight: '#BC6B25' }, // 1 — أخضر طبيعي
+  { primary: '#5C3010', background: '#FFFCE7', secondary: '#8A6C00', highlight: '#FFF49D' }, // 2 — بني عتيق
+  { primary: '#000000', background: '#FFFFFF', secondary: '#2B2B2B', highlight: '#59D8FF' }, // 3 — أبيض نقي
+  { primary: '#1B4F8A', background: '#FFFFFF', secondary: '#004A99', highlight: '#59D8FF' }, // 4 — أزرق
+  { primary: '#FFFFFF', background: '#22303C', secondary: '#4EAAFF', highlight: '#78C0FF' }, // 5 — أزرق داكن
+  { primary: '#D8CAB5', background: '#213440', secondary: '#C4A840', highlight: '#FFF49D' }, // 6 — أزرق غامق
+  { primary: '#FFFFFF', background: '#4A4A4A', secondary: '#FFD090', highlight: '#FFF49D' }, // 7 — رمادي داكن
+  { primary: '#FFE0C0', background: '#3A383B', secondary: '#FFC060', highlight: '#FFF49D' }, // 8 — بنفسجي داكن
+  { primary: '#000000', background: '#F3F6F4', secondary: '#161514', highlight: '#78C0FF' }, // 9 — محايد فاتح
+  { primary: '#FFFFFF', background: '#1A1A1A', secondary: '#E0E0E0', highlight: '#78C0FF' }, // 10 — أسود
+  { primary: '#000000', background: '#E7F7FE', secondary: '#0A1418', highlight: '#78C0FF' }, // 11 — سماوي فاتح
+  { primary: '#000000', background: '#F4FDD3', secondary: '#1C1D17', highlight: '#78C0FF' }, // 12 — أخضر فاتح
+  { primary: '#000000', background: '#FEEED4', secondary: '#2C2010', highlight: '#FFF49D' }, // 13 — خوخي
+  { primary: '#000000', background: '#D2F4CF', secondary: '#152214', highlight: '#78C0FF' }, // 14 — نعناعي
+  { primary: '#000000', background: '#FEFADF', secondary: '#1C1A0E', highlight: '#78C0FF' }, // 15 — أصفر فاتح
+  { primary: '#000000', background: '#EAF0FE', secondary: '#141822', highlight: '#78C0FF' }, // 16 — لافندر
 ].map((t, i) => ({
   ...t,
   id: `default_${i}`,
@@ -263,12 +264,12 @@ const QuranThemesManager: React.FC = () => {
             <Plus size={16} /> إضافة ثيم
           </button>
           <button onClick={handleSave} disabled={isSaving}
-            className="flex items-center gap-2 px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:bg-slate-600">
+            className="flex items-center gap-2 px-6 py-2 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:bg-admin-surface-light">
             <Save size={16} /> {isSaving ? 'حفظ...' : 'حفظ الكل'}
           </button>
         </div>
       </div>
-      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-emerald-400' : 'text-red-400'}`}>{saveMsg}</p>}
+      {saveMsg && <p className={`text-sm ${saveMsg.startsWith('✅') ? 'text-accent-light' : 'text-red-400'}`}>{saveMsg}</p>}
 
       {isLoading ? (
         <div className="text-center text-slate-400 py-12">جاري التحميل...</div>
@@ -282,15 +283,15 @@ const QuranThemesManager: React.FC = () => {
                 onClick={() => setSelectedIdx(i)}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right ${
                   i === selectedIdx
-                    ? 'bg-emerald-600/20 border border-emerald-500'
-                    : 'bg-slate-800/50 border border-slate-700/50 hover:bg-slate-700/50'
+                    ? 'bg-accent-dark/20 border border-accent'
+                    : 'bg-admin-surface/50 border border-admin-border/50 hover:bg-admin-surface-light/50'
                 }`}
               >
                 <GripVertical size={14} className="text-slate-600 shrink-0" />
                 {/* Color dots */}
                 <div className="flex gap-1 shrink-0">
                   {(['background', 'primary', 'secondary', 'highlight'] as const).map(k => (
-                    <Styled key={k} className="w-4 h-4 rounded-full border border-slate-600"
+                    <Styled key={k} className="w-4 h-4 rounded-full border border-admin-border"
                       css={{ backgroundColor: t[k] }} />
                   ))}
                 </div>
@@ -310,12 +311,12 @@ const QuranThemesManager: React.FC = () => {
               {/* Action bar */}
               <div className="flex items-center gap-2 justify-end">
                 <button onClick={() => moveTheme(-1)} disabled={selectedIdx === 0}
-                  className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-30"
+                  className="p-2 bg-admin-surface-light text-slate-300 rounded-lg hover:bg-admin-surface-light disabled:opacity-30"
                   aria-label="تحريك لأعلى" title="تحريك لأعلى">
                   <ChevronUp size={16} />
                 </button>
                 <button onClick={() => moveTheme(1)} disabled={selectedIdx === themes.length - 1}
-                  className="p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-30"
+                  className="p-2 bg-admin-surface-light text-slate-300 rounded-lg hover:bg-admin-surface-light disabled:opacity-30"
                   aria-label="تحريك لأسفل" title="تحريك لأسفل">
                   <ChevronDown size={16} />
                 </button>
@@ -327,7 +328,7 @@ const QuranThemesManager: React.FC = () => {
               </div>
 
               {/* Live Preview */}
-              <Styled className="rounded-xl overflow-hidden border border-slate-700"
+              <Styled className="rounded-xl overflow-hidden border border-admin-border"
                 css={{ backgroundColor: selected.background }}>
                 <div className="p-6 text-center space-y-3">
                   <Styled as="p" css={{ color: selected.primary, fontSize: 24, fontFamily: 'serif' }}>
@@ -346,7 +347,7 @@ const QuranThemesManager: React.FC = () => {
               {/* Color Editors */}
               <div className="grid grid-cols-2 gap-4">
                 {COLOR_FIELDS.map(({ key, label }) => (
-                  <div key={key} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+                  <div key={key} className="bg-admin-surface/50 p-4 rounded-xl border border-admin-border/50">
                     <label className="text-slate-300 text-sm block mb-2">{label}</label>
                     <div className="flex items-center gap-3">
                       <input type="color" value={selected[key]}
@@ -357,21 +358,21 @@ const QuranThemesManager: React.FC = () => {
                         onChange={e => updateColor(key, e.target.value)}
                         aria-label={`${label} (hex)`}
                         placeholder="#000000"
-                        className="flex-1 bg-slate-800 text-white rounded-lg px-3 py-2 border border-slate-700 font-mono text-sm" />
+                        className="flex-1 bg-admin-surface text-white rounded-lg px-3 py-2 border border-admin-border font-mono text-sm" />
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Icon Upload */}
-              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+              <div className="bg-admin-surface/50 p-4 rounded-xl border border-admin-border/50">
                 <label className="text-slate-300 text-sm block mb-3">
                   <ImageIcon size={14} className="inline mr-1" /> أيقونة الثيم
                 </label>
                 <div className="flex items-center gap-4">
                   {selected.iconUrl ? (
                     <div className="relative">
-                      <img src={selected.iconUrl} alt="" className="w-16 h-16 rounded-lg object-cover border border-slate-600" />
+                      <img src={selected.iconUrl} alt="" className="w-16 h-16 rounded-lg object-cover border border-admin-border" />
                       <button onClick={removeIcon}
                         className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5"
                         aria-label="إزالة الأيقونة" title="إزالة الأيقونة">
@@ -379,12 +380,12 @@ const QuranThemesManager: React.FC = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-500">
+                    <div className="w-16 h-16 rounded-lg border-2 border-dashed border-admin-border flex items-center justify-center text-slate-500">
                       <ImageIcon size={20} />
                     </div>
                   )}
                   <button onClick={() => iconInputRef.current?.click()} disabled={iconUploading}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 disabled:opacity-50">
+                    className="flex items-center gap-2 px-4 py-2 bg-admin-surface-light text-slate-300 rounded-lg hover:bg-admin-surface-light disabled:opacity-50">
                     <Upload size={14} /> {iconUploading ? 'جاري الرفع...' : 'رفع أيقونة'}
                   </button>
                   <input ref={iconInputRef} type="file" accept="image/*"
@@ -394,7 +395,7 @@ const QuranThemesManager: React.FC = () => {
               </div>
 
               {/* Multilingual Names */}
-              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50">
+              <div className="bg-admin-surface/50 p-4 rounded-xl border border-admin-border/50">
                 <label className="text-slate-300 text-sm block mb-2">
                   <Palette size={14} className="inline mr-1" /> أسماء الثيم
                 </label>
@@ -422,7 +423,7 @@ const QuranThemesManager: React.FC = () => {
                         placeholder={lang.name}
                         aria-label={`اسم الثيم بـ${lang.name}`}
                         dir={lang.rtl ? 'rtl' : 'ltr'}
-                        className="flex-1 bg-slate-800 text-white rounded-lg px-3 py-1.5 border border-slate-700 text-sm"
+                        className="flex-1 bg-admin-surface text-white rounded-lg px-3 py-1.5 border border-admin-border text-sm"
                       />
                     </div>
                   ))}
@@ -440,7 +441,7 @@ const QuranThemesManager: React.FC = () => {
       {showDeleteConfirm && selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
           onClick={() => setShowDeleteConfirm(false)}>
-          <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 space-y-4"
+          <div className="bg-admin-surface rounded-2xl p-6 max-w-md w-full mx-4 space-y-4"
             onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-white">حذف الثيم</h2>
             <p className="text-slate-300">
@@ -451,7 +452,7 @@ const QuranThemesManager: React.FC = () => {
             </p>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">
+                className="px-4 py-2 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">
                 إلغاء
               </button>
               <button onClick={deleteTheme}
@@ -484,7 +485,7 @@ function AddThemeModal({ onAdd, onClose }: { onAdd: (t: QuranTheme) => void; onC
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="bg-slate-800 rounded-2xl p-6 max-w-2xl w-full mx-4 space-y-5 max-h-[85vh] overflow-y-auto"
+      <div className="bg-admin-surface rounded-2xl p-6 max-w-2xl w-full mx-4 space-y-5 max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">إضافة ثيم جديد</h2>
@@ -492,7 +493,7 @@ function AddThemeModal({ onAdd, onClose }: { onAdd: (t: QuranTheme) => void; onC
         </div>
 
         {/* Preview */}
-        <Styled className="rounded-xl overflow-hidden border border-slate-700"
+        <Styled className="rounded-xl overflow-hidden border border-admin-border"
           css={{ backgroundColor: draft.background }}>
           <div className="p-4 text-center space-y-2">
             <Styled as="p" css={{ color: draft.primary, fontSize: 20, fontFamily: 'serif' }}>
@@ -518,7 +519,7 @@ function AddThemeModal({ onAdd, onClose }: { onAdd: (t: QuranTheme) => void; onC
                 <input type="text" value={draft[key]} onChange={e => setColor(key, e.target.value)}
                   aria-label={`${label} (hex)`}
                   placeholder="#000000"
-                  className="flex-1 bg-slate-900 text-white rounded-lg px-2 py-1.5 border border-slate-700 font-mono text-xs" />
+                  className="flex-1 bg-admin-bg text-white rounded-lg px-2 py-1.5 border border-admin-border font-mono text-xs" />
               </div>
             </div>
           ))}
@@ -535,18 +536,18 @@ function AddThemeModal({ onAdd, onClose }: { onAdd: (t: QuranTheme) => void; onC
                   onChange={e => setName(lang.code, e.target.value)}
                   placeholder={lang.name} dir={lang.rtl ? 'rtl' : 'ltr'}
                   aria-label={`اسم الثيم بـ${lang.name}`}
-                  className="flex-1 bg-slate-900 text-white rounded-lg px-2 py-1.5 border border-slate-700 text-sm" />
+                  className="flex-1 bg-admin-bg text-white rounded-lg px-2 py-1.5 border border-admin-border text-sm" />
               </div>
             ))}
           </div>
         </div>
 
         <div className="flex justify-end gap-3">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-700 text-slate-300 rounded-xl hover:bg-slate-600">
+          <button onClick={onClose} className="px-4 py-2 bg-admin-surface-light text-slate-300 rounded-xl hover:bg-admin-surface-light">
             إلغاء
           </button>
           <button onClick={() => onAdd(draft)} disabled={!canSubmit}
-            className="px-6 py-2 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed">
+            className="px-6 py-2 bg-accent-dark text-white rounded-xl hover:bg-accent-dark disabled:bg-admin-surface-light disabled:cursor-not-allowed">
             إضافة
           </button>
         </div>

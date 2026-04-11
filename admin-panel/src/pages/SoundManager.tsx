@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Upload,
+  Link,
   Play,
   Pause,
   Trash2,
@@ -15,13 +15,10 @@ import {
   AlertTriangle,
   Search,
   X,
-  Download,
-  Clock,
-  Bell,
+  Plus,
 } from 'lucide-react';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 // ==================== Types ====================
 
@@ -81,9 +78,6 @@ const PAGE_EVENT_TYPES: { key: keyof SoundAssignments['pageEvents']; label: stri
 
 const FIRESTORE_SOUNDS_COLLECTION = 'sounds';
 const FIRESTORE_ASSIGNMENTS_DOC = 'appConfig/soundSettings';
-const STORAGE_SOUNDS_PATH = 'sounds';
-const ACCEPTED_AUDIO_TYPES = '.mp3,.wav,.ogg';
-const MAX_FILE_SIZE_MB = 10;
 
 const DEFAULT_ASSIGNMENTS: SoundAssignments = {
   notifications: {
@@ -100,75 +94,49 @@ const DEFAULT_ASSIGNMENTS: SoundAssignments = {
   },
 };
 
-// ==================== Notification Scheduling Types ====================
+// ==================== Bundled Sounds (Built into the app) ====================
 
-interface NotificationScheduleItem {
-  enabled: boolean;
-  time: string;       // "HH:MM"
-  days: number[];     // 0=Sun...6=Sat, empty = every day
-  soundId: string;    // references a SoundFile.id
+interface BundledSound {
+  id: string;
+  name: string;
+  category: 'notification' | 'adhan';
 }
 
-interface NotificationScheduleConfig {
-  morningAzkar: NotificationScheduleItem;
-  eveningAzkar: NotificationScheduleItem;
-  sleepAzkar: NotificationScheduleItem;
-  wakeupAzkar: NotificationScheduleItem;
-  dailyVerse: NotificationScheduleItem;
-  salawat: NotificationScheduleItem;
-  tasbih: NotificationScheduleItem;
-  istighfar: NotificationScheduleItem;
-  quranReading: NotificationScheduleItem;
-  kahfFriday: NotificationScheduleItem;
-  updatedAt?: string;
-}
-
-type ScheduleKey = keyof Omit<NotificationScheduleConfig, 'updatedAt'>;
-
-const SCHEDULE_TYPES: { key: ScheduleKey; label: string; icon: string; defaultTime: string; description: string }[] = [
-  { key: 'morningAzkar', label: 'أذكار الصباح', icon: '🌅', defaultTime: '06:00', description: 'تذكير يومي بأذكار الصباح' },
-  { key: 'eveningAzkar', label: 'أذكار المساء', icon: '🌙', defaultTime: '17:00', description: 'تذكير يومي بأذكار المساء' },
-  { key: 'sleepAzkar', label: 'أذكار النوم', icon: '😴', defaultTime: '22:00', description: 'تذكير قبل النوم' },
-  { key: 'wakeupAzkar', label: 'أذكار الاستيقاظ', icon: '⏰', defaultTime: '05:30', description: 'تذكير عند الاستيقاظ' },
-  { key: 'dailyVerse', label: 'آية يومية', icon: '📖', defaultTime: '08:00', description: 'آية من القرآن يومياً' },
-  { key: 'salawat', label: 'الصلاة على النبي', icon: '☪️', defaultTime: '09:00', description: 'تذكير بالصلاة على النبي' },
-  { key: 'tasbih', label: 'تذكير التسبيح', icon: '📿', defaultTime: '15:00', description: 'تذكير بالتسبيح والذكر' },
-  { key: 'istighfar', label: 'تذكير الاستغفار', icon: '🤲', defaultTime: '12:00', description: 'تذكير بالاستغفار' },
-  { key: 'quranReading', label: 'ورد القرآن', icon: '📚', defaultTime: '20:00', description: 'تذكير بقراءة الورد اليومي' },
-  { key: 'kahfFriday', label: 'سورة الكهف - الجمعة', icon: '🕌', defaultTime: '10:00', description: 'تذكير بقراءة سورة الكهف يوم الجمعة' },
+const BUNDLED_SOUNDS: BundledSound[] = [
+  // إشعارات
+  { id: 'general_reminder', name: 'تذكير عام', category: 'notification' },
+  { id: 'salawat', name: 'صلاة على النبي', category: 'notification' },
+  { id: 'istighfar', name: 'استغفار', category: 'notification' },
+  { id: 'tasbih', name: 'تسبيح', category: 'notification' },
+  { id: 'subhanallah', name: 'سبحان الله', category: 'notification' },
+  { id: 'alhamdulillah', name: 'الحمد لله', category: 'notification' },
+  { id: 'morning_adhkar', name: 'أذكار الصباح', category: 'notification' },
+  { id: 'evening_adhkar', name: 'أذكار المساء', category: 'notification' },
+  // أذان
+  { id: 'makkah', name: 'أذان مكة المكرمة', category: 'adhan' },
+  { id: 'madinah', name: 'أذان المدينة المنورة', category: 'adhan' },
+  { id: 'alaqsa', name: 'أذان المسجد الأقصى', category: 'adhan' },
+  { id: 'mishary', name: 'مشاري العفاسي', category: 'adhan' },
+  { id: 'abdulbasit', name: 'عبد الباسط عبد الصمد', category: 'adhan' },
+  { id: 'sudais', name: 'عبد الرحمن السديس', category: 'adhan' },
+  { id: 'egypt', name: 'أذان مصر', category: 'adhan' },
+  { id: 'dosari', name: 'ياسر الدوسري', category: 'adhan' },
+  { id: 'ajman', name: 'أذان عجمان', category: 'adhan' },
+  { id: 'ali_mulla', name: 'علي الملا', category: 'adhan' },
+  { id: 'naqshbandi', name: 'النقشبندي', category: 'adhan' },
+  { id: 'sharif', name: 'محمد شريف', category: 'adhan' },
+  { id: 'mansoor_zahrani', name: 'منصور الزهراني', category: 'adhan' },
+  { id: 'haramain', name: 'الحرمين', category: 'adhan' },
+  { id: 'silent', name: 'صامت', category: 'adhan' },
 ];
 
-const DAYS_OF_WEEK = [
-  { value: 0, label: 'أحد', short: 'أ' },
-  { value: 1, label: 'إثنين', short: 'ث' },
-  { value: 2, label: 'ثلاثاء', short: 'ث' },
-  { value: 3, label: 'أربعاء', short: 'ر' },
-  { value: 4, label: 'خميس', short: 'خ' },
-  { value: 5, label: 'جمعة', short: 'ج' },
-  { value: 6, label: 'سبت', short: 'س' },
-];
-
-const DEFAULT_SCHEDULE_ITEM: NotificationScheduleItem = {
-  enabled: false,
-  time: '08:00',
-  days: [],
-  soundId: '',
-};
-
-const DEFAULT_SCHEDULE: NotificationScheduleConfig = Object.fromEntries(
-  SCHEDULE_TYPES.map(t => [t.key, { ...DEFAULT_SCHEDULE_ITEM, time: t.defaultTime }])
-) as unknown as NotificationScheduleConfig;
-
-const FIRESTORE_SCHEDULE_DOC = 'appConfig/notificationSchedule';
-
-type ActiveTab = 'library' | 'notifications' | 'events' | 'downloadable' | 'scheduling';
+type ActiveTab = 'library' | 'notifications' | 'events';
 
 // ==================== Component ====================
 
 export default function SoundManager() {
   const [sounds, setSounds] = useState<SoundFile[]>([]);
   const [assignments, setAssignments] = useState<SoundAssignments>(DEFAULT_ASSIGNMENTS);
-  const [schedule, setSchedule] = useState<NotificationScheduleConfig>(DEFAULT_SCHEDULE);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -180,9 +148,11 @@ export default function SoundManager() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
+  const [newSoundUrl, setNewSoundUrl] = useState('');
+  const [newSoundName, setNewSoundName] = useState('');
+  const [newSoundCategory, setNewSoundCategory] = useState<SoundCategory>('notification');
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ==================== Load Data ====================
 
@@ -193,10 +163,9 @@ export default function SoundManager() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [soundsSnap, assignmentsSnap, scheduleSnap] = await Promise.all([
+      const [soundsSnap, assignmentsSnap] = await Promise.all([
         getDocs(collection(db, FIRESTORE_SOUNDS_COLLECTION)),
         getDoc(doc(db, FIRESTORE_ASSIGNMENTS_DOC)),
-        getDoc(doc(db, FIRESTORE_SCHEDULE_DOC)),
       ]);
 
       const loadedSounds: SoundFile[] = soundsSnap.docs.map(d => ({
@@ -212,17 +181,6 @@ export default function SoundManager() {
           pageEvents: { ...DEFAULT_ASSIGNMENTS.pageEvents, ...data.pageEvents },
         });
       }
-
-      if (scheduleSnap.exists()) {
-        const data = scheduleSnap.data() as Partial<NotificationScheduleConfig>;
-        const merged: NotificationScheduleConfig = { ...DEFAULT_SCHEDULE };
-        for (const key of SCHEDULE_TYPES.map(t => t.key)) {
-          if (data[key]) {
-            merged[key] = { ...DEFAULT_SCHEDULE_ITEM, ...data[key] };
-          }
-        }
-        setSchedule(merged);
-      }
     } catch (err) {
       console.error('Error loading sound data:', err);
     } finally {
@@ -230,46 +188,38 @@ export default function SoundManager() {
     }
   };
 
-  // ==================== Upload ====================
+  // ==================== Add Sound by URL ====================
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleAddByUrl = async () => {
+    const url = newSoundUrl.trim();
+    if (!url) return;
+
+    // Basic URL validation
+    try { new URL(url); } catch {
+      alert('الرابط غير صالح — يجب أن يبدأ بـ https://');
+      return;
+    }
 
     setIsUploading(true);
     try {
-      for (const file of Array.from(files)) {
-        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-          alert(`الملف ${file.name} أكبر من ${MAX_FILE_SIZE_MB}MB`);
-          continue;
-        }
+      const soundDoc: Omit<SoundFile, 'id'> = {
+        name: newSoundName.trim() || url.split('/').pop()?.replace(/\.[^.]+$/, '') || 'صوت جديد',
+        category: newSoundCategory,
+        url,
+        storagePath: '',
+        uploadedAt: new Date().toISOString(),
+        fileSize: 0,
+      };
 
-        const timestamp = Date.now();
-        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const storagePath = `${STORAGE_SOUNDS_PATH}/${timestamp}_${safeName}`;
-        const storageRef = ref(storage, storagePath);
-
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-
-        const soundDoc: Omit<SoundFile, 'id'> = {
-          name: file.name.replace(/\.[^.]+$/, ''),
-          category: 'notification',
-          url,
-          storagePath,
-          uploadedAt: new Date().toISOString(),
-          fileSize: file.size,
-        };
-
-        const docRef = await addDoc(collection(db, FIRESTORE_SOUNDS_COLLECTION), soundDoc);
-        setSounds(prev => [...prev, { id: docRef.id, ...soundDoc }]);
-      }
-    } catch (err) {
-      console.error('Error uploading sound:', err);
-      alert('حدث خطأ أثناء رفع الملف');
+      const docRef = await addDoc(collection(db, FIRESTORE_SOUNDS_COLLECTION), soundDoc);
+      setSounds(prev => [...prev, { id: docRef.id, ...soundDoc }]);
+      setNewSoundUrl('');
+      setNewSoundName('');
+    } catch (err: any) {
+      console.error('Error adding sound:', err);
+      alert('حدث خطأ أثناء الإضافة — تحقق من الاتصال');
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -277,12 +227,6 @@ export default function SoundManager() {
 
   const handleDelete = async (sound: SoundFile) => {
     try {
-      // Remove from Storage
-      const storageRef = ref(storage, sound.storagePath);
-      await deleteObject(storageRef).catch(() => {
-        // File may already be deleted from storage
-      });
-
       // Remove from Firestore
       await deleteDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, sound.id));
 
@@ -357,26 +301,6 @@ export default function SoundManager() {
     }
   };
 
-  // ==================== Toggle Downloadable ====================
-
-  const toggleDownloadable = async (soundId: string, currentValue: boolean) => {
-    try {
-      await setDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, soundId), { isDownloadable: !currentValue }, { merge: true });
-      setSounds(prev => prev.map(s => s.id === soundId ? { ...s, isDownloadable: !currentValue } : s));
-    } catch (err) {
-      console.error('Error updating downloadable status:', err);
-    }
-  };
-
-  const updateDownloadDescription = async (soundId: string, description: string) => {
-    try {
-      await setDoc(doc(db, FIRESTORE_SOUNDS_COLLECTION, soundId), { downloadDescription: description }, { merge: true });
-      setSounds(prev => prev.map(s => s.id === soundId ? { ...s, downloadDescription: description } : s));
-    } catch (err) {
-      console.error('Error updating download description:', err);
-    }
-  };
-
   // ==================== Save Assignments ====================
 
   const handleSaveAssignments = async () => {
@@ -396,44 +320,6 @@ export default function SoundManager() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // ==================== Save Schedule ====================
-
-  const handleSaveSchedule = async () => {
-    setIsSaving(true);
-    setSaveStatus('idle');
-    try {
-      await setDoc(doc(db, FIRESTORE_SCHEDULE_DOC), {
-        ...schedule,
-        updatedAt: new Date().toISOString(),
-      });
-      setSaveStatus('success');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch (err) {
-      console.error('Error saving schedule:', err);
-      setSaveStatus('error');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const updateScheduleItem = (key: ScheduleKey, field: keyof NotificationScheduleItem, value: unknown) => {
-    setSchedule(prev => ({
-      ...prev,
-      [key]: { ...prev[key], [field]: value },
-    }));
-  };
-
-  const toggleScheduleDay = (key: ScheduleKey, day: number) => {
-    setSchedule(prev => {
-      const current = prev[key].days;
-      const updated = current.includes(day)
-        ? current.filter(d => d !== day)
-        : [...current, day].sort((a, b) => a - b);
-      return { ...prev, [key]: { ...prev[key], days: updated } };
-    });
   };
 
   // ==================== Filtering ====================
@@ -471,7 +357,7 @@ export default function SoundManager() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
+        <RefreshCw className="w-8 h-8 text-accent-light animate-spin" />
       </div>
     );
   }
@@ -479,9 +365,7 @@ export default function SoundManager() {
   const tabs: { key: ActiveTab; label: string; icon: React.ReactNode }[] = [
     { key: 'library', label: 'مكتبة الأصوات', icon: <Music className="w-4 h-4" /> },
     { key: 'notifications', label: 'أصوات الإشعارات', icon: <Volume2 className="w-4 h-4" /> },
-    { key: 'scheduling', label: 'جدولة الإشعارات', icon: <Bell className="w-4 h-4" /> },
     { key: 'events', label: 'أصوات الأحداث', icon: <Music className="w-4 h-4" /> },
-    { key: 'downloadable', label: 'أصوات قابلة للتحميل', icon: <Download className="w-4 h-4" /> },
   ];
 
   return (
@@ -489,8 +373,8 @@ export default function SoundManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-            <Volume2 className="w-6 h-6 text-emerald-400" />
+          <div className="w-12 h-12 bg-accent/20 rounded-xl flex items-center justify-center">
+            <Volume2 className="w-6 h-6 text-accent-light" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">إدارة الأصوات</h1>
@@ -498,16 +382,16 @@ export default function SoundManager() {
           </div>
         </div>
 
-        {(activeTab === 'notifications' || activeTab === 'events' || activeTab === 'scheduling') && (
+        {(activeTab === 'notifications' || activeTab === 'events') && (
           <button
-            onClick={activeTab === 'scheduling' ? handleSaveSchedule : activeTab === 'scheduling' ? handleSaveSchedule : handleSaveAssignments}
+            onClick={handleSaveAssignments}
             disabled={isSaving}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium transition-all ${
               saveStatus === 'success'
                 ? 'bg-green-500 text-white'
                 : saveStatus === 'error'
                 ? 'bg-red-500 text-white'
-                : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                : 'bg-accent hover:bg-accent-dark text-white'
             } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {isSaving ? (
@@ -532,8 +416,8 @@ export default function SoundManager() {
             onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
               activeTab === tab.key
-                ? 'bg-emerald-500 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                ? 'bg-accent text-white'
+                : 'bg-admin-surface text-slate-300 hover:bg-admin-surface-light border border-admin-border'
             }`}
           >
             {tab.icon}
@@ -545,30 +429,63 @@ export default function SoundManager() {
       {/* ==================== Sound Library ==================== */}
       {activeTab === 'library' && (
         <div className="space-y-4">
-          {/* Upload + Filter Bar */}
-          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700 flex flex-wrap items-center gap-4">
-            {/* Upload Button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-all disabled:opacity-50"
-            >
-              {isUploading ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Upload className="w-5 h-5" />
-              )}
-              {isUploading ? 'جاري الرفع...' : 'رفع صوت'}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_AUDIO_TYPES}
-              multiple
-              onChange={handleUpload}
-              className="hidden"
-              aria-label="اختر ملفات صوتية لتحميلها"
-            />
+          {/* Add by URL */}
+          <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                value={newSoundUrl}
+                onChange={(e) => setNewSoundUrl(e.target.value)}
+                placeholder="رابط الصوت (https://...)" 
+                className="flex-1 min-w-[250px] bg-admin-surface-light text-white px-4 py-2.5 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none"
+                dir="ltr"
+              />
+              <input
+                type="text"
+                value={newSoundName}
+                onChange={(e) => setNewSoundName(e.target.value)}
+                placeholder="اسم الصوت (اختياري)"
+                className="min-w-[180px] bg-admin-surface-light text-white px-4 py-2.5 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none"
+                dir="rtl"
+              />
+              <select
+                value={newSoundCategory}
+                onChange={(e) => setNewSoundCategory(e.target.value as SoundCategory)}
+                className="bg-admin-surface-light text-white px-3 py-2.5 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none"
+                aria-label="فئة الصوت"
+              >
+                {SOUND_CATEGORIES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAddByUrl}
+                disabled={isUploading || !newSoundUrl.trim()}
+                className="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-dark text-white rounded-xl font-medium transition-all disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Plus className="w-5 h-5" />
+                )}
+                {isUploading ? 'جاري الإضافة...' : 'إضافة'}
+              </button>
+            </div>
+            <p className="text-slate-500 text-xs">الصق رابط مباشر لملف MP3 من أي CDN أو موقع استضافة</p>
+            <details className="mt-2">
+              <summary className="text-xs text-accent-light cursor-pointer hover:underline">🌐 مواقع مجانية لرفع الملفات الصوتية</summary>
+              <ul className="mt-2 text-xs text-slate-400 space-y-1 pr-4 list-disc">
+                <li><strong>Cloudinary</strong> — cloudinary.com — 25 جيجا مجاناً، رابط مباشر</li>
+                <li><strong>Catbox.moe</strong> — catbox.moe — 200 ميجا للملف، بدون تسجيل</li>
+                <li><strong>Internet Archive</strong> — archive.org — مساحة غير محدودة</li>
+                <li><strong>GitHub Releases</strong> — github.com — ارفع كـ Release asset (حتى 2 جيجا)</li>
+                <li><strong>Google Drive</strong> — انسخ الرابط واستبدل: <code className="bg-admin-surface-light px-1 rounded" dir="ltr">https://drive.google.com/uc?export=download&id=FILE_ID</code></li>
+              </ul>
+            </details>
+          </div>
+
+          {/* Search + Filter Bar */}
+          <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border flex flex-wrap items-center gap-4">
 
             {/* Search */}
             <div className="relative flex-1 min-w-[200px]">
@@ -579,7 +496,7 @@ export default function SoundManager() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="بحث عن صوت..."
                 aria-label="بحث في الأصوات"
-                className="w-full bg-slate-700 text-white pr-10 pl-4 py-2.5 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+                className="w-full bg-admin-surface-light text-white pr-10 pl-4 py-2.5 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none"
                 dir="rtl"
               />
               {searchQuery && (
@@ -598,7 +515,7 @@ export default function SoundManager() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value as SoundCategory | 'all')}
-              className="bg-slate-700 text-white px-4 py-2.5 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+              className="bg-admin-surface-light text-white px-4 py-2.5 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none"
               aria-label="فلتر فئة الأصوات"
             >
               <option value="all">جميع الفئات</option>
@@ -612,19 +529,19 @@ export default function SoundManager() {
             </div>
           </div>
 
-          {/* Sound Grid */}
+          {/* Uploaded Sound Grid */}
           {filteredSounds.length === 0 ? (
-            <div className="bg-slate-800 rounded-2xl p-12 border border-slate-700 text-center">
-              <Music className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 text-lg">لا توجد أصوات</p>
-              <p className="text-slate-500 text-sm mt-1">ابدأ برفع ملفات صوتية</p>
+            <div className="bg-admin-surface rounded-2xl p-8 border border-admin-border text-center">
+              <Music className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+              <p className="text-slate-400">لا توجد أصوات مرفوعة</p>
+              <p className="text-slate-500 text-sm mt-1">أضف أصوات مخصصة عبر الرابط بالأعلى</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSounds.map(sound => (
                 <div
                   key={sound.id}
-                  className="bg-slate-800 rounded-2xl border border-slate-700 p-4 hover:border-slate-600 transition-all"
+                  className="bg-admin-surface rounded-2xl border border-admin-border p-4 hover:border-admin-border transition-all"
                 >
                   <div className="flex items-start justify-between mb-3">
                     {/* Name */}
@@ -636,7 +553,7 @@ export default function SoundManager() {
                             value={editingNameValue}
                             onChange={(e) => setEditingNameValue(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && saveEditedName(sound.id)}
-                            className="bg-slate-700 text-white px-3 py-1.5 rounded-lg border border-slate-600 text-sm w-full focus:border-emerald-500 focus:outline-none"
+                            className="bg-admin-surface-light text-white px-3 py-1.5 rounded-lg border border-admin-border text-sm w-full focus:border-accent focus:outline-none"
                             dir="rtl"
                             autoFocus
                             aria-label="اسم الصوت"
@@ -644,7 +561,7 @@ export default function SoundManager() {
                           />
                           <button
                             onClick={() => saveEditedName(sound.id)}
-                            className="text-emerald-400 hover:text-emerald-300 flex-shrink-0"
+                            className="text-accent-light hover:text-emerald-300 flex-shrink-0"
                             aria-label="حفظ الاسم"
                             title="حفظ الاسم"
                           >
@@ -662,7 +579,7 @@ export default function SoundManager() {
                       ) : (
                         <button
                           onClick={() => { setEditingNameId(sound.id); setEditingNameValue(sound.name); }}
-                          className="text-white font-medium text-sm truncate block w-full text-right hover:text-emerald-400 transition-colors"
+                          className="text-white font-medium text-sm truncate block w-full text-right hover:text-accent-light transition-colors"
                           title="انقر للتعديل"
                         >
                           {sound.name}
@@ -676,7 +593,7 @@ export default function SoundManager() {
                       className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mr-2 transition-all ${
                         playingId === sound.id
                           ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
+                          : 'bg-accent/20 text-accent-light hover:bg-accent/30'
                       }`}
                       aria-label={playingId === sound.id ? 'إيقاف الصوت' : 'تشغيل الصوت'}
                       title={playingId === sound.id ? 'إيقاف' : 'تشغيل'}
@@ -694,7 +611,7 @@ export default function SoundManager() {
                     <select
                       value={sound.category}
                       onChange={(e) => updateSoundCategory(sound.id, e.target.value as SoundCategory)}
-                      className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
+                      className="w-full bg-admin-surface-light text-white px-3 py-2 rounded-lg border border-admin-border text-sm focus:border-accent focus:outline-none"
                       aria-label="فئة الصوت"
                     >
                       {SOUND_CATEGORIES.map(c => (
@@ -710,7 +627,7 @@ export default function SoundManager() {
                   </div>
 
                   {/* Delete */}
-                  <div className="mt-3 pt-3 border-t border-slate-700">
+                  <div className="mt-3 pt-3 border-t border-admin-border">
                     {deleteConfirmId === sound.id ? (
                       <div className="flex items-center justify-between">
                         <span className="text-red-400 text-xs">هل أنت متأكد؟</span>
@@ -723,7 +640,7 @@ export default function SoundManager() {
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
-                            className="px-3 py-1 bg-slate-700 text-slate-300 rounded-lg text-xs hover:bg-slate-600 transition-colors"
+                            className="px-3 py-1 bg-admin-surface-light text-slate-300 rounded-lg text-xs hover:bg-admin-surface-light transition-colors"
                           >
                             إلغاء
                           </button>
@@ -749,7 +666,7 @@ export default function SoundManager() {
       {/* ==================== Notification Sound Assignment ==================== */}
       {activeTab === 'notifications' && (
         <div className="space-y-4">
-          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
             <p className="text-sm text-slate-400">
               اختر الصوت المناسب لكل نوع من الإشعارات. سيتم تطبيق التغييرات على جميع مستخدمي التطبيق.
             </p>
@@ -763,11 +680,11 @@ export default function SoundManager() {
               return (
                 <div
                   key={type.key}
-                  className="bg-slate-800 rounded-2xl border border-slate-700 p-4"
+                  className="bg-admin-surface rounded-2xl border border-admin-border p-4"
                 >
                   <div className="flex items-center gap-4">
                     {/* Icon / Label */}
-                    <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center text-xl">
+                    <div className="w-10 h-10 bg-admin-surface-light rounded-xl flex items-center justify-center text-xl">
                       {type.icon}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -786,15 +703,29 @@ export default function SoundManager() {
                           notifications: { ...prev.notifications, [type.key]: e.target.value },
                         }))
                       }
-                      className="bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none min-w-[200px]"
+                      className="bg-admin-surface-light text-white px-4 py-2 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none min-w-[200px]"
                       aria-label={`صوت ${type.label}`}
                     >
                       <option value="">— غير محدد —</option>
-                      {sounds.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {SOUND_CATEGORIES.find(c => c.value === s.category)?.icon} {s.name}
-                        </option>
-                      ))}
+                      <optgroup label="🔔 إشعارات مدمجة">
+                        {BUNDLED_SOUNDS.filter(s => s.category === 'notification').map(s => (
+                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="🕌 أذان مدمج">
+                        {BUNDLED_SOUNDS.filter(s => s.category === 'adhan').map(s => (
+                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      {sounds.length > 0 && (
+                        <optgroup label="📤 أصوات مرفوعة">
+                          {sounds.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {SOUND_CATEGORIES.find(c => c.value === s.category)?.icon} {s.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
 
                     {/* Preview */}
@@ -804,7 +735,7 @@ export default function SoundManager() {
                         className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                           playingId === selectedSound.id
                             ? 'bg-red-500/20 text-red-400'
-                            : 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-accent/20 text-accent-light'
                         }`}
                         aria-label={playingId === selectedSound.id ? 'إيقاف المعاينة' : 'معاينة الصوت'}
                         title={playingId === selectedSound.id ? 'إيقاف' : 'معاينة'}
@@ -827,7 +758,7 @@ export default function SoundManager() {
       {/* ==================== Page Sound Assignment ==================== */}
       {activeTab === 'events' && (
         <div className="space-y-4">
-          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
+          <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
             <p className="text-sm text-slate-400">
               اختر الأصوات التي تُشغّل عند أحداث معينة داخل التطبيق.
             </p>
@@ -841,10 +772,10 @@ export default function SoundManager() {
               return (
                 <div
                   key={type.key}
-                  className="bg-slate-800 rounded-2xl border border-slate-700 p-4"
+                  className="bg-admin-surface rounded-2xl border border-admin-border p-4"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center text-xl">
+                    <div className="w-10 h-10 bg-admin-surface-light rounded-xl flex items-center justify-center text-xl">
                       {type.icon}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -862,15 +793,29 @@ export default function SoundManager() {
                           pageEvents: { ...prev.pageEvents, [type.key]: e.target.value },
                         }))
                       }
-                      className="bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none min-w-[200px]"
+                      className="bg-admin-surface-light text-white px-4 py-2 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none min-w-[200px]"
                       aria-label={`صوت ${type.label}`}
                     >
                       <option value="">— غير محدد —</option>
-                      {sounds.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {SOUND_CATEGORIES.find(c => c.value === s.category)?.icon} {s.name}
-                        </option>
-                      ))}
+                      <optgroup label="🔔 إشعارات مدمجة">
+                        {BUNDLED_SOUNDS.filter(s => s.category === 'notification').map(s => (
+                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="🎵 مؤثرات مدمجة">
+                        {BUNDLED_SOUNDS.filter(s => s.category === 'adhan').map(s => (
+                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      {sounds.length > 0 && (
+                        <optgroup label="📤 أصوات مرفوعة">
+                          {sounds.map(s => (
+                            <option key={s.id} value={s.id}>
+                              {SOUND_CATEGORIES.find(c => c.value === s.category)?.icon} {s.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
 
                     {selectedSound && (
@@ -879,7 +824,7 @@ export default function SoundManager() {
                         className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
                           playingId === selectedSound.id
                             ? 'bg-red-500/20 text-red-400'
-                            : 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-accent/20 text-accent-light'
                         }`}
                         aria-label={playingId === selectedSound.id ? 'إيقاف المعاينة' : 'معاينة الصوت'}
                         title={playingId === selectedSound.id ? 'إيقاف' : 'معاينة'}
@@ -895,234 +840,6 @@ export default function SoundManager() {
                 </div>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {/* ==================== Notification Scheduling ==================== */}
-      {activeTab === 'scheduling' && (
-        <div className="space-y-4">
-          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="w-5 h-5 text-emerald-400" />
-              <h3 className="text-lg font-semibold text-white">جدولة الإشعارات الافتراضية</h3>
-            </div>
-            <p className="text-sm text-slate-400 mb-0">
-              حدد الوقت والأيام والصوت الافتراضي لكل نوع من الإشعارات. يمكن للمستخدم تعديل هذه الإعدادات من التطبيق.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {SCHEDULE_TYPES.map(({ key, label, icon, description }) => {
-              const item = schedule[key];
-              return (
-                <div
-                  key={key}
-                  className={`bg-slate-800 rounded-2xl border transition-colors ${
-                    item.enabled ? 'border-emerald-500/40' : 'border-slate-700'
-                  }`}
-                >
-                  {/* Header row */}
-                  <div className="flex items-center justify-between p-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{icon}</span>
-                      <div>
-                        <h4 className="text-white font-medium">{label}</h4>
-                        <p className="text-xs text-slate-400">{description}</p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        checked={item.enabled}
-                        title={`تفعيل ${label}`}
-                        onChange={() => updateScheduleItem(key, 'enabled', !item.enabled)}
-                      />
-                      <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:bg-emerald-500 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full" />
-                    </label>
-                  </div>
-
-                  {/* Expanded settings */}
-                  {item.enabled && (
-                    <div className="px-4 pb-4 space-y-4 border-t border-slate-700 pt-4">
-                      {/* Time picker */}
-                      <div className="flex items-center gap-3">
-                        <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                        <label className="text-sm text-slate-300 w-16">الوقت</label>
-                        <input
-                          type="time"
-                          title={`وقت إشعار ${label}`}
-                          value={item.time}
-                          onChange={e => updateScheduleItem(key, 'time', e.target.value)}
-                          className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
-                        />
-                      </div>
-
-                      {/* Day selector */}
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-sm text-slate-300">الأيام</span>
-                          <span className="text-xs text-slate-500">(فارغ = كل يوم)</span>
-                        </div>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {DAYS_OF_WEEK.map(day => {
-                            const active = item.days.includes(day.value);
-                            return (
-                              <button
-                                key={day.value}
-                                onClick={() => toggleScheduleDay(key, day.value)}
-                                className={`w-10 h-10 rounded-lg text-xs font-medium transition-colors ${
-                                  active
-                                    ? 'bg-emerald-500 text-white'
-                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                                }`}
-                                title={day.label}
-                              >
-                                {day.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Sound selector */}
-                      <div className="flex items-center gap-3">
-                        <Volume2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                        <label className="text-sm text-slate-300 w-16">الصوت</label>
-                        <select
-                          title={`صوت إشعار ${label}`}
-                          value={item.soundId}
-                          onChange={e => updateScheduleItem(key, 'soundId', e.target.value)}
-                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-1.5 text-white text-sm focus:border-emerald-500 focus:outline-none"
-                        >
-                          <option value="">الصوت الافتراضي</option>
-                          {sounds
-                            .filter(s => s.category === 'notification' || s.category === 'adhan')
-                            .map(s => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                        </select>
-                        {item.soundId && (
-                          <button
-                            onClick={() => {
-                              const sound = sounds.find(s => s.id === item.soundId);
-                              if (sound) togglePlay(sound);
-                            }}
-                            className="p-1.5 bg-slate-700 rounded-lg hover:bg-slate-600 transition-colors"
-                            title="تشغيل الصوت"
-                          >
-                            {playingId === item.soundId ? (
-                              <Pause className="w-4 h-4 text-emerald-400" />
-                            ) : (
-                              <Play className="w-4 h-4 text-emerald-400" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ==================== Downloadable Sounds ==================== */}
-      {activeTab === 'downloadable' && (
-        <div className="space-y-4">
-          <div className="bg-slate-800 rounded-2xl p-4 border border-slate-700">
-            <p className="text-sm text-slate-400">
-              حدد الأصوات القابلة للتحميل من قبل المستخدمين. سيظهر للمستخدم إعلان قبل تحميل كل صوت.
-            </p>
-          </div>
-
-          {/* All sounds with downloadable toggle */}
-          <div className="space-y-3">
-            {sounds.length === 0 ? (
-              <div className="bg-slate-800 rounded-2xl p-12 border border-slate-700 text-center">
-                <Music className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                <p className="text-slate-400 text-lg">لا توجد أصوات</p>
-                <p className="text-slate-500 text-sm mt-1">ارفع أصواتاً من تبويب "مكتبة الأصوات" أولاً</p>
-              </div>
-            ) : (
-              <>
-                <div className="text-sm text-slate-400 mb-2">
-                  {sounds.filter(s => s.isDownloadable).length} من {sounds.length} صوت متاح للتحميل
-                </div>
-                {sounds.map(sound => (
-                  <div
-                    key={sound.id}
-                    className={`bg-slate-800 rounded-2xl border p-4 transition-all ${
-                      sound.isDownloadable ? 'border-emerald-500/50' : 'border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Toggle */}
-                      <button
-                        onClick={() => toggleDownloadable(sound.id, !!sound.isDownloadable)}
-                        className={`w-12 h-7 rounded-full flex items-center transition-all flex-shrink-0 ${
-                          sound.isDownloadable ? 'bg-emerald-500 justify-end' : 'bg-slate-600 justify-start'
-                        }`}
-                        title={sound.isDownloadable ? 'إلغاء التحميل' : 'تفعيل التحميل'}
-                        aria-label={sound.isDownloadable ? 'إلغاء التحميل' : 'تفعيل التحميل'}
-                      >
-                        <div className="w-5 h-5 bg-white rounded-full mx-1 shadow-sm" />
-                      </button>
-
-                      {/* Icon */}
-                      <div className="w-10 h-10 bg-slate-700 rounded-xl flex items-center justify-center text-lg flex-shrink-0">
-                        {SOUND_CATEGORIES.find(c => c.value === sound.category)?.icon || '🎵'}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{sound.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {SOUND_CATEGORIES.find(c => c.value === sound.category)?.label} — {formatFileSize(sound.fileSize)}
-                        </p>
-                      </div>
-
-                      {/* Preview */}
-                      <button
-                        onClick={() => togglePlay(sound)}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                          playingId === sound.id
-                            ? 'bg-red-500/20 text-red-400'
-                            : 'bg-emerald-500/20 text-emerald-400'
-                        }`}
-                        title="تشغيل"
-                        aria-label={playingId === sound.id ? 'إيقاف الصوت' : 'تشغيل الصوت'}
-                      >
-                        {playingId === sound.id ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Description field (only when downloadable) */}
-                    {sound.isDownloadable && (
-                      <div className="mt-3 pt-3 border-t border-slate-700">
-                        <input
-                          type="text"
-                          value={sound.downloadDescription || ''}
-                          onChange={(e) => updateDownloadDescription(sound.id, e.target.value)}
-                          placeholder="وصف للمستخدم (مثال: أذان بصوت الشيخ مشاري راشد)"
-                          aria-label="وصف الصوت القابل للتحميل"
-                          className="w-full bg-slate-700 text-white px-4 py-2 rounded-xl border border-slate-600 text-sm focus:border-emerald-500 focus:outline-none"
-                          dir="rtl"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </>
-            )}
           </div>
         </div>
       )}

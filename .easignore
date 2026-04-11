@@ -4,7 +4,6 @@ server/
 .claude/
 design/
 docs/
-scripts/
 
 # Documentation
 *.md
@@ -24,3 +23,21 @@ coverage/
 # Build artifacts
 .expo/
 node_modules/.cache/
+public/
+*.aab
+*.apk
+*.ipa
+hosting/
+scan_report.json
+icon-analysis.json
+duplicates.txt
+# Native directories — excluded so EAS runs prebuild,
+# which applies all config plugins (setAlarmClock, direct
+# presentation, notification reschedule, widgets, etc.)
+# Leading / ensures only top-level dirs are excluded
+/android/
+//android/
+/ios/
+functions/
+credentials/
+*.tgz

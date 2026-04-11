@@ -128,23 +128,11 @@ struct SmallQuranAyahWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: "#1e3a5f"),
-                    Color(hex: "#2f7659")
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: Color(hex: "#1e3a5f"))
             
             VStack(spacing: 6) {
-                HStack {
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 12))
-                    Text("آية اليوم")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.8))
+                // App icon
+                WidgetAppIcon(size: 32)
                 
                 Spacer()
                 
@@ -157,12 +145,18 @@ struct SmallQuranAyahWidgetView: View {
                 
                 Spacer()
                 
-                Text("\(entry.data?.surahName ?? "سورة الفاتحة") - آية \(entry.data?.numberInSurah ?? 1)")
-                    .font(.system(size: 9))
-                    .foregroundColor(.white.opacity(0.7))
+                GlassPill {
+                    Text("\(entry.data?.surahName ?? "الفاتحة") - آية \(entry.data?.numberInSurah ?? 1)")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
             }
             .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -175,29 +169,24 @@ struct MediumQuranAyahWidgetView: View {
     
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: "#1e3a5f"),
-                    Color(hex: "#2f7659")
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            GlassWidgetBackground(accentColor: Color(hex: "#1e3a5f"))
             
-            VStack(spacing: 10) {
+            VStack(spacing: 8) {
+                // Header with icon
                 HStack {
-                    Image(systemName: "book.fill")
-                        .font(.system(size: 14))
+                    WidgetAppIcon(size: 20)
                     Text("آية اليوم")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
                     
                     Spacer()
                     
-                    Text(entry.data?.surahName ?? "سورة الفاتحة")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
+                    GlassPill {
+                        Text(entry.data?.surahName ?? "الفاتحة")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                 }
-                .foregroundColor(.white)
                 
                 Spacer()
                 
@@ -214,25 +203,27 @@ struct MediumQuranAyahWidgetView: View {
                         .font(.system(size: 11))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 
                 Spacer()
                 
-                HStack {
-                    Image(systemName: "number")
-                        .font(.system(size: 10))
-                    Text("آية \(entry.data?.numberInSurah ?? 1)")
-                        .font(.system(size: 10, weight: .medium))
+                GlassPill {
+                    HStack(spacing: 4) {
+                        Image(systemName: "number")
+                            .font(.system(size: 9))
+                        Text("آية \(entry.data?.numberInSurah ?? 1)")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.white.opacity(0.6))
                 }
-                .foregroundColor(.white.opacity(0.7))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.white.opacity(0.15))
-                .cornerRadius(8)
             }
             .padding()
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 

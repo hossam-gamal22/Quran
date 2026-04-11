@@ -3,9 +3,40 @@ import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
 import { getAyahAudioUrl, saveLastPlayback, getLastPlayback, getCachedSurah } from './quran-cache';
 import { audioCoordinator } from './audio-coordinator';
+import { addListeningTime } from './listening-tracker';
 
-// TrackPlayer has been removed — always use expo-av
-// Lock screen controls are not available with expo-av
+// TrackPlayer is used for native platforms (iOS/Android) for lock screen controls
+// expo-av is used as fallback for web platform and Expo Go
+
+// Dynamic import of TrackPlayer - may not be available in Expo Go
+let TrackPlayer: typeof import('react-native-track-player').default | null = null;
+let Event: typeof import('react-native-track-player').Event | null = null;
+let State: typeof import('react-native-track-player').State | null = null;
+let trackPlayerAvailable = false;
+
+// Try to load TrackPlayer (will fail in Expo Go)
+try {
+  if (Platform.OS !== 'web') {
+    const TP = require('react-native-track-player');
+    TrackPlayer = TP.default;
+    Event = TP.Event;
+    State = TP.State;
+    // Check if native module is actually available
+    trackPlayerAvailable = !!TrackPlayer?.getPlaybackState;
+    console.log('[AudioPlayer] TrackPlayer available:', trackPlayerAvailable);
+  }
+} catch (e) {
+  console.log('[AudioPlayer] TrackPlayer not available, using expo-av fallback');
+  trackPlayerAvailable = false;
+}
+
+// Re-export TrackPlayer hooks for components to use (only if available)
+export const usePlaybackState = trackPlayerAvailable
+  ? require('react-native-track-player').usePlaybackState
+  : () => ({ state: null });
+export const useProgress = trackPlayerAvailable
+  ? require('react-native-track-player').useProgress
+  : () => ({ position: 0, duration: 0, buffered: 0 });
 
 export interface PlaybackState {
   isPlaying: boolean;
@@ -21,7 +52,12 @@ export interface PlaybackState {
 type PlaybackCallback = (state: PlaybackState) => void;
 
 class AudioPlayerManager {
+  // expo-av sound for web fallback
   private sound: Audio.Sound | null = null;
+  // TrackPlayer state tracking
+  private trackPlayerListeners: (() => void)[] = [];
+  private useTrackPlayer: boolean = trackPlayerAvailable;
+  
   private state: PlaybackState = {
     isPlaying: false,
     isLoading: false,
@@ -40,21 +76,104 @@ class AudioPlayerManager {
   private surahOffsets: Map<string, number[]> = new Map();
   private offsetPoller: number | null = null;
   private isTransitioning: boolean = false;
+  private progressPoller: number | null = null;
+  private listenersSetup: boolean = false;
+  private listeningTimer: ReturnType<typeof setInterval> | null = null;
+  private listeningAccumulator: number = 0; // seconds accumulated since last save
 
   constructor() {
     this.initAudio();
   }
 
   private async initAudio() {
-    if (Platform.OS !== 'web') {
-      // Configure expo-av for background playback
+    if (this.useTrackPlayer) {
+      // TrackPlayer setup is handled externally in _layout.tsx
+      // Here we just set up the event listeners
+      this.setupTrackPlayerListeners();
+      console.log('[audio-player] ✅ Using TrackPlayer for Quran playback (lock screen controls enabled)');
+    } else {
+      // Web fallback - configure expo-av
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
       });
-      console.log('[audio-player] ✅ Using expo-av for Quran playback');
+      console.log('[audio-player] ✅ Using expo-av for Quran playback (web)');
     }
+  }
+
+  private setupTrackPlayerListeners() {
+    if (!TrackPlayer || !Event || !State) return;
+    // Guard against duplicate listener setup (e.g. hot reload)
+    if (this.listenersSetup) return;
+    this.listenersSetup = true;
+    
+    // Listen for playback state changes from TrackPlayer
+    const playbackStateListener = TrackPlayer.addEventListener(
+      Event.PlaybackState,
+      async (event) => {
+        if (!State) return;
+        // Only process TrackPlayer events when Quran is the active source.
+        // Radio and Azkar also use the same TrackPlayer instance — without
+        // this guard, their Loading/Buffering events would update Quran state,
+        // causing GlobalAudioContext to think Quran started and stop the radio.
+        const currentSource = audioCoordinator.getCurrentSource();
+        if (currentSource !== null && currentSource !== 'quran') return;
+
+        const isPlaying = event.state === State.Playing;
+        const isLoading = event.state === State.Loading || event.state === State.Buffering;
+
+        this.updateState({
+          isPlaying,
+          isLoading,
+        });
+      }
+    );
+    this.trackPlayerListeners.push(() => playbackStateListener.remove());
+
+    // Listen for track end to auto-play next
+    const queueEndListener = TrackPlayer.addEventListener(
+      Event.PlaybackQueueEnded,
+      async () => {
+        // Ignore queue-end events when another source (radio/azkar) owns TrackPlayer
+        const currentSource = audioCoordinator.getCurrentSource();
+        if (currentSource !== null && currentSource !== 'quran') return;
+
+        if (this.continuousPlay && !this.isTransitioning) {
+          await this.playNextAyah(true);
+        }
+      }
+    );
+    this.trackPlayerListeners.push(() => queueEndListener.remove());
+
+    // Start progress poller for TrackPlayer (since useProgress hook is for components only)
+    this.startProgressPoller();
+  }
+
+  private startProgressPoller() {
+    if (this.progressPoller || !TrackPlayer || !State) return;
+    
+    this.progressPoller = setInterval(async () => {
+      if (!this.useTrackPlayer || !TrackPlayer || !State) return;
+      // Only poll progress when Quran owns TrackPlayer
+      const currentSource = audioCoordinator.getCurrentSource();
+      if (currentSource !== null && currentSource !== 'quran') return;
+      try {
+        const progress = await TrackPlayer.getProgress();
+        const position = progress.position;
+        const duration = progress.duration;
+        const state = await TrackPlayer.getPlaybackState();
+
+        if (state.state !== State.Stopped && state.state !== State.None) {
+          this.updateState({
+            position: position * 1000, // Convert to ms
+            duration: duration * 1000, // Convert to ms
+          });
+        }
+      } catch {
+        // Ignore errors when player is not ready
+      }
+    }, 500) as unknown as number;
   }
 
   subscribe(callback: PlaybackCallback): () => void {
@@ -68,8 +187,40 @@ class AudioPlayerManager {
   }
 
   private updateState(updates: Partial<PlaybackState>) {
+    const wasPlaying = this.state.isPlaying;
     this.state = { ...this.state, ...updates };
+    const nowPlaying = this.state.isPlaying;
+
+    // Track listening time
+    if (!wasPlaying && nowPlaying) {
+      this.startListeningTimer();
+    } else if (wasPlaying && !nowPlaying) {
+      this.stopListeningTimer();
+    }
+
     this.notifyListeners();
+  }
+
+  private startListeningTimer() {
+    if (this.listeningTimer) return;
+    this.listeningTimer = setInterval(() => {
+      this.listeningAccumulator += 5;
+      if (this.listeningAccumulator >= 30) {
+        addListeningTime(this.listeningAccumulator);
+        this.listeningAccumulator = 0;
+      }
+    }, 5000);
+  }
+
+  private stopListeningTimer() {
+    if (this.listeningTimer) {
+      clearInterval(this.listeningTimer);
+      this.listeningTimer = null;
+    }
+    if (this.listeningAccumulator > 0) {
+      addListeningTime(this.listeningAccumulator);
+      this.listeningAccumulator = 0;
+    }
   }
 
   async playAyah(
@@ -141,36 +292,56 @@ class AudioPlayerManager {
       }
 
       console.log('[audio-player] creating sound url=', audioUrl, 'playingFullSurah=', this.playingFullSurah);
-      
+
+      // Abort if a newer playAyah call was made while resolving URL
+      if (myLoadId !== this.loadingId) return;
+
       // If full surah mode and starting from a specific ayah, don't auto-play — seek first
       const needsSeek = this.playingFullSurah && ayahNumber > 1;
 
-      // Use expo-av for playback
       this.isTransitioning = false;
-      let sound: Audio.Sound;
-      try {
-        ({ sound } = await Audio.Sound.createAsync(
-          { uri: audioUrl },
-          { shouldPlay: !needsSeek },
-          this.onPlaybackStatusUpdate.bind(this)
-        ));
-      } catch (urlError) {
-        // If CDN URL failed, retry with islamic.network fallback for full surah
-        if (this.playingFullSurah) {
-          const { getSurahAudioUrl } = await import('./quran-cache');
-          const fallbackUrl = getSurahAudioUrl(reciterIdentifier, surahNumber);
-          console.warn('[audio-player] CDN URL failed, retrying with fallback:', fallbackUrl);
-          ({ sound } = await Audio.Sound.createAsync(
-            { uri: fallbackUrl },
-            { shouldPlay: !needsSeek },
-            this.onPlaybackStatusUpdate.bind(this)
-          ));
-        } else {
-          throw urlError;
+
+      // Get surah name for notification
+      const surahName = surah?.englishName || `Surah ${surahNumber}`;
+      const reciterName = this.getReciterName(reciterIdentifier);
+
+      if (this.useTrackPlayer && TrackPlayer) {
+        // Use TrackPlayer for native platforms (with lock screen controls)
+        try {
+          await TrackPlayer.reset();
+          await TrackPlayer.add({
+            id: `quran-${surahNumber}-${ayahNumber}`,
+            url: audioUrl,
+            title: this.playingFullSurah
+              ? `${surah?.name || `سورة ${surahNumber}`}`
+              : `${surah?.name || `سورة ${surahNumber}`} - آية ${ayahNumber}`,
+            artist: reciterName,
+            album: 'القرآن الكريم',
+            artwork: require('../assets/images/icons/icon.png'),
+          });
+          
+          if (needsSeek) {
+            // Seek to specific ayah position before playing
+            const key = `${reciterIdentifier}:${surahNumber}`;
+            const offsets = this.surahOffsets.get(key);
+            if (offsets && offsets.length >= ayahNumber) {
+              const seekPosition = offsets[ayahNumber - 1] / 1000; // Convert ms to seconds
+              await TrackPlayer.seekTo(seekPosition);
+              console.log('[audio-player] TrackPlayer seeked to ayah', ayahNumber, 'at', seekPosition, 's');
+            }
+          }
+          
+          await TrackPlayer.play();
+        } catch (tpError) {
+          console.warn('[audio-player] TrackPlayer error, falling back to expo-av:', tpError);
+          // Fallback to expo-av if TrackPlayer fails
+          await this.playWithExpoAv(audioUrl, needsSeek);
         }
+      } else {
+        // Use expo-av for web platform
+        await this.playWithExpoAv(audioUrl, needsSeek);
       }
 
-      this.sound = sound;
       this.updateState({
         isPlaying: true,
         isLoading: false,
@@ -184,19 +355,18 @@ class AudioPlayerManager {
 
       if (this.playingFullSurah) {
         this.startOffsetPoller(reciterIdentifier, surahNumber);
-        // Seek to specific ayah position if not starting from beginning
-        if (ayahNumber > 1) {
+        // For expo-av, handle seek after playback starts
+        if (!this.useTrackPlayer && ayahNumber > 1) {
           const key = `${reciterIdentifier}:${surahNumber}`;
           const offsets = this.surahOffsets.get(key);
           if (offsets && offsets.length >= ayahNumber) {
             const seekPosition = offsets[ayahNumber - 1];
-            if (seekPosition > 0) {
-              await this.sound?.setPositionAsync(seekPosition);
-              console.log('[audio-player] seeked to ayah', ayahNumber, 'at', seekPosition, 'ms');
+            if (seekPosition > 0 && this.sound) {
+              await this.sound.setPositionAsync(seekPosition);
+              console.log('[audio-player] expo-av seeked to ayah', ayahNumber, 'at', seekPosition, 'ms');
+              await this.sound.playAsync();
             }
           }
-          // Now start playback after seeking
-          await this.sound?.playAsync();
         }
       }
     } catch (error) {
@@ -221,6 +391,39 @@ class AudioPlayerManager {
     return reciterNames[reciterIdentifier] || 'القارئ';
   }
 
+  // Helper method for expo-av playback (web platform)
+  private async playWithExpoAv(audioUrl: string, needsSeek: boolean): Promise<void> {
+    // Unload previous sound before creating new one to prevent resource leak
+    if (this.sound) {
+      try { await this.sound.unloadAsync(); } catch {}
+      this.sound = null;
+    }
+
+    let sound: Audio.Sound;
+    try {
+      ({ sound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: !needsSeek },
+        this.onPlaybackStatusUpdate.bind(this)
+      ));
+    } catch (urlError) {
+      // If CDN URL failed, retry with islamic.network fallback for full surah
+      if (this.playingFullSurah) {
+        const { getSurahAudioUrl } = await import('./quran-cache');
+        const fallbackUrl = getSurahAudioUrl(this.state.reciterIdentifier, this.state.currentSurah);
+        console.warn('[audio-player] CDN URL failed, retrying with fallback:', fallbackUrl);
+        ({ sound } = await Audio.Sound.createAsync(
+          { uri: fallbackUrl },
+          { shouldPlay: !needsSeek },
+          this.onPlaybackStatusUpdate.bind(this)
+        ));
+      } else {
+        throw urlError;
+      }
+    }
+    this.sound = sound;
+  }
+
   private async onPlaybackStatusUpdate(status: any) {
     if (status.isLoaded) {
       this.updateState({
@@ -239,23 +442,44 @@ class AudioPlayerManager {
   }
 
   async togglePlayPause(): Promise<void> {
-    if (!this.sound) return;
-    if (this.state.isPlaying) {
-      await this.sound.pauseAsync();
+    if (this.useTrackPlayer && TrackPlayer && State) {
+      const state = await TrackPlayer.getPlaybackState();
+      if (state.state === State.Playing) {
+        await TrackPlayer.pause();
+      } else {
+        await TrackPlayer.play();
+      }
     } else {
-      await this.sound.playAsync();
+      // expo-av fallback
+      if (!this.sound) return;
+      if (this.state.isPlaying) {
+        await this.sound.pauseAsync();
+      } else {
+        await this.sound.playAsync();
+      }
     }
   }
 
   async stop(skipReleaseFocus = false): Promise<void> {
-    // Stop expo-av sound if exists
+    if (this.useTrackPlayer && TrackPlayer) {
+      try {
+        await TrackPlayer.stop();
+        await TrackPlayer.reset();
+      } catch {}
+    }
+    
+    // Also stop expo-av sound if exists (fallback)
     if (this.sound) {
-      await this.sound.stopAsync();
-      await this.sound.unloadAsync();
+      try {
+        await this.sound.stopAsync();
+        await this.sound.unloadAsync();
+      } catch {}
       this.sound = null;
     }
+    
     this.playingFullSurah = false;
     this.stopOffsetPoller();
+    this.stopProgressPoller();
     this.updateState({
       isPlaying: false,
       isLoading: false,
@@ -306,7 +530,9 @@ class AudioPlayerManager {
   }
 
   async seekTo(positionMillis: number): Promise<void> {
-    if (this.sound) {
+    if (this.useTrackPlayer && TrackPlayer) {
+      await TrackPlayer.seekTo(positionMillis / 1000); // Convert ms to seconds
+    } else if (this.sound) {
       await this.sound.setPositionAsync(positionMillis);
     }
   }
@@ -409,6 +635,13 @@ class AudioPlayerManager {
     if (this.offsetPoller) {
       clearInterval(this.offsetPoller);
       this.offsetPoller = null;
+    }
+  }
+
+  private stopProgressPoller() {
+    if (this.progressPoller) {
+      clearInterval(this.progressPoller);
+      this.progressPoller = null;
     }
   }
 }

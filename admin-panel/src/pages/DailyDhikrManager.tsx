@@ -14,9 +14,10 @@ import {
   getFirestore,
   serverTimestamp,
 } from 'firebase/firestore';
-import { Pencil, Trash2, Plus, Power, Search } from 'lucide-react';
+import { Pencil, Trash2, Plus, Power, Search, Download } from 'lucide-react';
 import AutoTranslateField from '../components/AutoTranslateField';
 import TranslateButton from '../components/TranslateButton';
+import { getDefaultDailyDhikr } from '../data/adhkar-defaults';
 
 interface DailyDhikrItem {
   id: string;
@@ -43,6 +44,8 @@ export default function DailyDhikrManager() {
   const [formBenefit, setFormBenefit] = useState('');
   const [formEnabled, setFormEnabled] = useState(true);
   const [formTranslations, setFormTranslations] = useState<Record<string, string>>({});
+
+  const [errorMsg, setErrorMsg] = useState('');
 
   const db = getFirestore();
 
@@ -117,6 +120,9 @@ export default function DailyDhikrManager() {
       loadItems();
     } catch (err) {
       console.error('Save failed:', err);
+      const msg = `فشل الحفظ: ${(err as Error).message}`;
+      setErrorMsg(msg);
+      alert(msg);
     }
   };
 
@@ -137,6 +143,7 @@ export default function DailyDhikrManager() {
       loadItems();
     } catch (err) {
       console.error('Delete failed:', err);
+      alert(`فشل الحذف: ${(err as Error).message}`);
     }
   };
 
@@ -148,6 +155,7 @@ export default function DailyDhikrManager() {
       );
     } catch (err) {
       console.error('Toggle failed:', err);
+      alert(`فشل التبديل: ${(err as Error).message}`);
     }
   };
 
@@ -160,6 +168,13 @@ export default function DailyDhikrManager() {
 
   return (
     <div className="max-w-4xl mx-auto" dir="rtl">
+      {/* Error Banner */}
+      {errorMsg && (
+        <div className="mb-4 p-3 bg-red-900/30 border border-red-600/50 rounded-xl flex items-center justify-between">
+          <button onClick={() => setErrorMsg('')} className="text-red-400 hover:text-red-300 text-sm">✕</button>
+          <p className="text-red-300 text-sm">{errorMsg}</p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -170,16 +185,46 @@ export default function DailyDhikrManager() {
             إدارة الأذكار التي تظهر في صفحة "أذكار يومية" — تُدمج مع الأذكار المحلية
           </p>
         </div>
-        <button
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl transition-colors"
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          إضافة ذكر
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="flex items-center gap-2 bg-accent-dark hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl transition-colors"
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            إضافة ذكر
+          </button>
+          {items.length === 0 && (
+            <button
+              className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl transition-colors"
+              onClick={async () => {
+                if (!confirm('هل تريد استيراد الأذكار الافتراضية من التطبيق؟')) return;
+                try {
+                  const defaults = getDefaultDailyDhikr();
+                  for (const d of defaults) {
+                    await addDoc(collection(db, COLLECTION), {
+                      arabic: d.arabic,
+                      reference: d.reference,
+                      benefit: d.benefit,
+                      enabled: true,
+                      translations: {},
+                      createdAt: serverTimestamp(),
+                    });
+                  }
+                  await loadItems();
+                  alert(`✅ تم استيراد ${defaults.length} ذكر`);
+                } catch (err) {
+                  alert(`❌ فشل الاستيراد: ${(err as Error).message}`);
+                }
+              }}
+            >
+              <Download className="w-4 h-4" />
+              استيراد الافتراضي
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -191,13 +236,13 @@ export default function DailyDhikrManager() {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="بحث في الأذكار..."
           aria-label="بحث في الأذكار"
-          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-right text-gray-900 dark:text-white placeholder-gray-400"
+          className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-admin-surface border border-gray-200 dark:border-admin-border rounded-xl text-right text-gray-900 dark:text-white placeholder-gray-400"
         />
       </div>
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 mb-6 border border-gray-200 dark:border-slate-700 shadow-sm">
+        <div className="bg-white dark:bg-admin-surface rounded-2xl p-6 mb-6 border border-gray-200 dark:border-admin-border shadow-sm">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {editingItem ? 'تعديل الذكر' : 'إضافة ذكر جديد'}
           </h3>
@@ -211,7 +256,7 @@ export default function DailyDhikrManager() {
                 value={formArabic}
                 onChange={(e) => setFormArabic(e.target.value)}
                 rows={3}
-                className="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl text-right text-gray-900 dark:text-white resize-none"
+                className="w-full p-3 bg-gray-50 dark:bg-admin-bg border border-gray-200 dark:border-admin-border rounded-xl text-right text-gray-900 dark:text-white resize-none"
                 placeholder="أدخل نص الذكر..."
                 dir="rtl"
               />
@@ -225,7 +270,7 @@ export default function DailyDhikrManager() {
                 type="text"
                 value={formReference}
                 onChange={(e) => setFormReference(e.target.value)}
-                className="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl text-right text-gray-900 dark:text-white"
+                className="w-full p-3 bg-gray-50 dark:bg-admin-bg border border-gray-200 dark:border-admin-border rounded-xl text-right text-gray-900 dark:text-white"
                 placeholder="مثال: البخاري ومسلم"
                 dir="rtl"
               />
@@ -239,7 +284,7 @@ export default function DailyDhikrManager() {
                 value={formBenefit}
                 onChange={(e) => setFormBenefit(e.target.value)}
                 rows={2}
-                className="w-full p-3 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl text-right text-gray-900 dark:text-white resize-none"
+                className="w-full p-3 bg-gray-50 dark:bg-admin-bg border border-gray-200 dark:border-admin-border rounded-xl text-right text-gray-900 dark:text-white resize-none"
                 placeholder="فضل هذا الذكر..."
                 dir="rtl"
               />
@@ -282,13 +327,13 @@ export default function DailyDhikrManager() {
             <button
               onClick={handleSave}
               disabled={!formArabic.trim() || !formReference.trim()}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-medium transition-colors"
+              className="flex-1 bg-accent-dark hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-xl font-medium transition-colors"
             >
               {editingItem ? 'حفظ التعديلات' : 'إضافة'}
             </button>
             <button
               onClick={resetForm}
-              className="px-6 py-2.5 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+              className="px-6 py-2.5 bg-gray-100 dark:bg-admin-surface-light text-gray-700 dark:text-gray-300 rounded-xl font-medium hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
             >
               إلغاء
             </button>
@@ -299,7 +344,7 @@ export default function DailyDhikrManager() {
       {/* List */}
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
@@ -313,7 +358,7 @@ export default function DailyDhikrManager() {
           {filtered.map((item) => (
             <div
               key={item.id}
-              className={`bg-white dark:bg-slate-800 rounded-xl p-4 border border-gray-200 dark:border-slate-700 transition-opacity ${
+              className={`bg-white dark:bg-admin-surface rounded-xl p-4 border border-gray-200 dark:border-admin-border transition-opacity ${
                 !item.enabled ? 'opacity-50' : ''
               }`}
             >
@@ -324,7 +369,7 @@ export default function DailyDhikrManager() {
                     className={`p-2 rounded-lg transition-colors ${
                       item.enabled
                         ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-                        : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                        : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-admin-surface-light'
                     }`}
                     aria-label={item.enabled ? 'تعطيل' : 'تفعيل'}
                     title={item.enabled ? 'تعطيل' : 'تفعيل'}
@@ -353,7 +398,7 @@ export default function DailyDhikrManager() {
                   <p className="text-gray-900 dark:text-white leading-relaxed mb-2">
                     {item.arabic}
                   </p>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm text-emerald-600 dark:text-accent-light">
                     📖 {item.reference}
                   </p>
                   {item.benefit && (
