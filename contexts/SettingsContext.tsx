@@ -107,6 +107,7 @@ export interface NotificationSettings {
   worshipDailySummaryTime: string;
   worshipStreakAlerts: boolean;
   worshipWeeklyReport: boolean;
+  worshipWeeklyReportTime?: string;
   worshipQuietHoursEnabled: boolean;
   worshipQuietHoursStart: string;
   worshipQuietHoursEnd: string;
@@ -284,13 +285,13 @@ const defaultNotifications: NotificationSettings = {
   reminderMinutes: 0,
   fajrSpecial: true,
   azkarMorning: true,
-  azkarMorningTime: '06:30',
+  azkarMorningTime: '06:00',
   azkarEvening: true,
-  azkarEveningTime: '16:30',
+  azkarEveningTime: '17:45',
   morningAzkar: true,
-  morningAzkarTime: '06:30',
+  morningAzkarTime: '06:00',
   eveningAzkar: true,
-  eveningAzkarTime: '16:30',
+  eveningAzkarTime: '17:45',
   dailyVerse: true,
   dailyVerseTime: '13:00',
   dailyHadith: false,
@@ -302,33 +303,35 @@ const defaultNotifications: NotificationSettings = {
   // Worship tracking notifications
   worshipPrayerLogging: true,
   worshipDailySummary: true,
-  worshipDailySummaryTime: '22:00',
+  worshipDailySummaryTime: '21:30',
   worshipStreakAlerts: true,
-  worshipWeeklyReport: false,
+  worshipWeeklyReport: true,
+  worshipWeeklyReportTime: '21:00',
   worshipQuietHoursEnabled: false,
   worshipQuietHoursStart: '23:00',
   worshipQuietHoursEnd: '06:00',
   // Quran reading reminder
   quranReadingReminder: true,
-  quranReadingReminderTime: '21:00',
+  quranReadingReminderTime: '15:00',
   quranReminderDays: [0, 1, 2, 3, 4, 5, 6],
   quranReminder24Hour: true,
   quranReminderSoundType: 'default',
   // Salawat, Istighfar, Tasbih reminders
   salawatReminder: true,
-  salawatReminderTime: '16:30',
-  istighfarReminder: false,
-  istighfarReminderTime: '12:00',
-  tasbihReminder: false,
-  tasbihReminderTime: '14:00',
+  salawatReminderTime: '17:00',
+  istighfarReminder: true,
+  istighfarReminderTime: '19:00',
+  tasbihReminder: true,
+  tasbihReminderTime: '21:00',
   // Additional Adhkar reminders
   sleepAzkar: true,
-  sleepAzkarTime: '22:30',
+  sleepAzkarTime: '22:00',
   wakeupAzkar: true,
-  wakeupAzkarTime: '05:00',
+  wakeupAzkarTime: '10:00',
   afterPrayerAzkar: true,
   // Friday Surah Al-Kahf reminder
   kahfReminder: true,
+  kahfTime: '07:00',
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -392,6 +395,16 @@ const defaultSettings: AppSettings = {
 // ========================================
 
 const STORAGE_KEY = 'app_settings';
+
+// ========================================
+// Notification Defaults Migration
+// ========================================
+// Bump this version whenever default notification settings change.
+// On app update, existing users will get ALL notification settings
+// fully reset to defaults. Any changes the user makes after that
+// will be preserved going forward.
+const NOTIFICATION_DEFAULTS_VERSION = 5;
+const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
 // السياق
@@ -520,7 +533,25 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         if (i18nLang && i18nLang !== loadedSettings.language) {
           loadedSettings.language = i18nLang;
         }
-        
+
+        // Migration: full reset of notification settings when defaults version changes
+        try {
+          const storedVersion = await AsyncStorage.getItem(NOTIF_DEFAULTS_VERSION_KEY);
+          const currentVersion = parseInt(storedVersion || '0', 10);
+          if (currentVersion < NOTIFICATION_DEFAULTS_VERSION) {
+            // Full reset: replace ALL notification settings with defaults
+            // (times, toggles, sounds — everything). Any changes the user
+            // makes after this point will be preserved normally.
+            loadedSettings.notifications = { ...defaultNotifications };
+            // Persist migrated settings to AsyncStorage so they survive restarts
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
+            await AsyncStorage.setItem(NOTIF_DEFAULTS_VERSION_KEY, String(NOTIFICATION_DEFAULTS_VERSION));
+            console.log('🔔 Full notification reset to version', NOTIFICATION_DEFAULTS_VERSION);
+          }
+        } catch (migrationErr) {
+          console.warn('⚠️ Notification defaults migration failed:', migrationErr);
+        }
+
         setSettings(loadedSettings);
         
         // Cache theme snapshot for next cold start
@@ -564,7 +595,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             sleepAzkar: n.sleepAzkar ?? false,
             sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
             wakeupAzkar: n.wakeupAzkar ?? false,
-            wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
+            wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
             afterPrayerAzkar: n.afterPrayerAzkar ?? false,
             dailyVerse: n.dailyVerse,
             dailyVerseTime: n.dailyVerseTime,
@@ -606,7 +637,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             worshipDailySummaryTime: n.worshipDailySummaryTime,
             worshipStreakAlerts: n.worshipStreakAlerts,
             worshipWeeklyReport: n.worshipWeeklyReport,
+            worshipWeeklyReportTime: n.worshipWeeklyReportTime,
             kahfReminder: n.kahfReminder,
+            kahfTime: n.kahfTime,
           }).then(() => {
             // Mark initial scheduling complete so admin sync can safely proceed
             setInitialSchedulingDone(true);
@@ -788,9 +821,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       worshipDailySummaryTime: n.worshipDailySummaryTime,
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
+      worshipWeeklyReportTime: n.worshipWeeklyReportTime,
       kahfReminder: n.kahfReminder,
       kahfTime: n.kahfTime,
     });
+    await AsyncStorage.setItem('@last_notification_reschedule', new Date().toISOString());
   }, [settings]);
 
   // ========================================

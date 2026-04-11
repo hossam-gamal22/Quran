@@ -27,7 +27,10 @@ const TASK_NAME = 'RESCHEDULE_NOTIFICATIONS';
 /**
  * Define the background task at module scope (required by expo-task-manager).
  * This runs even when the app is killed.
+ * Wrapped in try-catch because TaskManager.defineTask can throw in Expo Go
+ * where native task manager modules are not available.
  */
+try {
 TaskManager.defineTask(TASK_NAME, async () => {
   const startTime = Date.now();
   try {
@@ -138,6 +141,11 @@ TaskManager.defineTask(TASK_NAME, async () => {
     return BackgroundFetch.BackgroundFetchResult.Failed;
   }
 });
+} catch (e) {
+  // TaskManager.defineTask throws in Expo Go where native modules are unavailable.
+  // This is safe to ignore — background task only works in dev-client/standalone builds.
+  console.warn('[background-task] defineTask failed (Expo Go?):', e);
+}
 
 /**
  * Register the background fetch task.

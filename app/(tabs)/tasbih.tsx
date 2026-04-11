@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -31,7 +30,7 @@ import Animated, {
   useAnimatedStyle,
   Easing,
 } from 'react-native-reanimated';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSettings } from '../../contexts/SettingsContext';
 import BackgroundWrapper from '../../components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';

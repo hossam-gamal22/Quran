@@ -110,7 +110,7 @@ export function handleNotificationNavigation(
 
     // ─── Surah Al-Kahf Friday reminder ───
     case 'kahf':
-      router.push('/surah/18' as any);
+      router.push('/surah-kahf' as any);
       return {
         navigated: true,
         audioUrl: data.ayahAudioUrl ? String(data.ayahAudioUrl) : undefined,

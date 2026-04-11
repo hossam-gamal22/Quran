@@ -356,8 +356,22 @@ export default function RootLayout() {
   // Wait for the eagerly-started language + theme cache loads.
   // Both are module-scope promises that read from AsyncStorage.
   // We gate rendering on these so the first paint has correct language AND theme.
+  // Safety: 4s timeout prevents permanent hang if AsyncStorage is slow/stuck.
   useEffect(() => {
-    Promise.all([languageInitPromise, themeCachePromise]).then(() => setLanguageReady(true));
+    let done = false;
+    Promise.all([languageInitPromise, themeCachePromise]).then(() => {
+      if (!done) { done = true; setLanguageReady(true); }
+    }).catch(() => {
+      if (!done) { done = true; setLanguageReady(true); }
+    });
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        console.warn('⚠️ Language/theme cache timed out after 4s — proceeding with defaults');
+        setLanguageReady(true);
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({

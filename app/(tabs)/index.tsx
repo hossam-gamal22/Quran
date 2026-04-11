@@ -25,8 +25,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInRight, FadeIn, FadeOut, useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getAllSurahs, type QuranV4Surah } from '@/lib/qcf-page-data';
@@ -710,25 +711,65 @@ export default function HomeScreen() {
   // Share App modal
   const [shareModalVisible, setShareModalVisible] = useState(false);
 
-  // Proactive share trigger — show every 5 app opens
+  // Proactive share trigger — cooldown system with 3-strike limit
+  const shareOpensRef = React.useRef(0);
   useEffect(() => {
     let mounted = true;
-    AsyncStorage.getItem('@rooh_local_stats').then(raw => {
-      if (!raw || !mounted) return;
+    (async () => {
       try {
-        const stats = JSON.parse(raw);
-        const opens: number = stats.appOpens ?? 0;
-        if (opens > 0 && opens % 5 === 0) {
+        const [statsRaw, dismissRaw, nextTriggerRaw, sharedFlag] = await Promise.all([
+          AsyncStorage.getItem('@rooh_local_stats'),
+          AsyncStorage.getItem('@share_prompt_dismiss_count'),
+          AsyncStorage.getItem('@share_prompt_next_trigger'),
+          AsyncStorage.getItem('@share_prompt_shared'),
+        ]);
+        if (!mounted) return;
+
+        // Already shared — never show again
+        if (sharedFlag === 'true') return;
+
+        // Dismissed 3+ times — never show again
+        const dismissCount = dismissRaw ? parseInt(dismissRaw, 10) : 0;
+        if (dismissCount >= 3) return;
+
+        const stats = statsRaw ? JSON.parse(statsRaw) : null;
+        const opens: number = stats?.appOpens ?? 0;
+        if (opens <= 0) return;
+        shareOpensRef.current = opens;
+
+        const nextTrigger = nextTriggerRaw ? parseInt(nextTriggerRaw, 10) : 5;
+
+        if (opens >= nextTrigger) {
           setTimeout(() => {
             if (mounted) setShareModalVisible(true);
           }, 1500);
         }
       } catch { /* ignore */ }
-    });
+    })();
     return () => { mounted = false; };
+  }, []);
+
+  const handleShareDismiss = React.useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem('@share_prompt_dismiss_count');
+      const count = raw ? parseInt(raw, 10) : 0;
+      const newCount = count + 1;
+      await AsyncStorage.setItem('@share_prompt_dismiss_count', String(newCount));
+      const nextTarget = shareOpensRef.current + 15;
+      await AsyncStorage.setItem('@share_prompt_next_trigger', String(nextTarget));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleShareCompleted = React.useCallback(async () => {
+    try {
+      await AsyncStorage.setItem('@share_prompt_shared', 'true');
+    } catch { /* ignore */ }
   }, []);
   const [cachedPrayerTimes, setCachedPrayerTimes] = useState<PrayerTimes | null>(null);
   const [nextPrayerCountdown, setNextPrayerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
+  // Banner countdown state (always-on, independent of modal)
+  const [bannerCountdown, setBannerCountdown] = useState<{ hours: number; minutes: number; seconds: number } | null>(null);
+  const [bannerNextPrayer, setBannerNextPrayer] = useState<{ name: PrayerName; time: string } | null>(null);
 
   // Load cached prayer times — try cache first, fallback to fetch
   useEffect(() => {
@@ -769,7 +810,9 @@ export default function HomeScreen() {
             // Sync to widget data
             try {
               const { updateSharedData } = await import('@/lib/widget-data');
+              const { cachePrayerTimesForWidget } = await import('@/lib/widget-data-bridge');
               const locationLabel = loc?.city ? `${loc.city}${loc.country ? ', ' + loc.country : ''}` : '';
+              cachePrayerTimesForWidget(times, locationLabel).catch(() => {});
               updateSharedData(times, locationLabel).catch(() => {});
             } catch {}
           }
@@ -792,6 +835,20 @@ export default function HomeScreen() {
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [showNextPrayerModal, cachedPrayerTimes]);
+
+  // Always-on banner countdown (updates every second for WelcomeBanner)
+  useEffect(() => {
+    if (!cachedPrayerTimes) return;
+    const update = () => {
+      const next = getNextPrayer(cachedPrayerTimes);
+      setBannerNextPrayer(next);
+      const remaining = getTimeRemaining(cachedPrayerTimes);
+      setBannerCountdown(remaining);
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [cachedPrayerTimes]);
 
   // Debug: Log when modal opens
   useEffect(() => {
@@ -1025,6 +1082,27 @@ export default function HomeScreen() {
   // Welcome banner from Firestore (start null to avoid flash of stale content)
   const [welcomeBanner, setWelcomeBanner] = useState<WelcomeBannerConfig | null>(null);
 
+  // Admin flags (default true when not set — opt-out, not opt-in)
+  const showPrayerCountdown = welcomeBanner?.showPrayerCountdown !== false;
+  const showIconAnimation = welcomeBanner?.showIconAnimation !== false;
+
+  // Breathe/pulse animation for mosque icon (scale 1.0 → 1.15 over 2s)
+  const iconScale = useSharedValue(1);
+  useEffect(() => {
+    if (showIconAnimation) {
+      iconScale.value = withRepeat(
+        withTiming(1.15, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      );
+    } else {
+      iconScale.value = 1;
+    }
+  }, [showIconAnimation]);
+  const animatedIconStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
   // Helper: check if banner is within its scheduled date range
   const isBannerActive = useCallback((banner: WelcomeBannerConfig | null): boolean => {
     if (!banner || !banner.enabled) return false;
@@ -1241,45 +1319,72 @@ export default function HomeScreen() {
         }
       >
         {/* الرسالة الترحيبية */}
-        {/* الرسالة الترحيبية - Firebase banner → Admin seasonal banner → Auto-seasonal */}
+        {/* الرسالة الترحيبية - Firebase banner → Admin seasonal → Auto-seasonal → Friday → Prayer Countdown */}
         {(() => {
-          // Priority: 1) Firebase welcome banner, 2) Admin seasonal content, 3) Auto-generated seasonal
+          // Shared countdown formatter
+          const fmtCountdown = (c: { hours: number; minutes: number; seconds: number }) =>
+            `${String(c.hours).padStart(2, '0')}:${String(c.minutes).padStart(2, '0')}:${String(c.seconds).padStart(2, '0')}`;
+          const countdownLine = bannerCountdown && bannerNextPrayer ? (
+            <Text style={[styles.bannerSecondaryCountdown, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {`${t(`prayer.${bannerNextPrayer.name}`)} · ${fmtCountdown(bannerCountdown)}`}
+            </Text>
+          ) : null;
+
+          // Priority 1: Firebase / Admin / Auto-seasonal banner
           const activeBanner = isBannerActive(welcomeBanner) && welcomeBanner 
             ? welcomeBanner 
             : (adminSeasonalBanner || autoSeasonalBanner);
           
-          if (!activeBanner) return null;
-          
-          return (
-          <Animated.View entering={FadeIn.duration(600)}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => router.push(activeBanner.route as any)}
-            >
-              {(() => {
-                const isRTLLang = settings.language === 'ar' || settings.language === 'ur';
-                const bannerBg = (!isRTLLang && activeBanner.backgroundImageNonAr) ? activeBanner.backgroundImageNonAr : activeBanner.backgroundImage;
-                
-                return activeBanner.displayMode === 'image_only' && bannerBg ? (
-                  <View style={[styles.seasonCardImage, { backgroundColor: `${activeBanner.color}22`, overflow: 'hidden' }]}>
-                    <Image
+          if (activeBanner) {
+            return (
+            <Animated.View entering={FadeIn.duration(600)}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => router.push(activeBanner.route as any)}
+              >
+                {(() => {
+                  const isRTLLang = settings.language === 'ar' || settings.language === 'ur';
+                  const bannerBg = (!isRTLLang && activeBanner.backgroundImageNonAr) ? activeBanner.backgroundImageNonAr : activeBanner.backgroundImage;
+                  
+                  return activeBanner.displayMode === 'image_only' && bannerBg ? (
+                    <View style={[styles.seasonCardImage, { backgroundColor: `${activeBanner.color}22`, overflow: 'hidden' }]}>
+                      <Image
+                        source={{ uri: bannerBg }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  ) : activeBanner.displayMode === 'text_image' && bannerBg ? (
+                    <ImageBackground
                       source={{ uri: bannerBg }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                ) : activeBanner.displayMode === 'text_image' && bannerBg ? (
-                  <ImageBackground
-                    source={{ uri: bannerBg }}
-                    style={styles.seasonCard}
-                    imageStyle={{ borderRadius: 20 }}
-                    resizeMode="cover"
-                  >
-                    <View style={styles.seasonCardOverlay}>
+                      style={styles.seasonCard}
+                      imageStyle={{ borderRadius: 20 }}
+                      resizeMode="cover"
+                    >
+                      <View style={styles.seasonCardOverlay}>
+                        <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                          <View style={styles.seasonInfo}>
+                            <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
+                            <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
+                            {countdownLine}
+                          </View>
+                          {activeBanner.customIconUrl ? (
+                            <Image source={{ uri: activeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
+                          ) : (
+                            <MaterialCommunityIcons name={safeIcon(activeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
+                          )}
+                        </View>
+                      </View>
+                    </ImageBackground>
+                  ) : (
+                    <View
+                      style={[styles.seasonCard, { backgroundColor: `${activeBanner.color}CC` }]}
+                    >
                       <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={styles.seasonInfo}>
                           <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
                           <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
+                          {countdownLine}
                         </View>
                         {activeBanner.customIconUrl ? (
                           <Image source={{ uri: activeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
@@ -1288,28 +1393,79 @@ export default function HomeScreen() {
                         )}
                       </View>
                     </View>
-                  </ImageBackground>
-                ) : (
-                  <View
-                    style={[styles.seasonCard, { backgroundColor: `${activeBanner.color}CC` }]}
-                  >
-                    <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <View style={styles.seasonInfo}>
-                        <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
-                        <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
-                      </View>
-                      {activeBanner.customIconUrl ? (
-                        <Image source={{ uri: activeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
-                      ) : (
-                        <MaterialCommunityIcons name={safeIcon(activeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
-                      )}
+                  );
+                })()}
+              </TouchableOpacity>
+            </Animated.View>
+            );
+          }
+
+          // Priority 2: Friday banner (day 5 = Friday in JS)
+          const isFriday = new Date().getDay() === 5;
+          if (isFriday) {
+            return (
+            <Animated.View entering={FadeIn.duration(600)}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => router.push('/surah/18' as any)}
+              >
+                <LinearGradient
+                  colors={['#1a4a3a', '#2d6a4f']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.prayerCountdownCard, styles.bannerShadow]}
+                >
+                  <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={styles.seasonInfo}>
+                      <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('home.fridayGreeting')}</Text>
+                      <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('home.fridaySubtitle')}</Text>
+                      {countdownLine}
                     </View>
+                    <Animated.View style={showIconAnimation ? animatedIconStyle : undefined}>
+                      <MaterialCommunityIcons name="book-open-page-variant" size={36} color="rgba(255,255,255,0.7)" />
+                    </Animated.View>
                   </View>
-                );
-              })()}
-            </TouchableOpacity>
-          </Animated.View>
-          );
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+            );
+          }
+
+          // Priority 3: Prayer countdown card (no event, not Friday) — gated by admin flag
+          if (showPrayerCountdown && bannerCountdown && bannerNextPrayer) {
+            const prayerName = t(`prayer.${bannerNextPrayer.name}`);
+            return (
+            <Animated.View entering={FadeIn.duration(600)}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => router.navigate('/(tabs)/prayer' as any)}
+              >
+                <LinearGradient
+                  colors={['#1a4a3a', '#2d6a4f']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.prayerCountdownCard, styles.bannerShadow]}
+                >
+                  <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    <View style={styles.seasonInfo}>
+                      <Text style={[styles.prayerCountdownName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        {`${t('home.remainingForAdhan')} ${prayerName}`}
+                      </Text>
+                      <Text style={[styles.prayerCountdownTimer, { textAlign: isRTL ? 'right' : 'left' }]}>
+                        {fmtCountdown(bannerCountdown)}
+                      </Text>
+                    </View>
+                    <Animated.View style={showIconAnimation ? animatedIconStyle : undefined}>
+                      <MaterialCommunityIcons name="mosque" size={36} color="rgba(255,255,255,0.7)" />
+                    </Animated.View>
+                  </View>
+                </LinearGradient>
+              </TouchableOpacity>
+            </Animated.View>
+            );
+          }
+
+          return null;
         })()}
 
         {/* Date Display */}
@@ -1325,8 +1481,8 @@ export default function HomeScreen() {
           </View>
         </Animated.View>
 
-        {/* Premium Upgrade Banner — fallback only when no admin/seasonal banner is active */}
-        {isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner) && (
+        {/* Premium Upgrade Banner — fallback only when no other banner is active */}
+        {isSubscriptionEnabled && !isPremium && showUpgradeBanner && !(isBannerActive(welcomeBanner) || adminSeasonalBanner || autoSeasonalBanner || (showPrayerCountdown && bannerCountdown) || new Date().getDay() === 5) && (
           <Animated.View entering={FadeInDown.delay(60).duration(400)}>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -1983,6 +2139,8 @@ export default function HomeScreen() {
       <ShareAppModal
         visible={shareModalVisible}
         onClose={() => setShareModalVisible(false)}
+        onDismiss={handleShareDismiss}
+        onShared={handleShareCompleted}
       />
 
     </BackgroundWrapper>
@@ -2092,6 +2250,49 @@ const _styles = StyleSheet.create({
     color: '#fff',
     lineHeight: 20,
     includeFontPadding: false,
+  },
+
+  // Prayer countdown card (Scenario A — no event)
+  prayerCountdownCard: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  prayerCountdownName: {
+    fontSize: 18,
+    fontFamily: fontBold(),
+    color: '#fff',
+    lineHeight: 30,
+    includeFontPadding: false,
+  },
+  prayerCountdownTimer: {
+    fontSize: 28,
+    fontFamily: fontBold(),
+    color: '#D4AF37',
+    lineHeight: 36,
+    includeFontPadding: false,
+    letterSpacing: 2,
+    fontVariant: ['tabular-nums'] as any,
+    marginTop: 4,
+  },
+  // Secondary countdown line on event/Friday banners
+  bannerSecondaryCountdown: {
+    fontSize: 12,
+    fontFamily: fontMedium(),
+    color: 'rgba(255,255,255,0.8)',
+    lineHeight: 20,
+    includeFontPadding: false,
+    fontVariant: ['tabular-nums'] as any,
+    marginTop: 6,
+  },
+  // Depth shadow for premium banner cards
+  bannerShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
   },
 
   // العناوين
@@ -2498,7 +2699,7 @@ const _styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#d1d5db',
+    backgroundColor: 'rgba(13,142,98,0.12)',
     marginBottom: 20,
   },
   nextPrayerIconCircle: {
@@ -2534,7 +2735,7 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: 'rgba(13,142,98,0.12)',
   },
   nextPrayerCountdownBoxDark: {
     backgroundColor: '#232d38',

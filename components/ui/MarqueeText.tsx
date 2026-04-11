@@ -33,7 +33,7 @@ import Animated, {
   Easing,
   cancelAnimation,
 } from 'react-native-reanimated';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
 interface MarqueeTextProps {

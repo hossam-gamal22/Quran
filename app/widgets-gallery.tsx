@@ -1,7 +1,7 @@
 // app/widgets-gallery.tsx
 // Widgets Gallery screen — showcases 3 categories of home-screen widgets
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,12 @@ import { t, getLanguage } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { toWesternNumerals, getSurahEnglishName } from '@/lib/quran-evidence';
 import { DarkColors } from '@/constants/theme';
+import { getLocalizedHijriDate } from '@/lib/hijri-date';
+import { getCachedPrayerTimes, getNextPrayer, formatPrayerTime } from '@/lib/prayer-times';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
+import { prepareVerseWidgetData, prepareDhikrWidgetData, prepareAzkarWidgetData } from '@/lib/widget-data';
+import type { VerseWidgetData, DhikrWidgetData, WidgetAzkarData } from '@/lib/widget-data';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -97,6 +103,9 @@ const WIDGET_PREVIEW_SIZE = {
   medium: { width: SCREEN_WIDTH - 80, height: 160 },
 };
 
+// Free widgets available to all users
+const FREE_WIDGET_IDS = ['prayer'];
+
 // -- Helpers --
 
 function handleAddWidget() {
@@ -151,28 +160,41 @@ function AyahPreviewText({ size }: { size: WidgetSize }) {
   const styles = useScaledStyles(_styles, colors.fs);
   const lang = getLanguage();
   const isAr = lang === 'ar';
-  const surahRef = isAr ? 'الفاتحة - آية ١' : `${getSurahEnglishName(1)} - ${t('quran.verseOfDay')} 1`;
+
+  // Fetch real daily verse data with fallback
+  const [verseData, setVerseData] = React.useState<VerseWidgetData | null>(null);
+  React.useEffect(() => {
+    prepareVerseWidgetData(lang).then(setVerseData).catch(() => {});
+  }, [lang]);
+
+  const arabicText = verseData?.arabic || 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ';
+  const surahRef = verseData
+    ? (isAr
+        ? `${verseData.surahName} - آية ${verseData.numberInSurah}`
+        : `${verseData.surahNameEn} - ${t('quran.verseOfDay')} ${verseData.numberInSurah}`)
+    : (isAr ? 'الفاتحة - آية ١' : `${getSurahEnglishName(1)} - ${t('quran.verseOfDay')} 1`);
+
   return (
-    <>
+    <View style={{ flex: 1, width: '100%' }}>
       <MaterialCommunityIcons
         name="book-open-page-variant"
         size={size === 'small' ? 18 : 22}
         color="rgba(255,255,255,0.5)"
         style={styles.previewIcon}
       />
-      <Text
-        style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall, !isAr && { fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 16 : 18 }]}
-        numberOfLines={size === 'small' ? 3 : 4}
-      >
-        {isAr
-          ? 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ'
-          : 'In the name of Allāh, the Entirely Merciful, the Especially Merciful.'}
-      </Text>
-      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall, !isAr && { fontSize: size === 'small' ? 9 : 11, lineHeight: size === 'small' ? 14 : 16 }]}>
-        {surahRef}
-      </Text>
-      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.dailyAyahTitle')}</Text>
-    </>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, paddingTop: 26 }}>
+        <Text
+          style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall, !isAr && { fontSize: size === 'small' ? 11 : 13, lineHeight: size === 'small' ? 16 : 18 }]}
+          numberOfLines={size === 'small' ? 3 : 4}
+        >
+          {arabicText}
+        </Text>
+        <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall, !isAr && { fontSize: size === 'small' ? 9 : 11, lineHeight: size === 'small' ? 14 : 16 }]} numberOfLines={1}>
+          {surahRef}
+        </Text>
+      </View>
+      <Text style={styles.previewLabel}>{t('widgets.dailyAyahTitle')}</Text>
+    </View>
   );
 }
 
@@ -210,13 +232,30 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
-  const prayers = [
-    { name: t('prayer.fajr'), time: isAr ? '٤:٣٠' : '4:30', done: true },
-    { name: t('prayer.dhuhr'), time: isAr ? '١٢:١٥' : '12:15', done: false, isNext: true },
-    { name: t('prayer.asr'), time: isAr ? '٣:٤٥' : '3:45', done: false },
-  ];
+
+  // Dynamic prayer data
+  const [cachedTimes, setCachedTimes] = React.useState<any>(null);
+  React.useEffect(() => {
+    const today = new Date().toISOString().split('T')[0]!;
+    getCachedPrayerTimes(today).then(times => { if (times) setCachedTimes(times); });
+  }, []);
+  const nextPrayer = cachedTimes ? getNextPrayer(cachedTimes) : null;
+
+  const PRAYER_KEYS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
+  const displayPrayers = PRAYER_KEYS.slice(0, 3).map(key => {
+    const time = cachedTimes ? (cachedTimes[key] || '') : '';
+    const isNext = nextPrayer?.name === key;
+    const now = new Date();
+    let done = false;
+    if (time && !isNext) {
+      const [h, m] = time.split(':').map(Number);
+      const pDate = new Date(); pDate.setHours(h, m, 0, 0);
+      done = now > pDate;
+    }
+    return { name: t(`prayer.${key}`), time: time ? formatPrayerTime(time, false) : '--:--', done, isNext };
+  });
   return (
-    <>
+    <View style={{ flex: 1, width: '100%' }}>
       <MaterialCommunityIcons
         name="mosque"
         size={size === 'small' ? 16 : 20}
@@ -224,18 +263,17 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
         style={styles.previewIcon}
       />
       {size === 'small' ? (
-        <>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 26 }}>
           <Text style={[styles.previewArabic, styles.previewArabicSmall]}>
-            {t('prayer.dhuhr')}
+            {nextPrayer ? t(`prayer.${nextPrayer.name}`) : t('prayer.dhuhr')}
           </Text>
           <Text style={{ fontFamily: fontBold(), fontSize: 20, color: '#fff' }}>
-            {isAr ? '١٢:١٥ م' : '12:15 PM'}
+            {nextPrayer ? formatPrayerTime(nextPrayer.time, false) : '--:--'}
           </Text>
-          <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.nextPrayer')}</Text>
-        </>
+        </View>
       ) : (
-        <View style={{ width: '100%', gap: 4 }}>
-          {prayers.map((p) => (
+        <View style={{ flex: 1, justifyContent: 'center', width: '100%', gap: 4, paddingTop: 26 }}>
+          {displayPrayers.map((p) => (
             <View key={p.name} style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8 }}>
               <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
                 <MaterialCommunityIcons
@@ -243,19 +281,19 @@ function PrayerPreviewText({ size }: { size: WidgetSize }) {
                   size={14}
                   color={p.done ? '#4CAF50' : p.isNext ? '#FFD700' : 'rgba(255,255,255,0.5)'}
                 />
-                <Text style={{ fontFamily: fontMedium(), fontSize: 13, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+                <Text style={{ fontFamily: fontMedium(), fontSize: 12, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
                   {p.name}
                 </Text>
               </View>
-              <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
+              <Text style={{ fontFamily: fontRegular(), fontSize: 11, color: p.isNext ? '#FFD700' : p.done ? 'rgba(255,255,255,0.5)' : '#fff' }}>
                 {p.time}
               </Text>
             </View>
           ))}
-          <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.prayerTimesTitle')}</Text>
         </View>
       )}
-    </>
+      <Text style={styles.previewLabel}>{size === 'small' ? t('widgets.nextPrayer') : t('widgets.prayerTimesTitle')}</Text>
+    </View>
   );
 }
 
@@ -293,22 +331,39 @@ function DhikrPreviewText({ size }: { size: WidgetSize }) {
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
+
+  // Fetch real daily dhikr data with fallback
+  const [dhikrData, setDhikrData] = React.useState<DhikrWidgetData | null>(null);
+  React.useEffect(() => {
+    prepareDhikrWidgetData(lang).then(setDhikrData).catch(() => {});
+  }, [lang]);
+
+  const dhikrText = dhikrData?.arabic || (isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi');
+  const countText = dhikrData
+    ? (isAr ? `${dhikrData.count} ${dhikrData.timesLabel || t('azkar.times')}` : `${dhikrData.count} ${dhikrData.timesLabel || t('azkar.times')}`)
+    : (isAr ? '٣ مرات' : `3 ${t('azkar.times')}`);
+
   return (
-    <>
+    <View style={{ flex: 1, width: '100%' }}>
       <MaterialCommunityIcons
         name="hand-heart"
         size={size === 'small' ? 18 : 22}
         color="rgba(255,255,255,0.5)"
         style={styles.previewIcon}
       />
-      <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
-        {isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi'}
-      </Text>
-      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        {isAr ? '٣ مرات' : `3 ${t('azkar.times')}`}
-      </Text>
-      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.dailyDhikrTitle')}</Text>
-    </>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, paddingTop: 26 }}>
+        <Text
+          style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}
+          numberOfLines={size === 'small' ? 3 : 4}
+        >
+          {dhikrText}
+        </Text>
+        <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]} numberOfLines={1}>
+          {countText}
+        </Text>
+      </View>
+      <Text style={styles.previewLabel}>{t('widgets.dailyDhikrTitle')}</Text>
+    </View>
   );
 }
 
@@ -346,22 +401,39 @@ function AzkarPreviewText({ size }: { size: WidgetSize }) {
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
+
+  // Fetch real azkar data with fallback
+  const [azkarData, setAzkarData] = React.useState<WidgetAzkarData | null>(null);
+  React.useEffect(() => {
+    prepareAzkarWidgetData(lang).then(setAzkarData).catch(() => {});
+  }, [lang]);
+
+  const zikrText = azkarData?.randomZikr?.text || (isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi');
+  const subText = azkarData?.randomZikr
+    ? (azkarData.randomZikr.categoryName || (isAr ? 'أذكار' : 'Adhkar'))
+    : (isAr ? 'سبحان الله العظيم' : 'SubhanAllah al-Azeem');
+
   return (
-    <>
+    <View style={{ flex: 1, width: '100%' }}>
       <MaterialCommunityIcons
         name="hand-heart"
         size={size === 'small' ? 18 : 22}
         color="rgba(255,255,255,0.5)"
         style={styles.previewIcon}
       />
-      <Text style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}>
-        {isAr ? 'سبحان الله وبحمده' : 'SubhanAllah wa bihamdihi'}
-      </Text>
-      <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]}>
-        {isAr ? 'سبحان الله العظيم' : 'SubhanAllah al-Azeem'}
-      </Text>
-      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.azkarTitle')}</Text>
-    </>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 10, paddingTop: 26 }}>
+        <Text
+          style={[styles.previewArabic, size === 'small' && styles.previewArabicSmall]}
+          numberOfLines={size === 'small' ? 3 : 4}
+        >
+          {zikrText}
+        </Text>
+        <Text style={[styles.previewArabicSub, size === 'small' && styles.previewArabicSubSmall]} numberOfLines={1}>
+          {subText}
+        </Text>
+      </View>
+      <Text style={styles.previewLabel}>{t('widgets.azkarTitle')}</Text>
+    </View>
   );
 }
 
@@ -399,20 +471,25 @@ function HijriPreviewText({ size }: { size: WidgetSize }) {
   const isRTL = useIsRTL();
   const lang = getLanguage();
   const isAr = lang === 'ar';
+  const hijri = React.useMemo(() => {
+    try { return getLocalizedHijriDate(); } catch { return null; }
+  }, []);
   return (
-    <>
+    <View style={{ flex: 1, width: '100%' }}>
       <MaterialCommunityIcons
         name="calendar-month"
         size={size === 'small' ? 18 : 22}
         color="rgba(255,255,255,0.5)"
         style={styles.previewIcon}
       />
-      <Text style={[styles.hijriDay, size === 'small' && styles.hijriDaySmall]}>15</Text>
-      <Text style={[styles.hijriMonth, size === 'small' && styles.hijriMonthSmall]}>
-        {isAr ? 'رمضان ١٤٤٧' : 'Ramadan 1447'}
-      </Text>
-      <Text style={[styles.previewLabel, { [isRTL ? 'right' : 'left']: 12 }]}>{t('widgets.hijriTitle')}</Text>
-    </>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 24 }}>
+        <Text style={[styles.hijriDay, size === 'small' && styles.hijriDaySmall]}>{hijri ? String(hijri.day) : '1'}</Text>
+        <Text style={[styles.hijriMonth, size === 'small' && styles.hijriMonthSmall]}>
+          {hijri ? `${hijri.monthName} ${hijri.year}` : (isAr ? 'محرم 1447' : 'Muharram 1447')}
+        </Text>
+      </View>
+      <Text style={styles.previewLabel}>{t('widgets.hijriTitle')}</Text>
+    </View>
   );
 }
 
@@ -430,10 +507,12 @@ function WidgetThumbnail({
   category,
   isSelected,
   onPress,
+  isLocked,
 }: {
   category: WidgetCategory;
   isSelected: boolean;
   onPress: () => void;
+  isLocked?: boolean;
 }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -450,6 +529,11 @@ function WidgetThumbnail({
       ]}
     >
       {PreviewComponent && <PreviewComponent size="small" />}
+      {isLocked && (
+        <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, padding: 4 }}>
+          <MaterialCommunityIcons name="lock" size={12} color="#f59e0b" />
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -462,11 +546,13 @@ export default function WidgetsGalleryScreen() {
   const { settings } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
+  const { isPremium } = useSubscription();
   const categories = getCategories();
-  const [activeTab, setActiveTab] = useState('ayah');
+  const [activeTab, setActiveTab] = useState('prayer');
   const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
 
   const activeCategory = categories.find((c) => c.id === activeTab) ?? categories[0];
+  const isActiveWidgetLocked = !isPremium && !FREE_WIDGET_IDS.includes(activeCategory.id);
 
   const onTabPress = useCallback((id: string) => {
     Haptics.selectionAsync();
@@ -486,8 +572,8 @@ export default function WidgetsGalleryScreen() {
       {/* Header */}
       <UniversalHeader
         title={t('widgets.galleryTitle')}
-        titleColor="#fff"
-        backColor="#fff"
+        titleColor={colors.text}
+        backColor={colors.text}
       />
 
       {/* Horizontal widget thumbnails */}
@@ -504,6 +590,7 @@ export default function WidgetsGalleryScreen() {
                 category={cat}
                 isSelected={activeTab === cat.id}
                 onPress={() => onTabPress(cat.id)}
+                isLocked={!isPremium && !FREE_WIDGET_IDS.includes(cat.id)}
               />
             </View>
           ))}
@@ -534,7 +621,7 @@ export default function WidgetsGalleryScreen() {
                 size={22}
                 color="#0d8e62"
               />
-              <Text style={[styles.cardTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.title}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.title}</Text>
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -544,11 +631,11 @@ export default function WidgetsGalleryScreen() {
               hitSlop={12}
               style={styles.gearButton}
             >
-              <MaterialCommunityIcons name="cog" size={20} color="rgba(255,255,255,0.5)" />
+              <MaterialCommunityIcons name="cog" size={20} color={colors.textLight} />
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.cardDescription, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.description}</Text>
+          <Text style={[styles.cardDescription, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{activeCategory.description}</Text>
 
           {/* Size pills */}
           <View style={[styles.sizePills, { flexDirection: 'row' }]}>
@@ -556,7 +643,7 @@ export default function WidgetsGalleryScreen() {
               onPress={() => onSizeChange('small')}
               style={[styles.pill, selectedSize === 'small' && styles.pillActive]}
             >
-              <Text style={[styles.pillText, selectedSize === 'small' && styles.pillTextActive]}>
+              <Text style={[styles.pillText, { color: selectedSize === 'small' ? colors.text : colors.textLight }]}>
                 {t('widgets.sizeSmall')}
               </Text>
             </TouchableOpacity>
@@ -564,7 +651,7 @@ export default function WidgetsGalleryScreen() {
               onPress={() => onSizeChange('medium')}
               style={[styles.pill, selectedSize === 'medium' && styles.pillActive]}
             >
-              <Text style={[styles.pillText, selectedSize === 'medium' && styles.pillTextActive]}>
+              <Text style={[styles.pillText, { color: selectedSize === 'medium' ? colors.text : colors.textLight }]}>
                 {t('widgets.sizeMedium')}
               </Text>
             </TouchableOpacity>
@@ -572,18 +659,26 @@ export default function WidgetsGalleryScreen() {
 
           {/* Add button */}
           <TouchableOpacity
-            onPress={handleAddWidget}
+            onPress={() => {
+              if (isActiveWidgetLocked) {
+                guardPremiumFeature('premium_widgets', router, isPremium);
+                return;
+              }
+              handleAddWidget();
+            }}
             activeOpacity={0.8}
             style={styles.addButton}
           >
             <LinearGradient
-              colors={['#0d8e62', '#0d8e62']}
+              colors={isActiveWidgetLocked ? ['rgba(13,142,98,0.5)', 'rgba(13,142,98,0.5)'] : ['#0d8e62', '#0d8e62']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.addButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             >
-              <MaterialCommunityIcons name="plus-circle-outline" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>{t('widgets.addToHomeScreen')}</Text>
+              <MaterialCommunityIcons name={isActiveWidgetLocked ? 'lock' : 'plus-circle-outline'} size={20} color="#fff" />
+              <Text style={styles.addButtonText}>
+                {isActiveWidgetLocked ? t('subscription.upgradeToPremium') : t('widgets.addToHomeScreen')}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
@@ -599,11 +694,11 @@ export default function WidgetsGalleryScreen() {
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="cog-outline" size={18} color="#0d8e62" />
-            <Text style={[styles.bottomLinkText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.widgetSettings')}</Text>
+            <Text style={[styles.bottomLinkText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.widgetSettings')}</Text>
             <MaterialCommunityIcons
               name={isRTL ? 'chevron-left' : 'chevron-right'}
               size={18}
-              color="rgba(255,255,255,0.3)"
+              color={colors.textLight}
             />
           </TouchableOpacity>
         </Animated.View>
@@ -683,14 +778,12 @@ const _styles = StyleSheet.create({
   },
   previewContent: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
   },
   previewIcon: {
     position: 'absolute',
     top: 10,
     right: 10,
+    zIndex: 1,
   },
   previewArabic: {
     fontFamily: 'Amiri',
@@ -706,38 +799,39 @@ const _styles = StyleSheet.create({
   },
   previewArabicSub: {
     fontFamily: 'Amiri',
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     writingDirection: 'rtl',
-    marginTop: 4,
-    lineHeight: 26,
+    marginTop: 2,
+    lineHeight: 22,
   },
   previewArabicSubSmall: {
-    fontSize: 13,
-    lineHeight: 22,
+    fontSize: 11,
+    lineHeight: 18,
   },
   previewLabel: {
     fontFamily: fontRegular(),
     fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
-    position: 'absolute',
-    bottom: 8,
-    lineHeight: 16,
+    lineHeight: 14,
     includeFontPadding: false,
+    paddingBottom: 6,
+    paddingHorizontal: 10,
   },
 
   // Hijri-specific
   hijriDay: {
     fontFamily: 'Amiri',
-    fontSize: 42,
+    fontSize: 38,
     color: '#fff',
     textAlign: 'center',
-    lineHeight: 48,
+    lineHeight: 44,
+    includeFontPadding: false,
   },
   hijriDaySmall: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 26,
+    lineHeight: 32,
   },
   hijriMonth: {
     fontFamily: 'Amiri',
@@ -775,7 +869,7 @@ const _styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(128,128,128,0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -797,9 +891,9 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(128,128,128,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(128,128,128,0.15)',
   },
   pillActive: {
     backgroundColor: 'rgba(61,153,112,0.2)',
