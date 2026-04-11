@@ -288,7 +288,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         purchaseErrorSubscription.current = IAP.purchaseErrorListener(
           (error: any) => {
-            console.log('❌ Purchase error:', error);
+            console.error('[IAP] Purchase error:', {
+              code: error.code,
+              message: error.message,
+              responseCode: (error as any).responseCode,
+              userInfo: (error as any).userInfo,
+            });
             if (error.code !== 'user-cancelled') {
               Alert.alert(t('subscription.purchaseError'), t('subscription.purchaseErrorMessage'));
             }
@@ -391,7 +396,12 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       return true;
     } catch (error) {
-      console.log('❌ Purchase failed:', error);
+      console.error('[IAP] Purchase failed:', {
+        code: (error as any)?.code,
+        message: (error as any)?.message,
+        responseCode: (error as any)?.responseCode,
+        userInfo: (error as any)?.userInfo,
+      });
       return false;
     }
   }, [config]);

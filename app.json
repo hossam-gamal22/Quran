@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.rooh.almuslim",
       "buildNumber": "5",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.rooh.almuslim"]
+        "com.apple.security.application-groups": ["group.com.rooh.almuslim"],
+        "aps-environment": "production"
       },
       "infoPlist": {
         "LSApplicationQueriesSchemes": ["whatsapp"],
@@ -125,7 +126,21 @@
             "./assets/sounds/adhan/sharif.mp3",
             "./assets/sounds/adhan/mansoor_zahrani.mp3",
             "./assets/sounds/adhan/haramain.mp3",
-            "./assets/sounds/adhan/silent.mp3"
+            "./assets/sounds/adhan/silent.mp3",
+            "./assets/sounds/adhan/makkah_short.wav",
+            "./assets/sounds/adhan/madinah_short.wav",
+            "./assets/sounds/adhan/abdulbasit_short.wav",
+            "./assets/sounds/adhan/ajman_short.wav",
+            "./assets/sounds/adhan/alaqsa_short.wav",
+            "./assets/sounds/adhan/ali_mulla_short.wav",
+            "./assets/sounds/adhan/dosari_short.wav",
+            "./assets/sounds/adhan/egypt_short.wav",
+            "./assets/sounds/adhan/haramain_short.wav",
+            "./assets/sounds/adhan/mansoor_zahrani_short.wav",
+            "./assets/sounds/adhan/mishary_short.wav",
+            "./assets/sounds/adhan/naqshbandi_short.wav",
+            "./assets/sounds/adhan/sharif_short.wav",
+            "./assets/sounds/adhan/sudais_short.wav"
           ]
         }
       ],

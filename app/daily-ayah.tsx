@@ -168,9 +168,9 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
 
         {/* Content */}
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 }}>
-          {/* Verse text — Arabic with QCF for Arabic users, translation for others */}
+          {/* Verse text — Arabic with QCF for iOS Arabic users, UTHMANI fallback on Android (view-shot can't access QCF fonts) */}
           {isArabicCard ? (
-            qcfGlyphs && qcfFontFamily ? (
+            Platform.OS === 'ios' && qcfGlyphs && qcfFontFamily ? (
               <Text style={{ fontSize: 26, color: '#FFFFFF', textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 14, writingDirection: 'rtl', ...TEXT_SHADOW }}>
                 {qcfGlyphs.join('')}
               </Text>

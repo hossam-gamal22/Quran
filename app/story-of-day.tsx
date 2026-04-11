@@ -126,6 +126,7 @@ export default function StoryOfDayScreen() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
   const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekingTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   // Derive raw video URL
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
@@ -181,6 +182,20 @@ export default function StoryOfDayScreen() {
   useEventListener(player, 'timeUpdate', ({ currentTime: ct }) => {
     if (!isSeeking) setPositionSec(ct);
   });
+
+  // Android: poll player.currentTime as fallback when timeUpdate events stall
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const interval = setInterval(() => {
+      if (player && !isSeeking) {
+        try {
+          setPositionSec(player.currentTime);
+          if (player.duration) setDurationSec(player.duration);
+        } catch {}
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [player, isSeeking]);
 
   // Update duration & auto-play when ready; recover from cache errors
   useEffect(() => {
@@ -300,6 +315,7 @@ export default function StoryOfDayScreen() {
   }, [resetControlsTimer]);
 
   const handleSeek = useCallback((value: number) => {
+    clearTimeout(seekingTimeout.current);
     setIsSeeking(false);
     player.currentTime = value;
     resetControlsTimer();
@@ -533,7 +549,11 @@ export default function StoryOfDayScreen() {
                           maximumValue={durationSec || 1}
                           value={displayPosition}
                           inverted={isRTL}
-                          onSlidingStart={() => setIsSeeking(true)}
+                          onSlidingStart={() => {
+                            setIsSeeking(true);
+                            clearTimeout(seekingTimeout.current);
+                            seekingTimeout.current = setTimeout(() => setIsSeeking(false), 3000);
+                          }}
                           onValueChange={(v: number) => { if (isSeeking) setSeekPosition(v); }}
                           onSlidingComplete={handleSeek}
                           minimumTrackTintColor={colors.primary}
