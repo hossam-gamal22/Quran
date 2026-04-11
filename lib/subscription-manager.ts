@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from './firebase-config';
 import { doc, getDoc } from 'firebase/firestore';
 import { t } from '@/lib/i18n';
+import type { SeasonalOffer } from '@/types/premium';
 
 // ==================== Types ====================
 
@@ -31,6 +32,8 @@ export interface SubscriptionState {
 export interface SubscriptionConfig {
   enabled: boolean;
   lifetimeEnabled: boolean;
+  /** Admin toggle: show/hide the premium upgrade banner globally */
+  premiumBannerEnabled: boolean;
   products: {
     monthly: { android: string; ios: string };
     yearly: { android: string; ios: string };
@@ -40,6 +43,7 @@ export interface SubscriptionConfig {
   trialDays: number;
   showPaywallOnLaunch: boolean;
   paywallFrequency: number; // show paywall every N app opens
+  seasonalOffer?: SeasonalOffer;
 }
 
 // ==================== Constants ====================
@@ -50,25 +54,32 @@ const CONFIG_CACHE_KEY = '@subscription_config_cache';
 export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
   enabled: false,
   lifetimeEnabled: false,
+  premiumBannerEnabled: true,
   products: {
     monthly: {
-      android: 'rooh_muslim_monthly',
-      ios: 'rooh_muslim_monthly',
+      android: 'rooh_premium_monthly',
+      ios: 'rooh_premium_monthly',
     },
     yearly: {
-      android: 'rooh_muslim_yearly',
-      ios: 'rooh_muslim_yearly',
+      android: 'rooh_premium_yearly',
+      ios: 'rooh_premium_yearly',
     },
     lifetime: {
-      android: 'rooh_muslim_lifetime',
-      ios: 'rooh_muslim_lifetime',
+      android: 'rooh_premium_lifetime',
+      ios: 'rooh_premium_lifetime',
     },
   },
   features: [
-    'subscription.removeAds',
-    'subscription.removeLogo',
-    'subscription.extraBackgrounds',
-    'subscription.supportDev',
+    'subscription.featureAdRemoval',
+    'subscription.featureExclusiveThemes',
+    'subscription.featureOfflineRecitation',
+    'subscription.featureAdvancedStats',
+    'subscription.featureCloudBackup',
+    'subscription.featureCustomBackgrounds',
+    'subscription.featurePremiumWidgets',
+    'subscription.featurePremiumSounds',
+    'subscription.featureWatermarkFree',
+    'subscription.featureAdvancedKhatma',
   ],
   trialDays: 3,
   showPaywallOnLaunch: false,
@@ -150,7 +161,7 @@ export const getProductIds = (config: SubscriptionConfig): string[] => {
     config.products.monthly[platform],
     config.products.yearly[platform],
     config.products.lifetime[platform],
-  ];
+  ].filter(Boolean);
 };
 
 export const getPlanFromProductId = (

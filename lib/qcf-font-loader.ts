@@ -1,28 +1,22 @@
 /**
- * QCF4 V4 Font Loader
+ * QCF4 V4 Font Loader — Offline Edition
  *
- * Downloads per-page QCF4 tajweed fonts (.ttf.gz) from jsDelivr CDN,
- * decompresses with pako, caches to local filesystem, and loads via expo-font.
+ * Loads per-page QCF4 tajweed fonts from bundled assets.
+ * All 604 fonts are pre-bundled with the app for offline access.
+ * No internet connection required to browse the Mushaf.
  *
- * Font source: quran_library package (alheekmahlib/quran_library)
- * Font naming: QCF4_tajweed_001.ttf.gz … QCF4_tajweed_604.ttf.gz
+ * Font naming: QCF4_tajweed_001.ttf … QCF4_tajweed_604.ttf
  */
 
 import * as Font from 'expo-font';
-import * as FileSystem from 'expo-file-system/legacy';
-import pako from 'pako';
-import { stripColrTable } from './ttf-cpal-patcher';
+import { QCF_FONT_MAP, TOTAL_QURAN_PAGES, isValidPage } from './qcf-font-map';
 
-const CDN_BASE =
-  'https://cdn.jsdelivr.net/gh/alheekmahlib/quran_library@main/assets/fonts/quran_fonts_qfc4';
-const CACHE_DIR = (FileSystem.documentDirectory ?? '') + 'qcf4_cache/';
+// Re-export for backward compatibility
+export { TOTAL_QURAN_PAGES, isValidPage };
 
-const loadedPages = new Map<number, boolean>();  // page -> darkMode used
+// Track which pages are loaded in memory
+const loadedPages = new Map<number, boolean>(); // page -> darkMode used
 const loadingPromises = new Map<string, Promise<void>>();
-let cacheDirReady = false;
-
-/** Total pages in the Quran Mushaf */
-export const TOTAL_QURAN_PAGES = 604;
 
 /** Font family for a given page (1-based). Use darkMode param for mode-specific names. */
 export function getPageFontFamily(page: number, darkMode?: boolean): string {
@@ -38,77 +32,41 @@ export function isPageFontLoaded(page: number, darkMode?: boolean): boolean {
   return loadedPages.get(page) === darkMode;
 }
 
-/** Validate page number */
-export function isValidPage(page: number): boolean {
-  return Number.isInteger(page) && page >= 1 && page <= TOTAL_QURAN_PAGES;
-}
-
-// ── Internals ──
-
-/** Ensure cache directory exists */
-async function ensureCacheDir(): Promise<void> {
-  if (cacheDirReady) return;
-  const info = await FileSystem.getInfoAsync(CACHE_DIR);
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(CACHE_DIR, { intermediates: true });
-  }
-  cacheDirReady = true;
-}
-
-/** Zero-pad page number to 3 digits */
-function pad3(n: number): string {
-  return String(n).padStart(3, '0');
-}
-
-// Accept darkMode param (default false)
+/**
+ * Load a QCF font for a specific Mushaf page from bundled assets.
+ * Fonts are pre-bundled — no internet required.
+ * 
+ * @param page Page number (1-604)
+ * @param darkMode Dark mode flag (for font naming only, not color processing)
+ */
 export async function loadPageFont(
   page: number,
   darkMode: boolean = false,
 ): Promise<void> {
+  // Validate page
+  if (!isValidPage(page)) {
+    console.warn(`[QCF4] Invalid page number: ${page}`);
+    return;
+  }
+
   // If already loaded with same mode, skip
   if (loadedPages.has(page) && loadedPages.get(page) === darkMode) return;
+  
   const promiseKey = `${page}_${darkMode}`;
   if (loadingPromises.has(promiseKey)) return loadingPromises.get(promiseKey);
 
   const promise = (async () => {
     try {
-      await ensureCacheDir();
       const familyName = getPageFontFamily(page, darkMode);
-      const cacheKey = darkMode ? '_dark_v7' : '_light_v7';
-      const cachedPath = CACHE_DIR + `page${page}${cacheKey}.ttf`;
+      const fontSource = QCF_FONT_MAP[page];
 
-        // Check if CPAL-patched version is already cached on disk
-        const cacheInfo = await FileSystem.getInfoAsync(cachedPath);
-        if (cacheInfo.exists) {
-          await Font.loadAsync({ [familyName]: cachedPath });
-          loadedPages.set(page, darkMode);
-          return;
-        }
+      if (!fontSource) {
+        throw new Error(`Font not found in bundle for page ${page}`);
+      }
 
-        // Download color font (.ttf.gz with COLR/CPAL) from CDN
-        const url = `${CDN_BASE}/QCF4_tajweed_${pad3(page)}.ttf.gz`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Font download failed: ${response.status} for page ${page}`);
-        }
-
-        // Decompress gzip → raw TTF bytes
-        const gzBuffer = await response.arrayBuffer();
-        let ttfBytes: Uint8Array = pako.ungzip(new Uint8Array(gzBuffer as ArrayBuffer));
-
-        // Strip COLR table so font renders as monochrome
-        // Text color is controlled by the React Native Text component's color prop
-        ttfBytes = stripColrTable(ttfBytes);
-
-        // Convert to base64 and write to cache
-        const base64 = uint8ArrayToBase64(ttfBytes);
-        await FileSystem.writeAsStringAsync(cachedPath, base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        // Load font into memory
-        await Font.loadAsync({ [familyName]: cachedPath });
-        loadedPages.set(page, darkMode);
+      // Load directly from bundled asset
+      await Font.loadAsync({ [familyName]: fontSource });
+      loadedPages.set(page, darkMode);
     } catch (err) {
       console.warn(`[QCF4] Failed to load font for page ${page}:`, err);
       throw err;
@@ -148,7 +106,7 @@ export async function ensurePagesLoaded(
 }
 
 /** Preload fonts spiraling outward from a start page */
-export function preloadFontsInBackground(startPage: number): void {
+export function preloadFontsInBackground(startPage: number, darkMode: boolean = false): void {
   let i = 0;
   const step = async () => {
     i++;
@@ -156,8 +114,10 @@ export function preloadFontsInBackground(startPage: number): void {
     for (const p of pages) {
       if (!loadedPages.has(p)) {
         try {
-          await loadPageFont(p);
-        } catch {}
+          await loadPageFont(p, darkMode);
+        } catch {
+          // Silent fail for background preload
+        }
       }
     }
     if (i < 10 && pages.length > 0) {
@@ -167,18 +127,12 @@ export function preloadFontsInBackground(startPage: number): void {
   setTimeout(step, 500);
 }
 
-// ── Helpers ──
-
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  const len = bytes.byteLength;
-  const chunkSize = 8192;
-  for (let offset = 0; offset < len; offset += chunkSize) {
-    const end = Math.min(offset + chunkSize, len);
-    const chunk = bytes.subarray(offset, end);
-    for (let j = 0; j < chunk.length; j++) {
-      binary += String.fromCharCode(chunk[j]);
-    }
-  }
-  return btoa(binary);
+/**
+ * Clear loaded fonts from memory tracking.
+ * Does not unload fonts from memory (expo-font doesn't support that).
+ * Useful for testing or memory pressure situations.
+ */
+export function clearLoadedFontsTracking(): void {
+  loadedPages.clear();
+  loadingPromises.clear();
 }

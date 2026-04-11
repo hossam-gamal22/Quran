@@ -3,15 +3,55 @@
  *
  * Handles:
  * 1. Notification permission requests (iOS + Android)
- * 2. Battery optimization exemption (Android) — critical for killed-app delivery
+ * 2. SCHEDULE_EXACT_ALARM check (Android 12+)
+ *
+ * Note: Battery optimization, autostart, and OEM permission prompts have been
+ * removed. Android scheduling now uses setAlarmClock() (patched via
+ * plugins/with-alarm-clock-scheduling.js) which bypasses Doze and OEM
+ * restrictions without user intervention.
  */
 
 import * as Notifications from 'expo-notifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Alert, Linking } from 'react-native';
+import { Platform, Alert, Linking, PermissionsAndroid } from 'react-native';
 import { t } from '@/lib/i18n';
 
-const BATTERY_OPT_ASKED_KEY = '@battery_opt_asked';
+/**
+ * Check if exact alarms can be scheduled.
+ *
+ * - Not needed below Android 12 (API < 31) — returns true.
+ * - Android 12+ (API >= 31): PermissionsAndroid.check for SCHEDULE_EXACT_ALARM.
+ */
+export async function checkExactAlarmPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  const apiLevel = Platform.Version as number;
+  if (apiLevel < 31) return true;
+
+  try {
+    const granted = await (PermissionsAndroid as any).check(
+      'android.permission.SCHEDULE_EXACT_ALARM',
+    );
+    return granted === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Open the system "Alarms & Reminders" settings page so the user can
+ * grant SCHEDULE_EXACT_ALARM.
+ */
+export async function openExactAlarmSettings(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    const IntentLauncher = require('expo-intent-launcher');
+    await IntentLauncher.startActivityAsync(
+      'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+      { data: 'package:com.rooh.almuslim' },
+    );
+  } catch {
+    await Linking.openSettings();
+  }
+}
 
 /**
  * Request notification permissions from the OS.
@@ -33,61 +73,15 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
   if (status !== 'granted') {
     Alert.alert(
-      t('notifications.permissionRequired') || '\u26A0\uFE0F \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0645\u0637\u0644\u0648\u0628\u0629',
-      t('notifications.permissionBody') || '\u064A\u0631\u062C\u0649 \u0627\u0644\u0633\u0645\u0627\u062D \u0628\u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0644\u0627\u0633\u062A\u0642\u0628\u0627\u0644 \u0645\u0648\u0627\u0639\u064A\u062F \u0627\u0644\u0635\u0644\u0627\u0629 \u0648\u0627\u0644\u0623\u0630\u0643\u0627\u0631',
+      t('notifications.permissionRequired') || '\u26A0\uFE0F الإشعارات مطلوبة',
+      t('notifications.permissionBody') || 'يرجى السماح بالإشعارات لاستقبال مواعيد الصلاة والأذكار',
       [
-        { text: t('common.later') || '\u0644\u0627\u062D\u0642\u064B\u0627', style: 'cancel' },
-        { text: t('common.settings') || '\u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A', onPress: () => Linking.openSettings() },
+        { text: t('common.later') || 'لاحقًا', style: 'cancel' },
+        { text: t('common.settings') || 'الإعدادات', onPress: () => Linking.openSettings() },
       ],
     );
     return false;
   }
 
   return true;
-}
-
-/**
- * Ask the user to disable battery optimization for this app (Android only).
- * Many OEMs (Xiaomi, Samsung, Huawei, Oppo) aggressively kill background apps,
- * preventing scheduled notifications from firing when the app is closed.
- *
- * This dialog is shown only ONCE. The user can dismiss it.
- */
-export async function requestBatteryOptimizationExemption(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-
-  // Only ask once
-  const asked = await AsyncStorage.getItem(BATTERY_OPT_ASKED_KEY);
-  if (asked === 'true') return;
-
-  Alert.alert(
-    t('notifications.batteryTitle') || '\u26A0\uFE0F \u062A\u0646\u0628\u064A\u0647 \u0645\u0647\u0645 \u0644\u0623\u0648\u0642\u0627\u062A \u0627\u0644\u0635\u0644\u0627\u0629',
-    t('notifications.batteryBody') || '\u0628\u0639\u0636 \u0627\u0644\u0623\u062C\u0647\u0632\u0629 \u062A\u0645\u0646\u0639 \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062A \u0639\u0646\u062F \u0625\u063A\u0644\u0627\u0642 \u0627\u0644\u062A\u0637\u0628\u064A\u0642.\n\n\u0644\u0636\u0645\u0627\u0646 \u0648\u0635\u0648\u0644 \u0623\u0630\u0627\u0646 \u0627\u0644\u0635\u0644\u0627\u0629 \u0641\u064A \u0648\u0642\u062A\u0647\u060C \u064A\u0631\u062C\u0649 \u0625\u064A\u0642\u0627\u0641 \u062A\u062D\u0633\u064A\u0646 \u0627\u0644\u0628\u0637\u0627\u0631\u064A\u0629 \u0644\u0644\u062A\u0637\u0628\u064A\u0642.',
-    [
-      {
-        text: t('common.later') || '\u0644\u0627\u062D\u0642\u064B\u0627',
-        style: 'cancel',
-        onPress: async () => {
-          await AsyncStorage.setItem(BATTERY_OPT_ASKED_KEY, 'true');
-        },
-      },
-      {
-        text: t('notifications.setupNow') || '\u0625\u0639\u062F\u0627\u062F \u0627\u0644\u0622\u0646 \u2705',
-        onPress: async () => {
-          await AsyncStorage.setItem(BATTERY_OPT_ASKED_KEY, 'true');
-          try {
-            // Try direct battery optimization intent
-            const IntentLauncher = require('expo-intent-launcher');
-            await IntentLauncher.startActivityAsync(
-              IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-              { data: 'package:com.rooh.almuslim' },
-            );
-          } catch {
-            // Fallback: open general app settings
-            await Linking.openSettings();
-          }
-        },
-      },
-    ],
-  );
 }

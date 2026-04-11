@@ -1,10 +1,11 @@
 export {
   ADHAN_SOUND_FILES,
   NOTIFICATION_SOUND_FILES,
-  deleteAllChannels,
-  setupNotificationChannels,
-  resetChannelsWithNewSound,
+  initializeAllNotificationChannels,
+  getAdhanChannelId,
+  getReminderChannelId,
   resetChannelsIfOutdated,
+  resolveSoundFile,
 } from './channels';
 
 export {
@@ -17,5 +18,5 @@ export {
 
 export {
   requestNotificationPermissions,
-  requestBatteryOptimizationExemption,
+  checkExactAlarmPermission,
 } from './permissions';

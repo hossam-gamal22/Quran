@@ -7,40 +7,43 @@ import {
   ActivityIndicator,
   Share,
   Platform,
-  Image,
   ScrollView,
   Alert,
   AppState,
 } from 'react-native';
-import { fontBold, fontRegular } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvent, useEventListener } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 
+import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
+import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { t } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
-import { getVerseQcfData } from '@/lib/qcf-page-data';
-import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
+import { ScreenContainer } from '@/components/screen-container';
+import {
+  getCachedDayData,
+  getCachedVideoUri,
+  cacheVideoFile,
+  invalidateCachedVideo,
+} from '@/lib/daily-video-prefetch';
 
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Constants & Types
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 const DAILY_VIDEO_JSON_URL =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/data/daily-video.json';
-
-function toArabicNumeral(n: number): string {
-  return String(n).replace(/\d/g, (d) => '\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669'[parseInt(d)]);
-}
 
 interface VideoEntry {
   reciterId: string;
@@ -62,233 +65,283 @@ interface DayData {
   videos: VideoEntry[];
 }
 
-type RollingData = Record<string, DayData>;
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Helpers
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-function formatTime(ms: number) {
-  const totalSec = Math.floor(ms / 1000);
+/** Format seconds to m:ss */
+function formatTime(seconds: number): string {
+  const totalSec = Math.max(0, Math.floor(seconds));
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
+/**
+ * Convert raw.githubusercontent.com URL to jsDelivr CDN URL.
+ * jsDelivr serves correct Content-Type: video/mp4 headers,
+ * enabling iOS AVPlayer to stream directly without downloading.
+ */
+function toJsDelivrUrl(rawUrl: string): string {
+  const match = rawUrl.match(
+    /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
+  );
+  if (!match) return rawUrl;
+  const [, owner, repo, branch, path] = match;
+  return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${path}`;
+}
+
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Component
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
 export default function StoryOfDayScreen() {
   const isRTL = useIsRTL();
   const { settings, isDarkMode } = useSettings();
   const colors = useColors();
+  const styles = useScaledStyles(_styles, colors.fs);
   const { isPremium } = useSubscription();
   const { stop: stopGlobalAudio } = useGlobalAudio();
 
-  // Stop any other audio when video page opens
-  useEffect(() => {
-    stopGlobalAudio();
-  }, []);
+  useEffect(() => { stopGlobalAudio(); }, []);
 
   const isArabic = (settings.language || 'ar') === 'ar';
 
-  const { logoSource } = useAppIdentity();
-
-  const videoRef = useRef<Video>(null);
+  // Data state
   const reciterScrollRef = useRef<ScrollView>(null);
   const [dayData, setDayData] = useState<DayData | null>(null);
   const [selectedReciterIdx, setSelectedReciterIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [fetchRetryKey, setFetchRetryKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [qcfReady, setQcfReady] = useState(false);
-  const [qcfPage, setQcfPage] = useState<number | null>(null);
-  const [qcfGlyphs, setQcfGlyphs] = useState<string[]>([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-
-
-  // Playback state
-  const [isPlaying, setIsPlaying] = useState(true);
+  // Player UI state
+  const [positionSec, setPositionSec] = useState(0);
+  const [durationSec, setDurationSec] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
   const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Derive raw video URL
+  const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
+  const rawVideoUrl = currentVideo
+    ? (isPremium && currentVideo.premiumUrl ? currentVideo.premiumUrl : currentVideo.url)
+    : null;
+
+  // Resolve video URL: cache-first, CDN fallback
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+  const resolvedSourceRef = useRef<'cache' | 'cdn' | null>(null);
+
+  useEffect(() => {
+    if (!rawVideoUrl) { setResolvedVideoUrl(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const cached = await getCachedVideoUri(rawVideoUrl);
+        if (cached && !cancelled) {
+          console.log('[DailyVideo] Playing from cache');
+          resolvedSourceRef.current = 'cache';
+          setResolvedVideoUrl(cached);
+          return;
+        }
+      } catch { /* ignore cache errors */ }
+      if (!cancelled) {
+        const cdnUrl = toJsDelivrUrl(rawVideoUrl);
+        console.log('[DailyVideo] Playing from CDN');
+        resolvedSourceRef.current = 'cdn';
+        setResolvedVideoUrl(cdnUrl);
+        // Background-cache for next visit
+        cacheVideoFile(rawVideoUrl).catch(() => {});
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [rawVideoUrl]);
+
+  // expo-video player — uses resolved URL (cache or CDN)
+  const player = useVideoPlayer(resolvedVideoUrl, (p) => {
+    p.loop = true;
+    p.timeUpdateEventInterval = 0.1;
+    p.play();
+  });
+
+  // Reactive state from player events
+  const { status, error: playerErrorObj } = useEvent(player, 'statusChange', {
+    status: player.status,
+  });
+  const { isPlaying } = useEvent(player, 'playingChange', {
+    isPlaying: player.playing,
+  });
+
+  // Track position
+  useEventListener(player, 'timeUpdate', ({ currentTime: ct }) => {
+    if (!isSeeking) setPositionSec(ct);
+  });
+
+  // Update duration & auto-play when ready; recover from cache errors
+  useEffect(() => {
+    if (status === 'readyToPlay') {
+      setDurationSec(player.duration);
+      setIsTransitioning(false);
+      player.play();
+    }
+    if (status === 'error') {
+      setIsTransitioning(false);
+      console.error('[DailyVideo] Player error:', playerErrorObj?.message);
+      // If cached file failed, invalidate and retry with CDN
+      if (resolvedSourceRef.current === 'cache' && rawVideoUrl) {
+        console.log('[DailyVideo] Cache playback failed, falling back to CDN');
+        invalidateCachedVideo(rawVideoUrl).catch(() => {});
+        resolvedSourceRef.current = 'cdn';
+        setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+      }
+    }
+  }, [status]);
+
+  // Pause on background
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background') {
+        try { player.pause(); } catch { /* noop */ }
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  // Fetch JSON data
+  useEffect(() => {
+    let cancelled = false;
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 10_000);
+
+    (async () => {
+      let hasCacheData = false;
+      try {
+        const cached = await getCachedDayData();
+        if (cached && !cancelled) {
+          console.log('[DailyVideo] Cache hit:', cached.surahName);
+          setDayData(cached);
+          setLoading(false);
+          hasCacheData = true;
+        }
+
+        const res = await fetch(DAILY_VIDEO_JSON_URL + `?_=${Date.now()}`, {
+          signal: abort.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+
+        let resolved: DayData | null = null;
+        const dateKeys = Object.keys(json)
+          .filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k))
+          .sort()
+          .reverse();
+
+        for (const dk of dateKeys) {
+          const entry = json[dk];
+          if (entry?.videos?.length) {
+            resolved = entry as DayData;
+            console.log('[DailyVideo] Resolved:', dk, entry.videos.length, 'reciters');
+            break;
+          }
+        }
+
+        if (!cancelled) {
+          if (resolved) setDayData(resolved);
+          else if (!hasCacheData) setError(true);
+        }
+      } catch (e: any) {
+        console.error('[DailyVideo]', e?.name === 'AbortError' ? 'Timeout' : e);
+        if (!cancelled && !hasCacheData) setError(true);
+      } finally {
+        clearTimeout(timeout);
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; abort.abort(); };
+  }, [fetchRetryKey]);
+
+  // Controls helpers
   const resetControlsTimer = useCallback(() => {
     if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
     controlsTimeout.current = setTimeout(() => setShowControls(false), 4000);
   }, []);
 
-  const togglePlayPause = useCallback(async () => {
-    if (!videoRef.current) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isPlaying) {
-      await videoRef.current.pauseAsync();
-    } else {
-      await videoRef.current.playAsync();
-    }
-    setIsPlaying(!isPlaying);
+  useEffect(() => {
     resetControlsTimer();
-  }, [isPlaying, resetControlsTimer]);
+    return () => { if (controlsTimeout.current) clearTimeout(controlsTimeout.current); };
+  }, []);
 
-  const toggleMute = useCallback(async () => {
-    if (!videoRef.current) return;
+  const togglePlayPause = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await videoRef.current.setIsMutedAsync(!isMuted);
-    setIsMuted(!isMuted);
+    if (isPlaying) player.pause(); else player.play();
     resetControlsTimer();
-  }, [isMuted, resetControlsTimer]);
+  }, [isPlaying, player, resetControlsTimer]);
+
+  const toggleMute = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const next = !isMuted;
+    player.muted = next;
+    setIsMuted(next);
+    resetControlsTimer();
+  }, [isMuted, player, resetControlsTimer]);
 
   const handleVideoTap = useCallback(() => {
     setShowControls((prev) => {
-      if (!prev) {
-        resetControlsTimer();
-        return true;
-      }
+      if (!prev) { resetControlsTimer(); return true; }
       if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
       return false;
     });
   }, [resetControlsTimer]);
 
-  const onPlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return;
-    if (!isSeeking) {
-      setPositionMs(status.positionMillis ?? 0);
-    }
-    setDurationMs(status.durationMillis ?? 0);
-    setIsPlaying(status.isPlaying);
-  }, [isSeeking]);
-
-  const handleSeek = useCallback(async (value: number) => {
+  const handleSeek = useCallback((value: number) => {
     setIsSeeking(false);
-    if (videoRef.current) {
-      await videoRef.current.setPositionAsync(value);
-    }
+    player.currentTime = value;
     resetControlsTimer();
-  }, [resetControlsTimer]);
+  }, [player, resetControlsTimer]);
 
-  const skipForward = useCallback(async () => {
-    if (!videoRef.current) return;
+  const skipForward = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newPos = Math.min(positionMs + 10000, durationMs);
-    await videoRef.current.setPositionAsync(newPos);
+    player.seekBy(10);
     resetControlsTimer();
-  }, [positionMs, durationMs, resetControlsTimer]);
+  }, [player, resetControlsTimer]);
 
-  const skipBack = useCallback(async () => {
-    if (!videoRef.current) return;
+  const skipBack = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const newPos = Math.max(positionMs - 10000, 0);
-    await videoRef.current.setPositionAsync(newPos);
+    player.seekBy(-10);
     resetControlsTimer();
-  }, [positionMs, resetControlsTimer]);
+  }, [player, resetControlsTimer]);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(DAILY_VIDEO_JSON_URL);
-        if (!res.ok) throw new Error('fetch failed');
-        const json = await res.json();
+  const handleReciterSwitch = useCallback((newIdx: number) => {
+    if (newIdx === selectedReciterIdx || isTransitioning) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsTransitioning(true);
+    setPositionSec(0);
+    setDurationSec(0);
+    setSelectedReciterIdx(newIdx);
+    setTimeout(() => setIsTransitioning(false), 8000);
+  }, [selectedReciterIdx, isTransitioning]);
 
-        let resolved: DayData | null = null;
-        const dateKeys = Object.keys(json).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k));
-
-        if (dateKeys.length > 0) {
-          const sorted = dateKeys.sort().reverse();
-          for (const dk of sorted) {
-            const entry = json[dk];
-            if (entry?.videos?.length) {
-              resolved = entry as DayData;
-              break;
-            }
-          }
-        }
-
-        if (!resolved && json.url && json.ayahText) {
-          resolved = {
-            ayahText: json.ayahText,
-            surahName: json.surahName,
-            surahEnglish: json.surahEnglish,
-            surahNumber: json.surahNumber,
-            ayahNumber: json.ayahNumber,
-            globalAyahNumber: json.globalAyahNumber,
-            generatedAt: json.generatedAt || json.date,
-            videos: [{
-              reciterId: 'ar.alafasy',
-              reciterLabel: 'مشاري العفاسي',
-              reciterLabelEn: 'Mishary Alafasy',
-              url: json.url,
-              duration: json.duration || 0,
-            }],
-          };
-        }
-
-        if (!cancelled) {
-          if (resolved) setDayData(resolved);
-          else setError(true);
-        }
-      } catch (e) {
-        if (!cancelled) setError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const retryFetch = useCallback(() => {
+    setLoading(true);
+    setError(false);
+    setDayData(null);
+    setFetchRetryKey((k) => k + 1);
   }, []);
 
-  // Load QCF font for verse
-  useEffect(() => {
-    if (!dayData?.surahNumber || !dayData?.ayahNumber) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const qcfData = getVerseQcfData(dayData.surahNumber, dayData.ayahNumber);
-        if (!qcfData || cancelled) return;
-        setQcfPage(qcfData.page);
-        setQcfGlyphs(qcfData.glyphs);
-        if (!isPageFontLoaded(qcfData.page, true)) {
-          await loadPageFont(qcfData.page, true);
-        }
-        if (!cancelled) setQcfReady(true);
-      } catch (e) {
-        if (!cancelled) setQcfReady(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [dayData?.surahNumber, dayData?.ayahNumber]);
-
-  // Auto-hide controls after 4s
-  useEffect(() => {
-    resetControlsTimer();
-    return () => {
-      if (controlsTimeout.current) clearTimeout(controlsTimeout.current);
-    };
-  }, []);
-
-  // Cleanup video on unmount + pause when app goes to background
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'active' && videoRef.current) {
-        videoRef.current.pauseAsync().catch(() => {});
-      }
-    });
-    return () => {
-      subscription.remove();
-      if (videoRef.current) {
-        videoRef.current.stopAsync().catch(() => {});
-        videoRef.current.unloadAsync().catch(() => {});
-      }
-    };
-  }, []);
-
-  const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
-  // Premium users get premiumUrl (no branding), free users get url (with logo branding)
-  const videoUrl = (isPremium && currentVideo?.premiumUrl) ? currentVideo.premiumUrl : currentVideo?.url;
-
+  // Download & Share (FileSystem only for camera roll / share sheet)
   const handleDownload = useCallback(async () => {
-    if (!videoUrl) return;
+    if (!rawVideoUrl) return;
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(videoUrl!, localPath);
+      const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
       if (!download?.uri) throw new Error('download failed');
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
@@ -298,25 +351,25 @@ export default function StoryOfDayScreen() {
       await MediaLibrary.saveToLibraryAsync(download.uri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(t('common.success'), t('storyOfDay.videoWithAudioSaved'));
-    } catch (e) {
+    } catch {
       Alert.alert('', t('storyOfDay.videoSaveError'));
     } finally {
       setSaving(false);
     }
-  }, [videoUrl]);
+  }, [rawVideoUrl]);
 
   const handleShare = useCallback(async () => {
-    if (!dayData || !videoUrl) return;
+    if (!dayData || !rawVideoUrl) return;
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(videoUrl, localPath);
+      const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
       if (download?.uri) {
         if (Platform.OS === 'ios') {
-          const sl = isArabic ? dayData.surahName : dayData.surahEnglish;
+          const label = isArabic ? dayData.surahName : dayData.surahEnglish;
           await Share.share({
-            message: dayData.ayahText + '\n\n' + sl + '\n\n' + t('storyOfDay.shareText'),
+            message: `${dayData.ayahText}\n\n${label}\n\n${t('storyOfDay.shareText')}`,
             url: download.uri,
           });
         } else {
@@ -328,351 +381,299 @@ export default function StoryOfDayScreen() {
           }
         }
       }
-    } catch (e) {
-      // silent
-    } finally {
-      setSharing(false);
-    }
-  }, [dayData, videoUrl, isArabic]);
+    } catch { /* silent */ }
+    finally { setSharing(false); }
+  }, [dayData, rawVideoUrl, isArabic]);
 
-  const qcfFontFamily = qcfReady && qcfPage ? getPageFontFamily(qcfPage, true) : null;
-  const isQcf = !!qcfFontFamily;
+  const displayPosition = isSeeking ? seekPosition : positionSec;
+  const playerReady = status === 'readyToPlay';
+  const playerError = status === 'error';
+  const playerLoading = status === 'loading' || status === 'idle';
 
+  // Render
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <UniversalHeader>
-          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {t('storyOfDay.title')}
-            </Text>
-            <SectionInfoButton sectionKey="stories" />
-          </View>
-        </UniversalHeader>
+    <ScreenContainer edges={['top', 'bottom']}>
+      <UniversalHeader>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+            {t('storyOfDay.title')}
+          </Text>
+          <SectionInfoButton sectionKey="stories" />
+        </View>
+      </UniversalHeader>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {loading ? (
-            <View style={styles.centered}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : error || !dayData || !currentVideo ? (
-            <View style={styles.centered}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : error || !dayData || !currentVideo ? (
+          <View style={styles.centered}>
+            <View style={[styles.fallbackCard, {
+              backgroundColor: isDarkMode ? 'rgba(30,30,32,0.55)' : 'rgba(255,255,255,0.7)',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+            }]}>
               <MaterialCommunityIcons name="video-off-outline" size={64} color={colors.muted} />
-              <Text style={[styles.errorText, { color: colors.muted }]}>
-                {t('storyOfDay.loadError')}
+              <Text style={[styles.fallbackTitle, { color: colors.text, writingDirection: 'rtl' }]}>
+                {'\u0641\u064a\u062f\u064a\u0648 \u0627\u0644\u064a\u0648\u0645 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u062d\u0627\u0644\u064a\u0627\u064b'}
               </Text>
+              <Text style={[styles.fallbackSubtitle, { color: colors.muted, writingDirection: 'rtl' }]}>
+                {isArabic ? '\u062a\u0623\u0643\u062f \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629' : 'Check your connection and try again'}
+              </Text>
+              <TouchableOpacity onPress={retryFetch} activeOpacity={0.7} style={styles.retryBtn}>
+                <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+                <Text style={styles.retryBtnText}>{t('common.retry') || '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'}</Text>
+              </TouchableOpacity>
             </View>
-          ) : (
-            <>
-              {/* Reciter Chips — starts from far right in RTL */}
-              {dayData.videos.length > 0 && (
-                <ScrollView
-                  ref={reciterScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={[styles.reciterChips, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                  style={styles.reciterScroll}
-                  onContentSizeChange={() => {
-                    if (isRTL && reciterScrollRef.current) {
-                      reciterScrollRef.current.scrollToEnd({ animated: false });
-                    }
-                  }}
-                >
-                  {dayData.videos.map((v, idx) => {
-                    const active = idx === selectedReciterIdx;
-                    return (
-                      <TouchableOpacity
-                        key={v.reciterId}
-                        onPress={() => {
-                          setSelectedReciterIdx(idx);
-                          setIsPlaying(true);
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        }}
-                        activeOpacity={0.7}
-                        style={[styles.chip, {
-                          backgroundColor: active ? '#22C55E' : 'rgba(34, 197, 94, 0.15)',
-                          borderColor: active ? '#22C55E' : 'rgba(34, 197, 94, 0.3)',
-                        }]}
-                      >
-                        <Text
-                          style={[styles.chipText, { color: active ? '#fff' : colors.text }]}
-                          numberOfLines={1}
-                        >
-                          {isArabic ? v.reciterLabel : v.reciterLabelEn}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+          </View>
+        ) : (
+          <>
+            {dayData.videos.length > 0 && (
+              <ScrollView
+                ref={reciterScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.reciterChips, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                style={styles.reciterScroll}
+                onContentSizeChange={() => {
+                  if (isRTL) reciterScrollRef.current?.scrollToEnd({ animated: false });
+                }}
+              >
+                {dayData.videos.map((v, idx) => {
+                  const active = idx === selectedReciterIdx;
+                  const disabled = isTransitioning && !active;
+                  return (
+                    <TouchableOpacity
+                      key={v.reciterId}
+                      onPress={() => handleReciterSwitch(idx)}
+                      disabled={disabled}
+                      activeOpacity={0.7}
+                      style={[styles.chip, {
+                        backgroundColor: active ? '#0d8e62' : 'rgba(34,197,94,0.15)',
+                        borderColor: active ? '#0d8e62' : 'rgba(34,197,94,0.3)',
+                        opacity: disabled ? 0.4 : 1,
+                      }]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                        {isArabic ? v.reciterLabel : v.reciterLabelEn}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity activeOpacity={1} onPress={handleVideoTap} style={styles.videoCard}>
+              <VideoView
+                player={player}
+                style={styles.videoPlayer}
+                contentFit="cover"
+                nativeControls={false}
+              />
+
+              {(isTransitioning || (playerLoading && !!resolvedVideoUrl)) && !playerError && (
+                <View style={styles.transitionOverlay}>
+                  <ActivityIndicator size="large" color="#fff" />
+                </View>
               )}
 
-              {/* Video Card */}
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={handleVideoTap}
-                style={styles.videoCard}
-              >
-                <Video
-                  ref={videoRef}
-                  source={{ uri: videoUrl! }}
-                  style={styles.videoPlayer}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={isPlaying}
-                  isLooping
-                  isMuted={isMuted}
-                  onPlaybackStatusUpdate={onPlaybackStatusUpdate}
-                />
+              {playerError && (
+                <View style={[styles.transitionOverlay, { backgroundColor: 'rgba(0,0,0,0.6)', gap: 12 }]}>
+                  <Ionicons name="cloud-offline-outline" size={48} color="rgba(255,255,255,0.7)" />
+                  <Text style={{
+                    color: 'rgba(255,255,255,0.8)', fontFamily: fontRegular(),
+                    fontSize: 15, textAlign: 'center', writingDirection: 'rtl',
+                  }}>
+                    {t('storyOfDay.loadError')}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={async () => {
+                      if (!rawVideoUrl) return;
+                      try {
+                        const cdnUrl = toJsDelivrUrl(rawVideoUrl);
+                        resolvedSourceRef.current = 'cdn';
+                        setResolvedVideoUrl(cdnUrl);
+                      } catch { /* noop */ }
+                    }}
+                    style={styles.retrySmallBtn}
+                  >
+                    <Text style={styles.retrySmallText}>
+                      {t('common.retry') || '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
-                {/* Text + branding are now baked into the video by the generation script */}
+              {showControls && playerReady && (
+                <View style={styles.controlsOverlay} pointerEvents="box-none">
+                  <View style={styles.centerControls}>
+                    <TouchableOpacity onPress={skipBack} style={styles.skipBtn}>
+                      <MaterialCommunityIcons name="rewind-10" size={32} color="rgba(255,255,255,0.9)" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtn}>
+                      <MaterialCommunityIcons
+                        name={isPlaying ? 'pause-circle' : 'play-circle'}
+                        size={64}
+                        color="rgba(255,255,255,0.95)"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={skipForward} style={styles.skipBtn}>
+                      <MaterialCommunityIcons name="fast-forward-10" size={32} color="rgba(255,255,255,0.9)" />
+                    </TouchableOpacity>
+                  </View>
 
-                {/* Full controls overlay */}
-                {showControls && (
-                  <View style={styles.controlsOverlay} pointerEvents="box-none">
-                    {/* Center: skip back, play/pause, skip forward */}
-                    <View style={styles.centerControls}>
-                      <TouchableOpacity onPress={skipBack} style={styles.skipBtn}>
-                        <MaterialCommunityIcons name="rewind-10" size={32} color="rgba(255,255,255,0.9)" />
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={togglePlayPause} style={styles.playPauseBtn}>
+                  <View style={styles.bottomBar}>
+                    <View style={[styles.bottomBarRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Text style={styles.timeText}>{formatTime(durationSec)}</Text>
+                      <View style={styles.sliderContainer}>
+                        <Slider
+                          style={styles.slider}
+                          minimumValue={0}
+                          maximumValue={durationSec || 1}
+                          value={displayPosition}
+                          inverted={isRTL}
+                          onSlidingStart={() => setIsSeeking(true)}
+                          onValueChange={(v: number) => { if (isSeeking) setSeekPosition(v); }}
+                          onSlidingComplete={handleSeek}
+                          minimumTrackTintColor={colors.primary}
+                          maximumTrackTintColor="rgba(255,255,255,0.3)"
+                          thumbTintColor="#fff"
+                        />
+                      </View>
+                      <Text style={styles.timeText}>{formatTime(displayPosition)}</Text>
+                      <TouchableOpacity onPress={toggleMute} style={styles.muteBtn}>
                         <MaterialCommunityIcons
-                          name={isPlaying ? 'pause-circle' : 'play-circle'}
-                          size={64}
-                          color="rgba(255,255,255,0.95)"
+                          name={isMuted ? 'volume-off' : 'volume-high'}
+                          size={20}
+                          color="rgba(255,255,255,0.9)"
                         />
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={skipForward} style={styles.skipBtn}>
-                        <MaterialCommunityIcons name="fast-forward-10" size={32} color="rgba(255,255,255,0.9)" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Bottom bar: time + seekbar + mute */}
-                    <View style={styles.bottomBar}>
-                      <View style={[styles.bottomBarRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <Text style={styles.timeText}>{formatTime(positionMs)}</Text>
-                        <View style={styles.sliderContainer}>
-                          <Slider
-                            style={styles.slider}
-                            minimumValue={0}
-                            maximumValue={durationMs || 1}
-                            value={positionMs}
-                            onSlidingStart={() => setIsSeeking(true)}
-                            onSlidingComplete={handleSeek}
-                            minimumTrackTintColor={colors.primary}
-                            maximumTrackTintColor="rgba(255,255,255,0.3)"
-                            thumbTintColor="#fff"
-                          />
-                        </View>
-                        <Text style={styles.timeText}>{formatTime(durationMs)}</Text>
-                        <TouchableOpacity onPress={toggleMute} style={styles.muteBtn}>
-                          <MaterialCommunityIcons
-                            name={isMuted ? 'volume-off' : 'volume-high'}
-                            size={20}
-                            color="rgba(255,255,255,0.9)"
-                          />
-                        </TouchableOpacity>
-                      </View>
                     </View>
                   </View>
-                )}
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.actionsSection}>
+              <TouchableOpacity
+                onPress={handleDownload}
+                disabled={saving}
+                activeOpacity={0.7}
+                style={[styles.actionBtn, {
+                  backgroundColor: '#0d8e62',
+                  borderColor: 'transparent',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                }]}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <MaterialCommunityIcons name="download" size={20} color="#fff" />
+                }
+                <Text style={[styles.btnText, { color: '#fff' }]}>
+                  {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
+                </Text>
               </TouchableOpacity>
 
-              {/* Action Buttons */}
-              <View style={styles.actionsSection}>
-                <TouchableOpacity
-                  onPress={handleDownload}
-                  disabled={saving}
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, {
-                    backgroundColor: '#22C55E',
-                    borderColor: 'transparent',
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
-                  }]}
-                >
-                  {saving ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <MaterialCommunityIcons name="download" size={20} color="#fff" />
-                  )}
-                  <Text style={[styles.btnText, { color: '#fff' }]}>
-                    {saving ? t('common.loading') : t('storyOfDay.saveVideoWithReciter')}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleShare}
-                  disabled={sharing}
-                  activeOpacity={0.7}
-                  style={[styles.actionBtn, {
-                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
-                    borderColor: 'rgba(34, 197, 94, 0.3)',
-                    flexDirection: isRTL ? 'row-reverse' : 'row',
-                  }]}
-                >
-                  {sharing ? (
-                    <ActivityIndicator color={colors.primary} size="small" />
-                  ) : (
-                    <MaterialCommunityIcons name="share-variant" size={20} color={colors.text} />
-                  )}
-                  <Text style={[styles.btnText, { color: colors.text }]}>
-                    {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+              <TouchableOpacity
+                onPress={handleShare}
+                disabled={sharing}
+                activeOpacity={0.7}
+                style={[styles.actionBtn, {
+                  backgroundColor: 'rgba(34,197,94,0.15)',
+                  borderColor: 'rgba(34,197,94,0.3)',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                }]}
+              >
+                {sharing
+                  ? <ActivityIndicator color={colors.primary} size="small" />
+                  : <MaterialCommunityIcons name="share-variant" size={20} color={colors.text} />
+                }
+                <Text style={[styles.btnText, { color: colors.text }]}>
+                  {sharing ? t('storyOfDay.sharingInProgress') : t('common.share')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </ScreenContainer>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-  safeArea: { flex: 1 },
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// Styles
+// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+const _styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingBottom: 24, flexGrow: 1 },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    minHeight: 300,
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, minHeight: 300 },
+  fallbackCard: {
+    alignItems: 'center', justifyContent: 'center', gap: 14,
+    paddingHorizontal: 28, paddingVertical: 36, borderRadius: 20,
+    borderWidth: 0.5, marginHorizontal: 8, width: '100%',
   },
-  headerTitle: { fontSize: 18, fontFamily: fontBold() },
-  errorText: { fontSize: 16, fontFamily: fontRegular(), textAlign: 'center' },
-
-  // Reciter chips
+  fallbackTitle: {
+    fontSize: 18, fontFamily: fontBold(), textAlign: 'center',
+    lineHeight: 30, includeFontPadding: false,
+  },
+  fallbackSubtitle: {
+    fontSize: 14, fontFamily: fontRegular(), textAlign: 'center',
+    lineHeight: 24, includeFontPadding: false, marginBottom: 4,
+  },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: '#22C55E', paddingHorizontal: 28,
+    paddingVertical: 12, borderRadius: 24, marginTop: 4,
+  },
+  retryBtnText: {
+    color: '#fff', fontFamily: fontSemiBold(), fontSize: 15,
+    lineHeight: 24, includeFontPadding: false,
+  },
+  retrySmallBtn: {
+    backgroundColor: '#22C55E', paddingHorizontal: 24,
+    paddingVertical: 10, borderRadius: 20, marginTop: 4,
+  },
+  retrySmallText: {
+    color: '#fff', fontFamily: fontSemiBold(), fontSize: 14, writingDirection: 'rtl',
+  },
+  headerTitle: { fontSize: 18, fontFamily: fontBold(), lineHeight: 30, includeFontPadding: false },
   reciterScroll: { marginTop: 8, marginBottom: 10, maxHeight: 44 },
-  reciterChips: { gap: 8, paddingHorizontal: 2 },
+  reciterChips: { gap: 8, paddingHorizontal: 16 },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth, flexShrink: 0,
   },
-  chipText: { fontFamily: fontBold(), fontSize: 14 },
-
-  // Video card
-  videoCard: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    aspectRatio: 9 / 16,
-    width: '100%',
+  chipText: { fontFamily: fontBold(), fontSize: 14, lineHeight: 24, includeFontPadding: false },
+  videoCard: { borderRadius: 20, overflow: 'hidden', aspectRatio: 9 / 16, width: '100%' },
+  videoPlayer: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
+  transitionOverlay: {
+    ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center', alignItems: 'center',
   },
-  videoPlayer: { ...StyleSheet.absoluteFillObject },
-
-  // Verse overlay — daily-ayah style
-  verseOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-  },
-  verseText: {
-    textAlign: 'center',
-    color: '#FFFFFF',
-    writingDirection: 'rtl',
-    marginBottom: 14,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  surahBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  surahBadgeText: {
-    color: '#FFFFFF',
-    fontFamily: 'Amiri',
-    fontSize: 13,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  // Branding — pinned at bottom
-  brandingArea: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandLogo: { width: 56, height: 56, borderRadius: 14, opacity: 0.85 },
-
-  // Full controls overlay
-  controlsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  centerControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 28,
-  },
-  playPauseBtn: {
-    width: 80,
-    height: 80,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  skipBtn: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  controlsOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  centerControls: { flexDirection: 'row', alignItems: 'center', gap: 28 },
+  playPauseBtn: { width: 80, height: 80, justifyContent: 'center', alignItems: 'center' },
+  skipBtn: { width: 48, height: 48, justifyContent: 'center', alignItems: 'center' },
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 14,
-    paddingTop: 8,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 12, paddingBottom: 14, paddingTop: 8,
   },
-  bottomBarRow: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  sliderContainer: {
-    flex: 1,
-    height: 30,
-    justifyContent: 'center',
-  },
-  slider: {
-    width: '100%',
-    height: 30,
-  },
+  bottomBarRow: { alignItems: 'center', gap: 6 },
+  sliderContainer: { flex: 1, height: 30, justifyContent: 'center' },
+  slider: { width: '100%', height: 30 },
   timeText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontFamily: fontRegular(),
-    minWidth: 36,
-    textAlign: 'center',
+    color: 'rgba(255,255,255,0.85)', fontSize: 12,
+    fontFamily: fontRegular(), minWidth: 36, textAlign: 'center',
   },
   muteBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center',
   },
-
-  // Action buttons
   actionsSection: { gap: 10, marginTop: 14 },
   actionBtn: {
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14, alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  btnText: { fontFamily: fontBold(), fontSize: 15 },
+  btnText: { fontFamily: fontBold(), fontSize: 15, lineHeight: 26, includeFontPadding: false },
 });

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Khatma } from './khatma-storage';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
+import { getReminderChannelId } from '../services/notifications/channels';
 
 // Sound file mapping (must match app.json expo-notifications sounds)
 const SOUND_FILES: Record<string, string> = {
@@ -62,16 +63,7 @@ export const requestNotificationPermissions = async (): Promise<boolean> => {
       return false;
     }
 
-    // Configure for Android
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('khatma-reminders', {
-        name: t('notifications.khatmaChannel'),
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#22C55E',
-        sound: 'general_reminder',
-      });
-    }
+    // Android channels are pre-created at startup in services/notifications/channels.ts
 
     return true;
   } catch (error) {
@@ -131,7 +123,9 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
     await cancelKhatmaReminder(khatma.id);
 
     // Parse reminder time (format: "HH:mm")
-    const [hours, minutes] = khatma.reminderTime.split(':').map(Number);
+    const parts = khatma.reminderTime.split(':').map(Number);
+    const hours = Number.isFinite(parts[0]) && parts[0] >= 0 && parts[0] <= 23 ? parts[0] : 0;
+    const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
 
     // Schedule daily notification with proper sound resolution
     const soundValue = resolveKhatmaSound('general_reminder', true);
@@ -146,12 +140,14 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
         },
         sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.HIGH,
-        ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: hours,
         minute: minutes,
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
       },
     });
 
@@ -225,9 +221,12 @@ export const sendTestKhatmaNotification = async (): Promise<void> => {
         title: dirText(`📖 ${t('notifications.testTitle')}`),
         body: dirText(t('notifications.testBody')),
         sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
-      trigger: null, // Immediate
+      trigger: Platform.OS === 'android'
+        ? { channelId: getReminderChannelId('general_reminder') }
+        : null,
     });
   } catch (error) {
     console.error('Error sending test notification:', error);
@@ -245,9 +244,12 @@ export const sendKhatmaCompletionNotification = async (khatmaName: string): Prom
         title: dirText(`🎉 ${t('notifications.khatmaComplete')}`),
         body: dirText(`${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`),
         sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'active' as const }),
       },
-      trigger: null, // Immediate
+      trigger: Platform.OS === 'android'
+        ? { channelId: getReminderChannelId('general_reminder') }
+        : null,
     });
   } catch (error) {
     console.error('Error sending completion notification:', error);
@@ -265,9 +267,12 @@ export const sendWirdCompletionNotification = async (): Promise<void> => {
         title: dirText(`✅ ${t('notifications.wellDone')}`),
         body: dirText(t('khatma.wirdCompletedMsg')),
         sound: resolveKhatmaSound('general_reminder', true),
-        ...(Platform.OS === 'android' && { channelId: 'khatma-reminders' }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'active' as const }),
       },
-      trigger: null, // Immediate
+      trigger: Platform.OS === 'android'
+        ? { channelId: getReminderChannelId('general_reminder') }
+        : null,
     });
   } catch (error) {
     console.error('Error sending wird completion notification:', error);

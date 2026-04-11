@@ -9,25 +9,30 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const Colors = {
   // الألوان الأساسية
-  primary: '#22C55E',
-  primaryLight: '#4ADE80',
-  primaryDark: '#16A34A',
+  primary: '#0d8e62',
+  primaryLight: '#3da87e',
+  primaryDark: '#0a7050',
   
   // الألوان الثانوية
-  secondary: '#6366F1',
-  secondaryLight: '#818CF8',
-  secondaryDark: '#4F46E5',
+  secondary: '#525252',
+  secondaryLight: '#525252',
+  secondaryDark: '#404040',
   
-  // الخلفيات والأسطح
-  background: '#FFFFFF',
-  surface: '#FFFFFF',
-  surfaceVariant: '#F3F4F6',
+  // الخلفيات والأسطح - AAA Grayscale Palette
+  background: '#eaeaea',
+  surface: '#F5F5F5',
+  surfaceVariant: '#FFFFFF',
   
-  // النصوص
-  text: '#1C1C1E',
-  textSecondary: '#3A3A3C',
-  textLight: '#8E8E93',
+  // النصوص - تباين عالي AAA
+  text: '#171717',
+  textSecondary: '#262626',
+  textLight: '#525252',
   textOnPrimary: '#FFFFFF',
+  
+  // ألوان الأيقونات - تباين عالي
+  icon: '#525252',
+  iconMuted: '#636363',
+  iconActive: '#0d8e62',
   
   // حالات
   success: '#34C759',
@@ -39,26 +44,26 @@ export const Colors = {
   white: '#FFFFFF',
   black: '#000000',
   
-  // الحدود والفواصل
-  border: 'rgba(0,0,0,0.1)',
-  divider: 'rgba(0,0,0,0.05)',
-  overlay: 'rgba(0, 0, 0, 0.4)',
+  // الحدود والفواصل - AAA
+  border: '#D1D1D1',
+  divider: '#E0E0E0',
+  overlay: 'rgba(0, 0, 0, 0.5)',
   
   // ألوان خاصة
   gold: '#FFD700',
-  quranGreen: '#22C55E',
+  quranGreen: '#0d8e62',
   prayerBlue: '#007AFF',
   
-  // ألوان زجاجية
-  glass: 'rgba(255, 255, 255, 0.7)',
-  glassDark: 'rgba(255, 255, 255, 0.5)',
-  glassLight: 'rgba(255, 255, 255, 0.85)',
-  glassBorder: 'rgba(255, 255, 255, 0.3)',
-  cardGlass: 'rgba(255, 255, 255, 0.75)',
+  // ألوان زجاجية — Apple iOS frosted glass
+  glass: 'rgba(255, 255, 255, 0.65)',
+  glassDark: 'rgba(255, 255, 255, 0.50)',
+  glassLight: 'rgba(255, 255, 255, 0.75)',
+  glassBorder: 'rgba(0, 0, 0, 0.08)',
+  cardGlass: 'rgba(255, 255, 255, 0.65)',
 
   // Aliases used by admin screens
-  textMuted: '#8E8E93',
-  accent: '#22C55E',
+  textMuted: '#525252',
+  accent: '#0d8e62',
   shadow: '#000000',
 };
 
@@ -68,25 +73,30 @@ export const Colors = {
 
 export const DarkColors = {
   // الألوان الأساسية
-  primary: '#22C55E',
-  primaryLight: '#4ADE80',
-  primaryDark: '#16A34A',
+  primary: '#0d8e62',
+  primaryLight: '#3da87e',
+  primaryDark: '#0a7050',
   
   // الألوان الثانوية
-  secondary: '#818CF8',
-  secondaryLight: '#A5B4FC',
-  secondaryDark: '#6366F1',
+  secondary: '#A3A3A3',
+  secondaryLight: '#D4D4D4',
+  secondaryDark: '#8A8A8A',
   
-  // الخلفيات والأسطح
-  background: '#11151c',
-  surface: '#1a1f2b',
-  surfaceVariant: '#242b3a',
+  // الخلفيات والأسطح - AAA Grayscale Palette
+  background: '#151719',
+  surface: '#1a222a',
+  surfaceVariant: '#232d38',
   
-  // النصوص
-  text: '#FFFFFF',
-  textSecondary: '#EBEBF5',
-  textLight: '#A8A8AD',
+  // النصوص - AAA
+  text: '#FAFAFA',
+  textSecondary: '#E5E5E5',
+  textLight: '#A3A3A3',
   textOnPrimary: '#FFFFFF',
+  
+  // ألوان الأيقونات
+  icon: '#A3A3A3',
+  iconMuted: '#8A8A8A',
+  iconActive: '#0d8e62',
   
   // حالات
   success: '#30D158',
@@ -98,26 +108,26 @@ export const DarkColors = {
   white: '#FFFFFF',
   black: '#000000',
   
-  // الحدود والفواصل
-  border: 'rgba(255,255,255,0.18)',
-  divider: 'rgba(255,255,255,0.08)',
+  // الحدود والفواصل - AAA
+  border: '#2d3740',
+  divider: '#232d38',
   overlay: 'rgba(0, 0, 0, 0.6)',
   
   // ألوان خاصة
   gold: '#FFD60A',
-  quranGreen: '#22C55E',
+  quranGreen: '#0d8e62',
   prayerBlue: '#0A84FF',
   
-  // ألوان زجاجية للدارك مود
-  glass: 'rgba(26, 31, 43, 0.8)',
-  glassDark: 'rgba(26, 31, 43, 0.6)',
-  glassLight: 'rgba(36, 43, 58, 0.9)',
-  glassBorder: 'rgba(255, 255, 255, 0.18)',
-  cardGlass: 'rgba(26, 31, 43, 0.85)',
+  // ألوان زجاجية — Apple iOS frosted glass dark
+  glass: 'rgba(26, 34, 42, 0.65)',
+  glassDark: 'rgba(26, 34, 42, 0.55)',
+  glassLight: 'rgba(26, 34, 42, 0.75)',
+  glassBorder: 'rgba(255, 255, 255, 0.12)',
+  cardGlass: 'rgba(26, 34, 42, 0.65)',
 
   // Aliases used by admin screens
-  textMuted: '#A8A8AD',
-  accent: '#22C55E',
+  textMuted: '#A3A3A3',
+  accent: '#0d8e62',
   shadow: '#000000',
 };
 
@@ -141,6 +151,8 @@ export const SchemeColors = {
     error: Colors.error,
     glass: Colors.glass,
     cardGlass: Colors.cardGlass,
+    icon: Colors.icon,
+    iconMuted: Colors.iconMuted,
   },
   dark: {
     primary: DarkColors.primary,
@@ -155,12 +167,12 @@ export const SchemeColors = {
     error: DarkColors.error,
     glass: DarkColors.glass,
     cardGlass: DarkColors.cardGlass,
+    icon: DarkColors.icon,
+    iconMuted: DarkColors.iconMuted,
   },
 };
 
 export type ThemeColors = typeof SchemeColors.light;
-
-export const ISLAMIC_PATTERN_OPACITY = { dark: 0.08, light: 0.05 };
 
 // ============================================
 // المسافات
@@ -288,22 +300,22 @@ export const Shadows = {
 
 export const GlassStyles = {
   light: {
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     ...Shadows.glass,
   },
   dark: {
-    backgroundColor: 'rgba(26, 31, 43, 0.8)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(30, 30, 30, 0.20)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
     ...Shadows.glass,
   },
   card: {
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderRadius: BorderRadius.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(0, 0, 0, 0.06)',
     ...Shadows.md,
   },
   cardDark: {
@@ -314,10 +326,10 @@ export const GlassStyles = {
     ...Shadows.md,
   },
   input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   inputDark: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -326,10 +338,10 @@ export const GlassStyles = {
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   button: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.05)',
+    borderColor: 'rgba(0, 0, 0, 0.08)',
     ...Shadows.sm,
   },
   buttonDark: {
@@ -381,7 +393,7 @@ export const Animation = {
 // ============================================
 
 export const AvailableAccentColors = [
-  { name: 'أخضر', nameEn: 'Green', value: '#22C55E' },
+  { name: 'أخضر', nameEn: 'Green', value: '#0d8e62' },
   { name: 'أزرق', nameEn: 'Blue', value: '#007AFF' },
   { name: 'بنفسجي', nameEn: 'Purple', value: '#5856D6' },
   { name: 'وردي', nameEn: 'Pink', value: '#FF2D55' },
@@ -397,7 +409,7 @@ export const AvailableAccentColors = [
 
 export const CARD_COLORS = [
   '#1e3a5f', // أزرق داكن
-  '#22C55E', // أخضر إسلامي
+  '#0d8e62', // أخضر إسلامي
   '#5b21b6', // بنفسجي
   '#7c2d12', // بني محروق
   '#1e40af', // أزرق ملكي
@@ -437,4 +449,9 @@ export const getColorsWithAccent = (isDark: boolean, accentColor: string) => {
     primaryDark: accentColor,
     quranGreen: accentColor,
   };
+};
+
+export const ISLAMIC_PATTERN_OPACITY = {
+  light: 0.06,
+  dark: 0.04,
 };

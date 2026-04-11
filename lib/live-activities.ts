@@ -33,6 +33,10 @@ export interface LiveActivityData {
   ayahText?: string;
   ayahRef?: string;
   sunriseTime?: string;
+  // Appearance fields — parity with WidgetAppearance system
+  accentColor?: string;
+  colorScheme?: 'auto' | 'light' | 'dark';
+  language?: string;
 }
 
 // ===================================================

@@ -8,14 +8,17 @@ export type PremiumFeatureKey =
   | 'sound_downloads'
   | 'cloud_backup'
   | 'advanced_stats'
-  | 'custom_backgrounds';
+  | 'custom_backgrounds'
+  | 'offline_recitation'
+  | 'advanced_khatma'
+  | 'custom_app_icon'
+  | 'premium_widgets'
+  | 'watermark_free_export';
 
 /** إعدادات ميزة واحدة */
 export interface FeatureGateEntry {
   /** هل هذه الميزة للبريميوم فقط؟ */
   premiumOnly: boolean;
-  label: string;
-  description: string;
 }
 
 /** إعدادات كل الميزات — من Firestore config/feature-gating */
@@ -28,6 +31,17 @@ export interface AdminGrantedPremium {
   grantedAt: string;
   expiresAt: string | null;
   reason?: string;
+  plan?: 'monthly' | 'yearly' | 'lifetime';
+}
+
+/** إعدادات العروض الموسمية */
+export interface SeasonalOffer {
+  enabled: boolean;
+  title: string;
+  description: string;
+  discountPercent: number;
+  startDate: string;
+  endDate: string;
 }
 
 /** مصدر البريميوم */

@@ -1,10 +1,19 @@
 // hooks/use-colors.ts
 
-import { useSettings } from "@/contexts/SettingsContext";
+import { useCallback } from "react";
+import { useSettings, FontSize } from "@/contexts/SettingsContext";
 import { Colors, DarkColors } from "@/constants/theme";
 import { getContrastPalette, getContrastTextColor, blendWithDimOverlay, getLuminance } from "@/lib/contrast-helper";
 import { APP_BACKGROUNDS } from "@/lib/backgrounds";
 import { useThemeConfig } from "@/contexts/ThemeConfigContext";
+
+// ─── Font-scale map (kept here to co-locate with useColors for zero-import usage)
+const FONT_SCALE: Record<FontSize, number> = {
+  small: 0.875,
+  medium: 1.0,
+  large: 1.125,
+  xlarge: 1.25,
+};
 
 // Extended colors object that includes commonly-used UI properties
 const LightColors = {
@@ -15,7 +24,7 @@ const LightColors = {
 
 const DarkColorsExtended = {
   ...DarkColors,
-  card: '#1a1f2b',
+  card: '#1a222a',
   cardGlass: DarkColors.cardGlass,
 };
 
@@ -24,9 +33,11 @@ export function useColors() {
   const { themeConfig } = useThemeConfig();
   
   // Merge: hardcoded defaults → admin Firestore overrides
+  // IMPORTANT: Never override 'primary' — it is the brand color (#0d8e62) and must remain constant
   const adminOverrides = isDarkMode ? themeConfig?.dark : themeConfig?.light;
   const baseColors = isDarkMode ? DarkColorsExtended : LightColors;
-  const colors = adminOverrides ? { ...baseColors, ...adminOverrides } : baseColors;
+  const { primary: _adminPrimary, ...safeOverrides } = adminOverrides ?? {};
+  const colors = adminOverrides ? { ...baseColors, ...safeOverrides } : baseColors;
 
   // Override text colors when a background is active
   const appBg = settings.display.appBackground;
@@ -41,7 +52,10 @@ export function useColors() {
 
   let bgTextColor: 'white' | 'black' | undefined;
   if (isActive && !skipOverride) {
-    if (builtInBg?.dominantColor) {
+    // Custom theme always uses dark backgrounds → force white text
+    if (settings.theme === 'custom') {
+      bgTextColor = 'white';
+    } else if (builtInBg?.dominantColor) {
       // Auto-detect from dominantColor
       bgTextColor = getContrastTextColor(builtInBg.dominantColor) === '#FFFFFF' ? 'white' : 'black';
     } else if (builtInBg?.textColor) {
@@ -66,13 +80,20 @@ export function useColors() {
     ? (bgTextColor === 'white' ? '#FFFFFF' : '#1C1C1E')
     : colors.text;
   const textLight = hasBgOverride
-    ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)')
+    ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)')
     : colors.textLight;
 
   // When a background is active, use glass card colors for better integration
+  // For dark bg (white text): use dark glass overlay so white text is readable on any part of the bg image
+  // For light bg (black text): use subtle transparent overlay
   const card = hasBgOverride
-    ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)')
+    ? (bgTextColor === 'white' ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.65)')
     : colors.card;
+
+  // Icon color override: adapt for bg-override mode
+  const icon = hasBgOverride
+    ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.85)' : '#525252')
+    : (colors.icon ?? (isDarkMode ? '#A3A3A3' : '#525252'));
 
   const hasDynamicBg = isActive && appBg === 'dynamic';
 
@@ -108,21 +129,53 @@ export function useColors() {
     }
   }
 
+  // Tab bar background — theme-aware for Android Material Design 3 compatibility
+  // Light mode: slightly darker than background for subtle elevation
+  // Dark mode: slightly lighter than background
+  // Custom background active: semi-transparent dark overlay
+  const tabBarBackground = hasBgOverride
+    ? 'rgba(0,0,0,0.92)'
+    : isDarkMode
+      ? '#1a222a'
+      : '#E0E0E0';
+
+  // Primary color for TEXT usage — darker in light mode for better contrast
+  // Use colors.primary for backgrounds/buttons, use primaryText for text
+  const primaryText = isDarkMode ? colors.primary : '#086B4A';
+
+  // Font scaling based on user's display font-size preference
+  const _scale = FONT_SCALE[settings.display.fontSize] ?? 1;
+  const fs = useCallback(
+    (baseSize: number): number => Math.round(baseSize * _scale),
+    [_scale],
+  );
+
   return {
     ...colors,
     text,
     textLight,
     card,
+    icon,
+    tabBarBackground,
+    primaryText,
+    /** Scale a base font size by the user's display preference */
+    fs,
     // Aliases used by many pages (maps to SchemeColors naming)
     foreground: text,
     muted: textLight,
     /** Whether a dynamic photo background is active */
     hasDynamicBg,
+    /** Whether a background image is overriding text colors */
+    hasBgOverride,
     /** Text shadow style for readability on photo backgrounds */
     textShadowStyle,
     /** Get contrast-aware text color for any background */
     getTextColor: (bg: string) => getContrastTextColor(bg),
     /** Get full contrast palette for any background */
     getContrastPalette: (bg: string) => getContrastPalette(bg),
+    /** Whether the app is currently in dark mode */
+    isDarkMode,
+    /** Correct StatusBar style accounting for dark mode AND background override */
+    statusBarStyle: (isDarkMode || (hasBgOverride && bgTextColor === 'white') ? 'light' : 'dark') as 'light' | 'dark',
   };
 }

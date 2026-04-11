@@ -10,36 +10,17 @@ const CACHE_KEY = '@feature_gating_cache';
 
 /** الإعدادات الافتراضية — كل الميزات premium-only (آمن) */
 export const DEFAULT_FEATURE_GATING: FeatureGatingConfig = {
-  ad_removal: {
-    premiumOnly: true,
-    label: 'إزالة الإعلانات',
-    description: 'إزالة جميع الإعلانات من التطبيق',
-  },
-  exclusive_themes: {
-    premiumOnly: true,
-    label: 'ثيمات حصرية',
-    description: 'ثيمات قراءة حصرية للمشتركين',
-  },
-  sound_downloads: {
-    premiumOnly: true,
-    label: 'تحميل الأصوات',
-    description: 'تحميل الأصوات والتلاوات',
-  },
-  cloud_backup: {
-    premiumOnly: true,
-    label: 'نسخ احتياطي سحابي',
-    description: 'نسخ احتياطي واسترجاع من السحابة',
-  },
-  advanced_stats: {
-    premiumOnly: true,
-    label: 'إحصائيات متقدمة',
-    description: 'إحصائيات تفصيلية للعبادات',
-  },
-  custom_backgrounds: {
-    premiumOnly: true,
-    label: 'خلفيات مخصصة',
-    description: 'رفع واستخدام خلفيات مخصصة',
-  },
+  ad_removal: { premiumOnly: true },
+  exclusive_themes: { premiumOnly: true },
+  sound_downloads: { premiumOnly: true },
+  cloud_backup: { premiumOnly: true },
+  advanced_stats: { premiumOnly: true },
+  custom_backgrounds: { premiumOnly: true },
+  offline_recitation: { premiumOnly: true },
+  advanced_khatma: { premiumOnly: true },
+  custom_app_icon: { premiumOnly: true },
+  premium_widgets: { premiumOnly: true },
+  watermark_free_export: { premiumOnly: true },
 };
 
 let memoryCache: FeatureGatingConfig | null = null;

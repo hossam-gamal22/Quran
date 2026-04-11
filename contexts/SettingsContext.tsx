@@ -12,10 +12,8 @@ import React, {
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance, ColorSchemeName, Alert, Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as Updates from 'expo-updates';
-import { scheduleNotificationsFromSettings } from '@/lib/notifications-manager';
-import { resetChannelsWithNewSound } from '@/services/notifications/channels';
+import { scheduleNotificationsFromSettings, syncNotificationDefaults } from '@/lib/notifications-manager';
 import { 
   t as translate, 
   setLanguage as setI18nLanguage, 
@@ -31,11 +29,46 @@ import { updateSharedData } from '@/lib/widget-data';
 import { switchAppIcon } from '@/lib/app-icon-manager';
 
 // ========================================
+// Eager theme cache — read previous session's theme/background at module load
+// so useState initializer can use the correct values on first render,
+// eliminating the dark→light (or vice-versa) flash.
+// ========================================
+
+const THEME_CACHE_KEY = '@cached_theme_snapshot';
+
+interface ThemeCacheSnapshot {
+  theme: string;
+  appBackground: string;
+  appBackgroundTextColor?: string;
+  isDarkMode?: boolean;
+}
+
+let _cachedThemeSnapshot: ThemeCacheSnapshot | null = null;
+
+/** Eagerly started at module scope — resolves before SettingsProvider mounts
+ *  because _layout.tsx gates on languageReady which also reads AsyncStorage. */
+export const themeCachePromise: Promise<ThemeCacheSnapshot | null> = AsyncStorage.getItem(THEME_CACHE_KEY)
+  .then((raw) => {
+    if (raw) {
+      try {
+        _cachedThemeSnapshot = JSON.parse(raw);
+      } catch { /* corrupted — use defaults */ }
+    }
+    return _cachedThemeSnapshot;
+  })
+  .catch(() => null);
+
+/** Synchronously returns the cached snapshot (available after themeCachePromise resolves) */
+export function getCachedThemeSnapshot(): ThemeCacheSnapshot | null {
+  return _cachedThemeSnapshot;
+}
+
+// ========================================
 // الأنواع
 // ========================================
 
 export type { Language } from '@/constants/translations';
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 99;
 
@@ -74,6 +107,7 @@ export interface NotificationSettings {
   worshipDailySummaryTime: string;
   worshipStreakAlerts: boolean;
   worshipWeeklyReport: boolean;
+  worshipWeeklyReportTime?: string;
   worshipQuietHoursEnabled: boolean;
   worshipQuietHoursStart: string;
   worshipQuietHoursEnd: string;
@@ -121,10 +155,24 @@ export interface NotificationSettings {
   customReminderDays?: number[];
   // Friday Surah Al-Kahf reminder (auto 2h after Jummah Dhuhr)
   kahfReminder?: boolean;
+  kahfTime?: string;
+  // Multi-time scheduling (up to 3 times per category)
+  morningAzkarTimes?: string[];
+  eveningAzkarTimes?: string[];
+  sleepAzkarTimes?: string[];
+  wakeupAzkarTimes?: string[];
+  dailyVerseTimes?: string[];
+  salawatReminderTimes?: string[];
+  tasbihReminderTimes?: string[];
+  istighfarReminderTimes?: string[];
+  customReminderTimes?: string[];
+  quranReadingReminderTimes?: string[];
+  // Per-category admin override tracking (true = user customized, skip admin sync)
+  notifOverrides?: Record<string, boolean>;
 }
 
 export type AppBackgroundKey = 'none' | 'background1' | 'background2' | 'background3' | 'background4' | 'background5' | 'background6' | 'background7' | 'dynamic';
-export type QuranBackgroundKey = 'quranbg1' | 'quranbg2' | 'quranbg3' | 'quranbg4';
+export type QuranBackgroundKey = 'none' | 'quranbg1' | 'quranbg2' | 'quranbg3' | 'quranbg4';
 
 export type HomeLayout = 'grid' | 'list';
 
@@ -210,6 +258,7 @@ interface SettingsContextType {
   // دوال التحديث
   updateLanguage: (language: Language) => Promise<void>;
   updateTheme: (theme: ThemeMode) => Promise<void>;
+  updateThemeAndDisplay: (theme: ThemeMode, display: Partial<DisplaySettings>) => Promise<void>;
   updateNotifications: (notifications: Partial<NotificationSettings>) => Promise<void>;
   updateDisplay: (display: Partial<DisplaySettings>) => Promise<void>;
   updatePrayer: (prayer: Partial<PrayerSettings>) => Promise<void>;
@@ -231,56 +280,58 @@ interface SettingsContextType {
 const defaultNotifications: NotificationSettings = {
   enabled: true,
   prayerTimes: true,
-  prayerReminder: true,
-  prayerReminderMinutes: 10,
-  reminderMinutes: 10,
+  prayerReminder: false,
+  prayerReminderMinutes: 0,
+  reminderMinutes: 0,
   fajrSpecial: true,
   azkarMorning: true,
   azkarMorningTime: '06:00',
   azkarEvening: true,
-  azkarEveningTime: '18:00',
+  azkarEveningTime: '17:45',
   morningAzkar: true,
   morningAzkarTime: '06:00',
   eveningAzkar: true,
-  eveningAzkarTime: '18:00',
+  eveningAzkarTime: '17:45',
   dailyVerse: true,
-  dailyVerseTime: '08:00',
+  dailyVerseTime: '13:00',
   dailyHadith: false,
   khatmaReminder: true,
   sound: true,
   vibration: true,
   soundType: 'default',
-  adhanSoundType: 'default',
+  adhanSoundType: 'makkah',
   // Worship tracking notifications
   worshipPrayerLogging: true,
-  worshipDailySummary: false,
-  worshipDailySummaryTime: '22:00',
+  worshipDailySummary: true,
+  worshipDailySummaryTime: '21:30',
   worshipStreakAlerts: true,
-  worshipWeeklyReport: false,
+  worshipWeeklyReport: true,
+  worshipWeeklyReportTime: '21:00',
   worshipQuietHoursEnabled: false,
   worshipQuietHoursStart: '23:00',
   worshipQuietHoursEnd: '06:00',
   // Quran reading reminder
-  quranReadingReminder: false,
-  quranReadingReminderTime: '20:00',
+  quranReadingReminder: true,
+  quranReadingReminderTime: '15:00',
   quranReminderDays: [0, 1, 2, 3, 4, 5, 6],
   quranReminder24Hour: true,
   quranReminderSoundType: 'default',
   // Salawat, Istighfar, Tasbih reminders
-  salawatReminder: false,
-  salawatReminderTime: '09:00',
-  istighfarReminder: false,
-  istighfarReminderTime: '12:00',
-  tasbihReminder: false,
-  tasbihReminderTime: '15:00',
+  salawatReminder: true,
+  salawatReminderTime: '17:00',
+  istighfarReminder: true,
+  istighfarReminderTime: '19:00',
+  tasbihReminder: true,
+  tasbihReminderTime: '21:00',
   // Additional Adhkar reminders
-  sleepAzkar: false,
+  sleepAzkar: true,
   sleepAzkarTime: '22:00',
-  wakeupAzkar: false,
-  wakeupAzkarTime: '05:30',
-  afterPrayerAzkar: false,
+  wakeupAzkar: true,
+  wakeupAzkarTime: '10:00',
+  afterPrayerAzkar: true,
   // Friday Surah Al-Kahf reminder
   kahfReminder: true,
+  kahfTime: '07:00',
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -292,7 +343,7 @@ const defaultDisplay: DisplaySettings = {
   showTransliteration: false,
   translationEdition: 'en.sahih',
   highlightTajweed: true,
-  appBackground: 'background1',
+  appBackground: 'background3',
   backgroundOpacity: 1,
   quranBackground: 'quranbg1',
   quranFontSizeAdjust: 0,
@@ -330,7 +381,7 @@ const defaultPrayer: PrayerSettings = {
 
 const defaultSettings: AppSettings = {
   language: 'ar',
-  theme: 'dark',
+  theme: 'custom',
   notifications: defaultNotifications,
   display: defaultDisplay,
   prayer: defaultPrayer,
@@ -344,6 +395,15 @@ const defaultSettings: AppSettings = {
 // ========================================
 
 const STORAGE_KEY = 'app_settings';
+
+// ========================================
+// Notification Defaults Migration
+// ========================================
+// Bump this version whenever default notification times change.
+// On app update, existing users will get their notification times
+// reset to the new defaults (toggles/booleans are preserved).
+const NOTIFICATION_DEFAULTS_VERSION = 4;
+const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
 // السياق
@@ -360,42 +420,65 @@ interface SettingsProviderProps {
 }
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
-  // Use lazy initializer so the FIRST render already has the correct language.
-  // By the time SettingsProvider mounts, _layout.tsx's languageReady gate has
-  // ensured languageInitPromise resolved, so getLanguage() is the saved value.
-  // This eliminates the "Arabic flash" for non-Arabic users.
+  // Use lazy initializer so the FIRST render already has the correct language
+  // AND theme. By the time SettingsProvider mounts, _layout.tsx's languageReady
+  // gate has ensured languageInitPromise resolved, so getLanguage() is the saved
+  // value. We also read the eagerly-cached theme snapshot so the initial render
+  // uses the correct theme/background — eliminating the flash.
   const [settings, setSettings] = useState<AppSettings>(() => {
     const initialLang = getLanguage() as Language;
-    if (__DEV__) console.log(`📱 SettingsProvider initial language: ${initialLang}`);
-    return {
+    const themeCache = getCachedThemeSnapshot();
+    if (__DEV__) console.log(`📱 SettingsProvider initial language: ${initialLang}, cachedTheme: ${themeCache?.theme ?? 'none'}`);
+    
+    const initial = {
       ...defaultSettings,
       language: initialLang,
     };
+    
+    // Apply cached theme/background to avoid flash
+    if (themeCache) {
+      initial.theme = themeCache.theme as ThemeMode;
+      initial.display = {
+        ...initial.display,
+        appBackground: themeCache.appBackground as AppBackgroundKey,
+        appBackgroundTextColor: themeCache.appBackgroundTextColor as 'white' | 'black' | undefined,
+      };
+    }
+    
+    return initial;
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [initialSchedulingDone, setInitialSchedulingDone] = useState(false);
   const [systemTheme, setSystemTheme] = useState<ColorSchemeName>(Appearance.getColorScheme());
 
   // حساب الوضع الداكن
-  // When a background that requires white text is active, force dark mode
-  // since dark backgrounds need light text for readability
+  // When theme is 'custom', use background-based contrast detection
+  // Otherwise, theme directly controls dark mode
   const appBgKey = settings.display.appBackground;
   const hasActiveBg = appBgKey && appBgKey !== 'none';
   const hasDynamicPhotoBg = appBgKey === 'dynamic' && settings.display.dimEnabled;
   const hasBuiltInBg = hasActiveBg && appBgKey !== 'dynamic';
 
-  // Smart contrast: determine if white text is needed based on effective bg color
+  // Smart contrast for custom theme: determine if white text is needed
   let needsWhiteText = settings.display.appBackgroundTextColor !== 'black';
   if (hasDynamicPhotoBg && settings.display.dynamicBgColor) {
-    // Blend photo color with dim overlay to get effective perceived color
     const dimOpacity = settings.display.dimOpacity ?? 0.55;
     const effectiveColor = blendWithDimOverlay(settings.display.dynamicBgColor, dimOpacity);
     needsWhiteText = getContrastTextColor(effectiveColor) === '#FFFFFF';
   }
 
-  const forceDarkMode = (hasDynamicPhotoBg || hasBuiltInBg) && needsWhiteText;
-  const isDarkMode = forceDarkMode ? true : (settings.theme === 'system' 
-    ? systemTheme === 'dark' 
-    : settings.theme === 'dark');
+  // Calculate isDarkMode based on theme mode
+  let isDarkMode: boolean;
+  if (settings.theme === 'custom') {
+    // Custom theme: default to dark mode, only override to light if we explicitly detect a light background
+    const hasLightBg = (hasDynamicPhotoBg || hasBuiltInBg) && !needsWhiteText;
+    isDarkMode = !hasLightBg;
+  } else {
+    // Standard themes: theme directly controls
+    isDarkMode = settings.theme === 'system' 
+      ? systemTheme === 'dark' 
+      : settings.theme === 'dark';
+  }
 
   // حساب اتجاه اللغة
   const isRTLMode = isRTL(settings.language);
@@ -427,7 +510,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       const i18nLang = await loadSavedLanguage();
       
       if (stored) {
-        const parsed = JSON.parse(stored);
+        let parsed: any;
+        try {
+          parsed = JSON.parse(stored);
+        } catch (parseError) {
+          console.error('⚠️ Corrupted settings JSON, resetting to defaults:', parseError);
+          // Remove corrupted data and fall back to defaults
+          await AsyncStorage.removeItem(STORAGE_KEY);
+          parsed = {};
+        }
         // Deep merge nested objects to preserve new defaults for fields added after initial save
         const loadedSettings = {
           ...defaultSettings,
@@ -441,14 +532,62 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         if (i18nLang && i18nLang !== loadedSettings.language) {
           loadedSettings.language = i18nLang;
         }
-        
+
+        // Migration: force-update notification times when defaults version changes
+        try {
+          const storedVersion = await AsyncStorage.getItem(NOTIF_DEFAULTS_VERSION_KEY);
+          const currentVersion = parseInt(storedVersion || '0', 10);
+          if (currentVersion < NOTIFICATION_DEFAULTS_VERSION) {
+            // Reset notification times to new defaults (preserve user toggles/booleans)
+            const timeKeys = [
+              'azkarMorningTime', 'azkarEveningTime', 'morningAzkarTime', 'eveningAzkarTime',
+              'dailyVerseTime', 'quranReadingReminderTime', 'salawatReminderTime',
+              'istighfarReminderTime', 'tasbihReminderTime', 'sleepAzkarTime', 'wakeupAzkarTime',
+              'worshipDailySummaryTime', 'worshipWeeklyReportTime', 'kahfTime',
+            ] as const;
+            for (const key of timeKeys) {
+              (loadedSettings.notifications as any)[key] = (defaultNotifications as any)[key];
+            }
+            // Enable newly-defaulted-on categories
+            loadedSettings.notifications.istighfarReminder = true;
+            loadedSettings.notifications.tasbihReminder = true;
+            loadedSettings.notifications.worshipWeeklyReport = true;
+            // Persist migrated settings to AsyncStorage so they survive restarts
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
+            await AsyncStorage.setItem(NOTIF_DEFAULTS_VERSION_KEY, String(NOTIFICATION_DEFAULTS_VERSION));
+            console.log('🔔 Migrated notification defaults to version', NOTIFICATION_DEFAULTS_VERSION);
+          }
+        } catch (migrationErr) {
+          console.warn('⚠️ Notification defaults migration failed:', migrationErr);
+        }
+
         setSettings(loadedSettings);
+        
+        // Cache theme snapshot for next cold start
+        const snapshot: ThemeCacheSnapshot = {
+          theme: loadedSettings.theme,
+          appBackground: loadedSettings.display.appBackground ?? 'none',
+          appBackgroundTextColor: loadedSettings.display.appBackgroundTextColor,
+        };
+        _cachedThemeSnapshot = snapshot;
+        AsyncStorage.setItem(THEME_CACHE_KEY, JSON.stringify(snapshot)).catch(() => {});
         
         // تحديث اللغة في نظام الترجمة
         await setI18nLanguage(loadedSettings.language);
         
         // RTL is handled manually via useIsRTL() hook — do NOT call
         // I18nManager.forceRTL() as it causes double-reversal on Android production builds.
+
+        // Wait for notification channels (Android) and installed sounds cache (all platforms)
+        // to be initialized before scheduling. These are set up in _layout.tsx's useEffect
+        // (parent), which runs AFTER this child useEffect.
+        try {
+          const { channelsReadyPromise } = await import('@/app/_layout');
+          await Promise.race([
+            channelsReadyPromise,
+            new Promise<void>(resolve => setTimeout(resolve, 5000)),
+          ]);
+        } catch {}
 
         // Schedule notifications on app init based on saved settings
         const n = loadedSettings.notifications;
@@ -465,14 +604,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             sleepAzkar: n.sleepAzkar ?? false,
             sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
             wakeupAzkar: n.wakeupAzkar ?? false,
-            wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
+            wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
             afterPrayerAzkar: n.afterPrayerAzkar ?? false,
             dailyVerse: n.dailyVerse,
             dailyVerseTime: n.dailyVerseTime,
             sound: n.sound,
             vibration: n.vibration !== false,
             soundType: n.soundType,
-            adhanSoundType: n.adhanSoundType,
+            adhanSoundType: n.adhanSoundType || 'makkah',
             azkarSoundType: n.azkarSoundType,
             dailyVerseSoundType: n.dailyVerseSoundType,
             salawatReminder: n.salawatReminder,
@@ -507,14 +646,28 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             worshipDailySummaryTime: n.worshipDailySummaryTime,
             worshipStreakAlerts: n.worshipStreakAlerts,
             worshipWeeklyReport: n.worshipWeeklyReport,
-          }).catch((e) => console.log('Init notification scheduling error (non-blocking):', e));
+            worshipWeeklyReportTime: n.worshipWeeklyReportTime,
+            kahfReminder: n.kahfReminder,
+            kahfTime: n.kahfTime,
+          }).then(() => {
+            // Mark initial scheduling complete so admin sync can safely proceed
+            setInitialSchedulingDone(true);
+          }).catch((e) => {
+            console.log('Init notification scheduling error (non-blocking):', e);
+            setInitialSchedulingDone(true); // Still mark done so startup isn't blocked
+          });
+        } else {
+          // No notifications enabled, still mark scheduling done
+          setInitialSchedulingDone(true);
         }
       } else {
         // أول تشغيل - محاولة تحديد اللغة من الجهاز
         await setI18nLanguage('ar');
+        setInitialSchedulingDone(true); // First launch — no notifications to schedule
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+      setInitialSchedulingDone(true); // Error case — unblock admin sync
     } finally {
       setIsLoading(false);
     }
@@ -532,6 +685,14 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
       setSettings(newSettings);
+      // Cache theme snapshot for next cold start — eliminates theme flash
+      const snapshot: ThemeCacheSnapshot = {
+        theme: newSettings.theme,
+        appBackground: newSettings.display.appBackground ?? 'none',
+        appBackgroundTextColor: newSettings.display.appBackgroundTextColor,
+      };
+      _cachedThemeSnapshot = snapshot;
+      AsyncStorage.setItem(THEME_CACHE_KEY, JSON.stringify(snapshot)).catch(() => {});
     } catch (error) {
       console.error('Error saving settings:', error);
     }
@@ -573,6 +734,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     await saveSettings(newSettings);
   }, [settings]);
 
+  const updateThemeAndDisplay = useCallback(async (theme: ThemeMode, display: Partial<DisplaySettings>) => {
+    const newSettings = {
+      ...settings,
+      theme,
+      display: { ...settings.display, ...display },
+    };
+    await saveSettings(newSettings);
+  }, [settings]);
+
   const updateNotifications = useCallback(async (notifications: Partial<NotificationSettings>) => {
     const newSettings = {
       ...settings,
@@ -581,29 +751,27 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     await saveSettings(newSettings);
 
     // If sound-related keys changed, reset Android channels so the new sound takes effect
-    const soundKeys = ['adhanSoundType', 'soundType', 'azkarSoundType'] as const;
+    const soundKeys = [
+      'adhanSoundType', 'soundType', 'azkarSoundType',
+      'salawatSoundType', 'tasbihSoundType', 'istighfarSoundType',
+      'dailyVerseSoundType', 'customReminderSoundType', 'quranReminderSoundType',
+    ] as const;
     const soundChanged = soundKeys.some(k => k in notifications);
     if (soundChanged) {
       const n2 = newSettings.notifications;
-      const adhan = n2.adhanSoundType || 'makkah';
-      const fajr = n2.adhanSoundType || 'makkah'; // Fajr uses same adhan by default
-      const reminder = n2.soundType || 'general_reminder';
-      // Persist for _layout.tsx channel init on next cold start
+      // 'default' adhan → treat as 'makkah' so channels always get a real adhan sound
+      const adhan = (n2.adhanSoundType && n2.adhanSoundType !== 'default') ? n2.adhanSoundType : 'makkah';
+      const fajr = adhan; // Fajr uses same adhan by default
+      const reminder = (n2.soundType && n2.soundType !== 'default') ? n2.soundType : 'general_reminder';
+      // Persist for backward compatibility
       await AsyncStorage.multiSet([
         ['selectedAdhanSound', adhan],
         ['selectedFajrSound', fajr],
         ['selectedReminderSound', reminder],
       ]);
-      // Delete + recreate channels so Android picks up the new sound
-      await resetChannelsWithNewSound(adhan, fajr, reminder).catch(() => {});
-
-      // Verify channels were recreated with the correct sound
-      if (Platform.OS === 'android') {
-        const channels = await Notifications.getNotificationChannelsAsync();
-        const channelInfo = channels.map(c => ({ id: c.id, sound: (c as any).sound }));
-        // eslint-disable-next-line no-console
-        console.log('[Settings] Active channels after reset:', channelInfo);
-      }
+      // No need to delete/recreate channels — all channels are pre-created at startup.
+      // The scheduleNotificationsFromSettings() call below will reschedule notifications
+      // with the correct channelId for the new sound.
     }
 
     // Schedule or cancel notifications based on updated settings
@@ -627,7 +795,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       sound: n.sound,
       vibration: n.vibration !== false,
       soundType: n.soundType,
-      adhanSoundType: n.adhanSoundType,
+      adhanSoundType: n.adhanSoundType || 'makkah',
       azkarSoundType: n.azkarSoundType,
       dailyVerseSoundType: n.dailyVerseSoundType,
       salawatReminder: n.salawatReminder,
@@ -662,9 +830,48 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       worshipDailySummaryTime: n.worshipDailySummaryTime,
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
+      worshipWeeklyReportTime: n.worshipWeeklyReportTime,
       kahfReminder: n.kahfReminder,
+      kahfTime: n.kahfTime,
     });
   }, [settings]);
+
+  // ========================================
+  // Admin Notification Defaults Sync
+  // ========================================
+  useEffect(() => {
+    // Sync notification defaults from admin only once after:
+    // 1. Settings are loaded (isLoading = false)
+    // 2. Initial scheduling is complete (initialSchedulingDone = true)
+    // This ordering prevents the race condition where sync would trigger
+    // another scheduleNotificationsFromSettings call while the initial one
+    // is still running.
+    if (!isLoading && initialSchedulingDone && settings.notifications.enabled) {
+      // Sync admin defaults: save to settings WITHOUT triggering a full reschedule.
+      // A reschedule here would cancelAll → wipe the queue we just built on startup.
+      // If the rebuild fails (e.g. prayer API timeout on Xiaomi/MIUI), the result
+      // is ZERO notifications. The saved defaults take effect on the next natural
+      // reschedule (foreground resume, user settings change, etc.).
+      (async () => {
+        try {
+          const updates = await syncNotificationDefaults({
+            notifOverrides: settings.notifications.notifOverrides,
+          });
+          if (updates) {
+            const newSettings = {
+              ...settings,
+              notifications: { ...settings.notifications, ...updates },
+            };
+            await saveSettings(newSettings);
+            console.log('📝 Admin defaults saved to settings (no reschedule — queue preserved)');
+          }
+        } catch (e) {
+          console.log('Admin notification defaults sync error (non-blocking):', e);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, initialSchedulingDone]);
 
   const updateDisplay = useCallback(async (display: Partial<DisplaySettings>) => {
     const newSettings = {
@@ -728,6 +935,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     currentTranslations,
     updateLanguage,
     updateTheme,
+    updateThemeAndDisplay,
     updateNotifications,
     updateDisplay,
     updatePrayer,
@@ -752,7 +960,28 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 export const useSettings = (): SettingsContextType => {
   const context = useContext(SettingsContext);
   if (!context) {
-    throw new Error('useSettings must be used within a SettingsProvider');
+    // Return safe defaults instead of crashing — this can happen during
+    // deep-link cold starts or Expo Go hot reloads before providers mount.
+    console.warn('[useSettings] Context not ready — returning defaults');
+    const noop = async () => {};
+    return {
+      settings: defaultSettings,
+      isLoading: true,
+      isDarkMode: false,
+      isRTL: false,
+      currentTranslations: translations.ar,
+      updateLanguage: noop as any,
+      updateTheme: noop as any,
+      updateThemeAndDisplay: noop as any,
+      updateNotifications: noop as any,
+      updateDisplay: noop as any,
+      updatePrayer: noop as any,
+      resetSettings: noop as any,
+      reloadSettings: noop as any,
+      exportSettings: (async () => '') as any,
+      importSettings: (async () => false) as any,
+      t: (key: string) => key,
+    };
   }
   return context;
 };

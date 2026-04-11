@@ -173,6 +173,42 @@ export async function fetchPrayerTimesByCity(
   }
 }
 
+// ─── Monthly Prayer Times Cache ────────────────────────────────────────────
+// Notifications scheduling must NEVER fail due to network issues.
+// We cache the last successful API response in AsyncStorage so that
+// rescheduling after a sound/time change works offline.
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const PRAYER_CACHE_PREFIX = '@prayer_times_cache_';
+
+function prayerCacheKey(lat: number, lng: number, month: number, year: number, method: number): string {
+  // Round coords to 2 decimals to avoid cache misses from tiny GPS drift.
+  return `${PRAYER_CACHE_PREFIX}${lat.toFixed(2)}_${lng.toFixed(2)}_${month}_${year}_${method}`;
+}
+
+async function getCachedPrayerTimes(key: string): Promise<PrayerTimesResponse[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Sanity check: must be an array with at least 28 days
+    if (Array.isArray(parsed) && parsed.length >= 28) return parsed;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function cachePrayerTimes(key: string, data: PrayerTimesResponse[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[prayer-api] Failed to cache prayer times:', e);
+  }
+}
+
+const FETCH_TIMEOUT_MS = 8000;
+
 export async function fetchMonthlyPrayerTimes(
   latitude: number,
   longitude: number,
@@ -180,19 +216,75 @@ export async function fetchMonthlyPrayerTimes(
   year: number,
   method: number = 4
 ): Promise<PrayerTimesResponse[]> {
+  const cacheKey = prayerCacheKey(latitude, longitude, month, year, method);
+
   try {
     const url = `${ALADHAN_API_BASE}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
-    
-    const response = await fetch(url);
+
+    // Fetch with timeout — never block scheduling for more than 8 seconds
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
     const data = await response.json();
 
     if (data.code === 200) {
+      // Cache successful response for offline use
+      cachePrayerTimes(cacheKey, data.data);
       return data.data;
     }
     throw new Error('Failed to fetch monthly prayer times');
   } catch (error) {
-    console.error('Error fetching monthly prayer times:', error);
+    console.warn('[prayer-api] Network fetch failed, trying cache:', error);
+    // Fallback: return cached data if available
+    const cached = await getCachedPrayerTimes(cacheKey);
+    if (cached) {
+      console.log(`[prayer-api] ✅ Using cached prayer times for ${month}/${year} (${cached.length} days)`);
+      return cached;
+    }
+    console.error('[prayer-api] ❌ No cache available, fetch failed:', error);
     throw error;
+  }
+}
+
+/**
+ * Pre-cache upcoming months of prayer times so that background scheduling
+ * works reliably offline. Call once on app startup when online.
+ *
+ * iOS:     current + next month   (covers the 7-day scheduling window)
+ * Android: current + next 2 months (covers the 30-day scheduling window)
+ */
+export async function prefetchUpcomingPrayerMonths(
+  latitude: number,
+  longitude: number,
+  method: number = 4,
+): Promise<void> {
+  const { Platform } = require('react-native');
+  const monthsToCache = Platform.OS === 'android' ? 3 : 2;
+  const now = new Date();
+
+  for (let offset = 0; offset < monthsToCache; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const month = d.getMonth() + 1;
+    const year = d.getFullYear();
+    const cacheKey = prayerCacheKey(latitude, longitude, month, year, method);
+
+    // Only fetch if not already cached — avoids redundant API calls
+    const existing = await getCachedPrayerTimes(cacheKey);
+    if (existing) {
+      console.log(`[prayer-api] ✅ Pre-cache hit for ${month}/${year} (${existing.length} days)`);
+      continue;
+    }
+
+    try {
+      await fetchMonthlyPrayerTimes(latitude, longitude, month, year, method);
+      console.log(`[prayer-api] 📥 Pre-cached prayer times for ${month}/${year}`);
+    } catch {
+      // Offline — silently skip; next app open with internet will populate
+      console.log(`[prayer-api] ⏭️ Pre-cache skipped for ${month}/${year} (offline)`);
+    }
   }
 }
 

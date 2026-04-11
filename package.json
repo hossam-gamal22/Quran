@@ -11,7 +11,9 @@
     "build:dev": "eas build --profile development --platform all",
     "build:preview": "eas build --profile preview --platform all",
     "build:prod": "eas build --profile production --platform all",
-    "translate": "node scripts/islamic-translator.js"
+    "translate": "node scripts/islamic-translator.js",
+    "sync-sounds": "node scripts/sync-sounds.js",
+    "postinstall": "node scripts/patch-expo-notifications.js || true"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -26,11 +28,12 @@
     "autoprefixer": "^10.4.27",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
+    "entities": "^8.0.0",
     "expo": "~54.0.33",
     "expo-application": "~7.0.8",
     "expo-asset": "~12.0.12",
-    "expo-audio": "~1.1.1",
     "expo-av": "~16.0.8",
+    "expo-background-fetch": "^14.0.9",
     "expo-blur": "~15.0.8",
     "expo-build-properties": "~1.0.10",
     "expo-clipboard": "~8.0.8",
@@ -60,10 +63,11 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
+    "expo-task-manager": "^14.0.9",
     "expo-updates": "~29.0.16",
+    "expo-video": "~3.0.16",
     "firebase": "^10.14.1",
-    "pako": "^2.1.0",
-    "playwright": "^1.58.2",
+    "lottie-react-native": "^7.3.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -73,6 +77,7 @@
     "react-native-google-mobile-ads": "^16.3.0",
     "react-native-iap": "^14.7.14",
     "react-native-localize": "^3.0.0",
+    "react-native-nitro-modules": "^0.31.10",
     "react-native-pager-view": "6.9.1",
     "react-native-reanimated": "~4.1.1",
     "react-native-render-html": "^6.3.4",
@@ -82,6 +87,7 @@
     "react-native-svg": "15.12.1",
     "react-native-svg-transformer": "^1.5.3",
     "react-native-tab-view": "^4.2.2",
+    "react-native-track-player": "5.0.0-alpha0",
     "react-native-view-shot": "^4.0.0",
     "react-native-web": "^0.21.0",
     "react-native-webview": "13.15.0",
@@ -93,7 +99,6 @@
     "@babel/core": "^7.25.0",
     "@expo-google-fonts/raleway": "^0.4.2",
     "@expo-google-fonts/rubik": "^0.4.2",
-    "@types/pako": "^2.0.4",
     "@types/react": "~19.1.10",
     "typescript": "~5.9.2"
   },
@@ -102,7 +107,8 @@
     "doctor": {
       "reactNativeDirectoryCheck": {
         "exclude": [
-          "react-native-shared-group-preferences"
+          "react-native-shared-group-preferences",
+          "react-native-track-player"
         ]
       }
     }

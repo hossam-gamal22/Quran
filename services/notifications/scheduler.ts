@@ -13,7 +13,7 @@
 
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES } from './channels';
+import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES, getAdhanChannelId, getReminderChannelId } from './channels';
 
 /**
  * Resolve a sound key to the correct platform value for notification content.
@@ -23,10 +23,11 @@ function resolveSoundValue(
   soundKey: string | undefined,
   soundMap: Record<string, string>,
 ): string | false {
-  if (!soundKey || soundKey === 'default') return 'default';
-  if (soundKey === 'silent') return false;
+  // Treat 'default' as 'makkah' so the Makkah adhan always plays
+  const effectiveKey = (!soundKey || soundKey === 'default') ? 'makkah' : soundKey;
+  if (effectiveKey === 'silent') return false;
 
-  const filename = soundMap[soundKey];
+  const filename = soundMap[effectiveKey];
   if (!filename) return 'default';
 
   // Android: no extension (raw resource name), iOS: with extension
@@ -54,24 +55,31 @@ export async function schedulePrayerNotification({
   if (prayerTime <= new Date()) return '';
 
   const soundValue = resolveSoundValue(selectedSound, ADHAN_SOUND_FILES);
-  const channelId = isFajr ? 'prayer-fajr' : 'prayer-times';
+  const channelId = getAdhanChannelId(selectedSound);
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: `\u{1F54C} ${prayerName}`,
-      body: '\u0627\u0636\u063A\u0637 \u0644\u0644\u0641\u062A\u062D',
-      sound: soundValue,
-      priority: Notifications.AndroidNotificationPriority.MAX,
-      data: { prayerName, type: 'prayer', isFajr },
-      ...(Platform.OS === 'android' && { channelId }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: prayerTime,
-    },
-  });
+  try {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `\u{1F54C} ${prayerName}`,
+        body: '\u0627\u0636\u063A\u0637 \u0644\u0644\u0641\u062A\u062D',
+        sound: soundValue,
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        data: { prayerName, type: 'prayer', isFajr },
+        ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: prayerTime,
+        ...(Platform.OS === 'android' && { channelId }),
+      },
+    });
 
-  return id;
+    return id;
+  } catch (e) {
+    console.warn('[Scheduler] Failed to schedule prayer notification:', prayerName, e);
+    return '';
+  }
 }
 
 /**
@@ -95,22 +103,30 @@ export async function scheduleReminderNotification({
 
   const soundValue = resolveSoundValue(selectedSound, NOTIFICATION_SOUND_FILES);
 
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title,
-      body,
-      sound: soundValue,
-      priority: Notifications.AndroidNotificationPriority.HIGH,
-      data: { type: 'reminder', ...data },
-      ...(Platform.OS === 'android' && { channelId: 'reminders' }),
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: triggerDate,
-    },
-  });
+  try {
+    const channelId = getReminderChannelId(selectedSound);
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: soundValue,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+        data: { type: 'reminder', ...data },
+        ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        ...(Platform.OS === 'android' && { channelId }),
+      },
+    });
 
-  return id;
+    return id;
+  } catch (e) {
+    console.warn('[Scheduler] Failed to schedule reminder notification:', title, e);
+    return '';
+  }
 }
 
 /**

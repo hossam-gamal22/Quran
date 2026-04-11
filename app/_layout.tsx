@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { AppState, AppStateStatus, Platform, View, Text, TextInput, LogBox, I18nManager } from 'react-native';
+import { Animated, AppState, AppStateStatus, Platform, StyleSheet as RNStyleSheet, View, Text, TextInput, LogBox, I18nManager } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -18,34 +18,42 @@ import { useSettings } from '@/contexts/SettingsContext';
 
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
 import { languageInitPromise, getLanguage } from '@/lib/i18n';
-import { syncAppIconOnStartup } from '@/lib/app-icon-manager';
+import { syncAppIconOnStartup, checkForIconUpdate } from '@/lib/app-icon-manager';
 
 // Contexts
-import { SettingsProvider } from '@/contexts/SettingsContext';
+import { SettingsProvider, themeCachePromise } from '@/contexts/SettingsContext';
+import { Colors, DarkColors } from '@/constants/theme';
+import { useColors } from '@/hooks/use-colors';
 import { QuranProvider } from '@/contexts/QuranContext';
 import { KhatmaProvider } from '@/contexts/KhatmaContext';
 import { WorshipProvider } from '@/contexts/WorshipContext';
 import { SeasonalProvider } from '@/contexts/SeasonalContext';
 import { ThemeConfigProvider } from '@/contexts/ThemeConfigContext';
 import { OnboardingProvider, useOnboarding } from '@/contexts/OnboardingContext';
+import { CelebrationProvider } from '@/contexts/CelebrationContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
-import { AdsProvider } from '@/lib/ads-context';
+import { AdsProvider, useAds } from '@/lib/ads-context';
 import { AppConfigProvider } from '@/lib/app-config-context';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { SubscriptionProvider, useSubscription } from '@/contexts/SubscriptionContext';
 
 // Firebase Integration
-import { registerUser, updateLastActive } from '@/lib/firebase-user';
+import { registerUser, updateLastActive, getUserId } from '@/lib/firebase-user';
+import { db } from '@/lib/firebase-config';
+import { doc as firestoreDoc, updateDoc as firestoreUpdateDoc, increment as firestoreIncrement } from 'firebase/firestore';
 import { 
   initializeGlobalStats, 
   trackAppOpen, 
   syncLocalStats 
 } from '@/lib/firebase-analytics';
+import { autoSelectMonthlyWinners, syncPendingScores } from '@/lib/rewards-manager';
 import { AudioPlayerBar } from '@/components/quran/AudioPlayerBar';
 import { GlobalAudioBar } from '@/components/ui/GlobalAudioBar';
-import { GlobalAudioProvider } from '@/contexts/GlobalAudioContext';
+import { GlobalAudioProvider, markTrackPlayerReady } from '@/contexts/GlobalAudioContext';
 import { usePathname, useRouter } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
+import { scheduleMidnightRefresh } from '@/lib/widget-data-bridge';
+import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { initRemoteTranslations } from '@/lib/remote-translations';
@@ -55,15 +63,28 @@ import { toWesternDigits } from '@/lib/format-number';
 import { fetchQuranThemes } from '@/lib/admin-data-api';
 import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
-import { Audio } from 'expo-av';
-import { NOTIFICATION_SOUNDS as NOTIFICATION_SOUND_FILES, ADHAN_SOUNDS as ADHAN_SOUND_FILES } from '@/lib/sound-manager';
+import { handleNotificationNavigation } from '@/lib/notification-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadInstalledSoundsCache } from '@/lib/notification-sound-installer';
-import { setupNotificationChannels, resetChannelsIfOutdated } from '@/services/notifications/channels';
+import { ensureNotificationIconsCached } from '@/lib/notification-icons';
+import { initializeAllNotificationChannels, resetChannelsIfOutdated } from '@/services/notifications/channels';
 import {
   requestNotificationPermissions as requestNewNotifPermissions,
-  requestBatteryOptimizationExemption,
 } from '@/services/notifications/permissions';
+import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezoneChange } from '@/lib/notifications-manager';
+// Import at module scope to register the background task definition (required by expo-task-manager)
+import '@/lib/background-notification-task';
+import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
+
+// Signal that notification channels have been initialized.
+// SettingsContext awaits this before scheduling to avoid race condition
+// (child useEffects fire before parent useEffects in React).
+let _channelsReadyResolve: () => void;
+export const channelsReadyPromise = new Promise<void>((resolve) => {
+  _channelsReadyResolve = resolve;
+});
+// Safety: resolve after 5s to prevent deadlock if init fails silently
+setTimeout(() => _channelsReadyResolve(), 5000);
 
 // Disable system-level RTL — the app handles RTL manually via useIsRTL() hook
 // in 200+ components. Without this, Arabic device language causes double-reversal.
@@ -81,6 +102,7 @@ LogBox.ignoreLogs([
   'Error playing ayah',
   'LoadBundleFromServerRequestError',
   'Could not load bundle',
+  "The action 'GO_BACK' was not handled",
 ]);
 
 // Configure notification handler at the top level (before any component renders)
@@ -90,7 +112,7 @@ try {
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
-      shouldSetBadge: false,
+      shouldSetBadge: true,
       shouldShowBanner: true,
       shouldShowList: true,
     }),
@@ -100,8 +122,25 @@ try {
 }
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// Disable native splash fade — we handle the transition ourselves via ThemeBootOverlay
+SplashScreen.setOptions({ fade: false });
 
-// TrackPlayer removed — app uses expo-av exclusively for audio
+// TrackPlayer initialization for lock screen audio controls (native only)
+// Must be registered at module scope before any component renders
+// Note: Will not work in Expo Go - requires dev client or standalone build
+let trackPlayerAvailable = false;
+if (Platform.OS !== 'web') {
+  try {
+    const TrackPlayer = require('react-native-track-player').default;
+    const { PlaybackService } = require('@/lib/track-player-service');
+    TrackPlayer.registerPlaybackService(() => PlaybackService);
+    trackPlayerAvailable = true;
+    console.log('🎵 TrackPlayer playback service registered');
+  } catch (e) {
+    // TrackPlayer not available (Expo Go)
+    console.log('ℹ️ TrackPlayer not available, using expo-av fallback');
+  }
+}
 
 // Register Android widget task handler at module scope
 if (Platform.OS === 'android') {
@@ -185,6 +224,68 @@ const SplashGate = ({ fontsReady }: { fontsReady: boolean }) => {
   return null;
 };
 
+// Centralized StatusBar — lives inside SettingsProvider so it can read theme state.
+// Replaces the old `style="auto"` which couldn't account for app backgrounds.
+/** Tracks route changes and calls onPageView() so the admin 'every N pages' interstitial mode works */
+const NavigationTracker = () => {
+  const pathname = usePathname();
+  const { onPageView } = useAds();
+  const prevPathRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (pathname && pathname !== prevPathRef.current) {
+      prevPathRef.current = pathname;
+      onPageView();
+    }
+  }, [pathname, onPageView]);
+
+  return null;
+};
+
+const StatusBarManager = () => {
+  const colors = useColors();
+  return <StatusBar style={colors.statusBarStyle} translucent={true} />;
+};
+
+// Smooth theme transition overlay — covers screen with correct theme color
+// while the real content finishes rendering (including background images).
+// Fades out AFTER settings are loaded, preventing any flash between splash and content.
+const ThemeBootOverlay = () => {
+  const { isLoading, isDarkMode } = useSettings();
+  const colors = useColors();
+  const opacity = useRef(new Animated.Value(1)).current;
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading) {
+      // Wait two frames for real content (including ImageBackground) to paint
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 350,
+            useNativeDriver: true,
+          }).start(() => setVisible(false));
+        });
+      });
+    }
+  }, [isLoading]);
+
+  if (!visible) return null;
+
+  const bg = colors.background;
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        RNStyleSheet.absoluteFill,
+        { backgroundColor: bg, opacity, zIndex: 99999 },
+      ]}
+    />
+  );
+};
+
 // Global RTL wrapper component
 // Note: We do NOT set `direction: 'rtl'` here because it conflicts with
 // the manual `flexDirection: isRTL ? 'row-reverse' : 'row'` patterns used
@@ -224,16 +325,40 @@ const OnboardingGate = () => {
   return null;
 };
 
+// Auto-presents the paywall based on admin config (showPaywallOnLaunch + paywallFrequency)
+const PaywallAutoTrigger = () => {
+  const { shouldAutoShowPaywall, markPaywallAutoShown, isLoading } = useSubscription();
+  const router = useRouter();
+  const triggered = useRef(false);
+
+  useEffect(() => {
+    if (!isLoading && shouldAutoShowPaywall && !triggered.current) {
+      triggered.current = true;
+      markPaywallAutoShown();
+      // Small delay to ensure navigation stack is ready
+      const timer = setTimeout(() => {
+        router.push('/subscription' as any);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, shouldAutoShowPaywall]);
+
+  return null;
+};
+
+
 export default function RootLayout() {
   const pathname = usePathname();
+  const router = useRouter();
   const [appReady, setAppReady] = useState(false);
   const [languageReady, setLanguageReady] = useState(false);
   const splashHidden = useRef(false);
 
-  // Wait for the eagerly-started language load (started at module scope in i18n.ts)
-  // so that currentLanguage is correct before ANY component calls t()
+  // Wait for the eagerly-started language + theme cache loads.
+  // Both are module-scope promises that read from AsyncStorage.
+  // We gate rendering on these so the first paint has correct language AND theme.
   useEffect(() => {
-    languageInitPromise.then(() => setLanguageReady(true));
+    Promise.all([languageInitPromise, themeCachePromise]).then(() => setLanguageReady(true));
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -249,6 +374,7 @@ export default function RootLayout() {
     'QCFSurahNames': require('../assets/fonts/qcf/surah-names.ttf'),
     'Amiri': require('../assets/fonts/Amiri-Regular.ttf'),
     'Amiri-Bold': require('../assets/fonts/Amiri-Bold.ttf'),
+    'Amiri-Italic': require('../assets/fonts/Amiri-Italic.ttf'),
     'KFGQPCUthmanic': require('../assets/fonts/KFGQPC-Uthmanic-Script.ttf'),
     'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
     'Orbitron-Regular': require('../assets/fonts/Orbitron-Regular.ttf'),
@@ -263,7 +389,10 @@ export default function RootLayout() {
         TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsModule');
         const ads = require('react-native-google-mobile-ads');
         await ads.default().initialize();
-        if (__DEV__) console.log('✅ Google Mobile Ads SDK initialized');
+        // Globally mute ad audio so ads never interrupt Quran/Radio playback
+        await ads.default().setAppVolume(0);
+        await ads.default().setAppMuted(true);
+        if (__DEV__) console.log('✅ Google Mobile Ads SDK initialized (audio muted)');
       } catch {
         // Not available (Expo Go / web)
       }
@@ -271,7 +400,7 @@ export default function RootLayout() {
     initAds();
   }, []);
 
-  // Safety timeout: ALWAYS hide splash screen after 12 seconds no matter what
+  // Safety timeout: ALWAYS hide splash screen after 6 seconds no matter what
   useEffect(() => {
     const safetyTimer = setTimeout(async () => {
       if (!splashHidden.current) {
@@ -290,24 +419,69 @@ export default function RootLayout() {
   useEffect(() => {
     async function initNotificationChannels() {
       try {
+        console.log('[Notifications] Init starting — requesting permissions...');
         const granted = await requestNewNotifPermissions();
-        if (!granted) return;
 
-        // Reset outdated cached channels (Android caches permanently)
+        // Always set up channels regardless of permission — they must exist
+        // before any notification can be scheduled (e.g. after user grants
+        // permission later via Settings).
+        console.log('[Notifications] Setting up channels...');
         await resetChannelsIfOutdated();
+        console.log('[Notifications] resetChannelsIfOutdated complete');
 
-        // Load user's saved sound preferences
-        const adhanSound    = (await AsyncStorage.getItem('selectedAdhanSound')) ?? 'makkah';
-        const fajrSound     = (await AsyncStorage.getItem('selectedFajrSound')) ?? 'makkah';
-        const reminderSound = (await AsyncStorage.getItem('selectedReminderSound')) ?? 'general_reminder';
+        await initializeAllNotificationChannels();
+        console.log('[Notifications] initializeAllNotificationChannels complete');
 
-        // Create channels with correct sounds
-        await setupNotificationChannels(adhanSound, fajrSound, reminderSound);
+        // Load installed custom sounds cache BEFORE unblocking scheduling.
+        // SettingsContext awaits channelsReadyPromise before scheduling —
+        // custom sounds must be in memory so resolveNotificationSound() finds them.
+        try {
+          await loadInstalledSoundsCache();
+          console.log('[Notifications] Installed sounds cache loaded');
+        } catch (e) {
+          console.warn('[Notifications] Failed to load sounds cache:', e);
+        }
 
-        // Battery optimization (Android only, shown once)
-        await requestBatteryOptimizationExemption();
+        // Unblock SettingsContext scheduling now that channels + sounds are ready
+        _channelsReadyResolve();
+
+        if (!granted) {
+          console.log('[Notifications] Permission NOT granted, skipping scheduling');
+          return;
+        }
+        console.log('[Notifications] Permission granted — scheduling...');
+
+        // Register background task to reschedule DATE-based notifications
+        // (prayer times, after-prayer azkar) even when app is closed/killed
+        await registerBackgroundNotificationTask();
+        console.log('[Notifications] Background task registered');
+
+        // Pre-cache upcoming months of prayer times so background scheduling
+        // works reliably offline. Non-blocking — failures are silently skipped.
+        try {
+          const { getPrayerLocation, getSettings } = await import('@/lib/storage');
+          const loc = await getPrayerLocation();
+          if (loc) {
+            const appSettings = await getSettings();
+            const { prefetchUpcomingPrayerMonths } = await import('@/lib/prayer-api');
+            prefetchUpcomingPrayerMonths(loc.latitude, loc.longitude, appSettings.calculationMethod).catch(() => {});
+          }
+        } catch {
+          // Non-critical — cache will be populated on next online scheduling
+        }
+
+        // NOTE: rescheduleAllFromStorage() is NOT called here intentionally.
+        // Scheduling is handled by SettingsContext.loadSettings() which:
+        // 1. Waits for channelsReadyPromise to resolve (channels exist)
+        // 2. Calls scheduleNotificationsFromSettings() with mutex protection
+        // 3. Sets initialSchedulingDone=true so admin sync can proceed
+        // Calling rescheduleAllFromStorage() here would race and potentially
+        // wipe notifications scheduled by SettingsContext.
+
+        console.log('[Notifications] Init complete');
       } catch (error) {
         console.error('[Notifications] Init failed:', error);
+        _channelsReadyResolve(); // Unblock scheduling even on failure
       }
     }
 
@@ -327,6 +501,51 @@ export default function RootLayout() {
         'Cache check',
         3000
       );
+
+      // Initialize TrackPlayer for lock screen audio controls (native only)
+      // Only runs if TrackPlayer was successfully registered at module scope
+      if (Platform.OS !== 'web' && trackPlayerAvailable) {
+        await initWithTimeout(
+          async () => {
+            try {
+              const TrackPlayer = require('react-native-track-player').default;
+              const { Capability, RepeatMode } = require('react-native-track-player');
+              await TrackPlayer.setupPlayer({
+                autoUpdateMetadata: true,
+              });
+              await TrackPlayer.updateOptions({
+                capabilities: [
+                  Capability.Play,
+                  Capability.Pause,
+                  Capability.Stop,
+                  Capability.SkipToNext,
+                  Capability.SkipToPrevious,
+                  Capability.SeekTo,
+                ],
+                compactCapabilities: [
+                  Capability.Play,
+                  Capability.Pause,
+                  Capability.SkipToNext,
+                ],
+                notificationCapabilities: [
+                  Capability.Play,
+                  Capability.Pause,
+                  Capability.Stop,
+                  Capability.SkipToNext,
+                  Capability.SkipToPrevious,
+                ],
+              });
+              await TrackPlayer.setRepeatMode(RepeatMode.Off);
+              markTrackPlayerReady();
+              console.log('🎵 TrackPlayer initialized');
+            } catch (e) {
+              console.log('ℹ️ TrackPlayer setup skipped (not available)');
+            }
+          },
+          'TrackPlayer setup',
+          5000
+        );
+      }
 
       // Load installed sounds cache BEFORE any parallel init
       // This must complete before notification scheduling uses getNotificationSoundValueSync()
@@ -359,9 +578,19 @@ export default function RootLayout() {
           3000
         ),
         initWithTimeout(
-          () => trackAppOpen(),
-          'Track app open',
-          3000
+          async () => {
+            // Track app open FIRST (saves score locally), then sync all pending to Firestore
+            await trackAppOpen();
+            const uid = await getUserId();
+            if (uid) await syncPendingScores(uid);
+          },
+          'Track app open + sync scores',
+          5000
+        ),
+        initWithTimeout(
+          () => autoSelectMonthlyWinners(),
+          'Auto-select monthly winners',
+          5000
         ),
         initWithTimeout(
           async () => {
@@ -371,12 +600,31 @@ export default function RootLayout() {
           'Quran themes sync',
           3000
         ),
+        initWithTimeout(
+          () => ensureNotificationIconsCached(),
+          'Notification icons cache',
+          3000
+        ),
       ]);
 
       if (__DEV__) console.log('✅ Firebase initialization sequence complete');
     };
 
     initFirebase();
+
+    // Pre-download azkar audio files to local cache (background, non-blocking)
+    initWithTimeout(
+      async () => {
+        const NetInfo = (await import('@react-native-community/netinfo')).default;
+        const state = await NetInfo.fetch();
+        if (state.isConnected) {
+          const { preDownloadAll } = await import('@/lib/azkar-audio-cache');
+          await preDownloadAll();
+        }
+      },
+      'Azkar audio pre-download',
+      60000 // Allow up to 60s — this runs in background
+    );
 
     // Sync widget data to native storage on launch
     initWithTimeout(
@@ -385,10 +633,37 @@ export default function RootLayout() {
       5000
     );
 
+    // Prefetch daily video for instant playback on Video of the Day screen
+    initWithTimeout(
+      async () => {
+        const { prefetchDailyVideos } = await import('@/lib/daily-video-prefetch');
+        await prefetchDailyVideos();
+      },
+      'Daily video prefetch',
+      8000
+    );
+
+    // Auto-start Live Activity if user had it enabled (iOS only)
+    initWithTimeout(
+      () => refreshLiveActivityIfEnabled(),
+      'Live Activity sync',
+      5000
+    );
+
+    // Schedule midnight refresh for daily verse/dhikr widget content
+    const cleanupMidnight = scheduleMidnightRefresh();
+
     // Sync app icon to match saved language on launch
     initWithTimeout(
       () => syncAppIconOnStartup(getLanguage() as any),
       'App icon sync',
+      5000
+    );
+
+    // Check for admin-pushed icon updates and show alert if new version
+    initWithTimeout(
+      () => checkForIconUpdate(),
+      'App icon update check',
       5000
     );
     
@@ -396,25 +671,52 @@ export default function RootLayout() {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
         syncWidgetDataToNative().catch(() => {});
+        // Refresh Live Activity countdown when app becomes active
+        refreshLiveActivityIfEnabled().catch(() => {});
+        // Verify prayer notifications exist; if none, force reschedule.
+        // This catches the case where all DATE triggers have fired and nothing is left.
+        ensurePrayerNotificationsExist().catch(() => {});
+        // Detect timezone/DST changes and force-reschedule if changed.
+        // This catches travel, manual timezone change, and DST transitions.
+        checkTimezoneChange().catch(() => {});
+        // Refresh the 7-day DATE trigger window for all notification categories.
+        // rescheduleAllFromStorage is internally throttled (60s) to avoid excessive work.
+        rescheduleAllFromStorage().catch(() => {});
       } else if (nextAppState === 'background') {
         syncLocalStats().catch(() => {});
+        // Sync widget data before app goes to background so widgets show fresh content
+        syncWidgetDataToNative().catch(() => {});
       }
     };
-    
+
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     const activityInterval = setInterval(() => {
       updateLastActive().catch(() => {});
     }, 5 * 60 * 1000);
-    
+
     const syncInterval = setInterval(() => {
       syncLocalStats().catch(() => {});
     }, 15 * 60 * 1000);
-    
+
+    // Periodic widget sync every 15 minutes to keep prayer countdown and azkar status current
+    const widgetSyncInterval = setInterval(() => {
+      syncWidgetDataToNative().catch(() => {});
+    }, 15 * 60 * 1000);
+
+    // Periodic prayer notification health check every 10 minutes
+    // Catches edge cases where all scheduled prayers expired while app stayed open
+    const prayerCheckInterval = setInterval(() => {
+      ensurePrayerNotificationsExist().catch(() => {});
+    }, 10 * 60 * 1000);
+
     return () => {
       subscription.remove();
       clearInterval(activityInterval);
       clearInterval(syncInterval);
+      clearInterval(widgetSyncInterval);
+      clearInterval(prayerCheckInterval);
+      cleanupMidnight();
     };
   }, []);
 
@@ -425,52 +727,11 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Foreground notification sound player — plays custom sound based on notification data
-  useEffect(() => {
-    let currentSound: Audio.Sound | null = null;
-    
-    const subscription = ExpoNotifications.addNotificationReceivedListener(async (notification) => {
-      const data = notification.request.content.data;
-      const soundType = data?.soundType as string | undefined;
-      if (!soundType || soundType === 'default' || soundType === 'silent') return;
-
-      // Resolve the sound file (check notification sounds first, then adhan sounds)
-      const soundFile = NOTIFICATION_SOUND_FILES[soundType] || ADHAN_SOUND_FILES[soundType];
-      if (!soundFile) return;
-
-      try {
-        // Clean up previous sound if still playing
-        if (currentSound) {
-          try { await currentSound.unloadAsync(); } catch {}
-          currentSound = null;
-        }
-
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
-          shouldDuckAndroid: true,
-        });
-
-        const { sound } = await Audio.Sound.createAsync(soundFile, { shouldPlay: true });
-        currentSound = sound;
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            sound.unloadAsync();
-            currentSound = null;
-          }
-        });
-      } catch (e) {
-        console.warn('Failed to play notification sound:', e);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-      if (currentSound) {
-        currentSound.unloadAsync().catch(() => {});
-      }
-    };
-  }, []);
+  // NOTE: Foreground notification sound player REMOVED.
+  // The native notification handler (setNotificationHandler with shouldPlaySound: true)
+  // already plays the correct custom sound from the bundled assets.
+  // Having a second expo-av player here caused double sound playback / echo
+  // when notifications arrived while the app was in the foreground.
 
   // Mark app ready when fonts finish (splash hide is handled by SplashGate inside SettingsProvider)
   useEffect(() => {
@@ -484,6 +745,44 @@ export default function RootLayout() {
       }
     }
   }, [fontsLoaded, fontError]);
+
+  // ── Cold-start notification handler ──
+  // When the app is killed and the user taps a notification, this captures the
+  // last notification response *after* the navigation tree is ready, then routes
+  // to the correct screen via the shared router.
+  const coldStartHandled = useRef(false);
+  useEffect(() => {
+    if (!appReady || !languageReady || coldStartHandled.current) return;
+    coldStartHandled.current = true;
+
+    const checkLastNotification = async () => {
+      try {
+        const response = await ExpoNotifications.getLastNotificationResponseAsync();
+        if (!response) return;
+
+        const data = response.notification.request.content.data;
+        const notifId = response.notification.request.identifier;
+
+        if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, data?.type);
+
+        // Track notification open in Firestore
+        if (data?.notificationDocId) {
+          firestoreUpdateDoc(firestoreDoc(db, 'notifications', data.notificationDocId as string), {
+            openedCount: firestoreIncrement(1),
+          }).catch(() => {});
+        }
+
+        // Small delay to ensure the navigation container is fully mounted
+        setTimeout(() => {
+          handleNotificationNavigation(data, router, notifId);
+        }, 600);
+      } catch (e) {
+        console.warn('Failed to handle cold-start notification:', e);
+      }
+    };
+
+    checkLastNotification();
+  }, [appReady, languageReady, router]);
 
   // Don't render tree until language is loaded from storage.
   // This prevents t() calls from returning Arabic on first render
@@ -502,6 +801,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <SettingsProvider>
           <SplashGate fontsReady={!!(fontsLoaded || fontError)} />
+          <ThemeBootOverlay />
           <RTLWrapper>
           <ThemeConfigProvider>
           <RemoteConfigProvider>
@@ -516,8 +816,11 @@ export default function RootLayout() {
                       <WorshipProvider>
                         <SeasonalProvider>
                           <OnboardingProvider>
+                          <CelebrationProvider>
                         <OnboardingGate />
-                        <StatusBar style="auto" />
+                        <PaywallAutoTrigger />
+                        <StatusBarManager />
+                        <NavigationTracker />
                         <OfflineModal />
                         <Stack
                           screenOptions={{
@@ -525,6 +828,7 @@ export default function RootLayout() {
                             animation: Platform.OS === 'ios' ? 'ios_from_right' : 'fade_from_bottom',
                             gestureEnabled: true,
                             fullScreenGestureEnabled: Platform.OS === 'ios',
+                            contentStyle: { backgroundColor: 'transparent' },
                           }}
                         >
                           <Stack.Screen name="(tabs)" />
@@ -533,8 +837,8 @@ export default function RootLayout() {
                           <Stack.Screen name="tafsir" />
                           <Stack.Screen name="azkar/[category]" />
                           <Stack.Screen name="settings/live-activities" options={{ headerShown: false }} />
-                          <Stack.Screen name="settings/photo-backgrounds" options={{ headerShown: false }} />
                           <Stack.Screen name="worship-tracker" />
+                          <Stack.Screen name="smart-tracker" options={{ headerShown: false }} />
                           <Stack.Screen name="names" />
                           <Stack.Screen name="ruqya" />
                           <Stack.Screen name="hijri" />
@@ -557,6 +861,7 @@ export default function RootLayout() {
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
                         <DynamicSplashOverlay />
                         <ScreenshotBranding />
+                          </CelebrationProvider>
                           </OnboardingProvider>
                         </SeasonalProvider>
                       </WorshipProvider>
