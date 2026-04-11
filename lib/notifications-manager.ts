@@ -652,9 +652,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // independently — no rescheduling required for the scheduling window.
     // WorkManager (15-min periodic) + foreground resume then refresh
     // the window before it expires.
-    // iOS: 3 days (budget: 64 scheduled max — silently drops excess)
-    // Android: 7 days (no hard limit)
-    const SCHEDULE_DAYS_AHEAD = Platform.OS === 'ios' ? 3 : 7;
+    // Android: 7 days (default). iOS: overridden per-category via iosMaxDays
+    // to stay within the hard 64-notification budget.
+    const SCHEDULE_DAYS_AHEAD = 7;
     const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7]; // Sun-Sat
 
     const scheduleWithDays = async (
@@ -665,6 +665,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       days?: number[],
       _channelId?: string, // kept for call-site compat; channel resolved from soundType
       soundType?: string,
+      iosMaxDays?: number, // iOS budget override — limits scheduling window
     ) => {
       // Get the pre-created channel for user-selected sound
       const resolvedChannelId = getReminderChannelId(soundType);
@@ -693,8 +694,10 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       const now = new Date();
       let scheduledCount = 0;
 
+      const effectiveDays = (Platform.OS === 'ios' && iosMaxDays !== undefined) ? iosMaxDays : SCHEDULE_DAYS_AHEAD;
+
       try {
-        for (let dayOffset = 0; dayOffset < SCHEDULE_DAYS_AHEAD; dayOffset++) {
+        for (let dayOffset = 0; dayOffset < effectiveDays; dayOffset++) {
           const triggerDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + dayOffset, hour, minute, 0, 0);
           // Skip dates in the past
           if (triggerDate <= now) continue;
@@ -740,11 +743,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       days?: number[],
       _channelId?: string,
       soundType?: string,
+      iosMaxDays?: number, // iOS budget override
     ) => {
       for (let i = 0; i < times.length; i++) {
         const { hour, minute } = parseTime(times[i]);
         const id = times.length > 1 ? `${baseId}_t${i}` : baseId;
-        await scheduleWithDays(id, content, hour, minute, days, _channelId, soundType);
+        await scheduleWithDays(id, content, hour, minute, days, _channelId, soundType, iosMaxDays);
       }
     };
 
@@ -793,6 +797,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
+        2, // iOS: 2 days for azkar (budget)
       );
     }
 
@@ -812,6 +817,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
+        2, // iOS: 2 days for azkar (budget)
       );
     }
 
@@ -831,6 +837,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
+        2, // iOS: 2 days for azkar (budget)
       );
     }
 
@@ -850,6 +857,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
+        2, // iOS: 2 days for azkar (budget)
       );
     }
 
@@ -993,6 +1001,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.dailyVerseDays,
         'daily-ayah',
         notifSettings.dailyVerseSoundType || 'general_reminder',
+        1, // iOS: 1 day for other reminders (budget)
       );
     } else {
       // Cancel all daily_ayah variants
@@ -1018,6 +1027,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.salawatDays,
         'general',
         salawatSound,
+        1, // iOS: 1 day (budget)
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1042,6 +1052,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.tasbihDays,
         'general',
         notifSettings.tasbihSoundType || 'tasbih',
+        1, // iOS: 1 day (budget)
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1066,6 +1077,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.istighfarDays,
         'general',
         notifSettings.istighfarSoundType || 'istighfar',
+        1, // iOS: 1 day (budget)
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1108,6 +1120,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.customReminderDays,
         'general',
         notifSettings.customReminderSoundType || 'general_reminder',
+        1, // iOS: 1 day (budget)
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1140,6 +1153,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         convertedDays,
         'general',
         notifSettings.quranReminderSoundType || 'general_reminder',
+        1, // iOS: 1 day (budget)
       );
     } else {
       for (const d of [1, 2, 3, 4, 5, 6, 7]) {
@@ -1166,6 +1180,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         undefined,
         'general',
         worshipSoundType,
+        1, // iOS: 1 day (budget)
       );
     } else {
       try { await Notifications.cancelScheduledNotificationAsync('worship_daily_summary'); } catch {}

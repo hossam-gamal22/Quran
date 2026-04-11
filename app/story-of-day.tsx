@@ -324,7 +324,8 @@ export default function StoryOfDayScreen() {
     setPositionSec(0);
     setDurationSec(0);
     setSelectedReciterIdx(newIdx);
-    setTimeout(() => setIsTransitioning(false), 8000);
+    // Safety timeout: clear transition flag if player takes too long
+    setTimeout(() => setIsTransitioning(false), 15000);
   }, [selectedReciterIdx, isTransitioning]);
 
   const retryFetch = useCallback(() => {

@@ -612,11 +612,9 @@ export default function RootLayout() {
           'Notification icons cache',
           3000
         ),
-        initWithTimeout(
-          () => prefetchDailyVideos(),
-          'Daily video prefetch',
-          8000
-        ),
+        // Video prefetch runs in background without timeout — it's non-blocking
+        // and the story screen falls back to CDN streaming if not cached yet
+        prefetchDailyVideos().catch(() => {}),
       ]);
 
       if (__DEV__) console.log('✅ Firebase initialization sequence complete');

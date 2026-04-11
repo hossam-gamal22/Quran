@@ -36,6 +36,9 @@ const MIN_VALID_VIDEO_SIZE = 100_000;
 /** In-memory lock: filenames currently being downloaded (prevents concurrent writes). */
 const _downloading = new Set<string>();
 
+/** Max simultaneous downloads to avoid overwhelming the network */
+const MAX_CONCURRENT_DOWNLOADS = 3;
+
 // ──────────────────────────────────────────────
 // Types (mirrored from story-of-day.tsx)
 // ──────────────────────────────────────────────
@@ -226,8 +229,77 @@ async function ensureCacheDir(): Promise<void> {
 // ──────────────────────────────────────────────
 
 /**
+ * Download a single video URL with CDN-first fallback.
+ * Returns true if successfully cached.
+ */
+async function downloadSingleVideo(rawUrl: string, label: string): Promise<boolean> {
+  const filename = videoCacheFilename(rawUrl);
+  const localPath = CACHE_DIR + filename;
+
+  try {
+    // Skip if already cached and valid
+    if (await isValidCachedVideo(localPath)) {
+      if (__DEV__) console.log(`🎬 Already cached: ${filename}`);
+      return true;
+    }
+
+    // Mark as downloading (prevents screen from reading partial file)
+    _downloading.add(filename);
+
+    // Remove corrupt file if present
+    const info = await FileSystem.getInfoAsync(localPath);
+    if (info.exists) {
+      await FileSystem.deleteAsync(localPath, { idempotent: true });
+    }
+
+    const downloadUrl = toJsDelivrUrl(rawUrl);
+    if (__DEV__) console.log(`🎬 Downloading: ${filename}`);
+
+    let ok = await atomicDownload(downloadUrl, localPath);
+    if (!ok) {
+      if (__DEV__) console.warn(`🎬 CDN failed, trying raw URL: ${filename}`);
+      ok = await atomicDownload(rawUrl, localPath);
+    }
+
+    if (!ok) {
+      if (__DEV__) console.warn(`🎬 Both sources failed for: ${filename}`);
+    }
+
+    return ok;
+  } catch (e) {
+    if (__DEV__) console.warn(`🎬 Failed to cache ${label}:`, (e as any)?.message);
+    return false;
+  } finally {
+    _downloading.delete(filename);
+  }
+}
+
+/**
+ * Run async tasks with a concurrency limit.
+ * Executes up to `limit` tasks in parallel, starting next when one finishes.
+ */
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  limit: number
+): Promise<T[]> {
+  const results: T[] = [];
+  let idx = 0;
+
+  async function worker() {
+    while (idx < tasks.length) {
+      const i = idx++;
+      results[i] = await tasks[i]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+/**
  * Called once on app startup.
- * Downloads JSON manifest + ALL reciter videos to local cache.
+ * Downloads JSON manifest + ALL reciter videos to local cache in parallel.
  * Skips if already cached for today.
  */
 export async function prefetchDailyVideos(): Promise<void> {
@@ -283,64 +355,35 @@ export async function prefetchDailyVideos(): Promise<void> {
     await AsyncStorage.setItem(META_KEY, JSON.stringify(dayData));
     if (__DEV__) console.log('🎬 Cached day metadata for', today);
 
-    // Download ALL reciter videos using atomic writes
+    // Collect all URLs to download
     await ensureCacheDir();
-    let allSuccess = true;
+    const downloadTasks: (() => Promise<boolean>)[] = [];
 
-    for (let i = 0; i < dayData.videos.length; i++) {
-      const video = dayData.videos[i];
+    for (const video of dayData.videos) {
       const urls = [video.url, video.premiumUrl].filter(Boolean) as string[];
-
       for (const rawUrl of urls) {
-        try {
-          const filename = videoCacheFilename(rawUrl);
-          const localPath = CACHE_DIR + filename;
-
-          // Skip if already cached and valid
-          if (await isValidCachedVideo(localPath)) {
-            if (__DEV__) console.log(`🎬 [${i + 1}/${dayData.videos.length}] Already cached: ${filename}`);
-            continue;
-          }
-
-          // Mark as downloading (prevents screen from reading partial file)
-          _downloading.add(filename);
-
-          // Remove corrupt file if present
-          const info = await FileSystem.getInfoAsync(localPath);
-          if (info.exists) {
-            await FileSystem.deleteAsync(localPath, { idempotent: true });
-          }
-
-          const downloadUrl = toJsDelivrUrl(rawUrl);
-          if (__DEV__) console.log(`🎬 [${i + 1}/${dayData.videos.length}] Downloading: ${filename}`);
-
-          // Atomic download: writes to .downloading temp, renames when valid
-          let ok = await atomicDownload(downloadUrl, localPath);
-          if (!ok) {
-            if (__DEV__) console.warn(`🎬 CDN failed, trying raw URL: ${filename}`);
-            ok = await atomicDownload(rawUrl, localPath);
-          }
-
-          if (!ok) {
-            if (__DEV__) console.warn(`🎬 Both sources failed for: ${filename}`);
-            allSuccess = false;
-          }
-
-          _downloading.delete(filename);
-        } catch (e) {
-          if (__DEV__) console.warn(`🎬 Failed to cache ${video.reciterLabel}:`, (e as any)?.message);
-          allSuccess = false;
-        }
+        downloadTasks.push(() => downloadSingleVideo(rawUrl, video.reciterLabel));
       }
     }
 
-    // Only mark today as fully prefetched if ALL downloads succeeded.
-    // If some failed, next launch will retry.
-    if (allSuccess) {
+    if (__DEV__) console.log(`🎬 Starting ${downloadTasks.length} downloads (${MAX_CONCURRENT_DOWNLOADS} concurrent)`);
+
+    // Download in parallel with concurrency limit
+    const results = await runWithConcurrency(downloadTasks, MAX_CONCURRENT_DOWNLOADS);
+
+    const succeeded = results.filter(Boolean).length;
+    const failed = results.length - succeeded;
+
+    // Mark today as prefetched if at least half succeeded (don't re-download everything next time)
+    if (failed === 0) {
+      await AsyncStorage.setItem(DATE_KEY, today);
+    } else if (succeeded >= results.length / 2) {
+      // Partial success: mark as done to avoid re-downloading already cached files
+      // The daily-video screen will CDN-stream any missing files
       await AsyncStorage.setItem(DATE_KEY, today);
     }
 
-    if (__DEV__) console.log('🎬 Prefetch complete', allSuccess ? '✓' : '(partial)');
+    if (__DEV__) console.log(`🎬 Prefetch complete: ${succeeded}/${results.length} succeeded${failed > 0 ? ` (${failed} failed, will stream from CDN)` : ' ✓'}`);
   } catch (e) {
     if (__DEV__) console.log('🎬 Prefetch failed (non-blocking):', (e as any)?.message);
     // Non-blocking — screen will fall back to streaming

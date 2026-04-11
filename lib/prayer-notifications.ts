@@ -117,11 +117,11 @@ function prayerTimeToDateForDay(timeStr: string, day: Date, advanceMinutes: numb
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - advanceMinutes, 0, 0);
 }
 
-// عدد الأيام المجدولة مسبقاً
-// iOS: 3 days (hard 64-notification budget — silently drops excess)
-// Android: 7 days (OEMs throttle above ~50-100 setAlarmClock entries)
+// عدد الأيام المجدولة مسبقاً — 7 days.
+// Prayer is the highest priority and gets a full 7-day window on BOTH platforms.
+// iOS 64-notification budget is managed by reducing OTHER categories' windows.
 // App reschedules on every foreground resume via ensurePrayerNotificationsExist().
-const PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 3 : 7;
+const PRAYER_SCHEDULE_DAYS = 7;
 
 // ─── جدولة إشعارات الصلاة لـ 7 أيام ─────────────────────────────────────────
 export async function schedulePrayerNotifications(
