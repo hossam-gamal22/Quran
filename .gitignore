@@ -74,3 +74,11 @@ scripts/fonts/.DS_Store
 *.jks
 *.keystore
 credentials.json
+# Build artifacts
+*.ipa
+*.apk
+*.aab
+
+# Large local-only directories
+public/video-*
+package-lock.json
