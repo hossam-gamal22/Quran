@@ -96,9 +96,12 @@ function videoCacheFilename(url: string): string {
 
 /**
  * Convert raw.githubusercontent.com URL → jsDelivr CDN URL.
- * jsDelivr serves correct Content-Type headers and is more reliable for downloads.
+ * GitHub Releases URLs (github.com/.../releases/download/...) are returned as-is
+ * since they already serve via Azure Blob CDN with proper download support.
  */
 function toJsDelivrUrl(rawUrl: string): string {
+  // GitHub Releases URLs are already CDN-backed — no conversion needed
+  if (rawUrl.includes('/releases/download/')) return rawUrl;
   const match = rawUrl.match(
     /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
   );
@@ -298,6 +301,37 @@ async function runWithConcurrency<T>(
 }
 
 /**
+ * Deletes cached video files that don't belong to today.
+ * Filenames follow the pattern: video-YYYY-MM-DD-reciter[-premium].mp4
+ * Only keeps files matching today's date to avoid unbounded storage growth.
+ */
+async function purgeOldVideos(today: string): Promise<void> {
+  try {
+    const dirInfo = await FileSystem.getInfoAsync(CACHE_DIR);
+    if (!dirInfo.exists) return;
+
+    const files = await FileSystem.readDirectoryAsync(CACHE_DIR);
+    const oldFiles = files.filter((f) =>
+      f.endsWith('.mp4') &&
+      !f.endsWith('.downloading') &&
+      !f.includes(today)
+    );
+
+    if (oldFiles.length === 0) return;
+
+    await Promise.all(
+      oldFiles.map((f) =>
+        FileSystem.deleteAsync(CACHE_DIR + f, { idempotent: true }).catch(() => {})
+      )
+    );
+
+    if (__DEV__) console.log(`🎬 Purged ${oldFiles.length} old video(s)`);
+  } catch {
+    // Non-blocking — old files will be cleaned on next launch
+  }
+}
+
+/**
  * Called once on app startup.
  * Downloads JSON manifest + ALL reciter videos to local cache in parallel.
  * Skips if already cached for today.
@@ -308,6 +342,9 @@ export async function prefetchDailyVideos(): Promise<void> {
     await migrateFromCacheDir();
 
     const today = todayDateString();
+
+    // Clean up old videos from previous days (keeps only today's)
+    await purgeOldVideos(today);
 
     // Skip if already prefetched today AND files still exist on disk
     const cachedDate = await AsyncStorage.getItem(DATE_KEY);

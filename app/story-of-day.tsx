@@ -83,6 +83,8 @@ function formatTime(seconds: number): string {
  * enabling iOS AVPlayer to stream directly without downloading.
  */
 function toJsDelivrUrl(rawUrl: string): string {
+  // GitHub Releases URLs are already CDN-backed — no conversion needed
+  if (rawUrl.includes('/releases/download/')) return rawUrl;
   const match = rawUrl.match(
     /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)$/
   );
@@ -138,13 +140,18 @@ export default function StoryOfDayScreen() {
   const resolvedSourceRef = useRef<'cache' | 'cdn' | null>(null);
 
   useEffect(() => {
-    if (!rawVideoUrl) { setResolvedVideoUrl(null); return; }
+    if (!rawVideoUrl) {
+      if (__DEV__) console.log('[DailyVideo] No rawVideoUrl — currentVideo:', currentVideo?.reciterLabel, 'isPremium:', isPremium);
+      setResolvedVideoUrl(null);
+      return;
+    }
+    if (__DEV__) console.log('[DailyVideo] Resolving URL for:', rawVideoUrl.split('/').pop());
     let cancelled = false;
     (async () => {
       try {
         const cached = await getCachedVideoUri(rawVideoUrl);
         if (cached && !cancelled) {
-          console.log('[DailyVideo] Playing from cache');
+          console.log('[DailyVideo] Playing from cache:', cached.split('/').pop());
           resolvedSourceRef.current = 'cache';
           setResolvedVideoUrl(cached);
           return;
@@ -152,7 +159,7 @@ export default function StoryOfDayScreen() {
       } catch { /* ignore cache errors */ }
       if (!cancelled) {
         const cdnUrl = toJsDelivrUrl(rawVideoUrl);
-        console.log('[DailyVideo] Playing from CDN');
+        console.log('[DailyVideo] Playing from CDN:', cdnUrl.split('/').pop());
         resolvedSourceRef.current = 'cdn';
         setResolvedVideoUrl(cdnUrl);
         // Background-cache for next visit
@@ -182,10 +189,36 @@ export default function StoryOfDayScreen() {
     if (!isSeeking) setPositionSec(ct);
   });
 
+  // Android fallback: poll position when timeUpdate events stall
+  useEffect(() => {
+    if (Platform.OS !== 'android' || status !== 'readyToPlay') return;
+    const id = setInterval(() => {
+      try {
+        if (!isSeeking && player.playing) {
+          setPositionSec(player.currentTime);
+        }
+        if (durationSec === 0 && player.duration > 0) {
+          setDurationSec(player.duration);
+        }
+      } catch { /* player may be released */ }
+    }, 500);
+    return () => clearInterval(id);
+  }, [status, isSeeking, durationSec]);
+
   // Update duration & auto-play when ready; recover from cache errors
   useEffect(() => {
+    if (__DEV__) console.log('[DailyVideo] Status changed:', status, 'resolvedUrl:', resolvedVideoUrl ? 'set' : 'null');
     if (status === 'readyToPlay') {
-      setDurationSec(player.duration);
+      const dur = player.duration;
+      if (dur > 0) {
+        setDurationSec(dur);
+      } else if (Platform.OS === 'android') {
+        // Android: duration may not be available immediately
+        const t = setTimeout(() => {
+          try { if (player.duration > 0) setDurationSec(player.duration); } catch {}
+        }, 300);
+        return () => clearTimeout(t);
+      }
       setIsTransitioning(false);
       player.play();
     }
@@ -300,8 +333,9 @@ export default function StoryOfDayScreen() {
   }, [resetControlsTimer]);
 
   const handleSeek = useCallback((value: number) => {
-    setIsSeeking(false);
     player.currentTime = value;
+    setPositionSec(value);
+    setIsSeeking(false);
     resetControlsTimer();
   }, [player, resetControlsTimer]);
 
@@ -472,7 +506,7 @@ export default function StoryOfDayScreen() {
                 nativeControls={false}
               />
 
-              {(isTransitioning || (playerLoading && !!resolvedVideoUrl)) && !playerError && (
+              {(isTransitioning || playerLoading || !resolvedVideoUrl) && !playerError && (
                 <View style={styles.transitionOverlay}>
                   <ActivityIndicator size="large" color="#fff" />
                 </View>
