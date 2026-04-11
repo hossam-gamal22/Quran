@@ -346,6 +346,7 @@ export async function schedulePrayerNotifications(
                   },
                 });
                 // Persist IDs so Smart Tracker can cancel the fallback
+                scheduledIds.push(fallbackId);
                 await NotifIds.saveAdhanId(prayerKey, id);
                 await NotifIds.saveFallbackId(prayerKey, fallbackId);
                 await NotifIds.saveAdhanFiredAt(prayerKey, triggerDate.getTime());

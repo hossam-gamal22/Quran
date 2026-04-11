@@ -19,3 +19,5 @@ You are acting as a Senior Mobile Developer and UI/UX Expert. You MUST strictly 
 
 ## 4. Mandatory Task Completion Verification
 - **CRITICAL RULE:** After you solve any problem, successfully test it on the iOS Simulator, and present the final code, you MUST conclude your response by sending me exactly this message: **"Has this actually been solved or not?"** Do not forget this under any circumstances.
+
+? Do you want to log in to your Apple account? › (Y/n)

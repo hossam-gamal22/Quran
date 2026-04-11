@@ -1018,7 +1018,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         if (location) {
           const appSettings = await getSettings();
           const today = new Date();
-          const AFTER_PRAYER_SCHEDULE_DAYS = 7;
+          const AFTER_PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 2 : 7;
           const lastDay = new Date(today);
           lastDay.setDate(lastDay.getDate() + AFTER_PRAYER_SCHEDULE_DAYS - 1);
 
@@ -1521,7 +1521,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // Post-reschedule verification — log total scheduled count for debugging
     try {
       const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      console.log('[Notifications] Total scheduled:', scheduled.length);
+      console.log(`[Budget] Total iOS scheduled: ${scheduled.length}${Platform.OS === 'ios' ? ' / 64 limit' : ''}`);
     } catch (_) {}
 
     // Release mutex — always runs even on error
