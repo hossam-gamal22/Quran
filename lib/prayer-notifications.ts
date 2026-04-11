@@ -117,12 +117,11 @@ function prayerTimeToDateForDay(timeStr: string, day: Date, advanceMinutes: numb
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - advanceMinutes, 0, 0);
 }
 
-// عدد الأيام المجدولة مسبقاً — 7 days (reduced from 14).
-// Android OEMs (Xiaomi/MIUI, Samsung, Huawei) throttle or drop alarms when
-// the total count exceeds ~50-100 setAlarmClock entries. 7 days × 5 prayers
-// = 35 DATE triggers — well within safe limits. The app reschedules on every
-// foreground resume via ensurePrayerNotificationsExist(), so 7 days is sufficient.
-const PRAYER_SCHEDULE_DAYS = 7;
+// عدد الأيام المجدولة مسبقاً
+// iOS: 3 days (hard 64-notification budget — silently drops excess)
+// Android: 7 days (OEMs throttle above ~50-100 setAlarmClock entries)
+// App reschedules on every foreground resume via ensurePrayerNotificationsExist().
+const PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 3 : 7;
 
 // ─── جدولة إشعارات الصلاة لـ 7 أيام ─────────────────────────────────────────
 export async function schedulePrayerNotifications(

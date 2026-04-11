@@ -435,8 +435,8 @@ export default function MawlidScreen() {
           <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(192,123,16,0.12)' : '#fff8e1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#c07b10" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.reminder')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              <Text style={[styles.tipTitle, { color: isDarkMode ? colors.text : '#5D4037', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.mawlid.reminder')}</Text>
+              <Text style={[styles.tipText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('seasonal.mawlid.reminderText')}
               </Text>
             </View>

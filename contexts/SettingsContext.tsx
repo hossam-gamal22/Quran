@@ -399,11 +399,10 @@ const STORAGE_KEY = 'app_settings';
 // ========================================
 // Notification Defaults Migration
 // ========================================
-// Bump this version whenever default notification settings change.
-// On app update, existing users will get ALL notification settings
-// fully reset to defaults. Any changes the user makes after that
-// will be preserved going forward.
-const NOTIFICATION_DEFAULTS_VERSION = 5;
+// Bump this version whenever default notification times change.
+// On app update, existing users will get their notification times
+// reset to the new defaults (toggles/booleans are preserved).
+const NOTIFICATION_DEFAULTS_VERSION = 4;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
@@ -534,19 +533,29 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
           loadedSettings.language = i18nLang;
         }
 
-        // Migration: full reset of notification settings when defaults version changes
+        // Migration: force-update notification times when defaults version changes
         try {
           const storedVersion = await AsyncStorage.getItem(NOTIF_DEFAULTS_VERSION_KEY);
           const currentVersion = parseInt(storedVersion || '0', 10);
           if (currentVersion < NOTIFICATION_DEFAULTS_VERSION) {
-            // Full reset: replace ALL notification settings with defaults
-            // (times, toggles, sounds — everything). Any changes the user
-            // makes after this point will be preserved normally.
-            loadedSettings.notifications = { ...defaultNotifications };
-            // Persist migrated settings to AsyncStorage so they survive restarts
+            // Reset notification times to new defaults (preserve user toggles/booleans)
+            const timeKeys = [
+              'azkarMorningTime', 'azkarEveningTime', 'morningAzkarTime', 'eveningAzkarTime',
+              'dailyVerseTime', 'quranReadingReminderTime', 'salawatReminderTime',
+              'istighfarReminderTime', 'tasbihReminderTime', 'sleepAzkarTime', 'wakeupAzkarTime',
+              'worshipDailySummaryTime', 'worshipWeeklyReportTime', 'kahfTime',
+            ] as const;
+            for (const key of timeKeys) {
+              (loadedSettings.notifications as any)[key] = (defaultNotifications as any)[key];
+            }
+            // Enable newly-defaulted-on categories
+            loadedSettings.notifications.istighfarReminder = true;
+            loadedSettings.notifications.tasbihReminder = true;
+            loadedSettings.notifications.worshipWeeklyReport = true;
+            // Persist migrated settings to AsyncStorage so they survive next cold start
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
             await AsyncStorage.setItem(NOTIF_DEFAULTS_VERSION_KEY, String(NOTIFICATION_DEFAULTS_VERSION));
-            console.log('🔔 Full notification reset to version', NOTIFICATION_DEFAULTS_VERSION);
+            console.log('🔔 Migrated notification defaults to version', NOTIFICATION_DEFAULTS_VERSION);
           }
         } catch (migrationErr) {
           console.warn('⚠️ Notification defaults migration failed:', migrationErr);
@@ -825,7 +834,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       kahfReminder: n.kahfReminder,
       kahfTime: n.kahfTime,
     });
-    await AsyncStorage.setItem('@last_notification_reschedule', new Date().toISOString());
   }, [settings]);
 
   // ========================================

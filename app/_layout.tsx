@@ -74,6 +74,7 @@ import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezone
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
+import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
 
 // Signal that notification channels have been initialized.
 // SettingsContext awaits this before scheduling to avoid race condition
@@ -99,6 +100,7 @@ LogBox.ignoreLogs([
   '[expo-av]:',
   'setLayoutAnimationEnabledExperimental',
   'Error playing ayah',
+  'No native splash screen registered',
   'LoadBundleFromServerRequestError',
   'Could not load bundle',
   "The action 'GO_BACK' was not handled",
@@ -120,9 +122,13 @@ try {
   // Silently ignore — Expo Go doesn't support push notifications
 }
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
-// Disable native splash fade — we handle the transition ourselves via ThemeBootOverlay
-SplashScreen.setOptions({ fade: false });
+try {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+  // Disable native splash fade — we handle the transition ourselves via ThemeBootOverlay
+  SplashScreen.setOptions({ fade: false });
+} catch {
+  // Native splash screen not available (Expo Go / hot reload)
+}
 
 // TrackPlayer initialization for lock screen audio controls (native only)
 // Must be registered at module scope before any component renders
@@ -413,15 +419,17 @@ export default function RootLayout() {
     initAds();
   }, []);
 
-  // Safety timeout: ALWAYS hide splash screen after 6 seconds no matter what
+  // Safety timeout: ALWAYS hide splash screen after 6 seconds no matter what.
+  // Must call hideSplash() unconditionally — the font-loaded effect sets
+  // splashHidden.current=true but delegates actual hide to SplashGate,
+  // which may be waiting for SettingsContext.isLoading (blocked by Firebase
+  // offline timeout). Without this, splash stays forever on slow networks.
   useEffect(() => {
     const safetyTimer = setTimeout(async () => {
-      if (!splashHidden.current) {
-        console.warn('⚠️ Safety timeout reached — forcing splash screen hide');
-        splashHidden.current = true;
-        setAppReady(true);
-        await hideSplash();
-      }
+      console.warn('⚠️ Safety timeout reached — forcing splash screen hide');
+      splashHidden.current = true;
+      setAppReady(true);
+      await hideSplash();
     }, 6000);
     return () => clearTimeout(safetyTimer);
   }, []);
@@ -603,6 +611,11 @@ export default function RootLayout() {
           () => ensureNotificationIconsCached(),
           'Notification icons cache',
           3000
+        ),
+        initWithTimeout(
+          () => prefetchDailyVideos(),
+          'Daily video prefetch',
+          8000
         ),
       ]);
 

@@ -190,21 +190,21 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
           style={[styles.specialDayCard, { backgroundColor: isDarkMode ? 'rgba(42,42,62,0.85)' : 'rgba(255,248,225,0.85)' }]}
         >
           <View style={[styles.specialDayHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <Text style={[styles.specialDayTitle, { color: colors.text }]}>
+            <Text style={[styles.specialDayTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>
               {t('seasonal.specialDay')}: {getLanguage() === 'ar' ? day.nameAr : day.nameEn}
             </Text>
           </View>
-        <Text style={[styles.specialDayDesc, { color: colors.textLight }]}>
+        <Text style={[styles.specialDayDesc, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>
           {day.description}
         </Text>
         
         {day.virtues.length > 0 && (
           <View style={styles.virtuesContainer}>
-            <Text style={[styles.virtuesTitle, { color: colors.text }]}>{t('seasonal.ashura.virtues')}:</Text>
+            <Text style={[styles.virtuesTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>{t('seasonal.ashura.virtues')}:</Text>
             {day.virtues.map((virtue, index) => (
               <View key={index} style={[styles.virtueItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="check-circle" size={16} color={seasonColor} />
-                <Text style={[styles.virtueText, { color: colors.textLight }]}>{virtue}</Text>
+                <Text style={[styles.virtueText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{virtue}</Text>
               </View>
             ))}
           </View>
@@ -212,11 +212,11 @@ const SpecialDayCard: React.FC<SpecialDayCardProps> = ({ day, seasonColor, isDar
 
         {day.recommendedActions.length > 0 && (
           <View style={styles.actionsContainer}>
-            <Text style={[styles.actionsTitle, { color: colors.text }]}>{t('seasonal.ashura.recommendedActions')}:</Text>
+            <Text style={[styles.actionsTitle, { color: isDarkMode ? colors.text : '#5D4037' }]}>{t('seasonal.ashura.recommendedActions')}:</Text>
             {day.recommendedActions.map((action, index) => (
               <View key={index} style={[styles.actionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="hand-pointing-right" size={16} color="#0d8e62" />
-                <Text style={[styles.actionText, { color: colors.textLight }]}>{action}</Text>
+                <Text style={[styles.actionText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)' }]}>{action}</Text>
               </View>
             ))}
           </View>

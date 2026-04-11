@@ -297,8 +297,8 @@ const ActionItem: React.FC<ActionItemProps> = ({ action, isCompleted, onToggle, 
         />
       </View>
       <View style={styles.actionContent}>
-        <Text style={[styles.actionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{titleMap[action.id] || action.title}</Text>
-        <Text style={[styles.actionSubtitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subMap[action.id] || action.subtitle}</Text>
+        <Text style={[styles.actionTitle, { color: isCompleted && !isDarkMode ? '#1B5E20' : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{titleMap[action.id] || action.title}</Text>
+        <Text style={[styles.actionSubtitle, { color: isCompleted && !isDarkMode ? 'rgba(27,94,32,0.75)' : colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{subMap[action.id] || action.subtitle}</Text>
       </View>
       {isCompleted && (
         <MaterialCommunityIcons name="check-circle" size={24} color="#0d8e62" />
@@ -455,8 +455,8 @@ export default function AshuraScreen() {
           <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(192,123,16,0.12)' : '#fff8e1', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons name="lightbulb-on" size={24} color="#c07b10" />
             <View style={styles.tipContent}>
-              <Text style={[styles.tipTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.tip')}</Text>
-              <Text style={[styles.tipText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              <Text style={[styles.tipTitle, { color: isDarkMode ? colors.text : '#5D4037', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('seasonal.ashura.tip')}</Text>
+              <Text style={[styles.tipText, { color: isDarkMode ? colors.textLight : 'rgba(93,64,55,0.75)', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('seasonal.ashura.tipText')}
               </Text>
             </View>

@@ -459,9 +459,9 @@ export async function scheduleKahfReminder(): Promise<void> {
 
     const kahfAttachments = await getNotificationIconAttachment('quran');
 
-    // Schedule next 4 Fridays as DATE triggers
+    // Schedule next Fridays as DATE triggers (iOS: 2 to stay within budget)
     const now = new Date();
-    const KAHF_WEEKS = 4;
+    const KAHF_WEEKS = Platform.OS === 'ios' ? 2 : 4;
     const firstFri = new Date(now.getFullYear(), now.getMonth(), now.getDate(), kahfHour, kahfMinute, 0, 0);
     const daysTilFri = (5 - firstFri.getDay() + 7) % 7;
     firstFri.setDate(firstFri.getDate() + daysTilFri);
@@ -649,10 +649,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // rescheduling completes, so the next occurrence is lost forever.
     //
     // By scheduling 7 days of DATE triggers up front, each alarm fires
-    // independently — no rescheduling required for the 7-day window.
+    // independently — no rescheduling required for the scheduling window.
     // WorkManager (15-min periodic) + foreground resume then refresh
     // the window before it expires.
-    const SCHEDULE_DAYS_AHEAD = 7;
+    // iOS: 3 days (budget: 64 scheduled max — silently drops excess)
+    // Android: 7 days (no hard limit)
+    const SCHEDULE_DAYS_AHEAD = Platform.OS === 'ios' ? 3 : 7;
     const ALL_DAYS = [1, 2, 3, 4, 5, 6, 7]; // Sun-Sat
 
     const scheduleWithDays = async (
@@ -723,7 +725,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     };
 
     // Helper: get times array from multi-time field or fall back to single-time field
-    const MAX_TIMES = 3;
+    // iOS: cap at 2 to stay within 64-notification budget
+    const MAX_TIMES = Platform.OS === 'ios' ? 2 : 3;
     const getTimesArray = (multiTimes?: string[], singleTime?: string, fallback = '08:00'): string[] => {
       if (multiTimes && multiTimes.length > 0) return multiTimes.slice(0, MAX_TIMES);
       return [singleTime || fallback];
@@ -860,7 +863,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         if (location) {
           const appSettings = await getSettings();
           const today = new Date();
-          const AFTER_PRAYER_SCHEDULE_DAYS = 7;
+          // iOS: 2 days to stay within 64-notification budget (app reschedules on foreground)
+          const AFTER_PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 2 : 7;
           const lastDay = new Date(today);
           lastDay.setDate(lastDay.getDate() + AFTER_PRAYER_SCHEDULE_DAYS - 1);
 
@@ -1174,7 +1178,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       const worshipWeeklyChannelId = getReminderChannelId(worshipWeeklySoundType);
       const worshipWeeklyAttachments = await getNotificationIconAttachment('reminder');
       const now = new Date();
-      const WEEKLY_SCHEDULE_COUNT = 4; // 4 Fridays ahead
+      const WEEKLY_SCHEDULE_COUNT = Platform.OS === 'ios' ? 2 : 4; // iOS: 2 Fridays (budget), Android: 4
       let scheduledWeekly = 0;
       for (let w = 0; w < WEEKLY_SCHEDULE_COUNT; w++) {
         // Find the next Friday from today + w weeks
@@ -1237,7 +1241,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
       const kahfAttachments = await getNotificationIconAttachment('quran');
       const nowKahf = new Date();
-      const KAHF_WEEKS = 4;
+      const KAHF_WEEKS = Platform.OS === 'ios' ? 2 : 4;
       // Find next Friday
       const firstFri = new Date(nowKahf.getFullYear(), nowKahf.getMonth(), nowKahf.getDate(), kahfHour, kahfMinute, 0, 0);
       const daysTilFri = (5 - firstFri.getDay() + 7) % 7;
@@ -1292,6 +1296,13 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       `prayer=${diag.prayerCount} afterPrayer=${diag.afterPrayerCount} ` +
       `wird=${diag.wirdCount} ayah=${diag.dailyAyahCount} other=${diag.otherCount}`
     );
+
+    // iOS 64-notification hard budget check
+    if (Platform.OS === 'ios' && diag.totalScheduled > 64) {
+      console.warn(`⚠️ [Budget] iOS notification limit EXCEEDED: ${diag.totalScheduled}/64 — excess will be silently dropped by the system`);
+    } else if (Platform.OS === 'ios') {
+      console.log(`📊 [Budget] iOS: ${diag.totalScheduled}/64 scheduled`);
+    }
 
     // Post-schedule verification: dump all prayer identifiers + trigger dates + channels + sounds
     try {

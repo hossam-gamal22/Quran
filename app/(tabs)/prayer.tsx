@@ -830,6 +830,18 @@ export default function PrayerScreen() {
                   </View>
                 )}
 
+                {/* تعديل المواقيت — navigate to adjustments page */}
+                <TouchableOpacity
+                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 20 }]}
+                  onPress={() => { setShowSettings(false); router.push('/settings/prayer-adjustments' as any); }}
+                >
+                  <MaterialCommunityIcons name="tune-vertical" size={20} color="#0d8e62" style={{ marginHorizontal: 4 }} />
+                  <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {t('prayerAdjustments.title')}
+                  </Text>
+                  <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={22} color={colors.textLight} />
+                </TouchableOpacity>
+
                 <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.displayOptions')}</Text>
                 <GlassToggle label={t('prayer.showSunrise')} icon="weather-sunny" enabled={settings.prayer.showSunrise} onToggle={(val) => updatePrayer({ showSunrise: val })} />
                 <GlassToggle label={t('prayer.hourFormat24')} icon="clock-digital" enabled={settings.prayer.show24Hour} onToggle={(val) => updatePrayer({ show24Hour: val })} />
