@@ -1370,7 +1370,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
               data: { type: 'worship_weekly', iconType: 'reminder' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
               ...(Platform.OS === 'ios' && worshipWeeklyAttachments && { attachments: worshipWeeklyAttachments }),
-              ...(Platform.OS === 'ios' && { interruptionLevel: 'active' as const }),
+              ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
             },
             trigger: {
               type: Notifications.SchedulableTriggerInputTypes.DATE,

@@ -15,7 +15,6 @@ import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
-import { useAppIdentity } from '@/hooks/use-app-identity';
 import { APP_BACKGROUNDS, BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -70,7 +69,6 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
     const viewShotRef = useRef<ViewShot>(null);
     const colors = useColors();
     const { isDarkMode, t } = useSettings();
-    const { logoSource } = useAppIdentity();
     const isRTL = useIsRTL();
 
     const [selectedSize, setSelectedSize] = useState<ImageSizeKey>('portrait');
@@ -202,12 +200,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
       }
     };
 
-    // ─── Logo sizes per aspect ratio (adjustable here) ───
-    const LOGO_SIZES: Record<ImageSizeKey, number> = {
-      portrait: 100,  // 4:5
-      story: 200,     // 9:16
-    };
-    const logoSize = LOGO_SIZES[selectedSize];
+
 
     // ─── Shared content renderer (used by capture & preview) ───
     // Content and logo flow naturally in a column. Scale is applied to the
@@ -234,14 +227,6 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
           <View style={{ alignItems: 'center' }}>
             {children}
           </View>
-        </View>
-        {/* Logo — size changes per aspect ratio */}
-        <View style={{ marginTop: 10, alignItems: 'center' }}>
-          <Image
-            source={logoSource}
-            style={{ width: logoSize, height: logoSize, borderRadius: Math.round(logoSize / 5) }}
-            resizeMode="contain"
-          />
         </View>
       </View>
     );

@@ -59,7 +59,6 @@ import {
 import { ORNAMENT_NO_TINT_INDICES, QURAN_THEMES, getGoldenColor, getSafeThemeIndex } from '@/constants/quran-themes';
 import { Spacing, FONT_SIZES } from '@/constants/theme';
 import { getAppName } from '@/constants/app';
-import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
@@ -627,7 +626,7 @@ export default function SurahScreen() {
     ? (isRawColorDark ? '#FFFFFF' : rawTextColor)
     : (!isRawColorDark ? '#000000' : rawTextColor);
   const goldenColor = getGoldenColor(themeIndex);
-  const { logoSource: appIcon } = useAppIdentity();
+
 
   // Display settings for toggles
   const showTashkeel = settings.display.showTashkeel ?? true;
@@ -1277,10 +1276,7 @@ export default function SurahScreen() {
               playingAyahKey={null}
               highlightAyahKey={null}
             />
-            {/* Branding watermark — always present in capture */}
-            <View style={s.shareWatermark} pointerEvents="none" collapsable={false}>
-              <Image source={appIcon} style={s.shareWatermarkIcon} resizeMode="contain" />
-            </View>
+
           </ImageBackground>
         </View>
       </ViewShot>
@@ -1816,18 +1812,7 @@ const s = StyleSheet.create({
   },
   pageIndicator: { fontSize: 16, fontFamily: 'Amiri-Bold' },
 
-  // Share watermark (visible in captures)
-  shareWatermark: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
-    flexDirection: 'row-reverse',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  shareWatermarkIcon: { width: 48, height: 48, borderRadius: 12, opacity: 0.7 },
+
 
   // Long-press onboarding hint
   longPressHint: {

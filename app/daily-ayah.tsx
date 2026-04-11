@@ -34,7 +34,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import { Spacing } from '@/constants/theme';
-import { useAppIdentity } from '@/hooks/use-app-identity';
+
 import { DAILY_AYAHS } from '@/data/daily-ayahs';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -148,7 +148,6 @@ const TEXT_SHADOW = {
 
 function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar' }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
-  const { logoSource } = useAppIdentity();
   const isSolidBg = bgUrl.startsWith('#');
   const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
 
@@ -200,10 +199,6 @@ function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGl
           )}
         </View>
 
-        {/* Branding watermark */}
-        <View style={{ position: 'absolute', bottom: 16, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <RNImage source={logoSource} style={{ width: 56, height: 56, borderRadius: 14, opacity: 0.85 }} />
-        </View>
       </View>
     </ViewShot>
   );
