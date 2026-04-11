@@ -8,6 +8,7 @@ export interface NotificationSettings {
   adhanSound: boolean;
   adhanSoundType?: string;
   soundType?: string;
+  iosScheduleDays?: number; // Dynamic iOS budget — overrides PRAYER_SCHEDULE_DAYS on iOS
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {

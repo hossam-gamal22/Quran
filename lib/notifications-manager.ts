@@ -33,7 +33,121 @@ let _pendingReschedule: Record<string, any> | null = null;
 
 // ─── Refresh Reminder Constants ──────────────────────────────────────────────
 const REFRESH_REMINDER_PREFIX = 'refresh_reminder';
-const REFRESH_REMINDER_SCHEDULE = [6]; // fire on day 6 — gives 24h buffer before 7-day window expires
+// Default day 6 — dynamically adjusted by iOS budget allocator
+let _refreshReminderDay = 6;
+
+// ─── iOS Dynamic Budget Allocator ────────────────────────────────────────────
+// iOS hard-limits local scheduled notifications to 64. Excess is silently dropped.
+// This allocator distributes days across tiers in priority order:
+//   Tier 1: Prayer (min 3, max 7) — highest priority
+//   Tier 2: After-prayer azkar (min 1, follows prayer)
+//   Tier 3: Azkar (morning/evening/sleep/wakeup, min 1)
+//   Tier 4: Other reminders (min 1)
+// Fixed slots: refresh(1) + kahf(≤2) + worship_weekly(≤2) = up to 5
+interface IosBudgetAllocation {
+  prayerDays: number;
+  afterPrayerDays: number;
+  azkarDays: number;
+  otherDays: number;
+  refreshDay: number;
+}
+
+function calculateIosBudget(params: {
+  prayer: boolean;
+  afterPrayer: boolean;
+  azkarTimesPerDay: number;   // total times/day across all 4 azkar categories
+  otherTimesPerDay: number;   // total times/day across all other categories
+  kahfEnabled: boolean;
+  worshipWeeklyEnabled: boolean;
+}): IosBudgetAllocation {
+  const IOS_MAX = 64;
+  const fixedSlots = 1 /* refresh */
+    + (params.kahfEnabled ? 2 : 0)
+    + (params.worshipWeeklyEnabled ? 2 : 0);
+  let remaining = IOS_MAX - fixedSlots;
+
+  const prayerCost = params.prayer ? 5 : 0;
+  const afterPrayerCost = params.afterPrayer ? 5 : 0;
+  const azkarCost = params.azkarTimesPerDay;
+  const otherCost = params.otherTimesPerDay;
+
+  // Nothing enabled → max days for everything
+  if (prayerCost + afterPrayerCost + azkarCost + otherCost === 0) {
+    return { prayerDays: 7, afterPrayerDays: 7, azkarDays: 7, otherDays: 7, refreshDay: 6 };
+  }
+
+  // Step 1: Reserve minimum for each active tier
+  const prayerMin = prayerCost > 0 ? 3 : 0;
+  const afterPrayerMin = afterPrayerCost > 0 ? 1 : 0;
+  const azkarMin = azkarCost > 0 ? 1 : 0;
+  const otherMin = otherCost > 0 ? 1 : 0;
+
+  let prayerDays = prayerMin;
+  let afterPrayerDays = afterPrayerMin;
+  let azkarDays = azkarMin;
+  let otherDays = otherMin;
+
+  const minCost = prayerMin * prayerCost + afterPrayerMin * afterPrayerCost
+    + azkarMin * azkarCost + otherMin * otherCost;
+
+  // If minimums already exceed budget, do best-effort
+  if (minCost > remaining) {
+    // Give prayer whatever fits, others get 1 day if possible
+    const otherReserve = afterPrayerMin * afterPrayerCost + azkarMin * azkarCost + otherMin * otherCost;
+    prayerDays = prayerCost > 0 ? Math.max(1, Math.floor((remaining - otherReserve) / prayerCost)) : 0;
+    remaining -= prayerDays * prayerCost + afterPrayerDays * afterPrayerCost
+      + azkarDays * azkarCost + otherDays * otherCost;
+  } else {
+    remaining -= minCost;
+  }
+
+  // Step 2: Distribute surplus — prayer first (highest priority)
+  if (prayerCost > 0 && remaining > 0) {
+    const extra = Math.min(7 - prayerDays, Math.floor(remaining / prayerCost));
+    prayerDays += extra;
+    remaining -= extra * prayerCost;
+  }
+
+  // After-prayer follows prayer (capped at prayer days)
+  if (afterPrayerCost > 0 && remaining > 0) {
+    const extra = Math.min(prayerDays - afterPrayerDays, Math.floor(remaining / afterPrayerCost));
+    afterPrayerDays += extra;
+    remaining -= extra * afterPrayerCost;
+  }
+
+  // Azkar
+  if (azkarCost > 0 && remaining > 0) {
+    const extra = Math.min(7 - azkarDays, Math.floor(remaining / azkarCost));
+    azkarDays += extra;
+    remaining -= extra * azkarCost;
+  }
+
+  // Other
+  if (otherCost > 0 && remaining > 0) {
+    const extra = Math.min(7 - otherDays, Math.floor(remaining / otherCost));
+    otherDays += extra;
+    remaining -= extra * otherCost;
+  }
+
+  // Refresh fires 1 day before shortest window expires (minimum day 1)
+  const allWindows = [
+    ...(prayerDays > 0 ? [prayerDays] : []),
+    ...(afterPrayerDays > 0 ? [afterPrayerDays] : []),
+    ...(azkarDays > 0 ? [azkarDays] : []),
+    ...(otherDays > 0 ? [otherDays] : []),
+  ];
+  const shortest = allWindows.length > 0 ? Math.min(...allWindows) : 7;
+  const refreshDay = Math.max(1, shortest - 1);
+
+  const used = prayerDays * prayerCost + afterPrayerDays * afterPrayerCost
+    + azkarDays * azkarCost + otherDays * otherCost + fixedSlots;
+  console.log(
+    `📊 [iOS Budget] prayer=${prayerDays}d after=${afterPrayerDays}d azkar=${azkarDays}d other=${otherDays}d | ` +
+    `${used}/${IOS_MAX} slots | refresh=day${refreshDay}`
+  );
+
+  return { prayerDays, afterPrayerDays, azkarDays, otherDays, refreshDay };
+}
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
 const KEYS = {
@@ -641,6 +755,47 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       adminDefaults: Object.keys(adminDefaults).length > 0 ? adminDefaults : 'none',
     }));
 
+    // ─── iOS Budget Allocation ──────────────────────────────────────────
+    // Calculate per-category iOS scheduling days BEFORE creating helpers,
+    // so the correct values are available to all call sites.
+    const MAX_TIMES_CAP = Platform.OS === 'ios' ? 2 : 3;
+    const countTimes = (multi?: string[], single?: string) => {
+      if (multi && multi.length > 0) return Math.min(multi.length, MAX_TIMES_CAP);
+      return single ? 1 : 0;
+    };
+
+    let iosBudget: IosBudgetAllocation | null = null;
+    if (Platform.OS === 'ios') {
+      // Count azkar times per day (4 categories)
+      let azkarTimesPerDay = 0;
+      if (notifSettings.morningAzkar) azkarTimesPerDay += countTimes(notifSettings.morningAzkarTimes, notifSettings.morningAzkarTime) || 1;
+      if (notifSettings.eveningAzkar) azkarTimesPerDay += countTimes(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime) || 1;
+      if (notifSettings.sleepAzkar) azkarTimesPerDay += countTimes(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime) || 1;
+      if (notifSettings.wakeupAzkar) azkarTimesPerDay += countTimes(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime) || 1;
+
+      // Count other reminder times per day (7 categories)
+      let otherTimesPerDay = 0;
+      if (notifSettings.dailyVerse) otherTimesPerDay += countTimes(notifSettings.dailyVerseTimes, notifSettings.dailyVerseTime) || 1;
+      if (notifSettings.salawatReminder) otherTimesPerDay += countTimes(notifSettings.salawatReminderTimes, notifSettings.salawatReminderTime) || 1;
+      if (notifSettings.tasbihReminder) otherTimesPerDay += countTimes(notifSettings.tasbihReminderTimes, notifSettings.tasbihReminderTime) || 1;
+      if (notifSettings.istighfarReminder) otherTimesPerDay += countTimes(notifSettings.istighfarReminderTimes, notifSettings.istighfarReminderTime) || 1;
+      if (notifSettings.customReminder) otherTimesPerDay += countTimes(notifSettings.customReminderTimes, notifSettings.customReminderTime) || 1;
+      if (notifSettings.quranReadingReminder) otherTimesPerDay += countTimes(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime) || 1;
+      if (notifSettings.worshipDailySummary) otherTimesPerDay += 1;
+
+      iosBudget = calculateIosBudget({
+        prayer: !!notifSettings.prayerTimes,
+        afterPrayer: !!notifSettings.afterPrayerAzkar,
+        azkarTimesPerDay,
+        otherTimesPerDay,
+        kahfEnabled: !!notifSettings.kahfReminder,
+        worshipWeeklyEnabled: !!notifSettings.worshipWeeklyReport,
+      });
+
+      // Update refresh reminder day based on budget
+      _refreshReminderDay = iosBudget.refreshDay;
+    }
+
     // ─── DATE-based scheduling (7 days ahead) ─────────────────────────────
     // DAILY/WEEKLY triggers rely on a fire-then-reschedule cycle:
     // when the alarm fires, the system delivers the notification then
@@ -729,7 +884,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Helper: get times array from multi-time field or fall back to single-time field
     // iOS: cap at 2 to stay within 64-notification budget
-    const MAX_TIMES = Platform.OS === 'ios' ? 2 : 3;
+    const MAX_TIMES = MAX_TIMES_CAP;
     const getTimesArray = (multiTimes?: string[], singleTime?: string, fallback = '08:00'): string[] => {
       if (multiTimes && multiTimes.length > 0) return multiTimes.slice(0, MAX_TIMES);
       return [singleTime || fallback];
@@ -767,6 +922,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       adhanSound: notifSettings.sound,
       adhanSoundType: adhanSound,
       soundType: generalSound,
+      ...(iosBudget && { iosScheduleDays: iosBudget.prayerDays }),
     };
     // Phase B+C: Catch prayer scheduling errors so they don't kill the
     // entire reschedule. Log the failure and continue with other categories.
@@ -797,7 +953,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
-        2, // iOS: 2 days for azkar (budget)
+        iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
 
@@ -817,7 +973,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
-        2, // iOS: 2 days for azkar (budget)
+        iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
 
@@ -837,7 +993,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
-        2, // iOS: 2 days for azkar (budget)
+        iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
 
@@ -857,7 +1013,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.azkarDays,
         'azkar',
         azkarSound,
-        2, // iOS: 2 days for azkar (budget)
+        iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
 
@@ -871,8 +1027,10 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         if (location) {
           const appSettings = await getSettings();
           const today = new Date();
-          // iOS: 2 days to stay within 64-notification budget (app reschedules on foreground)
-          const AFTER_PRAYER_SCHEDULE_DAYS = Platform.OS === 'ios' ? 2 : 7;
+          // iOS: use dynamic budget allocation; Android: 7 days
+          const AFTER_PRAYER_SCHEDULE_DAYS = (Platform.OS === 'ios' && iosBudget)
+            ? iosBudget.afterPrayerDays
+            : 7;
           const lastDay = new Date(today);
           lastDay.setDate(lastDay.getDate() + AFTER_PRAYER_SCHEDULE_DAYS - 1);
 
@@ -1001,7 +1159,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.dailyVerseDays,
         'daily-ayah',
         notifSettings.dailyVerseSoundType || 'general_reminder',
-        1, // iOS: 1 day for other reminders (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       // Cancel all daily_ayah variants
@@ -1027,7 +1185,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.salawatDays,
         'general',
         salawatSound,
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1052,7 +1210,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.tasbihDays,
         'general',
         notifSettings.tasbihSoundType || 'tasbih',
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1077,7 +1235,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.istighfarDays,
         'general',
         notifSettings.istighfarSoundType || 'istighfar',
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1120,7 +1278,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         notifSettings.customReminderDays,
         'general',
         notifSettings.customReminderSoundType || 'general_reminder',
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       for (const d of ALL_DAYS) {
@@ -1153,7 +1311,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         convertedDays,
         'general',
         notifSettings.quranReminderSoundType || 'general_reminder',
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       for (const d of [1, 2, 3, 4, 5, 6, 7]) {
@@ -1180,7 +1338,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         undefined,
         'general',
         worshipSoundType,
-        1, // iOS: 1 day (budget)
+        iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
       try { await Notifications.cancelScheduledNotificationAsync('worship_daily_summary'); } catch {}
@@ -1396,11 +1554,13 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
  * Each successful reschedule cancels the old reminder and pushes a new one forward.
  */
 export async function scheduleRefreshReminder(): Promise<void> {
-  // Cancel all existing refresh reminders
-  for (const days of REFRESH_REMINDER_SCHEDULE) {
-    try {
-      await Notifications.cancelScheduledNotificationAsync(`${REFRESH_REMINDER_PREFIX}_${days}`);
-    } catch {}
+  // Cancel existing refresh reminder
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`${REFRESH_REMINDER_PREFIX}_${_refreshReminderDay}`);
+  } catch {}
+  // Also cancel legacy day-6 reminder in case it was previously set at a different day
+  if (_refreshReminderDay !== 6) {
+    try { await Notifications.cancelScheduledNotificationAsync(`${REFRESH_REMINDER_PREFIX}_6`); } catch {}
   }
 
   const { status } = await Notifications.getPermissionsAsync();
@@ -1408,34 +1568,32 @@ export async function scheduleRefreshReminder(): Promise<void> {
 
   const refreshAttachments = await getNotificationIconAttachment('reminder');
 
-  for (const days of REFRESH_REMINDER_SCHEDULE) {
-    const triggerDate = new Date();
-    triggerDate.setDate(triggerDate.getDate() + days);
-    triggerDate.setHours(20, 0, 0, 0);
+  const triggerDate = new Date();
+  triggerDate.setDate(triggerDate.getDate() + _refreshReminderDay);
+  triggerDate.setHours(20, 0, 0, 0);
 
-    try {
-      await Notifications.scheduleNotificationAsync({
-        identifier: `${REFRESH_REMINDER_PREFIX}_${days}`,
-        content: {
-          title: dirText(t('notifications.refreshReminderTitle')),
-          body: dirText(t('notifications.refreshReminderBody')),
-          sound: 'default',
-          data: { type: 'refresh_reminder', iconType: 'reminder' },
-          ...(Platform.OS === 'android' && { channelId: 'general' }),
-          ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-          ...(Platform.OS === 'ios' && refreshAttachments && { attachments: refreshAttachments }),
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: triggerDate,
-          ...(Platform.OS === 'android' && { channelId: 'general' }),
-        },
-      });
-    } catch (err) {
-      console.warn(`Failed to schedule refresh reminder (day ${days}):`, err);
-    }
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${REFRESH_REMINDER_PREFIX}_${_refreshReminderDay}`,
+      content: {
+        title: dirText(t('notifications.refreshReminderTitle')),
+        body: dirText(t('notifications.refreshReminderBody')),
+        sound: 'default',
+        data: { type: 'refresh_reminder', iconType: 'reminder' },
+        ...(Platform.OS === 'android' && { channelId: 'general' }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+        ...(Platform.OS === 'ios' && refreshAttachments && { attachments: refreshAttachments }),
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        ...(Platform.OS === 'android' && { channelId: 'general' }),
+      },
+    });
+  } catch (err) {
+    console.warn(`Failed to schedule refresh reminder (day ${_refreshReminderDay}):`, err);
   }
-  console.log(`🔄 Refresh reminder scheduled for day ${REFRESH_REMINDER_SCHEDULE[0]} at 8:00 PM`);
+  console.log(`🔄 Refresh reminder scheduled for day ${_refreshReminderDay} at 8:00 PM`);
 }
 
 // ─── Notification Diagnostics ────────────────────────────────────────────────

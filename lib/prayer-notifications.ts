@@ -117,11 +117,10 @@ function prayerTimeToDateForDay(timeStr: string, day: Date, advanceMinutes: numb
   return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - advanceMinutes, 0, 0);
 }
 
-// عدد الأيام المجدولة مسبقاً — 7 days.
-// Prayer is the highest priority and gets a full 7-day window on BOTH platforms.
-// iOS 64-notification budget is managed by reducing OTHER categories' windows.
+// عدد الأيام المجدولة مسبقاً — 7 days (default).
+// iOS budget allocator may override this via notifSettings.iosScheduleDays.
 // App reschedules on every foreground resume via ensurePrayerNotificationsExist().
-const PRAYER_SCHEDULE_DAYS = 7;
+const DEFAULT_PRAYER_SCHEDULE_DAYS = 7;
 
 // ─── جدولة إشعارات الصلاة لـ 7 أيام ─────────────────────────────────────────
 export async function schedulePrayerNotifications(
@@ -148,6 +147,11 @@ export async function schedulePrayerNotifications(
   const lang = getLanguage();
 
   try {
+    // Use iOS budget allocation if provided, otherwise default
+    const PRAYER_SCHEDULE_DAYS = (Platform.OS === 'ios' && notifSettings.iosScheduleDays)
+      ? notifSettings.iosScheduleDays
+      : DEFAULT_PRAYER_SCHEDULE_DAYS;
+
     // Fetch prayer times for the scheduling window using monthly calendar API (1-2 calls max)
     const today = new Date();
     console.log(`[prayer-notif] Starting scheduling for ${PRAYER_SCHEDULE_DAYS} days from ${today.toISOString()}`);
