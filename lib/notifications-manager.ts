@@ -1518,6 +1518,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   } catch (error) {
     console.error('Error scheduling notifications from settings:', error);
   } finally {
+    // Post-reschedule verification — log total scheduled count for debugging
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      console.log('[Notifications] Total scheduled:', scheduled.length);
+    } catch (_) {}
+
     // Release mutex — always runs even on error
     _isScheduling = false;
 

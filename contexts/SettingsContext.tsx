@@ -834,6 +834,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       kahfReminder: n.kahfReminder,
       kahfTime: n.kahfTime,
     });
+    await AsyncStorage.setItem('@last_notification_reschedule', new Date().toISOString());
   }, [settings]);
 
   // ========================================

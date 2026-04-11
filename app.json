@@ -17,7 +17,7 @@
       "bundleIdentifier": "com.rooh.almuslim",
       "buildNumber": "5",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.roohmuslim.app"]
+        "com.apple.security.application-groups": ["group.com.rooh.almuslim"]
       },
       "infoPlist": {
         "LSApplicationQueriesSchemes": ["whatsapp"],
