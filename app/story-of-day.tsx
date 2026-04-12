@@ -280,13 +280,15 @@ export default function StoryOfDayScreen() {
         setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
       } else {
         cdnRetryCount.current += 1;
-        // First CDN failure: try raw GitHub URL directly as fallback
+        // First CDN failure: retry with a cache-buster to force a fresh connection
         if (cdnRetryCount.current === 1 && rawVideoUrl && !rawVideoUrl.includes('file://')) {
-          console.log('[DailyVideo] jsDelivr failed, trying raw GitHub URL');
+          console.log('[DailyVideo] First attempt failed, retrying with cache-bust');
           resolvedSourceRef.current = 'cdn';
-          setResolvedVideoUrl(rawVideoUrl);
+          // Append cache-buster to force React state change + fresh network request
+          const separator = rawVideoUrl.includes('?') ? '&' : '?';
+          setResolvedVideoUrl(rawVideoUrl + separator + '_retry=' + Date.now());
         } else {
-          // Both CDN and raw GitHub failed — mark video as unavailable
+          // Both attempts failed — mark video as unavailable
           console.warn('[DailyVideo] All sources exhausted — showing ayah text fallback');
           setVideoUnavailable(true);
         }
