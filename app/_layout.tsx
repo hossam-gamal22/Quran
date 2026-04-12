@@ -57,7 +57,6 @@ import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { initRemoteTranslations } from '@/lib/remote-translations';
-import { ScreenshotBranding } from '@/components/ui/ScreenshotBranding';
 import { fontRegular } from '@/lib/fonts';
 import { toWesternDigits } from '@/lib/format-number';
 import { fetchQuranThemes } from '@/lib/admin-data-api';
@@ -864,7 +863,6 @@ export default function RootLayout() {
                         </Stack>
                         {!(pathname && pathname.startsWith('/qibla')) && <GlobalAudioBar />}
                         <DynamicSplashOverlay />
-                        <ScreenshotBranding />
                           </CelebrationProvider>
                           </OnboardingProvider>
                         </SeasonalProvider>
