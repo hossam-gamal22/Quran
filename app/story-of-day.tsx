@@ -172,7 +172,12 @@ export default function StoryOfDayScreen() {
         resolvedSourceRef.current = 'cdn';
         setResolvedVideoUrl(cdnUrl);
         // Background-cache for next visit
-        cacheVideoFile(rawVideoUrl).catch(() => {});
+        cacheVideoFile(rawVideoUrl).then((uri) => {
+          if (uri) console.log('[DailyVideo] Background cache saved:', uri.split('/').pop());
+          else console.warn('[DailyVideo] Background cache failed for:', rawVideoUrl.split('/').pop());
+        }).catch((e) => {
+          console.warn('[DailyVideo] Background cache error:', e);
+        });
       }
     })();
     return () => { cancelled = true; };
@@ -251,6 +256,16 @@ export default function StoryOfDayScreen() {
       }
       setIsTransitioning(false);
       player.play();
+
+      // If loaded from CDN, ensure playback cache is populated for next visit
+      if (resolvedSourceRef.current === 'cdn' && rawVideoUrl) {
+        getCachedVideoUri(rawVideoUrl).then((cached) => {
+          if (!cached) {
+            console.log('[DailyVideo] Video playing from CDN — retrying background cache');
+            cacheVideoFile(rawVideoUrl).catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
     if (status === 'error') {
       setIsTransitioning(false);
@@ -445,6 +460,8 @@ export default function StoryOfDayScreen() {
         const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
         if (!download?.uri) throw new Error('download failed');
         saveUri = download.uri;
+        // Also populate playback cache so future visits don't re-download
+        cacheVideoFile(rawVideoUrl).catch(() => {});
       }
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
@@ -478,6 +495,8 @@ export default function StoryOfDayScreen() {
         const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
         if (!download?.uri) throw new Error('download failed');
         shareUri = download.uri;
+        // Also populate playback cache so future visits don't re-download
+        cacheVideoFile(rawVideoUrl).catch(() => {});
       }
       if (Platform.OS === 'ios') {
         const label = isArabic ? dayData.surahName : dayData.surahEnglish;

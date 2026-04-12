@@ -1326,7 +1326,7 @@ export default function CategoryAzkarScreen() {
                           <MaterialCommunityIcons
                             name={isGlobalAzkarPlaying && currentlyPlayingZikrId === currentZikr.id && audioPlaying && !audioPaused ? 'volume-high' : 'volume-medium'}
                             size={22}
-                            color={isGlobalAzkarPlaying && currentlyPlayingZikrId === currentZikr.id ? categoryInfo.color : (darkMode ? '#9CA3AF' : '#6B7280')}
+                            color={isGlobalAzkarPlaying && currentlyPlayingZikrId === currentZikr.id && audioPlaying && !audioPaused ? categoryInfo.color : (darkMode ? '#9CA3AF' : '#6B7280')}
                           />
                         </TouchableOpacity>
                       )}
