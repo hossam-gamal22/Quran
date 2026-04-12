@@ -351,8 +351,8 @@ export async function prefetchDailyVideos(): Promise<void> {
 
     const today = todayDateString();
 
-    // Clean up old videos from previous days (keeps only today's)
-    await purgeOldVideos(today);
+    // NOTE: purgeOldVideos is called AFTER successful downloads (not here)
+    // to preserve yesterday's cache as offline fallback.
 
     // Skip if already prefetched today AND files still exist on disk
     const cachedDate = await AsyncStorage.getItem(DATE_KEY);
@@ -422,11 +422,19 @@ export async function prefetchDailyVideos(): Promise<void> {
     // Mark today as prefetched if at least half succeeded (don't re-download everything next time)
     if (failed === 0) {
       await AsyncStorage.setItem(DATE_KEY, today);
+      // All downloads succeeded — safe to purge old videos
+      await purgeOldVideos(today);
     } else if (succeeded >= results.length / 2) {
       // Partial success: mark as done to avoid re-downloading already cached files
       // The daily-video screen will CDN-stream any missing files
       await AsyncStorage.setItem(DATE_KEY, today);
+      // Enough today's videos exist — purge old ones
+      await purgeOldVideos(today);
+    } else if (succeeded >= 1) {
+      // At least one succeeded — purge old but don't mark as fully done
+      await purgeOldVideos(today);
     }
+    // If succeeded === 0 → keep old videos as offline fallback (don't purge)
 
     if (__DEV__) console.log(`🎬 Prefetch complete: ${succeeded}/${results.length} succeeded${failed > 0 ? ` (${failed} failed, will stream from CDN)` : ' ✓'}`);
   } catch (e) {

@@ -130,6 +130,7 @@ export default function StoryOfDayScreen() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
   const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seekingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive raw video URL
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
@@ -177,6 +178,7 @@ export default function StoryOfDayScreen() {
   const player = useVideoPlayer(resolvedVideoUrl, (p) => {
     p.loop = true;
     p.timeUpdateEventInterval = 0.1;
+    p.muted = isMuted; // preserve mute state across source changes
     p.play();
   });
 
@@ -237,9 +239,14 @@ export default function StoryOfDayScreen() {
         cdnRetryCount.current = 0;
         setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
       } else {
-        // CDN also failed — mark video as unavailable
         cdnRetryCount.current += 1;
-        if (cdnRetryCount.current >= 1) {
+        // First CDN failure: try raw GitHub URL directly as fallback
+        if (cdnRetryCount.current === 1 && rawVideoUrl && !rawVideoUrl.includes('file://')) {
+          console.log('[DailyVideo] jsDelivr failed, trying raw GitHub URL');
+          resolvedSourceRef.current = 'cdn';
+          setResolvedVideoUrl(rawVideoUrl);
+        } else {
+          // Both CDN and raw GitHub failed — mark video as unavailable
           console.warn('[DailyVideo] All sources exhausted — showing ayah text fallback');
           setVideoUnavailable(true);
         }
@@ -345,6 +352,7 @@ export default function StoryOfDayScreen() {
   }, [resetControlsTimer]);
 
   const handleSeek = useCallback((value: number) => {
+    if (seekingTimeoutRef.current) clearTimeout(seekingTimeoutRef.current);
     player.currentTime = value;
     setPositionSec(value);
     setIsSeeking(false);
@@ -387,15 +395,25 @@ export default function StoryOfDayScreen() {
     setSaving(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
-      if (!download?.uri) throw new Error('download failed');
+      let saveUri: string;
+      // Use cached file if available to avoid re-downloading
+      const cachedUri = await getCachedVideoUri(rawVideoUrl);
+      if (cachedUri) {
+        const dest = FileSystem.cacheDirectory + 'save-video-' + Date.now() + '.mp4';
+        await FileSystem.copyAsync({ from: cachedUri.replace('file://', ''), to: dest });
+        saveUri = dest;
+      } else {
+        const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
+        const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
+        if (!download?.uri) throw new Error('download failed');
+        saveUri = download.uri;
+      }
       const perm = await MediaLibrary.requestPermissionsAsync();
       if (!perm.granted) {
         Alert.alert('', t('storyOfDay.photoPermissionRequired'));
         return;
       }
-      await MediaLibrary.saveToLibraryAsync(download.uri);
+      await MediaLibrary.saveToLibraryAsync(saveUri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(t('common.success'), t('storyOfDay.videoWithAudioSaved'));
     } catch {
@@ -410,26 +428,37 @@ export default function StoryOfDayScreen() {
     setSharing(true);
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-      const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
-      if (download?.uri) {
-        if (Platform.OS === 'ios') {
-          const label = isArabic ? dayData.surahName : dayData.surahEnglish;
-          await Share.share({
-            message: `${dayData.ayahText}\n\n${label}\n\n${t('storyOfDay.shareText')}`,
-            url: download.uri,
+      let shareUri: string;
+      // Use cached file if available to avoid re-downloading
+      const cachedUri = await getCachedVideoUri(rawVideoUrl);
+      if (cachedUri) {
+        const dest = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
+        await FileSystem.copyAsync({ from: cachedUri.replace('file://', ''), to: dest });
+        shareUri = dest;
+      } else {
+        const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
+        const download = await FileSystem.downloadAsync(toJsDelivrUrl(rawVideoUrl), localPath);
+        if (!download?.uri) throw new Error('download failed');
+        shareUri = download.uri;
+      }
+      if (Platform.OS === 'ios') {
+        const label = isArabic ? dayData.surahName : dayData.surahEnglish;
+        await Share.share({
+          message: `${dayData.ayahText}\n\n${label}\n\n${t('storyOfDay.shareText')}`,
+          url: shareUri,
+        });
+      } else {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(shareUri, {
+            mimeType: 'video/mp4',
+            dialogTitle: t('storyOfDay.shareText'),
           });
-        } else {
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(download.uri, {
-              mimeType: 'video/mp4',
-              dialogTitle: t('storyOfDay.shareText'),
-            });
-          }
         }
       }
-    } catch { /* silent */ }
-    finally { setSharing(false); }
+    } catch (e) {
+      console.warn('[Share] Error:', e);
+      Alert.alert('', t('storyOfDay.videoSaveError'));
+    } finally { setSharing(false); }
   }, [dayData, rawVideoUrl, isArabic]);
 
   const displayPosition = isSeeking ? seekPosition : positionSec;
@@ -611,7 +640,11 @@ export default function StoryOfDayScreen() {
                           maximumValue={durationSec || 1}
                           value={displayPosition}
                           inverted={isRTL}
-                          onSlidingStart={() => setIsSeeking(true)}
+                          onSlidingStart={() => {
+                            setIsSeeking(true);
+                            if (seekingTimeoutRef.current) clearTimeout(seekingTimeoutRef.current);
+                            seekingTimeoutRef.current = setTimeout(() => setIsSeeking(false), 3000);
+                          }}
                           onValueChange={(v: number) => { if (isSeeking) setSeekPosition(v); }}
                           onSlidingComplete={handleSeek}
                           minimumTrackTintColor={colors.primary}
