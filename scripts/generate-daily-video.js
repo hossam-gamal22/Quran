@@ -18,7 +18,7 @@ const { createCanvas, GlobalFonts, loadImage } = require('@napi-rs/canvas');
 // ─── Config ──────────────────────────────────────────────────────────
 
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/public';
+const GITHUB_RAW_BASE = 'https://github.com/hossam-gamal22/Quran/releases/download/daily-videos';
 
 const REPO_ROOT = path.join(__dirname, '..');
 const PUBLIC_DIR = path.join(REPO_ROOT, 'public');
@@ -54,17 +54,18 @@ const RECITERS = [
   { id: 'ar.saoodshuraym',        label: 'سعود الشريم',          labelEn: 'Saud Ash-Shuraym' },
 ];
 
+// Pure landscape/sky terms — no fields, meadows, or pastoral scenes that may include animals
 const PHOTO_SEARCH_TERMS = [
-  'minimalist nature serene',
-  'calm ocean horizon minimal',
-  'beautiful sunrise sky peaceful',
-  'serene mountain lake solitude',
-  'golden sunset clouds minimal',
-  'starry night sky dark',
-  'green forest morning mist',
-  'desert dunes golden hour',
-  'lavender field dreamy',
-  'clear blue sky gradient',
+  'minimalist sky gradient abstract',
+  'calm ocean waves horizon',
+  'sunrise sky clouds peaceful',
+  'mountain peak snow landscape',
+  'sunset clouds dramatic sky',
+  'starry night milky way',
+  'misty forest trees morning',
+  'sand dunes desert abstract',
+  'blue sky fluffy clouds',
+  'aurora borealis northern lights',
 ];
 
 

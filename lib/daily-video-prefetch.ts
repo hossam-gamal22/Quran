@@ -200,7 +200,14 @@ async function atomicDownload(url: string, localPath: string): Promise<boolean> 
       await FileSystem.deleteAsync(tmpPath, { idempotent: true });
     }
 
-    await FileSystem.downloadAsync(url, tmpPath);
+    const result = await FileSystem.downloadAsync(url, tmpPath);
+
+    // Check HTTP status — skip validation on non-2xx responses
+    if (result.status && result.status >= 400) {
+      if (__DEV__) console.warn(`🎬 Download HTTP ${result.status}: ${url.split('/').pop()}`);
+      await FileSystem.deleteAsync(tmpPath, { idempotent: true });
+      return false;
+    }
 
     if (await isValidCachedVideo(tmpPath)) {
       // Atomic rename: file only appears at final path when fully valid
@@ -210,7 +217,8 @@ async function atomicDownload(url: string, localPath: string): Promise<boolean> 
 
     await FileSystem.deleteAsync(tmpPath, { idempotent: true });
     return false;
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn(`🎬 Download error: ${(e as any)?.message} for ${url.split('/').pop()}`);
     try { await FileSystem.deleteAsync(tmpPath, { idempotent: true }); } catch { /* noop */ }
     return false;
   }

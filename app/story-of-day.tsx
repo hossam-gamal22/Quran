@@ -119,6 +119,8 @@ export default function StoryOfDayScreen() {
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [videoUnavailable, setVideoUnavailable] = useState(false);
+  const cdnRetryCount = useRef(0);
 
   // Player UI state
   const [positionSec, setPositionSec] = useState(0);
@@ -140,6 +142,8 @@ export default function StoryOfDayScreen() {
   const resolvedSourceRef = useRef<'cache' | 'cdn' | null>(null);
 
   useEffect(() => {
+    cdnRetryCount.current = 0;
+    setVideoUnavailable(false);
     if (!rawVideoUrl) {
       if (__DEV__) console.log('[DailyVideo] No rawVideoUrl — currentVideo:', currentVideo?.reciterLabel, 'isPremium:', isPremium);
       setResolvedVideoUrl(null);
@@ -224,13 +228,21 @@ export default function StoryOfDayScreen() {
     }
     if (status === 'error') {
       setIsTransitioning(false);
-      console.error('[DailyVideo] Player error:', playerErrorObj?.message);
+      console.warn('[DailyVideo] Player error:', playerErrorObj?.message);
       // If cached file failed, invalidate and retry with CDN
       if (resolvedSourceRef.current === 'cache' && rawVideoUrl) {
         console.log('[DailyVideo] Cache playback failed, falling back to CDN');
         invalidateCachedVideo(rawVideoUrl).catch(() => {});
         resolvedSourceRef.current = 'cdn';
+        cdnRetryCount.current = 0;
         setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+      } else {
+        // CDN also failed — mark video as unavailable
+        cdnRetryCount.current += 1;
+        if (cdnRetryCount.current >= 1) {
+          console.warn('[DailyVideo] All sources exhausted — showing ayah text fallback');
+          setVideoUnavailable(true);
+        }
       }
     }
   }, [status]);
@@ -498,6 +510,37 @@ export default function StoryOfDayScreen() {
               </ScrollView>
             )}
 
+            {videoUnavailable && dayData ? (
+              <View style={[styles.videoCard, styles.ayahFallbackCard]}>
+                <View style={styles.ayahFallbackGradient}>
+                  <MaterialCommunityIcons name="bookshelf" size={36} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8 }} />
+                  <Text style={styles.ayahFallbackText}>
+                    {'\uFD3F'} {dayData.ayahText} {'\uFD3E'}
+                  </Text>
+                  <View style={styles.ayahFallbackDivider} />
+                  <Text style={styles.ayahFallbackSurah}>
+                    {isArabic ? dayData.surahName : dayData.surahEnglish}
+                    {dayData.ayahNumber ? ` — ${isArabic ? 'آية' : 'Ayah'} ${dayData.ayahNumber}` : ''}
+                  </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      cdnRetryCount.current = 0;
+                      setVideoUnavailable(false);
+                      if (rawVideoUrl) {
+                        resolvedSourceRef.current = 'cdn';
+                        setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+                      }
+                    }}
+                    style={[styles.retrySmallBtn, { marginTop: 16 }]}
+                  >
+                    <Text style={styles.retrySmallText}>
+                      {t('common.retry') || 'إعادة المحاولة'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
             <TouchableOpacity activeOpacity={1} onPress={handleVideoTap} style={styles.videoCard}>
               <VideoView
                 player={player}
@@ -589,6 +632,7 @@ export default function StoryOfDayScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            )}
 
             <View style={styles.actionsSection}>
               <TouchableOpacity
@@ -711,4 +755,24 @@ const _styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center', gap: 8,
   },
   btnText: { fontFamily: fontBold(), fontSize: 15, lineHeight: 26, includeFontPadding: false },
+  ayahFallbackCard: {
+    backgroundColor: '#0a2e2e',
+  },
+  ayahFallbackGradient: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 32,
+  },
+  ayahFallbackText: {
+    color: 'rgba(255,255,255,0.92)', fontFamily: fontBold(), fontSize: 24,
+    lineHeight: 46, textAlign: 'center', writingDirection: 'rtl',
+    includeFontPadding: false,
+  },
+  ayahFallbackDivider: {
+    width: 60, height: 1.5, backgroundColor: 'rgba(255,255,255,0.25)',
+    marginVertical: 16, borderRadius: 1,
+  },
+  ayahFallbackSurah: {
+    color: 'rgba(255,255,255,0.6)', fontFamily: fontSemiBold(), fontSize: 15,
+    textAlign: 'center', writingDirection: 'rtl', includeFontPadding: false,
+  },
 });

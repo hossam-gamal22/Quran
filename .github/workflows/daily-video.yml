@@ -50,6 +50,38 @@ jobs:
           echo "📂 App icon: $(ls -la ../assets/images/icons/icon.png 2>&1)"
           node generate-daily-video.js
 
+      - name: Upload videos to GitHub Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create the release tag if it doesn't exist
+          gh release create daily-videos \
+            --title "Daily Videos" \
+            --notes "Auto-generated daily Quran recitation videos. Updated daily by GitHub Actions." \
+            2>/dev/null || true
+
+          # Upload all MP4 files from public/ (overwrite existing)
+          if ls public/*.mp4 1>/dev/null 2>&1; then
+            echo "📤 Uploading $(ls public/*.mp4 | wc -l) video files..."
+            gh release upload daily-videos public/*.mp4 --clobber
+            echo "✅ Upload complete"
+          else
+            echo "⚠️ No video files found in public/"
+          fi
+
+          # Clean old release assets (older than ROLLING_DAYS=7)
+          CUTOFF_DATE=$(date -d '8 days ago' +%Y-%m-%d 2>/dev/null || date -v-8d +%Y-%m-%d)
+          echo "🗑️ Cleaning release assets before $CUTOFF_DATE..."
+          gh release view daily-videos --json assets -q '.assets[].name' | while read -r asset; do
+            if [[ "$asset" =~ ^video-([0-9]{4}-[0-9]{2}-[0-9]{2})-.+\.mp4$ ]]; then
+              ASSET_DATE="${BASH_REMATCH[1]}"
+              if [[ "$ASSET_DATE" < "$CUTOFF_DATE" ]]; then
+                echo "   🗑️ Deleting old asset: $asset"
+                gh release delete-asset daily-videos "$asset" -y 2>/dev/null || true
+              fi
+            fi
+          done
+
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
