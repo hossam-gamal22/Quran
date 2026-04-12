@@ -1079,8 +1079,8 @@ export default function CategoryAzkarScreen() {
                   }}
                   numberOfLines={2}
                 >
-                  {audioQueueIndex >= 0
-                    ? (category?.includes('duas') ? t('azkar.duaNumber', { num: String(audioQueueIndex + 1) }) : t('azkar.dhikrNumber', { num: String(audioQueueIndex + 1) }))
+                  {audioQueueIndex >= 0 && audioQueueIndex < audioQueue.length
+                    ? (audioQueue[audioQueueIndex].zikr.arabic?.substring(0, 60) || getCategoryName(categoryInfo, language))
                     : getCategoryName(categoryInfo, language)}
                 </Text>
                 <Text
