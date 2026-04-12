@@ -656,13 +656,26 @@ export default function CategoryAzkarScreen() {
   const audioTracks: AudioTrack[] = React.useMemo(() => {
     return audioQueue.map((item, index) => ({
       id: String(item.zikr.id),
-      title: category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }),
+      title: item.zikr.arabic?.substring(0, 60) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })),
       subtitle: categoryInfo ? getCategoryName(categoryInfo, language) : '',
       url: item.zikr.audio!,
       localSource: getAzkarAudioSource(item.zikr.audio) ?? undefined,
       categoryId: String(categoryInfo?.id || category),
     }));
   }, [audioQueue, categoryInfo, category]);
+
+  // Play a single zikr from its index in the full azkar array
+  const handlePlayZikrAudio = useCallback(async (zikr: Zikr) => {
+    if (!zikr.audio) return;
+    const queueIdx = audioQueue.findIndex(q => q.zikr.id === zikr.id);
+    if (queueIdx < 0) return;
+    if (isGlobalAzkarPlaying && audioQueueIndex === queueIdx) {
+      await globalAudio.togglePlayPause();
+    } else {
+      await globalAudio.playAzkarQueue(audioTracks, queueIdx, `/azkar/${category}`);
+      setAudioPlaying(true);
+    }
+  }, [audioQueue, audioTracks, globalAudio, category, isGlobalAzkarPlaying, audioQueueIndex]);
 
   const hasAudio = audioQueue.length > 0;
 
@@ -1260,13 +1273,23 @@ export default function CategoryAzkarScreen() {
                             fontFamily: isCurrentTrack ? fontBold() : fontRegular(),
                             color: isCurrentTrack ? categoryInfo.color : (darkMode ? '#E5E7EB' : '#374151'),
                             textAlign: isRTL ? 'right' : 'left',
-                            writingDirection: isRTL ? 'rtl' : 'ltr',
+                            writingDirection: 'rtl',
                             lineHeight: 24,
                           }}
                           numberOfLines={1}
                         >
-                          {category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })}
+                          {item.zikr.arabic?.substring(0, 50) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }))}
                         </Text>
+                      </View>
+                      <View style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isCurrentTrack ? categoryInfo.color : (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
+                      }}>
+                        <MaterialCommunityIcons name="music-note" size={16} color={isCurrentTrack ? '#fff' : (darkMode ? '#9CA3AF' : '#6B7280')} />
                       </View>
                     </TouchableOpacity>
                   );
@@ -1295,6 +1318,18 @@ export default function CategoryAzkarScreen() {
                   <GlassCard intensity={46} style={styles.zikrCardGlass}>
                     {/* أزرار الإجراءات */}
                     <View style={[styles.actionButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      {hasAudio && !!currentZikr.audio && language === 'ar' && (
+                        <TouchableOpacity
+                          onPress={() => handlePlayZikrAudio(currentZikr)}
+                          style={styles.actionButton}
+                        >
+                          <MaterialCommunityIcons
+                            name={isGlobalAzkarPlaying && currentlyPlayingZikrId === currentZikr.id && audioPlaying && !audioPaused ? 'volume-high' : 'volume-medium'}
+                            size={22}
+                            color={isGlobalAzkarPlaying && currentlyPlayingZikrId === currentZikr.id ? categoryInfo.color : (darkMode ? '#9CA3AF' : '#6B7280')}
+                          />
+                        </TouchableOpacity>
+                      )}
                       <TouchableOpacity
                         onPress={() => toggleFavorite(currentZikr.id)}
                         style={styles.actionButton}
@@ -1348,7 +1383,16 @@ export default function CategoryAzkarScreen() {
                         paddingBottom: 4,
                       } : {};
                       return (
-                        <>
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onLongPress={() => {
+                            if (hasAudio && currentZikr.audio && language === 'ar') {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                              handlePlayZikrAudio(currentZikr);
+                            }
+                          }}
+                          delayLongPress={400}
+                        >
                           {hadBasmala && (
                             <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} />
                           )}
@@ -1371,7 +1415,7 @@ export default function CategoryAzkarScreen() {
                               {getZikrTranslation(currentZikr, language)}
                             </Text>
                           )}
-                        </>
+                        </TouchableOpacity>
                       );
                     })()}
 
