@@ -12,6 +12,7 @@ import { radioPlayer } from '@/lib/radio-player';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 import { markTrackPlayerSetupDone, isTrackPlayerSetupDone, onTrackPlayerSetupDone } from '@/lib/track-player-ready';
 import { getCategoryTrimMs } from '@/lib/azkar-audio-config';
+import { Asset } from 'expo-asset';
 import type { RadioStation, RadioPlaybackState } from '@/types/radio';
 
 // Dynamic import of TrackPlayer - may not be available in Expo Go
@@ -300,13 +301,23 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
     try {
       if (isTrackPlayerReady() && TrackPlayer) {
         // Use TrackPlayer for native platforms (with lock screen controls)
-        const tpTracks = queue.map((t, i) => ({
-          id: `azkar-${t.id}-${i}`,
-          url: t.url,
-          title: t.title,
-          artist: t.subtitle || 'أذكار',
-          album: 'الأذكار',
-          artwork: require('../assets/images/icons/icon.png'),
+        const tpTracks = await Promise.all(queue.map(async (t, i) => {
+          let resolvedUrl = t.url;
+          if (t.localSource) {
+            try {
+              const asset = Asset.fromModule(t.localSource);
+              if (!asset.localUri) await asset.downloadAsync();
+              resolvedUrl = asset.localUri || asset.uri || t.url;
+            } catch {}
+          }
+          return {
+            id: `azkar-${t.id}-${i}`,
+            url: resolvedUrl,
+            title: t.title,
+            artist: t.subtitle || 'أذكار',
+            album: 'الأذكار',
+            artwork: require('../assets/images/icons/icon.png'),
+          };
         }));
 
         await TrackPlayer.reset();

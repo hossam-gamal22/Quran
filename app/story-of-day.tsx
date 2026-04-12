@@ -199,12 +199,12 @@ export default function StoryOfDayScreen() {
     if (!isSeeking) setPositionSec(ct);
   });
 
-  // Android fallback: poll position when timeUpdate events stall
+  // Fallback: poll position (Android timeUpdate stalls) & duration (both platforms)
   useEffect(() => {
-    if (Platform.OS !== 'android' || status !== 'readyToPlay') return;
+    if (status !== 'readyToPlay') return;
     const id = setInterval(() => {
       try {
-        if (!isSeeking && player.playing) {
+        if (!isSeeking && player.playing && Platform.OS === 'android') {
           setPositionSec(player.currentTime);
         }
         if (durationSec === 0 && player.duration > 0) {
@@ -242,8 +242,8 @@ export default function StoryOfDayScreen() {
       const dur = player.duration;
       if (dur > 0) {
         setDurationSec(dur);
-      } else if (Platform.OS === 'android') {
-        // Android: duration may not be available immediately
+      } else {
+        // Duration may not be available immediately on some platforms
         const t = setTimeout(() => {
           try { if (player.duration > 0) setDurationSec(player.duration); } catch {}
         }, 300);

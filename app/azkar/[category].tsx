@@ -68,6 +68,7 @@ import { Spacing } from '@/constants/theme';
 import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
 import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
+import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
 import { searchPhotos, type Photo } from '@/lib/api/pexels';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -658,8 +659,10 @@ export default function CategoryAzkarScreen() {
       title: category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) }),
       subtitle: categoryInfo ? getCategoryName(categoryInfo, language) : '',
       url: item.zikr.audio!,
+      localSource: getAzkarAudioSource(item.zikr.audio) ?? undefined,
+      categoryId: String(categoryInfo?.id || category),
     }));
-  }, [audioQueue, categoryInfo]);
+  }, [audioQueue, categoryInfo, category]);
 
   const hasAudio = audioQueue.length > 0;
 
