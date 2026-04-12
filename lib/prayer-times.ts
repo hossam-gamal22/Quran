@@ -188,8 +188,12 @@ export const fetchPrayerTimes = async (
 
   const url = `https://api.aladhan.com/v1/timings/${day}-${month}-${year}?latitude=${latitude}&longitude=${longitude}&method=${settings.calculationMethod}&school=${settings.asrJuristic}`;
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     const data = await response.json();
 
     if (data.code === 200 && data.status === 'OK') {
@@ -198,6 +202,7 @@ export const fetchPrayerTimes = async (
       throw new Error('Failed to fetch prayer times');
     }
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Error fetching prayer times:', error);
     throw error;
   }

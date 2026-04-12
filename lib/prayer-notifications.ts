@@ -19,6 +19,8 @@ import {
   PrayerKey 
 } from './notification-types';
 import { checkExactAlarmPermission } from '@/services/notifications/permissions';
+import { getOfflinePrayerTimesRange } from '@/lib/prayer-week-cache';
+import type { PrayerTimes as PrayerTimesType } from '@/lib/prayer-times';
 
 // Re-export للتوافق
 export { NotificationSettings, DEFAULT_NOTIFICATION_SETTINGS } from './notification-types';
@@ -161,16 +163,60 @@ export async function schedulePrayerNotifications(
     const currentMonth = today.getMonth() + 1;
     const currentYear = today.getFullYear();
 
-    const monthlyData = await fetchMonthlyPrayerTimes(
-      location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
-    );
+    // ─── Data Source: try API first, then offline fallback ────────────
+    type DayScheduleData = { date: Date; timings: Record<string, string>; isOffline: boolean };
+    let scheduleDays: DayScheduleData[] = [];
+    let usedOfflineFallback = false;
 
-    // If the scheduling window spans into next month, fetch that too
-    let nextMonthData: PrayerTimesResponse[] | null = null;
-    if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
-      nextMonthData = await fetchMonthlyPrayerTimes(
-        location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
+    try {
+      const monthlyData = await fetchMonthlyPrayerTimes(
+        location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
       );
+
+      // If the scheduling window spans into next month, fetch that too
+      let nextMonthData: PrayerTimesResponse[] | null = null;
+      if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
+        nextMonthData = await fetchMonthlyPrayerTimes(
+          location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
+        );
+      }
+
+      // Build unified structure from API data
+      for (let dayOffset = 0; dayOffset < PRAYER_SCHEDULE_DAYS; dayOffset++) {
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + dayOffset);
+        const isNextMonth = targetDate.getMonth() + 1 !== currentMonth || targetDate.getFullYear() !== currentYear;
+        const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
+        const dayData = source[targetDate.getDate() - 1];
+        if (!dayData) continue;
+        scheduleDays.push({ date: targetDate, timings: dayData.timings as Record<string, string>, isOffline: false });
+      }
+    } catch (apiError) {
+      console.warn('[prayer-notif] API fetch failed, trying offline fallback:', apiError);
+      // Offline fallback: use local calculation / cache / extrapolation / country defaults
+      const offlineRange = await getOfflinePrayerTimesRange(today, PRAYER_SCHEDULE_DAYS);
+      if (offlineRange.length === 0) {
+        throw apiError; // Nothing available offline either
+      }
+      usedOfflineFallback = true;
+      for (const entry of offlineRange) {
+        const d = new Date(entry.date + 'T12:00:00');
+        // Convert PrayerTimes (HH:MM keys) to API-style timings record
+        const timings: Record<string, string> = {
+          Fajr: entry.times.fajr,
+          Sunrise: entry.times.sunrise,
+          Dhuhr: entry.times.dhuhr,
+          Asr: entry.times.asr,
+          Maghrib: entry.times.maghrib,
+          Isha: entry.times.isha,
+        };
+        scheduleDays.push({ date: d, timings, isOffline: true });
+      }
+      console.log(`[prayer-notif] 📴 Using offline data for ${offlineRange.length} days (sources: ${offlineRange.map(r => r.source).join(', ')})`);
+    }
+
+    if (scheduleDays.length === 0) {
+      throw new Error('No prayer data available for scheduling');
     }
 
     // ─── API fetch succeeded — NOW cancel old prayer notifications ──────────
@@ -204,21 +250,14 @@ export async function schedulePrayerNotifications(
     const now = new Date();
     const mosqueAttachments = await getNotificationIconAttachment('mosque');
 
-    for (let dayOffset = 0; dayOffset < PRAYER_SCHEDULE_DAYS; dayOffset++) {
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + dayOffset);
-
-      // Pick prayer data from the correct month
-      const isNextMonth = targetDate.getMonth() + 1 !== currentMonth || targetDate.getFullYear() !== currentYear;
-      const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
-      const dayData = source[targetDate.getDate() - 1]; // Array is 0-indexed, days are 1-indexed
-      if (!dayData) continue;
+    for (let dayOffset = 0; dayOffset < scheduleDays.length; dayOffset++) {
+      const { date: targetDate, timings } = scheduleDays[dayOffset];
 
       for (const prayerKey of PRAYER_KEYS) {
         if (!notifSettings.prayers[prayerKey]) continue;
 
         const apiKey = PRAYER_KEY_TO_API[prayerKey];
-        const timeStr = dayData.timings[apiKey as keyof typeof dayData.timings];
+        const timeStr = timings[apiKey];
         if (!timeStr) continue;
 
         const triggerDate = prayerTimeToDateForDay(timeStr, targetDate, notifSettings.advanceMinutes);
@@ -268,7 +307,7 @@ export async function schedulePrayerNotifications(
       }
     }
 
-    console.log(`✅ Scheduled ${scheduledIds.length} prayer notifications (${PRAYER_SCHEDULE_DAYS} days)`);
+    console.log(`✅ Scheduled ${scheduledIds.length} prayer notifications (${scheduleDays.length} days${usedOfflineFallback ? ', OFFLINE' : ''})`);
     // Dump all scheduled prayer IDs for ADB debugging
     console.log(`[prayer-notif] IDs: ${scheduledIds.join(', ')}`);
 

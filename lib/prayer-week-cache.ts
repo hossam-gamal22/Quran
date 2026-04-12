@@ -3,6 +3,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString } from '@/lib/prayer-times';
+import { calculateLocalPrayerTimes, getCountryFallbackPrayerTimes } from '@/lib/country-prayer-defaults';
+import { getStoredLocation } from '@/lib/prayer-times';
 
 // ────────────────────────────────────────────
 // Types
@@ -200,7 +202,7 @@ export function isExtrapolationReliable(cache: WeekCacheData, targetDate: string
 // Offline Fallback Chain
 // ────────────────────────────────────────────
 
-export type PrayerDataSource = 'live' | 'todayCache' | 'weekCache' | 'extrapolated' | 'error';
+export type PrayerDataSource = 'live' | 'todayCache' | 'weekCache' | 'extrapolated' | 'localCalc' | 'countryFallback' | 'error';
 
 export interface OfflinePrayerResult {
   times: PrayerTimes | null;
@@ -210,7 +212,7 @@ export interface OfflinePrayerResult {
 
 /**
  * Try to load prayer times from any available offline source.
- * Priority: today's cache → week cache → extrapolation → null
+ * Priority: today's cache → week cache → extrapolation → local calc (stored coords) → country fallback → null
  */
 export async function getOfflinePrayerTimes(targetDate?: string): Promise<OfflinePrayerResult> {
   const today = targetDate || getTodayDateString();
@@ -249,6 +251,29 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
     if (prevCache) {
       return { times: prevCache, source: 'extrapolated', cacheAgeDays: i };
     }
+  }
+
+  // 5. Local calculation using stored coordinates (adhan package — no network)
+  try {
+    const storedLoc = await getStoredLocation();
+    if (storedLoc?.latitude && storedLoc?.longitude) {
+      const targetDateObj = new Date(today + 'T12:00:00');
+      // Use default method 4 (Umm Al-Qura); user settings would need AsyncStorage read
+      const times = calculateLocalPrayerTimes(storedLoc.latitude, storedLoc.longitude, targetDateObj, 4, 0);
+      console.log('📍 Offline: used local calculation from stored coordinates');
+      return { times, source: 'localCalc', cacheAgeDays: 0 };
+    }
+  } catch (e) {
+    console.warn('Local calculation from stored coords failed:', e);
+  }
+
+  // 6. Country fallback — device region → capital city calculation
+  try {
+    const result = getCountryFallbackPrayerTimes(new Date(today + 'T12:00:00'));
+    console.log(`🌍 Offline: used country fallback (${result.countryCode} → ${result.cityNameEn})`);
+    return { times: result.times, source: 'countryFallback', cacheAgeDays: 0 };
+  } catch (e) {
+    console.warn('Country fallback failed:', e);
   }
 
   return { times: null, source: 'error', cacheAgeDays: -1 };
@@ -317,4 +342,72 @@ export function buildWeekEntries(
   }
 
   return entries;
+}
+
+// ────────────────────────────────────────────
+// Offline Range for Notifications/Widgets
+// ────────────────────────────────────────────
+
+/**
+ * Get prayer times for a range of days using the best offline source available.
+ * Used by notification scheduling and widget data when the API is unreachable.
+ * Returns an array of { date, times } entries — one per day.
+ */
+export async function getOfflinePrayerTimesRange(
+  startDate: Date,
+  days: number,
+): Promise<Array<{ date: string; times: PrayerTimes; source: PrayerDataSource }>> {
+  const results: Array<{ date: string; times: PrayerTimes; source: PrayerDataSource }> = [];
+  const weekCache = await getWeekCache();
+  const storedLoc = await getStoredLocation();
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const dateStr = formatDateString(d);
+
+    // 1. Per-day cache
+    const cached = await getCachedPrayerTimes(dateStr);
+    if (cached) {
+      results.push({ date: dateStr, times: cached, source: 'todayCache' });
+      continue;
+    }
+
+    // 2. Week cache exact match
+    if (weekCache) {
+      const weekDay = findDayInWeekCache(weekCache, dateStr);
+      if (weekDay) {
+        results.push({ date: dateStr, times: weekDay, source: 'weekCache' });
+        continue;
+      }
+
+      // 3. Extrapolation
+      if (isExtrapolationReliable(weekCache, dateStr)) {
+        const extrapolated = extrapolatePrayerTimes(weekCache, dateStr);
+        if (extrapolated) {
+          results.push({ date: dateStr, times: extrapolated, source: 'extrapolated' });
+          continue;
+        }
+      }
+    }
+
+    // 4. Local calculation with stored coordinates
+    if (storedLoc?.latitude && storedLoc?.longitude) {
+      try {
+        const times = calculateLocalPrayerTimes(storedLoc.latitude, storedLoc.longitude, d, 4, 0);
+        results.push({ date: dateStr, times, source: 'localCalc' });
+        continue;
+      } catch {}
+    }
+
+    // 5. Country fallback
+    try {
+      const fb = getCountryFallbackPrayerTimes(d);
+      results.push({ date: dateStr, times: fb.times, source: 'countryFallback' });
+    } catch {
+      // Skip this day if everything fails
+    }
+  }
+
+  return results;
 }

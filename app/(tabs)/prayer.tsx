@@ -307,15 +307,18 @@ export default function PrayerScreen() {
       const lat = currentLocation.coords.latitude;
       const lon = currentLocation.coords.longitude;
 
-      // Try locale-aware geocoding first
+      // Try locale-aware geocoding first (3s timeout to avoid offline hang)
       let city = '';
       let country = '';
       try {
         const lang = language || 'ar';
+        const geocodeCtrl = new AbortController();
+        const geocodeTimeout = setTimeout(() => geocodeCtrl.abort(), 3000);
         const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&format=json&accept-language=${encodeURIComponent(lang)}`,
-          { headers: { 'User-Agent': 'RuhAlMuslim/1.0' } }
+          { headers: { 'User-Agent': 'RuhAlMuslim/1.0' }, signal: geocodeCtrl.signal }
         );
+        clearTimeout(geocodeTimeout);
         if (res.ok) {
           const data = await res.json();
           city = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.state || '';
@@ -444,10 +447,13 @@ export default function PrayerScreen() {
           currentLoc = stored;
           try {
             const lang = language || 'ar';
+            const geocodeCtrl = new AbortController();
+            const geocodeTimeout = setTimeout(() => geocodeCtrl.abort(), 3000);
             const res = await fetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(stored.latitude)}&lon=${encodeURIComponent(stored.longitude)}&format=json&accept-language=${encodeURIComponent(lang)}`,
-              { headers: { 'User-Agent': 'RuhAlMuslim/1.0' } }
+              { headers: { 'User-Agent': 'RuhAlMuslim/1.0' }, signal: geocodeCtrl.signal }
             );
+            clearTimeout(geocodeTimeout);
             if (res.ok) {
               const data = await res.json();
               const city = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.state || '';
@@ -498,6 +504,32 @@ export default function PrayerScreen() {
       const loc = currentLoc || await fetchLocation();
       if (!loc) throw new Error(t('messages.locationRequired'));
       setLocation(loc);
+
+      // ─── Early network check: skip API when offline ───
+      const netState = await NetInfo.fetch();
+      const isOnline = netState.isConnected && netState.isInternetReachable !== false;
+      if (!isOnline) {
+        console.log('📴 Offline detected — skipping API, using offline fallback chain');
+        const offlineResult = await getOfflinePrayerTimes();
+        if (offlineResult.times) {
+          setPrayerTimes(offlineResult.times);
+          setDataSource(offlineResult.source);
+          setCacheAgeDays(offlineResult.cacheAgeDays);
+          // Sync offline times to widgets
+          try {
+            const { updateSharedData } = require('@/lib/widget-data');
+            const locationLabel = loc?.city ? `${loc.city}${loc.country ? ', ' + loc.country : ''}` : '';
+            updateSharedData(offlineResult.times, locationLabel).catch(() => {});
+          } catch {}
+          // Update live activity with offline times
+          if (Platform.OS === 'ios') {
+            updatePrayerLiveActivity(offlineResult.times);
+          }
+          return;
+        }
+        // If offline fallback chain is completely empty, throw to reach catch block
+        throw new Error('offline_no_data');
+      }
 
       const response = await fetchPrayerTimes(loc, new Date(), settingsFromStore);
       let times = parsePrayerTimes(response);
@@ -588,8 +620,8 @@ export default function PrayerScreen() {
   // Auto-refresh when connectivity returns while showing stale/extrapolated data
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const isOnline = state.isConnected && state.isInternetReachable !== false;
-      if (isOnline && (dataSource === 'extrapolated' || dataSource === 'error')) {
+      const isOnlineRefresh = state.isConnected && state.isInternetReachable !== false;
+      if (isOnlineRefresh && (dataSource === 'extrapolated' || dataSource === 'error' || dataSource === 'localCalc' || dataSource === 'countryFallback')) {
         console.log('🌐 Connectivity restored — auto-refreshing prayer times');
         loadPrayerTimes(true);
       }
@@ -677,6 +709,7 @@ export default function PrayerScreen() {
         </View>
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#0d8e62']} tintColor="#0d8e62" />}>
+
           {error && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorContainer, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(239,83,80,0.15)' : '#ffebee' }]}>
               <MaterialCommunityIcons name="alert-circle" size={24} color="#ef5350" />
@@ -687,10 +720,10 @@ export default function PrayerScreen() {
             </Animated.View>
           )}
 
-          {/* Stale/extrapolated data warning banner */}
-          {dataSource === 'extrapolated' && !error && (
+          {/* Stale/extrapolated/offline data warning banner */}
+          {(dataSource === 'extrapolated' || dataSource === 'localCalc' || dataSource === 'countryFallback') && !error && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.staleBanner, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,152,0,0.15)' : 'rgba(255,243,224,0.95)' }]}>
-              <MaterialCommunityIcons name="clock-alert-outline" size={22} color={isDarkMode ? '#ffb74d' : '#e65100'} />
+              <MaterialCommunityIcons name={dataSource === 'countryFallback' ? 'earth' : 'clock-alert-outline'} size={22} color={isDarkMode ? '#ffb74d' : '#e65100'} />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.staleBannerText, { color: isDarkMode ? '#ffcc80' : '#e65100', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                   {t('prayer.approximateTimes')}

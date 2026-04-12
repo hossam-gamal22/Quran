@@ -69,6 +69,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
 import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
+import { hasQuranRefs } from '@/lib/azkar-quran-refs';
+import AzkarQcfVerse from '@/components/AzkarQcfVerse';
 import { searchPhotos, type Photo } from '@/lib/api/pexels';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -1364,15 +1366,16 @@ export default function CategoryAzkarScreen() {
 
                     {/* النص الرئيسي */}
                     {/* Main dhikr text: Arabic for Arabic users, translation for others */}
-                    {/* Use Uthmanic font for Quran content (detected by verse brackets or known IDs) */}
+                    {/* Use QCF Mushaf font for mapped Quran verses, KFGQPCUthmanic fallback for others */}
                     {(() => {
+                      const useQcf = hasQuranRefs(currentZikr.id);
                       const knownQuranIds = [48, 481, 482, 49];
                       const hasVerseBrackets = currentZikr.arabic?.includes('﴿') || currentZikr.arabic?.includes('﴾');
-                      const isQuranSurah = knownQuranIds.includes(currentZikr.id) || hasVerseBrackets;
+                      const isQuranSurah = useQcf || knownQuranIds.includes(currentZikr.id) || hasVerseBrackets;
                       const { stripped, hadBasmala } = stripBasmalaPrefix(currentZikr.arabic);
                       const rawDisplay = hadBasmala ? stripped : currentZikr.arabic;
                       const displayText = isQuranSurah ? stripVerseNumbers(rawDisplay) : rawDisplay;
-                      const quranFontStyle = isQuranSurah ? {
+                      const quranFontStyle = (!useQcf && isQuranSurah) ? {
                         fontFamily: 'KFGQPCUthmanic',
                         fontSize: 30,
                         lineHeight: 62,
@@ -1393,14 +1396,20 @@ export default function CategoryAzkarScreen() {
                           }}
                           delayLongPress={400}
                         >
-                          {hadBasmala && (
+                          {hadBasmala && !useQcf && (
                             <BasmalaHeader tintColor={darkMode ? '#D4A574' : '#C9A84C'} />
                           )}
-                          {isArabic ? (
+                          {useQcf && isArabic ? (
+                            <AzkarQcfVerse
+                              azkarId={currentZikr.id}
+                              textColor={isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === currentZikr.id ? categoryInfo.color : (darkMode ? '#F9FAFB' : '#1F2937')}
+                              fallbackText={currentZikr.arabic}
+                            />
+                          ) : isArabic ? (
                             <Text style={[
                               styles.arabicText,
                               { color: darkMode ? '#F9FAFB' : '#1F2937' },
-                              currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                              isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
                               quranFontStyle,
                             ]}>
                               {displayText}
@@ -1409,7 +1418,7 @@ export default function CategoryAzkarScreen() {
                             <Text style={[
                               styles.arabicText,
                               { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
-                              currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
+                              isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === currentZikr.id && { color: categoryInfo.color },
                               quranFontStyle,
                             ]}>
                               {getZikrTranslation(currentZikr, language)}
@@ -1572,7 +1581,7 @@ export default function CategoryAzkarScreen() {
                   <GlassCard intensity={40} style={[
                     styles.zikrCardGlass,
                     { padding: 0 },
-                    currentlyPlayingZikrId === zikr.id && { borderWidth: 1.5, borderColor: categoryInfo.color },
+                    isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === zikr.id && { borderWidth: 1.5, borderColor: categoryInfo.color },
                   ]}>
                     {/* Collapsed header — always visible */}
                     <TouchableOpacity
@@ -1595,12 +1604,12 @@ export default function CategoryAzkarScreen() {
                         style={[
                           styles.arabicText,
                           { color: darkMode ? '#F9FAFB' : '#1F2937', fontSize: 18, marginBottom: 0, flex: 1, textAlign: isArabic ? 'right' : (isRTL ? 'right' : 'left'), writingDirection: isArabic ? 'rtl' : (isRTL ? 'rtl' : 'ltr') },
-                          currentlyPlayingZikrId === zikr.id && { color: categoryInfo.color },
-                          ([48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾')) && { fontFamily: 'KFGQPCUthmanic', fontSize: 22, lineHeight: 44 },
+                          isGlobalAzkarPlaying && audioPlaying && !audioPaused && currentlyPlayingZikrId === zikr.id && { color: categoryInfo.color },
+                          (!hasQuranRefs(zikr.id) && ([48, 481, 482, 49].includes(zikr.id) || zikr.arabic?.includes('﴿') || zikr.arabic?.includes('﴾'))) && { fontFamily: 'KFGQPCUthmanic', fontSize: 22, lineHeight: 44 },
                         ]}
                         numberOfLines={isExpanded ? undefined : 2}
                       >
-                        {isArabic ? listDisplayText : getZikrTranslation(zikr, language)}
+                        {isArabic ? (hasQuranRefs(zikr.id) ? zikr.arabic : listDisplayText) : getZikrTranslation(zikr, language)}
                       </Text>
                       <View style={[styles.listCollapseRight, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={[styles.listMiniCount, { backgroundColor: zDone ? '#10B981' : categoryInfo.color }]}>

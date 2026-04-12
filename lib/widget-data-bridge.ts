@@ -17,6 +17,7 @@ import {
 } from './widget-data';
 import { getLanguage } from './i18n';
 import { type PrayerTimes } from './prayer-times';
+import { getOfflinePrayerTimes } from './prayer-week-cache';
 
 const APP_GROUP = 'group.com.rooh.almuslim';
 const WIDGET_DATA_KEY = 'widget_shared_data';
@@ -167,8 +168,20 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
     const lang = getLanguage();
     const settings = await getWidgetSettings();
 
+    // Auto-fetch offline prayer times if none are passed
+    let effectivePrayerTimes = prayerTimes || null;
+    if (!effectivePrayerTimes) {
+      try {
+        const offlineResult = await getOfflinePrayerTimes();
+        if (offlineResult.times) {
+          effectivePrayerTimes = offlineResult.times;
+          if (__DEV__) console.log(`📴 Widget: using offline prayer times (source: ${offlineResult.source})`);
+        }
+      } catch {}
+    }
+
     const [prayerData, azkarData, verseData, dhikrData, prayerCompletion] = await Promise.all([
-      preparePrayerWidgetData(prayerTimes || null, location, lang),
+      preparePrayerWidgetData(effectivePrayerTimes, location, lang),
       prepareAzkarWidgetData(lang, settings.azkarWidget.categories),
       prepareVerseWidgetData(lang, { showTranslation: settings.verseWidget.showTranslation }),
       prepareDhikrWidgetData(lang, { showTranslation: settings.dhikrWidget.showTranslation, showBenefit: settings.dhikrWidget.showBenefit }),

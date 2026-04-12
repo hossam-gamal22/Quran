@@ -21,7 +21,7 @@ import { t } from '@/lib/i18n';
 // Bump this whenever channel config changes (sounds, importance, etc.)
 // Forces a delete+recreate of all channels on next app launch.
 const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
-const CURRENT_CHANNELS_VERSION = '13';
+const CURRENT_CHANNELS_VERSION = '14';
 
 // ─── Adhan sound filename map (all files in assets/sounds/) ─────────────────
 export const ADHAN_SOUND_FILES: Record<string, string> = {
@@ -138,7 +138,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
         enableVibrate: true,
         lightColor: '#1B5E20',
         lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-        bypassDnd: false,
+        bypassDnd: true,
       });
     } catch (e) {
       console.warn(`[Channels] Failed to create ${channelId}:`, e);

@@ -118,7 +118,6 @@ export default function StoryOfDayScreen() {
   const [fetchRetryKey, setFetchRetryKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
   const cdnRetryCount = useRef(0);
 
@@ -132,9 +131,12 @@ export default function StoryOfDayScreen() {
   const [isBuffering, setIsBuffering] = useState(false);
   const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const bufferingCheckRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const lastPositionRef = useRef(0);
-  const reciterSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Refs for values read inside event handlers / intervals (avoids stale closures)
+  const isSeekingRef = useRef(false);
+  const positionRef = useRef(0);
+  const durationFoundRef = useRef(false);
 
   // Derive raw video URL
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
@@ -192,70 +194,94 @@ export default function StoryOfDayScreen() {
   });
 
   // Reactive state from player events
-  const { status, error: playerErrorObj } = useEvent(player, 'statusChange', {
+  const { status: eventStatus, error: playerErrorObj } = useEvent(player, 'statusChange', {
     status: player.status,
   });
   const { isPlaying } = useEvent(player, 'playingChange', {
     isPlaying: player.playing,
   });
 
-  // Track position
-  useEventListener(player, 'timeUpdate', ({ currentTime: ct }) => {
-    if (!isSeeking) setPositionSec(ct);
-  });
-
-  // Fallback: poll position (Android timeUpdate stalls) & duration (both platforms)
+  // Workaround: expo-video useEvent can miss readyToPlay if emitted synchronously.
+  // Poll the actual player status to detect when it's ready.
+  const [actualStatus, setActualStatus] = useState(player.status);
   useEffect(() => {
-    if (status !== 'readyToPlay') return;
+    setActualStatus(eventStatus);
+  }, [eventStatus]);
+  useEffect(() => {
+    // If the player is already ready but useEvent hasn't caught up, fix it
     const id = setInterval(() => {
       try {
-        if (!isSeeking && player.playing && Platform.OS === 'android') {
-          setPositionSec(player.currentTime);
+        const real = player.status;
+        if (real === 'readyToPlay' && actualStatus !== 'readyToPlay') {
+          setActualStatus('readyToPlay');
         }
-        if (durationSec === 0 && player.duration > 0) {
-          setDurationSec(player.duration);
+      } catch { /* player released */ }
+    }, 300);
+    return () => clearInterval(id);
+  }, [player, actualStatus]);
+
+  const status = actualStatus;
+
+  // Keep refs in sync with state (for use inside event handlers/intervals)
+  useEffect(() => { isSeekingRef.current = isSeeking; }, [isSeeking]);
+
+  // Track position + detect duration (timeUpdate fires every 0.1s — most reliable)
+  useEventListener(player, 'timeUpdate', ({ currentTime: ct }) => {
+    positionRef.current = ct;
+    if (!isSeekingRef.current) setPositionSec(ct);
+    // Aggressively check duration until found
+    if (!durationFoundRef.current) {
+      try {
+        const d = player.duration;
+        if (d && d > 0 && isFinite(d)) {
+          durationFoundRef.current = true;
+          setDurationSec(d);
+        }
+      } catch { /* player may be released */ }
+    }
+  });
+
+  // Android fallback: poll position when timeUpdate events stall
+  useEffect(() => {
+    if (Platform.OS !== 'android' || status !== 'readyToPlay') return;
+    const id = setInterval(() => {
+      try {
+        if (!isSeekingRef.current && player.playing) {
+          const ct = player.currentTime;
+          positionRef.current = ct;
+          setPositionSec(ct);
         }
       } catch { /* player may be released */ }
     }, 500);
     return () => clearInterval(id);
-  }, [status, isSeeking, durationSec]);
-
-  // Detect mid-stream buffering stalls
-  useEffect(() => {
-    if (status !== 'readyToPlay') return;
-    bufferingCheckRef.current = setInterval(() => {
-      if (!isPlaying || isSeeking) {
-        setIsBuffering(false);
-        return;
-      }
-      const currentPos = positionSec;
-      if (currentPos === lastPositionRef.current) {
-        setIsBuffering(true);
-      } else {
-        setIsBuffering(false);
-        lastPositionRef.current = currentPos;
-      }
-    }, 1500);
-    return () => clearInterval(bufferingCheckRef.current);
-  }, [status, isPlaying, isSeeking, positionSec]);
+  }, [status]);
 
   // Update duration & auto-play when ready; recover from cache errors
   useEffect(() => {
     if (__DEV__) console.log('[DailyVideo] Status changed:', status, 'resolvedUrl:', resolvedVideoUrl ? 'set' : 'null');
     if (status === 'readyToPlay') {
       setIsBuffering(false);
+      player.play();
+
+      // Try to get duration immediately; timeUpdate handler will keep retrying if 0
       const dur = player.duration;
-      if (dur > 0) {
+      if (dur && dur > 0 && isFinite(dur)) {
+        durationFoundRef.current = true;
         setDurationSec(dur);
       } else {
-        // Duration may not be available immediately on some platforms
+        durationFoundRef.current = false;
+        // Retry after a short delay — timeUpdate will also keep trying
         const t = setTimeout(() => {
-          try { if (player.duration > 0) setDurationSec(player.duration); } catch {}
-        }, 300);
+          try {
+            const d = player.duration;
+            if (d && d > 0 && isFinite(d)) {
+              durationFoundRef.current = true;
+              setDurationSec(d);
+            }
+          } catch {}
+        }, 500);
         return () => clearTimeout(t);
       }
-      setIsTransitioning(false);
-      player.play();
 
       // If loaded from CDN, ensure playback cache is populated for next visit
       if (resolvedSourceRef.current === 'cdn' && rawVideoUrl) {
@@ -268,7 +294,6 @@ export default function StoryOfDayScreen() {
       }
     }
     if (status === 'error') {
-      setIsTransitioning(false);
       setIsBuffering(false);
       console.warn('[DailyVideo] Player error:', playerErrorObj?.message);
       // If cached file failed, invalidate and retry with CDN
@@ -311,7 +336,6 @@ export default function StoryOfDayScreen() {
     });
     return () => {
       sub.remove();
-      clearTimeout(reciterSwitchTimeoutRef.current);
     };
   }, [player, status, videoUnavailable]);
 
@@ -423,19 +447,16 @@ export default function StoryOfDayScreen() {
   }, [player, resetControlsTimer]);
 
   const handleReciterSwitch = useCallback((newIdx: number) => {
-    if (newIdx === selectedReciterIdx || isTransitioning) return;
+    if (newIdx === selectedReciterIdx) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setIsTransitioning(true);
     setIsBuffering(false);
     setPositionSec(0);
     setDurationSec(0);
+    durationFoundRef.current = false;
+    positionRef.current = 0;
+    lastPositionRef.current = 0;
     setSelectedReciterIdx(newIdx);
-    // Safety timeout: clear transition flag if player takes too long
-    clearTimeout(reciterSwitchTimeoutRef.current);
-    reciterSwitchTimeoutRef.current = setTimeout(
-      () => setIsTransitioning(false), 15000
-    );
-  }, [selectedReciterIdx, isTransitioning]);
+  }, [selectedReciterIdx]);
 
   const retryFetch = useCallback(() => {
     setLoading(true);
@@ -576,17 +597,14 @@ export default function StoryOfDayScreen() {
               >
                 {dayData.videos.map((v, idx) => {
                   const active = idx === selectedReciterIdx;
-                  const disabled = isTransitioning && !active;
                   return (
                     <TouchableOpacity
                       key={v.reciterId}
                       onPress={() => handleReciterSwitch(idx)}
-                      disabled={disabled}
                       activeOpacity={0.7}
                       style={[styles.chip, {
                         backgroundColor: active ? '#0d8e62' : 'rgba(34,197,94,0.15)',
                         borderColor: active ? '#0d8e62' : 'rgba(34,197,94,0.3)',
-                        opacity: disabled ? 0.4 : 1,
                       }]}
                     >
                       <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
@@ -637,19 +655,9 @@ export default function StoryOfDayScreen() {
                 nativeControls={false}
               />
 
-              {(isTransitioning || playerLoading || !resolvedVideoUrl) && !playerError && (
+              {(playerLoading || !resolvedVideoUrl) && !playerError && (
                 <View style={styles.transitionOverlay}>
                   <ActivityIndicator size="large" color="#fff" />
-                </View>
-              )}
-
-              {isBuffering && !playerError && !isTransitioning && !playerLoading && (
-                <View style={[styles.controlsOverlay, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-                  <ActivityIndicator size="large" color="#fff" />
-                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12,
-                                 marginTop: 8, fontFamily: fontRegular() }}>
-                    {t('common.loading')}
-                  </Text>
                 </View>
               )}
 

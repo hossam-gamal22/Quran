@@ -252,6 +252,7 @@
           ]
         }
       ],
+      "./plugins/with-alarm-clock-scheduling",
       "./plugins/with-ios-widgets",
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
