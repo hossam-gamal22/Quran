@@ -499,7 +499,7 @@ const QuickAccessItem: React.FC<QuickAccessItemProps> = ({ item, onPress, isDark
           justifyContent: 'center',
           marginBottom: 8,
         }}>
-          <MaterialCommunityIcons name={safeIcon(item.icon) as any} size={30} color="#fff" />
+           <MaterialCommunityIcons name={safeIcon(item.icon) as any} size={30} color={colors.getTextColor(item.color)} />
         </View>
         <Text style={[styles.quickAccessName, { color: colors.text, writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
           {getItemName()}
@@ -755,7 +755,12 @@ export default function HomeScreen() {
       const count = raw ? parseInt(raw, 10) : 0;
       const newCount = count + 1;
       await AsyncStorage.setItem('@share_prompt_dismiss_count', String(newCount));
-      const nextTarget = shareOpensRef.current + 15;
+      
+      // Progressive delay: أول مرة +20، تاني مرة +35، بعد كده مفيش
+      // Pattern: 5 → 25 → 60 → never
+      const delays = [20, 35]; // delay increments per dismiss
+      const delay = delays[count] ?? 50; // fallback to 50 if somehow more
+      const nextTarget = shareOpensRef.current + delay;
       await AsyncStorage.setItem('@share_prompt_next_trigger', String(nextTarget));
     } catch { /* ignore */ }
   }, []);
@@ -810,9 +815,7 @@ export default function HomeScreen() {
             // Sync to widget data
             try {
               const { updateSharedData } = await import('@/lib/widget-data');
-              const { cachePrayerTimesForWidget } = await import('@/lib/widget-data-bridge');
               const locationLabel = loc?.city ? `${loc.city}${loc.country ? ', ' + loc.country : ''}` : '';
-              cachePrayerTimesForWidget(times, locationLabel).catch(() => {});
               updateSharedData(times, locationLabel).catch(() => {});
             } catch {}
           }
@@ -1324,8 +1327,8 @@ export default function HomeScreen() {
           // Shared countdown formatter
           const fmtCountdown = (c: { hours: number; minutes: number; seconds: number }) =>
             `${String(c.hours).padStart(2, '0')}:${String(c.minutes).padStart(2, '0')}:${String(c.seconds).padStart(2, '0')}`;
-          const countdownLine = bannerCountdown && bannerNextPrayer ? (
-            <Text style={[styles.bannerSecondaryCountdown, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+            const countdownLine = bannerCountdown && bannerNextPrayer ? (textColor?: string) => (
+              <Text style={[styles.bannerSecondaryCountdown, textColor ? { color: textColor } : {}, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
               {`${t(`prayer.${bannerNextPrayer.name}`)} · ${fmtCountdown(bannerCountdown)}`}
             </Text>
           ) : null;
@@ -1366,7 +1369,7 @@ export default function HomeScreen() {
                           <View style={styles.seasonInfo}>
                             <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
                             <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
-                            {countdownLine}
+                              {countdownLine?.()}
                           </View>
                           {activeBanner.customIconUrl ? (
                             <Image source={{ uri: activeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
@@ -1380,18 +1383,25 @@ export default function HomeScreen() {
                     <View
                       style={[styles.seasonCard, { backgroundColor: `${activeBanner.color}CC` }]}
                     >
+                        {(() => {
+                          const bannerFg = colors.getTextColor(activeBanner.color);
+                            const bannerFgSub = bannerFg === '#FFFFFF' ? 'rgba(255,255,255,0.88)' : 'rgba(0,0,0,0.75)';
+                            const bannerFgCount = bannerFg === '#FFFFFF' ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.55)';
+                          return (
                       <View style={[styles.seasonContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <View style={styles.seasonInfo}>
-                          <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
-                          <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
-                          {countdownLine}
+                            <Text style={[styles.seasonName, { color: bannerFg, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'title') : activeBanner.title}</Text>
+                              <Text style={[styles.seasonGreeting, { color: bannerFgSub, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{isBannerActive(welcomeBanner) ? resolveBannerText(activeBanner, 'subtitle') : activeBanner.subtitle}</Text>
+                            {countdownLine?.(bannerFgCount)}
                         </View>
                         {activeBanner.customIconUrl ? (
                           <Image source={{ uri: activeBanner.customIconUrl }} style={{ width: 36, height: 36 }} resizeMode="contain" />
                         ) : (
-                          <MaterialCommunityIcons name={safeIcon(activeBanner.icon, 'moon-waning-crescent') as any} size={36} color="#fff" />
+                            <MaterialCommunityIcons name={safeIcon(activeBanner.icon, 'moon-waning-crescent') as any} size={36} color={bannerFg} />
                         )}
                       </View>
+                          );
+                        })()}
                     </View>
                   );
                 })()}
@@ -1419,7 +1429,7 @@ export default function HomeScreen() {
                     <View style={styles.seasonInfo}>
                       <Text style={[styles.seasonName, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('home.fridayGreeting')}</Text>
                       <Text style={[styles.seasonGreeting, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('home.fridaySubtitle')}</Text>
-                      {countdownLine}
+                       {countdownLine?.()}
                     </View>
                     <Animated.View style={showIconAnimation ? animatedIconStyle : undefined}>
                       <MaterialCommunityIcons name="book-open-page-variant" size={36} color="rgba(255,255,255,0.7)" />
@@ -1950,7 +1960,7 @@ export default function HomeScreen() {
                         <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                       )}
                       <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                      <Text style={[styles.modalBtnText, { color: colors.textLight }]}>{t('common.cancel')}</Text>
+                      <Text style={[styles.modalBtnText, { color: colors.glassTextLight }]}>{t('common.cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.modalBtn, styles.modalBtnConfirm, !pendingIds.length && { opacity: 0.5 }]} disabled={!pendingIds.length} onPress={() => { saveQuickAccessIds(pendingIds, pendingCustomItems); setShowCustomizeModal(false); }}>
                       <Text style={styles.modalBtnConfirmText}>{t('common.save')}</Text>

@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { fetchMonthlyPrayerTimes, type PrayerTimesResponse } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import { t, getLanguage } from './i18n';
-import { getNotifText, fetchNotificationTexts } from './notifications-manager';
+import { getNotifText, fetchNotificationTexts } from './notification-texts';
 import { getAdhanChannelId } from '../services/notifications/channels';
 import { dirText } from './notification-text-direction';
 import { resolveNotificationSound } from './resolve-notification-sound';

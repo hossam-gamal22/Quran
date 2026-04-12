@@ -33,6 +33,9 @@ export interface LiveActivityData {
   ayahText?: string;
   ayahRef?: string;
   sunriseTime?: string;
+  accentColor?: string;
+  colorScheme?: 'light' | 'dark' | 'auto';
+  language?: string;
 }
 
 // ===================================================

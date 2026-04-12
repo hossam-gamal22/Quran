@@ -99,8 +99,8 @@ export default function PrayerCalculationScreen() {
                   onPress={() => handleAsr(m.value)}
                 >
                   <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.asrJuristic === m.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
@@ -125,8 +125,8 @@ export default function PrayerCalculationScreen() {
                   onPress={() => handleMethod(m.value)}
                 >
                   <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
-                    <Text style={[styles.optionLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
-                    <Text style={[styles.optionSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
+                    <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
                   </View>
                   {settings.prayer.calculationMethod === m.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />

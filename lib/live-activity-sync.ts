@@ -7,6 +7,7 @@ import {
   getLiveActivitySettings,
   startLiveActivity,
   updateLiveActivity,
+  endLiveActivity,
   LiveActivityData,
 } from '@/lib/live-activities';
 import { getCachedPrayerTimes, getTodayDateString, formatPrayerTime } from '@/lib/prayer-times';
@@ -65,6 +66,15 @@ export async function refreshLiveActivityIfEnabled(): Promise<void> {
         time: formatPrayerTime(times.sunrise, false),
         passed: sTime < now,
       });
+    }
+
+    // If all 5 main prayers have passed (after Isha), end the Live Activity
+    const mainPrayers = allPrayers.filter(p => p.name !== 'sunrise');
+    const allPassed = mainPrayers.length > 0 && mainPrayers.every(p => p.passed);
+    if (allPassed) {
+      await endLiveActivity();
+      if (__DEV__) console.log('📍 Live Activity ended — all prayers passed');
+      return;
     }
 
     const nextPrayer = allPrayers.find(p => !p.passed && p.name !== 'sunrise') || allPrayers[allPrayers.length - 1];

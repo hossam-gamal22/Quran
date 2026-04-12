@@ -8,7 +8,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   Dimensions,
 } from 'react-native';
@@ -27,14 +26,16 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
-import { toWesternNumerals, getSurahEnglishName } from '@/lib/quran-evidence';
+import { getSurahEnglishName } from '@/lib/quran-evidence';
 import { DarkColors } from '@/constants/theme';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
 import { getCachedPrayerTimes, getNextPrayer, formatPrayerTime } from '@/lib/prayer-times';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
-import { prepareVerseWidgetData, prepareDhikrWidgetData, prepareAzkarWidgetData } from '@/lib/widget-data';
+import { prepareVerseWidgetData, prepareDhikrWidgetData, prepareAzkarWidgetData, getWidgetSettings } from '@/lib/widget-data';
 import type { VerseWidgetData, DhikrWidgetData, WidgetAzkarData } from '@/lib/widget-data';
+import { requestAddWidget } from '@/lib/widget-add-helper';
+import { getWidgetTheme, type WidgetTheme } from '@/components/widgets/android/shared';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -106,22 +107,11 @@ const WIDGET_PREVIEW_SIZE = {
 // Free widgets available to all users
 const FREE_WIDGET_IDS = ['prayer'];
 
-// -- Helpers --
-
-function handleAddWidget() {
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-  if (Platform.OS === 'ios') {
-    Alert.alert(
-      t('widgets.addWidget'),
-      t('widgets.addWidgetIosInstructions'),
-      [{ text: t('common.ok'), style: 'default' }],
-    );
-  } else {
-    Alert.alert(t('widgets.addWidget'), t('widgets.addWidgetRequested'), [
-      { text: t('common.ok'), style: 'default' },
-    ]);
-  }
+// Theme gradient context — lets preview components use the user's widget theme
+const GalleryThemeContext = React.createContext<[string, string, ...string[]] | null>(null);
+function useGalleryGradient(fallback: [string, string, ...string[]]): [string, string, ...string[]] {
+  const ctx = React.useContext(GalleryThemeContext);
+  return ctx || fallback;
 }
 
 // -- Sub-components --
@@ -130,9 +120,10 @@ function AyahPreview({ size }: { size: WidgetSize }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
+  const gradient = useGalleryGradient(['#1e3a5f', '#0d8e62']);
   return (
     <LinearGradient
-      colors={['#1e3a5f', '#0d8e62']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -202,9 +193,10 @@ function PrayerPreview({ size }: { size: WidgetSize }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
+  const gradient = useGalleryGradient(['#0d8e62', '#1d4a3a']);
   return (
     <LinearGradient
-      colors={['#0d8e62', '#1d4a3a']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -301,9 +293,10 @@ function DhikrPreview({ size }: { size: WidgetSize }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
+  const gradient = useGalleryGradient(['#4a3d73', '#7c3aed']);
   return (
     <LinearGradient
-      colors={['#4a3d73', '#7c3aed']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -371,9 +364,10 @@ function AzkarPreview({ size }: { size: WidgetSize }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
+  const gradient = useGalleryGradient(['#4c1d95', '#5b21b6']);
   return (
     <LinearGradient
-      colors={['#4c1d95', '#5b21b6']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -441,9 +435,10 @@ function HijriPreview({ size }: { size: WidgetSize }) {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const dims = WIDGET_PREVIEW_SIZE[size];
+  const gradient = useGalleryGradient(['#92400e', '#b45309']);
   return (
     <LinearGradient
-      colors={['#92400e', '#b45309']}
+      colors={gradient}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.widgetPreview, { width: dims.width, height: dims.height }]}
@@ -550,6 +545,13 @@ export default function WidgetsGalleryScreen() {
   const categories = getCategories();
   const [activeTab, setActiveTab] = useState('prayer');
   const [selectedSize, setSelectedSize] = useState<WidgetSize>('small');
+  const [widgetTheme, setWidgetTheme] = useState<WidgetTheme | null>(null);
+
+  useEffect(() => {
+    getWidgetSettings().then(s => {
+      setWidgetTheme(getWidgetTheme(s.widgetTheme));
+    }).catch(() => {});
+  }, []);
 
   const activeCategory = categories.find((c) => c.id === activeTab) ?? categories[0];
   const isActiveWidgetLocked = !isPremium && !FREE_WIDGET_IDS.includes(activeCategory.id);
@@ -566,7 +568,12 @@ export default function WidgetsGalleryScreen() {
 
   const PreviewComponent = PREVIEW_MAP[activeCategory.id];
 
+  const themeGradient: [string, string, ...string[]] | null = widgetTheme
+    ? [widgetTheme.gradient.from, widgetTheme.gradient.to]
+    : null;
+
   return (
+    <GalleryThemeContext.Provider value={themeGradient}>
     <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
     <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]} edges={['top', 'bottom']}>
       {/* Header */}
@@ -664,7 +671,8 @@ export default function WidgetsGalleryScreen() {
                 guardPremiumFeature('advanced_stats', router, isPremium);
                 return;
               }
-              handleAddWidget();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              requestAddWidget(activeCategory.id, selectedSize);
             }}
             activeOpacity={0.8}
             style={styles.addButton}
@@ -705,6 +713,7 @@ export default function WidgetsGalleryScreen() {
       </ScrollView>
     </SafeAreaView>
     </BackgroundWrapper>
+    </GalleryThemeContext.Provider>
   );
 }
 

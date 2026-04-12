@@ -237,9 +237,8 @@ const textColor = getContrastTextColor(backgroundColor);
 
 ### Native Widgets
 
-- **Android**: Kotlin Glance framework in `android/PrayerClockWidget/`, `android/AzkarWidget/`, `android/HijriCalendarWidget/`, `android/QuranAyahWidget/`
-- **iOS**: WidgetKit in `ios/PrayerClockWidget/`, `widgets/ios/`
-- Legacy Android RemoteViews in `widgets/android/`
+- **Android**: React Native Android Widget (`components/widgets/android/`) — 10 widget components (5 types × 2 sizes)
+- **iOS**: WidgetKit in `widgets/ios/`
 
 ### Data Flow
 
@@ -309,7 +308,7 @@ App → `updateSharedData()` → AsyncStorage + iOS Shared Container → Native 
 ## Widget Development
 - **Data layer**: `lib/widget-data.ts` — `prepareVerseWidgetData()`, `prepareDhikrWidgetData()`, `preparePrayerWidgetData()`
 - **iOS**: WidgetKit with glass morphism gradients (`widgets/ios/`)
-- **Android**: Material You / Material Design 3 (`widgets/android/`)
+- **Android**: React Native Android Widget (`components/widgets/android/`)
 - Widgets update daily for verse/dhikr content
 - Prayer widget supports interactive completion checkboxes
 - Settings: `app/widget-settings.tsx`, Gallery: `app/widgets-gallery.tsx`

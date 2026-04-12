@@ -407,10 +407,11 @@ const styles = StyleSheet.create({
   },
   cardArabic: {
     fontSize: 22,
-    fontFamily: fontBold(),
+    fontFamily: 'Amiri-Bold',
     color: '#fff',
     textAlign: 'center',
     lineHeight: 38,
+    writingDirection: 'rtl',
   },
   cardArabicQcf: {
     color: '#fff',

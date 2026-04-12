@@ -19,6 +19,8 @@ export interface WelcomeBannerConfig {
   backgroundImageNonAr?: string;
   scheduledFrom?: string;   // ISO date — banner visible from this date
   scheduledUntil?: string;  // ISO date — banner hidden after this date
+  showPrayerCountdown?: boolean;
+  showIconAnimation?: boolean;
 }
 
 export interface MultiLangText {

@@ -4,13 +4,25 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
   const { verse } = data;
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: schemeColors, gradient } = resolveColorScheme(data.settings?.verseWidget?.colorScheme, 'verse');
+  const showTranslation = (data.settings?.verseWidget?.showTranslation ?? false) && !!verse.translation;
   const truncated = verse.arabic.length > 60
     ? verse.arabic.substring(0, 60) + '…'
     : verse.arabic;
+
+  // Premium theme overrides colorScheme
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const bg = useTheme ? theme.gradient : gradient;
+  const textColor = useTheme ? theme.textColor : schemeColors.white;
+  const mutedColor = useTheme ? theme.mutedColor : schemeColors.whiteMuted;
+  const badgeBg = useTheme ? theme.badgeBg : schemeColors.badgeBgAlt;
+  const badgeText = useTheme ? theme.badgeText : schemeColors.gold;
+  const accent = useTheme ? theme.accentColor : COLORS.teal;
 
   return (
     <FlexWidget
@@ -20,7 +32,7 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
         flexDirection: 'column',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundGradient: GRADIENTS.verse,
+        backgroundGradient: bg,
         borderRadius: 20,
         padding: 12,
       }}
@@ -40,18 +52,32 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
         text={truncated}
         style={{
           fontSize: 14,
-          color: COLORS.white,
+          color: textColor,
           fontFamily: FONT.amiri,
           textAlign: 'center',
         }}
-        maxLines={3}
+        maxLines={showTranslation ? 2 : 3}
         truncate="END"
       />
+
+      {showTranslation ? (
+        <TextWidget
+          text={verse.translation!}
+          style={{
+            fontSize: 10,
+            color: mutedColor,
+            fontFamily: FONT.amiri,
+            textAlign: 'center',
+          }}
+          maxLines={1}
+          truncate="END"
+        />
+      ) : null}
 
       {/* Surah badge */}
       <FlexWidget
         style={{
-          backgroundColor: COLORS.badgeBgAlt,
+          backgroundColor: badgeBg,
           borderRadius: 10,
           paddingHorizontal: 10,
           paddingVertical: 3,
@@ -61,7 +87,7 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
           text={verse.surahName}
           style={{
             fontSize: 11,
-            color: COLORS.gold,
+            color: badgeText,
             fontFamily: FONT.amiri,
           }}
         />
@@ -72,7 +98,7 @@ export function DailyVerseSmallWidget({ data }: { data: SharedWidgetData }) {
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: COLORS.teal,
+          color: accent,
           fontFamily: FONT.amiri,
         }}
       />

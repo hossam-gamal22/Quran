@@ -1,16 +1,15 @@
 // app/question-answer.tsx
 // صفحة سؤال وجواب من إذاعة القرآن الكريم من القاهرة - روح المسلم
+// البيانات مخزنة محلياً في ملف JSON - متاحة فوراً بدون إنترنت
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   Pressable,
-  ActivityIndicator,
   Platform,
   LayoutAnimation,
-  UIManager,
   ScrollView,
   ViewStyle,
   TextStyle,
@@ -30,9 +29,8 @@ import { UniversalHeader } from '@/components/ui';
 import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// البيانات المخزنة محلياً
+import qaData from '@/data/json/qa-data.json';
 
 // ========================================
 // الألوان والثوابت
@@ -49,61 +47,13 @@ interface Category {
   id: string;
   name: string;
   image: string;
-  isPublished: boolean;
 }
 
 interface QAItem {
   id: string;
   question: string;
   answer: string;
-  programeQandAId: string;
-  mediaService?: {
-    audioRef: string;
-    durationInSec: number;
-  };
-  subjects: Array<{ id: string; name: string }>;
-}
-
-interface ApiResponse<T> {
-  count: number;
-  data: T[];
-  isSuccess: boolean;
-}
-
-// ========================================
-// API Functions
-// ========================================
-
-const API_BASE = 'https://API.misrquran.gov.eg/api';
-
-async function fetchCategories(): Promise<Category[]> {
-  try {
-    const response = await fetch(`${API_BASE}/ProgramQandAs/GetAll?ishome=false`);
-    const data: ApiResponse<Category> = await response.json();
-    if (data.isSuccess) {
-      return data.data.filter(cat => cat.isPublished);
-    }
-    return [];
-  } catch (error) {
-    console.error('[Q&A] Error fetching categories:', error);
-    return [];
-  }
-}
-
-async function fetchQAByCategory(categoryId: string): Promise<QAItem[]> {
-  try {
-    const response = await fetch(
-      `${API_BASE}/QuestionAndAnswers/GetByPublic?firstItemId=${categoryId}`
-    );
-    const data: ApiResponse<QAItem> = await response.json();
-    if (data.isSuccess) {
-      return data.data;
-    }
-    return [];
-  } catch (error) {
-    console.error('[Q&A] Error fetching Q&A:', error);
-    return [];
-  }
+  audioUrl?: string;
 }
 
 // ========================================
@@ -115,58 +65,19 @@ export default function QuestionAnswerScreen() {
   const isRTL = useIsRTL();
   const { isDarkMode } = useSettings();
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [qaItems, setQaItems] = useState<QAItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // البيانات من الملف المخزن - جاهزة فوراً
+  const categories = useMemo(() => qaData.categories as Category[], []);
+  const allItems = useMemo(() => qaData.items as Record<string, QAItem[]>, []);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.id ?? '');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [loadingQA, setLoadingQA] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // تحميل التصنيفات عند التشغيل
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // تحميل الأسئلة عند تغيير التصنيف
-  useEffect(() => {
-    if (selectedCategory) {
-      loadQA(selectedCategory);
-    }
-  }, [selectedCategory]);
-
-  const loadCategories = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const cats = await fetchCategories();
-      setCategories(cats);
-      if (cats.length > 0) {
-        setSelectedCategory(cats[0].id);
-      }
-    } catch (e) {
-      setError(t('common.errorLoadContent'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadQA = useCallback(async (categoryId: string) => {
-    try {
-      setLoadingQA(true);
-      const items = await fetchQAByCategory(categoryId);
-      setQaItems(items);
-      setExpandedItems(new Set());
-    } catch (e) {
-      console.error('[Q&A] Error loading Q&A:', e);
-    } finally {
-      setLoadingQA(false);
-    }
-  }, []);
+  const qaItems = selectedCategory ? (allItems[selectedCategory] ?? []) : [];
 
   const handleCategoryChange = useCallback((key: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(key);
+    setExpandedItems(new Set());
   }, []);
 
   const toggleExpanded = useCallback((id: string) => {
@@ -182,10 +93,6 @@ export default function QuestionAnswerScreen() {
       return next;
     });
   }, []);
-
-  // تحويل التصنيفات لتبويبات
-  // ترتيب التصنيفات
-  const displayCategories = categories;
 
   // تصيير عنصر سؤال وجواب
   const renderQAItem = useCallback(({ item }: { item: QAItem }) => {
@@ -231,30 +138,6 @@ export default function QuestionAnswerScreen() {
       height: 1,
       marginVertical: Spacing.md,
       backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-    };
-
-    const subjectsRowStyle: ViewStyle = {
-      flexDirection: isRTL ? 'row-reverse' : 'row',
-      flexWrap: 'wrap',
-      gap: Spacing.xs,
-      marginBottom: Spacing.sm,
-    };
-
-    const subjectTagStyle: ViewStyle = {
-      paddingHorizontal: Spacing.sm,
-      paddingVertical: 4,
-      borderRadius: BorderRadius.sm,
-      backgroundColor: ACCENT_LIGHT,
-    };
-
-    const subjectTextStyle: TextStyle = {
-      fontFamily: fontMedium(),
-      fontSize: colors.fs(FONT_SIZES.xs),
-      color: ACCENT,
-      lineHeight: 18,
-      includeFontPadding: false,
-      textAlign: isRTL ? 'right' : 'left',
-      writingDirection: isRTL ? 'rtl' : 'ltr',
     };
 
     const answerRowStyle: ViewStyle = {
@@ -325,19 +208,6 @@ export default function QuestionAnswerScreen() {
           <View style={answerContainerStyle}>
             <View style={dividerStyle} />
             
-            {/* المواضيع */}
-            {item.subjects && item.subjects.length > 0 && (
-              <View style={subjectsRowStyle}>
-                {item.subjects.map(subject => (
-                  <View key={subject.id} style={subjectTagStyle}>
-                    <Text style={subjectTextStyle}>
-                      {subject.name.trim()}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            
             <View style={answerRowStyle}>
               <View style={answerIconStyle}>
                 <MaterialCommunityIcons name="check-circle" size={20} color={colors.primary} />
@@ -352,60 +222,6 @@ export default function QuestionAnswerScreen() {
       </Pressable>
     );
   }, [colors, isDarkMode, isRTL, expandedItems, toggleExpanded]);
-
-  // حالة التحميل
-  if (loading) {
-    return (
-      <ScreenContainer>
-        <UniversalHeader title={t('questionAnswer.title')} showBack />
-        <View style={centerContainerStyle}>
-          <ActivityIndicator size="large" color={ACCENT} />
-        </View>
-      </ScreenContainer>
-    );
-  }
-
-  // حالة الخطأ
-  if (error) {
-    const errorTextStyle: TextStyle = {
-      fontFamily: fontMedium(),
-      fontSize: colors.fs(FONT_SIZES.md),
-      marginTop: Spacing.md,
-      textAlign: 'center',
-      color: colors.textLight,
-      lineHeight: 28,
-      includeFontPadding: false,
-    };
-
-    const retryButtonStyle: ViewStyle = {
-      marginTop: Spacing.lg,
-      paddingHorizontal: Spacing.lg,
-      paddingVertical: Spacing.sm,
-      borderRadius: BorderRadius.md,
-      backgroundColor: ACCENT,
-    };
-
-    const retryButtonTextStyle: TextStyle = {
-      fontFamily: fontSemiBold(),
-      fontSize: colors.fs(FONT_SIZES.md),
-      color: '#fff',
-      lineHeight: 28,
-      includeFontPadding: false,
-    };
-
-    return (
-      <ScreenContainer>
-        <UniversalHeader title={t('questionAnswer.title')} showBack />
-        <View style={centerContainerStyle}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color={colors.textLight} />
-          <Text style={errorTextStyle}>{error}</Text>
-          <Pressable onPress={loadCategories} style={retryButtonStyle}>
-            <Text style={retryButtonTextStyle}>{t('common.retry')}</Text>
-          </Pressable>
-        </View>
-      </ScreenContainer>
-    );
-  }
 
   const tabsContainerStyle: ViewStyle = {
     paddingHorizontal: Spacing.md,
@@ -438,20 +254,6 @@ export default function QuestionAnswerScreen() {
     paddingBottom: Spacing.xxl,
   };
 
-  const headerInfoStyle: ViewStyle = {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-  };
-
-  const headerTextStyle: TextStyle = {
-    fontFamily: fontRegular(),
-    fontSize: colors.fs(FONT_SIZES.sm),
-    lineHeight: 22,
-    opacity: 0.8,
-    color: colors.textLight,
-    textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr',
-  };
-
   const emptyTextStyle: TextStyle = {
     fontFamily: fontMedium(),
     fontSize: colors.fs(FONT_SIZES.md),
@@ -479,7 +281,7 @@ export default function QuestionAnswerScreen() {
           style={[{ flexGrow: 0, zIndex: 10, backgroundColor: colors.background }, isRTL && { transform: [{ scaleX: -1 }] }]}
         >
           <View style={[chipsContainerStyle, isRTL && { transform: [{ scaleX: -1 }] }]}>
-            {displayCategories.map(cat => {
+            {categories.map(cat => {
               const isSelected = selectedCategory === cat.id;
               return (
                 <Pressable
@@ -529,11 +331,7 @@ export default function QuestionAnswerScreen() {
       )}
 
       {/* المحتوى */}
-      {loadingQA ? (
-        <View style={centerContainerStyle}>
-          <ActivityIndicator size="large" color={ACCENT} />
-        </View>
-      ) : qaItems.length === 0 ? (
+      {qaItems.length === 0 ? (
         <View style={centerContainerStyle}>
           <MaterialCommunityIcons name="help-box" size={48} color={colors.textLight} />
           <Text style={emptyTextStyle}>

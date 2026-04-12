@@ -52,10 +52,6 @@ import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 
 const basmalaImg = require('@/assets/images/quran/basmala.png');
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ─── Image Card Themes ───────────────────────────────────────────────────────
 const CARD_THEMES = [
@@ -761,7 +757,7 @@ export default function FavoritesScreen() {
       marginBottom: 16,
     },
     noteSaveBtn: {
-      backgroundColor: colors.primary,
+      backgroundColor: '#0d8e62',
       borderRadius: 16,
       padding: 16,
       alignItems: 'center',

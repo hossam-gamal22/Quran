@@ -141,6 +141,7 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
         sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -221,6 +222,7 @@ export const sendTestKhatmaNotification = async (): Promise<void> => {
         body: dirText(t('notifications.testBody')),
         sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
         ? { channelId: getReminderChannelId('general_reminder') }
@@ -243,6 +245,7 @@ export const sendKhatmaCompletionNotification = async (khatmaName: string): Prom
         body: dirText(`${t('khatma.khatmaCompletedMsg')} - "${khatmaName}"`),
         sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
         ? { channelId: getReminderChannelId('general_reminder') }
@@ -265,6 +268,7 @@ export const sendWirdCompletionNotification = async (): Promise<void> => {
         body: dirText(t('khatma.wirdCompletedMsg')),
         sound: resolveKhatmaSound('general_reminder', true),
         ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: Platform.OS === 'android'
         ? { channelId: getReminderChannelId('general_reminder') }

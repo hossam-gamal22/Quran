@@ -4,6 +4,7 @@
 
 import { Platform } from 'react-native';
 import { Audio } from 'expo-av';
+import NetInfo from '@react-native-community/netinfo';
 import { resolveStreamUrl } from '@/services/radioService';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 import { isTrackPlayerSetupDone } from '@/lib/track-player-ready';
@@ -391,13 +392,20 @@ export const radioPlayer = {
     } catch (error) {
       console.error('[RadioPlayer] playback error:', error);
 
-      // Auto-retry on stream connection errors
+      // Auto-retry on stream connection errors (only if online)
       if (_retryCount < MAX_AUTO_RETRIES) {
         _retryCount++;
         console.log(`[RadioPlayer] Auto-retry ${_retryCount}/${MAX_AUTO_RETRIES}`);
         updateState({ status: 'buffering', errorMessage: undefined });
         if (_retryTimer) clearTimeout(_retryTimer);
-        _retryTimer = setTimeout(() => {
+        _retryTimer = setTimeout(async () => {
+          // Check network before retry
+          const netState = await NetInfo.fetch();
+          if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+            console.log('[RadioPlayer] Auto-retry aborted: offline');
+            updateState({ status: 'error', errorMessage: undefined });
+            return;
+          }
           if (station) radioPlayer._retryPlay(station);
         }, 2000);
         return;
@@ -410,6 +418,14 @@ export const radioPlayer = {
   /** Internal retry — same as play() but does NOT reset _retryCount */
   async _retryPlay(station: RadioStation): Promise<void> {
     if (Platform.OS === 'web') return;
+
+    // Check network before retrying
+    const netState = await NetInfo.fetch();
+    if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+      console.log('[RadioPlayer] _retryPlay aborted: offline');
+      updateState({ status: 'error', errorMessage: undefined });
+      return;
+    }
 
     updateState({ status: 'loading', currentStation: station, errorMessage: undefined });
 

@@ -666,7 +666,7 @@ export default function HijriScreen() {
                   style={[
                     styles.offsetOption,
                     { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' },
-                    hijriOffset === offset && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    hijriOffset === offset && { backgroundColor: '#0d8e62', borderColor: '#0d8e62' },
                   ]}
                   onPress={() => saveOffset(offset)}
                 >
@@ -679,7 +679,7 @@ export default function HijriScreen() {
                   <Text style={[
                     styles.offsetOptionText,
                     { color: colors.text },
-                    hijriOffset === offset && { color: getContrastTextColor(colors.primary), fontWeight: '700' },
+                    hijriOffset === offset && { color: '#FFFFFF', fontWeight: '700' },
                   ]}>
                     {offset === 0 ? t('hijri.noAdjustment') : offset > 0 ? `+${offset} ${t('seasonal.day')}` : `${offset} ${t('seasonal.day')}`}
                   </Text>

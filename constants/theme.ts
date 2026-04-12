@@ -450,3 +450,8 @@ export const getColorsWithAccent = (isDark: boolean, accentColor: string) => {
     quranGreen: accentColor,
   };
 };
+
+export const ISLAMIC_PATTERN_OPACITY = {
+  light: 0.08,
+  dark: 0.12,
+};

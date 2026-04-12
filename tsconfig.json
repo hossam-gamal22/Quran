@@ -11,6 +11,7 @@
     }
   },
   "include": [
+    "*.d.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
     "lib/**/*.ts",

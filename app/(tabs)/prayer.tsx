@@ -62,6 +62,7 @@ import { GlassCard, GlassToggle } from '@/components/ui/GlassCard';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Line, G } from 'react-native-svg';
+import SujudIcon from '@/assets/images/sujud.svg';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
 import { trackPrayer } from '@/lib/firebase-analytics';
 
@@ -78,12 +79,19 @@ import {
 import { getDuaOfTheDay } from '@/data/daily-duas';
 import { getAyahOfTheDay } from '@/data/daily-ayahs';
 
+import NetInfo from '@react-native-community/netinfo';
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
 import RectangleWidgetView from '@/components/ui/prayer/RectangleWidgetView';
 import AnalogClockView from '@/components/ui/prayer/AnalogClockView';
 import DigitalTypographyView from '@/components/ui/prayer/DigitalTypographyView';
+import {
+  PrayerDataSource,
+  getOfflinePrayerTimes,
+  cacheWeekPrayerTimes,
+  buildWeekEntries,
+} from '@/lib/prayer-week-cache';
 
 const CLOCK_STYLE_KEY = '@prayer_clock_style';
 const CLOCK_THUMB_SIZE = 72;
@@ -128,6 +136,9 @@ export default function PrayerScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showMethodPicker, setShowMethodPicker] = useState(false);
+  const [dataSource, setDataSource] = useState<PrayerDataSource>('live');
+  const [cacheAgeDays, setCacheAgeDays] = useState(0);
+  const [usingMakkahFallback, setUsingMakkahFallback] = useState(false);
   const [showAsrPicker, setShowAsrPicker] = useState(false);
 
   // Live Activity state (iOS only)
@@ -336,6 +347,7 @@ export default function PrayerScreen() {
       console.error('Error fetching location:', err);
       const stored = await getStoredLocation();
       if (stored) return stored;
+      setUsingMakkahFallback(true);
       return { latitude: 21.4225, longitude: 39.8262, city: t('prayer.defaultCity'), country: t('prayer.defaultCountry') };
     }
   };
@@ -418,6 +430,7 @@ export default function PrayerScreen() {
   const loadPrayerTimes = async (forceRefresh = false) => {
     try {
       setError(null);
+      setDataSource('live');
       const settingsFromStore = await getPrayerSettings();
       setPrayerSettings(settingsFromStore);
 
@@ -459,6 +472,8 @@ export default function PrayerScreen() {
         const cached = await getCachedPrayerTimes(today);
         if (cached) {
           setPrayerTimes(cached);
+          setDataSource('todayCache');
+          setCacheAgeDays(0);
           // Also sync cached times to widgets
           try {
             const { updateSharedData } = require('@/lib/widget-data');
@@ -489,6 +504,24 @@ export default function PrayerScreen() {
       times = applyAdjustments(times, settingsFromStore.adjustments);
       await cachePrayerTimes(today, times);
       setPrayerTimes(times);
+      setDataSource('live');
+      setCacheAgeDays(0);
+      setUsingMakkahFallback(false);
+
+      // Build week cache from monthly API for offline resilience
+      try {
+        const { fetchMonthlyPrayerTimes: fetchMonthly } = require('@/lib/prayer-times') as typeof import('@/lib/prayer-times');
+        const now = new Date();
+        const monthlyData = await fetchMonthly(loc, now.getMonth() + 1, now.getFullYear(), settingsFromStore);
+        if (monthlyData?.length) {
+          const weekEntries = buildWeekEntries(monthlyData, settingsFromStore);
+          if (weekEntries.length > 0) {
+            await cacheWeekPrayerTimes(weekEntries, { latitude: loc.latitude, longitude: loc.longitude });
+          }
+        }
+      } catch (e) {
+        console.log('📅 Week cache build failed (non-critical):', e);
+      }
 
       // Sync prayer times to widget data so home screen widgets update immediately
       try {
@@ -518,7 +551,27 @@ export default function PrayerScreen() {
       }
     } catch (err) {
       console.error('Error loading prayer times:', err);
-      setError((err && (err as any).message) || t('messages.error'));
+      // Try offline fallback chain before showing error
+      try {
+        const offlineResult = await getOfflinePrayerTimes();
+        if (offlineResult.times) {
+          setPrayerTimes(offlineResult.times);
+          setDataSource(offlineResult.source);
+          setCacheAgeDays(offlineResult.cacheAgeDays);
+          console.log(`📅 Offline fallback: source=${offlineResult.source}, age=${offlineResult.cacheAgeDays} days`);
+          return;
+        }
+      } catch (offlineErr) {
+        console.warn('Offline fallback also failed:', offlineErr);
+      }
+      setDataSource('error');
+      // Check if offline and show friendly message
+      const netState = await NetInfo.fetch();
+      if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+        setError(t('messages.noInternet'));
+      } else {
+        setError(t('messages.error'));
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -531,6 +584,18 @@ export default function PrayerScreen() {
     const ahSuffix = t('calendar.ahSuffix');
     if (hijri) setHijriDate(`${hijri.day} ${hijri.monthName} ${hijri.year} ${ahSuffix}`);
   }, []));
+
+  // Auto-refresh when connectivity returns while showing stale/extrapolated data
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const isOnline = state.isConnected && state.isInternetReachable !== false;
+      if (isOnline && (dataSource === 'extrapolated' || dataSource === 'error')) {
+        console.log('🌐 Connectivity restored — auto-refreshing prayer times');
+        loadPrayerTimes(true);
+      }
+    });
+    return () => unsubscribe();
+  }, [dataSource]);
 
   const onRefresh = useCallback(() => { setIsRefreshing(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadPrayerTimes(true); }, []);
 
@@ -565,6 +630,9 @@ export default function PrayerScreen() {
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity onPress={() => router.push('/worship-tracker/prayer' as any)} style={styles.headerButton}>
               <MaterialCommunityIcons name="chart-bar" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/salati' as any)} style={styles.headerButton}>
+              <SujudIcon width={22} height={22} fill={colors.text} />
             </TouchableOpacity>
           </View>
           <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center', flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'center', gap: 8 }}>
@@ -610,12 +678,44 @@ export default function PrayerScreen() {
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#0d8e62']} tintColor="#0d8e62" />}>
           {error && (
-            <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorContainer, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(239,83,80,0.15)' : '#ffebee' }]}>
               <MaterialCommunityIcons name="alert-circle" size={24} color="#ef5350" />
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={[styles.errorText, { color: isDarkMode ? '#ef9a9a' : '#c62828' }]}>{error}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => loadPrayerTimes(true)}>
                 <Text style={styles.retryText}>{t('common.retry')}</Text>
               </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {/* Stale/extrapolated data warning banner */}
+          {dataSource === 'extrapolated' && !error && (
+            <Animated.View entering={FadeInDown.duration(300)} style={[styles.staleBanner, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,152,0,0.15)' : 'rgba(255,243,224,0.95)' }]}>
+              <MaterialCommunityIcons name="clock-alert-outline" size={22} color={isDarkMode ? '#ffb74d' : '#e65100'} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.staleBannerText, { color: isDarkMode ? '#ffcc80' : '#e65100', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {t('prayer.approximateTimes')}
+                </Text>
+                {cacheAgeDays > 0 && (
+                  <Text style={[styles.staleBannerSubtext, { color: isDarkMode ? '#ffe0b2' : '#bf360c', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {t('prayer.lastUpdatedAgo').replace('{days}', String(cacheAgeDays))}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity style={[styles.staleBannerRefresh, { backgroundColor: isDarkMode ? 'rgba(255,152,0,0.25)' : 'rgba(230,81,0,0.12)' }]} onPress={() => loadPrayerTimes(true)}>
+                <MaterialCommunityIcons name="refresh" size={18} color={isDarkMode ? '#ffb74d' : '#e65100'} />
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+
+          {/* Makkah fallback location banner */}
+          {usingMakkahFallback && !error && dataSource !== 'extrapolated' && (
+            <Animated.View entering={FadeInDown.duration(300)} style={[styles.staleBanner, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,152,0,0.15)' : 'rgba(255,243,224,0.95)' }]}>
+              <MaterialCommunityIcons name="map-marker-alert-outline" size={22} color={isDarkMode ? '#ffb74d' : '#e65100'} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.staleBannerText, { color: isDarkMode ? '#ffcc80' : '#e65100', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {t('prayer.makkahFallback')}
+                </Text>
+              </View>
             </Animated.View>
           )}
 
@@ -749,23 +849,65 @@ export default function PrayerScreen() {
                     <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                   )}
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                  <Text style={[styles.extraTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.extraTimes')}</Text>
+                  <Text style={[styles.extraTitle, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.extraTimes')}</Text>
                   <View style={[styles.extraRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                     <View style={styles.extraItem}>
-                      <MaterialCommunityIcons name="weather-night" size={20} color={colors.icon} />
-                      <Text style={[styles.extraLabel, { color: colors.textLight }]}>{t('prayer.midnight')}</Text>
-                      <Text style={[styles.extraValue, { color: colors.text }]}>{formatPrayerTime(prayerTimes.midnight, settings.prayer.show24Hour)}</Text>
+                      <MaterialCommunityIcons name="weather-night" size={20} color={colors.glassIcon} />
+                      <Text style={[styles.extraLabel, { color: colors.glassTextLight }]}>{t('prayer.midnight')}</Text>
+                      <Text style={[styles.extraValue, { color: colors.glassText }]}>{formatPrayerTime(prayerTimes.midnight, settings.prayer.show24Hour)}</Text>
                     </View>
                     <View style={styles.extraItem}>
-                      <MaterialCommunityIcons name="star-crescent" size={20} color={colors.icon} />
-                      <Text style={[styles.extraLabel, { color: colors.textLight }]}>{t('prayer.lastThird')}</Text>
-                      <Text style={[styles.extraValue, { color: colors.text }]}>{formatPrayerTime(prayerTimes.lastThird, settings.prayer.show24Hour)}</Text>
+                      <MaterialCommunityIcons name="star-crescent" size={20} color={colors.glassIcon} />
+                      <Text style={[styles.extraLabel, { color: colors.glassTextLight }]}>{t('prayer.lastThird')}</Text>
+                      <Text style={[styles.extraValue, { color: colors.glassText }]}>{formatPrayerTime(prayerTimes.lastThird, settings.prayer.show24Hour)}</Text>
                     </View>
                   </View>
                 </Animated.View>
               )}
 
               {/* Qibla button removed as requested */}
+
+              {/* صلاتي - Smart Prayer Tracker Card */}
+              <Animated.View entering={FadeInDown.delay(500).duration(500)}>
+                <TouchableOpacity
+                  style={styles.salatiCard}
+                  onPress={() => router.push('/salati')}
+                  activeOpacity={0.8}
+                >
+                  {Platform.OS === 'ios' && (
+                    <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                  )}
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                  
+                  <View style={[styles.salatiContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                    {/* Chevron */}
+                    <MaterialCommunityIcons
+                      name={isRTL ? 'chevron-right' : 'chevron-left'}
+                      size={24}
+                      color={colors.glassTextLight}
+                    />
+                    
+                    {/* Text */}
+                    <View style={[styles.salatiTextContainer, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+                      <Text style={[styles.salatiTitle, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {t('smartTracker.title')}
+                      </Text>
+                      <Text style={[styles.salatiSubtitle, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {t('smartTracker.subtitle')}
+                      </Text>
+                    </View>
+                    
+                    {/* Icon */}
+                    <View style={styles.salatiIconContainer}>
+                      <SujudIcon
+                        width={32}
+                        height={32}
+                        fill="#0d8e62"
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
 
               <View style={styles.bottomSpace} />
             </>
@@ -936,6 +1078,10 @@ const _styles = StyleSheet.create({
   errorText: { flex: 1, fontSize: 14, fontFamily: fontMedium(), color: '#c62828', lineHeight: 24, includeFontPadding: false },
   retryButton: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#ef5350', borderRadius: 8 },
   retryText: { fontSize: 12, fontFamily: fontSemiBold(), color: '#fff' },
+  staleBanner: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginVertical: 8, padding: 14, borderRadius: 12, gap: Spacing.sm, borderWidth: 0.5, borderColor: 'rgba(255,152,0,0.3)' },
+  staleBannerText: { fontSize: 13, fontFamily: fontMedium(), lineHeight: 22, includeFontPadding: false },
+  staleBannerSubtext: { fontSize: 11, fontFamily: fontRegular(), lineHeight: 18, includeFontPadding: false, marginTop: 2 },
+  staleBannerRefresh: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   circularContainer: { paddingVertical: 30 },
   lastThirdBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a237e', marginHorizontal: 16, marginVertical: 10, padding: 15, borderRadius: 12, gap: Spacing.sm },
   lastThirdText: { flex: 1, fontSize: 14, fontFamily: fontMedium(), color: '#fff', lineHeight: 24, includeFontPadding: false },
@@ -946,6 +1092,13 @@ const _styles = StyleSheet.create({
   extraLabel: { fontSize: 12, fontFamily: fontRegular(), lineHeight: 20, includeFontPadding: false },
   extraValue: { fontSize: 16, fontFamily: fontBold(), lineHeight: 28, includeFontPadding: false },
   bottomSpace: { height: 100 },
+  // صلاتي card styles
+  salatiCard: { marginHorizontal: 16, marginVertical: 10, borderRadius: 20, overflow: 'hidden' },
+  salatiContent: { paddingHorizontal: 16, paddingVertical: 16, alignItems: 'center', gap: 12 },
+  salatiIconContainer: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(13, 142, 98, 0.15)', alignItems: 'center', justifyContent: 'center' },
+  salatiTextContainer: { flex: 1 },
+  salatiTitle: { fontSize: 18, fontFamily: fontBold(), lineHeight: 28, includeFontPadding: false },
+  salatiSubtitle: { fontSize: 13, fontFamily: fontRegular(), lineHeight: 22, includeFontPadding: false },
   // Qibla button styles removed
   toggleContainer: { marginHorizontal: 16, marginBottom: 16 },
   widgetContainer: { minHeight: 180, minWidth: 320, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', marginVertical: 18, padding: 18 },

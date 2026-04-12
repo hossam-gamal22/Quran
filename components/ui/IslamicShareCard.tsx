@@ -214,7 +214,7 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
     const doCapture = async (sizeKey: ImageSizeKey = selectedSize) => {
       if (!viewShotRef.current) throw new Error('ViewShot ref not ready');
       const config = getSizeConfig(sizeKey);
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 400 : 150));
       const uri = await Promise.race([
         captureRef(viewShotRef, {
           format: 'png',

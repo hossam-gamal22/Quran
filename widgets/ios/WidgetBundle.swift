@@ -266,3 +266,125 @@ func azkarCategoryName(for category: String) -> String {
     default: return "أذكار"
     }
 }
+
+// ========================================
+// نظام الثيمات — يقرأ widgetTheme من البيانات المشتركة
+// ========================================
+
+/// ثيم ويدجت واحد — يتطابق مع WidgetTheme في shared.ts
+struct IOSWidgetTheme {
+    let id: String
+    let gradientFrom: Color
+    let gradientTo: Color
+    let accentColor: Color
+    let textColor: Color
+    let mutedColor: Color
+    let badgeBg: Color
+    let badgeText: Color
+}
+
+/// الثيمات المتاحة — تتطابق مع WIDGET_THEMES في shared.ts
+let widgetThemes: [String: IOSWidgetTheme] = [
+    "default_dark": IOSWidgetTheme(
+        id: "default_dark",
+        gradientFrom: Color(hex: "#0e1f38"), gradientTo: Color(hex: "#091428"),
+        accentColor: Color(hex: "#0d9668"), textColor: .white,
+        mutedColor: Color(hex: "#c8d6e5"),
+        badgeBg: Color(hex: "#1a2744"), badgeText: Color(hex: "#f0c654")
+    ),
+    "default_light": IOSWidgetTheme(
+        id: "default_light",
+        gradientFrom: Color(hex: "#f0ead8"), gradientTo: Color(hex: "#e8dfc8"),
+        accentColor: Color(hex: "#0d9668"), textColor: Color(hex: "#1a1a2e"),
+        mutedColor: Color(hex: "#4a4a6a"),
+        badgeBg: Color(hex: "#dde5d8"), badgeText: Color(hex: "#b8860b")
+    ),
+    "masjid_green": IOSWidgetTheme(
+        id: "masjid_green",
+        gradientFrom: Color(hex: "#0a3d2e"), gradientTo: Color(hex: "#062218"),
+        accentColor: Color(hex: "#14c78a"), textColor: Color(hex: "#e8f5e9"),
+        mutedColor: Color(hex: "#a5d6a7"),
+        badgeBg: Color(hex: "#1b5e20"), badgeText: Color(hex: "#c8e6c9")
+    ),
+    "kaaba_gold": IOSWidgetTheme(
+        id: "kaaba_gold",
+        gradientFrom: Color(hex: "#2c1810"), gradientTo: Color(hex: "#1a0e08"),
+        accentColor: Color(hex: "#d4a017"), textColor: Color(hex: "#fef3c7"),
+        mutedColor: Color(hex: "#d4a853"),
+        badgeBg: Color(hex: "#78350f"), badgeText: Color(hex: "#fbbf24")
+    ),
+    "royal_purple": IOSWidgetTheme(
+        id: "royal_purple",
+        gradientFrom: Color(hex: "#1a0a2e"), gradientTo: Color(hex: "#0d0518"),
+        accentColor: Color(hex: "#a78bfa"), textColor: Color(hex: "#ede9fe"),
+        mutedColor: Color(hex: "#a78bfa"),
+        badgeBg: Color(hex: "#4c1d95"), badgeText: Color(hex: "#c4b5fd")
+    ),
+    "ocean_blue": IOSWidgetTheme(
+        id: "ocean_blue",
+        gradientFrom: Color(hex: "#0c2461"), gradientTo: Color(hex: "#061630"),
+        accentColor: Color(hex: "#3a7ca5"), textColor: Color(hex: "#dbeafe"),
+        mutedColor: Color(hex: "#93bbfc"),
+        badgeBg: Color(hex: "#1e3a5f"), badgeText: Color(hex: "#bfdbfe")
+    ),
+    "desert_sand": IOSWidgetTheme(
+        id: "desert_sand",
+        gradientFrom: Color(hex: "#3d2b1f"), gradientTo: Color(hex: "#261a10"),
+        accentColor: Color(hex: "#c17f59"), textColor: Color(hex: "#fef3c7"),
+        mutedColor: Color(hex: "#d6a87c"),
+        badgeBg: Color(hex: "#78350f"), badgeText: Color(hex: "#fde68a")
+    ),
+    "emerald_night": IOSWidgetTheme(
+        id: "emerald_night",
+        gradientFrom: Color(hex: "#064e3b"), gradientTo: Color(hex: "#022c22"),
+        accentColor: Color(hex: "#34d399"), textColor: Color(hex: "#d1fae5"),
+        mutedColor: Color(hex: "#6ee7b7"),
+        badgeBg: Color(hex: "#065f46"), badgeText: Color(hex: "#a7f3d0")
+    ),
+    "midnight_rose": IOSWidgetTheme(
+        id: "midnight_rose",
+        gradientFrom: Color(hex: "#4a1942"), gradientTo: Color(hex: "#2d0f28"),
+        accentColor: Color(hex: "#f472b6"), textColor: Color(hex: "#fce7f3"),
+        mutedColor: Color(hex: "#f9a8d4"),
+        badgeBg: Color(hex: "#831843"), badgeText: Color(hex: "#fbcfe8")
+    ),
+]
+
+/// الحصول على الثيم من البيانات المشتركة — fallback to default_dark
+func loadWidgetTheme() -> IOSWidgetTheme {
+    guard let data = loadSharedRawData(),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let settings = json["settings"] as? [String: Any],
+          let themeId = settings["widgetTheme"] as? String,
+          let theme = widgetThemes[themeId] else {
+        return widgetThemes["default_dark"]!
+    }
+    return theme
+}
+
+/// خلفية الويدجت تستخدم الثيم
+struct ThemedWidgetBackground: View {
+    var theme: IOSWidgetTheme
+    
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    theme.gradientFrom.opacity(0.95),
+                    theme.gradientTo.opacity(0.95)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    theme.accentColor.opacity(0.15),
+                    Color.clear
+                ]),
+                startPoint: .topLeading,
+                endPoint: .center
+            )
+        }
+    }
+}

@@ -53,6 +53,8 @@ import { useQuran } from '@/contexts/QuranContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t as translate, getLanguage } from '@/lib/i18n';
 import { useQuranTracker } from '@/contexts/WorshipContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import {
   getQuranTextColor,
 } from '@/components/ui/QuranBackgroundWrapper';
@@ -281,6 +283,7 @@ const MushafPage = React.memo(function MushafPage({
   }
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
+  const usePlainArabicMode = shouldForcePlainArabic || (Platform.OS === 'android' && fontError);
 
   // Load QCF4 per-page font (use needsDarkFont based on actual background)
   useEffect(() => {
@@ -315,7 +318,7 @@ const MushafPage = React.memo(function MushafPage({
   const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.18) : 0;
 
   // Font loading state
-  if (!shouldForcePlainArabic && !fontLoaded && !fontError) {
+  if (!usePlainArabicMode && !fontLoaded && !fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color={goldenColor} />
@@ -324,7 +327,7 @@ const MushafPage = React.memo(function MushafPage({
   }
 
   // Font failed to load — retry UI
-  if (!shouldForcePlainArabic && fontError) {
+  if (!usePlainArabicMode && fontError) {
     return (
       <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ color: textColor, marginBottom: 12 }}>{translate('quran.fontLoadError')}</Text>
@@ -392,7 +395,7 @@ const MushafPage = React.memo(function MushafPage({
             <View key={i}>
               <Text
                 style={{
-                    fontFamily: !shouldForcePlainArabic && fontLoaded ? fontFamily : 'Amiri-Regular',
+                    fontFamily: !usePlainArabicMode && fontLoaded ? fontFamily : 'Amiri-Regular',
                   fontSize,
                   textAlign: 'center',
                   lineHeight,
@@ -418,7 +421,7 @@ const MushafPage = React.memo(function MushafPage({
                   const ayahObj = surahData?.ayahs.find(a => a.ns === group.ayah);
                   const ayahText = ayahObj?.t;
 
-                  if (ayahText && (shouldForcePlainArabic || !fontLoaded)) {
+                  if (ayahText && (usePlainArabicMode || !fontLoaded)) {
                     const wordsFromAyah = ayahText.split(/\s+/).filter(Boolean);
                     let wordIndex = 0;
                     return (
@@ -556,10 +559,13 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
           </TouchableOpacity>
         </View>
 
-        {/* Center: page number - surah name */}
+        {/* Center: surah name + juz below */}
         <View style={gh.center}>
           <Text style={[gh.pageInfo, { color: goldenColor }]} numberOfLines={1}>
             {toArabicNumber(currentPage)} - {surahName}
+          </Text>
+          <Text style={[gh.juzLabel, { color: goldenColor }]} numberOfLines={1}>
+            الجزء {toArabicNumber(juz)}
           </Text>
         </View>
 
@@ -577,18 +583,19 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
 const gh = StyleSheet.create({
   wrapper: {
     zIndex: 10,
-    height: 48,
+    height: 52,
   },
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 48,
+    height: 52,
     paddingHorizontal: 12,
   },
   left: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 50, justifyContent: 'flex-end' },
   center: { alignItems: 'center', paddingHorizontal: 8, flexShrink: 0 },
-  pageInfo: { fontSize: 15, fontFamily: 'Amiri-Bold', lineHeight: 26, includeFontPadding: false },
+  pageInfo: { fontSize: 15, fontFamily: 'Rubik-Bold', lineHeight: 20, includeFontPadding: false },
+  juzLabel: { fontSize: 11, fontFamily: 'Rubik-Medium', lineHeight: 16, includeFontPadding: false, opacity: 0.75 },
 });
 
 // ══════════════════════════════════════════════
@@ -603,6 +610,7 @@ export default function SurahScreen() {
 
   const router = useRouter();
   const { settings, isDarkMode, updateDisplay, isLoading: settingsLoading, t } = useSettings();
+  const { isPremium } = useSubscription();
   const surahColors = useColors();
   const s = useScaledStyles(_s, surahColors.fs);
   const stg = useScaledStyles(_stg, surahColors.fs);
@@ -1656,10 +1664,15 @@ export default function SurahScreen() {
                               const isSelected = themeIndex === i && (!quranBgKey || quranBgKey === 'none');
                               const lang = getLanguage();
                               const themeName = th.name?.[lang] || th.name?.ar || th.name?.en || '';
+                              const isThemeLocked = i >= 5 && !isPremium;
                               return (
                                 <TouchableOpacity
                                   key={i}
                                   onPress={() => {
+                                    if (isThemeLocked) {
+                                      guardPremiumFeature('exclusive_themes', router, isPremium);
+                                      return;
+                                    }
                                     updateDisplay({ quranThemeIndex: i, quranBackground: 'none' });
                                     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                   }}
@@ -1669,6 +1682,7 @@ export default function SurahScreen() {
                                       backgroundColor: th.background,
                                       borderWidth: isSelected ? 2.5 : 1,
                                       borderColor: isSelected ? goldenColor : (settingsIsLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)'),
+                                      opacity: isThemeLocked ? 0.65 : 1,
                                     },
                                     isRTL ? { transform: [{ scaleX: -1 }] } : undefined,
                                   ]}
@@ -1684,6 +1698,11 @@ export default function SurahScreen() {
                                   {isSelected && (
                                     <View style={[stg.themePreviewCheck, { backgroundColor: goldenColor }]}>
                                       <MaterialCommunityIcons name="check" size={10} color="#fff" />
+                                    </View>
+                                  )}
+                                  {isThemeLocked && (
+                                    <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8, padding: 2 }}>
+                                      <MaterialCommunityIcons name="lock" size={12} color="#fff" />
                                     </View>
                                   )}
                                 </TouchableOpacity>

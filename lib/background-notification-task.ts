@@ -17,7 +17,7 @@
  *   for reliable execution — prompted in notification settings screen
  */
 
-import * as BackgroundFetch from 'expo-background-fetch';
+import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -27,20 +27,17 @@ const TASK_NAME = 'RESCHEDULE_NOTIFICATIONS';
 /**
  * Define the background task at module scope (required by expo-task-manager).
  * This runs even when the app is killed.
- * Wrapped in try-catch because TaskManager.defineTask can throw in Expo Go
- * where native task manager modules are not available.
  */
-try {
 TaskManager.defineTask(TASK_NAME, async () => {
   const startTime = Date.now();
   try {
     // Quick check: are notifications enabled at all?
     const raw = await AsyncStorage.getItem('app_settings');
-    if (!raw) return BackgroundFetch.BackgroundFetchResult.NoData;
+    if (!raw) return BackgroundTask.BackgroundTaskResult.Success;
 
     const settings = JSON.parse(raw);
     if (!settings.notifications?.enabled) {
-      return BackgroundFetch.BackgroundFetchResult.NoData;
+      return BackgroundTask.BackgroundTaskResult.Success;
     }
 
     // Dynamic import to avoid circular dependencies and reduce cold-start cost.
@@ -83,7 +80,7 @@ TaskManager.defineTask(TASK_NAME, async () => {
       sleepAzkar: n.sleepAzkar ?? false,
       sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
       wakeupAzkar: n.wakeupAzkar ?? false,
-      wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
+      wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
       afterPrayerAzkar: n.afterPrayerAzkar ?? false,
       dailyVerse: n.dailyVerse,
       dailyVerseTime: n.dailyVerseTime,
@@ -135,17 +132,12 @@ TaskManager.defineTask(TASK_NAME, async () => {
     );
 
     console.log(`[background-task] Rescheduled in ${Date.now() - startTime}ms`);
-    return BackgroundFetch.BackgroundFetchResult.NewData;
+    return BackgroundTask.BackgroundTaskResult.Success;
   } catch (e) {
     console.warn('[background-task] Failed:', e);
-    return BackgroundFetch.BackgroundFetchResult.Failed;
+    return BackgroundTask.BackgroundTaskResult.Failed;
   }
 });
-} catch (e) {
-  // TaskManager.defineTask throws in Expo Go where native modules are unavailable.
-  // This is safe to ignore — background task only works in dev-client/standalone builds.
-  console.warn('[background-task] defineTask failed (Expo Go?):', e);
-}
 
 /**
  * Register the background fetch task.
@@ -163,22 +155,18 @@ export async function registerBackgroundNotificationTask(): Promise<void> {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(TASK_NAME);
     if (isRegistered) {
       // Re-register to ensure the latest minimumInterval is applied
-      // (e.g., after an app update that changed the interval)
-      await BackgroundFetch.unregisterTaskAsync(TASK_NAME);
+      await BackgroundTask.unregisterTaskAsync(TASK_NAME);
     }
 
-    await BackgroundFetch.registerTaskAsync(TASK_NAME, {
+    await BackgroundTask.registerTaskAsync(TASK_NAME, {
       minimumInterval: 15 * 60, // 15 minutes (minimum allowed by OS)
-      stopOnTerminate: false,        // Android: keep running after app kill
-      startOnBoot: true,             // Android: restart after device reboot
     });
 
-    // Check the background fetch status for diagnostics
-    const status = await BackgroundFetch.getStatusAsync();
+    // Check the background task status for diagnostics
+    const status = await BackgroundTask.getStatusAsync();
     const statusName =
-      status === BackgroundFetch.BackgroundFetchStatus.Available ? 'available' :
-      status === BackgroundFetch.BackgroundFetchStatus.Restricted ? 'RESTRICTED' :
-      status === BackgroundFetch.BackgroundFetchStatus.Denied ? 'DENIED' :
+      status === BackgroundTask.BackgroundTaskStatus.Available ? 'available' :
+      status === BackgroundTask.BackgroundTaskStatus.Restricted ? 'RESTRICTED' :
       `unknown(${status})`;
 
     console.log(`[background-task] Registered (status: ${statusName})`);
@@ -196,7 +184,7 @@ export async function unregisterBackgroundNotificationTask(): Promise<void> {
   try {
     const isRegistered = await TaskManager.isTaskRegisteredAsync(TASK_NAME);
     if (isRegistered) {
-      await BackgroundFetch.unregisterTaskAsync(TASK_NAME);
+      await BackgroundTask.unregisterTaskAsync(TASK_NAME);
       console.log('[background-task] Unregistered');
     }
   } catch (e) {

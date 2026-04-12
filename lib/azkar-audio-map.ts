@@ -406,3 +406,5 @@ export const getAzkarAudioSource = (filename: string | null | undefined): any | 
   const m4aKey = filename.replace(/\.mp3$/, ".m4a");
   return AZKAR_AUDIO_MAP[m4aKey] || AZKAR_AUDIO_MAP[filename] || null;
 };
+
+export const AZKAR_FILENAMES = Object.keys(AZKAR_AUDIO_MAP);

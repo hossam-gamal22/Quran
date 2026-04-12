@@ -132,7 +132,7 @@ export default function CustomDhikrScreen() {
                   <MaterialCommunityIcons
                     name={icon as any}
                     size={24}
-                    color={selectedIcon === icon ? '#0d8e62' : colors.textLight}
+                    color={selectedIcon === icon ? '#0d8e62' : colors.glassTextLight}
                   />
                 </TouchableOpacity>
               ))}

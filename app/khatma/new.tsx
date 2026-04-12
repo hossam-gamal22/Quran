@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +23,8 @@ import GlassCard from '../../components/ui/GlassCard';
 import { UniversalHeader } from '@/components/ui';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import { t, getDateLocale } from '@/lib/i18n';
 import {
   Spacing,
@@ -54,7 +57,26 @@ export default function NewKhatmaScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
-  const { durations, createKhatma } = useKhatma();
+  const { durations, createKhatma, khatmas } = useKhatma();
+  const { isPremium } = useSubscription();
+
+  const GREEN = '#0d8e62';
+
+  // Card styling - better contrast in light mode
+  const cardStyle = {
+    backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
+    borderColor: isDarkMode ? colors.border : '#C9CDD2',
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    // Shadow for light mode only
+    ...(isDarkMode ? {} : {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      elevation: 3,
+    }),
+  };
 
   // State
   const [name, setName] = useState('');
@@ -85,6 +107,13 @@ export default function NewKhatmaScreen() {
   const handleCreate = useCallback(async () => {
     if (!selectedDuration) {
       Alert.alert(t('messages.alert'), t('khatma.selectDurationAlert'));
+      return;
+    }
+
+    // Free users limited to 1 khatma
+    const activeCount = khatmas.filter(k => !k.isCompleted).length;
+    if (activeCount >= 1 && !isPremium) {
+      guardPremiumFeature('multiple_khatma', router, isPremium);
       return;
     }
 
@@ -147,14 +176,11 @@ export default function NewKhatmaScreen() {
           <TextInput
             style={[
               styles.input,
-              {
-                backgroundColor: colors.card,
-                color: colors.text,
-                borderColor: colors.border,
-              },
+              cardStyle,
+              { color: colors.text },
             ]}
             placeholder={t('khatma.khatmaNamePlaceholder')}
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={isDarkMode ? colors.textSecondary : '#9CA3AF'}
             value={name}
             onChangeText={setName}
             textAlign={isRTL ? 'right' : 'left'}
@@ -174,11 +200,11 @@ export default function NewKhatmaScreen() {
                 key={duration.id}
                 style={[
                   styles.durationCard,
+                  cardStyle,
                   {
-                    backgroundColor: colors.card,
                     borderColor: selectedDuration?.id === duration.id
-                      ? colors.primary
-                      : colors.border,
+                      ? GREEN
+                      : (isDarkMode ? colors.border : '#C9CDD2'),
                     borderWidth: selectedDuration?.id === duration.id ? 2 : 1,
                   },
                 ]}
@@ -189,7 +215,7 @@ export default function NewKhatmaScreen() {
                     styles.durationName,
                     {
                       color: selectedDuration?.id === duration.id
-                        ? colors.primary
+                        ? GREEN
                         : colors.text,
                     },
                   ]}
@@ -200,7 +226,7 @@ export default function NewKhatmaScreen() {
                   {toArabicNumber(duration.pagesPerDay)} {t('khatma.pagesPerDayUnit')}
                 </Text>
                 {selectedDuration?.id === duration.id && (
-                  <View style={[styles.selectedCheck, { backgroundColor: colors.primary }]}>
+                  <View style={[styles.selectedCheck, { backgroundColor: GREEN }]}>
                     <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                   </View>
                 )}
@@ -211,81 +237,70 @@ export default function NewKhatmaScreen() {
 
         {/* Selected Duration Info */}
         {selectedDuration && (
-          <GlassCard style={styles.infoCard}>
+          <View style={[styles.infoCard, cardStyle, { borderColor: isDarkMode ? colors.border : '#C9CDD2' }]}>
             <View style={[styles.infoRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.infoItem}>
-                <Ionicons name="calendar-outline" size={24} color={colors.primary} />
+                <Ionicons name="calendar-outline" size={24} color={isDarkMode ? '#4ADE80' : '#0d8e62'} />
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {toArabicNumber(selectedDuration.days)}
                 </Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('khatma.daily')}</Text>
+                <Text style={[styles.infoLabel, { color: isDarkMode ? colors.textSecondary : '#6B7280' }]}>{t('khatma.daily')}</Text>
               </View>
 
-              <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
+              <View style={[styles.infoDivider, { backgroundColor: isDarkMode ? colors.border : '#E5E5E5' }]} />
 
               <View style={styles.infoItem}>
-                <Ionicons name="document-text-outline" size={24} color={colors.primary} />
+                <Ionicons name="document-text-outline" size={24} color={isDarkMode ? '#4ADE80' : '#0d8e62'} />
                 <Text style={[styles.infoValue, { color: colors.text }]}>
                   {toArabicNumber(selectedDuration.pagesPerDay)}
                 </Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('khatma.pagesPerDayUnit')}</Text>
+                <Text style={[styles.infoLabel, { color: isDarkMode ? colors.textSecondary : '#6B7280' }]}>{t('khatma.pagesPerDayUnit')}</Text>
               </View>
 
-              <View style={[styles.infoDivider, { backgroundColor: colors.border }]} />
+              <View style={[styles.infoDivider, { backgroundColor: isDarkMode ? colors.border : '#E5E5E5' }]} />
 
               <View style={styles.infoItem}>
-                <Ionicons name="book-outline" size={24} color={colors.primary} />
+                <Ionicons name="book-outline" size={24} color={isDarkMode ? '#4ADE80' : '#0d8e62'} />
                 <Text style={[styles.infoValue, { color: colors.text }]}>{toArabicNumber(604)}</Text>
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{t('common.page')}</Text>
+                <Text style={[styles.infoLabel, { color: isDarkMode ? colors.textSecondary : '#6B7280' }]}>{t('common.page')}</Text>
               </View>
             </View>
-          </GlassCard>
+          </View>
         )}
 
         {/* Reminder */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('khatma.dailyReminder')}</Text>
           
-          <TouchableOpacity
-            style={[styles.reminderToggle, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={() => setReminderEnabled(!reminderEnabled)}
+          <View
+            style={[styles.reminderToggle, cardStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           >
             <View style={[styles.reminderToggleContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Ionicons
                 name={reminderEnabled ? 'notifications' : 'notifications-outline'}
                 size={24}
-                color={reminderEnabled ? colors.primary : colors.textSecondary}
+                color={reminderEnabled ? GREEN : colors.textSecondary}
               />
               <Text style={[styles.reminderToggleText, { color: colors.text }]}>
                 {t('khatma.enableReminder')}
               </Text>
             </View>
-            <View
-              style={[
-                styles.toggleSwitch,
-                {
-                  backgroundColor: reminderEnabled ? colors.primary : colors.border,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.toggleKnob,
-                  {
-                    transform: [{ translateX: reminderEnabled ? 20 : 0 }],
-                  },
-                ]}
-              />
-            </View>
-          </TouchableOpacity>
+            <Switch
+              trackColor={{ false: isDarkMode ? colors.border : '#D1D5DB', true: '#0d8e62' }}
+              thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+              ios_backgroundColor={isDarkMode ? colors.border : '#D1D5DB'}
+              onValueChange={setReminderEnabled}
+              value={reminderEnabled}
+            />
+          </View>
 
           {reminderEnabled && (
             <TouchableOpacity
-              style={[styles.timeSelector, { backgroundColor: colors.card, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+              style={[styles.timeSelector, cardStyle, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
               onPress={() => setShowTimePicker(true)}
             >
               <View style={[styles.timeSelectorContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Ionicons name="time-outline" size={24} color={colors.primary} />
+                <Ionicons name="time-outline" size={24} color={GREEN} />
                 <Text style={[styles.timeSelectorLabel, { color: colors.text }]}>
                   {t('khatma.reminderTime')}
                 </Text>
@@ -330,9 +345,9 @@ export default function NewKhatmaScreen() {
                         paddingHorizontal: 14,
                         paddingVertical: 8,
                         borderRadius: 20,
-                        backgroundColor: isSelected ? colors.primary : colors.primary + '25',
+                        backgroundColor: isSelected ? GREEN : GREEN + '25',
                         borderWidth: 1,
-                        borderColor: isSelected ? colors.primary : colors.primary + '4D',
+                        borderColor: isSelected ? GREEN : GREEN + '4D',
                       }}
                     >
                       <Text style={{
@@ -374,7 +389,7 @@ export default function NewKhatmaScreen() {
           style={[
             styles.createButton,
             {
-              backgroundColor: selectedDuration ? colors.primary : colors.border,
+              backgroundColor: selectedDuration ? GREEN : (isDarkMode ? colors.border : '#D1D5DB'),
               flexDirection: isRTL ? 'row-reverse' : 'row',
             },
           ]}
@@ -385,8 +400,8 @@ export default function NewKhatmaScreen() {
             <Text style={styles.createButtonText}>{t('khatma.creating')}</Text>
           ) : (
             <>
-              <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-              <Text style={styles.createButtonText}>{t('khatma.startKhatma')}</Text>
+              <Ionicons name="add-circle" size={24} color={selectedDuration ? '#FFFFFF' : (isDarkMode ? '#FFFFFF' : '#6B7280')} />
+              <Text style={[styles.createButtonText, { color: selectedDuration ? '#FFFFFF' : (isDarkMode ? '#FFFFFF' : '#6B7280') }]}>{t('khatma.startKhatma')}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -512,17 +527,6 @@ const _styles = StyleSheet.create({
     fontWeight: '500',
     lineHeight: 28,
     includeFontPadding: false,
-  },
-  toggleSwitch: {
-    width: 50,
-    height: 28,
-    borderRadius: BorderRadius.full,
-    padding: 4,
-  },
-  toggleKnob: {
-    width: 20,
-    height: 20,
-    borderRadius: BorderRadius.full,
   },
   timeSelector: {
     flexDirection: 'row',

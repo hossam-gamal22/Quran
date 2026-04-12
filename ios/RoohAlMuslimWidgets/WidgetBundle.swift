@@ -68,7 +68,7 @@ extension Color {
 
 struct WidgetConstants {
     /// App Group ID للمشاركة مع التطبيق
-    static let appGroupId = "group.com.roohmuslim.app"
+    static let appGroupId = "group.com.rooh.almuslim"
     
     /// اسم ملف البيانات المشتركة
     static let sharedDataFile = "widget_data.json"

@@ -4,10 +4,21 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: sc, gradient } = resolveColorScheme(undefined, 'azkar');
+
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const bg = useTheme ? theme.gradient : gradient;
+  const accent = useTheme ? theme.accentColor : sc.tealLight;
+  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
+  const grayLightColor = useTheme ? theme.mutedColor : sc.grayLight;
+  const badgeBg = useTheme ? theme.badgeBg : sc.badgeBg;
+  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
+  const brandColor = useTheme ? theme.accentColor : sc.teal;
 
   return (
     <FlexWidget
@@ -17,7 +28,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
         flexDirection: 'column',
         justifyContent: 'space-between',
         alignItems: 'center',
-        backgroundGradient: GRADIENTS.azkar,
+        backgroundGradient: bg,
         borderRadius: 20,
         padding: 12,
       }}
@@ -38,7 +49,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: azkar.morningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+            backgroundColor: azkar.morningCompleted ? badgeBg : cardBg,
             borderRadius: 12,
             paddingHorizontal: 10,
             paddingVertical: 5,
@@ -50,7 +61,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             text={azkar.morningCompleted ? '✓' : '○'}
             style={{
               fontSize: 14,
-              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayDark,
+              color: azkar.morningCompleted ? accent : grayDarkColor,
               marginRight: 6,
             }}
           />
@@ -58,7 +69,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             text="أذكار الصباح"
             style={{
               fontSize: 13,
-              color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
+              color: azkar.morningCompleted ? accent : grayLightColor,
               fontFamily: FONT.amiri,
             }}
           />
@@ -70,7 +81,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: azkar.eveningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+            backgroundColor: azkar.eveningCompleted ? badgeBg : cardBg,
             borderRadius: 12,
             paddingHorizontal: 10,
             paddingVertical: 5,
@@ -81,7 +92,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             text={azkar.eveningCompleted ? '✓' : '○'}
             style={{
               fontSize: 14,
-              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayDark,
+              color: azkar.eveningCompleted ? accent : grayDarkColor,
               marginRight: 6,
             }}
           />
@@ -89,7 +100,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
             text="أذكار المساء"
             style={{
               fontSize: 13,
-              color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
+              color: azkar.eveningCompleted ? accent : grayLightColor,
               fontFamily: FONT.amiri,
             }}
           />
@@ -100,7 +111,7 @@ export function AzkarProgressSmallWidget({ data }: { data: SharedWidgetData }) {
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: COLORS.teal,
+          color: brandColor,
           fontFamily: FONT.amiri,
         }}
       />

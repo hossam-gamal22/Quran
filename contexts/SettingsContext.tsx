@@ -646,7 +646,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             worshipDailySummaryTime: n.worshipDailySummaryTime,
             worshipStreakAlerts: n.worshipStreakAlerts,
             worshipWeeklyReport: n.worshipWeeklyReport,
-            worshipWeeklyReportTime: n.worshipWeeklyReportTime,
+            worshipWeeklyReportTime: n.worshipWeeklyReportTime ?? '21:00',
             kahfReminder: n.kahfReminder,
             kahfTime: n.kahfTime,
           }).then(() => {
@@ -830,7 +830,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       worshipDailySummaryTime: n.worshipDailySummaryTime,
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
-      worshipWeeklyReportTime: n.worshipWeeklyReportTime,
+      worshipWeeklyReportTime: n.worshipWeeklyReportTime ?? '21:00',
       kahfReminder: n.kahfReminder,
       kahfTime: n.kahfTime,
     });

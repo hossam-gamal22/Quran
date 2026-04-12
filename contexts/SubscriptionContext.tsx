@@ -364,6 +364,19 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         console.log(`🛒 Purchase requested: plan=${plan}, productId=${productId}, platform=${platformKey}`);
       }
 
+      // Verify the product was actually fetched from the store
+      const fetchedProduct = rawProductsRef.current.find(
+        (p: any) => p.productId === productId || p.id === productId
+      );
+      if (!fetchedProduct) {
+        console.log('❌ Product not found in fetched products:', productId);
+        Alert.alert(
+          t('subscription.purchaseError'),
+          t('subscription.purchaseErrorMessage')
+        );
+        return false;
+      }
+
       if (plan === 'lifetime') {
         await IAP.requestPurchase({
           type: 'in-app',
@@ -390,8 +403,16 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         });
       }
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.log('❌ Purchase failed:', error);
+      // Don't show alert for user-initiated cancellations
+      const code = error?.code || error?.responseCode;
+      if (code !== 'E_USER_CANCELLED' && code !== 'user-cancelled' && code !== 2) {
+        Alert.alert(
+          t('subscription.purchaseError'),
+          t('subscription.purchaseErrorMessage')
+        );
+      }
       return false;
     }
   }, [config]);

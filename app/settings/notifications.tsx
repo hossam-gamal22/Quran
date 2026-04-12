@@ -43,12 +43,8 @@ import { sendTestNotification } from '@/lib/notifications-manager';
 
 // Removed: interstitial ads on sound download to reduce user frustration
 import { useIsRTL } from '@/hooks/use-is-rtl';
-
-
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 
 // ========================================
 // الثوابت
@@ -76,6 +72,8 @@ const REMINDER_SOUNDS: { id: ReminderSoundType; nameKey: string }[] = [
   { id: 'general_reminder', nameKey: 'notificationSounds.reminderTone' },
   { id: 'silent', nameKey: 'notificationSounds.silent' },
 ];
+
+const FREE_ADHAN_IDS: AdhanSoundType[] = ['default', 'makkah', 'madinah', 'alaqsa', 'silent'];
 
 const ADHAN_SOUNDS: { id: AdhanSoundType; name: string; description: string; icon: string }[] = [
   { id: 'default', name: t('notificationSounds.defaultSound'), description: t('notificationSounds.systemSound'), icon: 'bell-ring' },
@@ -260,6 +258,7 @@ const springLayoutAnimation = () => {
 export default function NotificationsScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
+  const { isPremium } = useSubscription();
   const { settings, isDarkMode, updateNotifications } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -935,10 +934,9 @@ export default function NotificationsScreen() {
             </View>
           );
         })()}
-
-        {/* Full adhan list (when expanded) */}
-        {adhanListExpanded && ADHAN_SOUNDS.filter(s => s.id === 'default' || s.id === 'silent' || !disabledSoundIds.has(s.id)).map((sound) => {
-          const isSelected = (settings.notifications.adhanSoundType || 'default') === sound.id;
+        {adhanListExpanded && ADHAN_SOUNDS.map((sound) => {
+          const isSelected = settings.notifications.adhanSoundType === sound.id;
+          const isSoundLocked = !isPremium && !FREE_ADHAN_IDS.includes(sound.id);
           return (
             <TouchableOpacity
               key={sound.id}
@@ -946,9 +944,13 @@ export default function NotificationsScreen() {
                 styles.adhanSoundOption,
                 { borderBottomColor: colors.divider },
                 isSelected && styles.adhanSoundOptionSelected,
-                { flexDirection: isRTL ? 'row-reverse' : 'row' },
+                { flexDirection: isRTL ? 'row-reverse' : 'row', opacity: isSoundLocked ? 0.6 : 1 },
               ]}
               onPress={() => {
+                if (isSoundLocked) {
+                  guardPremiumFeature('sound_downloads', router, isPremium);
+                  return;
+                }
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 updateNotifications({ adhanSoundType: sound.id });
                 springLayoutAnimation();
@@ -958,7 +960,7 @@ export default function NotificationsScreen() {
             >
               <View style={[styles.adhanSoundIconBg, isSelected && styles.adhanSoundIconBgSelected, !isSelected && { backgroundColor: colors.surface }]}>
                 <MaterialCommunityIcons
-                  name={sound.icon as any}
+                  name={isSoundLocked ? 'lock' : sound.icon as any}
                   size={18}
                   color={isSelected ? '#fff' : colors.textLight}
                 />

@@ -129,7 +129,7 @@ function generateFallbackData(): SharedWidgetData {
     settings: {
       enabled: true,
       prayerWidget: { enabled: true, showAllPrayers: true, showHijriDate: true, showLocation: true, showCompletion: true, colorScheme: 'auto', accentColor: '#0d8e62' },
-      azkarWidget: { enabled: true, showTranslation: false, autoRefresh: true, refreshInterval: 60, categories: ['morning', 'evening', 'misc'] },
+      azkarWidget: { enabled: true, showTranslation: false, categories: ['morning', 'evening', 'misc'] },
       hijriWidget: { enabled: true, showGregorian: true },
       verseWidget: { enabled: true, showTranslation: false, colorScheme: 'auto' },
       dhikrWidget: { enabled: true, showTranslation: false, showBenefit: true },

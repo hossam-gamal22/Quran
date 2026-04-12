@@ -9,6 +9,8 @@
  */
 
 import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
+import { Platform } from 'react-native';
 import { QCF_FONT_MAP, TOTAL_QURAN_PAGES, isValidPage } from './qcf-font-map';
 
 // Re-export for backward compatibility
@@ -17,6 +19,20 @@ export { TOTAL_QURAN_PAGES, isValidPage };
 // Track which pages are loaded in memory
 const loadedPages = new Map<number, boolean>(); // page -> darkMode used
 const loadingPromises = new Map<string, Promise<void>>();
+
+async function resolveAndroidFontSource(fontSource: any): Promise<any> {
+  if (Platform.OS !== 'android') return fontSource;
+  try {
+    const asset = Asset.fromModule(fontSource);
+    if (!asset.downloaded) {
+      await asset.downloadAsync();
+    }
+    return asset.localUri ?? asset.uri ?? fontSource;
+  } catch (err) {
+    console.warn('[QCF4] Android asset resolve failed, falling back to bundled source:', err);
+    return fontSource;
+  }
+}
 
 /** Font family for a given page (1-based). Use darkMode param for mode-specific names. */
 export function getPageFontFamily(page: number, darkMode?: boolean): string {
@@ -64,9 +80,26 @@ export async function loadPageFont(
         throw new Error(`Font not found in bundle for page ${page}`);
       }
 
-      // Load directly from bundled asset
-      await Font.loadAsync({ [familyName]: fontSource });
-      loadedPages.set(page, darkMode);
+      const resolvedFontSource = await resolveAndroidFontSource(fontSource);
+
+      // Android can fail on first attempt (Metro asset fetch, memory pressure)
+      // Retry up to 3 times with increasing delay
+      const maxRetries = Platform.OS === 'android' ? 3 : 1;
+      let lastErr: any;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          if (attempt > 0) {
+            await new Promise(r => setTimeout(r, 300 * attempt));
+          }
+          await Font.loadAsync({ [familyName]: resolvedFontSource });
+          loadedPages.set(page, darkMode);
+          return;
+        } catch (e) {
+          lastErr = e;
+          console.warn(`[QCF4] Attempt ${attempt + 1}/${maxRetries} failed for page ${page}:`, e);
+        }
+      }
+      throw lastErr;
     } catch (err) {
       console.warn(`[QCF4] Failed to load font for page ${page}:`, err);
       throw err;

@@ -4,7 +4,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { PrayerTimes, getNextPrayer, getTimeRemaining, formatTime12h } from './prayer-times';
-import { getLocalizedHijriDate } from './hijri-date';
+import { getLocalizedHijriDate, HIJRI_MONTHS_EN } from './hijri-date';
 import { getAllAzkar, resolveTranslationValue } from '@/lib/azkar-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { t, getDateLocale, getLanguage } from '@/lib/i18n';
@@ -110,6 +110,7 @@ export interface PrayerCompletionData {
 
 export interface WidgetSettings {
   enabled: boolean;
+  widgetTheme?: string; // Theme ID from WIDGET_THEMES
   prayerWidget: {
     enabled: boolean;
     showAllPrayers: boolean;
@@ -122,8 +123,6 @@ export interface WidgetSettings {
   azkarWidget: {
     enabled: boolean;
     showTranslation: boolean;
-    autoRefresh: boolean;
-    refreshInterval: number; // بالدقائق
     categories: string[];
   };
   hijriWidget: {
@@ -158,6 +157,7 @@ export interface SharedWidgetData {
 
 export const defaultWidgetSettings: WidgetSettings = {
   enabled: true,
+  widgetTheme: 'default_dark',
   prayerWidget: {
     enabled: true,
     showAllPrayers: true,
@@ -170,8 +170,6 @@ export const defaultWidgetSettings: WidgetSettings = {
   azkarWidget: {
     enabled: true,
     showTranslation: false,
-    autoRefresh: true,
-    refreshInterval: 60,
     categories: ['1', '2', '3'],
   },
   hijriWidget: {
@@ -289,7 +287,7 @@ export const preparePrayerWidgetData = async (
     hijriDate: hijri ? `${hijri.day} ${hijri.monthName} ${hijri.year}` : '',
     hijriDay: hijri?.day || 1,
     hijriMonth: hijri?.monthName || '',
-    hijriMonthEn: hijri?.monthName || '',
+    hijriMonthEn: hijri ? (HIJRI_MONTHS_EN[hijri.month - 1] || '') : '',
     hijriYear: hijri?.year || 1446,
     gregorianDate: now.toLocaleDateString(getDateLocale(), { 
       weekday: 'long', 
@@ -413,7 +411,8 @@ function getDhikrCategoryName(category: string): string {
  * تحضير بيانات آية اليوم للويدجت
  */
 export const prepareVerseWidgetData = async (
-  language: string = 'ar'
+  language: string = 'ar',
+  options?: { showTranslation?: boolean }
 ): Promise<VerseWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
 
@@ -462,7 +461,8 @@ export const prepareVerseWidgetData = async (
  * تحضير بيانات الذكر اليومي للويدجت
  */
 export const prepareDhikrWidgetData = async (
-  language: string = 'ar'
+  language: string = 'ar',
+  options?: { showTranslation?: boolean; showBenefit?: boolean }
 ): Promise<DhikrWidgetData> => {
   const todayDate = new Date().toISOString().split('T')[0]!;
   const allAzkar = getAllAzkar();
@@ -483,11 +483,11 @@ export const prepareDhikrWidgetData = async (
   const zikr = allAzkar[index]!;
 
   const lang = language as 'ar' | 'en' | 'ur' | 'id' | 'tr' | 'fr' | 'de' | 'hi' | 'bn' | 'ms' | 'ru' | 'es';
-  const translation = language !== 'ar' ? (resolveTranslationValue(zikr.translations?.[lang]) || resolveTranslationValue(zikr.translations?.['en'])) : undefined;
+  const translation = (options?.showTranslation !== false && language !== 'ar') ? (resolveTranslationValue(zikr.translations?.[lang]) || resolveTranslationValue(zikr.translations?.['en'])) : undefined;
   const benefitVal = zikr.benefit;
-  const benefit = typeof benefitVal === 'string'
+  const benefit = (options?.showBenefit !== false) ? (typeof benefitVal === 'string'
     ? benefitVal
-    : benefitVal?.[lang] || benefitVal?.['ar'] || undefined;
+    : benefitVal?.[lang] || benefitVal?.['ar'] || undefined) : undefined;
 
   return {
     arabic: stripAzkarBrackets(zikr.arabic),

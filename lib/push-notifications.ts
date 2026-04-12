@@ -212,6 +212,7 @@ export const scheduleLocalNotification = async (
         sound: soundEnabled ? 'default' : undefined,
         ...(Platform.OS === 'android' && !vibrationEnabled && { vibrate: [0] }),
         ...(Platform.OS === 'android' && triggerChannelId && { channelId: triggerChannelId }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger,
     });

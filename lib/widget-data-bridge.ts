@@ -170,8 +170,8 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
     const [prayerData, azkarData, verseData, dhikrData, prayerCompletion] = await Promise.all([
       preparePrayerWidgetData(prayerTimes || null, location, lang),
       prepareAzkarWidgetData(lang, settings.azkarWidget.categories),
-      prepareVerseWidgetData(lang),
-      prepareDhikrWidgetData(lang),
+      prepareVerseWidgetData(lang, { showTranslation: settings.verseWidget.showTranslation }),
+      prepareDhikrWidgetData(lang, { showTranslation: settings.dhikrWidget.showTranslation, showBenefit: settings.dhikrWidget.showBenefit }),
       getPrayerCompletion(),
     ]);
 
@@ -211,7 +211,7 @@ export function scheduleMidnightRefresh(onRefresh?: () => void): () => void {
   const msUntilMidnight = midnight.getTime() - now.getTime();
 
   const timer = setTimeout(() => {
-    updateWidgetData().catch(() => {});
+    updateWidgetData().catch((e) => console.warn('⚠️ Midnight widget refresh failed:', e));
     onRefresh?.();
     scheduleMidnightRefresh(onRefresh);
   }, msUntilMidnight);

@@ -21,7 +21,11 @@ import { fetchAppConfig, getStoreUrls, type ShareModalConfig } from '@/lib/app-c
 interface ShareAppModalProps {
   visible: boolean;
   onClose: () => void;
+  onDismiss?: () => Promise<void>;
+  onShared?: () => Promise<void>;
 }
+
+// ShareAppModal receives onDismiss but MUST call it when user taps "ليس الآن"
 
 const DEFAULT_CONFIG: ShareModalConfig = {
   enabled: true,
@@ -32,7 +36,7 @@ const DEFAULT_CONFIG: ShareModalConfig = {
   shareUrlFallback: 'https://roohmuslim.app',
 };
 
-const ShareAppModal: React.FC<ShareAppModalProps> = ({ visible, onClose }) => {
+const ShareAppModal: React.FC<ShareAppModalProps> = ({ visible, onClose, onDismiss, onShared }) => {
   const colors = useColors();
   const { t, isDarkMode } = useSettings();
 
@@ -73,18 +77,27 @@ const ShareAppModal: React.FC<ShareAppModalProps> = ({ visible, onClose }) => {
     const message = config.shareMessageAr;
     const url = storeUrl || config.shareUrlFallback;
     try {
-      await Share.share({
+      const result = await Share.share({
         message: `${message}\n${url}`,
         title: t('common.appName'),
         url: Platform.OS === 'ios' ? url : undefined,
       });
+      // Mark as shared if user actually shared (not cancelled)
+      if (result.action === Share.sharedAction && onShared) {
+        await onShared();
+      }
     } catch {
       // user cancelled or error — ignore
     }
+    onClose();
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Track dismiss so we delay next prompt
+    if (onDismiss) {
+      await onDismiss();
+    }
     onClose();
   };
 

@@ -625,13 +625,7 @@ const DUAS_BY_RITUAL: DuaRitualGroup[] = [
   },
 ];
 
-// ========================================
-// تفعيل LayoutAnimation على أندرويد
-// ========================================
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ========================================
 // مكون بطاقة أدعية المنسك (التبويب الثالث)

@@ -4,11 +4,22 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
   const prayers = prayer.allPrayers.filter(p => p.name !== 'Sunrise');
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: sc, gradient } = resolveColorScheme(data.settings?.prayerWidget?.colorScheme, 'prayer');
+
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const accentColor = useTheme ? theme.accentColor : (data.settings?.prayerWidget?.accentColor || COLORS.teal) as `#${string}`;
+  const accent = useTheme ? theme.accentColor : sc.tealLight;
+  const textColor = useTheme ? theme.textColor : sc.white;
+  const mutedColor = useTheme ? theme.mutedColor : sc.whiteMuted;
+  const grayColor = useTheme ? theme.mutedColor : sc.gray;
+  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
+  const brandColor = useTheme ? theme.accentColor : sc.teal;
 
   return (
     <FlexWidget
@@ -16,7 +27,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        backgroundGradient: GRADIENTS.prayer,
+        backgroundGradient: useTheme ? theme.gradient : gradient,
         borderRadius: 20,
         padding: 12,
       }}
@@ -45,20 +56,33 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
             text="مواقيت الصلاة"
             style={{
               fontSize: 13,
-              color: COLORS.tealLight,
+              color: accent,
               fontFamily: FONT.amiriBold,
               marginLeft: 6,
             }}
           />
         </FlexWidget>
-        <TextWidget
-          text={prayer.hijriDate}
-          style={{
-            fontSize: 10,
-            color: COLORS.gray,
-            fontFamily: FONT.amiri,
-          }}
-        />
+        {(data.settings?.prayerWidget?.showHijriDate ?? true) && (
+          <TextWidget
+            text={prayer.hijriDate}
+            style={{
+              fontSize: 10,
+              color: grayColor,
+              fontFamily: FONT.amiri,
+            }}
+          />
+        )}
+        {(data.settings?.prayerWidget?.showLocation ?? true) && prayer.location ? (
+          <TextWidget
+            text={prayer.location}
+            style={{
+              fontSize: 10,
+              color: grayDarkColor,
+              fontFamily: FONT.amiri,
+              marginLeft: 4,
+            }}
+          />
+        ) : null}
       </FlexWidget>
 
       {/* Prayer times row */}
@@ -81,7 +105,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isNext ? COLORS.teal : '#00000000',
+                backgroundColor: isNext ? accentColor : '#00000000',
                 borderRadius: 14,
                 paddingHorizontal: 10,
                 paddingVertical: 6,
@@ -91,7 +115,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 text={p.nameAr}
                 style={{
                   fontSize: 12,
-                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.whiteMuted,
+                  color: isNext ? textColor : isPassed ? grayDarkColor : mutedColor,
                   fontFamily: FONT.amiriBold,
                 }}
               />
@@ -99,7 +123,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
                 text={p.time}
                 style={{
                   fontSize: 14,
-                  color: isNext ? COLORS.white : isPassed ? COLORS.grayDark : COLORS.whiteAlt,
+                  color: isNext ? textColor : isPassed ? grayDarkColor : (useTheme ? theme.textColor : sc.whiteAlt),
                   fontFamily: FONT.amiri,
                   marginTop: 2,
                 }}
@@ -114,7 +138,7 @@ export function PrayerTimesMediumWidget({ data }: { data: SharedWidgetData }) {
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: COLORS.teal,
+          color: brandColor,
           fontFamily: FONT.amiri,
           textAlign: 'center',
           marginTop: 4,

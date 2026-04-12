@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Linking,
   Image,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -162,7 +163,9 @@ export default function AboutScreen() {
   }));
 
   const openEmail = () => {
-    Linking.openURL(`mailto:${contactEmail}?subject=${encodeURIComponent(t('aboutApp.emailSubject'))}`).catch(() => {});
+    Linking.openURL(`mailto:${contactEmail}?subject=${encodeURIComponent(t('aboutApp.emailSubject'))}`).catch(() => {
+      Alert.alert(t('common.error'), t('messages.networkError'));
+    });
   };
 
   return (
@@ -261,7 +264,9 @@ export default function AboutScreen() {
               icon="facebook"
               iconColor="#1877F2"
               title="Facebook"
-              onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/').catch(() => {})}
+              onPress={() => Linking.openURL('https://www.facebook.com/HossamGamal59/').catch(() => {
+                Alert.alert(t('common.error'), t('messages.networkError'));
+              })}
               isDarkMode={isDarkMode}
             />
           </View>

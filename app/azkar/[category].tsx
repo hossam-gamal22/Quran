@@ -24,10 +24,6 @@ import {
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -100,7 +96,7 @@ const CATEGORY_PHOTO_TERMS: Record<string, string[]> = {
 };
 
 // Map azkar category IDs → worship tracker keys
-const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date'>>> = {
+const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>>> = {
   morning: 'morning',
   evening: 'evening',
   sleep: 'sleep',

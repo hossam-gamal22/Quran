@@ -47,6 +47,12 @@ const SHARED_SWIFT_FILES = [
   'SharedActivityAttributes.swift',
 ];
 
+// Font files needed by widgets (HijriDateWidget uses Amiri)
+const WIDGET_FONT_FILES = [
+  'Amiri-Regular.ttf',
+  'Amiri-Bold.ttf',
+];
+
 /**
  * Main plugin: wires up the WidgetKit extension target
  */
@@ -95,6 +101,16 @@ const withIOSWidgets = (config) => {
       copyDirectorySync(assetsSource, assetsDest);
     }
 
+    // Copy Amiri font files for HijriDateWidget
+    const fontsDir = path.join(projectRoot, 'assets', 'fonts');
+    for (const fontFile of WIDGET_FONT_FILES) {
+      const src = path.join(fontsDir, fontFile);
+      const dst = path.join(widgetDir, fontFile);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
     // Create widget entitlements file
     const widgetEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -136,6 +152,11 @@ const withIOSWidgets = (config) => {
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Amiri-Regular.ttf</string>
+		<string>Amiri-Bold.ttf</string>
+	</array>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
@@ -150,7 +171,7 @@ const withIOSWidgets = (config) => {
 
     // Create PBXGroup for widget files (all files including Swift sources)
     const widgetGroup = xcodeProject.addPbxGroup(
-      [...WIDGET_SWIFT_FILES, ...SHARED_SWIFT_FILES, 'Assets.xcassets', `${WIDGET_EXTENSION_NAME}.entitlements`, 'Info.plist'],
+      [...WIDGET_SWIFT_FILES, ...SHARED_SWIFT_FILES, ...WIDGET_FONT_FILES, 'Assets.xcassets', `${WIDGET_EXTENSION_NAME}.entitlements`, 'Info.plist'],
       groupName,
       groupName
     );
@@ -268,6 +289,24 @@ const withIOSWidgets = (config) => {
           comment: 'Assets.xcassets in Resources',
         });
         break;
+      }
+    }
+
+    // Add font files to the widget target's Resources build phase
+    for (const child of groupChildren) {
+      if (WIDGET_FONT_FILES.includes(child.comment)) {
+        const fontBuildFileUuid = xcodeProject.generateUuid();
+        objects['PBXBuildFile'][fontBuildFileUuid] = {
+          isa: 'PBXBuildFile',
+          fileRef: child.value,
+          fileRef_comment: child.comment,
+        };
+        objects['PBXBuildFile'][`${fontBuildFileUuid}_comment`] = `${child.comment} in Resources`;
+
+        objects['PBXResourcesBuildPhase'][resourcesBuildPhaseUuid].files.push({
+          value: fontBuildFileUuid,
+          comment: `${child.comment} in Resources`,
+        });
       }
     }
 

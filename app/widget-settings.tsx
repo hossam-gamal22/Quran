@@ -28,12 +28,15 @@ import {
   saveWidgetSettings,
   requestWidgetUpdate,
 } from '@/lib/widget-data';
+import { WIDGET_THEMES, type WidgetTheme } from '@/components/widgets/android/shared';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import GlassCard from '@/components/ui/GlassCard';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
@@ -51,12 +54,12 @@ const ACCENT_COLORS = [
 ];
 
 const AZKAR_CATEGORIES = [
-  { key: 'morning', nameKey: 'widget.morningAzkar', icon: 'weather-sunny' },
-  { key: 'evening', nameKey: 'widget.eveningAzkar', icon: 'weather-night' },
-  { key: 'sleep', nameKey: 'widget.sleepAzkar', icon: 'sleep' },
-  { key: 'wakeup', nameKey: 'widget.wakeupAzkar', icon: 'alarm' },
-  { key: 'afterPrayer', nameKey: 'widget.afterPrayerAzkar', icon: 'mosque' },
-  { key: 'misc', nameKey: 'widget.miscAzkar', icon: 'bookmark-multiple' },
+  { key: '1', nameKey: 'widget.morningAzkar', icon: 'weather-sunny' },
+  { key: '1b', nameKey: 'widget.eveningAzkar', icon: 'weather-night' },
+  { key: '2', nameKey: 'widget.sleepAzkar', icon: 'sleep' },
+  { key: '3', nameKey: 'widget.wakeupAzkar', icon: 'alarm' },
+  { key: '27', nameKey: 'widget.afterPrayerAzkar', icon: 'mosque' },
+  { key: '26', nameKey: 'widget.miscAzkar', icon: 'bookmark-multiple' },
 ];
 
 // ========================================
@@ -138,8 +141,9 @@ const SettingRow: React.FC<SettingRowProps> = ({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onValueChange(newValue);
         }}
-        trackColor={{ false: '#ddd', true: '#0d8e62' }}
-        thumbColor={value ? '#fff' : '#f4f3f4'}
+        trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+        thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+        ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
       />
     </View>
   );
@@ -254,6 +258,7 @@ export default function WidgetSettingsScreen() {
   const [hasChanges, setHasChanges] = useState(false);
 
   const { settings: appSettings, isDarkMode } = useSettings();
+  const { isPremium } = useSubscription();
   const isRTL = useIsRTL();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -356,11 +361,17 @@ export default function WidgetSettingsScreen() {
 
   // حفظ الإعدادات
   const handleSave = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await saveWidgetSettings(settings);
-    await requestWidgetUpdate();
-    setHasChanges(false);
-    Alert.alert(t('common.savedSuccess'), t('widgets.settingsSaved'));
+    try {
+      await saveWidgetSettings(settings);
+      await requestWidgetUpdate();
+      setHasChanges(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(t('common.savedSuccess'), t('widgets.settingsSaved'));
+    } catch (error) {
+      console.warn('⚠️ Widget settings save failed:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('common.error'), t('widgets.settingsSaveFailed'));
+    }
   };
 
   // إعادة تعيين الإعدادات
@@ -385,9 +396,19 @@ export default function WidgetSettingsScreen() {
 
   // تحديث الويدجت يدوياً
   const handleRefreshWidget = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await requestWidgetUpdate();
-    Alert.alert(t('common.success'), t('widgets.widgetUpdated'));
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (hasChanges) {
+        await saveWidgetSettings(settings);
+        setHasChanges(false);
+      }
+      await requestWidgetUpdate();
+      Alert.alert(t('common.success'), t('widgets.widgetUpdated'));
+    } catch (error) {
+      console.warn('⚠️ Widget refresh failed:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(t('common.error'), t('widgets.widgetUpdateFailed'));
+    }
   };
 
   return (
@@ -447,11 +468,72 @@ export default function WidgetSettingsScreen() {
           />
         </SettingSection>
 
+        {/* مظهر الويدجت — Premium Theme Picker */}
+        <SettingSection
+          title={t('widgets.widgetTheme')}
+          icon="palette"
+          index={1}
+          isDarkMode={isDarkMode}
+          isRTL={isRTL}
+        >
+          <View style={styles.themePicker}>
+            {WIDGET_THEMES.map((theme) => {
+              const isSelected = settings.widgetTheme === theme.id;
+              const isLocked = theme.isPremium && !isPremium;
+              return (
+                <TouchableOpacity
+                  key={theme.id}
+                  style={[
+                    styles.themeOption,
+                    isSelected && styles.themeOptionSelected,
+                  ]}
+                  onPress={() => {
+                    if (isLocked) {
+                      guardPremiumFeature('widget_themes' as any, router, isPremium);
+                      return;
+                    }
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updateSettings({ widgetTheme: theme.id });
+                  }}
+                >
+                  <LinearGradient
+                    colors={[theme.gradient.from, theme.gradient.to]}
+                    style={styles.themePreview}
+                  >
+                    <Text style={[styles.themePreviewText, { color: theme.textColor }]}>
+                      بِسْمِ اللَّهِ
+                    </Text>
+                    {isLocked && (
+                      <View style={styles.themeLockBadge}>
+                        <MaterialCommunityIcons name="crown" size={12} color="#f0c654" />
+                      </View>
+                    )}
+                    {isSelected && (
+                      <View style={[styles.themeCheckBadge, { backgroundColor: theme.accentColor }]}>
+                        <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </LinearGradient>
+                  <Text
+                    style={[
+                      styles.themeLabel,
+                      { color: isSelected ? colors.primary : colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isRTL ? theme.nameAr : theme.nameEn}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </SettingSection>
+
         {/* ويدجت الصلاة */}
         <SettingSection
           title={t('widgets.prayerTimesWidget')}
           icon="mosque"
-          index={1}
+          index={2}
           isDarkMode={isDarkMode}
           isRTL={isRTL}
         >
@@ -509,7 +591,7 @@ export default function WidgetSettingsScreen() {
         <SettingSection
           title={t('widgets.azkarWidget')}
           icon="hand-heart"
-          index={2}
+          index={3}
           isDarkMode={isDarkMode}
           isRTL={isRTL}
         >
@@ -546,7 +628,7 @@ export default function WidgetSettingsScreen() {
         <SettingSection
           title={t('widgets.hijriWidget')}
           icon="calendar-month"
-          index={3}
+          index={4}
           isDarkMode={isDarkMode}
           isRTL={isRTL}
         >
@@ -571,7 +653,7 @@ export default function WidgetSettingsScreen() {
         <SettingSection
           title={t('widgets.verseWidget')}
           icon="book-open-page-variant"
-          index={4}
+          index={5}
           isDarkMode={isDarkMode}
           isRTL={isRTL}
         >
@@ -596,7 +678,7 @@ export default function WidgetSettingsScreen() {
         <SettingSection
           title={t('widgets.dhikrWidget')}
           icon="hand-heart"
-          index={5}
+          index={6}
           isDarkMode={isDarkMode}
           isRTL={isRTL}
         >
@@ -656,7 +738,7 @@ export default function WidgetSettingsScreen() {
               {t('widgets.addToHomeScreen')}:{'\n'}
               {Platform.OS === 'ios'
                 ? `• ${t('widgets.addWidgetIosInstructions')}\n• ${t('common.appName')}`
-                : `• ${t('widgets.addWidgetIosInstructions')}\n• ${t('common.appName')}`}
+                : `• ${t('widgets.addWidgetAndroidInstructions')}\n• ${t('common.appName')}`}
             </Text>
           </GlassCard>
         </Animated.View>
@@ -902,6 +984,61 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     color: '#fff',
     lineHeight: 28,
+    includeFontPadding: false,
+  },
+  // اختيار المظهر
+  themePicker: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 5,
+  },
+  themeOption: {
+    width: '30%' as any,
+    alignItems: 'center' as const,
+  },
+  themeOptionSelected: {
+    // handled by themeCheckBadge
+  },
+  themePreview: {
+    width: '100%' as any,
+    aspectRatio: 1.3,
+    borderRadius: 14,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    overflow: 'hidden' as const,
+  },
+  themePreviewText: {
+    fontSize: 14,
+    fontFamily: fontBold(),
+    includeFontPadding: false,
+  },
+  themeLockBadge: {
+    position: 'absolute' as const,
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  themeCheckBadge: {
+    position: 'absolute' as const,
+    bottom: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  themeLabel: {
+    fontSize: 11,
+    fontFamily: fontMedium(),
+    textAlign: 'center' as const,
+    marginTop: 5,
     includeFontPadding: false,
   },
   bottomSpace: {

@@ -145,8 +145,9 @@ export default function QuranReminderScreen() {
             <Switch
               value={reminderEnabled}
               onValueChange={handleToggle}
-              trackColor={{ false: '#767577', true: accent + '80' }}
-              thumbColor={reminderEnabled ? accent : '#f4f3f4'}
+              trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+              thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+              ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
             />
             <Text style={[s.toggleLabel, { color: colors.text }]}>{t('quranReminder.enableReminder')}</Text>
           </View>

@@ -516,6 +516,9 @@ export interface TranslationKeys {
     hourFormat24: string;
     defaultCity: string;
     defaultCountry: string;
+    approximateTimes: string;
+    lastUpdatedAgo: string;
+    makkahFallback: string;
   };
   
   // التسبيح
@@ -1303,6 +1306,7 @@ export interface TranslationKeys {
     addToHomeScreen: string;
     addWidget: string;
     addWidgetIosInstructions: string;
+    addWidgetAndroidInstructions: string;
     addWidgetRequested: string;
     azkarCategories: string;
     azkarDesc: string;
@@ -1355,6 +1359,11 @@ export interface TranslationKeys {
     widgetPreview: string;
     widgetSettingsTitle: string;
     widgetUpdated: string;
+    settingsSaveFailed: string;
+    widgetUpdateFailed: string;
+    widgetTheme: string;
+    widgetThemePremium: string;
+    widgetThemeDefault: string;
   
     widgetStep1: string;
     widgetStep2Android: string;
@@ -2388,6 +2397,8 @@ export interface TranslationKeys {
     volume: string;
     noFavorites: string;
     noFavoritesDesc: string;
+    noInternet: string;
+    internetRequired: string;
   };
   // سؤال وجواب
   questionAnswer: {
@@ -2434,6 +2445,8 @@ export interface TranslationKeys {
     proximityActive: string;
     cooldownActive: string;
     prayerNotYet: string;
+    willBeLate: string;
+    done: string;
   };
 }
 // ==================== العربية ====================
@@ -2934,6 +2947,9 @@ const ar: TranslationKeys = {
     hourFormat24: 'تنسيق 24 ساعة',
     defaultCity: 'مكة المكرمة',
     defaultCountry: 'السعودية',
+    approximateTimes: 'المواقيت تقريبية — افتح التطبيق وأنت متصل بالإنترنت للتحديث',
+    lastUpdatedAgo: 'آخر تحديث: منذ {days} أيام',
+    makkahFallback: 'يتم عرض مواقيت مكة المكرمة — فعّل الموقع لعرض مواقيتك',
   },
   tasbih: {
     title: 'المسبحة',
@@ -3701,6 +3717,7 @@ const ar: TranslationKeys = {
     addToHomeScreen: 'أضِف إلى الشاشة الرئيسية',
     addWidget: 'إضافة ودجة',
     addWidgetIosInstructions: 'اضغط مطولاً على الشاشة الرئيسية ثم اختر "+" لإضافة ودجة',
+    addWidgetAndroidInstructions: 'اضغط مطولاً على الشاشة الرئيسية > الودجات > ابحث عن "روح المسلم" > اسحب الودجة المطلوبة',
     addWidgetRequested: 'تم طلب إضافة الودجة',
     azkarCategories: 'فئات الأذكار',
     azkarDesc: 'أذكار وأدعية يومية',
@@ -3753,6 +3770,11 @@ const ar: TranslationKeys = {
     widgetPreview: 'معاينة الودجة',
     widgetSettingsTitle: 'إعدادات الودجات',
     widgetUpdated: 'تم تحديث الودجة',
+    settingsSaveFailed: 'فشل حفظ الإعدادات، حاول مرة أخرى',
+    widgetUpdateFailed: 'فشل تحديث الودجة، حاول مرة أخرى',
+    widgetTheme: 'مظهر الودجة',
+    widgetThemePremium: 'مظاهر مميزة',
+    widgetThemeDefault: 'المظهر الافتراضي',
   
     widgetStep1: 'اضغط مطولًا على الشاشة الرئيسية',
     widgetStep2Android: 'اختر "الودجات" من القائمة',
@@ -4055,7 +4077,7 @@ const ar: TranslationKeys = {
     upgradeToPremium: 'اشترك في النسخة المميزة',
     upgradeToPremiumDesc: 'تمتع بتجربة بدون إعلانات ومزايا حصرية',
     featureAdRemoval: 'إزالة جميع الإعلانات',
-    featureExclusiveThemes: 'ثيمات حصرية للمصحف (١٤ ثيم)',
+    featureExclusiveThemes: 'ثيمات حصرية للمصحف (١٢ ثيم)',
     featureOfflineRecitation: 'تحميل التلاوة للاستماع بدون إنترنت',
     featureAdvancedStats: 'إحصائيات متقدمة للعبادات',
     featureCloudBackup: 'نسخ احتياطي سحابي واستعادة',
@@ -4772,6 +4794,8 @@ const ar: TranslationKeys = {
     volume: 'مستوى الصوت',
     noFavorites: 'لا توجد محطات محفوظة',
     noFavoritesDesc: 'اضغط على أيقونة القلب لحفظ محطاتك المفضلة',
+    noInternet: 'لا يوجد اتصال بالإنترنت',
+    internetRequired: 'الإذاعة تحتاج اتصال بالإنترنت للعمل',
   },
   questionAnswer: {
     title: 'سؤال وجواب',
@@ -4816,6 +4840,8 @@ const ar: TranslationKeys = {
     proximityActive: 'مستشعر القرب نشط',
     cooldownActive: 'انتظر...',
     prayerNotYet: 'لم يحن موعد هذه الصلاة بعد',
+    willBeLate: 'متأخرة',
+    done: 'تمت',
   },
 };
 // ==================== English ====================
@@ -5316,6 +5342,9 @@ const en: TranslationKeys = {
     hourFormat24: '24-Hour Format',
     defaultCity: 'Makkah',
     defaultCountry: 'Saudi Arabia',
+    approximateTimes: 'Times are approximate — open the app online to update',
+    lastUpdatedAgo: 'Last updated: {days} days ago',
+    makkahFallback: 'Showing Makkah prayer times — enable location for your local times',
   },
   tasbih: {
     title: 'Tasbih',
@@ -6083,6 +6112,7 @@ const en: TranslationKeys = {
     addToHomeScreen: 'Add to Home Screen',
     addWidget: 'Add Widget',
     addWidgetIosInstructions: 'Long press on home screen then tap "+" to add widget',
+    addWidgetAndroidInstructions: 'Long press home screen > Widgets > Search "Ruh Al-Muslim" > Drag widget',
     addWidgetRequested: 'Widget add requested',
     azkarCategories: 'Azkar Categories',
     azkarDesc: 'Daily azkar and duas',
@@ -6135,6 +6165,11 @@ const en: TranslationKeys = {
     widgetPreview: 'Widget Preview',
     widgetSettingsTitle: 'Widget Settings',
     widgetUpdated: 'Widget Updated',
+    settingsSaveFailed: 'Failed to save settings, please try again',
+    widgetUpdateFailed: 'Failed to update widget, please try again',
+    widgetTheme: 'Widget Theme',
+    widgetThemePremium: 'Premium Themes',
+    widgetThemeDefault: 'Default Theme',
   
     widgetStep1: 'Long press on the home screen',
     widgetStep2Android: 'Select "Widgets" from the menu',
@@ -6437,7 +6472,7 @@ const en: TranslationKeys = {
     upgradeToPremium: 'Upgrade to Premium',
     upgradeToPremiumDesc: 'Enjoy an ad-free experience with exclusive features',
     featureAdRemoval: 'Remove all ads',
-    featureExclusiveThemes: 'Exclusive Mushaf themes (14 themes)',
+    featureExclusiveThemes: 'Exclusive Mushaf themes (12 themes)',
     featureOfflineRecitation: 'Download recitations for offline listening',
     featureAdvancedStats: 'Advanced worship analytics',
     featureCloudBackup: 'Cloud backup & restore',
@@ -7154,6 +7189,8 @@ const en: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'No saved stations',
     noFavoritesDesc: 'Tap the heart icon to save your favorite stations',
+    noInternet: 'No internet connection',
+    internetRequired: 'Radio requires an internet connection to work',
   },
   questionAnswer: {
     title: 'Q&A',
@@ -7198,6 +7235,8 @@ const en: TranslationKeys = {
     proximityActive: 'Proximity sensor active',
     cooldownActive: 'Wait...',
     prayerNotYet: 'This prayer time has not arrived yet',
+    willBeLate: 'Late',
+    done: 'Done',
   },
 };
 //==================== Français ====================
@@ -7284,6 +7323,7 @@ const fr: TranslationKeys = {
     minute: 'minute',
     monthly: 'Mensuel',
     networkError: 'Erreur réseau',
+    weakConnection: 'Connexion faible — données en cache affichées',
     noAudioFile: 'Aucun fichier audio',
     noConnection: 'Pas de connexion',
     noContent: 'Aucun contenu',
@@ -7698,6 +7738,9 @@ const fr: TranslationKeys = {
     hourFormat24: 'Format 24 heures',
     defaultCity: 'La Mecque',
     defaultCountry: 'Arabie saoudite',
+    approximateTimes: 'Les horaires sont approximatifs — ouvrez l\'application en ligne pour mettre à jour',
+    lastUpdatedAgo: 'Dernière mise à jour : il y a {days} jours',
+    makkahFallback: 'Horaires de La Mecque affichés — activez la localisation pour vos horaires locaux',
   },
   tasbih: {
     title: 'Tasbih',
@@ -8176,7 +8219,6 @@ const fr: TranslationKeys = {
     warning: 'Avertissement',
     info: 'Info',
     networkError: 'Erreur réseau',
-    weakConnection: 'Connexion faible — données en cache affichées',
     noInternet: 'Pas de connexion internet',
     tryAgain: 'Réessayer',
     savedSuccessfully: 'Enregistré avec succès',
@@ -8466,6 +8508,7 @@ const fr: TranslationKeys = {
     addToHomeScreen: 'Ajouter à l\'écran d\'accueil',
     addWidget: 'Ajouter un widget',
     addWidgetIosInstructions: 'Appuyez longuement sur l\'écran d\'accueil puis appuyez sur "+" pour ajouter un widget',
+    addWidgetAndroidInstructions: 'Appuyez longuement sur l\'écran > Widgets > Cherchez "Ruh Al-Muslim" > Glissez le widget',
     addWidgetRequested: 'Demande d\'ajout de widget',
     azkarCategories: 'Catégories d\'adhkar',
     azkarDesc: 'Adhkar et duas quotidiens',
@@ -8517,7 +8560,9 @@ const fr: TranslationKeys = {
     verseWidget: 'Widget de verset',
     widgetPreview: 'Aperçu du widget',
     widgetSettingsTitle: 'Paramètres des widgets',
-    widgetUpdated: 'Widget mis à jour',
+    widgetTheme: 'Thème du widget',
+    widgetThemePremium: 'Thèmes premium',
+    widgetThemeDefault: 'Thème par défaut',
   
     widgetStep1: 'Appuyez longuement sur l\'écran d\'accueil',
     widgetStep2Android: 'Sélectionnez "Widgets" dans le menu',
@@ -8819,7 +8864,7 @@ const fr: TranslationKeys = {
     upgradeToPremium: 'Passer à Premium',
     upgradeToPremiumDesc: 'Profitez d\'une expérience sans publicité avec des fonctionnalités exclusives',
     featureAdRemoval: 'Suppression de toutes les publicités',
-    featureExclusiveThemes: 'Thèmes exclusifs du Mushaf (14 thèmes)',
+    featureExclusiveThemes: 'Thèmes exclusifs du Mushaf (12 thèmes)',
     featureOfflineRecitation: 'Télécharger les récitations hors ligne',
     featureAdvancedStats: 'Statistiques avancées des adorations',
     featureCloudBackup: 'Sauvegarde et restauration cloud',
@@ -9536,6 +9581,8 @@ const fr: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'Aucune station enregistrée',
     noFavoritesDesc: 'Appuyez sur l\'icône cœur pour enregistrer vos stations préférées',
+    noInternet: 'Pas de connexion internet',
+    internetRequired: 'La radio nécessite une connexion internet',
   },
   questionAnswer: {
     title: 'Questions et Réponses',
@@ -9580,6 +9627,8 @@ const fr: TranslationKeys = {
     proximityActive: 'Capteur de proximité actif',
     cooldownActive: 'Attendez...',
     prayerNotYet: 'L\'heure de cette prière n\'est pas encore arrivée',
+    willBeLate: 'En retard',
+    done: 'Terminé',
   },
 };
 
@@ -10082,6 +10131,9 @@ const de: TranslationKeys = {
     hourFormat24: '24-Stunden-Format',
     defaultCity: 'Mekka',
     defaultCountry: 'Saudi-Arabien',
+    approximateTimes: 'Zeiten sind ungefähr — öffnen Sie die App online zum Aktualisieren',
+    lastUpdatedAgo: 'Zuletzt aktualisiert: vor {days} Tagen',
+    makkahFallback: 'Mekka-Gebetszeiten werden angezeigt — aktivieren Sie den Standort für Ihre lokalen Zeiten',
   },
   tasbih: {
     title: 'Tasbih',
@@ -10849,6 +10901,7 @@ const de: TranslationKeys = {
     addToHomeScreen: 'Zum Startbildschirm hinzufügen',
     addWidget: 'Widget hinzufügen',
     addWidgetIosInstructions: 'Halten Sie den Startbildschirm gedrückt und tippen Sie auf "+", um ein Widget hinzuzufügen',
+    addWidgetAndroidInstructions: 'Startbildschirm gedrückt halten > Widgets > "Ruh Al-Muslim" suchen > Widget ziehen',
     addWidgetRequested: 'Widget-Hinzufügung angefordert',
     azkarCategories: 'Adhkar-Kategorien',
     azkarDesc: 'Tägliche Adhkar und Duas',
@@ -10897,10 +10950,12 @@ const de: TranslationKeys = {
     trackPrayerCompletion: 'Gebetserfüllung verfolgen',
     trackPrayerCompletionDesc: 'Gebetserfüllung verfolgen aktivieren',
     updateWidgetNow: 'Widget jetzt aktualisieren',
-    verseWidget: 'Vers-Widget',
-    widgetPreview: 'Widget-Vorschau',
-    widgetSettingsTitle: 'Widget-Einstellungen',
     widgetUpdated: 'Widget aktualisiert',
+    settingsSaveFailed: 'Einstellungen konnten nicht gespeichert werden, bitte erneut versuchen',
+    widgetUpdateFailed: 'Widget konnte nicht aktualisiert werden, bitte erneut versuchen',
+    widgetTheme: 'Widget-Thema',
+    widgetThemePremium: 'Premium-Themen',
+    widgetThemeDefault: 'Standard-Thema',
   
     widgetStep1: 'Lange auf den Startbildschirm drücken',
     widgetStep2Android: '"Widgets" im Menü auswählen',
@@ -11202,7 +11257,7 @@ const de: TranslationKeys = {
     upgradeToPremium: 'Auf Premium upgraden',
     upgradeToPremiumDesc: 'Genießen Sie ein werbefreies Erlebnis mit exklusiven Funktionen',
     featureAdRemoval: 'Alle Werbung entfernen',
-    featureExclusiveThemes: 'Exklusive Mushaf-Themen (14 Themen)',
+    featureExclusiveThemes: 'Exklusive Mushaf-Themen (12 Themen)',
     featureOfflineRecitation: 'Rezitationen offline herunterladen',
     featureAdvancedStats: 'Erweiterte Anbetungsstatistiken',
     featureCloudBackup: 'Cloud-Backup und Wiederherstellung',
@@ -11919,6 +11974,8 @@ const de: TranslationKeys = {
     volume: 'Lautstärke',
     noFavorites: 'Keine gespeicherten Sender',
     noFavoritesDesc: 'Tippen Sie auf das Herzsymbol, um Ihre Lieblingssender zu speichern',
+    noInternet: 'Keine Internetverbindung',
+    internetRequired: 'Radio benötigt eine Internetverbindung',
   },
   questionAnswer: {
     title: 'Fragen und Antworten',
@@ -11963,6 +12020,8 @@ const de: TranslationKeys = {
     proximityActive: 'Näherungssensor aktiv',
     cooldownActive: 'Warten...',
     prayerNotYet: 'Die Gebetszeit ist noch nicht eingetroffen',
+    willBeLate: 'Verspätet',
+    done: 'Erledigt',
   },
 };
 
@@ -12465,6 +12524,9 @@ const tr: TranslationKeys = {
     hourFormat24: '24 Saat Formatı',
     defaultCity: 'Mekke',
     defaultCountry: 'Suudi Arabistan',
+    approximateTimes: 'Vakitler tahminidir — güncellemek için uygulamayı çevrimiçi açın',
+    lastUpdatedAgo: 'Son güncelleme: {days} gün önce',
+    makkahFallback: 'Mekke namaz vakitleri gösteriliyor — yerel vakitleriniz için konumu etkinleştirin',
   },
   tasbih: {
     title: 'Tesbih',
@@ -13232,6 +13294,7 @@ const tr: TranslationKeys = {
     addToHomeScreen: 'Ana Ekrana Ekle',
     addWidget: 'Widget Ekle',
     addWidgetIosInstructions: 'Ana ekranda uzun basın ve "+" simgesine dokunarak widget ekleyin',
+    addWidgetAndroidInstructions: 'Ana ekrana uzun basın > Widget\'lar > "Ruh Al-Muslim" arayın > Widget\'ı sürükleyin',
     addWidgetRequested: 'Widget ekleme istendi',
     azkarCategories: 'Zikir Kategorileri',
     azkarDesc: 'Günlük zikirler ve dualar',
@@ -13277,13 +13340,15 @@ const tr: TranslationKeys = {
     showVirtueDesc: 'Zikrin faziletini göster',
     sizeMedium: 'Orta',
     sizeSmall: 'Küçük',
-    trackPrayerCompletion: 'Namaz Tamamlama Takibi',
-    trackPrayerCompletionDesc: 'Namaz tamamlama takibini aç',
-    updateWidgetNow: 'Widget\'ı Şimdi Güncelle',
     verseWidget: 'Ayet Widget\'ı',
     widgetPreview: 'Widget Önizleme',
     widgetSettingsTitle: 'Widget Ayarları',
     widgetUpdated: 'Widget Güncellendi',
+    settingsSaveFailed: 'Ayarlar kaydedilemedi, tekrar deneyin',
+    widgetUpdateFailed: 'Widget güncellenemedi, tekrar deneyin',
+    widgetTheme: 'Widget Teması',
+    widgetThemePremium: 'Premium Temalar',
+    widgetThemeDefault: 'Varsayılan Tema',
   
     widgetStep1: 'Ana ekrana uzun basın',
     widgetStep2Android: 'Menüden "Widget" seçin',
@@ -13585,7 +13650,7 @@ const tr: TranslationKeys = {
     upgradeToPremium: 'Premium\'a Yükselt',
     upgradeToPremiumDesc: 'Reklamsız ve özel özelliklerle deneyimin tadını çıkarın',
     featureAdRemoval: 'Tüm reklamları kaldır',
-    featureExclusiveThemes: 'Özel Mushaf temaları (14 tema)',
+    featureExclusiveThemes: 'Özel Mushaf temaları (12 tema)',
     featureOfflineRecitation: 'Çevrimdışı dinlemek için tilavet indir',
     featureAdvancedStats: 'Gelişmiş ibadet istatistikleri',
     featureCloudBackup: 'Bulut yedekleme ve geri yükleme',
@@ -14302,6 +14367,8 @@ const tr: TranslationKeys = {
     volume: 'Ses',
     noFavorites: 'Kayıtlı istasyon yok',
     noFavoritesDesc: 'Favori istasyonlarınızı kaydetmek için kalp simgesine dokunun',
+    noInternet: 'İnternet bağlantısı yok',
+    internetRequired: 'Radyo çalışmak için internet bağlantısı gerektirir',
   },
   questionAnswer: {
     title: 'Soru ve Cevap',
@@ -14346,6 +14413,8 @@ const tr: TranslationKeys = {
     proximityActive: 'Yakınlık sensörü aktif',
     cooldownActive: 'Bekleyin...',
     prayerNotYet: 'Bu namazın vakti henüz gelmedi',
+    willBeLate: 'Geç',
+    done: 'Tamamlandı',
   },
 };
 
@@ -14848,6 +14917,9 @@ const es: TranslationKeys = {
     hourFormat24: 'Formato 24 horas',
     defaultCity: 'La Meca',
     defaultCountry: 'Arabia Saudita',
+    approximateTimes: 'Los horarios son aproximados — abre la app con internet para actualizar',
+    lastUpdatedAgo: 'Última actualización: hace {days} días',
+    makkahFallback: 'Mostrando horarios de La Meca — activa la ubicación para tus horarios locales',
   },
   tasbih: {
     title: 'Tasbih',
@@ -15615,6 +15687,7 @@ const es: TranslationKeys = {
     addToHomeScreen: 'Agregar a la pantalla de inicio',
     addWidget: 'Agregar widget',
     addWidgetIosInstructions: 'Mantenga pulsada la pantalla de inicio y toque "+" para agregar un widget',
+    addWidgetAndroidInstructions: 'Mantenga la pantalla de inicio > Widgets > Busque "Ruh Al-Muslim" > Arrastre el widget',
     addWidgetRequested: 'Solicitud de agregar widget',
     azkarCategories: 'Categorías de adhkar',
     azkarDesc: 'Adhkar y duas diarios',
@@ -15657,9 +15730,6 @@ const es: TranslationKeys = {
     showVerseTranslation: 'Mostrar traducción del versículo',
     showVerseTranslationDesc: 'Mostrar traducción debajo del versículo',
     showVirtue: 'Mostrar virtud',
-    showVirtueDesc: 'Mostrar virtud del dhikr',
-    sizeMedium: 'Mediano',
-    sizeSmall: 'Pequeño',
     trackPrayerCompletion: 'Seguimiento de oración',
     trackPrayerCompletionDesc: 'Activar seguimiento de oración',
     updateWidgetNow: 'Actualizar widget ahora',
@@ -15667,6 +15737,11 @@ const es: TranslationKeys = {
     widgetPreview: 'Vista previa del widget',
     widgetSettingsTitle: 'Configuración de widgets',
     widgetUpdated: 'Widget actualizado',
+    settingsSaveFailed: 'Error al guardar la configuración, inténtelo de nuevo',
+    widgetUpdateFailed: 'Error al actualizar el widget, inténtelo de nuevo',
+    widgetTheme: 'Tema del widget',
+    widgetThemePremium: 'Temas premium',
+    widgetThemeDefault: 'Tema predeterminado',
   
     widgetStep1: 'Mantén presionada la pantalla de inicio',
     widgetStep2Android: 'Selecciona "Widgets" del menú',
@@ -15968,7 +16043,7 @@ const es: TranslationKeys = {
     upgradeToPremium: 'Actualizar a Premium',
     upgradeToPremiumDesc: 'Disfruta de una experiencia sin anuncios con funciones exclusivas',
     featureAdRemoval: 'Eliminar todos los anuncios',
-    featureExclusiveThemes: 'Temas exclusivos del Mushaf (14 temas)',
+    featureExclusiveThemes: 'Temas exclusivos del Mushaf (12 temas)',
     featureOfflineRecitation: 'Descargar recitaciones para escuchar sin conexión',
     featureAdvancedStats: 'Estadísticas avanzadas de adoración',
     featureCloudBackup: 'Respaldo y restauración en la nube',
@@ -16685,6 +16760,8 @@ const es: TranslationKeys = {
     volume: 'Volumen',
     noFavorites: 'Sin estaciones guardadas',
     noFavoritesDesc: 'Toca el icono del corazón para guardar tus estaciones favoritas',
+    noInternet: 'Sin conexión a internet',
+    internetRequired: 'La radio requiere conexión a internet para funcionar',
   },
   questionAnswer: {
     title: 'Preguntas y Respuestas',
@@ -16729,6 +16806,8 @@ const es: TranslationKeys = {
     proximityActive: 'Sensor de proximidad activo',
     cooldownActive: 'Espera...',
     prayerNotYet: 'La hora de esta oración aún no ha llegado',
+    willBeLate: 'Tardía',
+    done: 'Hecho',
   },
 };
 // ==================== اردو (Urdu) ====================
@@ -17230,6 +17309,9 @@ const ur: TranslationKeys = {
     hourFormat24: '24 گھنٹے کی شکل',
     defaultCity: 'مکہ مکرمہ',
     defaultCountry: 'سعودی عرب',
+    approximateTimes: 'اوقات تقریبی ہیں — اپ ڈیٹ کے لیے ایپ آن لائن کھولیں',
+    lastUpdatedAgo: 'آخری اپ ڈیٹ: {days} دن پہلے',
+    makkahFallback: 'مکہ مکرمہ کے اوقات دکھائے جا رہے ہیں — اپنے مقامی اوقات کے لیے مقام فعال کریں',
   },
   tasbih: {
     title: 'تسبیح',
@@ -17997,6 +18079,7 @@ const ur: TranslationKeys = {
     addToHomeScreen: 'ہوم اسکرین میں شامل',
     addWidget: 'وجٹ شامل کریں',
     addWidgetIosInstructions: 'ہوم اسکرین پر دیر تک دبائیں پھر "+" دبا کر ویجٹ شامل کریں',
+    addWidgetAndroidInstructions: 'ہوم اسکرین دبائیں > ویجٹس > "روح المسلم" تلاش کریں > ویجٹ گھسیٹیں',
     addWidgetRequested: 'ویجٹ شامل کرنے کی درخواست',
     azkarCategories: 'اذکار کی اقسام',
     azkarDesc: 'روزانہ اذکار و دعائیں',
@@ -18037,9 +18120,6 @@ const ur: TranslationKeys = {
     showTranslation: 'ترجمہ دکھائیں',
     showTranslationDesc: 'متن کا ترجمہ دکھائیں',
     showVerseTranslation: 'آیت ترجمہ دکھائیں',
-    showVerseTranslationDesc: 'آیت کے نیچے ترجمہ',
-    showVirtue: 'فضیلت دکھائیں',
-    showVirtueDesc: 'ذکر کی فضیلت دکھائیں',
     sizeMedium: 'درمیانہ',
     sizeSmall: 'چھوٹا',
     trackPrayerCompletion: 'نماز مکمل ٹریکنگ',
@@ -18049,6 +18129,11 @@ const ur: TranslationKeys = {
     widgetPreview: 'ویجٹ پیش نظارہ',
     widgetSettingsTitle: 'ویجٹ ترتیبات',
     widgetUpdated: 'ویجٹ اپ ڈیٹ',
+    settingsSaveFailed: 'ترتیبات محفوظ کرنے میں ناکامی، دوبارہ کوشش کریں',
+    widgetUpdateFailed: 'ویجٹ اپ ڈیٹ کرنے میں ناکامی، دوبارہ کوشش کریں',
+    widgetTheme: 'ویجٹ تھیم',
+    widgetThemePremium: 'پریمیم تھیمز',
+    widgetThemeDefault: 'ڈیفالٹ تھیم',
   
     widgetStep1: 'ہوم اسکرین پر لمبا ٹیپ کریں',
     widgetStep2Android: 'مینو سے "وجیٹس" منتخب کریں',
@@ -18350,7 +18435,7 @@ const ur: TranslationKeys = {
     upgradeToPremium: 'پریمیم میں اپ گریڈ کریں',
     upgradeToPremiumDesc: 'اشتہارات کے بغیر اور خصوصی فیچرز کے ساتھ لطف اٹھائیں',
     featureAdRemoval: 'تمام اشتہارات ہٹائیں',
-    featureExclusiveThemes: 'مصحف کے خصوصی تھیمز (١٤ تھیمز)',
+    featureExclusiveThemes: 'مصحف کے خصوصی تھیمز (١٢ تھیمز)',
     featureOfflineRecitation: 'آف لائن سننے کے لیے تلاوت ڈاؤن لوڈ کریں',
     featureAdvancedStats: 'عبادت کے جدید اعدادوشمار',
     featureCloudBackup: 'کلاؤڈ بیک اپ اور بحالی',
@@ -19067,6 +19152,8 @@ const ur: TranslationKeys = {
     volume: 'آواز',
     noFavorites: 'کوئی محفوظ اسٹیشن نہیں',
     noFavoritesDesc: 'اپنے پسندیدہ اسٹیشنز محفوظ کرنے کے لیے دل کے آئیکن پر دبائیں',
+    noInternet: 'انٹرنیٹ کنکشن نہیں',
+    internetRequired: 'ریڈیو کو کام کرنے کے لیے انٹرنیٹ ضروری ہے',
   },
   questionAnswer: {
     title: 'سوال و جواب',
@@ -19111,6 +19198,8 @@ const ur: TranslationKeys = {
     proximityActive: 'قربت سینسر فعال',
     cooldownActive: 'انتظار کریں...',
     prayerNotYet: 'اس نماز کا وقت ابھی نہیں آیا',
+    willBeLate: 'تأخیر',
+    done: 'مکمل',
   },
 };
 
@@ -19613,6 +19702,9 @@ const id: TranslationKeys = {
     hourFormat24: 'Format 24 Jam',
     defaultCity: 'Mekkah',
     defaultCountry: 'Arab Saudi',
+    approximateTimes: 'Waktu bersifat perkiraan — buka aplikasi secara online untuk memperbarui',
+    lastUpdatedAgo: 'Terakhir diperbarui: {days} hari yang lalu',
+    makkahFallback: 'Menampilkan waktu shalat Mekkah — aktifkan lokasi untuk waktu lokal Anda',
   },
   tasbih: {
     title: 'Tasbih',
@@ -20380,6 +20472,7 @@ const id: TranslationKeys = {
     addToHomeScreen: 'Tambah ke Layar Utama',
     addWidget: 'Tambah Widget',
     addWidgetIosInstructions: 'Tekan lama layar utama lalu ketuk "+" untuk menambah widget',
+    addWidgetAndroidInstructions: 'Tekan lama layar utama > Widget > Cari "Ruh Al-Muslim" > Seret widget',
     addWidgetRequested: 'Permintaan tambah widget',
     azkarCategories: 'Kategori Dzikir',
     azkarDesc: 'Dzikir dan doa harian',
@@ -20420,9 +20513,6 @@ const id: TranslationKeys = {
     showTranslation: 'Tampilkan Terjemahan',
     showTranslationDesc: 'Tampilkan terjemahan teks',
     showVerseTranslation: 'Tampilkan Terjemahan Ayat',
-    showVerseTranslationDesc: 'Tampilkan terjemahan di bawah ayat',
-    showVirtue: 'Tampilkan Keutamaan',
-    showVirtueDesc: 'Tampilkan keutamaan dzikir',
     sizeMedium: 'Sedang',
     sizeSmall: 'Kecil',
     trackPrayerCompletion: 'Lacak Penyelesaian Shalat',
@@ -20432,6 +20522,11 @@ const id: TranslationKeys = {
     widgetPreview: 'Pratinjau Widget',
     widgetSettingsTitle: 'Pengaturan Widget',
     widgetUpdated: 'Widget Diperbarui',
+    settingsSaveFailed: 'Gagal menyimpan pengaturan, coba lagi',
+    widgetUpdateFailed: 'Gagal memperbarui widget, coba lagi',
+    widgetTheme: 'Tema Widget',
+    widgetThemePremium: 'Tema Premium',
+    widgetThemeDefault: 'Tema Default',
   
     widgetStep1: 'Tekan lama pada layar utama',
     widgetStep2Android: 'Pilih "Widget" dari menu',
@@ -20733,7 +20828,7 @@ const id: TranslationKeys = {
     upgradeToPremium: 'Upgrade ke Premium',
     upgradeToPremiumDesc: 'Nikmati pengalaman tanpa iklan dengan fitur eksklusif',
     featureAdRemoval: 'Hapus semua iklan',
-    featureExclusiveThemes: 'Tema Mushaf eksklusif (14 tema)',
+    featureExclusiveThemes: 'Tema Mushaf eksklusif (12 tema)',
     featureOfflineRecitation: 'Unduh tilawah untuk mendengarkan offline',
     featureAdvancedStats: 'Statistik ibadah lanjutan',
     featureCloudBackup: 'Pencadangan dan pemulihan cloud',
@@ -21450,6 +21545,8 @@ const id: TranslationKeys = {
     volume: 'Volume',
     noFavorites: 'Belum ada stasiun tersimpan',
     noFavoritesDesc: 'Ketuk ikon hati untuk menyimpan stasiun favorit Anda',
+    noInternet: 'Tidak ada koneksi internet',
+    internetRequired: 'Radio memerlukan koneksi internet untuk bekerja',
   },
   questionAnswer: {
     title: 'Tanya Jawab',
@@ -21494,6 +21591,8 @@ const id: TranslationKeys = {
     proximityActive: 'Sensor kedekatan aktif',
     cooldownActive: 'Tunggu...',
     prayerNotYet: 'Waktu sholat ini belum tiba',
+    willBeLate: 'Terlambat',
+    done: 'Selesai',
   },
 };
 
@@ -21996,6 +22095,9 @@ const ms: TranslationKeys = {
     hourFormat24: 'Format 24 Jam',
     defaultCity: 'Makkah',
     defaultCountry: 'Arab Saudi',
+    approximateTimes: 'Waktu adalah anggaran — buka aplikasi dalam talian untuk kemas kini',
+    lastUpdatedAgo: 'Kemas kini terakhir: {days} hari lalu',
+    makkahFallback: 'Menunjukkan waktu solat Makkah — aktifkan lokasi untuk waktu tempatan anda',
   },
   tasbih: {
     title: 'Tasbih',
@@ -22763,6 +22865,7 @@ const ms: TranslationKeys = {
     addToHomeScreen: 'Tambah ke Skrin Utama',
     addWidget: 'Tambah Widget',
     addWidgetIosInstructions: 'Tekan lama skrin utama lalu ketuk "+" untuk tambah widget',
+    addWidgetAndroidInstructions: 'Tekan lama skrin utama > Widget > Cari "Ruh Al-Muslim" > Seret widget',
     addWidgetRequested: 'Permintaan tambah widget',
     azkarCategories: 'Kategori Zikir',
     azkarDesc: 'Zikir dan doa harian',
@@ -22803,9 +22906,6 @@ const ms: TranslationKeys = {
     showTranslation: 'Papar Terjemahan',
     showTranslationDesc: 'Papar terjemahan teks',
     showVerseTranslation: 'Papar Terjemahan Ayat',
-    showVerseTranslationDesc: 'Papar terjemahan di bawah ayat',
-    showVirtue: 'Papar Kelebihan',
-    showVirtueDesc: 'Papar kelebihan zikir',
     sizeMedium: 'Sederhana',
     sizeSmall: 'Kecil',
     trackPrayerCompletion: 'Jejak Penyempurnaan Solat',
@@ -22815,6 +22915,11 @@ const ms: TranslationKeys = {
     widgetPreview: 'Pratonton Widget',
     widgetSettingsTitle: 'Tetapan Widget',
     widgetUpdated: 'Widget Dikemas Kini',
+    settingsSaveFailed: 'Gagal menyimpan tetapan, sila cuba lagi',
+    widgetUpdateFailed: 'Gagal mengemas kini widget, sila cuba lagi',
+    widgetTheme: 'Tema Widget',
+    widgetThemePremium: 'Tema Premium',
+    widgetThemeDefault: 'Tema Lalai',
   
     widgetStep1: 'Tekan lama pada skrin utama',
     widgetStep2Android: 'Pilih "Widget" dari menu',
@@ -23116,7 +23221,7 @@ const ms: TranslationKeys = {
     upgradeToPremium: 'Naik Taraf ke Premium',
     upgradeToPremiumDesc: 'Nikmati pengalaman tanpa iklan dengan ciri eksklusif',
     featureAdRemoval: 'Alih keluar semua iklan',
-    featureExclusiveThemes: 'Tema Mushaf eksklusif (14 tema)',
+    featureExclusiveThemes: 'Tema Mushaf eksklusif (12 tema)',
     featureOfflineRecitation: 'Muat turun tilawah untuk mendengar luar talian',
     featureAdvancedStats: 'Statistik ibadah lanjutan',
     featureCloudBackup: 'Sandaran dan pemulihan awan',
@@ -23833,6 +23938,8 @@ const ms: TranslationKeys = {
     volume: 'Kelantangan',
     noFavorites: 'Tiada stesen tersimpan',
     noFavoritesDesc: 'Ketik ikon hati untuk menyimpan stesen kegemaran anda',
+    noInternet: 'Tiada sambungan internet',
+    internetRequired: 'Radio memerlukan sambungan internet untuk berfungsi',
   },
   questionAnswer: {
     title: 'Soal Jawab',
@@ -23877,6 +23984,8 @@ const ms: TranslationKeys = {
     proximityActive: 'Sensor kedekatan aktif',
     cooldownActive: 'Tunggu...',
     prayerNotYet: 'Waktu solat ini belum tiba',
+    willBeLate: 'Lewat',
+    done: 'Selesai',
   },
 };
 // ==================== हिन्दी (Hindi) ======================================
@@ -24378,6 +24487,9 @@ const hi: TranslationKeys = {
     hourFormat24: '24 घंटे का प्रारूप',
     defaultCity: 'मक्का',
     defaultCountry: 'सऊदी अरब',
+    approximateTimes: 'समय अनुमानित हैं — अपडेट के लिए इंटरनेट से जुड़कर ऐप खोलें',
+    lastUpdatedAgo: 'आखिरी अपडेट: {days} दिन पहले',
+    makkahFallback: 'मक्का के नमाज़ समय दिखाए जा रहे हैं — स्थानीय समय के लिए लोकेशन सक्षम करें',
   },
   tasbih: {
     title: 'तसबीह',
@@ -25146,6 +25258,7 @@ const hi: TranslationKeys = {
     addToHomeScreen: 'होम स्क्रीन पर जोड़ें',
     addWidget: 'विज़ेट जोड़ें',
     addWidgetIosInstructions: 'होम स्क्रीन पर लंबा दबाएँ फिर "+" से विजेट जोड़ें',
+    addWidgetAndroidInstructions: 'होम स्क्रीन दबाएँ > विजेट > "Ruh Al-Muslim" खोजें > विजेट खींचें',
     addWidgetRequested: 'विजेट जोड़ने की अनुरोध',
     azkarCategories: 'अज़कार श्रेणियाँ',
     azkarDesc: 'दैनिक अज़कार और दुआएँ',
@@ -25186,9 +25299,6 @@ const hi: TranslationKeys = {
     showTranslation: 'अनुवाद दिखाएँ',
     showTranslationDesc: 'पाठ अनुवाद दिखाएँ',
     showVerseTranslation: 'आयत अनुवाद दिखाएँ',
-    showVerseTranslationDesc: 'आयत के नीचे अनुवाद',
-    showVirtue: 'फ़ज़ीलत दिखाएँ',
-    showVirtueDesc: 'ज़िक्र की फ़ज़ीलत दिखाएँ',
     sizeMedium: 'मध्यम',
     sizeSmall: 'छोटा',
     trackPrayerCompletion: 'नमाज़ पूर्ति ट्रैकिंग',
@@ -25198,6 +25308,11 @@ const hi: TranslationKeys = {
     widgetPreview: 'विजेट पूर्वावलोकन',
     widgetSettingsTitle: 'विजेट सेटिंग्स',
     widgetUpdated: 'विजेट अपडेट',
+    settingsSaveFailed: 'सेटिंग्स सहेजने में विफल, कृपया पुनः प्रयास करें',
+    widgetUpdateFailed: 'विजेट अपडेट करने में विफल, कृपया पुनः प्रयास करें',
+    widgetTheme: 'विजेट थीम',
+    widgetThemePremium: 'प्रीमियम थीम',
+    widgetThemeDefault: 'डिफ़ॉल्ट थीम',
   
     widgetStep1: 'होम स्क्रीन पर लंबा दबाएँ',
     widgetStep2Android: 'मेनू से "विजेट्स" चुनें',
@@ -25499,7 +25614,7 @@ const hi: TranslationKeys = {
     upgradeToPremium: 'प्रीमियम में अपग्रेड करें',
     upgradeToPremiumDesc: 'विज्ञापन-मुक्त अनुभव और विशेष सुविधाओं का आनंद लें',
     featureAdRemoval: 'सभी विज्ञापन हटाएं',
-    featureExclusiveThemes: 'विशेष मुस्ह० थीम (१४ थीम)',
+    featureExclusiveThemes: 'विशेष मुस्ह० थीम (१२ थीम)',
     featureOfflineRecitation: 'ऑफलाइन सुनने के लिए तिलावत डाउनलोड करें',
     featureAdvancedStats: 'उन्नत इबादत आँकड़े',
     featureCloudBackup: 'क्लाउड बैकअप और पुनर्स्थापना',
@@ -26216,6 +26331,8 @@ const hi: TranslationKeys = {
     volume: 'आवाज़',
     noFavorites: 'कोई सहेजा हुआ स्टेशन नहीं',
     noFavoritesDesc: 'अपने पसंदीदा स्टेशन सहेजने के लिए दिल आइकन पर टैप करें',
+    noInternet: 'इंटरनेट कनेक्शन नहीं',
+    internetRequired: 'रेडियो के लिए इंटरनेट कनेक्शन आवश्यक है',
   },
   questionAnswer: {
     title: 'प्रश्न और उत्तर',
@@ -26260,6 +26377,8 @@ const hi: TranslationKeys = {
     proximityActive: 'प्रॉक्सिमिटी सेंसर सक्रिय',
     cooldownActive: 'रुकिए...',
     prayerNotYet: 'इस नमाज़ का समय अभी नहीं आया है',
+    willBeLate: 'देरी से',
+    done: 'पूर्ण',
   },
 };
 
@@ -26762,6 +26881,9 @@ const bn: TranslationKeys = {
     hourFormat24: '২৪ ঘণ্টা ফরম্যাট',
     defaultCity: 'মক্কা',
     defaultCountry: 'সৌদি আরব',
+    approximateTimes: 'সময়গুলি আনুমানিক — আপডেটের জন্য অনলাইনে অ্যাপ খুলুন',
+    lastUpdatedAgo: 'শেষ আপডেট: {days} দিন আগে',
+    makkahFallback: 'মক্কার নামাজের সময় দেখানো হচ্ছে — আপনার স্থানীয় সময়ের জন্য লোকেশন সক্রিয় করুন',
   },
   tasbih: {
     title: 'তাসবীহ',
@@ -27529,6 +27651,7 @@ const bn: TranslationKeys = {
     addToHomeScreen: 'হোম স্ক্রিনে যোগ',
     addWidget: 'উইজেট যোগ',
     addWidgetIosInstructions: 'হোম স্ক্রিনে দীর্ঘ চাপ দিন তারপর "+" দিয়ে উইজেট যোগ করুন',
+    addWidgetAndroidInstructions: 'হোম স্ক্রিনে দীর্ঘ চাপ > উইজেট > "Ruh Al-Muslim" খুঁজুন > উইজেট টানুন',
     addWidgetRequested: 'উইজেট যোগ অনুরোধ',
     azkarCategories: 'আযকার বিভাগ',
     azkarDesc: 'দৈনিক আযকার ও দোয়া',
@@ -27569,9 +27692,6 @@ const bn: TranslationKeys = {
     showTranslation: 'অনুবাদ দেখান',
     showTranslationDesc: 'টেক্সট অনুবাদ দেখান',
     showVerseTranslation: 'আয়াত অনুবাদ দেখান',
-    showVerseTranslationDesc: 'আয়াতের নিচে অনুবাদ',
-    showVirtue: 'ফজিলত দেখান',
-    showVirtueDesc: 'যিকরের ফজিলত দেখান',
     sizeMedium: 'মাঝারি',
     sizeSmall: 'ছোট',
     trackPrayerCompletion: 'নামাজ সম্পন্ন ট্র্যাকিং',
@@ -27581,6 +27701,11 @@ const bn: TranslationKeys = {
     widgetPreview: 'উইজেট প্রিভিউ',
     widgetSettingsTitle: 'উইজেট সেটিংস',
     widgetUpdated: 'উইজেট আপডেট',
+    settingsSaveFailed: 'সেটিংস সংরক্ষণ ব্যর্থ, আবার চেষ্টা করুন',
+    widgetUpdateFailed: 'উইজেট আপডেট ব্যর্থ, আবার চেষ্টা করুন',
+    widgetTheme: 'উইজেট থিম',
+    widgetThemePremium: 'প্রিমিয়াম থিম',
+    widgetThemeDefault: 'ডিফল্ট থিম',
   
     widgetStep1: 'হোম স্ক্রিনে বেশিক্ষণ চাপুন',
     widgetStep2Android: 'মেনু থেকে "উইজেট" নির্বাচন করুন',
@@ -27882,7 +28007,7 @@ const bn: TranslationKeys = {
     upgradeToPremium: 'প্রিমিয়ামে আপগ্রেড করুন',
     upgradeToPremiumDesc: 'বিজ্ঞাপন-মুক্ত অভিজ্ঞতা এবং বিশেষ সুবিধা উপভোগ করুন',
     featureAdRemoval: 'সব বিজ্ঞাপন সরান',
-    featureExclusiveThemes: 'বিশেষ মুসহাফ থিম (১৪ থিম)',
+    featureExclusiveThemes: 'বিশেষ মুসহাফ থিম (১২ থিম)',
     featureOfflineRecitation: 'অফলাইন শোনার জন্য তিলাওয়াত ডাউনলোড করুন',
     featureAdvancedStats: 'উন্নত ইবাদত পরিসংখ্যান',
     featureCloudBackup: 'ক্লাউড ব্যাকআপ এবং পুনরুদ্ধার',
@@ -28599,6 +28724,8 @@ const bn: TranslationKeys = {
     volume: 'ভলিউম',
     noFavorites: 'কোনো সংরক্ষিত স্টেশন নেই',
     noFavoritesDesc: 'আপনার পছন্দের স্টেশন সংরক্ষণ করতে হার্ট আইকনে ট্যাপ করুন',
+    noInternet: 'ইন্টারনেট সংযোগ নেই',
+    internetRequired: 'রেডিও কাজ করতে ইন্টারনেট সংযোগ প্রয়োজন',
   },
   questionAnswer: {
     title: 'প্রশ্ন ও উত্তর',
@@ -28643,6 +28770,8 @@ const bn: TranslationKeys = {
     proximityActive: 'প্রক্সিমিটি সেন্সর সক্রিয়',
     cooldownActive: 'অপেক্ষা করুন...',
     prayerNotYet: 'এই নামাযের সময় এখনো আসেনি',
+    willBeLate: 'বিলম্বিত',
+    done: 'সম্পন্ন',
   },
 };
 
@@ -29145,6 +29274,9 @@ const ru: TranslationKeys = {
     hourFormat24: '24-часовой формат',
     defaultCity: 'Мекка',
     defaultCountry: 'Саудовская Аравия',
+    approximateTimes: 'Время приблизительное — откройте приложение онлайн для обновления',
+    lastUpdatedAgo: 'Последнее обновление: {days} дней назад',
+    makkahFallback: 'Показано время намаза Мекки — включите местоположение для локального времени',
   },
   tasbih: {
     title: 'Тасбих',
@@ -29911,6 +30043,7 @@ const ru: TranslationKeys = {
     addToHomeScreen: 'Добавить на главный экран',
     addWidget: 'Добавить виджет',
     addWidgetIosInstructions: 'Удерживайте главный экран, затем нажмите "+" для добавления виджета',
+    addWidgetAndroidInstructions: 'Удерживайте экран > Виджеты > Найдите "Ruh Al-Muslim" > Перетащите виджет',
     addWidgetRequested: 'Запрос на добавление виджета',
     azkarCategories: 'Категории азкаров',
     azkarDesc: 'Ежедневные азкары и дуа',
@@ -29952,9 +30085,6 @@ const ru: TranslationKeys = {
     showTranslationDesc: 'Показать перевод текста',
     showVerseTranslation: 'Показать перевод аята',
     showVerseTranslationDesc: 'Показать перевод под аятом',
-    showVirtue: 'Показать достоинство',
-    showVirtueDesc: 'Показать достоинство зикра',
-    sizeMedium: 'Средний',
     sizeSmall: 'Маленький',
     trackPrayerCompletion: 'Отслеживание выполнения',
     trackPrayerCompletionDesc: 'Включить отслеживание выполнения',
@@ -29963,6 +30093,11 @@ const ru: TranslationKeys = {
     widgetPreview: 'Предпросмотр виджета',
     widgetSettingsTitle: 'Настройки виджетов',
     widgetUpdated: 'Виджет обновлён',
+    settingsSaveFailed: 'Не удалось сохранить настройки, попробуйте ещё раз',
+    widgetUpdateFailed: 'Не удалось обновить виджет, попробуйте ещё раз',
+    widgetTheme: 'Тема виджета',
+    widgetThemePremium: 'Премиум темы',
+    widgetThemeDefault: 'Тема по умолчанию',
   
     widgetStep1: 'Долгое нажатие на главный экран',
     widgetStep2Android: 'Выберите "Виджеты" в меню',
@@ -30264,7 +30399,7 @@ const ru: TranslationKeys = {
     upgradeToPremium: 'Обновить до Премиум',
     upgradeToPremiumDesc: 'Наслаждайтесь без рекламы с эксклюзивными функциями',
     featureAdRemoval: 'Удаление всей рекламы',
-    featureExclusiveThemes: 'Эксклюзивные темы Мусхафа (14 тем)',
+    featureExclusiveThemes: 'Эксклюзивные темы Мусхафа (12 тем)',
     featureOfflineRecitation: 'Загрузка чтения для прослушивания офлайн',
     featureAdvancedStats: 'Расширенная статистика поклонения',
     featureCloudBackup: 'Облачное резервное копирование и восстановление',
@@ -30981,6 +31116,8 @@ const ru: TranslationKeys = {
     volume: 'Громкость',
     noFavorites: 'Нет сохранённых станций',
     noFavoritesDesc: 'Нажмите на значок сердца, чтобы сохранить любимые станции',
+    noInternet: 'Нет подключения к интернету',
+    internetRequired: 'Радио требует подключения к интернету',
   },
   questionAnswer: {
     title: 'Вопросы и ответы',
@@ -31025,6 +31162,8 @@ const ru: TranslationKeys = {
     proximityActive: 'Датчик приближения активен',
     cooldownActive: 'Подождите...',
     prayerNotYet: 'Время этой молитвы ещё не наступило',
+    willBeLate: 'Просрочено',
+    done: 'Выполнено',
   },
 };
 

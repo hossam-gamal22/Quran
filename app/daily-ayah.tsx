@@ -493,68 +493,79 @@ export default function DailyAyahVideoScreen() {
         </View>
 
         {/* Ayah text preview — Mushaf style */}
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onLongPress={handleLongPress}
-          delayLongPress={500}
-          style={{
-            marginHorizontal: 16,
-            padding: 20,
-            backgroundColor: isDarkMode ? 'rgba(50,45,35,0.6)' : 'rgba(253,248,235,0.95)',
-            borderRadius: 16,
-            borderWidth: 1.5,
-            borderColor: isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)',
-          }}
-        >
-          {/* Verse text — Arabic for Arabic users, translation for others */}
-          {isArabic ? (
-            qcfGlyphs && qcfFontFamily ? (
-              <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 12, writingDirection: 'rtl' }}>
-                {qcfGlyphs.join('')}
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 26, color: colors.text, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
-                ﴿ {currentAyah.arabic} ﴾
-              </Text>
-            )
-          ) : (
-            <Text style={{ fontSize: 20, color: colors.text, textAlign: isRTL ? 'right' : 'left', lineHeight: 34, fontFamily: fontRegular(), marginBottom: 12, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
-              {verseTranslation || currentAyah.trans || currentAyah.arabic}
-            </Text>
-          )}
-
-          {/* Surah reference — transliterated for non-Arabic */}
-          <Text style={{ fontSize: 15, color: colors.primary, textAlign: 'center', fontFamily: isArabic ? UTHMANI_FALLBACK : undefined }}>
-            {isArabic ? `${currentAyah.ref.split(' ')[0]}: ${toArabicNumeral(currentAyah.ayah)}` : transliterateReference(currentAyah.ref, language)}
-          </Text>
-
-          <Text style={{ fontSize: 11, color: colors.textLight, textAlign: 'center', marginTop: 8, opacity: 0.6 }}>
-            {t('quran.longPressToGoToVerse')}
-          </Text>
-
-          {/* Translation with proper direction — only for non-Arabic users */}
-          {!isArabic && showTranslation && (
-            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border, direction: 'ltr' }}>
-              <TranslatedAyahTrans trans={currentAyah.trans} isEnglish={isEnglish} textLight={colors.textLight} />
-            </View>
-          )}
-
-          {/* Tafsir section */}
-          {showTafsir && (
-            <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: colors.border }}>
-              <Text style={{ fontSize: 14, fontFamily: fontSemiBold(), color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 6, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
-                {t('home.tafsirMuyassar')}
-              </Text>
-              {tafsirLoading ? (
-                <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+        {/* Parchment card — explicit text colors based on card background, not global theme */}
+        {(() => {
+          // Card-specific text colors: dark text on cream bg (light mode), light text on dark bg (dark mode)
+          const cardTextColor = isDarkMode ? '#FFFFFF' : '#1C1C1E';
+          const cardTextLightColor = isDarkMode ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.65)';
+          const cardBorderColor = isDarkMode ? 'rgba(180,160,100,0.3)' : 'rgba(180,160,100,0.5)';
+          return (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onLongPress={handleLongPress}
+              delayLongPress={500}
+              style={{
+                marginHorizontal: 16,
+                padding: 20,
+                backgroundColor: isDarkMode ? 'rgba(50,45,35,0.6)' : 'rgba(253,248,235,0.95)',
+                borderRadius: 16,
+                borderWidth: 1.5,
+                borderColor: cardBorderColor,
+              }}
+            >
+              {/* Verse text — Arabic for Arabic users, translation for others */}
+              {isArabic ? (
+                qcfGlyphs && qcfFontFamily ? (
+                  <Text style={{ fontSize: 26, color: cardTextColor, textAlign: 'center', lineHeight: 50, fontFamily: qcfFontFamily, marginBottom: 12, writingDirection: 'rtl' }}>
+                    {qcfGlyphs.join('')}
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 26, color: cardTextColor, textAlign: 'center', lineHeight: 50, fontFamily: UTHMANI_FONT, marginBottom: 12, writingDirection: 'rtl' }}>
+                    ﴿ {currentAyah.arabic} ﴾
+                  </Text>
+                )
               ) : (
-                <Text style={{ fontSize: 15, fontFamily: fontRegular(), color: colors.text, textAlign: 'right', writingDirection: 'rtl', lineHeight: 26 }}>
-                  {tafsirText || t('common.loading')}
+                <Text style={{ fontSize: 20, color: cardTextColor, textAlign: isRTL ? 'right' : 'left', lineHeight: 34, fontFamily: fontRegular(), marginBottom: 12, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+                  {verseTranslation || currentAyah.trans || currentAyah.arabic}
                 </Text>
               )}
-            </View>
-          )}
-        </TouchableOpacity>
+
+              {/* Surah reference — transliterated for non-Arabic */}
+              <Text style={{ fontSize: 15, color: isDarkMode ? '#4ADE80' : '#0d8e62', textAlign: 'center', fontFamily: isArabic ? UTHMANI_FALLBACK : undefined }}>
+                {isArabic ? `${currentAyah.ref.split(' ')[0]}: ${toArabicNumeral(currentAyah.ayah)}` : transliterateReference(currentAyah.ref, language)}
+              </Text>
+
+              <Text style={{ fontSize: 11, color: cardTextLightColor, textAlign: 'center', marginTop: 8 }}>
+                {t('quran.longPressToGoToVerse')}
+              </Text>
+
+              {/* Translation with proper direction — only for non-Arabic users */}
+              {!isArabic && showTranslation && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: cardBorderColor, direction: 'ltr' }}>
+                  <Text style={{ fontSize: 14, color: cardTextLightColor, textAlign: 'left', writingDirection: 'ltr' as const, fontStyle: 'italic', lineHeight: 22 }}>
+                    {isEnglish ? currentAyah.trans : currentAyah.trans}
+                  </Text>
+                </View>
+              )}
+
+              {/* Tafsir section */}
+              {showTafsir && (
+                <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 0.5, borderTopColor: cardBorderColor }}>
+                  <Text style={{ fontSize: 14, fontFamily: fontSemiBold(), color: colors.primary, textAlign: isRTL ? 'right' : 'left', marginBottom: 6, writingDirection: isRTL ? 'rtl' : 'ltr' }}>
+                    {t('home.tafsirMuyassar')}
+                  </Text>
+                  {tafsirLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+                  ) : (
+                    <Text style={{ fontSize: 15, fontFamily: fontRegular(), color: cardTextColor, textAlign: 'right', writingDirection: 'rtl', lineHeight: 26 }}>
+                      {tafsirText || t('common.loading')}
+                    </Text>
+                  )}
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })()}
 
         {/* Tafsir toggle button — at bottom */}
         <View style={{ paddingHorizontal: 16, marginTop: 16, flexDirection: isRTL ? 'row-reverse' : 'row', gap: Spacing.sm }}>

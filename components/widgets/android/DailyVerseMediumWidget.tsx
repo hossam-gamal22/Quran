@@ -4,10 +4,20 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
   const { verse } = data;
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: schemeColors, gradient } = resolveColorScheme(data.settings?.verseWidget?.colorScheme, 'verse');
+
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const bg = useTheme ? theme.gradient : gradient;
+  const textColor = useTheme ? theme.textColor : schemeColors.white;
+  const mutedColor = useTheme ? theme.mutedColor : schemeColors.whiteMuted;
+  const badgeBg = useTheme ? theme.badgeBg : schemeColors.badgeBgAlt;
+  const badgeText = useTheme ? theme.badgeText : schemeColors.gold;
+  const accent = useTheme ? theme.accentColor : schemeColors.tealLight;
 
   return (
     <FlexWidget
@@ -16,7 +26,7 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
         width: 'match_parent',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        backgroundGradient: GRADIENTS.verse,
+        backgroundGradient: bg,
         borderRadius: 20,
         padding: 14,
       }}
@@ -43,7 +53,7 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
             text="آية اليوم"
             style={{
               fontSize: 13,
-              color: COLORS.tealLight,
+              color: accent,
               fontFamily: FONT.amiriBold,
               marginLeft: 6,
             }}
@@ -51,7 +61,7 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
         </FlexWidget>
         <FlexWidget
           style={{
-            backgroundColor: COLORS.badgeBgAlt,
+            backgroundColor: badgeBg,
             borderRadius: 10,
             paddingHorizontal: 10,
             paddingVertical: 3,
@@ -61,7 +71,7 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
             text={`${verse.surahName} ﴿${verse.numberInSurah}﴾`}
             style={{
               fontSize: 11,
-              color: COLORS.gold,
+              color: badgeText,
               fontFamily: FONT.amiri,
             }}
           />
@@ -73,21 +83,36 @@ export function DailyVerseMediumWidget({ data }: { data: SharedWidgetData }) {
         text={verse.arabic}
         style={{
           fontSize: 17,
-          color: COLORS.white,
+          color: textColor,
           fontFamily: FONT.amiri,
           textAlign: 'center',
           marginVertical: 6,
         }}
-        maxLines={4}
+        maxLines={(data.settings?.verseWidget?.showTranslation && verse.translation) ? 3 : 4}
         truncate="END"
       />
+
+      {/* Translation */}
+      {(data.settings?.verseWidget?.showTranslation ?? false) && verse.translation ? (
+        <TextWidget
+          text={verse.translation}
+          style={{
+            fontSize: 11,
+            color: mutedColor,
+            fontFamily: FONT.amiri,
+            textAlign: 'center',
+          }}
+          maxLines={2}
+          truncate="END"
+        />
+      ) : null}
 
       {/* Branding */}
       <TextWidget
         text={BRANDING.name}
         style={{
           fontSize: BRANDING.fontSize,
-          color: COLORS.teal,
+          color: accent,
           fontFamily: FONT.amiri,
           textAlign: 'center',
         }}

@@ -148,7 +148,7 @@ export default function WirdScreen() {
             {t('khatma.noActiveKhatmaDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: '#0d8e62', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -174,7 +174,7 @@ export default function WirdScreen() {
             {t('khatma.khatmaCompletedMsg')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: '#0d8e62', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleResetKhatma}
           >
             <Ionicons name="refresh" size={20} color="#FFFFFF" />
@@ -228,7 +228,7 @@ export default function WirdScreen() {
                 style={[
                   styles.progressFill,
                   {
-                    backgroundColor: colors.primary,
+                    backgroundColor: '#0d8e62',
                     width: `${stats?.progressPercentage || 0}%`,
                   },
                 ]}
@@ -360,7 +360,7 @@ export default function WirdScreen() {
       {!wirdInfo?.isCompleted && (
         <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
           <TouchableOpacity
-            style={[styles.completeButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.completeButton, { backgroundColor: '#0d8e62', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={handleCompleteWird}
             disabled={isCompleting}
           >

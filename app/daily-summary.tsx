@@ -23,6 +23,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useWorship } from '@/contexts/WorshipContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { t } from '@/lib/i18n';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { localizeNumber } from '@/lib/format-number';
@@ -51,12 +52,33 @@ interface StatCardProps {
   colors: any;
   isRTL: boolean;
   isDarkMode: boolean;
+  locked?: boolean;
+  onLockPress?: () => void;
 }
 
-function StatCard({ icon, iconColor, title, value, subtitle, details, delay, colors, isRTL, isDarkMode }: StatCardProps) {
+function StatCard({ icon, iconColor, title, value, subtitle, details, delay, colors, isRTL, isDarkMode, locked, onLockPress }: StatCardProps) {
   return (
     <Animated.View entering={FadeInDown.delay(delay).duration(400)}>
       <GlassCard style={styles.statCard}>
+        {locked && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onLockPress}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              zIndex: 10,
+              backgroundColor: isDarkMode ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.7)',
+              borderRadius: 16,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <MaterialCommunityIcons name="lock" size={28} color={isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'} />
+            <Text style={{ color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)', fontFamily: fontSemiBold(), fontSize: 13, marginTop: 4 }}>
+              {t('subscription.premiumFeature') || 'ميزة مميزة'}
+            </Text>
+          </TouchableOpacity>
+        )}
         <View style={[styles.statHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <View style={[styles.statIconContainer, { backgroundColor: `${iconColor}20` }]}>
             <MaterialCommunityIcons name={icon as any} size={24} color={iconColor} />
@@ -110,6 +132,7 @@ export default function DailySummaryScreen() {
   const isRTL = useIsRTL();
   const { isDarkMode } = useSettings();
   const { todayPrayer, todayQuran, todayAzkar } = useWorship();
+  const { isPremium } = useSubscription();
 
   const [tasbihCount, setTasbihCount] = useState(0);
   const [tasbihTypes, setTasbihTypes] = useState(0);
@@ -230,6 +253,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
+          locked={!isPremium}
+          onLockPress={() => router.push('/subscription' as any)}
         />
 
         {/* الأذكار */}
@@ -243,6 +268,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
+          locked={!isPremium}
+          onLockPress={() => router.push('/subscription' as any)}
         />
 
         {/* التسبيح */}
@@ -256,6 +283,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
+          locked={!isPremium}
+          onLockPress={() => router.push('/subscription' as any)}
         />
 
         {/* سماع القرآن */}
@@ -269,6 +298,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
+          locked={!isPremium}
+          onLockPress={() => router.push('/subscription' as any)}
         />
 
         {/* زرار عرض التفاصيل */}

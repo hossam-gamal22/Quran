@@ -36,9 +36,6 @@ import { useCompanionsContent } from '@/lib/content-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ========================================
 // الألوان

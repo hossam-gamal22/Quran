@@ -35,6 +35,7 @@ struct PrayerWidgetData: Codable {
     var hijriDate: String
     var hijriDay: Int
     var hijriMonth: String
+    var hijriMonthEn: String?
     var hijriYear: Int
     var gregorianDate: String
     var location: String
@@ -203,14 +204,11 @@ struct SharedWidgetData: Codable {
 
 struct SmallPrayerWidgetView: View {
     let entry: PrayerWidgetEntry
-    
-    var accentColor: Color {
-        Color(hex: entry.settings?.prayerWidget.accentColor ?? "#2f7659")
-    }
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: accentColor)
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 6) {
                 // App icon
@@ -219,29 +217,36 @@ struct SmallPrayerWidgetView: View {
                 // اسم الصلاة القادمة
                 Text(entry.data?.nextPrayerNameAr ?? "الظهر")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                 
                 // الوقت
                 Text(entry.data?.nextPrayerTime ?? "12:15 م")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                 
                 // الوقت المتبقي
-                GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                GlassPill(color: theme.badgeBg.opacity(0.6)) {
                     HStack(spacing: 4) {
                         Image(systemName: "timer")
                             .font(.system(size: 10))
                         Text(entry.data?.timeRemaining ?? "2:30")
                             .font(.system(size: 11, weight: .medium))
                     }
-                    .foregroundColor(WidgetConstants.Colors.gold)
+                    .foregroundColor(theme.badgeText)
                 }
                 
                 // التاريخ الهجري
                 if entry.settings?.prayerWidget.showHijriDate ?? true {
                     Text(entry.data?.hijriDate ?? "15 رمضان")
                         .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(theme.mutedColor.opacity(0.6))
+                }
+                // الموقع
+                if entry.settings?.prayerWidget.showLocation ?? true,
+                   let loc = entry.data?.location, !loc.isEmpty {
+                    Text(loc)
+                        .font(.system(size: 8))
+                        .foregroundColor(theme.mutedColor.opacity(0.4))
                 }
             }
             .padding()
@@ -271,14 +276,11 @@ struct SmallPrayerWidgetView: View {
 
 struct MediumPrayerWidgetView: View {
     let entry: PrayerWidgetEntry
-    
-    var accentColor: Color {
-        Color(hex: entry.settings?.prayerWidget.accentColor ?? "#2f7659")
-    }
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: accentColor)
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 0) {
                 // Header with app icon
@@ -286,12 +288,20 @@ struct MediumPrayerWidgetView: View {
                     WidgetAppIcon(size: 20)
                     Text("مواقيت الصلاة")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(theme.mutedColor)
                     Spacer()
-                    if entry.settings?.prayerWidget.showHijriDate ?? true {
-                        Text(entry.data?.hijriDate ?? "15 رمضان")
-                            .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.5))
+                    VStack(alignment: .trailing, spacing: 1) {
+                        if entry.settings?.prayerWidget.showHijriDate ?? true {
+                            Text(entry.data?.hijriDate ?? "15 رمضان")
+                                .font(.system(size: 10))
+                                .foregroundColor(theme.mutedColor.opacity(0.6))
+                        }
+                        if entry.settings?.prayerWidget.showLocation ?? true,
+                           let loc = entry.data?.location, !loc.isEmpty {
+                            Text(loc)
+                                .font(.system(size: 9))
+                                .foregroundColor(theme.mutedColor.opacity(0.4))
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -303,20 +313,20 @@ struct MediumPrayerWidgetView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(entry.data?.nextPrayerNameAr ?? "الظهر")
                             .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
                         
                         Text(entry.data?.nextPrayerTime ?? "12:15 م")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
                         
-                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        GlassPill(color: theme.badgeBg.opacity(0.6)) {
                             HStack(spacing: 4) {
                                 Image(systemName: "timer")
                                     .font(.system(size: 10))
                                 Text(entry.data?.timeRemaining ?? "2:30")
                                     .font(.system(size: 11, weight: .medium))
                             }
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                         }
                     }
                     
@@ -332,10 +342,10 @@ struct MediumPrayerWidgetView: View {
                                     Text(prayer.nameAr)
                                         .font(.system(size: 11, weight: prayer.isNext ? .bold : .regular))
                                 }
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.35) : prayer.isNext ? WidgetConstants.Colors.gold : .white.opacity(0.8))
+                                .foregroundColor(prayer.isPassed ? theme.mutedColor.opacity(0.35) : prayer.isNext ? theme.badgeText : theme.textColor.opacity(0.8))
                                 .padding(.horizontal, prayer.isNext ? 6 : 0)
                                 .padding(.vertical, prayer.isNext ? 2 : 0)
-                                .background(prayer.isNext ? WidgetConstants.Glass.pill : Color.clear)
+                                .background(prayer.isNext ? theme.badgeBg.opacity(0.5) : Color.clear)
                                 .cornerRadius(6)
                             }
                         }
@@ -370,14 +380,11 @@ struct MediumPrayerWidgetView: View {
 
 struct LargePrayerWidgetView: View {
     let entry: PrayerWidgetEntry
-    
-    var accentColor: Color {
-        Color(hex: entry.settings?.prayerWidget.accentColor ?? "#2f7659")
-    }
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: accentColor)
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 12) {
                 // Header with icon
@@ -385,7 +392,7 @@ struct LargePrayerWidgetView: View {
                     WidgetAppIcon(size: 20)
                     Text("مواقيت الصلاة")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                     
                     Spacer()
                     
@@ -396,7 +403,7 @@ struct LargePrayerWidgetView: View {
                             Text(entry.data?.gregorianDate ?? "الأحد 2 مارس")
                                 .font(.system(size: 9))
                         }
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(theme.mutedColor)
                     }
                 }
                 .padding(.horizontal)
@@ -406,7 +413,7 @@ struct LargePrayerWidgetView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("الصلاة القادمة")
                             .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(theme.mutedColor.opacity(0.6))
                         
                         HStack {
                             Image(systemName: prayerIcon)
@@ -414,7 +421,7 @@ struct LargePrayerWidgetView: View {
                             Text(entry.data?.nextPrayerNameAr ?? "الظهر")
                                 .font(.system(size: 24, weight: .bold))
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                     }
                     
                     Spacer()
@@ -422,22 +429,22 @@ struct LargePrayerWidgetView: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text(entry.data?.nextPrayerTime ?? "12:15 م")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
                         
-                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        GlassPill(color: theme.badgeBg.opacity(0.6)) {
                             HStack(spacing: 4) {
                                 Image(systemName: "timer")
                                     .font(.system(size: 10))
                                 Text(entry.data?.timeRemaining ?? "2:30")
                                     .font(.system(size: 11, weight: .medium))
                             }
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                         }
                     }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
-                .background(WidgetConstants.Glass.highlight)
+                .background(theme.badgeBg.opacity(0.3))
                 .cornerRadius(14)
                 .padding(.horizontal)
                 
@@ -450,27 +457,27 @@ struct LargePrayerWidgetView: View {
                                 Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
                                     .font(.system(size: 13))
                                     .frame(width: 18)
-                                    .foregroundColor(isCompleted ? .green : .white.opacity(0.25))
+                                    .foregroundColor(isCompleted ? .green : theme.mutedColor.opacity(0.25))
                             }
                             
                             Image(systemName: iconForPrayer(prayer.name))
                                 .font(.system(size: 13))
                                 .frame(width: 22)
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white.opacity(0.7))
+                                .foregroundColor(prayer.isPassed ? theme.mutedColor.opacity(0.3) : prayer.isNext ? theme.badgeText : theme.mutedColor)
                             
                             Text(prayer.nameAr)
                                 .font(.system(size: 13, weight: prayer.isNext ? .bold : .regular))
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white)
+                                .foregroundColor(prayer.isPassed ? theme.mutedColor.opacity(0.3) : prayer.isNext ? theme.badgeText : theme.textColor)
                             
                             Spacer()
                             
                             Text(prayer.time)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundColor(prayer.isPassed ? .white.opacity(0.3) : prayer.isNext ? WidgetConstants.Colors.gold : .white)
+                                .foregroundColor(prayer.isPassed ? theme.mutedColor.opacity(0.3) : prayer.isNext ? theme.badgeText : theme.textColor)
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 5)
-                        .background(prayer.isNext ? WidgetConstants.Glass.pill : Color.clear)
+                        .background(prayer.isNext ? theme.badgeBg.opacity(0.4) : Color.clear)
                         .cornerRadius(8)
                     }
                 }
@@ -546,17 +553,22 @@ struct NextPrayerWidget: Widget {
 struct NextPrayerWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: PrayerWidgetProvider.Entry
+    let theme = loadWidgetTheme()
     
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallPrayerWidgetView(entry: entry)
+            SmallPrayerWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
         case .systemMedium:
-            MediumPrayerWidgetView(entry: entry)
+            MediumPrayerWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
         case .systemLarge:
-            LargePrayerWidgetView(entry: entry)
+            LargePrayerWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
         default:
-            SmallPrayerWidgetView(entry: entry)
+            SmallPrayerWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
         }
     }
 }

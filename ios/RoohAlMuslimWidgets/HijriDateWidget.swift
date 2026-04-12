@@ -73,7 +73,7 @@ struct HijriDateWidgetEntry: TimelineEntry {
 struct HijriDateWidgetProvider: TimelineProvider {
     typealias Entry = HijriDateWidgetEntry
     
-    let appGroupId = "group.com.roohmuslim.app"
+    let appGroupId = WidgetConstants.appGroupId
     
     func placeholder(in context: Context) -> HijriDateWidgetEntry {
         HijriDateWidgetEntry(

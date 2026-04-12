@@ -125,10 +125,11 @@ struct FullVerseSettingsData: Codable {
 
 struct SmallQuranAyahWidgetView: View {
     let entry: QuranAyahWidgetEntry
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: Color(hex: "#1e3a5f"))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 6) {
                 // App icon
@@ -140,15 +141,15 @@ struct SmallQuranAyahWidgetView: View {
                     .font(.system(size: 14, weight: .medium))
                     .multilineTextAlignment(.center)
                     .lineLimit(4)
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                     .environment(\.layoutDirection, .rightToLeft)
                 
                 Spacer()
                 
-                GlassPill {
+                GlassPill(color: theme.badgeBg.opacity(0.4)) {
                     Text("\(entry.data?.surahName ?? "الفاتحة") - آية \(entry.data?.numberInSurah ?? 1)")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(theme.mutedColor)
                 }
             }
             .padding()
@@ -166,25 +167,25 @@ struct SmallQuranAyahWidgetView: View {
 
 struct MediumQuranAyahWidgetView: View {
     let entry: QuranAyahWidgetEntry
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: Color(hex: "#1e3a5f"))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 8) {
-                // Header with icon
                 HStack {
                     WidgetAppIcon(size: 20)
                     Text("آية اليوم")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(theme.mutedColor)
                     
                     Spacer()
                     
-                    GlassPill {
+                    GlassPill(color: theme.badgeBg.opacity(0.4)) {
                         Text(entry.data?.surahName ?? "الفاتحة")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(theme.mutedColor)
                     }
                 }
                 
@@ -194,7 +195,7 @@ struct MediumQuranAyahWidgetView: View {
                     .font(.system(size: 16, weight: .medium))
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                     .environment(\.layoutDirection, .rightToLeft)
                 
                 if entry.settings?.showTranslation ?? false,
@@ -203,19 +204,19 @@ struct MediumQuranAyahWidgetView: View {
                         .font(.system(size: 11))
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(theme.mutedColor)
                 }
                 
                 Spacer()
                 
-                GlassPill {
+                GlassPill(color: theme.badgeBg.opacity(0.4)) {
                     HStack(spacing: 4) {
                         Image(systemName: "number")
                             .font(.system(size: 9))
                         Text("آية \(entry.data?.numberInSurah ?? 1)")
                             .font(.system(size: 10, weight: .medium))
                     }
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(theme.mutedColor)
                 }
             }
             .padding()
@@ -243,23 +244,97 @@ struct QuranAyahWidget: Widget {
         }
         .configurationDisplayName("آية اليوم")
         .description("آية يومية متجددة من القرآن الكريم")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
 struct QuranAyahWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: QuranAyahWidgetProvider.Entry
+    let theme = loadWidgetTheme()
     
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallQuranAyahWidgetView(entry: entry)
+            SmallQuranAyahWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-ayah"))
         case .systemMedium:
-            MediumQuranAyahWidgetView(entry: entry)
+            MediumQuranAyahWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-ayah"))
+        case .systemLarge:
+            LargeQuranAyahWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-ayah"))
         default:
-            SmallQuranAyahWidgetView(entry: entry)
+            SmallQuranAyahWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-ayah"))
         }
+    }
+}
+
+// ========================================
+// واجهة الويدجت الكبير
+// ========================================
+
+struct LargeQuranAyahWidgetView: View {
+    let entry: QuranAyahWidgetEntry
+    let theme: IOSWidgetTheme
+    
+    var body: some View {
+        ZStack {
+            ThemedWidgetBackground(theme: theme)
+            
+            VStack(spacing: 12) {
+                HStack {
+                    WidgetAppIcon(size: 24)
+                    Text("آية اليوم")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(theme.mutedColor)
+                    
+                    Spacer()
+                    
+                    GlassPill(color: theme.badgeBg.opacity(0.4)) {
+                        Text(entry.data?.surahName ?? "الفاتحة")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(theme.mutedColor)
+                    }
+                }
+                
+                Spacer()
+                
+                Text(entry.data?.arabic ?? "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ")
+                    .font(.system(size: 22, weight: .medium))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(6)
+                    .foregroundColor(theme.textColor)
+                    .environment(\.layoutDirection, .rightToLeft)
+                
+                if entry.settings?.showTranslation ?? false,
+                   let translation = entry.data?.translation, !translation.isEmpty {
+                    Text(translation)
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .foregroundColor(theme.mutedColor)
+                }
+                
+                Spacer()
+                
+                GlassPill(color: theme.badgeBg.opacity(0.4)) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "book.fill")
+                            .font(.system(size: 10))
+                        Text("آية \(entry.data?.numberInSurah ?? 1)")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(theme.mutedColor)
+                }
+            }
+            .padding()
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -285,6 +360,14 @@ struct QuranAyahWidget_Previews: PreviewProvider {
             ))
             .previewContext(WidgetPreviewContext(family: .systemMedium))
             .previewDisplayName("Medium")
+            
+            QuranAyahWidgetEntryView(entry: QuranAyahWidgetEntry(
+                date: Date(),
+                data: nil,
+                settings: nil
+            ))
+            .previewContext(WidgetPreviewContext(family: .systemLarge))
+            .previewDisplayName("Large")
         }
     }
 }

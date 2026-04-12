@@ -266,6 +266,10 @@ export default function TasbihScreen() {
     textSec: colors.textLight,
     ring: GREEN,
     ringBg: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+    // Glass card colors - safe for light glass overlays
+    glassText: colors.glassText,
+    glassTextSec: colors.glassTextLight,
+    glassIcon: colors.glassIcon,
   };
 
   // ===== STATE =====
@@ -312,7 +316,7 @@ export default function TasbihScreen() {
   const [customText, setCustomText] = useState('');
   const [customTarget, setCustomTarget] = useState('33');
   const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
-  const [showVirtue, setShowVirtue] = useState(false);
+  const [showVirtue, setShowVirtue] = useState(true);
   const isArabic = getLanguage() === 'ar';
   const [showTranslation, setShowTranslation] = useState(false);
   const [completedTasbihat, setCompletedTasbihat] = useState<Record<number, boolean>>({});
@@ -424,7 +428,7 @@ export default function TasbihScreen() {
       if (settingsRaw) {
         const p = JSON.parse(settingsRaw);
         setVibrationEnabled(p.vibrationEnabled ?? true);
-        setShowVirtue(p.showVirtue ?? false);
+        setShowVirtue(p.showVirtue ?? true);
         setAutoAdvance(p.autoAdvance ?? true);
         setShowTranslation(p.showTranslation ?? false);
       }
@@ -778,8 +782,14 @@ export default function TasbihScreen() {
           </View>
         </View>
 
-        {/* Progress indicator */}
-        <View style={[s.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        {/* Scrollable Content */}
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }} 
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+        >
+          {/* Progress indicator */}
+          <View style={[s.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           <Text style={[s.progressText, { color: GREEN, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {String(completedCount)}/{String(allTasbihItems.length)}
           </Text>
@@ -827,6 +837,8 @@ export default function TasbihScreen() {
                     s.sliderItemText,
                     { color: isSelected ? '#fff' : isCompleted ? GREEN : C.text, fontFamily: isSelected ? fontBold() : fontSemiBold() },
                   ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {isArabic ? stripTashkeel(item.text) : (item.transliteration || stripTashkeel(item.text))}
                 </Text>
@@ -863,6 +875,8 @@ export default function TasbihScreen() {
                     s.sliderItemText,
                     { color: isSelected ? '#fff' : isCompleted ? GREEN : C.text, fontFamily: isSelected ? fontBold() : fontSemiBold() },
                   ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
                 >
                   {isArabic ? stripTashkeel(item.text) : ((item as any).transliteration || stripTashkeel(item.text))}
                 </Text>
@@ -901,9 +915,6 @@ export default function TasbihScreen() {
               {isArabic && selectedTasbih.transliteration && showTranslation && (
                 <Text style={[s.selectedTranslit, { color: C.textSec }]}>{selectedTasbih.transliteration}</Text>
               )}
-              {getPresetVirtue(selectedTasbih.id) && showVirtue && (
-                <Text style={[s.selectedVirtue, { color: C.textSec, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>{getPresetVirtue(selectedTasbih.id)}</Text>
-              )}
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -918,6 +929,43 @@ export default function TasbihScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* ===== VIRTUE CARD ===== */}
+        {showVirtue && getPresetVirtue(selectedTasbih.id) && (
+          <View style={s.virtueContainer}>
+            {/* Virtue Card */}
+            <View style={[s.virtueCard, { 
+              backgroundColor: isDarkMode ? 'rgba(13,142,98,0.15)' : 'rgba(13,142,98,0.10)',
+              borderColor: isDarkMode ? 'rgba(13,142,98,0.30)' : 'rgba(13,142,98,0.20)',
+            }]}>
+              {/* Header */}
+              <View style={[s.virtueHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name="star" size={16} color={GREEN} />
+                <Text style={[s.virtueTitle, { color: GREEN }]}>{t('azkar.dhikrVirtue')}</Text>
+              </View>
+              
+              {/* Virtue text */}
+              <Text style={[s.virtueText, { 
+                color: C.text, 
+                textAlign: isRTL ? 'right' : 'left', 
+                writingDirection: isRTL ? 'rtl' : 'ltr' 
+              }]}>
+                {getPresetVirtue(selectedTasbih.id)}
+              </Text>
+              
+              {/* Source reference */}
+              {getPresetReference(selectedTasbih.id) && (
+                <Text style={[s.virtueSource, { 
+                  color: C.textSec, 
+                  textAlign: isRTL ? 'right' : 'left',
+                  writingDirection: isRTL ? 'rtl' : 'ltr'
+                }]}>
+                  {getPresetReference(selectedTasbih.id)}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ===== MAIN COUNTER with RING ===== */}
         <View style={s.counterArea}>
@@ -971,9 +1019,9 @@ export default function TasbihScreen() {
               </Svg>
               {/* Center content */}
               <View style={[s.ringCenter, { overflow: 'visible', width: RING_SIZE * 0.8, height: RING_SIZE * 0.65 }]}>
-                <Text style={[s.countNum, { color: C.text, fontSize: count >= 1000 ? 52 : count >= 100 ? 72 : 96, lineHeight: count >= 1000 ? 64 : count >= 100 ? 86 : 110, fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium', fontWeight: '900' }, colors.textShadowStyle]} numberOfLines={1}>{String(count)}</Text>
-                <View style={[s.countDivider, { backgroundColor: C.textSec }]} />
-                <Text style={[s.countTarget, { color: C.textSec, fontSize: colors.fs(24), fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium', fontWeight: '700' }]}>{String(selectedTasbih.target)}</Text>
+                <Text style={[s.countNum, { color: C.glassText, fontSize: count >= 1000 ? 52 : count >= 100 ? 72 : 96, lineHeight: count >= 1000 ? 64 : count >= 100 ? 86 : 110, fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium', fontWeight: '900' }, colors.textShadowStyle]} numberOfLines={1}>{String(count)}</Text>
+                <View style={[s.countDivider, { backgroundColor: C.glassTextSec }]} />
+                <Text style={[s.countTarget, { color: C.glassTextSec, fontSize: colors.fs(24), fontFamily: Platform.OS === 'ios' ? 'Helvetica Neue' : 'sans-serif-medium', fontWeight: '700' }]}>{String(selectedTasbih.target)}</Text>
               </View>
             </Animated.View>
           </TouchableOpacity>
@@ -996,7 +1044,7 @@ export default function TasbihScreen() {
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.45)' : 'rgba(255,255,255,0.60)' }]} />
                 <MaterialCommunityIcons name={chip.icon} size={14} color={GREEN} />
-                <Text style={[s.chipText, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{chip.text}</Text>
+                <Text style={[s.chipText, { color: C.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{chip.text}</Text>
               </View>
             ))}
           </View>
@@ -1019,6 +1067,7 @@ export default function TasbihScreen() {
             {t('tasbih.tapToCount')}
           </Text>
         </View>
+        </ScrollView>
 
         {/* Bottom actions */}
         <BannerAdComponent screen="tasbih" />
@@ -1305,7 +1354,7 @@ const _s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 14, paddingVertical: 8,
     borderRadius: 20, borderWidth: 1, borderColor: 'transparent',
-    flexShrink: 0,
+    flexShrink: 0, maxWidth: SCREEN_WIDTH * 0.45,
   },
   sliderItemText: {
     fontSize: 13, fontFamily: fontSemiBold(),
@@ -1338,11 +1387,51 @@ const _s = StyleSheet.create({
     lineHeight: 20, includeFontPadding: false,
   },
 
+  // Virtue Card
+  virtueContainer: {
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  virtueCard: {
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+  },
+  virtueHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  virtueTitle: {
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    lineHeight: 20,
+    includeFontPadding: false,
+  },
+  virtueText: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    lineHeight: 24,
+    includeFontPadding: false,
+  },
+  virtueSource: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    marginTop: 8,
+    opacity: 0.7,
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+
   // Counter area
   counterArea: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 20,
-    marginTop: -48,
+    paddingTop: 16,
+    paddingBottom: 24,
     overflow: 'visible' as const,
   },
   ringRow: {

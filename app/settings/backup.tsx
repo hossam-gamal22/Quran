@@ -24,6 +24,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -32,6 +33,8 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import { t, getDateLocale } from '@/lib/i18n';
 import {
   BACKUP_VERSION,
@@ -144,6 +147,7 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value, isDarkMode }) => {
 export default function BackupScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
+  const { isPremium } = useSubscription();
   const { settings, isDarkMode, exportSettings, importSettings, reloadSettings } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -246,6 +250,10 @@ export default function BackupScreen() {
   // ========================================
 
   const handleUploadToCloud = async () => {
+    if (!isPremium) {
+      guardPremiumFeature('cloud_backup', router, isPremium);
+      return;
+    }
     if (!authUser?.openId) {
       Alert.alert(t('backup.loginRequired'), t('backup.loginRequiredMsg'));
       return;
@@ -273,6 +281,10 @@ export default function BackupScreen() {
   };
 
   const handleDownloadFromCloud = async () => {
+    if (!isPremium) {
+      guardPremiumFeature('cloud_backup', router, isPremium);
+      return;
+    }
     if (!authUser?.openId) {
       Alert.alert(t('backup.loginRequired'), t('backup.loginRequiredMsg'));
       return;
@@ -311,6 +323,14 @@ export default function BackupScreen() {
 
   const performCloudRestore = async () => {
     if (!authUser?.openId) return;
+
+    // Pre-flight network check
+    const netState = await NetInfo.fetch();
+    if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+      Alert.alert(t('common.error'), t('messages.noInternet'));
+      return;
+    }
+
     setIsDownloading(true);
     try {
       const result = await downloadFromCloud(authUser.openId);
@@ -335,7 +355,13 @@ export default function BackupScreen() {
     } catch (error) {
       console.error('Cloud restore error:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert(t('common.error'), t('backup.downloadError'));
+      // Check if error was due to network
+      const netCheck = await NetInfo.fetch();
+      if (!(netCheck.isConnected && netCheck.isInternetReachable !== false)) {
+        Alert.alert(t('common.error'), t('messages.noInternet'));
+      } else {
+        Alert.alert(t('common.error'), t('backup.downloadError'));
+      }
     } finally {
       setIsDownloading(false);
     }

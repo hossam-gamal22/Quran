@@ -4,7 +4,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) {
   const { azkar } = data;
@@ -12,6 +12,20 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
   const truncatedZikr = zikrText.length > 80
     ? zikrText.substring(0, 80) + '…'
     : zikrText;
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: sc, gradient } = resolveColorScheme(undefined, 'azkar');
+
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const bg = useTheme ? theme.gradient : gradient;
+  const textColor = useTheme ? theme.textColor : sc.white;
+  const mutedColor = useTheme ? theme.mutedColor : sc.whiteMuted;
+  const accent = useTheme ? theme.accentColor : sc.tealLight;
+  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
+  const grayLightColor = useTheme ? theme.mutedColor : sc.grayLight;
+  const badgeBg = useTheme ? theme.badgeBg : sc.badgeBg;
+  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
+  const dividerColor = useTheme ? theme.mutedColor : sc.divider;
+  const brandColor = useTheme ? theme.accentColor : sc.teal;
 
   return (
     <FlexWidget
@@ -19,7 +33,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        backgroundGradient: GRADIENTS.azkar,
+        backgroundGradient: bg,
         borderRadius: 20,
         padding: 12,
       }}
@@ -47,7 +61,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             text="الأذكار اليومية"
             style={{
               fontSize: 13,
-              color: COLORS.tealLight,
+              color: accent,
               fontFamily: FONT.amiriBold,
               marginLeft: 6,
             }}
@@ -57,7 +71,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           text={BRANDING.name}
           style={{
             fontSize: BRANDING.fontSize,
-            color: COLORS.teal,
+            color: brandColor,
             fontFamily: FONT.amiri,
           }}
         />
@@ -85,7 +99,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: azkar.morningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+              backgroundColor: azkar.morningCompleted ? badgeBg : cardBg,
               borderRadius: 10,
               paddingHorizontal: 8,
               paddingVertical: 4,
@@ -94,13 +108,13 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           >
             <TextWidget
               text={azkar.morningCompleted ? '✓' : '○'}
-              style={{ fontSize: 12, color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayDark, marginRight: 4 }}
+              style={{ fontSize: 12, color: azkar.morningCompleted ? accent : grayDarkColor, marginRight: 4 }}
             />
             <TextWidget
               text="الصباح"
               style={{
                 fontSize: 12,
-                color: azkar.morningCompleted ? COLORS.tealLight : COLORS.grayLight,
+                color: azkar.morningCompleted ? accent : grayLightColor,
                 fontFamily: FONT.amiri,
               }}
             />
@@ -109,7 +123,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              backgroundColor: azkar.eveningCompleted ? COLORS.badgeBg : COLORS.cardBg,
+              backgroundColor: azkar.eveningCompleted ? badgeBg : cardBg,
               borderRadius: 10,
               paddingHorizontal: 8,
               paddingVertical: 4,
@@ -117,13 +131,13 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           >
             <TextWidget
               text={azkar.eveningCompleted ? '✓' : '○'}
-              style={{ fontSize: 12, color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayDark, marginRight: 4 }}
+              style={{ fontSize: 12, color: azkar.eveningCompleted ? accent : grayDarkColor, marginRight: 4 }}
             />
             <TextWidget
               text="المساء"
               style={{
                 fontSize: 12,
-                color: azkar.eveningCompleted ? COLORS.tealLight : COLORS.grayLight,
+                color: azkar.eveningCompleted ? accent : grayLightColor,
                 fontFamily: FONT.amiri,
               }}
             />
@@ -135,7 +149,7 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
           style={{
             width: 1,
             height: 'match_parent',
-            backgroundColor: COLORS.divider,
+            backgroundColor: dividerColor,
             marginRight: 10,
           }}
         />
@@ -152,13 +166,27 @@ export function AzkarProgressMediumWidget({ data }: { data: SharedWidgetData }) 
             text={truncatedZikr}
             style={{
               fontSize: 15,
-              color: COLORS.white,
+              color: textColor,
               fontFamily: FONT.amiri,
               textAlign: 'right',
             }}
-            maxLines={3}
+            maxLines={(data.settings?.azkarWidget?.showTranslation && azkar.randomZikr?.translation) ? 2 : 3}
             truncate="END"
           />
+          {(data.settings?.azkarWidget?.showTranslation ?? false) && azkar.randomZikr?.translation ? (
+            <TextWidget
+              text={azkar.randomZikr.translation}
+              style={{
+                fontSize: 11,
+                color: mutedColor,
+                fontFamily: FONT.amiri,
+                textAlign: 'right',
+                marginTop: 4,
+              }}
+              maxLines={2}
+              truncate="END"
+            />
+          ) : null}
         </FlexWidget>
       </FlexWidget>
     </FlexWidget>

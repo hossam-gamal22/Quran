@@ -299,7 +299,7 @@ export default function HijriCalendarScreen() {
     upcomingDesc: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 1, lineHeight: 18 },
     upcomingDate: { fontSize: 12, color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginTop: 2 },
     upcomingDiff: {
-      backgroundColor: colors.primary, borderRadius: 16,
+      backgroundColor: '#0d8e62', borderRadius: 16,
       paddingHorizontal: 10, paddingVertical: 4,
     },
     upcomingDiffText: { fontSize: 12, fontWeight: '700', color: '#fff' },
@@ -358,9 +358,9 @@ export default function HijriCalendarScreen() {
         >
           <View style={[
             s.dayInner,
-            isSelected && { backgroundColor: colors.primary },
-            isTodayDay && !isSelected && { borderWidth: 2, borderColor: colors.primary },
-            hasEvent && !isSelected && { backgroundColor: (dayEvent?.color || colors.primary) + '15' },
+            isSelected && { backgroundColor: '#0d8e62' },
+            isTodayDay && !isSelected && { borderWidth: 2, borderColor: '#0d8e62' },
+            hasEvent && !isSelected && { backgroundColor: (dayEvent?.color || '#0d8e62') + '15' },
             isBlessedPeriod && !isSelected && { backgroundColor: '#F5A62318', borderWidth: 0.5, borderColor: '#F5A62340' },
           ]}>
             <Text style={[

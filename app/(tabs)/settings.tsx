@@ -38,6 +38,7 @@ import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import { getDisplayName, setDisplayName, getUserId } from '@/lib/firebase-user';
 import { saveDisplayName } from '@/lib/rewards-manager';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 // ========================================
 // مكونات فرعية
@@ -180,6 +181,7 @@ export default function SettingsScreen() {
   } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
+  const { isPremium } = useSubscription();
 
   const appVersion = Constants.expoConfig?.version || '1.0.0';
 
@@ -327,15 +329,20 @@ export default function SettingsScreen() {
               <MaterialCommunityIcons name="account-circle" size={52} color="#0d8e62" />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[styles.profileName, {
-                color: colors.text,
-                textAlign: isRTL ? 'right' : 'left',
-                writingDirection: isRTL ? 'rtl' : 'ltr',
-              }]}>
-                {displayName
-                  ? t('settings.welcomeUser').replace('{name}', displayName)
-                  : t('home.welcome')}
-              </Text>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.profileName, {
+                  color: colors.text,
+                  textAlign: isRTL ? 'right' : 'left',
+                  writingDirection: isRTL ? 'rtl' : 'ltr',
+                }]}>
+                  {displayName
+                    ? t('settings.welcomeUser').replace('{name}', displayName)
+                    : t('home.welcome')}
+                </Text>
+                {isPremium && (
+                  <MaterialCommunityIcons name="crown" size={18} color={isDarkMode ? '#FFD700' : '#B8860B'} />
+                )}
+              </View>
               <Text style={[styles.profileEditHint, {
                 color: colors.textLight,
                 textAlign: isRTL ? 'right' : 'left',

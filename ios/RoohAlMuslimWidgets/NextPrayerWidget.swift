@@ -100,7 +100,7 @@ struct PrayerWidgetProvider: IntentTimelineProvider {
     typealias Entry = PrayerWidgetEntry
     
     // App Group ID للمشاركة مع التطبيق الرئيسي
-    let appGroupId = "group.com.roohmuslim.app"
+    let appGroupId = WidgetConstants.appGroupId
     
     func placeholder(in context: Context) -> PrayerWidgetEntry {
         PrayerWidgetEntry(

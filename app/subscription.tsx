@@ -27,6 +27,20 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
 const ACCENT = '#0d8e62';
 
+// Hardcoded premium features that are ACTUALLY implemented and gated
+const PREMIUM_FEATURES = [
+  'subscription.featureAdRemoval',
+  'subscription.featureExclusiveThemes',
+  'subscription.featurePremiumSounds',
+  'subscription.featureOfflineRecitation',
+  'subscription.featureCloudBackup',
+  'subscription.featureCustomBackgrounds',
+  'subscription.featurePremiumWidgets',
+  'subscription.featureAdvancedKhatma',
+  'subscription.featureAdvancedStats',
+  'subscription.supportDev',
+] as const;
+
 export default function SubscriptionScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -67,8 +81,11 @@ export default function SubscriptionScreen() {
   const handlePurchase = async () => {
     setPurchasing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await purchase(selectedPlan);
+    const success = await purchase(selectedPlan);
     setPurchasing(false);
+    if (!success && !isPremium) {
+      // Error alert is shown inside purchase() — no duplicate needed
+    }
   };
 
   const handleRestore = async () => {
@@ -191,22 +208,10 @@ export default function SubscriptionScreen() {
           </View>
         )}
 
-        {/* Trial Days Badge */}
-        {config.trialDays > 0 && (
-          <View style={[styles.trialBadge, { backgroundColor: isDarkMode ? '#1a2a3a' : '#e6f0ff' }]}>
-            <MaterialCommunityIcons name="clock-outline" size={18} color={ACCENT} />
-            <Text style={[styles.trialText, { color: colors.text }]}>
-              {t('subscription.freeTrial') || 'تجربة مجانية'}: {config.trialDays} {t('subscription.days') || 'أيام'}
-            </Text>
-          </View>
-        )}
-
         {/* Features */}
         <View style={[styles.featuresCard, { backgroundColor: colors.card }]}>
-          {features.map((feature, i) => {
-            // If feature is a translation key (starts with subscription.), translate it
-            // Otherwise it's raw Arabic text from Firestore, use directly
-            const displayText = feature.startsWith('subscription.') ? t(feature) : feature;
+          {PREMIUM_FEATURES.map((feature, i) => {
+            const displayText = t(feature) || feature;
             return (
               <View key={i} style={[styles.featureRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <MaterialCommunityIcons name="check-circle" size={22} color={ACCENT} />
@@ -499,24 +504,6 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     color: '#fff',
     lineHeight: 24,
-    includeFontPadding: false,
-  },
-  // Trial days badge
-  trialBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 16,
-    alignSelf: 'center',
-  },
-  trialText: {
-    fontSize: 14,
-    fontFamily: fontMedium(),
-    lineHeight: 22,
     includeFontPadding: false,
   },
 });

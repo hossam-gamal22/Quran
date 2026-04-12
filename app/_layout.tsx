@@ -6,7 +6,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, AppState, AppStateStatus, Platform, StyleSheet as RNStyleSheet, View, Text, TextInput, LogBox, I18nManager } from 'react-native';
+import { Animated, AppState, AppStateStatus, Platform, StyleSheet as RNStyleSheet, View, Text, TextInput, LogBox, I18nManager, UIManager } from 'react-native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -53,6 +53,7 @@ import { GlobalAudioProvider, markTrackPlayerReady } from '@/contexts/GlobalAudi
 import { usePathname, useRouter } from 'expo-router';
 import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { scheduleMidnightRefresh } from '@/lib/widget-data-bridge';
+import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { initRemoteTranslations } from '@/lib/remote-translations';
@@ -91,6 +92,11 @@ setTimeout(() => _channelsReadyResolve(), 5000);
 I18nManager.allowRTL(false);
 I18nManager.forceRTL(false);
 
+// Enable LayoutAnimation on Android — single consolidated call for the entire app
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 // Suppress known non-critical warnings
 LogBox.ignoreLogs([
   'expo-notifications: Android Push notifications',
@@ -123,9 +129,14 @@ try {
 }
 
 try {
-  SplashScreen.preventAutoHideAsync().catch(() => {});
+  // Prevent auto-hide - we control when to hide via SplashGate
+  SplashScreen.preventAutoHideAsync().catch(() => {
+    // Ignore - native splash might not be available (Expo Go, hot reload)
+  });
   // Disable native splash fade — we handle the transition ourselves via ThemeBootOverlay
-  SplashScreen.setOptions({ fade: false });
+  if (SplashScreen.setOptions) {
+    SplashScreen.setOptions({ fade: false });
+  }
 } catch {
   // Native splash screen not available (Expo Go / hot reload)
 }
@@ -206,10 +217,15 @@ const initWithTimeout = async (fn: () => Promise<void>, name: string, timeout = 
 
 const hideSplash = async () => {
   try {
-    await SplashScreen.hideAsync();
-    if (__DEV__) console.log('✅ Splash screen hidden');
+    // Check if SplashScreen native module is available
+    if (SplashScreen && typeof SplashScreen.hideAsync === 'function') {
+      await SplashScreen.hideAsync().catch(() => {
+        // Ignore all errors - splash may already be hidden or not registered
+      });
+      if (__DEV__) console.log('✅ Splash screen hidden');
+    }
   } catch (e) {
-    // Ignore — might already be hidden
+    // Ignore — splash screen not available (Expo Go, hot reload, etc.)
   }
 };
 
@@ -509,50 +525,50 @@ export default function RootLayout() {
         3000
       );
 
-      // Initialize TrackPlayer for lock screen audio controls (native only)
-      // Only runs if TrackPlayer was successfully registered at module scope
-      if (Platform.OS !== 'web' && trackPlayerAvailable) {
-        await initWithTimeout(
-          async () => {
-            try {
-              const TrackPlayer = require('react-native-track-player').default;
-              const { Capability, RepeatMode } = require('react-native-track-player');
-              await TrackPlayer.setupPlayer({
-                autoUpdateMetadata: true,
-              });
-              await TrackPlayer.updateOptions({
-                capabilities: [
-                  Capability.Play,
-                  Capability.Pause,
-                  Capability.Stop,
-                  Capability.SkipToNext,
-                  Capability.SkipToPrevious,
-                  Capability.SeekTo,
-                ],
-                compactCapabilities: [
-                  Capability.Play,
-                  Capability.Pause,
-                  Capability.SkipToNext,
-                ],
-                notificationCapabilities: [
-                  Capability.Play,
-                  Capability.Pause,
-                  Capability.Stop,
-                  Capability.SkipToNext,
-                  Capability.SkipToPrevious,
-                ],
-              });
-              await TrackPlayer.setRepeatMode(RepeatMode.Off);
-              markTrackPlayerReady();
-              console.log('🎵 TrackPlayer initialized');
-            } catch (e) {
-              console.log('ℹ️ TrackPlayer setup skipped (not available)');
-            }
-          },
-          'TrackPlayer setup',
-          5000
-        );
-      }
+      // Initialize TrackPlayer in parallel (non-blocking) — runs alongside Firebase inits
+      // so its startup cost doesn't gate the splash screen hide.
+      const trackPlayerInitPromise = Platform.OS !== 'web' && trackPlayerAvailable
+        ? initWithTimeout(
+            async () => {
+              try {
+                const TrackPlayer = require('react-native-track-player').default;
+                const { Capability, RepeatMode } = require('react-native-track-player');
+                await TrackPlayer.setupPlayer({
+                  autoUpdateMetadata: true,
+                });
+                await TrackPlayer.updateOptions({
+                  capabilities: [
+                    Capability.Play,
+                    Capability.Pause,
+                    Capability.Stop,
+                    Capability.SkipToNext,
+                    Capability.SkipToPrevious,
+                    Capability.SeekTo,
+                  ],
+                  compactCapabilities: [
+                    Capability.Play,
+                    Capability.Pause,
+                    Capability.SkipToNext,
+                  ],
+                  notificationCapabilities: [
+                    Capability.Play,
+                    Capability.Pause,
+                    Capability.Stop,
+                    Capability.SkipToNext,
+                    Capability.SkipToPrevious,
+                  ],
+                });
+                await TrackPlayer.setRepeatMode(RepeatMode.Off);
+                markTrackPlayerReady();
+                console.log('🎵 TrackPlayer initialized');
+              } catch (e) {
+                console.log('ℹ️ TrackPlayer setup skipped (not available)');
+              }
+            },
+            'TrackPlayer setup',
+            5000
+          )
+        : Promise.resolve();
 
       // Load installed sounds cache BEFORE any parallel init
       // This must complete before notification scheduling uses getNotificationSoundValueSync()
@@ -563,7 +579,9 @@ export default function RootLayout() {
       );
 
       // Run remaining Firebase inits in parallel for faster startup
+      // TrackPlayer setup runs here too — no longer gates the sounds cache load
       await Promise.all([
+        trackPlayerInitPromise,
         initWithTimeout(
           () => initTranslationOverrides(),
           'Translation overrides',
@@ -582,7 +600,7 @@ export default function RootLayout() {
         initWithTimeout(
           () => registerUser().then(() => {}),
           'User registration',
-          3000
+          8000
         ),
         initWithTimeout(
           async () => {
@@ -592,7 +610,7 @@ export default function RootLayout() {
             if (uid) await syncPendingScores(uid);
           },
           'Track app open + sync scores',
-          5000
+          10000
         ),
         initWithTimeout(
           () => autoSelectMonthlyWinners(),
@@ -612,12 +630,14 @@ export default function RootLayout() {
           'Notification icons cache',
           3000
         ),
-        // Video prefetch runs in background without timeout — it's non-blocking
-        // and the story screen falls back to CDN streaming if not cached yet
-        prefetchDailyVideos().catch(() => {}),
       ]);
 
       if (__DEV__) console.log('✅ Firebase initialization sequence complete');
+
+      // Video prefetch runs AFTER all critical init — truly fire-and-forget.
+      // Not inside Promise.all to avoid blocking Firebase init completion.
+      // The story screen falls back to CDN streaming if not cached yet.
+      prefetchDailyVideos().catch(() => {});
     };
 
     initFirebase();
@@ -626,6 +646,13 @@ export default function RootLayout() {
     initWithTimeout(
       () => syncWidgetDataToNative(),
       'Widget sync',
+      5000
+    );
+
+    // Auto-start/refresh Live Activity for prayer countdown (iOS only)
+    initWithTimeout(
+      () => refreshLiveActivityIfEnabled(),
+      'Live Activity refresh',
       5000
     );
 
@@ -650,6 +677,7 @@ export default function RootLayout() {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
         syncWidgetDataToNative().catch(() => {});
+        refreshLiveActivityIfEnabled().catch(() => {});
         // Verify prayer notifications exist; if none, force reschedule.
         // This catches the case where all DATE triggers have fired and nothing is left.
         ensurePrayerNotificationsExist().catch(() => {});

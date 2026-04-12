@@ -45,6 +45,8 @@ import { getColoredBookmarks } from '../../lib/quran-bookmarks';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { getFirstSurahOnPage } from '../../lib/qcf-page-data';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import {
   downloadSurah,
   isDownloading,
@@ -219,6 +221,7 @@ const GlassActionButton: React.FC<GlassActionButtonProps> = ({
 
 export default function QuranScreen() {
   const router = useRouter();
+  const { isPremium } = useSubscription();
 
   const { isDarkMode, settings, updateDisplay, updateNotifications, t } = useSettings();
   const { config } = useAppConfig();
@@ -350,6 +353,10 @@ export default function QuranScreen() {
 
   // Download handler
   const handleDownloadSurah = useCallback(async (surahNumber: number) => {
+    if (!isPremium) {
+      guardPremiumFeature('sound_downloads', router, isPremium);
+      return;
+    }
     if (downloadingSet.has(surahNumber) || downloadedSet.has(surahNumber)) return;
     // Clear previous failure
     setFailedSet(prev => {
@@ -761,7 +768,7 @@ export default function QuranScreen() {
             {error}
           </Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            style={[styles.retryButton, { backgroundColor: '#0d8e62' }]}
             onPress={() => router.replace('/quran')}
           >
             <Text style={styles.retryButtonText}>{t('common.retry')}</Text>

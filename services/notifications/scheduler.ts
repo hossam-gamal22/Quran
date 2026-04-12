@@ -66,6 +66,7 @@ export async function schedulePrayerNotification({
         priority: Notifications.AndroidNotificationPriority.MAX,
         data: { prayerName, type: 'prayer', isFajr },
         ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -112,6 +113,7 @@ export async function scheduleReminderNotification({
         priority: Notifications.AndroidNotificationPriority.HIGH,
         data: { type: 'reminder', ...data },
         ...(Platform.OS === 'android' && { channelId }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

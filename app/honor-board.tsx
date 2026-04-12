@@ -9,8 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -25,6 +24,7 @@ import { BackButton } from '@/components/ui';
 import { useRouter } from 'expo-router';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useCelebration } from '@/contexts/CelebrationContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getMonthPrayerRecords, getAllQuranRecords, getAllAzkarRecords, formatDate, getMonthlyActivityStats } from '@/lib/worship-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -43,6 +43,7 @@ export default function HonorBoard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { showCelebration } = useCelebration();
+  const { isPremium } = useSubscription();
   const [config, setConfig] = useState<RewardsConfig | null>(null);
   const [userScore, setUserScore] = useState<number>(0);
   const [userRank, setUserRank] = useState<number | null>(null);
@@ -387,6 +388,9 @@ export default function HonorBoard() {
                           <Text style={[styles.leaderboardName, { color: isCurrentUser ? (isDarkMode ? '#f59e0b' : '#B57200') : colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                             {user.displayName}
                           </Text>
+                          {isCurrentUser && isPremium && (
+                            <MaterialCommunityIcons name="crown" size={16} color={isDarkMode ? '#FFD700' : '#B8860B'} />
+                          )}
                           {isCurrentUser && (
                             <Text style={[styles.youBadge, { color: isDarkMode ? '#f59e0b' : '#B57200' }]}>
                               {isArabic ? '(أنت)' : '(You)'}

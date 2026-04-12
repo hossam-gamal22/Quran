@@ -87,8 +87,9 @@ export default function LiveActivitiesSettingsScreen() {
               <Switch
                 value={enabled}
                 onValueChange={handleToggle}
-                trackColor={{ false: '#767577', true: '#0d8e62' }}
-                thumbColor="#fff"
+                trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+                thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+                ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
               />
             </View>
             <Text style={[styles.description, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>

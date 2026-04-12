@@ -93,6 +93,14 @@ export function useColors() {
     ? (bgTextColor === 'white' ? 'rgba(255,255,255,0.85)' : '#525252')
     : (colors.icon ?? (isDarkMode ? '#A3A3A3' : '#525252'));
 
+  // Glass card text colors — for cards with semi-transparent overlays like:
+  // Dark mode: rgba(30,30,30,0.40) + BlurView → light text needed
+  // Light mode: rgba(255,255,255,0.60) + BlurView → dark text needed
+  // These colors are INDEPENDENT of hasBgOverride and always match the card's own local background
+  const glassText = isDarkMode ? '#FFFFFF' : '#1C1C1E';
+  const glassTextLight = isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
+  const glassIcon = isDarkMode ? 'rgba(255,255,255,0.85)' : '#525252';
+
   const hasDynamicBg = isActive && appBg === 'dynamic';
 
   // Text shadow — adaptive based on how much contrast the dim provides
@@ -175,5 +183,13 @@ export function useColors() {
     isDarkMode,
     /** Correct StatusBar style accounting for dark mode AND background override */
     statusBarStyle: (isDarkMode || (hasBgOverride && bgTextColor === 'white') ? 'light' : 'dark') as 'light' | 'dark',
+    // Glass card colors — use these for cards with BlurView + semi-transparent overlay
+    // These are safe regardless of global app background
+    /** Text color for glass cards (dark text in light mode, light text in dark mode) */
+    glassText,
+    /** Secondary text color for glass cards */
+    glassTextLight,
+    /** Icon color for glass cards */
+    glassIcon,
   };
 }

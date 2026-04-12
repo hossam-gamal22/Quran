@@ -18,7 +18,11 @@ import { Audio } from 'expo-av';
 import { getSurahName, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useRouter } from 'expo-router';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import {
   downloadSurah as downloadSurahAudio,
@@ -74,6 +78,8 @@ const STORAGE_KEY_RECITER = '@recitations_reciter';
 export default function RecitationsScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
+  const router = useRouter();
+  const { isPremium } = useSubscription();
   const language = getLanguage();
   const isArabic = language === 'ar';
   const [selectedReciter, setSelectedReciter] = useState(RECITERS[0]);
@@ -132,14 +138,27 @@ export default function RecitationsScreen() {
   useEffect(() => { loadDownloaded(); }, [loadDownloaded]);
 
   const handleDownload = useCallback(async (surahNum: number) => {
+    if (!isPremium) {
+      guardPremiumFeature('sound_downloads', router, isPremium);
+      return;
+    }
     if (isDownloading(surahNum, selectedReciter.identifier)) return;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    // Check network before attempting download
+    const netState = await NetInfo.fetch();
+    if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+      Alert.alert(t('common.error'), t('messages.noInternet'));
+      return;
+    }
+
     setDownloadingSet(prev => new Set(prev).add(surahNum));
     try {
       await downloadSurahAudio(surahNum, selectedReciter.identifier);
       setDownloadedSet(prev => new Set(prev).add(surahNum));
     } catch (e: any) {
-      Alert.alert(t('common.error'), e?.message || 'Failed to download surah');
+      // Show friendly message, not raw error
+      Alert.alert(t('common.error'), t('messages.networkError'));
     } finally {
       setDownloadingSet(prev => {
         const next = new Set(prev);
@@ -300,7 +319,7 @@ export default function RecitationsScreen() {
       gap: 8,
     },
     juzNum: {
-      width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary,
+      width: 44, height: 44, borderRadius: 22, backgroundColor: '#0d8e62',
       justifyContent: 'center', alignItems: 'center',
     },
     juzNumText: { fontSize: 16, fontWeight: '900', color: '#fff' },
@@ -397,7 +416,7 @@ export default function RecitationsScreen() {
           <Text style={s.reciterName}>{isArabic ? selectedReciter.nameAr : selectedReciter.name}</Text>
         </View>
         <Animated.View style={[{
-          width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary,
+          width: 36, height: 36, borderRadius: 18, backgroundColor: '#0d8e62',
           justifyContent: 'center', alignItems: 'center',
           transform: [{ scale: isPlaying ? pulseAnim : 1 }],
         }]}>

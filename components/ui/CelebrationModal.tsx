@@ -8,13 +8,11 @@ import {
   Modal,
   TouchableOpacity,
   Dimensions,
-  Platform,
 } from 'react-native';
 import LottieView from 'lottie-react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { BlurView } from 'expo-blur';
 import { useColors } from '@/hooks/use-colors';
 import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { t } from '@/lib/i18n';
@@ -38,7 +36,8 @@ const ANIMATION_SIZES: Record<CelebrationType, number> = {
   khatma_wird: 200,
 };
 
-const CONFETTI_COLORS = ['#0d8e62', '#0f987f', '#10B981', '#22C55E', '#34D399', '#059669'];
+const CONFETTI_COLORS_DARK = ['#0d8e62', '#0f987f', '#10B981', '#22C55E', '#34D399', '#059669'];
+const CONFETTI_COLORS_LIGHT = ['#0d8e62', '#1B5E20', '#2E7D32', '#388E3C', '#43A047', '#4CAF50'];
 
 interface CelebrationModalProps {
   visible: boolean;
@@ -66,11 +65,21 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
   if (!visible) return null;
 
   const animSize = ANIMATION_SIZES[type];
-  const cardBg = colors.isDarkMode ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.92)';
-  const accentColor = type === 'monthly_winner' ? (colors.isDarkMode ? '#FFD60A' : '#FFD700') : '#0f987f';
+  
+  // Clear, high-contrast backgrounds
+  const cardBg = colors.isDarkMode ? '#1C1C1E' : '#FFFFFF';
+  const cardTextColor = colors.isDarkMode ? '#FFFFFF' : '#1C1C1E';
+  const subtitleColor = colors.isDarkMode ? '#4ADE80' : '#0d8e62';
+  const buttonBg = colors.isDarkMode ? '#22C55E' : '#0d8e62';
+  const confettiColors = colors.isDarkMode ? CONFETTI_COLORS_DARK : CONFETTI_COLORS_LIGHT;
+  
+  // Special gold colors for monthly winner
+  const isWinner = type === 'monthly_winner';
+  const accentColor = isWinner ? (colors.isDarkMode ? '#FFD60A' : '#D4A017') : subtitleColor;
+  const buttonColor = isWinner ? (colors.isDarkMode ? '#FFD60A' : '#D4A017') : buttonBg;
 
   const cardContent = (
-    <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24 }}>
+    <View style={{ alignItems: 'center', paddingVertical: 32, paddingHorizontal: 24, backgroundColor: cardBg }}>
       <LottieView
         ref={lottieRef}
         source={ANIMATION_SOURCES[type]}
@@ -80,7 +89,7 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
       />
       <Animated.Text
         entering={FadeInDown.delay(200).duration(500)}
-        style={{ fontSize: 22, fontFamily: fontBold(), textAlign: 'center', marginTop: 8, lineHeight: 34, color: colors.text }}
+        style={{ fontSize: 22, fontFamily: fontBold(), textAlign: 'center', marginTop: 8, lineHeight: 34, color: cardTextColor }}
       >
         {title}
       </Animated.Text>
@@ -94,7 +103,7 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
       ) : null}
       <Animated.View entering={FadeInDown.delay(600).duration(400)}>
         <TouchableOpacity
-          style={{ marginTop: 20, paddingHorizontal: 40, paddingVertical: 12, borderRadius: 16, backgroundColor: accentColor }}
+          style={{ marginTop: 20, paddingHorizontal: 40, paddingVertical: 12, borderRadius: 16, backgroundColor: buttonColor }}
           onPress={onDismiss}
           activeOpacity={0.8}
         >
@@ -110,8 +119,12 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
     width: width - 48,
     borderRadius: 24,
     overflow: 'hidden' as const,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: cardBg,
+    // Subtle shadow for light mode, border for dark mode
+    ...(colors.isDarkMode 
+      ? { borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }
+      : { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 }
+    ),
   };
 
   return (
@@ -135,20 +148,14 @@ export function CelebrationModal({ visible, type, title, subtitle, onDismiss }: 
           fadeOut
           explosionSpeed={350}
           fallSpeed={2500}
-          colors={CONFETTI_COLORS}
+          colors={confettiColors}
         />
 
         <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
           <Animated.View entering={FadeIn.duration(300)}>
-            {Platform.OS === 'ios' ? (
-              <BlurView intensity={90} tint={colors.isDarkMode ? 'dark' : 'light'} style={cardStyle}>
-                {cardContent}
-              </BlurView>
-            ) : (
-              <View style={[cardStyle, { backgroundColor: cardBg }]}>
-                {cardContent}
-              </View>
-            )}
+            <View style={cardStyle}>
+              {cardContent}
+            </View>
           </Animated.View>
         </TouchableOpacity>
       </TouchableOpacity>

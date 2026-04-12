@@ -36,6 +36,7 @@ import {
 } from '@/services/radioService';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import NetInfo from '@react-native-community/netinfo';
 
 const ACCENT = '#0d8e62';
 
@@ -66,6 +67,7 @@ function RadioScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [showSearch, setShowSearch] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
 
   // Interstitial ad — show after 20s of radio playback (every channel open)
@@ -81,7 +83,12 @@ function RadioScreen() {
       const data = await fetchAllStations(forceRefresh);
       setStations(data);
     } catch {
-      setError(t('radio.errorLoading'));
+      const netState = await NetInfo.fetch();
+      if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+        setError(t('radio.internetRequired'));
+      } else {
+        setError(t('radio.errorLoading'));
+      }
     } finally {
       setLoading(false);
     }
@@ -96,6 +103,15 @@ function RadioScreen() {
     loadStations();
     loadFavorites();
   }, [loadStations, loadFavorites]);
+
+  // Monitor network connectivity
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      setIsOffline(offline);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const toggleSearch = useCallback(() => {
     const toValue = showSearch ? 0 : 1;
@@ -129,6 +145,14 @@ function RadioScreen() {
 
   const handlePlayStation = useCallback(async (station: RadioStation) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Check network connectivity before trying to play
+    const netState = await NetInfo.fetch();
+    if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+      setError(t('radio.internetRequired'));
+      return;
+    }
+
     try {
       console.log('[Radio] handlePlayStation:', station.name, station.streamUrl);
       if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
@@ -353,7 +377,7 @@ function RadioScreen() {
           borderColor: isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
           flexDirection: isRTL ? 'row-reverse' : 'row',
         }]}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+          <MaterialCommunityIcons name={isOffline ? 'wifi-off' : 'alert-circle-outline'} size={24} color="#EF4444" />
           <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
             <Text style={[styles.errorBannerMsg, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={2}>
               {error}
@@ -375,17 +399,21 @@ function RadioScreen() {
           borderColor: isDarkMode ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.15)',
           flexDirection: isRTL ? 'row-reverse' : 'row',
         }]}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+          <MaterialCommunityIcons
+            name={isOffline ? 'wifi-off' : 'alert-circle-outline'}
+            size={24}
+            color="#EF4444"
+          />
           <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
             <Text style={[styles.errorBannerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {radioState.currentStation.name}
             </Text>
             <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-              {radioState.errorMessage || t('radio.connectionError')}
+              {isOffline ? t('radio.noInternet') : t('radio.connectionError')}
             </Text>
           </View>
           <Pressable
-            onPress={() => playRadio(radioState.currentStation!)}
+            onPress={() => handlePlayStation(radioState.currentStation!)}
             style={[styles.retryBannerBtn, { backgroundColor: '#EF4444' }]}
           >
             <MaterialCommunityIcons name="refresh" size={18} color="#fff" />

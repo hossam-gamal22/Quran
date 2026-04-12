@@ -4,16 +4,27 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ImageWidget } from 'react-native-android-widget';
 import type { SharedWidgetData } from '@/lib/widget-data';
-import { COLORS, GRADIENTS, FONT, BRANDING, APP_ICON, ICON_SIZE } from './shared';
+import { COLORS, FONT, BRANDING, APP_ICON, ICON_SIZE, getWidgetTheme, resolveColorScheme } from './shared';
 
 export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
   const { prayer } = data;
-  const hijriParts = prayer.hijriDate.split(' ');
+  const hijriParts = (prayer.hijriDate || '').split(' ');
   const day = hijriParts[0] || '';
   const monthYear = hijriParts.slice(1).join(' ');
+  const gregorian = prayer.gregorianDate || '';
+  const theme = getWidgetTheme(data.settings?.widgetTheme);
+  const { colors: sc, gradient } = resolveColorScheme(undefined, 'hijri');
 
-  const today = new Date();
-  const gregorian = `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
+  const useTheme = theme.id !== 'default_dark' && theme.id !== 'default_light';
+  const bg = useTheme ? theme.gradient : gradient;
+  const textColor = useTheme ? theme.textColor : sc.white;
+  const dayColor = useTheme ? theme.badgeText : sc.gold;
+  const accent = useTheme ? theme.accentColor : sc.tealLight;
+  const grayColor = useTheme ? theme.mutedColor : sc.gray;
+  const grayDarkColor = useTheme ? theme.mutedColor : sc.grayDark;
+  const cardBg = useTheme ? theme.badgeBg : sc.cardBg;
+  const dividerColor = useTheme ? theme.mutedColor : sc.divider;
+  const brandColor = useTheme ? theme.accentColor : sc.teal;
 
   return (
     <FlexWidget
@@ -21,7 +32,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
         height: 'match_parent',
         width: 'match_parent',
         flexDirection: 'column',
-        backgroundGradient: GRADIENTS.hijri,
+        backgroundGradient: bg,
         borderRadius: 20,
         padding: 14,
       }}
@@ -49,7 +60,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
             text="التقويم الهجري"
             style={{
               fontSize: 13,
-              color: COLORS.tealLight,
+              color: accent,
               fontFamily: FONT.amiriBold,
               marginLeft: 6,
             }}
@@ -59,7 +70,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
           text={BRANDING.name}
           style={{
             fontSize: BRANDING.fontSize,
-            color: COLORS.teal,
+            color: brandColor,
             fontFamily: FONT.amiri,
           }}
         />
@@ -86,7 +97,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
             text={day}
             style={{
               fontSize: 40,
-              color: COLORS.gold,
+              color: dayColor,
               fontFamily: FONT.amiriBold,
             }}
           />
@@ -97,7 +108,7 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
           style={{
             width: 1,
             height: 'match_parent',
-            backgroundColor: COLORS.divider,
+            backgroundColor: dividerColor,
             marginHorizontal: 10,
           }}
         />
@@ -114,34 +125,36 @@ export function HijriDateMediumWidget({ data }: { data: SharedWidgetData }) {
             text={monthYear}
             style={{
               fontSize: 17,
-              color: COLORS.white,
+              color: textColor,
               fontFamily: FONT.amiriBold,
             }}
           />
-          <FlexWidget
-            style={{
-              backgroundColor: COLORS.cardBg,
-              borderRadius: 10,
-              paddingHorizontal: 10,
-              paddingVertical: 3,
-              marginTop: 6,
-            }}
-          >
-            <TextWidget
-              text={gregorian}
+          {(data.settings?.hijriWidget?.showGregorian ?? true) && (
+            <FlexWidget
               style={{
-                fontSize: 13,
-                color: COLORS.gray,
-                fontFamily: FONT.amiri,
+                backgroundColor: cardBg,
+                borderRadius: 10,
+                paddingHorizontal: 10,
+                paddingVertical: 3,
+                marginTop: 6,
               }}
-            />
-          </FlexWidget>
+            >
+              <TextWidget
+                text={gregorian}
+                style={{
+                  fontSize: 13,
+                  color: grayColor,
+                  fontFamily: FONT.amiri,
+                }}
+              />
+            </FlexWidget>
+          )}
           {prayer.location ? (
             <TextWidget
               text={prayer.location}
               style={{
                 fontSize: 11,
-                color: COLORS.grayDark,
+                color: grayDarkColor,
                 fontFamily: FONT.amiri,
                 marginTop: 4,
               }}

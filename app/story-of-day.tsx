@@ -129,8 +129,12 @@ export default function StoryOfDayScreen() {
   const [showControls, setShowControls] = useState(true);
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekPosition, setSeekPosition] = useState(0);
+  const [isBuffering, setIsBuffering] = useState(false);
   const controlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seekingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bufferingCheckRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const lastPositionRef = useRef(0);
+  const reciterSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Derive raw video URL
   const currentVideo = dayData?.videos?.[selectedReciterIdx] ?? null;
@@ -211,10 +215,30 @@ export default function StoryOfDayScreen() {
     return () => clearInterval(id);
   }, [status, isSeeking, durationSec]);
 
+  // Detect mid-stream buffering stalls
+  useEffect(() => {
+    if (status !== 'readyToPlay') return;
+    bufferingCheckRef.current = setInterval(() => {
+      if (!isPlaying || isSeeking) {
+        setIsBuffering(false);
+        return;
+      }
+      const currentPos = positionSec;
+      if (currentPos === lastPositionRef.current) {
+        setIsBuffering(true);
+      } else {
+        setIsBuffering(false);
+        lastPositionRef.current = currentPos;
+      }
+    }, 1500);
+    return () => clearInterval(bufferingCheckRef.current);
+  }, [status, isPlaying, isSeeking, positionSec]);
+
   // Update duration & auto-play when ready; recover from cache errors
   useEffect(() => {
     if (__DEV__) console.log('[DailyVideo] Status changed:', status, 'resolvedUrl:', resolvedVideoUrl ? 'set' : 'null');
     if (status === 'readyToPlay') {
+      setIsBuffering(false);
       const dur = player.duration;
       if (dur > 0) {
         setDurationSec(dur);
@@ -230,6 +254,7 @@ export default function StoryOfDayScreen() {
     }
     if (status === 'error') {
       setIsTransitioning(false);
+      setIsBuffering(false);
       console.warn('[DailyVideo] Player error:', playerErrorObj?.message);
       // If cached file failed, invalidate and retry with CDN
       if (resolvedSourceRef.current === 'cache' && rawVideoUrl) {
@@ -254,15 +279,24 @@ export default function StoryOfDayScreen() {
     }
   }, [status]);
 
-  // Pause on background
+  // Pause on background, auto-resume on foreground
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background') {
+      if (state === 'background' || state === 'inactive') {
         try { player.pause(); } catch { /* noop */ }
+      } else if (state === 'active') {
+        try {
+          if (status === 'readyToPlay' && !videoUnavailable) {
+            player.play();
+          }
+        } catch { /* noop */ }
       }
     });
-    return () => sub.remove();
-  }, [player]);
+    return () => {
+      sub.remove();
+      clearTimeout(reciterSwitchTimeoutRef.current);
+    };
+  }, [player, status, videoUnavailable]);
 
   // Fetch JSON data
   useEffect(() => {
@@ -375,11 +409,15 @@ export default function StoryOfDayScreen() {
     if (newIdx === selectedReciterIdx || isTransitioning) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIsTransitioning(true);
+    setIsBuffering(false);
     setPositionSec(0);
     setDurationSec(0);
     setSelectedReciterIdx(newIdx);
     // Safety timeout: clear transition flag if player takes too long
-    setTimeout(() => setIsTransitioning(false), 15000);
+    clearTimeout(reciterSwitchTimeoutRef.current);
+    reciterSwitchTimeoutRef.current = setTimeout(
+      () => setIsTransitioning(false), 15000
+    );
   }, [selectedReciterIdx, isTransitioning]);
 
   const retryFetch = useCallback(() => {
@@ -581,6 +619,16 @@ export default function StoryOfDayScreen() {
               {(isTransitioning || playerLoading || !resolvedVideoUrl) && !playerError && (
                 <View style={styles.transitionOverlay}>
                   <ActivityIndicator size="large" color="#fff" />
+                </View>
+              )}
+
+              {isBuffering && !playerError && !isTransitioning && !playerLoading && (
+                <View style={[styles.controlsOverlay, { backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+                  <ActivityIndicator size="large" color="#fff" />
+                  <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12,
+                                 marginTop: 8, fontFamily: fontRegular() }}>
+                    {t('common.loading')}
+                  </Text>
                 </View>
               )}
 

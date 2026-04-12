@@ -48,7 +48,7 @@ struct AzkarWidgetEntry: TimelineEntry {
 struct AzkarWidgetProvider: TimelineProvider {
     typealias Entry = AzkarWidgetEntry
     
-    let appGroupId = "group.com.roohmuslim.app"
+    let appGroupId = WidgetConstants.appGroupId
     
     func placeholder(in context: Context) -> AzkarWidgetEntry {
         AzkarWidgetEntry(

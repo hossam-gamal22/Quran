@@ -112,6 +112,7 @@ export async function checkAndNotifyUpdate(
         },
         ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.HIGH }),
         ...(Platform.OS === 'android' && { channelId: 'general' }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

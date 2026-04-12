@@ -30,8 +30,6 @@ struct AzkarWidgetData: Codable {
 struct AzkarWidgetSettings: Codable {
     var enabled: Bool
     var showTranslation: Bool
-    var autoRefresh: Bool
-    var refreshInterval: Int
     var categories: [String]
 }
 
@@ -72,8 +70,6 @@ struct AzkarWidgetProvider: TimelineProvider {
         let data = loadData() ?? sampleData
         let settings = loadSettings()
         
-        let refreshInterval = settings?.refreshInterval ?? 60
-        
         let entry = AzkarWidgetEntry(
             date: currentDate,
             data: data,
@@ -82,7 +78,7 @@ struct AzkarWidgetProvider: TimelineProvider {
         
         let nextUpdate = Calendar.current.date(
             byAdding: .minute,
-            value: refreshInterval,
+            value: 60,
             to: currentDate
         )!
         
@@ -178,21 +174,17 @@ func getCategoryName(_ category: String, translatedName: String? = nil) -> Strin
 
 struct SmallAzkarWidgetView: View {
     let entry: AzkarWidgetEntry
+    let theme: IOSWidgetTheme
     
     var category: String {
         entry.data?.randomZikr.category ?? "morning"
     }
     
-    var categoryTranslatedName: String? {
-        entry.data?.randomZikr.categoryName
-    }
-    
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: getCategoryColor(category))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 6) {
-                // App icon
                 WidgetAppIcon(size: 32)
                 
                 Spacer()
@@ -201,19 +193,19 @@ struct SmallAzkarWidgetView: View {
                     .font(.system(size: 14, weight: .medium))
                     .multilineTextAlignment(.center)
                     .lineLimit(4)
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                 
                 Spacer()
                 
                 if (entry.data?.randomZikr.count ?? 1) > 1 {
-                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                    GlassPill(color: theme.badgeBg.opacity(0.6)) {
                         HStack(spacing: 4) {
                             Image(systemName: "repeat")
                                 .font(.system(size: 9))
                             Text("\(entry.data?.randomZikr.count ?? 1) \(entry.data?.randomZikr.timesLabel ?? "مرات")")
                                 .font(.system(size: 10, weight: .medium))
                         }
-                        .foregroundColor(WidgetConstants.Colors.gold)
+                        .foregroundColor(theme.badgeText)
                     }
                 }
             }
@@ -232,6 +224,7 @@ struct SmallAzkarWidgetView: View {
 
 struct MediumAzkarWidgetView: View {
     let entry: AzkarWidgetEntry
+    let theme: IOSWidgetTheme
     
     var category: String {
         entry.data?.randomZikr.category ?? "morning"
@@ -243,7 +236,7 @@ struct MediumAzkarWidgetView: View {
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: getCategoryColor(category))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 0) {
                 // Header
@@ -251,26 +244,25 @@ struct MediumAzkarWidgetView: View {
                     WidgetAppIcon(size: 20)
                     Text(getCategoryName(category, translatedName: categoryTranslatedName))
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(theme.mutedColor)
                     Spacer()
                     
-                    // Morning/Evening completion
                     HStack(spacing: 8) {
                         HStack(spacing: 3) {
                             Image(systemName: entry.data?.morningCompleted ?? false ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 10))
-                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.4))
+                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : theme.mutedColor.opacity(0.4))
                             Text("صباح")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(theme.mutedColor.opacity(0.6))
                         }
                         HStack(spacing: 3) {
                             Image(systemName: entry.data?.eveningCompleted ?? false ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 10))
-                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.4))
+                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : theme.mutedColor.opacity(0.4))
                             Text("مساء")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(theme.mutedColor.opacity(0.6))
                         }
                     }
                 }
@@ -279,13 +271,12 @@ struct MediumAzkarWidgetView: View {
                 .padding(.bottom, 6)
                 
                 HStack(spacing: 12) {
-                    // Zikr text
                     VStack(alignment: .trailing, spacing: 6) {
                         Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده")
                             .font(.system(size: 15, weight: .medium))
                             .multilineTextAlignment(.trailing)
                             .lineLimit(4)
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
                         
                         if entry.settings?.showTranslation ?? false,
                            let translation = entry.data?.randomZikr.translation {
@@ -293,19 +284,19 @@ struct MediumAzkarWidgetView: View {
                                 .font(.system(size: 10))
                                 .multilineTextAlignment(.trailing)
                                 .lineLimit(2)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(theme.mutedColor.opacity(0.5))
                         }
                     }
                     
                     if (entry.data?.randomZikr.count ?? 1) > 1 {
-                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        GlassPill(color: theme.badgeBg.opacity(0.6)) {
                             HStack(spacing: 3) {
                                 Image(systemName: "repeat")
                                     .font(.system(size: 9))
                                 Text("\(entry.data?.randomZikr.count ?? 1)×")
                                     .font(.system(size: 11, weight: .bold))
                             }
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                         }
                     }
                 }
@@ -326,6 +317,7 @@ struct MediumAzkarWidgetView: View {
 
 struct LargeAzkarWidgetView: View {
     let entry: AzkarWidgetEntry
+    let theme: IOSWidgetTheme
     
     var category: String {
         entry.data?.randomZikr.category ?? "morning"
@@ -337,15 +329,14 @@ struct LargeAzkarWidgetView: View {
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: getCategoryColor(category))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 12) {
-                // Header
                 HStack {
                     WidgetAppIcon(size: 20)
                     Text(getCategoryName(category, translatedName: categoryTranslatedName))
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                     
                     Spacer()
                     
@@ -353,19 +344,19 @@ struct LargeAzkarWidgetView: View {
                         HStack(spacing: 3) {
                             Image(systemName: entry.data?.morningCompleted ?? false ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 14))
-                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : .white.opacity(0.4))
+                                .foregroundColor(entry.data?.morningCompleted ?? false ? .green : theme.mutedColor.opacity(0.4))
                             Text("صباح")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(theme.mutedColor)
                         }
                         
                         HStack(spacing: 3) {
                             Image(systemName: entry.data?.eveningCompleted ?? false ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 14))
-                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : .white.opacity(0.4))
+                                .foregroundColor(entry.data?.eveningCompleted ?? false ? .green : theme.mutedColor.opacity(0.4))
                             Text("مساء")
                                 .font(.system(size: 9))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(theme.mutedColor)
                         }
                     }
                 }
@@ -375,13 +366,12 @@ struct LargeAzkarWidgetView: View {
                     .background(WidgetConstants.Glass.border)
                     .padding(.horizontal)
                 
-                // Main dhikr text
                 VStack(spacing: 10) {
                     Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده، سبحان الله العظيم")
                         .font(.system(size: 20, weight: .medium))
                         .multilineTextAlignment(.center)
                         .lineLimit(6)
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                         .padding(.horizontal)
                     
                     if entry.settings?.showTranslation ?? false,
@@ -390,14 +380,13 @@ struct LargeAzkarWidgetView: View {
                             .font(.system(size: 12))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(theme.mutedColor.opacity(0.5))
                             .padding(.horizontal)
                     }
                 }
                 
                 Spacer()
                 
-                // Benefit
                 if let benefit = entry.data?.randomZikr.benefit {
                     VStack(spacing: 5) {
                         HStack {
@@ -406,30 +395,29 @@ struct LargeAzkarWidgetView: View {
                             Text("الفائدة")
                                 .font(.system(size: 10, weight: .bold))
                         }
-                        .foregroundColor(WidgetConstants.Colors.gold)
+                        .foregroundColor(theme.badgeText)
                         
                         Text(benefit)
                             .font(.system(size: 11))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(theme.mutedColor)
                     }
                     .padding(10)
-                    .background(WidgetConstants.Glass.highlight)
+                    .background(theme.badgeBg.opacity(0.3))
                     .cornerRadius(12)
                     .padding(.horizontal)
                 }
                 
-                // Count
                 if (entry.data?.randomZikr.count ?? 1) > 1 {
-                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                    GlassPill(color: theme.badgeBg.opacity(0.6)) {
                         HStack(spacing: 5) {
                             Image(systemName: "repeat")
                                 .font(.system(size: 11))
                             Text("كرر \(entry.data?.randomZikr.count ?? 1) مرات")
                                 .font(.system(size: 12, weight: .medium))
                         }
-                        .foregroundColor(WidgetConstants.Colors.gold)
+                        .foregroundColor(theme.badgeText)
                     }
                 }
             }
@@ -465,17 +453,22 @@ struct AzkarWidget: Widget {
 struct AzkarWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: AzkarWidgetProvider.Entry
+    let theme = loadWidgetTheme()
     
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallAzkarWidgetView(entry: entry)
+            SmallAzkarWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
         case .systemMedium:
-            MediumAzkarWidgetView(entry: entry)
+            MediumAzkarWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
         case .systemLarge:
-            LargeAzkarWidgetView(entry: entry)
+            LargeAzkarWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
         default:
-            SmallAzkarWidgetView(entry: entry)
+            SmallAzkarWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
         }
     }
 }

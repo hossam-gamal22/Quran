@@ -110,7 +110,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
           <Text
             style={[
               styles.languageName,
-              { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+              { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
               isSelected && styles.languageNameSelected,
             ]}
           >
@@ -119,7 +119,7 @@ const LanguageItem: React.FC<LanguageItemProps> = ({
           <Text
             style={[
               styles.languageEnglish,
-              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+              { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
             ]}
           >
             {language.name}
@@ -280,12 +280,12 @@ export default function LanguageScreen() {
           <MaterialCommunityIcons
             name="magnify"
             size={22}
-            color={colors.textLight}
+            color={colors.glassTextLight}
           />
           <TextInput
-            style={[styles.searchInput, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+            style={[styles.searchInput, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
             placeholder={t('common.search') + '...'}
-            placeholderTextColor={colors.textLight}
+            placeholderTextColor={colors.glassTextLight}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -294,7 +294,7 @@ export default function LanguageScreen() {
               <MaterialCommunityIcons
                 name="close-circle"
                 size={20}
-                color={colors.textLight}
+                color={colors.glassTextLight}
               />
             </TouchableOpacity>
           )}

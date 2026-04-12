@@ -7,64 +7,64 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0A337579423C4D299CF0AB82 /* alaqsa.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 44E5078847E0407D882F0F0D /* alaqsa.mp3 */; };
+		00F857D326D74D66A23300F0 /* ali_mulla.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 601F506AA93F4321BF04B46D /* ali_mulla.mp3 */; };
+		077B2C35B6B34BA2BE6B0E90 /* general_reminder.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 44A9C302D2524CCE88949BD7 /* general_reminder.mp3 */; };
+		0C694C69CE334FB895D84295 /* mishary.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 2A7C8DDDF137426199CB819D /* mishary.mp3 */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		13CFB8B22CAC4850AD75B952 /* HijriDateWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F913A6BF16934492955730E4 /* HijriDateWidget.swift */; };
-		160872DCD29443B5AAD0756D /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3ACE33D7193149FB993F4872 /* ActivityKit.framework */; };
-		21C5643FBFB05963329A01F5 /* libPods-rwhalmslm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 83F2AF147404E4BB55019383 /* libPods-rwhalmslm.a */; };
-		2432DB71D14F40469FB78249 /* alhamdulillah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B479A541C84D408487CF27A7 /* alhamdulillah.mp3 */; };
-		27FD40D7B2DC4DA6A60797CD /* mansoor_zahrani.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = C34E17D2085542F8B1C3179C /* mansoor_zahrani.mp3 */; };
-		2B4F529A204249CE814D28E0 /* mishary.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 18DAB47E11E04C87B5F2617B /* mishary.mp3 */; };
-		35CB1548B001F39D81123604 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0E4B5F709D2243950F122EFD /* PrivacyInfo.xcprivacy */; };
+		16954179E6B14EA7BB1A5243 /* sudais.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 626E884DF9E94541839A2499 /* sudais.mp3 */; };
+		2BC5766A783F41F3B3B6974C /* evening_adhkar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 22C4DFC4AA84437A9D2E3B52 /* evening_adhkar.mp3 */; };
+		37F7A7CFD8E8DBBD61C50797 /* libPods-rwhalmslm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 327FBC779D8784F3077581AE /* libPods-rwhalmslm.a */; };
+		3D3B52247AE94DD68C0EBB12 /* abdulbasit.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 44D739EF30544F07AE618D2A /* abdulbasit.mp3 */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		4B66937614674609B336DFB9 /* ajman.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 61E0145E3C4E4F59A2C8FDDF /* ajman.mp3 */; };
-		4D3A9FAD35AE4AB6A675F444 /* makkah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 949B29405A0145898B8C81A0 /* makkah.mp3 */; };
-		5280076EEDB94ED9A19C3D56 /* dosari.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 56B0290A90FF4600A7BA172B /* dosari.mp3 */; };
-		53ADEAD9C4B2455FAD912444 /* egypt.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 9F20ACF18B9544DD92526B3B /* egypt.mp3 */; };
-		612300BFE37B411EA2672A7F /* tasbih.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 8EEAC1BEE94B4F8D92915E18 /* tasbih.mp3 */; };
-		6CEDBED6E3F744B6B18275BA /* abdulbasit.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 41589ABD0AE743BC836202F4 /* abdulbasit.mp3 */; };
-		6E289C198A374C3088CF4265 /* haramain.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 1A6E8C905A4B46E7AA82E038 /* haramain.mp3 */; };
-		79D9BDF9DC184CDFB4D62CA9 /* RoohAlMuslimWidgets.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = 95433B5D279042488DAC22FB /* RoohAlMuslimWidgets.appex */; };
-		7BDD92CF82FF44289148B7C4 /* SharedActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ACF4CBFDE0747858AEE1996 /* SharedActivityAttributes.swift */; };
-		7EEC10888F834C3093B11B71 /* subhanallah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 0056F395297149948FBB5FE1 /* subhanallah.mp3 */; };
-		80D3C780759361CBBA2DB29F /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 864684F82BC47F7565D6A6A9 /* ExpoModulesProvider.swift */; };
-		8540EA917089456985FD62F3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3E893EE5A61B4FDF8EC11E03 /* Assets.xcassets */; };
-		8D33C137F2A145A5801250D7 /* salawat.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E4DCF833533249A08F91F7EB /* salawat.mp3 */; };
-		9170BD79B4F34CF5A483E013 /* ali_mulla.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = D6FD4DA9C0C8482A82337575 /* ali_mulla.mp3 */; };
-		977FE97DBFEB449DBA8FA0DE /* morning_adhkar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 6BF9E8DCB0B649A7ACEDDC89 /* morning_adhkar.mp3 */; };
-		9F94C408CB2743F88ED379E9 /* sudais.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 98DD36384B694BD4B111ECCF /* sudais.mp3 */; };
-		A33FB51799AF42BFA0100ED2 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 62CC4D766FC74D75BDED42D9 /* SwiftUI.framework */; };
-		AB596373CD494078B32FA571 /* sharif.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 617DA35C0AAD438CB5D14003 /* sharif.mp3 */; };
-		B5CCC83335FA475EB48D4FE7 /* naqshbandi.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 53C5E348BCED494BAF77F328 /* naqshbandi.mp3 */; };
-		B93C1B0475F44508807F3EEA /* evening_adhkar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E6A1A90553EF446AB4B2B10C /* evening_adhkar.mp3 */; };
+		411BD1825B544D3FA7C7EC8F /* naqshbandi.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = DC017FE6A8AF4451A2D1CC84 /* naqshbandi.mp3 */; };
+		44C7A696E11A43898B4063F9 /* istighfar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = AF91FD2F0493492DB9F1351E /* istighfar.mp3 */; };
+		48682A700360497EBDDE84FA /* PrayerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3697AB3DEEF46CDA66FF35E /* PrayerLiveActivity.swift */; };
+		6B250E4544B64901BCBD9FF5 /* sharif.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 49F758E381D943E5A1657A16 /* sharif.mp3 */; };
+		6C978DC6AA2846979F3B54F6 /* silent.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = EEE631D9B8554AD4AA141A11 /* silent.mp3 */; };
+		706F9F3434C24D73850F0B1C /* WidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525328D92C124195AAE5CBE0 /* WidgetBundle.swift */; };
+		81B9D03E9DFC4D539C099639 /* madinah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 90C8A8856E294C248B133FD3 /* madinah.mp3 */; };
+		83BDDA8A2AEF45E093008DEC /* subhanallah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = EBE7A190ABCC4E8F9B69A3A8 /* subhanallah.mp3 */; };
+		892BCC86E7DA4630BFFDE9A6 /* NextPrayerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 299CD8613C534E488C578938 /* NextPrayerWidget.swift */; };
+		8B2A832A25A44B009113A274 /* alhamdulillah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = F8FF9754922B45669264B6F2 /* alhamdulillah.mp3 */; };
+		8CA94465FFE44C7DACB6D3B2 /* AzkarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D2AF1E02A0477DA40BB7AF /* AzkarWidget.swift */; };
+		953FA6F5A8C24CF6891A6460 /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 497C9D3675174EED8E9D6F9A /* ActivityKit.framework */; };
+		981D760442B4426ABBD36BA5 /* salawat.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 03B054C4291D4BAFBC6F6FFE /* salawat.mp3 */; };
+		98AABBBCAB91459489F2BE1C /* RoohAlMuslimWidgets.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = 805B85C7D8C24B9BA82FB04B /* RoohAlMuslimWidgets.appex */; };
+		A2D3F3AA8D144212B43450CA /* dosari.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 146A6CCB6B8746CDA76C9067 /* dosari.mp3 */; };
+		B3F149C2588F47888588D3D8 /* tasbih.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 1337F37B17E44B80B52D4D9C /* tasbih.mp3 */; };
+		B6F1D1AD589B4CCAA08C3259 /* haramain.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = EE19CE5389ED46ABB67D1095 /* haramain.mp3 */; };
+		B8F5BDCD077145B39EFC46CD /* ajman.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 7A9DFE687C704D9B900B0B83 /* ajman.mp3 */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		BC2743FBE46040C4886A5B5F /* istighfar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 271BF76F72304F3D82C2ED67 /* istighfar.mp3 */; };
-		C19E92D7C9714DEE9A4633DA /* DhikrWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FAA1467B710499F94275352 /* DhikrWidget.swift */; };
-		C32DB72BA58A4F72ABDA9970 /* PrayerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33E0F22A3E64DE280F17608 /* PrayerLiveActivity.swift */; };
-		C87DEF3C16B54E94804B39DA /* AzkarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8F5CE4421B4450EB650D5EE /* AzkarWidget.swift */; };
-		CB023213A0B64F4CB1767309 /* general_reminder.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 1331733E27214FFAA7A130DD /* general_reminder.mp3 */; };
-		D06E723E9E7941CD92C7781E /* madinah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = DB19AF949AA64B04A0B9DD43 /* madinah.mp3 */; };
-		D6D540FADBB045E3B13D7543 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 56038CE74BF846BEB038B4E7 /* WidgetKit.framework */; };
-		E519E5B480AE41A696479C03 /* WidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C56ABF5AD484A08B63B19BE /* WidgetBundle.swift */; };
-		EB6AB30671ED429D96169783 /* silent.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = BF90CE2D796B4DC5900AC7FA /* silent.mp3 */; };
-		EEBB0EAA806D4992B9F4D65B /* QuranAyahWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FBEA009D1B402A8EABC24A /* QuranAyahWidget.swift */; };
+		BD3CCF4A697407E017347856 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 628718F591918445A787ADD0 /* PrivacyInfo.xcprivacy */; };
+		C1DC996026A14EE89EB2FFE0 /* SharedActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 534BCB1E22894BC78A83DD0C /* SharedActivityAttributes.swift */; };
+		C2707FD8B1B34C1F9C201F61 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8EDDC38D2514724B531A67C /* SwiftUI.framework */; };
+		C61AAC8F28CD497FA4F731EE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 183E4E73664240C3AB33055B /* Assets.xcassets */; };
+		C9428A8372804DDA91262CA6 /* egypt.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 873351C94509403FB52858FA /* egypt.mp3 */; };
+		D3A7DC8632F94FAD9A03AABF /* makkah.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 5C4D7481D63B43A2BAD25318 /* makkah.mp3 */; };
+		D6621DAC4CC64889AAED6D05 /* HijriDateWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 854399CE028B4A909D56466A /* HijriDateWidget.swift */; };
+		D8A9DCBFC14A4F089CB80250 /* alaqsa.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 08C392455A734537906F1FD6 /* alaqsa.mp3 */; };
+		D9D0AEB53EB044B88D2C68B1 /* QuranAyahWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D12D1B078144539EB9D989 /* QuranAyahWidget.swift */; };
+		E1D0FCEEB3F0138F61ED7189 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56A87FBF87EA3D79FDC0C396 /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		FE404AB1678249AE853A904F /* NextPrayerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A730F60B30B4914A379182F /* NextPrayerWidget.swift */; };
+		F37EDF9AB9C640DE88258952 /* DhikrWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB733F6D5AD4DE59736F95F /* DhikrWidget.swift */; };
+		F60A68270FBF4BE0BB522DEE /* mansoor_zahrani.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = D61D49B1D3394ECC88CCC036 /* mansoor_zahrani.mp3 */; };
+		F8806AD02AAF499797A8222A /* morning_adhkar.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = 303103F306D0423BA1C1B033 /* morning_adhkar.mp3 */; };
+		FC2B601076EE4F32B0388A4E /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F0FEFA3F13F244BC8E20ED9C /* WidgetKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		9677D68E677B49AE933FF91F /* Copy Files */ = {
+		309D4AE59874455AB78CC402 /* Copy Files */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				79D9BDF9DC184CDFB4D62CA9 /* RoohAlMuslimWidgets.appex in Copy Files */,
+				98AABBBCAB91459489F2BE1C /* RoohAlMuslimWidgets.appex in Copy Files */,
 			);
 			name = "Copy Files";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		99362D25F63E41FCA8A403DE /* Embed App Extensions */ = {
+		96B17316BDC0498F936B3EF8 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
@@ -77,57 +77,57 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0056F395297149948FBB5FE1 /* subhanallah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = subhanallah.mp3; path = rwhalmslm/subhanallah.mp3; sourceTree = "<group>"; };
-		0E4B5F709D2243950F122EFD /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = rwhalmslm/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		1331733E27214FFAA7A130DD /* general_reminder.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = general_reminder.mp3; path = rwhalmslm/general_reminder.mp3; sourceTree = "<group>"; };
+		03B054C4291D4BAFBC6F6FFE /* salawat.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = salawat.mp3; path = rwhalmslm/salawat.mp3; sourceTree = "<group>"; };
+		05DB3B68E3A6B8C9E6A9FDBA /* Pods-rwhalmslm.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-rwhalmslm.release.xcconfig"; path = "Target Support Files/Pods-rwhalmslm/Pods-rwhalmslm.release.xcconfig"; sourceTree = "<group>"; };
+		08C392455A734537906F1FD6 /* alaqsa.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = alaqsa.mp3; path = rwhalmslm/alaqsa.mp3; sourceTree = "<group>"; };
+		1337F37B17E44B80B52D4D9C /* tasbih.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = tasbih.mp3; path = rwhalmslm/tasbih.mp3; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* rwhalmslm.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = rwhalmslm.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = rwhalmslm/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = rwhalmslm/Info.plist; sourceTree = "<group>"; };
-		18DAB47E11E04C87B5F2617B /* mishary.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = mishary.mp3; path = rwhalmslm/mishary.mp3; sourceTree = "<group>"; };
-		1A6E8C905A4B46E7AA82E038 /* haramain.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = haramain.mp3; path = rwhalmslm/haramain.mp3; sourceTree = "<group>"; };
-		1A730F60B30B4914A379182F /* NextPrayerWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = NextPrayerWidget.swift; path = NextPrayerWidget.swift; sourceTree = "<group>"; };
-		1ACF4CBFDE0747858AEE1996 /* SharedActivityAttributes.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = SharedActivityAttributes.swift; path = SharedActivityAttributes.swift; sourceTree = "<group>"; };
-		22005C5D7A284D00F0E66D36 /* Pods-rwhalmslm.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-rwhalmslm.debug.xcconfig"; path = "Target Support Files/Pods-rwhalmslm/Pods-rwhalmslm.debug.xcconfig"; sourceTree = "<group>"; };
-		271BF76F72304F3D82C2ED67 /* istighfar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = istighfar.mp3; path = rwhalmslm/istighfar.mp3; sourceTree = "<group>"; };
-		2FAA1467B710499F94275352 /* DhikrWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = DhikrWidget.swift; path = DhikrWidget.swift; sourceTree = "<group>"; };
-		3ACE33D7193149FB993F4872 /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
-		3E893EE5A61B4FDF8EC11E03 /* Assets.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
-		41589ABD0AE743BC836202F4 /* abdulbasit.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = abdulbasit.mp3; path = rwhalmslm/abdulbasit.mp3; sourceTree = "<group>"; };
-		44E5078847E0407D882F0F0D /* alaqsa.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = alaqsa.mp3; path = rwhalmslm/alaqsa.mp3; sourceTree = "<group>"; };
-		53C5E348BCED494BAF77F328 /* naqshbandi.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = naqshbandi.mp3; path = rwhalmslm/naqshbandi.mp3; sourceTree = "<group>"; };
-		56038CE74BF846BEB038B4E7 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
-		56B0290A90FF4600A7BA172B /* dosari.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = dosari.mp3; path = rwhalmslm/dosari.mp3; sourceTree = "<group>"; };
-		617DA35C0AAD438CB5D14003 /* sharif.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = sharif.mp3; path = rwhalmslm/sharif.mp3; sourceTree = "<group>"; };
-		61E0145E3C4E4F59A2C8FDDF /* ajman.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ajman.mp3; path = rwhalmslm/ajman.mp3; sourceTree = "<group>"; };
-		62CC4D766FC74D75BDED42D9 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
-		6BF9E8DCB0B649A7ACEDDC89 /* morning_adhkar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = morning_adhkar.mp3; path = rwhalmslm/morning_adhkar.mp3; sourceTree = "<group>"; };
-		7C56ABF5AD484A08B63B19BE /* WidgetBundle.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = WidgetBundle.swift; path = WidgetBundle.swift; sourceTree = "<group>"; };
-		83F2AF147404E4BB55019383 /* libPods-rwhalmslm.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-rwhalmslm.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		864684F82BC47F7565D6A6A9 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-rwhalmslm/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		8EEAC1BEE94B4F8D92915E18 /* tasbih.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = tasbih.mp3; path = rwhalmslm/tasbih.mp3; sourceTree = "<group>"; };
-		949B29405A0145898B8C81A0 /* makkah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = makkah.mp3; path = rwhalmslm/makkah.mp3; sourceTree = "<group>"; };
-		95433B5D279042488DAC22FB /* RoohAlMuslimWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = RoohAlMuslimWidgets.appex; path = RoohAlMuslimWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		98DD36384B694BD4B111ECCF /* sudais.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = sudais.mp3; path = rwhalmslm/sudais.mp3; sourceTree = "<group>"; };
-		9A32D9FE968C4D2FB7D20AAA /* RoohAlMuslimWidgets.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = RoohAlMuslimWidgets.entitlements; path = RoohAlMuslimWidgets.entitlements; sourceTree = "<group>"; };
-		9F20ACF18B9544DD92526B3B /* egypt.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = egypt.mp3; path = rwhalmslm/egypt.mp3; sourceTree = "<group>"; };
+		146A6CCB6B8746CDA76C9067 /* dosari.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = dosari.mp3; path = rwhalmslm/dosari.mp3; sourceTree = "<group>"; };
+		15D12D1B078144539EB9D989 /* QuranAyahWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = QuranAyahWidget.swift; path = QuranAyahWidget.swift; sourceTree = "<group>"; };
+		15D2AF1E02A0477DA40BB7AF /* AzkarWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = AzkarWidget.swift; path = AzkarWidget.swift; sourceTree = "<group>"; };
+		183E4E73664240C3AB33055B /* Assets.xcassets */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Assets.xcassets; sourceTree = "<group>"; };
+		1BB733F6D5AD4DE59736F95F /* DhikrWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = DhikrWidget.swift; path = DhikrWidget.swift; sourceTree = "<group>"; };
+		22C4DFC4AA84437A9D2E3B52 /* evening_adhkar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = evening_adhkar.mp3; path = rwhalmslm/evening_adhkar.mp3; sourceTree = "<group>"; };
+		299CD8613C534E488C578938 /* NextPrayerWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = NextPrayerWidget.swift; path = NextPrayerWidget.swift; sourceTree = "<group>"; };
+		2A7C8DDDF137426199CB819D /* mishary.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = mishary.mp3; path = rwhalmslm/mishary.mp3; sourceTree = "<group>"; };
+		303103F306D0423BA1C1B033 /* morning_adhkar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = morning_adhkar.mp3; path = rwhalmslm/morning_adhkar.mp3; sourceTree = "<group>"; };
+		327FBC779D8784F3077581AE /* libPods-rwhalmslm.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-rwhalmslm.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		3691049559574EA9B1E1C984 /* RoohAlMuslimWidgets.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = RoohAlMuslimWidgets.entitlements; path = RoohAlMuslimWidgets.entitlements; sourceTree = "<group>"; };
+		3BB0FACAEE144758BD2AB9FB /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
+		44A9C302D2524CCE88949BD7 /* general_reminder.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = general_reminder.mp3; path = rwhalmslm/general_reminder.mp3; sourceTree = "<group>"; };
+		44D739EF30544F07AE618D2A /* abdulbasit.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = abdulbasit.mp3; path = rwhalmslm/abdulbasit.mp3; sourceTree = "<group>"; };
+		497C9D3675174EED8E9D6F9A /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
+		49F758E381D943E5A1657A16 /* sharif.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = sharif.mp3; path = rwhalmslm/sharif.mp3; sourceTree = "<group>"; };
+		525328D92C124195AAE5CBE0 /* WidgetBundle.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = WidgetBundle.swift; path = WidgetBundle.swift; sourceTree = "<group>"; };
+		534BCB1E22894BC78A83DD0C /* SharedActivityAttributes.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = SharedActivityAttributes.swift; path = SharedActivityAttributes.swift; sourceTree = "<group>"; };
+		56A87FBF87EA3D79FDC0C396 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-rwhalmslm/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		5C4D7481D63B43A2BAD25318 /* makkah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = makkah.mp3; path = rwhalmslm/makkah.mp3; sourceTree = "<group>"; };
+		601F506AA93F4321BF04B46D /* ali_mulla.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ali_mulla.mp3; path = rwhalmslm/ali_mulla.mp3; sourceTree = "<group>"; };
+		626E884DF9E94541839A2499 /* sudais.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = sudais.mp3; path = rwhalmslm/sudais.mp3; sourceTree = "<group>"; };
+		628718F591918445A787ADD0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = rwhalmslm/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		6BC4792EDA8EC84884B482B1 /* Pods-rwhalmslm.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-rwhalmslm.debug.xcconfig"; path = "Target Support Files/Pods-rwhalmslm/Pods-rwhalmslm.debug.xcconfig"; sourceTree = "<group>"; };
+		7A9DFE687C704D9B900B0B83 /* ajman.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ajman.mp3; path = rwhalmslm/ajman.mp3; sourceTree = "<group>"; };
+		805B85C7D8C24B9BA82FB04B /* RoohAlMuslimWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = undefined; name = RoohAlMuslimWidgets.appex; path = RoohAlMuslimWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		854399CE028B4A909D56466A /* HijriDateWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = HijriDateWidget.swift; path = HijriDateWidget.swift; sourceTree = "<group>"; };
+		873351C94509403FB52858FA /* egypt.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = egypt.mp3; path = rwhalmslm/egypt.mp3; sourceTree = "<group>"; };
+		90C8A8856E294C248B133FD3 /* madinah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = madinah.mp3; path = rwhalmslm/madinah.mp3; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = rwhalmslm/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B2FBEA009D1B402A8EABC24A /* QuranAyahWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = QuranAyahWidget.swift; path = QuranAyahWidget.swift; sourceTree = "<group>"; };
-		B3AFACCE53614C1689541418 /* Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Info.plist; sourceTree = "<group>"; };
-		B479A541C84D408487CF27A7 /* alhamdulillah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = alhamdulillah.mp3; path = rwhalmslm/alhamdulillah.mp3; sourceTree = "<group>"; };
-		B54CBBF884AFE63D152546F1 /* Pods-rwhalmslm.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-rwhalmslm.release.xcconfig"; path = "Target Support Files/Pods-rwhalmslm/Pods-rwhalmslm.release.xcconfig"; sourceTree = "<group>"; };
+		AF91FD2F0493492DB9F1351E /* istighfar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = istighfar.mp3; path = rwhalmslm/istighfar.mp3; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		BF90CE2D796B4DC5900AC7FA /* silent.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = silent.mp3; path = rwhalmslm/silent.mp3; sourceTree = "<group>"; };
-		C33E0F22A3E64DE280F17608 /* PrayerLiveActivity.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = PrayerLiveActivity.swift; path = PrayerLiveActivity.swift; sourceTree = "<group>"; };
-		C34E17D2085542F8B1C3179C /* mansoor_zahrani.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = mansoor_zahrani.mp3; path = rwhalmslm/mansoor_zahrani.mp3; sourceTree = "<group>"; };
-		D6FD4DA9C0C8482A82337575 /* ali_mulla.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = ali_mulla.mp3; path = rwhalmslm/ali_mulla.mp3; sourceTree = "<group>"; };
-		DB19AF949AA64B04A0B9DD43 /* madinah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = madinah.mp3; path = rwhalmslm/madinah.mp3; sourceTree = "<group>"; };
-		E4DCF833533249A08F91F7EB /* salawat.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = salawat.mp3; path = rwhalmslm/salawat.mp3; sourceTree = "<group>"; };
-		E6A1A90553EF446AB4B2B10C /* evening_adhkar.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = evening_adhkar.mp3; path = rwhalmslm/evening_adhkar.mp3; sourceTree = "<group>"; };
+		D61D49B1D3394ECC88CCC036 /* mansoor_zahrani.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = mansoor_zahrani.mp3; path = rwhalmslm/mansoor_zahrani.mp3; sourceTree = "<group>"; };
+		DC017FE6A8AF4451A2D1CC84 /* naqshbandi.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = naqshbandi.mp3; path = rwhalmslm/naqshbandi.mp3; sourceTree = "<group>"; };
+		E3697AB3DEEF46CDA66FF35E /* PrayerLiveActivity.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = PrayerLiveActivity.swift; path = PrayerLiveActivity.swift; sourceTree = "<group>"; };
+		EBE7A190ABCC4E8F9B69A3A8 /* subhanallah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = subhanallah.mp3; path = rwhalmslm/subhanallah.mp3; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		EE19CE5389ED46ABB67D1095 /* haramain.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = haramain.mp3; path = rwhalmslm/haramain.mp3; sourceTree = "<group>"; };
+		EEE631D9B8554AD4AA141A11 /* silent.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = silent.mp3; path = rwhalmslm/silent.mp3; sourceTree = "<group>"; };
+		F0FEFA3F13F244BC8E20ED9C /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = rwhalmslm/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* rwhalmslm-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "rwhalmslm-Bridging-Header.h"; path = "rwhalmslm/rwhalmslm-Bridging-Header.h"; sourceTree = "<group>"; };
-		F8F5CE4421B4450EB650D5EE /* AzkarWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = AzkarWidget.swift; path = AzkarWidget.swift; sourceTree = "<group>"; };
-		F913A6BF16934492955730E4 /* HijriDateWidget.swift */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = sourcecode.swift; name = HijriDateWidget.swift; path = HijriDateWidget.swift; sourceTree = "<group>"; };
+		F8EDDC38D2514724B531A67C /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		F8FF9754922B45669264B6F2 /* alhamdulillah.mp3 */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = undefined; includeInIndex = 0; lastKnownFileType = unknown; name = alhamdulillah.mp3; path = rwhalmslm/alhamdulillah.mp3; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,23 +135,33 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				21C5643FBFB05963329A01F5 /* libPods-rwhalmslm.a in Frameworks */,
+				37F7A7CFD8E8DBBD61C50797 /* libPods-rwhalmslm.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A61F08B4ABA04BD79407D85B /* Frameworks */ = {
+		AD4B2DA3794C45A590BC9087 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D6D540FADBB045E3B13D7543 /* WidgetKit.framework in Frameworks */,
-				A33FB51799AF42BFA0100ED2 /* SwiftUI.framework in Frameworks */,
-				160872DCD29443B5AAD0756D /* ActivityKit.framework in Frameworks */,
+				FC2B601076EE4F32B0388A4E /* WidgetKit.framework in Frameworks */,
+				C2707FD8B1B34C1F9C201F61 /* SwiftUI.framework in Frameworks */,
+				953FA6F5A8C24CF6891A6460 /* ActivityKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		05E731260E7CCCDE9F2A9F7E /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				6BC4792EDA8EC84884B482B1 /* Pods-rwhalmslm.debug.xcconfig */,
+				05DB3B68E3A6B8C9E6A9FDBA /* Pods-rwhalmslm.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		13B07FAE1A68108700A75B9A /* rwhalmslm */ = {
 			isa = PBXGroup;
 			children = (
@@ -161,30 +171,30 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				1331733E27214FFAA7A130DD /* general_reminder.mp3 */,
-				E4DCF833533249A08F91F7EB /* salawat.mp3 */,
-				271BF76F72304F3D82C2ED67 /* istighfar.mp3 */,
-				8EEAC1BEE94B4F8D92915E18 /* tasbih.mp3 */,
-				0056F395297149948FBB5FE1 /* subhanallah.mp3 */,
-				B479A541C84D408487CF27A7 /* alhamdulillah.mp3 */,
-				6BF9E8DCB0B649A7ACEDDC89 /* morning_adhkar.mp3 */,
-				E6A1A90553EF446AB4B2B10C /* evening_adhkar.mp3 */,
-				949B29405A0145898B8C81A0 /* makkah.mp3 */,
-				DB19AF949AA64B04A0B9DD43 /* madinah.mp3 */,
-				44E5078847E0407D882F0F0D /* alaqsa.mp3 */,
-				18DAB47E11E04C87B5F2617B /* mishary.mp3 */,
-				41589ABD0AE743BC836202F4 /* abdulbasit.mp3 */,
-				98DD36384B694BD4B111ECCF /* sudais.mp3 */,
-				9F20ACF18B9544DD92526B3B /* egypt.mp3 */,
-				56B0290A90FF4600A7BA172B /* dosari.mp3 */,
-				61E0145E3C4E4F59A2C8FDDF /* ajman.mp3 */,
-				D6FD4DA9C0C8482A82337575 /* ali_mulla.mp3 */,
-				53C5E348BCED494BAF77F328 /* naqshbandi.mp3 */,
-				617DA35C0AAD438CB5D14003 /* sharif.mp3 */,
-				C34E17D2085542F8B1C3179C /* mansoor_zahrani.mp3 */,
-				1A6E8C905A4B46E7AA82E038 /* haramain.mp3 */,
-				BF90CE2D796B4DC5900AC7FA /* silent.mp3 */,
-				0E4B5F709D2243950F122EFD /* PrivacyInfo.xcprivacy */,
+				44A9C302D2524CCE88949BD7 /* general_reminder.mp3 */,
+				03B054C4291D4BAFBC6F6FFE /* salawat.mp3 */,
+				AF91FD2F0493492DB9F1351E /* istighfar.mp3 */,
+				1337F37B17E44B80B52D4D9C /* tasbih.mp3 */,
+				EBE7A190ABCC4E8F9B69A3A8 /* subhanallah.mp3 */,
+				F8FF9754922B45669264B6F2 /* alhamdulillah.mp3 */,
+				303103F306D0423BA1C1B033 /* morning_adhkar.mp3 */,
+				22C4DFC4AA84437A9D2E3B52 /* evening_adhkar.mp3 */,
+				5C4D7481D63B43A2BAD25318 /* makkah.mp3 */,
+				90C8A8856E294C248B133FD3 /* madinah.mp3 */,
+				08C392455A734537906F1FD6 /* alaqsa.mp3 */,
+				2A7C8DDDF137426199CB819D /* mishary.mp3 */,
+				44D739EF30544F07AE618D2A /* abdulbasit.mp3 */,
+				626E884DF9E94541839A2499 /* sudais.mp3 */,
+				873351C94509403FB52858FA /* egypt.mp3 */,
+				146A6CCB6B8746CDA76C9067 /* dosari.mp3 */,
+				7A9DFE687C704D9B900B0B83 /* ajman.mp3 */,
+				601F506AA93F4321BF04B46D /* ali_mulla.mp3 */,
+				DC017FE6A8AF4451A2D1CC84 /* naqshbandi.mp3 */,
+				49F758E381D943E5A1657A16 /* sharif.mp3 */,
+				D61D49B1D3394ECC88CCC036 /* mansoor_zahrani.mp3 */,
+				EE19CE5389ED46ABB67D1095 /* haramain.mp3 */,
+				EEE631D9B8554AD4AA141A11 /* silent.mp3 */,
+				628718F591918445A787ADD0 /* PrivacyInfo.xcprivacy */,
 			);
 			name = rwhalmslm;
 			sourceTree = "<group>";
@@ -193,43 +203,33 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				83F2AF147404E4BB55019383 /* libPods-rwhalmslm.a */,
+				327FBC779D8784F3077581AE /* libPods-rwhalmslm.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		5877598840560C12803D9CD5 /* ExpoModulesProviders */ = {
+		5C65B046E542072ECC884385 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				B763818C464BDDCAF8ECF1A0 /* rwhalmslm */,
+				B8F3953246C3CA933455F02E /* rwhalmslm */,
 			);
 			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
-		69F7144B68F2AD1004317D3D /* Pods */ = {
+		72B23D1C55EF4776804E9661 /* RoohAlMuslimWidgets */ = {
 			isa = PBXGroup;
 			children = (
-				22005C5D7A284D00F0E66D36 /* Pods-rwhalmslm.debug.xcconfig */,
-				B54CBBF884AFE63D152546F1 /* Pods-rwhalmslm.release.xcconfig */,
-			);
-			name = Pods;
-			path = Pods;
-			sourceTree = "<group>";
-		};
-		7648CC7A39A44C7192CEBE9B /* RoohAlMuslimWidgets */ = {
-			isa = PBXGroup;
-			children = (
-				7C56ABF5AD484A08B63B19BE /* WidgetBundle.swift */,
-				1A730F60B30B4914A379182F /* NextPrayerWidget.swift */,
-				B2FBEA009D1B402A8EABC24A /* QuranAyahWidget.swift */,
-				F8F5CE4421B4450EB650D5EE /* AzkarWidget.swift */,
-				2FAA1467B710499F94275352 /* DhikrWidget.swift */,
-				F913A6BF16934492955730E4 /* HijriDateWidget.swift */,
-				C33E0F22A3E64DE280F17608 /* PrayerLiveActivity.swift */,
-				1ACF4CBFDE0747858AEE1996 /* SharedActivityAttributes.swift */,
-				3E893EE5A61B4FDF8EC11E03 /* Assets.xcassets */,
-				9A32D9FE968C4D2FB7D20AAA /* RoohAlMuslimWidgets.entitlements */,
-				B3AFACCE53614C1689541418 /* Info.plist */,
+				525328D92C124195AAE5CBE0 /* WidgetBundle.swift */,
+				299CD8613C534E488C578938 /* NextPrayerWidget.swift */,
+				15D12D1B078144539EB9D989 /* QuranAyahWidget.swift */,
+				15D2AF1E02A0477DA40BB7AF /* AzkarWidget.swift */,
+				1BB733F6D5AD4DE59736F95F /* DhikrWidget.swift */,
+				854399CE028B4A909D56466A /* HijriDateWidget.swift */,
+				E3697AB3DEEF46CDA66FF35E /* PrayerLiveActivity.swift */,
+				534BCB1E22894BC78A83DD0C /* SharedActivityAttributes.swift */,
+				183E4E73664240C3AB33055B /* Assets.xcassets */,
+				3691049559574EA9B1E1C984 /* RoohAlMuslimWidgets.entitlements */,
+				3BB0FACAEE144758BD2AB9FB /* Info.plist */,
 			);
 			name = RoohAlMuslimWidgets;
 			path = RoohAlMuslimWidgets;
@@ -249,9 +249,9 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				7648CC7A39A44C7192CEBE9B /* RoohAlMuslimWidgets */,
-				69F7144B68F2AD1004317D3D /* Pods */,
-				5877598840560C12803D9CD5 /* ExpoModulesProviders */,
+				72B23D1C55EF4776804E9661 /* RoohAlMuslimWidgets */,
+				05E731260E7CCCDE9F2A9F7E /* Pods */,
+				5C65B046E542072ECC884385 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -262,15 +262,15 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* rwhalmslm.app */,
-				95433B5D279042488DAC22FB /* RoohAlMuslimWidgets.appex */,
+				805B85C7D8C24B9BA82FB04B /* RoohAlMuslimWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B763818C464BDDCAF8ECF1A0 /* rwhalmslm */ = {
+		B8F3953246C3CA933455F02E /* rwhalmslm */ = {
 			isa = PBXGroup;
 			children = (
-				864684F82BC47F7565D6A6A9 /* ExpoModulesProvider.swift */,
+				56A87FBF87EA3D79FDC0C396 /* ExpoModulesProvider.swift */,
 			);
 			name = rwhalmslm;
 			sourceTree = "<group>";
@@ -292,16 +292,16 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "rwhalmslm" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				5499E609BA0DCDE4DFB19B59 /* [Expo] Configure project */,
+				F209BEE41B26D9F8D6717701 /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				9677D68E677B49AE933FF91F /* Copy Files */,
-				99362D25F63E41FCA8A403DE /* Embed App Extensions */,
-				E6BFE8E90A8C10A2D6CBB009 /* [CP] Embed Pods Frameworks */,
-				C028E31FBEB4E6A23C5D58FF /* [CP-User] [RNGoogleMobileAds] Configuration */,
+				309D4AE59874455AB78CC402 /* Copy Files */,
+				96B17316BDC0498F936B3EF8 /* Embed App Extensions */,
+				FE3152F318F1F270B6BC3746 /* [CP] Embed Pods Frameworks */,
+				E8DAB8AEB108CB03468E623B /* [CP-User] [RNGoogleMobileAds] Configuration */,
 			);
 			buildRules = (
 			);
@@ -312,13 +312,13 @@
 			productReference = 13B07F961A680F5B00A75B9A /* rwhalmslm.app */;
 			productType = "com.apple.product-type.application";
 		};
-		67C8D2CEB84840FFAFA6E38B /* RoohAlMuslimWidgets */ = {
+		3A7F3433F1A6471BB2C4EDFB /* RoohAlMuslimWidgets */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 74169970EA384759810ABE07 /* Build configuration list for PBXNativeTarget "RoohAlMuslimWidgets" */;
+			buildConfigurationList = 267206844AAB492D93679806 /* Build configuration list for PBXNativeTarget "RoohAlMuslimWidgets" */;
 			buildPhases = (
-				FD7EB20101C34596A961AA80 /* Sources */,
-				A61F08B4ABA04BD79407D85B /* Frameworks */,
-				7532F11FC746487E9B3EBAB8 /* Resources */,
+				A8D4D03A46664FD294FB0F47 /* Sources */,
+				AD4B2DA3794C45A590BC9087 /* Frameworks */,
+				2DA74CC895D14C9B9631375B /* Resources */,
 			);
 			buildRules = (
 			);
@@ -326,7 +326,7 @@
 			);
 			name = RoohAlMuslimWidgets;
 			productName = RoohAlMuslimWidgets;
-			productReference = 95433B5D279042488DAC22FB /* RoohAlMuslimWidgets.appex */;
+			productReference = 805B85C7D8C24B9BA82FB04B /* RoohAlMuslimWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -356,7 +356,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* rwhalmslm */,
-				67C8D2CEB84840FFAFA6E38B /* RoohAlMuslimWidgets */,
+				3A7F3433F1A6471BB2C4EDFB /* RoohAlMuslimWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -369,38 +369,38 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				CB023213A0B64F4CB1767309 /* general_reminder.mp3 in Resources */,
-				8D33C137F2A145A5801250D7 /* salawat.mp3 in Resources */,
-				BC2743FBE46040C4886A5B5F /* istighfar.mp3 in Resources */,
-				612300BFE37B411EA2672A7F /* tasbih.mp3 in Resources */,
-				7EEC10888F834C3093B11B71 /* subhanallah.mp3 in Resources */,
-				2432DB71D14F40469FB78249 /* alhamdulillah.mp3 in Resources */,
-				977FE97DBFEB449DBA8FA0DE /* morning_adhkar.mp3 in Resources */,
-				B93C1B0475F44508807F3EEA /* evening_adhkar.mp3 in Resources */,
-				4D3A9FAD35AE4AB6A675F444 /* makkah.mp3 in Resources */,
-				D06E723E9E7941CD92C7781E /* madinah.mp3 in Resources */,
-				0A337579423C4D299CF0AB82 /* alaqsa.mp3 in Resources */,
-				2B4F529A204249CE814D28E0 /* mishary.mp3 in Resources */,
-				6CEDBED6E3F744B6B18275BA /* abdulbasit.mp3 in Resources */,
-				9F94C408CB2743F88ED379E9 /* sudais.mp3 in Resources */,
-				53ADEAD9C4B2455FAD912444 /* egypt.mp3 in Resources */,
-				5280076EEDB94ED9A19C3D56 /* dosari.mp3 in Resources */,
-				4B66937614674609B336DFB9 /* ajman.mp3 in Resources */,
-				9170BD79B4F34CF5A483E013 /* ali_mulla.mp3 in Resources */,
-				B5CCC83335FA475EB48D4FE7 /* naqshbandi.mp3 in Resources */,
-				AB596373CD494078B32FA571 /* sharif.mp3 in Resources */,
-				27FD40D7B2DC4DA6A60797CD /* mansoor_zahrani.mp3 in Resources */,
-				6E289C198A374C3088CF4265 /* haramain.mp3 in Resources */,
-				EB6AB30671ED429D96169783 /* silent.mp3 in Resources */,
-				35CB1548B001F39D81123604 /* PrivacyInfo.xcprivacy in Resources */,
+				077B2C35B6B34BA2BE6B0E90 /* general_reminder.mp3 in Resources */,
+				981D760442B4426ABBD36BA5 /* salawat.mp3 in Resources */,
+				44C7A696E11A43898B4063F9 /* istighfar.mp3 in Resources */,
+				B3F149C2588F47888588D3D8 /* tasbih.mp3 in Resources */,
+				83BDDA8A2AEF45E093008DEC /* subhanallah.mp3 in Resources */,
+				8B2A832A25A44B009113A274 /* alhamdulillah.mp3 in Resources */,
+				F8806AD02AAF499797A8222A /* morning_adhkar.mp3 in Resources */,
+				2BC5766A783F41F3B3B6974C /* evening_adhkar.mp3 in Resources */,
+				D3A7DC8632F94FAD9A03AABF /* makkah.mp3 in Resources */,
+				81B9D03E9DFC4D539C099639 /* madinah.mp3 in Resources */,
+				D8A9DCBFC14A4F089CB80250 /* alaqsa.mp3 in Resources */,
+				0C694C69CE334FB895D84295 /* mishary.mp3 in Resources */,
+				3D3B52247AE94DD68C0EBB12 /* abdulbasit.mp3 in Resources */,
+				16954179E6B14EA7BB1A5243 /* sudais.mp3 in Resources */,
+				C9428A8372804DDA91262CA6 /* egypt.mp3 in Resources */,
+				A2D3F3AA8D144212B43450CA /* dosari.mp3 in Resources */,
+				B8F5BDCD077145B39EFC46CD /* ajman.mp3 in Resources */,
+				00F857D326D74D66A23300F0 /* ali_mulla.mp3 in Resources */,
+				411BD1825B544D3FA7C7EC8F /* naqshbandi.mp3 in Resources */,
+				6B250E4544B64901BCBD9FF5 /* sharif.mp3 in Resources */,
+				F60A68270FBF4BE0BB522DEE /* mansoor_zahrani.mp3 in Resources */,
+				B6F1D1AD589B4CCAA08C3259 /* haramain.mp3 in Resources */,
+				6C978DC6AA2846979F3B54F6 /* silent.mp3 in Resources */,
+				BD3CCF4A697407E017347856 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		7532F11FC746487E9B3EBAB8 /* Resources */ = {
+		2DA74CC895D14C9B9631375B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				8540EA917089456985FD62F3 /* Assets.xcassets in Resources */,
+				C61AAC8F28CD497FA4F731EE /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -445,30 +445,6 @@
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
-		};
-		5499E609BA0DCDE4DFB19B59 /* [Expo] Configure project */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/.xcode.env",
-				"$(SRCROOT)/.xcode.env.local",
-				"$(SRCROOT)/rwhalmslm/rwhalmslm.entitlements",
-				"$(SRCROOT)/Pods/Target Support Files/Pods-rwhalmslm/expo-configure-project.sh",
-			);
-			name = "[Expo] Configure project";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(SRCROOT)/Pods/Target Support Files/Pods-rwhalmslm/ExpoModulesProvider.swift",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-rwhalmslm/expo-configure-project.sh\"\n";
 		};
 		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -526,7 +502,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-rwhalmslm/Pods-rwhalmslm-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		C028E31FBEB4E6A23C5D58FF /* [CP-User] [RNGoogleMobileAds] Configuration */ = {
+		E8DAB8AEB108CB03468E623B /* [CP-User] [RNGoogleMobileAds] Configuration */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -539,7 +515,31 @@
 			shellPath = /bin/sh;
 			shellScript = "#!/usr/bin/env bash\n#\n# Copyright (c) 2016-present Invertase Limited & Contributors\n#\n# Licensed under the Apache License, Version 2.0 (the \"License\");\n# you may not use this library except in compliance with the License.\n# You may obtain a copy of the License at\n#\n#   http://www.apache.org/licenses/LICENSE-2.0\n#\n# Unless required by applicable law or agreed to in writing, software\n# distributed under the License is distributed on an \"AS IS\" BASIS,\n# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n# See the License for the specific language governing permissions and\n# limitations under the License.\n#\n\n##########################################################################\n##########################################################################\n#\n#  NOTE THAT IF YOU CHANGE THIS FILE YOU MUST RUN pod install AFTERWARDS\n#\n#  This file is installed as an Xcode build script in the project file\n#  by cocoapods, and you will not see your changes until you pod install\n#\n##########################################################################\n##########################################################################\n\nset -e\n\n_MAX_LOOKUPS=2;\n_SEARCH_RESULT=''\n_RN_ROOT_EXISTS=''\n_CURRENT_LOOKUPS=1\n_PROJECT_ABBREVIATION=\"RNGoogleMobileAds\"\n_JSON_ROOT=\"'react-native-google-mobile-ads'\"\n_JSON_FILE_NAME='app.json'\n_JSON_OUTPUT_BASE64='e30=' # { }\n_CURRENT_SEARCH_DIR=${PROJECT_DIR}\n_PLIST_BUDDY=/usr/libexec/PlistBuddy\n_TARGET_PLIST=\"${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}\"\n_DSYM_PLIST=\"${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist\"\n_PACKAGE_JSON_NAME='package.json'\n\n# plist arrays\n_PLIST_ENTRY_KEYS=()\n_PLIST_ENTRY_TYPES=()\n_PLIST_ENTRY_VALUES=()\n\nfunction setPlistValue {\n  echo \"note:      setting plist entry '$1' of type '$2' in file '$4'\"\n  ${_PLIST_BUDDY} -c \"Add :$1 $2 '$3'\" $4 || echo \"note:      '$1' already exists\"\n}\n\nfunction getJsonKeyValue () {\n  if [[ ${_RN_ROOT_EXISTS} ]]; then\n    ruby -KU -e \"require 'rubygems';require 'json'; output=JSON.parse('$1'); puts output[$_JSON_ROOT]['$2']\"\n  else\n    echo \"\"\n  fi;\n}\n\nfunction jsonBoolToYesNo () {\n  if [[ $1 == \"false\" ]]; then\n    echo \"NO\"\n  elif [[ $1 == \"true\" ]]; then\n    echo \"YES\"\n  else echo \"NO\"\n  fi\n}\n\necho \"note: -> ${_PROJECT_ABBREVIATION} build script started\"\necho \"note: 1) Locating ${_JSON_FILE_NAME} file:\"\n\nif [[ -z ${_CURRENT_SEARCH_DIR} ]]; then\n  _CURRENT_SEARCH_DIR=$(pwd)\nfi;\n\nwhile true; do\n  _CURRENT_SEARCH_DIR=$(dirname \"$_CURRENT_SEARCH_DIR\")\n  if [[ \"$_CURRENT_SEARCH_DIR\" == *.generated ]]; then continue; fi\n  if [[ \"$_CURRENT_SEARCH_DIR\" == \"/\" ]] || [[ ${_CURRENT_LOOKUPS} -gt ${_MAX_LOOKUPS} ]]; then break; fi;\n  echo \"note:      ($_CURRENT_LOOKUPS of $_MAX_LOOKUPS) Searching in '$_CURRENT_SEARCH_DIR' for a ${_JSON_FILE_NAME} file.\"\n  _SEARCH_RESULT=$(find \"$_CURRENT_SEARCH_DIR\" -maxdepth 2 -name ${_JSON_FILE_NAME} -print | /usr/bin/head -n 1)\n  if [[ ${_SEARCH_RESULT} ]]; then\n    echo \"note:      ${_JSON_FILE_NAME} found at $_SEARCH_RESULT\"\n    break;\n  fi;\n  _CURRENT_LOOKUPS=$((_CURRENT_LOOKUPS+1))\ndone\n\nif [[ ${_SEARCH_RESULT} ]]; then\n  _JSON_OUTPUT_RAW=$(cat \"${_SEARCH_RESULT}\")\n  _RN_ROOT_EXISTS=$(ruby -KU -e \"require 'rubygems';require 'json'; output=JSON.parse('$_JSON_OUTPUT_RAW'); puts output[$_JSON_ROOT]\" || echo '')\n\n  if [[ ${_RN_ROOT_EXISTS} ]]; then\n    if ! python3 --version >/dev/null 2>&1; then echo \"error: python3 not found, app.json file processing error.\" && exit 1; fi\n    _JSON_OUTPUT_BASE64=$(python3 -c 'import json,sys,base64;print(base64.b64encode(bytes(json.dumps(json.loads(open('\"'${_SEARCH_RESULT}'\"', '\"'rb'\"').read())['${_JSON_ROOT}']), '\"'utf-8'\"')).decode())' || echo \"e30=\")\n  fi\n\n  _PLIST_ENTRY_KEYS+=(\"google_mobile_ads_json_raw\")\n  _PLIST_ENTRY_TYPES+=(\"string\")\n  _PLIST_ENTRY_VALUES+=(\"$_JSON_OUTPUT_BASE64\")\n\n  # config.delay_app_measurement_init\n  _DELAY_APP_MEASUREMENT=$(getJsonKeyValue \"$_JSON_OUTPUT_RAW\" \"delay_app_measurement_init\")\n  if [[ $_DELAY_APP_MEASUREMENT == \"true\" ]]; then\n    _PLIST_ENTRY_KEYS+=(\"GADDelayAppMeasurementInit\")\n    _PLIST_ENTRY_TYPES+=(\"bool\")\n    _PLIST_ENTRY_VALUES+=(\"YES\")\n  fi\n\n  # config.ios_app_id\n  _IOS_APP_ID=$(getJsonKeyValue \"$_JSON_OUTPUT_RAW\" \"ios_app_id\")\n  if [[ $_IOS_APP_ID ]]; then\n    _PLIST_ENTRY_KEYS+=(\"GADApplicationIdentifier\")\n    _PLIST_ENTRY_TYPES+=(\"string\")\n    _PLIST_ENTRY_VALUES+=(\"$_IOS_APP_ID\")\n  fi\n\n  # config.sk_ad_network_items\n  _SK_AD_NETWORK_ITEMS=$(getJsonKeyValue \"$_JSON_OUTPUT_RAW\" \"sk_ad_network_items\")\n  if [[ $_SK_AD_NETWORK_ITEMS ]]; then\n    _PLIST_ENTRY_KEYS+=(\"SKAdNetworkItems\")\n    _PLIST_ENTRY_TYPES+=(\"array\")\n    _PLIST_ENTRY_VALUES+=(\"\")\n\n    oldifs=$IFS\n    IFS=\"\n\"\n    array=($(echo \"$_SK_AD_NETWORK_ITEMS\"))\n    IFS=$oldifs\n    for i in \"${!array[@]}\"; do\n      _PLIST_ENTRY_KEYS+=(\"SKAdNetworkItems:$i:SKAdNetworkIdentifier\")\n      _PLIST_ENTRY_TYPES+=(\"string\")\n      _PLIST_ENTRY_VALUES+=(\"${array[i]}\")  \n    done\n  fi\n\n    # config.user_tracking_usage_description\n  _USER_TRACKING_USAGE_DESCRIPTION=$(getJsonKeyValue \"$_JSON_OUTPUT_RAW\" \"user_tracking_usage_description\")\n  if [[ $_USER_TRACKING_USAGE_DESCRIPTION ]]; then\n    _PLIST_ENTRY_KEYS+=(\"NSUserTrackingUsageDescription\")\n    _PLIST_ENTRY_TYPES+=(\"string\")\n    _PLIST_ENTRY_VALUES+=(\"$_USER_TRACKING_USAGE_DESCRIPTION\")\n  fi\nelse\n  _PLIST_ENTRY_KEYS+=(\"google_mobile_ads_json_raw\")\n  _PLIST_ENTRY_TYPES+=(\"string\")\n  _PLIST_ENTRY_VALUES+=(\"$_JSON_OUTPUT_BASE64\")\n  echo \"note:   An ${_JSON_FILE_NAME} file was not found, whilst this file is optional it is recommended to include it to auto-configure services.\"\nfi;\n\necho \"note: 2) Injecting Info.plist entries: \"\n\n# Log out the keys we're adding\nfor i in \"${!_PLIST_ENTRY_KEYS[@]}\"; do\n  echo \"    ->  $i) ${_PLIST_ENTRY_KEYS[$i]}\" \"${_PLIST_ENTRY_TYPES[$i]}\" \"${_PLIST_ENTRY_VALUES[$i]}\"\ndone\n\nif ! [[ -f \"${_TARGET_PLIST}\" ]]; then\n  echo \"error: unable to locate Info.plist to set properties. App will crash without GADApplicationIdentifier set.\"\n  exit 1\nfi\n\nif ! [[ $_IOS_APP_ID ]]; then\n  echo \"warning:  ios_app_id key not found in react-native-google-mobile-ads key in app.json. App will crash without it. You may safely ignore this warning if you are using our Expo config plugin.\"\n  exit 0\nfi\n\nfor plist in \"${_TARGET_PLIST}\" \"${_DSYM_PLIST}\" ; do\n  if [[ -f \"${plist}\" ]]; then\n\n    # paths with spaces break the call to setPlistValue. temporarily modify\n    # the shell internal field separator variable (IFS), which normally\n    # includes spaces, to consist only of line breaks\n    oldifs=$IFS\n    IFS=\"\n\"\n\n    for i in \"${!_PLIST_ENTRY_KEYS[@]}\"; do\n      setPlistValue \"${_PLIST_ENTRY_KEYS[$i]}\" \"${_PLIST_ENTRY_TYPES[$i]}\" \"${_PLIST_ENTRY_VALUES[$i]}\" \"${plist}\"\n    done\n\n    # restore the original internal field separator value\n    IFS=$oldifs\n  else\n    echo \"warning:   A Info.plist build output file was not found (${plist})\"\n  fi\ndone\n\necho \"note: <- ${_PROJECT_ABBREVIATION} build script finished\"\n";
 		};
-		E6BFE8E90A8C10A2D6CBB009 /* [CP] Embed Pods Frameworks */ = {
+		F209BEE41B26D9F8D6717701 /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/rwhalmslm/rwhalmslm.entitlements",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-rwhalmslm/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-rwhalmslm/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-rwhalmslm/expo-configure-project.sh\"\n";
+		};
+		FE3152F318F1F270B6BC3746 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -569,29 +569,95 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				80D3C780759361CBBA2DB29F /* ExpoModulesProvider.swift in Sources */,
+				E1D0FCEEB3F0138F61ED7189 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		FD7EB20101C34596A961AA80 /* Sources */ = {
+		A8D4D03A46664FD294FB0F47 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E519E5B480AE41A696479C03 /* WidgetBundle.swift in Sources */,
-				FE404AB1678249AE853A904F /* NextPrayerWidget.swift in Sources */,
-				EEBB0EAA806D4992B9F4D65B /* QuranAyahWidget.swift in Sources */,
-				C87DEF3C16B54E94804B39DA /* AzkarWidget.swift in Sources */,
-				C19E92D7C9714DEE9A4633DA /* DhikrWidget.swift in Sources */,
-				13CFB8B22CAC4850AD75B952 /* HijriDateWidget.swift in Sources */,
-				C32DB72BA58A4F72ABDA9970 /* PrayerLiveActivity.swift in Sources */,
-				7BDD92CF82FF44289148B7C4 /* SharedActivityAttributes.swift in Sources */,
+				706F9F3434C24D73850F0B1C /* WidgetBundle.swift in Sources */,
+				892BCC86E7DA4630BFFDE9A6 /* NextPrayerWidget.swift in Sources */,
+				D9D0AEB53EB044B88D2C68B1 /* QuranAyahWidget.swift in Sources */,
+				8CA94465FFE44C7DACB6D3B2 /* AzkarWidget.swift in Sources */,
+				F37EDF9AB9C640DE88258952 /* DhikrWidget.swift in Sources */,
+				D6621DAC4CC64889AAED6D05 /* HijriDateWidget.swift in Sources */,
+				48682A700360497EBDDE84FA /* PrayerLiveActivity.swift in Sources */,
+				C1DC996026A14EE89EB2FFE0 /* SharedActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		078FAB892E774951A8739691 /* Debug */ = {
+		13B07F941A680F5B00A75B9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6BC4792EDA8EC84884B482B1 /* Pods-rwhalmslm.debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = rwhalmslm/rwhalmslm.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"FB_SONARKIT_ENABLED=1",
+				);
+				INFOPLIST_FILE = rwhalmslm/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.rooh.almuslim;
+				PRODUCT_NAME = rwhalmslm;
+				SWIFT_OBJC_BRIDGING_HEADER = "rwhalmslm/rwhalmslm-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
+		13B07F951A680F5B00A75B9A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 05DB3B68E3A6B8C9E6A9FDBA /* Pods-rwhalmslm.release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = rwhalmslm/rwhalmslm.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = rwhalmslm/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-lc++",
+				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.rooh.almuslim;
+				PRODUCT_NAME = rwhalmslm;
+				SWIFT_OBJC_BRIDGING_HEADER = "rwhalmslm/rwhalmslm-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		3265E9E7E33A4503900ECF4C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -621,73 +687,7 @@
 			};
 			name = Debug;
 		};
-		13B07F941A680F5B00A75B9A /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 22005C5D7A284D00F0E66D36 /* Pods-rwhalmslm.debug.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = rwhalmslm/rwhalmslm.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
-				ENABLE_BITCODE = NO;
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"$(inherited)",
-					"FB_SONARKIT_ENABLED=1",
-				);
-				INFOPLIST_FILE = rwhalmslm/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-ObjC",
-					"-lc++",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
-				PRODUCT_BUNDLE_IDENTIFIER = com.rooh.almuslim;
-				PRODUCT_NAME = rwhalmslm;
-				SWIFT_OBJC_BRIDGING_HEADER = "rwhalmslm/rwhalmslm-Bridging-Header.h";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VERSIONING_SYSTEM = "apple-generic";
-			};
-			name = Debug;
-		};
-		13B07F951A680F5B00A75B9A /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = B54CBBF884AFE63D152546F1 /* Pods-rwhalmslm.release.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = rwhalmslm/rwhalmslm.entitlements;
-				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = rwhalmslm/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					"-ObjC",
-					"-lc++",
-				);
-				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
-				PRODUCT_BUNDLE_IDENTIFIER = com.rooh.almuslim;
-				PRODUCT_NAME = rwhalmslm;
-				SWIFT_OBJC_BRIDGING_HEADER = "rwhalmslm/rwhalmslm-Bridging-Header.h";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VERSIONING_SYSTEM = "apple-generic";
-			};
-			name = Release;
-		};
-		52C399BF241A4B2992B5A203 /* Release */ = {
+		6FA8C5DD93CE4E9E8A958374 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -768,7 +768,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@types+react@19.1.17_react@19.1.0/node_modules/react-native";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
@@ -823,7 +823,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/.pnpm/react-native@0.81.5_@babel+core@7.29.0_@types+react@19.1.17_react@19.1.0/node_modules/react-native";
+				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				USE_HERMES = true;
@@ -843,11 +843,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		74169970EA384759810ABE07 /* Build configuration list for PBXNativeTarget "RoohAlMuslimWidgets" */ = {
+		267206844AAB492D93679806 /* Build configuration list for PBXNativeTarget "RoohAlMuslimWidgets" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				078FAB892E774951A8739691 /* Debug */,
-				52C399BF241A4B2992B5A203 /* Release */,
+				3265E9E7E33A4503900ECF4C /* Debug */,
+				6FA8C5DD93CE4E9E8A958374 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1233,7 +1233,7 @@ export default function AllahNamesScreen() {
 
                 <View style={{ alignItems: 'center', paddingVertical: Spacing.lg }}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: Colors.secondary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                    style={[styles.actionBtn, { backgroundColor: '#0d8e62', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
                     onPress={() => handleCopyName(selectedName)}
                   >
                     <Ionicons name="copy" size={18} color="#FFF" />
@@ -1434,7 +1434,7 @@ const _styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#0d8e62',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1479,7 +1479,7 @@ const _styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#0d8e62',
     alignItems: 'center',
     justifyContent: 'center',
   },

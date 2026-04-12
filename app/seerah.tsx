@@ -33,10 +33,6 @@ import { useSeerahContent } from '@/lib/content-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ========================================
 // الألوان

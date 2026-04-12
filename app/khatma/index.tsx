@@ -35,7 +35,7 @@ export default function KhatmaListScreen() {
   const router = useRouter();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
-  const { settings, t } = useSettings();
+  const { settings, t, isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const {
     khatmas,
@@ -44,6 +44,22 @@ export default function KhatmaListScreen() {
     setActiveKhatma,
     deleteKhatma,
   } = useKhatma();
+
+  const GREEN = '#0d8e62';
+
+  // Card styling - better contrast in light mode
+  const innerCardStyle = {
+    backgroundColor: isDarkMode ? colors.card : '#F0F0F2',
+    borderWidth: isDarkMode ? 0 : 1,
+    borderColor: isDarkMode ? 'transparent' : '#D1D5DB',
+    // Shadow for light mode only
+    ...(isDarkMode ? {} : {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+    }),
+  };
 
   // Handle delete khatma
   const handleDelete = useCallback(
@@ -140,7 +156,7 @@ export default function KhatmaListScreen() {
           <GlassCard
             style={[
               styles.khatmaCard,
-              isActive && { borderColor: colors.primary, borderWidth: 2 },
+              isActive && { borderColor: GREEN, borderWidth: 2 },
             ]}
           >
             {/* Header */}
@@ -150,7 +166,7 @@ export default function KhatmaListScreen() {
                   {item.name}
                 </Text>
                 {isActive && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
+                  <View style={[styles.activeBadge, { backgroundColor: GREEN }]}>
                     <Text style={styles.activeBadgeText}>{t('khatma.active')}</Text>
                   </View>
                 )}
@@ -178,7 +194,7 @@ export default function KhatmaListScreen() {
                   style={[
                     styles.progressFill,
                     {
-                      backgroundColor: item.isCompleted ? colors.success : colors.primary,
+                      backgroundColor: item.isCompleted ? colors.success : GREEN,
                       width: `${stats.progressPercentage}%`,
                     },
                   ]}
@@ -192,7 +208,7 @@ export default function KhatmaListScreen() {
             {/* Stats */}
             <View style={[styles.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <View style={styles.statItem}>
-                <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+                <Ionicons name="document-text-outline" size={18} color={GREEN} />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {toArabicNumber(stats.pagesRead)}
                 </Text>
@@ -202,7 +218,7 @@ export default function KhatmaListScreen() {
               </View>
 
               <View style={styles.statItem}>
-                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Ionicons name="calendar-outline" size={18} color={GREEN} />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {toArabicNumber(stats.daysRemaining)}
                 </Text>
@@ -212,7 +228,7 @@ export default function KhatmaListScreen() {
               </View>
 
               <View style={styles.statItem}>
-                <Ionicons name="book-outline" size={18} color={colors.primary} />
+                <Ionicons name="book-outline" size={18} color={GREEN} />
                 <Text style={[styles.statValue, { color: colors.text }]}>
                   {toArabicNumber(item.pagesPerDay)}
                 </Text>
@@ -223,8 +239,8 @@ export default function KhatmaListScreen() {
             </View>
 
             {/* Current Position */}
-            <View style={[styles.currentPosition, { backgroundColor: colors.card }]}>
-              <Text style={[styles.positionLabel, { color: colors.textSecondary }]}>
+            <View style={[styles.currentPosition, innerCardStyle]}>
+              <Text style={[styles.positionLabel, { color: isDarkMode ? colors.textSecondary : '#6B7280' }]}>
                 {t('khatma.currentPosition')}
               </Text>
               <Text style={[styles.positionValue, { color: colors.text }]}>
@@ -263,7 +279,7 @@ export default function KhatmaListScreen() {
       <BackgroundWrapper backgroundKey={settings.display.appBackground} backgroundUrl={settings.display.appBackgroundUrl} opacity={settings.display.backgroundOpacity ?? 1} style={{ flex: 1 }}>
       <SafeAreaView style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={GREEN} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             {t('khatma.loading')}
           </Text>
@@ -286,7 +302,7 @@ export default function KhatmaListScreen() {
           onPress: () => router.push('/khatma/new'),
           color: '#FFFFFF',
           size: 24,
-          style: { backgroundColor: colors.primary, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+          style: { backgroundColor: GREEN, borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
         }]}
       >
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
@@ -315,7 +331,7 @@ export default function KhatmaListScreen() {
             {t('khatma.noKhatmasDesc')}
           </Text>
           <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+            style={[styles.startButton, { backgroundColor: GREEN, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             onPress={() => router.push('/khatma/new')}
           >
             <Ionicons name="add" size={20} color="#FFFFFF" />
@@ -327,7 +343,7 @@ export default function KhatmaListScreen() {
       {/* Floating Action Button for Active Khatma */}
       {activeKhatma && !activeKhatma.isCompleted && (
         <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+          style={[styles.fab, { backgroundColor: GREEN, flexDirection: isRTL ? 'row-reverse' : 'row' }]}
           onPress={() => router.push('/khatma/wird')}
         >
           <Ionicons name="book" size={24} color="#FFFFFF" />

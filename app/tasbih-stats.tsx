@@ -132,9 +132,9 @@ export default function TasbihStatsScreen() {
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                <MaterialCommunityIcons name="calendar-today" size={28} color={C.text} />
-                <Text style={[s.statValue, { color: C.text }]}>{totalToday}</Text>
-                <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.todaysCount')}</Text>
+                <MaterialCommunityIcons name="calendar-today" size={28} color={C.glassText} />
+                <Text style={[s.statValue, { color: C.glassText }]}>{totalToday}</Text>
+                <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.todaysCount')}</Text>
               </View>
               <View
                 style={[
@@ -146,9 +146,9 @@ export default function TasbihStatsScreen() {
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                <MaterialCommunityIcons name="sync" size={28} color={C.text} />
-                <Text style={[s.statValue, { color: C.text }]}>{rounds}</Text>
-                <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.completedRounds')}</Text>
+                <MaterialCommunityIcons name="sync" size={28} color={C.glassText} />
+                <Text style={[s.statValue, { color: C.glassText }]}>{rounds}</Text>
+                <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.completedRounds')}</Text>
               </View>
             </View>
 
@@ -163,9 +163,9 @@ export default function TasbihStatsScreen() {
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                <MaterialCommunityIcons name="sigma" size={28} color={C.text} />
-                <Text style={[s.statValue, { color: C.text }]}>{allTimeTotal}</Text>
-                <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.allTimeTotal')}</Text>
+                <MaterialCommunityIcons name="sigma" size={28} color={C.glassText} />
+                <Text style={[s.statValue, { color: C.glassText }]}>{allTimeTotal}</Text>
+                <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.allTimeTotal')}</Text>
               </View>
               <View
                 style={[
@@ -177,9 +177,9 @@ export default function TasbihStatsScreen() {
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                <MaterialCommunityIcons name="chart-line" size={28} color={C.text} />
-                <Text style={[s.statValue, { color: C.text }]}>{avgPerDay}</Text>
-                <Text style={[s.statLabel, { color: C.textLight }]}>{t('tasbih.dailyAverage')}</Text>
+                <MaterialCommunityIcons name="chart-line" size={28} color={C.glassText} />
+                <Text style={[s.statValue, { color: C.glassText }]}>{avgPerDay}</Text>
+                <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.dailyAverage')}</Text>
               </View>
             </View>
 
@@ -208,7 +208,7 @@ export default function TasbihStatsScreen() {
                         )}
                         <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
                         <Text style={[s.statsRowVal, { color: C.text }]}>{cnt}</Text>
-                        <Text style={[s.statsRowDate, { color: C.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+                        <Text style={[s.statsRowDate, { color: C.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                           {text.length > 30 ? text.slice(0, 28) + '…' : text}
                         </Text>
                       </View>
@@ -224,9 +224,9 @@ export default function TasbihStatsScreen() {
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                <MaterialCommunityIcons name="chart-bar" size={40} color={C.textLight} style={{ opacity: 0.5 }} />
-                <Text style={[s.emptyText, { color: C.textLight }]}>{t('tasbih.noDataYet')}</Text>
-                <Text style={[s.emptySubtext, { color: C.textLight }]}>{t('tasbih.startTasbihHint')}</Text>
+                <MaterialCommunityIcons name="chart-bar" size={40} color={C.glassTextLight} style={{ opacity: 0.5 }} />
+                <Text style={[s.emptyText, { color: C.glassTextLight }]}>{t('tasbih.noDataYet')}</Text>
+                <Text style={[s.emptySubtext, { color: C.glassTextLight }]}>{t('tasbih.startTasbihHint')}</Text>
               </View>
             ) : (
               Object.entries(dailyStats)
@@ -257,8 +257,8 @@ export default function TasbihStatsScreen() {
                           alignItems: 'center',
                         }}
                       >
-                        <Text style={[s.statsRowVal, { color: C.text }]}>{cnt} {t('tasbih.dhikrUnit')}</Text>
-                        <Text style={[s.statsRowDate, { color: C.textLight }]}>{date}</Text>
+                        <Text style={[s.statsRowVal, { color: C.glassText }]}>{cnt} {t('tasbih.dhikrUnit')}</Text>
+                        <Text style={[s.statsRowDate, { color: C.glassTextLight }]}>{date}</Text>
                       </View>
                       {dayTypeStats && Object.keys(dayTypeStats).length > 0 && (
                         <View style={{ marginTop: 8, gap: 4 }}>
@@ -278,7 +278,7 @@ export default function TasbihStatsScreen() {
                                   style={{
                                     fontSize: 11,
                                     fontFamily: fontMedium(),
-                                    color: C.text,
+                                    color: C.glassText,
                                     opacity: 0.8,
                                   }}
                                 >
@@ -288,7 +288,7 @@ export default function TasbihStatsScreen() {
                                   style={{
                                     fontSize: 11,
                                     fontFamily: fontRegular(),
-                                    color: C.textLight,
+                                    color: C.glassTextLight,
                                   }}
                                   numberOfLines={1}
                                 >
