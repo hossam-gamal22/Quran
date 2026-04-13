@@ -9,7 +9,6 @@ import {
   FlatList,
   Pressable,
   Platform,
-  LayoutAnimation,
   ScrollView,
   ViewStyle,
   TextStyle,
@@ -82,7 +81,6 @@ export default function QuestionAnswerScreen() {
 
   const toggleExpanded = useCallback((id: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedItems(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -279,7 +277,7 @@ export default function QuestionAnswerScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={tabsContainerStyle}
-          style={[{ flexGrow: 0, zIndex: 10, backgroundColor: colors.background }, isRTL && { transform: [{ scaleX: -1 }] }]}
+          style={[{ flexGrow: 0, zIndex: 10 }, isRTL && { transform: [{ scaleX: -1 }] }]}
         >
           <View style={[chipsContainerStyle, isRTL && { transform: [{ scaleX: -1 }] }]}>
             {categories.map(cat => {
