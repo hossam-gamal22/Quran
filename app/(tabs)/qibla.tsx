@@ -26,6 +26,8 @@ import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useAnimatedStyle,
+  useSharedValue,
+  withTiming,
   runOnJS,
 } from 'react-native-reanimated';
 import { useCompassHeading } from '@/hooks/use-compass-heading';
@@ -439,6 +441,9 @@ const QiblaScreen = () => {
   const guidanceTurnRight = t('qibla.turnRight') || 'Turn Right';
   const guidanceTurnLeft = t('qibla.turnLeft') || 'Turn Left';
 
+  // Shared value for alignment glow (0 = not aligned, 1 = aligned)
+  const alignedProgress = useSharedValue(0);
+
   // POINTER: rotates to point toward Qibla
   const pointerAnimatedStyle = useAnimatedStyle(() => {
     const safeBearing =
@@ -460,12 +465,27 @@ const QiblaScreen = () => {
       text = guidanceAligned;
       aligned = true;
     }
+
+    // Animate glow based on alignment
+    alignedProgress.value = withTiming(aligned ? 1 : 0, { duration: 300 });
+
     runOnJS(onGuidanceUpdate)(text, aligned);
 
     return {
       transform: [{ rotate: `${rotation}deg` }],
     };
   }, [qiblaBearing, guidanceAligned, guidanceTurnRight, guidanceTurnLeft]);
+
+  // Green glow style for pointer when aligned
+  const pointerGlowStyle = useAnimatedStyle(() => {
+    return {
+      shadowColor: '#4CAF50',
+      shadowOpacity: alignedProgress.value * 0.9,
+      shadowRadius: alignedProgress.value * 20,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: alignedProgress.value * 20,
+    };
+  });
 
   // ------ Loading / Error / Offline ------
   const bgProps = {
@@ -703,6 +723,7 @@ const QiblaScreen = () => {
               StyleSheet.absoluteFillObject,
               styles.centered,
               pointerAnimatedStyle,
+              pointerGlowStyle,
             ]}
             pointerEvents="none"
           >
