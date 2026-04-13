@@ -4,6 +4,7 @@
 // Falls back to Location.watchHeadingAsync if sensors unavailable.
 
 import { useEffect, useRef, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { Magnetometer, Accelerometer } from 'expo-sensors';
 import * as Location from 'expo-location';
@@ -41,9 +42,17 @@ function computeTiltCompensatedHeading(
 ): number {
   // Normalize accelerometer (gravity vector)
   const aNorm = Math.sqrt(ax * ax + ay * ay + az * az) || 1;
-  const gx = ax / aNorm;
-  const gy = ay / aNorm;
-  const gz = az / aNorm;
+  let gx = ax / aNorm;
+  let gy = ay / aNorm;
+  let gz = az / aNorm;
+
+  // iOS accelerometer reports gravity with opposite sign vs Android
+  // (iOS: flat face-up z ≈ -1, Android: z ≈ +1). Negate to unify.
+  if (Platform.OS === 'ios') {
+    gx = -gx;
+    gy = -gy;
+    gz = -gz;
+  }
 
   // Project magnetic vector onto horizontal plane using cross products
   // East vector E = M × G (cross product of magnetometer and gravity)
