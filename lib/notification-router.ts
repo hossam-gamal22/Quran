@@ -178,6 +178,14 @@ export function handleNotificationNavigation(
       return { navigated: true };
     }
 
+    // ─── Khatma (Quran reading plan) ───
+    case 'khatma_reminder':
+    case 'khatma_daily_wird':
+    case 'khatma_complete':
+    case 'khatma_wird_complete':
+      router.push('/khatma' as any);
+      return { navigated: true };
+
     // ─── No-op types (just opening the app is enough) ───
     case 'refresh_reminder':
     case 'test':

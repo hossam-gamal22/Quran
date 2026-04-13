@@ -53,6 +53,7 @@ interface ExpoPushMessage {
   channelId?: string;
   priority?: 'default' | 'normal' | 'high';
   ttl?: number;
+  _displayInForeground?: boolean;
 }
 
 export interface PushNotificationPayload {
@@ -342,11 +343,14 @@ export const sendPushNotification = async (
         sound: 'default',
         priority: 'high',
         channelId: 'general',
+        ttl: 86400,
+        _displayInForeground: true,
         data: {
           actionType: payload.actionType,
           actionUrl: payload.actionUrl,
           imageUrl: payload.imageUrl,
           language: user.language,
+          type: payload.actionType || 'admin',
         },
       };
     });

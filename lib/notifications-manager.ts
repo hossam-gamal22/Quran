@@ -31,6 +31,8 @@ import { getNotificationIconAttachment } from './notification-icons';
 // another run is triggered with the latest settings automatically.
 let _isScheduling = false;
 let _pendingReschedule: Record<string, any> | null = null;
+let _schedulingStartedAt = 0;
+const MUTEX_TIMEOUT_MS = 30_000; // Force-release after 30 seconds
 
 // ─── Refresh Reminder Constants ──────────────────────────────────────────────
 const REFRESH_REMINDER_PREFIX = 'refresh_reminder';
@@ -638,11 +640,19 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   // When skipped, we store the latest settings so they run after the current
   // scheduling completes — guarantees the most recent user changes take effect.
   if (_isScheduling) {
-    console.log('[notifications-manager] scheduleNotificationsFromSettings queued — already in progress');
-    _pendingReschedule = notifSettings as Record<string, any>;
-    return;
+    // Force-release stale mutex if holder has been running too long (e.g. hung API call)
+    const elapsed = Date.now() - _schedulingStartedAt;
+    if (elapsed > MUTEX_TIMEOUT_MS) {
+      console.warn(`⚠️ [notifications-manager] Mutex held for ${Math.round(elapsed / 1000)}s — force releasing`);
+      _isScheduling = false;
+    } else {
+      console.log('[notifications-manager] scheduleNotificationsFromSettings queued — already in progress');
+      _pendingReschedule = notifSettings as Record<string, any>;
+      return;
+    }
   }
   _isScheduling = true;
+  _schedulingStartedAt = Date.now();
 
   try {
     if (!notifSettings.enabled) {
@@ -1403,6 +1413,11 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       `prayer=${diag.prayerCount} afterPrayer=${diag.afterPrayerCount} ` +
       `wird=${diag.wirdCount} ayah=${diag.dailyAyahCount} other=${diag.otherCount}`
     );
+
+    // Critical: detect silent scheduling failure (0 scheduled when user expects notifications)
+    if (diag.totalScheduled === 0 && notifSettings.enabled) {
+      console.warn('🚨 [POST-SCHEDULE] WARNING: 0 notifications scheduled despite enabled=true! Possible scheduling failure.');
+    }
 
     // iOS 64-notification hard budget check
     if (Platform.OS === 'ios' && diag.totalScheduled > 64) {
