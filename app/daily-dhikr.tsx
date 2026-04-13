@@ -272,12 +272,14 @@ export default function DailyDhikrScreen() {
           })()}
 
           {/* Reference */}
-          <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <MaterialCommunityIcons name="book-open-page-variant" size={18} color={ACCENT} />
-            <Text style={[styles.referenceText, { color: colors.textLight }]}>
-              {transliterateReference(dhikr.reference, language)}
-            </Text>
-          </View>
+          {dhikr.reference ? (
+            <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <MaterialCommunityIcons name="book-open-page-variant" size={18} color={ACCENT} />
+              <Text style={[styles.referenceText, { color: colors.textLight }]}>
+                {transliterateReference(dhikr.reference, language)}
+              </Text>
+            </View>
+          ) : null}
 
           {/* Refresh Button */}
           <TouchableOpacity

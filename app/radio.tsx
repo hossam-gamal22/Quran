@@ -403,7 +403,7 @@ function RadioScreen() {
           flexDirection: isRTL ? 'row-reverse' : 'row',
         }]}>
           <MaterialCommunityIcons
-            name={isOffline ? 'wifi-off' : 'alert-circle-outline'}
+            name={isOffline ? 'wifi-off' : radioState.errorMessage === 'STREAM_OFFLINE' ? 'broadcast-off' : 'alert-circle-outline'}
             size={24}
             color="#EF4444"
           />
@@ -412,7 +412,7 @@ function RadioScreen() {
               {radioState.currentStation.name}
             </Text>
             <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-              {isOffline ? t('radio.noInternet') : t('radio.connectionError')}
+              {isOffline ? t('radio.noInternet') : radioState.errorMessage === 'STREAM_OFFLINE' ? t('radio.stationOffline') : t('radio.connectionError')}
             </Text>
           </View>
           <Pressable

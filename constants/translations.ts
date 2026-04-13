@@ -1886,9 +1886,12 @@ export interface TranslationKeys {
   };
   qibla: {
     aligned: string;
+    calibrate: string;
+    distanceToKaaba: string;
     findingDirection: string;
     internetRequired: string;
     locationFailed: string;
+    mediumAccuracy: string;
     permissionRequired: string;
     sensorFailed: string;
     servicesDisabled: string;
@@ -2389,6 +2392,7 @@ export interface TranslationKeys {
     tapToPlay: string;
     buffering: string;
     connectionError: string;
+    stationOffline: string;
     tryAgain: string;
     addFavorite: string;
     removeFavorite: string;
@@ -4303,9 +4307,12 @@ const ar: TranslationKeys = {
   },
   qibla: {
     aligned: 'القبلة أمامك',
+    calibrate: 'حرّك هاتفك على شكل ∞ لمعايرة البوصلة',
+    distanceToKaaba: 'على بُعد {km} كم من الكعبة المشرفة',
     findingDirection: 'جاري تحديد الاتجاه...',
     internetRequired: 'يتطلب الاتصال بالإنترنت',
     locationFailed: 'فشل تحديد الموقع',
+    mediumAccuracy: 'دقة متوسطة',
     permissionRequired: 'يتطلب إذن الموقع',
     sensorFailed: 'فشل المستشعر',
     servicesDisabled: 'خدمات الموقع معطلة',
@@ -4792,6 +4799,7 @@ const ar: TranslationKeys = {
     tapToPlay: 'اضغط للتشغيل',
     buffering: 'جاري التحميل...',
     connectionError: 'خطأ في الاتصال',
+    stationOffline: 'هذه المحطة غير متاحة حالياً',
     tryAgain: 'حاول مرة أخرى',
     addFavorite: 'إضافة للمحفوظات',
     removeFavorite: 'إزالة من المحفوظات',
@@ -6704,9 +6712,12 @@ const en: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla Aligned',
+    calibrate: 'Move your phone in a figure-8 to calibrate',
+    distanceToKaaba: '{km} km from the Kaaba',
     findingDirection: 'Finding direction...',
     internetRequired: 'Internet required',
     locationFailed: 'Location failed',
+    mediumAccuracy: 'Medium Accuracy',
     permissionRequired: 'Location permission required',
     sensorFailed: 'Sensor failed',
     servicesDisabled: 'Location services disabled',
@@ -7193,6 +7204,7 @@ const en: TranslationKeys = {
     tapToPlay: 'Tap to play',
     buffering: 'Buffering...',
     connectionError: 'Connection error',
+    stationOffline: 'This station is currently unavailable',
     tryAgain: 'Try again',
     addFavorite: 'Add to favorites',
     removeFavorite: 'Remove from favorites',
@@ -9105,9 +9117,12 @@ const fr: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla alignée',
+    calibrate: 'Bougez votre téléphone en 8 pour calibrer',
+    distanceToKaaba: 'À {km} km de la Kaaba',
     findingDirection: 'Recherche de la direction...',
     internetRequired: 'Internet requis',
     locationFailed: 'Échec de la localisation',
+    mediumAccuracy: 'Précision moyenne',
     permissionRequired: 'Autorisation de localisation requise',
     sensorFailed: 'Échec du capteur',
     servicesDisabled: 'Services de localisation désactivés',
@@ -9594,6 +9609,7 @@ const fr: TranslationKeys = {
     tapToPlay: 'Appuyez pour écouter',
     buffering: 'Mise en mémoire tampon...',
     connectionError: 'Erreur de connexion',
+    stationOffline: 'Cette station est actuellement indisponible',
     tryAgain: 'Réessayer',
     addFavorite: 'Ajouter aux favoris',
     removeFavorite: 'Retirer des favoris',
@@ -11507,9 +11523,12 @@ const de: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla ausgerichtet',
+    calibrate: 'Bewegen Sie Ihr Telefon in einer 8 zur Kalibrierung',
+    distanceToKaaba: '{km} km von der Kaaba entfernt',
     findingDirection: 'Richtung wird gesucht...',
     internetRequired: 'Internet erforderlich',
     locationFailed: 'Standort fehlgeschlagen',
+    mediumAccuracy: 'Mittlere Genauigkeit',
     permissionRequired: 'Standortberechtigung erforderlich',
     sensorFailed: 'Sensor fehlgeschlagen',
     servicesDisabled: 'Standortdienste deaktiviert',
@@ -11996,6 +12015,7 @@ const de: TranslationKeys = {
     tapToPlay: 'Tippen zum Abspielen',
     buffering: 'Pufferung...',
     connectionError: 'Verbindungsfehler',
+    stationOffline: 'Dieser Sender ist derzeit nicht verfügbar',
     tryAgain: 'Erneut versuchen',
     addFavorite: 'Zu Favoriten hinzufügen',
     removeFavorite: 'Aus Favoriten entfernen',
@@ -13909,9 +13929,12 @@ const tr: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kıble Hizalandı',
+    calibrate: 'Pusulayı kalibre etmek için telefonunuzu 8 şeklinde hareket ettirin',
+    distanceToKaaba: 'Kabe\'ye {km} km uzaklıkta',
     findingDirection: 'Yön bulunuyor...',
     internetRequired: 'İnternet Gerekli',
     locationFailed: 'Konum Başarısız',
+    mediumAccuracy: 'Orta Doğruluk',
     permissionRequired: 'Konum İzni Gerekli',
     sensorFailed: 'Sensör Başarısız',
     servicesDisabled: 'Konum Servisleri Kapalı',
@@ -14398,6 +14421,7 @@ const tr: TranslationKeys = {
     tapToPlay: 'Çalmak için dokunun',
     buffering: 'Arabelleğe alınıyor...',
     connectionError: 'Bağlantı hatası',
+    stationOffline: 'Bu istasyon şu anda kullanılamıyor',
     tryAgain: 'Tekrar dene',
     addFavorite: 'Favorilere ekle',
     removeFavorite: 'Favorilerden kaldır',
@@ -16311,9 +16335,12 @@ const es: TranslationKeys = {
   },
   qibla: {
     aligned: 'Qibla alineada',
+    calibrate: 'Mueve tu teléfono en forma de 8 para calibrar',
+    distanceToKaaba: 'A {km} km de la Kaaba',
     findingDirection: 'Buscando dirección...',
     internetRequired: 'Internet requerido',
     locationFailed: 'Ubicación fallida',
+    mediumAccuracy: 'Precisión media',
     permissionRequired: 'Permiso de ubicación requerido',
     sensorFailed: 'Sensor fallido',
     servicesDisabled: 'Servicios de ubicación desactivados',
@@ -16800,6 +16827,7 @@ const es: TranslationKeys = {
     tapToPlay: 'Toca para reproducir',
     buffering: 'Cargando...',
     connectionError: 'Error de conexión',
+    stationOffline: 'Esta estación no está disponible actualmente',
     tryAgain: 'Intentar de nuevo',
     addFavorite: 'Agregar a favoritos',
     removeFavorite: 'Quitar de favoritos',
@@ -18712,9 +18740,12 @@ const ur: TranslationKeys = {
   },
   qibla: {
     aligned: 'قبلہ سیدھ میں',
+    calibrate: 'کمپاس کو کیلیبریٹ کرنے کے لیے فون کو 8 کی شکل میں ہلائیں',
+    distanceToKaaba: 'کعبہ سے {km} کلومیٹر دور',
     findingDirection: 'سمت تلاش ہو رہی...',
     internetRequired: 'انٹرنیٹ ضروری',
     locationFailed: 'مقام ناکام',
+    mediumAccuracy: 'درمیانی درستگی',
     permissionRequired: 'مقام کی اجازت ضروری',
     sensorFailed: 'سینسر ناکام',
     servicesDisabled: 'مقام خدمات غیر فعال',
@@ -19201,6 +19232,7 @@ const ur: TranslationKeys = {
     tapToPlay: 'چلانے کے لیے دبائیں',
     buffering: 'بفرنگ...',
     connectionError: 'کنکشن کی خرابی',
+    stationOffline: 'یہ اسٹیشن فی الحال دستیاب نہیں ہے',
     tryAgain: 'دوبارہ کوشش کریں',
     addFavorite: 'پسندیدہ میں شامل کریں',
     removeFavorite: 'پسندیدہ سے ہٹائیں',
@@ -21114,9 +21146,12 @@ const id: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kiblat Selaras',
+    calibrate: 'Gerakkan ponsel Anda membentuk angka 8 untuk kalibrasi',
+    distanceToKaaba: '{km} km dari Ka\'bah',
     findingDirection: 'Mencari arah...',
     internetRequired: 'Internet Diperlukan',
     locationFailed: 'Lokasi Gagal',
+    mediumAccuracy: 'Akurasi Sedang',
     permissionRequired: 'Izin Lokasi Diperlukan',
     sensorFailed: 'Sensor Gagal',
     servicesDisabled: 'Layanan Lokasi Nonaktif',
@@ -21603,6 +21638,7 @@ const id: TranslationKeys = {
     tapToPlay: 'Ketuk untuk memutar',
     buffering: 'Memuat...',
     connectionError: 'Kesalahan koneksi',
+    stationOffline: 'Stasiun ini saat ini tidak tersedia',
     tryAgain: 'Coba lagi',
     addFavorite: 'Tambah ke favorit',
     removeFavorite: 'Hapus dari favorit',
@@ -23516,9 +23552,12 @@ const ms: TranslationKeys = {
   },
   qibla: {
     aligned: 'Kiblat Selaras',
+    calibrate: 'Gerakkan telefon anda dalam bentuk 8 untuk kalibrasi',
+    distanceToKaaba: '{km} km dari Kaabah',
     findingDirection: 'Mencari arah...',
     internetRequired: 'Internet Diperlukan',
     locationFailed: 'Lokasi Gagal',
+    mediumAccuracy: 'Ketepatan Sederhana',
     permissionRequired: 'Kebenaran Lokasi Diperlukan',
     sensorFailed: 'Sensor Gagal',
     servicesDisabled: 'Perkhidmatan Lokasi Dinyahaktifkan',
@@ -24005,6 +24044,7 @@ const ms: TranslationKeys = {
     tapToPlay: 'Ketik untuk main',
     buffering: 'Memuat...',
     connectionError: 'Ralat sambungan',
+    stationOffline: 'Stesen ini tidak tersedia buat masa ini',
     tryAgain: 'Cuba lagi',
     addFavorite: 'Tambah ke kegemaran',
     removeFavorite: 'Buang dari kegemaran',
@@ -25918,9 +25958,12 @@ const hi: TranslationKeys = {
   },
   qibla: {
     aligned: 'क़िबला सीध में',
+    calibrate: 'कम्पास कैलिब्रेट करने के लिए फोन को 8 के आकार में घुमाएं',
+    distanceToKaaba: 'काबा से {km} किमी दूर',
     findingDirection: 'दिशा खोजी जा रही...',
     internetRequired: 'इंटरनेट आवश्यक',
     locationFailed: 'स्थान विफल',
+    mediumAccuracy: 'मध्यम सटीकता',
     permissionRequired: 'स्थान अनुमति आवश्यक',
     sensorFailed: 'सेंसर विफल',
     servicesDisabled: 'स्थान सेवाएँ अक्षम',
@@ -26407,6 +26450,7 @@ const hi: TranslationKeys = {
     tapToPlay: 'चलाने के लिए टैप करें',
     buffering: 'बफरिंग...',
     connectionError: 'कनेक्शन त्रुटि',
+    stationOffline: 'यह स्टेशन वर्तमान में अनुपलब्ध है',
     tryAgain: 'पुनः प्रयास करें',
     addFavorite: 'पसंदीदा में जोड़ें',
     removeFavorite: 'पसंदीदा से हटाएं',
@@ -28320,9 +28364,12 @@ const bn: TranslationKeys = {
   },
   qibla: {
     aligned: 'কিবলা সারিবদ্ধ',
+    calibrate: 'কম্পাস ক্যালিব্রেট করতে ফোনটি ৮ আকারে নাড়ান',
+    distanceToKaaba: 'কাবা থেকে {km} কিমি দূরে',
     findingDirection: 'দিক খোঁজা হচ্ছে...',
     internetRequired: 'ইন্টারনেট প্রয়োজন',
     locationFailed: 'অবস্থান ব্যর্থ',
+    mediumAccuracy: 'মধ্যম নির্ভুলতা',
     permissionRequired: 'অবস্থান অনুমতি প্রয়োজন',
     sensorFailed: 'সেন্সর ব্যর্থ',
     servicesDisabled: 'লোকেশন সেবা নিষ্ক্রিয়',
@@ -28809,6 +28856,7 @@ const bn: TranslationKeys = {
     tapToPlay: 'চালাতে ট্যাপ করুন',
     buffering: 'বাফারিং...',
     connectionError: 'সংযোগ ত্রুটি',
+    stationOffline: 'এই স্টেশনটি বর্তমানে অনুপলব্ধ',
     tryAgain: 'আবার চেষ্টা করুন',
     addFavorite: 'পছন্দের তালিকায় যোগ করুন',
     removeFavorite: 'পছন্দের তালিকা থেকে সরান',
@@ -30721,9 +30769,12 @@ const ru: TranslationKeys = {
   },
   qibla: {
     aligned: 'Кибла выравнена',
+    calibrate: 'Двигайте телефон восьмёркой для калибровки',
+    distanceToKaaba: '{km} км от Каабы',
     findingDirection: 'Поиск направления...',
     internetRequired: 'Требуется интернет',
     locationFailed: 'Ошибка местоположения',
+    mediumAccuracy: 'Средняя точность',
     permissionRequired: 'Требуется разрешение на местоположение',
     sensorFailed: 'Ошибка датчика',
     servicesDisabled: 'Службы геолокации отключены',
@@ -31210,6 +31261,7 @@ const ru: TranslationKeys = {
     tapToPlay: 'Нажмите для воспроизведения',
     buffering: 'Буферизация...',
     connectionError: 'Ошибка подключения',
+    stationOffline: 'Эта станция в настоящее время недоступна',
     tryAgain: 'Попробовать снова',
     addFavorite: 'Добавить в избранное',
     removeFavorite: 'Удалить из избранного',

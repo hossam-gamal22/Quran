@@ -170,6 +170,7 @@ async function playWithExpoAv(url: string): Promise<void> {
     console.log(`[RadioPlayer] Stream URL OK (${res.status}), creating sound...`);
   } catch (e: any) {
     // AbortError means timeout — still try to play (some streams don't reply to HEAD)
+    // But NSURLErrorDomain / resource-unavailable errors should fail immediately
     if (e?.name !== 'AbortError') {
       throw e;
     }
@@ -181,8 +182,8 @@ async function playWithExpoAv(url: string): Promise<void> {
     { uri: url },
     { shouldPlay: true, progressUpdateIntervalMillis: 500 },
   );
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const tid = setTimeout(() => {
       reject(new Error('Stream connection timed out'));
       // Clean up orphaned sound if createAsync resolves after timeout
       createPromise.then(result => {
@@ -190,9 +191,20 @@ async function playWithExpoAv(url: string): Promise<void> {
           try { result.sound.unloadAsync(); } catch {}
         }
       }).catch(() => {});
-    }, 15_000)
-  );
-  const { sound } = await Promise.race([createPromise, timeoutPromise]);
+    }, 15_000);
+    // Keep reference so it doesn't prevent GC, but no need to clear
+    void tid;
+  });
+
+  let sound: Audio.Sound;
+  try {
+    const result = await Promise.race([createPromise, timeoutPromise]);
+    sound = result.sound;
+  } catch (createError: any) {
+    // AVPlayerItem errors (NSURLErrorDomain -1008, etc.) surface here
+    console.warn('[RadioPlayer] expo-av createAsync failed:', createError?.message || createError);
+    throw new Error('STREAM_OFFLINE');
+  }
   _expoAvSound = sound;
   console.log('[RadioPlayer] expo-av sound created successfully');
 
@@ -389,10 +401,18 @@ export const radioPlayer = {
         await playWithExpoAv(resolvedUrl);
         _activeEngine = 'expoav';
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[RadioPlayer] playback error:', error);
 
-      // Auto-retry on stream connection errors (only if online)
+      // Stream is confirmed offline — don't waste retries on a dead URL
+      const isStreamOffline = error?.message === 'STREAM_OFFLINE';
+      if (isStreamOffline) {
+        console.log('[RadioPlayer] Stream confirmed offline, skipping retries');
+        updateState({ status: 'error', errorMessage: 'STREAM_OFFLINE' });
+        return;
+      }
+
+      // Auto-retry on transient connection errors (only if online)
       if (_retryCount < MAX_AUTO_RETRIES) {
         _retryCount++;
         console.log(`[RadioPlayer] Auto-retry ${_retryCount}/${MAX_AUTO_RETRIES}`);
@@ -439,8 +459,12 @@ export const radioPlayer = {
         await playWithExpoAv(resolvedUrl);
         _activeEngine = 'expoav';
       }
-    } catch {
-      updateState({ status: 'error', errorMessage: 'Failed to play stream' });
+    } catch (retryError: any) {
+      const isStreamOffline = retryError?.message === 'STREAM_OFFLINE';
+      updateState({
+        status: 'error',
+        errorMessage: isStreamOffline ? 'STREAM_OFFLINE' : 'Failed to play stream',
+      });
     }
   },
 

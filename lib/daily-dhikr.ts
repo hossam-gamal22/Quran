@@ -33,14 +33,14 @@ function getLocalPool(): DailyDhikr[] {
   if (localPool) return localPool;
   try {
     const azkarData = require('@/data/json/azkar.json');
-    const azkar: any[] = azkarData.azkar || [];
-    // Pick adhkar that have benefit (virtue) — these are more meaningful for daily display
+    const azkar: any[] = Array.isArray(azkarData) ? azkarData : (azkarData.azkar || []);
+    // Pick adhkar that have arabic text — these are meaningful for daily display
     localPool = azkar
-      .filter((z: any) => z.arabic && z.reference)
+      .filter((z: any) => z.arabic)
       .map((z: any) => ({
         id: `local_${z.id}`,
         arabic: z.arabic,
-        reference: z.reference,
+        reference: z.reference || '',
         benefit: typeof z.benefit === 'string' ? z.benefit : (z.benefit?.ar || ''),
         category: z.category,
         source: 'local' as const,

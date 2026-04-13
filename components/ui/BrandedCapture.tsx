@@ -2,7 +2,6 @@
 // نظام مشاركة الصور (معطل - المستخدم يأخذ سكرين شوت عادي)
 
 import React, { forwardRef, useImperativeHandle } from 'react';
-import { View } from 'react-native';
 
 // ─── Size options (kept for type compatibility) ───
 export type ImageSizeKey = 'portrait' | 'story';
@@ -32,17 +31,15 @@ interface BrandedCaptureProps {
  * Users can take regular screenshots instead.
  */
 export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCaptureProps>(
-  ({ children }, ref) => {
+  (_props, ref) => {
     // Provide no-op handle for existing code
     useImperativeHandle(ref, () => ({
       capture: async () => '',
       showSizePicker: () => {},
     }));
 
-    // Resolve render prop pattern
-    const resolvedChildren = typeof children === 'function' ? children('#FFFFFF') : children;
-
-    return <View>{resolvedChildren}</View>;
+    // Screenshot sharing disabled — don't render children to avoid duplicate content
+    return null;
   }
 );
 

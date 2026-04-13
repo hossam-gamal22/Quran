@@ -4,7 +4,6 @@
 // Falls back to Location.watchHeadingAsync if sensors unavailable.
 
 import { useEffect, useRef, useCallback } from 'react';
-import { Platform } from 'react-native';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import { Magnetometer, Accelerometer } from 'expo-sensors';
 import * as Location from 'expo-location';
@@ -27,8 +26,8 @@ export interface CompassHeadingResult {
 // Constants
 // ---------------------------------------------------------------------------
 const SENSOR_INTERVAL_MS = 16;  // ~60 Hz
-const EMA_ALPHA = 0.25;         // Low-pass filter strength (0..1, higher = more responsive)
-const ANIMATION_DURATION_MS = 80; // Fast tracking — filter handles smoothness
+const EMA_ALPHA = 0.4;          // Low-pass filter strength (0..1, higher = more responsive)
+const ANIMATION_DURATION_MS = 50; // Snappy tracking — filter handles smoothness
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -47,33 +46,18 @@ function computeTiltCompensatedHeading(
   const gz = az / aNorm;
 
   // Project magnetic vector onto horizontal plane using cross products
-  // East = M × G (cross product of magnetometer and gravity)
-  const ex = my * gz - mz * gy;
-  const ey = mz * gx - mx * gz;
-  // North = G × E (cross product of gravity and east)
-  const nx = gy * ey - gz * (-ex); // simplified: G × E
-  const ny = gz * ex - gx * ey;    // note: ez was computed but we only need 2D heading
-
-  // Recompute properly:
-  // East vector E = M × G
+  // East vector E = M × G (cross product of magnetometer and gravity)
   const Ex = my * gz - mz * gy;
   const Ey = mz * gx - mx * gz;
   const Ez = mx * gy - my * gx;
-  // North vector N = G × E
+  // North vector N = G × E (cross product of gravity and east)
   const Nx = gy * Ez - gz * Ey;
   const Ny = gz * Ex - gx * Ez;
 
   // Heading = atan2(East dot device-forward, North dot device-forward)
-  // For a phone held upright or flat, device-forward is +Y axis on iOS, -Y on Android
-  // On expo-sensors: x=right, y=up, z=toward-face (iOS standard)
-  // For flat phone: forward ≈ (0, 1, 0)
-  // heading = atan2(Ex, Nx) gives heading in radians
-  let heading = Math.atan2(Ex, Nx) * (180 / Math.PI);
-
-  // Platform correction: Android reports sensor axes differently
-  if (Platform.OS === 'android') {
-    heading = Math.atan2(Ey, Ny) * (180 / Math.PI);
-  }
+  // Device-forward is +Y axis on both iOS and Android (expo-sensors normalizes axes).
+  // expo-sensors: x=right, y=forward/up, z=out of screen
+  let heading = Math.atan2(Ey, Ny) * (180 / Math.PI);
 
   return ((heading % 360) + 360) % 360;
 }

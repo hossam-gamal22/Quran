@@ -77,7 +77,8 @@ export async function resolveStreamUrl(
       continue;
     }
   }
-  return safeUrl;
+  // All URLs failed — throw so the caller knows the stream is unreachable
+  throw new Error('STREAM_OFFLINE');
 }
 
 // ==================== Arabic Country Name Mapping ====================
