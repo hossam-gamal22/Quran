@@ -132,7 +132,8 @@ function calculateIosBudget(params: {
     remaining -= extra * otherCost;
   }
 
-  // Refresh fires 1 day before shortest window expires (minimum day 1)
+  // Refresh fires 2 days before shortest window expires (minimum day 1)
+  // Extra day gives user more buffer before notifications expire
   const allWindows = [
     ...(prayerDays > 0 ? [prayerDays] : []),
     ...(afterPrayerDays > 0 ? [afterPrayerDays] : []),
@@ -140,7 +141,7 @@ function calculateIosBudget(params: {
     ...(otherDays > 0 ? [otherDays] : []),
   ];
   const shortest = allWindows.length > 0 ? Math.min(...allWindows) : 7;
-  const refreshDay = Math.max(1, shortest - 1);
+  const refreshDay = Math.max(1, shortest - 2);
 
   const used = prayerDays * prayerCost + afterPrayerDays * afterPrayerCost
     + azkarDays * azkarCost + otherDays * otherCost + fixedSlots;
@@ -242,7 +243,7 @@ export const DEFAULT_ALL_NOTIF: AllNotificationSettings = {
   wirdMorningTime: '07:00',
   wirdEveningTime: '17:00',
   kahfEnabled: false,
-  kahfTime: '14:00',
+  kahfTime: '14:00', // Fallback only — actual time is Dhuhr + 2h (calculated dynamically)
   dailyAyahEnabled: false,
   dailyAyahTime: '06:30',
 };
@@ -492,9 +493,61 @@ export async function scheduleKahfReminder(): Promise<void> {
     const hasPermission = await requestNotifPermission();
     if (!hasPermission) return;
 
-    // Parse the user-set time
-    const timeStr = allSettings.kahfTime || '14:00';
-    const [kahfHour, kahfMinute] = timeStr.split(':').map(Number);
+    // Default: 2 hours after Friday Dhuhr prayer. Falls back to user-set time or 14:00.
+    let kahfHour = 14;
+    let kahfMinute = 0;
+    let kahfUsesDynamicTime = false;
+
+    // Try to compute Kahf time as Dhuhr + 2 hours from prayer API
+    try {
+      const kahfLocation = await getPrayerLocation();
+      if (kahfLocation) {
+        const kahfAppSettings = await getSettings();
+        const { fetchMonthlyPrayerTimes } = await import('./prayer-api');
+        const nowForKahf = new Date();
+        const kahfMonthData = await fetchMonthlyPrayerTimes(
+          kahfLocation.latitude, kahfLocation.longitude,
+          nowForKahf.getMonth() + 1, nowForKahf.getFullYear(),
+          kahfAppSettings.calculationMethod
+        );
+        if (kahfMonthData && Array.isArray(kahfMonthData)) {
+          const tempFri = new Date(nowForKahf);
+          const daysToFri = (5 - tempFri.getDay() + 7) % 7;
+          tempFri.setDate(tempFri.getDate() + daysToFri);
+          if (tempFri <= nowForKahf) tempFri.setDate(tempFri.getDate() + 7);
+          const friDayOfMonth = tempFri.getDate();
+
+          const dayData = kahfMonthData.find((d: any) => {
+            const dDate = d?.date?.gregorian?.day;
+            return dDate && parseInt(dDate, 10) === friDayOfMonth;
+          });
+          const dhuhrStr = dayData?.timings?.Dhuhr;
+          if (dhuhrStr) {
+            const cleanTime = dhuhrStr.replace(/\s*\(.*\)/, '').trim();
+            const [dH, dM] = cleanTime.split(':').map(Number);
+            if (!isNaN(dH) && !isNaN(dM)) {
+              kahfHour = dH + 2;
+              kahfMinute = dM;
+              if (kahfHour >= 24) kahfHour -= 24;
+              kahfUsesDynamicTime = true;
+              console.log(`🕌 Kahf time calculated: Dhuhr(${dH}:${String(dM).padStart(2, '0')}) + 2h = ${kahfHour}:${String(kahfMinute).padStart(2, '0')}`);
+            }
+          }
+        }
+      }
+    } catch (kahfLocErr) {
+      console.warn('⚠️ Failed to fetch Dhuhr for Kahf — falling back to fixed time:', kahfLocErr);
+    }
+
+    // Fallback: use user-set kahfTime if dynamic calculation failed
+    if (!kahfUsesDynamicTime) {
+      const timeStr = allSettings.kahfTime || '14:00';
+      const [fH, fM] = timeStr.split(':').map(Number);
+      if (!isNaN(fH) && !isNaN(fM)) {
+        kahfHour = fH;
+        kahfMinute = fM;
+      }
+    }
 
     // Get current language for notifications
     const lang = 'ar'; // Default to Arabic for Quran notifications
@@ -1337,11 +1390,60 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     }
 
     // 10) Schedule Friday Surah Al-Kahf reminder (next 4 Fridays as DATE triggers)
+    //     Default: 2 hours after Friday Dhuhr prayer. Falls back to user-set time or 14:00.
     if (notifSettings.kahfReminder) {
-      // Use user-set kahfTime if available, otherwise fallback to 14:00
       let kahfHour = 14;
       let kahfMinute = 0;
-      if (notifSettings.kahfTime) {
+      let kahfUsesDynamicTime = false;
+
+      // Try to compute Kahf time as Dhuhr + 2 hours from prayer API
+      try {
+        const kahfLocation = await getPrayerLocation();
+        if (kahfLocation) {
+          const kahfAppSettings = await getSettings();
+          const { fetchMonthlyPrayerTimes } = await import('./prayer-api');
+          const nowForKahf = new Date();
+          const kahfMonthData = await fetchMonthlyPrayerTimes(
+            kahfLocation.latitude, kahfLocation.longitude,
+            nowForKahf.getMonth() + 1, nowForKahf.getFullYear(),
+            kahfAppSettings.calculationMethod
+          );
+          // Find next Friday's Dhuhr time from monthly data
+          if (kahfMonthData && Array.isArray(kahfMonthData)) {
+            // Find next Friday (day 5 in JS)
+            const tempFri = new Date(nowForKahf);
+            const daysToFri = (5 - tempFri.getDay() + 7) % 7;
+            tempFri.setDate(tempFri.getDate() + daysToFri);
+            if (tempFri <= nowForKahf) tempFri.setDate(tempFri.getDate() + 7);
+            const friDayOfMonth = tempFri.getDate();
+
+            // Find matching day in monthly data (1-indexed)
+            const dayData = kahfMonthData.find((d: any) => {
+              const dDate = d?.date?.gregorian?.day;
+              return dDate && parseInt(dDate, 10) === friDayOfMonth;
+            });
+            const dhuhrStr = dayData?.timings?.Dhuhr;
+            if (dhuhrStr) {
+              // Parse "12:15 (EET)" or "12:15" format
+              const cleanTime = dhuhrStr.replace(/\s*\(.*\)/, '').trim();
+              const [dH, dM] = cleanTime.split(':').map(Number);
+              if (!isNaN(dH) && !isNaN(dM)) {
+                // Add 2 hours to Dhuhr
+                kahfHour = dH + 2;
+                kahfMinute = dM;
+                if (kahfHour >= 24) kahfHour -= 24;
+                kahfUsesDynamicTime = true;
+                console.log(`🕌 Kahf time calculated: Dhuhr(${dH}:${String(dM).padStart(2, '0')}) + 2h = ${kahfHour}:${String(kahfMinute).padStart(2, '0')}`);
+              }
+            }
+          }
+        }
+      } catch (kahfLocErr) {
+        console.warn('⚠️ Failed to fetch Dhuhr for Kahf — falling back to fixed time:', kahfLocErr);
+      }
+
+      // Fallback: use user-set kahfTime if dynamic calculation failed
+      if (!kahfUsesDynamicTime && notifSettings.kahfTime) {
         const [uH, uM] = notifSettings.kahfTime.split(':').map(Number);
         if (!isNaN(uH) && !isNaN(uM)) {
           kahfHour = uH;
@@ -1497,10 +1599,11 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
 // ─── Refresh Reminder (Safety Net) ───────────────────────────────────────────
 /**
- * Schedule a single safety-net reminder on day 6 of the 7-day scheduling window.
+ * Schedule a single safety-net reminder on day 5 of the 7-day scheduling window.
  * If the user doesn't open the app, this fires at 8 PM to prompt them to open it
  * so prayer notifications get rescheduled before the window expires on day 7.
  * Each successful reschedule cancels the old reminder and pushes a new one forward.
+ * iOS: no custom attachment → system shows app icon automatically.
  */
 export async function scheduleRefreshReminder(): Promise<void> {
   // Cancel existing refresh reminder
@@ -1515,23 +1618,40 @@ export async function scheduleRefreshReminder(): Promise<void> {
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') return;
 
-  const refreshAttachments = await getNotificationIconAttachment('reminder');
-
   const triggerDate = new Date();
   triggerDate.setDate(triggerDate.getDate() + _refreshReminderDay);
   triggerDate.setHours(20, 0, 0, 0);
+
+  // Build body: try to include next Fajr time for the refresh day
+  let body = t('notifications.refreshReminderBody');
+  try {
+    const location = await getPrayerLocation();
+    if (location) {
+      const appSettings = await getSettings();
+      const prayerData = await fetchPrayerTimesByCoords(
+        location.latitude, location.longitude, appSettings.calculationMethod, triggerDate
+      );
+      const fajrTime = prayerData?.timings?.Fajr;
+      if (fajrTime) {
+        const cleanTime = fajrTime.replace(/\s*\(.*\)/, ''); // strip timezone suffix
+        const fajrLabel = t('prayer.fajr');
+        body = `${fajrLabel}: ${cleanTime} — ${t('notifications.refreshReminderBody')}`;
+      }
+    }
+  } catch {
+    // Fallback to default body — no prayer data available
+  }
 
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: `${REFRESH_REMINDER_PREFIX}_${_refreshReminderDay}`,
       content: {
         title: dirText(t('notifications.refreshReminderTitle')),
-        body: dirText(t('notifications.refreshReminderBody')),
+        body: dirText(body),
         sound: 'default',
-        data: { type: 'refresh_reminder', iconType: 'reminder' },
+        data: { type: 'refresh_reminder' },
         ...(Platform.OS === 'android' && { channelId: 'general' }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-        ...(Platform.OS === 'ios' && refreshAttachments && { attachments: refreshAttachments }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

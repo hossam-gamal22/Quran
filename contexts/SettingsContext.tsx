@@ -327,11 +327,11 @@ const defaultNotifications: NotificationSettings = {
   sleepAzkar: true,
   sleepAzkarTime: '22:00',
   wakeupAzkar: true,
-  wakeupAzkarTime: '10:00',
+  wakeupAzkarTime: '05:30',
   afterPrayerAzkar: true,
   // Friday Surah Al-Kahf reminder
   kahfReminder: true,
-  kahfTime: '07:00',
+  kahfTime: '14:00',
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -402,7 +402,7 @@ const STORAGE_KEY = 'app_settings';
 // Bump this version whenever default notification times change.
 // On app update, existing users will get their notification times
 // reset to the new defaults (toggles/booleans are preserved).
-const NOTIFICATION_DEFAULTS_VERSION = 4;
+const NOTIFICATION_DEFAULTS_VERSION = 5;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
@@ -552,6 +552,9 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             loadedSettings.notifications.istighfarReminder = true;
             loadedSettings.notifications.tasbihReminder = true;
             loadedSettings.notifications.worshipWeeklyReport = true;
+            loadedSettings.notifications.sleepAzkar = true;
+            loadedSettings.notifications.wakeupAzkar = true;
+            loadedSettings.notifications.afterPrayerAzkar = true;
             // Persist migrated settings to AsyncStorage so they survive next cold start
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
             await AsyncStorage.setItem(NOTIF_DEFAULTS_VERSION_KEY, String(NOTIFICATION_DEFAULTS_VERSION));
