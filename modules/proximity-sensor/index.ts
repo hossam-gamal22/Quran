@@ -1,5 +1,4 @@
 import { requireNativeModule, EventEmitter } from 'expo-modules-core';
-import { Platform } from 'react-native';
 
 interface ProximitySensorEvents {
   onProximityChange: { isNear: boolean };
@@ -12,37 +11,40 @@ try {
   ProximitySensorNative = requireNativeModule('ProximitySensor');
   emitter = new EventEmitter(ProximitySensorNative);
 } catch {
-  // Module not available (e.g., Expo Go, web)
+  // Not available in Expo Go — will use accelerometer fallback
+  console.log('[ProximitySensor] Native module not available');
 }
 
 export const ProximitySensor = {
   startMonitoring: (): void => {
+    if (!ProximitySensorNative) return;
     try {
-      ProximitySensorNative?.startMonitoring();
+      ProximitySensorNative.startMonitoring();
     } catch {
       // Silent fail
     }
   },
 
   stopMonitoring: (): void => {
+    if (!ProximitySensorNative) return;
     try {
-      ProximitySensorNative?.stopMonitoring();
+      ProximitySensorNative.stopMonitoring();
     } catch {
       // Silent fail
     }
   },
 
   isAvailable: (): boolean => {
-    if (Platform.OS === 'web') return false;
+    if (!ProximitySensorNative) return false;
     try {
-      return ProximitySensorNative?.isAvailable() ?? false;
+      return ProximitySensorNative.isAvailable();
     } catch {
       return false;
     }
   },
 
   addListener: (callback: (event: { isNear: boolean }) => void) => {
-    if (!emitter) return { remove: () => {} };
+    if (!ProximitySensorNative || !emitter) return { remove: () => {} };
     return emitter.addListener('onProximityChange', callback);
   },
 };

@@ -35,8 +35,15 @@ public class ProximitySensorModule: Module {
     }
 
     Function("isAvailable") { () -> Bool in
-      // iOS devices have proximity sensor (except iPod/iPad)
-      return true
+      // Check actual hardware: enable monitoring briefly and read the state
+      let device = UIDevice.current
+      let wasEnabled = device.isProximityMonitoringEnabled
+      device.isProximityMonitoringEnabled = true
+      let available = device.isProximityMonitoringEnabled
+      if !wasEnabled {
+        device.isProximityMonitoringEnabled = false
+      }
+      return available
     }
 
     OnDestroy {

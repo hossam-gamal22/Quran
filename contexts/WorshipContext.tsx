@@ -234,6 +234,13 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
+      // Ensure new-day reset: if no record exists for today, create a blank one
+      const today = getTodayDate();
+      const storedRecord = await getPrayerRecord(today);
+      if (!storedRecord) {
+        await savePrayerRecord({ ...defaultPrayerRecord, date: today });
+      }
+
       await Promise.all([
         refreshTodayRecords(),
         refreshStats(),

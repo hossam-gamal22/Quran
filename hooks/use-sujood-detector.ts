@@ -17,8 +17,10 @@ const PROXIMITY_SUJOOD_MIN_MS = 500; // Must be near for 500ms to count as sujoo
 
 // Accelerometer (fallback)
 const SENSOR_INTERVAL_MS = 50; // 20Hz - enough for sujood detection
-const SUJOOD_THRESHOLD = -9.5; // Z-axis threshold for face-down detection
-const DEBOUNCE_COUNT = 3; // Number of consecutive readings to confirm sujood
+const SUJOOD_THRESHOLD = -8.0; // Z-axis threshold for face-down detection
+const SUJOOD_THRESHOLD_RELAXED = -7.0; // Relaxed threshold when phone is also level on X/Y
+const LEVEL_TOLERANCE = 3; // Max tilt on X/Y axes for relaxed threshold
+const DEBOUNCE_COUNT = 2; // Number of consecutive readings to confirm sujood
 
 // Shared
 const COOLDOWN_MS = 800; // Minimum time between sujood detections
@@ -232,10 +234,11 @@ export function useSujoodDetector(): SujoodDetector {
   // ---------------------------------------------------------------------------
   const handleAccelerometerData = useCallback(
     (data: AccelerometerMeasurement) => {
-      const { z } = data;
+      const { x, y, z } = data;
       setCurrentZ(z);
 
-      const isInSujoodPosition = z < SUJOOD_THRESHOLD;
+      const isInSujoodPosition = z < SUJOOD_THRESHOLD ||
+        (Math.abs(x) < LEVEL_TOLERANCE && Math.abs(y) < LEVEL_TOLERANCE && z < SUJOOD_THRESHOLD_RELAXED);
 
       if (isInSujoodPosition) {
         consecutiveCountRef.current++;
