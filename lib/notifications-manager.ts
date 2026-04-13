@@ -370,7 +370,7 @@ const DAILY_AYAHS = [
 
 export async function scheduleDailyAyahNotification(
   settings: AllNotificationSettings,
-  soundType: string = 'general_reminder'
+  soundType: string = 'notif_verse'
 ): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync('daily_ayah');
@@ -384,8 +384,9 @@ export async function scheduleDailyAyahNotification(
   const dayIndex = new Date().getDay();
   const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
 
-  // Get the pre-created channel for the user's selected sound
-  const resolvedChannelId = getReminderChannelId(soundType);
+  // Get the pre-created channel for the verse notification sound
+  const verseSound = 'notif_verse';
+  const resolvedChannelId = getReminderChannelId(verseSound);
 
   try {
     const quranAttachments = await getNotificationIconAttachment('quran');
@@ -394,8 +395,8 @@ export async function scheduleDailyAyahNotification(
       content: {
         title: dirText(t('settings.dailyAyahTitle')),
         body: dirText(ayahData.text),
-        sound: resolveNotificationSound(soundType, true),
-        data: { type: 'daily_ayah', soundType, iconType: 'quran' },
+        sound: resolveNotificationSound(verseSound, true),
+        data: { type: 'daily_ayah', soundType: verseSound, iconType: 'quran' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && quranAttachments && { attachments: quranAttachments }),
       },
@@ -556,7 +557,7 @@ export async function scheduleKahfReminder(): Promise<void> {
     const KAHF_FIRST_AYAH_TEXT = 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ';
     const KAHF_FIRST_AYAH_GLOBAL = 2141;
     const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
-    const kahfSoundType = 'general_reminder';
+    const kahfSoundType = 'notif_kahf';
     const kahfChannelId = getReminderChannelId(kahfSoundType);
 
     const kahfAttachments = await getNotificationIconAttachment('quran');
@@ -977,19 +978,20 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // Schedule sleep azkar if enabled
     if (notifSettings.sleepAzkar) {
       const sleepTimes = getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00');
-      const sleepText = getNotifText('sleep', t('settings.sleepAzkarTitle'), t('settings.sleepAzkarBody'), lang);
+      const sleepText = getNotifText('sleep', t('notifications.sleepAzkarTitle'), t('notifications.sleepAzkarBody'), lang);
+      const sleepSound = 'notif_sleep';
       await scheduleMultiTime(
         'wird_sleep',
         {
           title: sleepText.title,
           body: sleepText.body,
-          sound: resolveNotificationSound(azkarSound, notifSettings.sound),
-          data: { type: 'wird', period: 'sleep', soundType: azkarSound, iconType: 'moon' },
+          sound: resolveNotificationSound(sleepSound, notifSettings.sound),
+          data: { type: 'sleep_azkar', period: 'sleep', soundType: sleepSound, iconType: 'moon' },
         },
         sleepTimes,
         notifSettings.azkarDays,
         'azkar',
-        azkarSound,
+        sleepSound,
         iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
@@ -998,18 +1000,19 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     if (notifSettings.wakeupAzkar) {
       const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '05:30');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
+      const wakeupSound = 'notif_wakeup';
       await scheduleMultiTime(
         'wird_wakeup',
         {
           title: wakeupText.title,
           body: wakeupText.body,
-          sound: resolveNotificationSound(azkarSound, notifSettings.sound),
-          data: { type: 'wird', period: 'wakeup', soundType: azkarSound, iconType: 'morning' },
+          sound: resolveNotificationSound(wakeupSound, notifSettings.sound),
+          data: { type: 'wird', period: 'wakeup', soundType: wakeupSound, iconType: 'morning' },
         },
         wakeupTimes,
         notifSettings.azkarDays,
         'azkar',
-        azkarSound,
+        wakeupSound,
         iosBudget?.azkarDays, // iOS dynamic budget
       );
     }
@@ -1058,7 +1061,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           }
 
           const now = new Date();
-          const afterPrayerChannelId = getReminderChannelId(notifSettings.azkarSoundType || 'general_reminder');
+          const afterPrayerSound = 'notif_after_prayer';
+          const afterPrayerChannelId = getReminderChannelId(afterPrayerSound);
           const afterPrayerAttachments = await getNotificationIconAttachment('prayer_beads');
           let scheduledCount = 0;
 
@@ -1089,8 +1093,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
                   content: {
                     title: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).title),
                     body: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).body),
-                    sound: resolveNotificationSound(notifSettings.azkarSoundType || 'general_reminder', notifSettings.sound),
-                    data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: notifSettings.azkarSoundType || 'general_reminder', iconType: 'prayer_beads' },
+                    sound: resolveNotificationSound(afterPrayerSound, notifSettings.sound),
+                    data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: afterPrayerSound, iconType: 'prayer_beads' },
                     ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
                     ...(Platform.OS === 'android' && { channelId: afterPrayerChannelId }),
                     ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
@@ -1296,18 +1300,19 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           })
         : undefined;
       const quranText = getNotifText('quran', t('settings.quranReadingNotifTitle'), t('settings.quranReadingNotifBody'), lang);
+      const quranSound = 'notif_verse';
       await scheduleMultiTime(
         'quran_reading_reminder',
         {
           title: quranText.title,
           body: quranText.body,
-          sound: resolveNotificationSound(notifSettings.quranReminderSoundType || 'general_reminder', notifSettings.sound),
-          data: { type: 'quran_reading', soundType: notifSettings.quranReminderSoundType || 'general_reminder', iconType: 'quran' },
+          sound: resolveNotificationSound(quranSound, notifSettings.sound),
+          data: { type: 'quran_reading', soundType: quranSound, iconType: 'quran' },
         },
         quranTimes,
         convertedDays,
         'general',
-        notifSettings.quranReminderSoundType || 'general_reminder',
+        quranSound,
         iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
@@ -1321,20 +1326,20 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // Daily summary
     if (notifSettings.worshipDailySummary) {
       const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
-      const worshipSoundType = notifSettings.soundType || 'general_reminder';
+      const dailySummarySound = 'notif_daily_summary';
       await scheduleWithDays(
         'worship_daily_summary',
         {
           title: getNotifText('worship_daily', t('settings.worshipDailySummaryTitle'), t('settings.worshipDailySummaryBody'), lang).title,
           body: getNotifText('worship_daily', t('settings.worshipDailySummaryTitle'), t('settings.worshipDailySummaryBody'), lang).body,
-          sound: resolveNotificationSound(worshipSoundType, notifSettings.sound),
+          sound: resolveNotificationSound(dailySummarySound, notifSettings.sound),
           data: { type: 'worship_summary', iconType: 'reminder', screen: '/daily-summary' },
         },
         summaryTime.hour,
         summaryTime.minute,
         undefined,
         'general',
-        worshipSoundType,
+        dailySummarySound,
         iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
@@ -1344,8 +1349,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // Weekly report (every Friday — schedule next 4 Fridays as DATE triggers)
     if (notifSettings.worshipWeeklyReport) {
       const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
-      const worshipWeeklySoundType = notifSettings.soundType || 'general_reminder';
-      const worshipWeeklyChannelId = getReminderChannelId(worshipWeeklySoundType);
+      const worshipWeeklyChannelId = 'general'; // device default sound
       const worshipWeeklyAttachments = await getNotificationIconAttachment('reminder');
       const now = new Date();
       const WEEKLY_SCHEDULE_COUNT = Platform.OS === 'ios' ? 2 : 4; // iOS: 2 Fridays (budget), Android: 4
@@ -1369,7 +1373,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             content: {
               title: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).title),
               body: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).body),
-              sound: resolveNotificationSound(worshipWeeklySoundType, notifSettings.sound),
+              sound: 'default',
               data: { type: 'worship_weekly', iconType: 'reminder' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
               ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),

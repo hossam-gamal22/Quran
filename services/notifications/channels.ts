@@ -21,7 +21,7 @@ import { t } from '@/lib/i18n';
 // Bump this whenever channel config changes (sounds, importance, etc.)
 // Forces a delete+recreate of all channels on next app launch.
 const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
-const CURRENT_CHANNELS_VERSION = '14';
+const CURRENT_CHANNELS_VERSION = '15';
 
 // ─── Adhan sound filename map (all files in assets/sounds/) ─────────────────
 export const ADHAN_SOUND_FILES: Record<string, string> = {
@@ -44,14 +44,20 @@ export const ADHAN_SOUND_FILES: Record<string, string> = {
 
 // ─── Notification/reminder sound filename map (all files in assets/sounds/) ──
 export const NOTIFICATION_SOUND_FILES: Record<string, string> = {
-  alhamdulillah:    'alhamdulillah.mp3',
-  evening_adhkar:   'evening_adhkar.mp3',
-  general_reminder: 'general_reminder.mp3',
-  istighfar:        'istighfar.mp3',
-  morning_adhkar:   'morning_adhkar.mp3',
-  salawat:          'salawat.mp3',
-  subhanallah:      'subhanallah.mp3',
-  tasbih:           'tasbih.mp3',
+  alhamdulillah:       'alhamdulillah.mp3',
+  evening_adhkar:      'evening_adhkar.mp3',
+  general_reminder:    'general_reminder.mp3',
+  istighfar:           'istighfar.mp3',
+  morning_adhkar:      'morning_adhkar.mp3',
+  notif_after_prayer:  'notif_after_prayer.mp3',
+  notif_daily_summary: 'notif_daily_summary.mp3',
+  notif_kahf:          'notif_kahf.mp3',
+  notif_sleep:         'notif_sleep.mp3',
+  notif_verse:         'notif_verse.mp3',
+  notif_wakeup:        'notif_wakeup.mp3',
+  salawat:             'salawat.mp3',
+  subhanallah:         'subhanallah.mp3',
+  tasbih:              'tasbih.mp3',
 };
 
 /**

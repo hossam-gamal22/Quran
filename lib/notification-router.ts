@@ -178,6 +178,11 @@ export function handleNotificationNavigation(
       return { navigated: true };
     }
 
+    // ─── Sleep Azkar → Surah Al-Mulk ───
+    case 'sleep_azkar':
+      router.push('/surah-mulk' as any);
+      return { navigated: true };
+
     // ─── Khatma (Quran reading plan) ───
     case 'khatma_reminder':
     case 'khatma_daily_wird':

@@ -127,7 +127,13 @@
             "./assets/sounds/sharif.mp3",
             "./assets/sounds/mansoor_zahrani.mp3",
             "./assets/sounds/haramain.mp3",
-            "./assets/sounds/silent.mp3"
+            "./assets/sounds/silent.mp3",
+            "./assets/sounds/notifications/notif_sleep.mp3",
+            "./assets/sounds/notifications/notif_wakeup.mp3",
+            "./assets/sounds/notifications/notif_after_prayer.mp3",
+            "./assets/sounds/notifications/notif_verse.mp3",
+            "./assets/sounds/notifications/notif_kahf.mp3",
+            "./assets/sounds/notifications/notif_daily_summary.mp3"
           ]
         }
       ],

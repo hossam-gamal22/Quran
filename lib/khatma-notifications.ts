@@ -128,7 +128,8 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
     const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
 
     // Schedule daily notification with proper sound resolution
-    const soundValue = resolveKhatmaSound('general_reminder', true);
+    const khatmaSoundKey = 'notif_verse';
+    const soundValue = resolveKhatmaSound(khatmaSoundKey, true);
     
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
@@ -140,14 +141,14 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
         },
         sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.HIGH,
-        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId(khatmaSoundKey) }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: hours,
         minute: minutes,
-        ...(Platform.OS === 'android' && { channelId: getReminderChannelId('general_reminder') }),
+        ...(Platform.OS === 'android' && { channelId: getReminderChannelId(khatmaSoundKey) }),
       },
     });
 

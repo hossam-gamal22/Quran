@@ -1509,6 +1509,8 @@ export interface TranslationKeys {
     prayerAcceptedBody: string;
     didYouPray: string;
     didYouPrayBody: string;
+    sleepAzkarTitle: string;
+    sleepAzkarBody: string;
   };
   favorites: {
     addAzkarHint: string;
@@ -3924,6 +3926,8 @@ const ar: TranslationKeys = {
     prayerAcceptedBody: 'جزاك الله خيراً على المحافظة على الصلاة',
     didYouPray: 'هل صليت؟',
     didYouPrayBody: 'لا تنسَ صلاتك، بارك الله فيك',
+    sleepAzkarTitle: 'أذكار النوم • سورة الملك 🌙',
+    sleepAzkarBody: 'تذكّر بقراءة سورة الملك قبل نومك',
   },
   favorites: {
     addAzkarHint: 'أضف أذكار من صفحة الأذكار',
@@ -6323,6 +6327,8 @@ const en: TranslationKeys = {
     prayerAcceptedBody: 'May Allah reward you for keeping up with your prayers',
     didYouPray: 'Did you pray?',
     didYouPrayBody: 'Don\'t forget your prayer, may Allah bless you',
+    sleepAzkarTitle: 'Sleep Adhkar • Surah Al-Mulk 🌙',
+    sleepAzkarBody: 'Remember to read Surah Al-Mulk before sleeping',
   },
   favorites: {
     addAzkarHint: 'Add azkar from the azkar page',
@@ -8722,6 +8728,8 @@ const fr: TranslationKeys = {
     prayerAcceptedBody: 'Qu\'Allah te récompense pour ta persévérance dans la prière',
     didYouPray: 'As-tu prié ?',
     didYouPrayBody: 'N\'oublie pas ta prière, qu\'Allah te bénisse',
+    sleepAzkarTitle: 'Adhkar du coucher • Sourate Al-Mulk 🌙',
+    sleepAzkarBody: 'N\'oubliez pas de lire la Sourate Al-Mulk avant de dormir',
   },
   favorites: {
     addAzkarHint: 'Ajoutez des adhkar depuis la page adhkar',
@@ -11122,6 +11130,8 @@ const de: TranslationKeys = {
     prayerAcceptedBody: 'Möge Allah dich für deine Gebetstreue belohnen',
     didYouPray: 'Hast du gebetet?',
     didYouPrayBody: 'Vergiss dein Gebet nicht, möge Allah dich segnen',
+    sleepAzkarTitle: 'Schlaf-Adhkar • Sure Al-Mulk 🌙',
+    sleepAzkarBody: 'Vergiss nicht, Sure Al-Mulk vor dem Schlafen zu lesen',
   },
   favorites: {
     addAzkarHint: 'Adhkar von der Adhkar-Seite hinzufügen',
@@ -13522,6 +13532,8 @@ const tr: TranslationKeys = {
     prayerAcceptedBody: 'Namaza devam ettiğin için Allah seni mükafatlandırsın',
     didYouPray: 'Namaz kıldın mı?',
     didYouPrayBody: 'Namazını unutma, Allah seni mübarek kılsın',
+    sleepAzkarTitle: 'Uyku Zikirleri • Mülk Suresi 🌙',
+    sleepAzkarBody: 'Uyumadan önce Mülk Suresini okumayı unutmayın',
   },
   favorites: {
     addAzkarHint: 'Zikir sayfasından zikir ekleyin',
@@ -15922,6 +15934,8 @@ const es: TranslationKeys = {
     prayerAcceptedBody: 'Que Allah te recompense por mantener tus oraciones',
     didYouPray: '¿Has rezado?',
     didYouPrayBody: 'No olvides tu oración, que Allah te bendiga',
+    sleepAzkarTitle: 'Adhkar para dormir • Sura Al-Mulk 🌙',
+    sleepAzkarBody: 'Recuerda leer la Sura Al-Mulk antes de dormir',
   },
   favorites: {
     addAzkarHint: 'Añade adhkar desde la página de adhkar',
@@ -18321,6 +18335,8 @@ const ur: TranslationKeys = {
     prayerAcceptedBody: 'نماز کی پابندی پر اللہ آپ کو جزائے خیر دے',
     didYouPray: 'کیا آپ نے نماز پڑھی؟',
     didYouPrayBody: 'اپنی نماز مت بھولیں، اللہ آپ پر رحم فرمائے',
+    sleepAzkarTitle: 'سونے کے اذکار • سورۃ الملک 🌙',
+    sleepAzkarBody: 'سونے سے پہلے سورۃ الملک پڑھنا نہ بھولیں',
   },
   favorites: {
     addAzkarHint: 'اذکار کے صفحے سے اذکار شامل کریں',
@@ -20721,6 +20737,8 @@ const id: TranslationKeys = {
     prayerAcceptedBody: 'Semoga Allah memberkatimu karena menjaga shalatmu',
     didYouPray: 'Sudahkah kamu shalat?',
     didYouPrayBody: 'Jangan lupa shalatmu, semoga Allah memberkatimu',
+    sleepAzkarTitle: 'Dzikir Tidur • Surah Al-Mulk 🌙',
+    sleepAzkarBody: 'Ingatlah membaca Surah Al-Mulk sebelum tidur',
   },
   favorites: {
     addAzkarHint: 'Tambahkan dzikir dari halaman dzikir',
@@ -23121,6 +23139,8 @@ const ms: TranslationKeys = {
     prayerAcceptedBody: 'Semoga Allah memberkati anda kerana menjaga solat',
     didYouPray: 'Sudahkah anda solat?',
     didYouPrayBody: 'Jangan lupa solat anda, semoga Allah memberkati anda',
+    sleepAzkarTitle: 'Zikir Tidur • Surah Al-Mulk 🌙',
+    sleepAzkarBody: 'Ingat membaca Surah Al-Mulk sebelum tidur',
   },
   favorites: {
     addAzkarHint: 'Tambah zikir dari halaman zikir',
@@ -25521,6 +25541,8 @@ const hi: TranslationKeys = {
     prayerAcceptedBody: 'नमाज़ की पाबंदी पर अल्लाह आपको अजर दे',
     didYouPray: 'क्या आपने नमाज़ पढ़ी?',
     didYouPrayBody: 'अपनी नमाज़ मत भूलें, अल्लाह आपको बरकत दे',
+    sleepAzkarTitle: 'सोने के अज़कार • सूरह अल-मुल्क 🌙',
+    sleepAzkarBody: 'सोने से पहले सूरह अल-मुल्क पढ़ना न भूलें',
   },
   favorites: {
     addAzkarHint: 'अज़कार पेज से अज़कार जोड़ें',
@@ -27921,6 +27943,8 @@ const bn: TranslationKeys = {
     prayerAcceptedBody: 'নামাজের প্রতি যত্নশীল থাকায় আল্লাহ আপনাকে পুরস্কৃত করুন',
     didYouPray: 'আপনি কি নামাজ পড়েছেন?',
     didYouPrayBody: 'আপনার নামাজ ভুলবেন না, আল্লাহ আপনাকে বরকত দিন',
+    sleepAzkarTitle: 'ঘুমের আযকার • সূরা আল-মুল্ক 🌙',
+    sleepAzkarBody: 'ঘুমানোর আগে সূরা আল-মুল্ক পড়তে ভুলবেন না',
   },
   favorites: {
     addAzkarHint: 'আযকার পৃষ্ঠা থেকে যোগ করুন',
@@ -30320,6 +30344,8 @@ const ru: TranslationKeys = {
     prayerAcceptedBody: 'Да вознаградит вас Аллах за соблюдение молитвы',
     didYouPray: 'Вы помолились?',
     didYouPrayBody: 'Не забудьте о молитве, да благословит вас Аллах',
+    sleepAzkarTitle: 'Азкары перед сном • Сура Аль-Мульк 🌙',
+    sleepAzkarBody: 'Не забудьте прочитать Суру Аль-Мульк перед сном',
   },
   favorites: {
     addAzkarHint: 'Добавьте азкары со страницы азкаров',
