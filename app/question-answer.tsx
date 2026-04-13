@@ -10,7 +10,6 @@ import {
   Pressable,
   Platform,
   ScrollView,
-  Dimensions,
   ViewStyle,
   TextStyle,
   StyleSheet,
@@ -38,7 +37,6 @@ import qaData from '@/data/json/qa-data.json';
 
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ========================================
 // أنواع البيانات
@@ -77,30 +75,19 @@ export default function QuestionAnswerScreen() {
 
   const tabsScrollRef = useRef<ScrollView>(null);
   const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
-  const scrollContentWidthRef = useRef(0);
-  const flatListRef = useRef<FlatList>(null);
 
   const handleCategoryChange = useCallback((key: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(key);
     setExpandedItems(new Set());
 
-    // Scroll list back to top
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-
-    // Scroll to make the selected tab fully visible
+    // Scroll to make the selected tab visible
     const layout = tabLayoutsRef.current[key];
-    if (layout && tabsScrollRef.current && scrollContentWidthRef.current > 0) {
-      if (isRTL) {
-        const mirroredX = scrollContentWidthRef.current - layout.x - layout.width;
-        const centeredX = mirroredX - (SCREEN_WIDTH - layout.width) / 2;
-        tabsScrollRef.current.scrollTo({ x: Math.max(0, centeredX), animated: true });
-      } else {
-        const centeredX = layout.x - (SCREEN_WIDTH - layout.width) / 2;
-        tabsScrollRef.current.scrollTo({ x: Math.max(0, centeredX), animated: true });
-      }
+    if (layout && tabsScrollRef.current) {
+      const scrollX = Math.max(0, layout.x - Spacing.md);
+      tabsScrollRef.current.scrollTo({ x: scrollX, animated: true });
     }
-  }, [isRTL]);
+  }, []);
 
   const toggleExpanded = useCallback((id: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -300,10 +287,9 @@ export default function QuestionAnswerScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={tabsContainerStyle}
-          onContentSizeChange={(w) => { scrollContentWidthRef.current = w; }}
-          style={[{ flexGrow: 0, zIndex: 10 }, isRTL && { transform: [{ scaleX: -1 }] }]}
+          style={{ flexGrow: 0, zIndex: 10 }}
         >
-          <View style={[chipsContainerStyle, isRTL && { transform: [{ scaleX: -1 }] }]}>
+          <View style={chipsContainerStyle}>
             {categories.map(cat => {
               const isSelected = selectedCategory === cat.id;
               return (
@@ -367,9 +353,8 @@ export default function QuestionAnswerScreen() {
         </View>
       ) : (
         <FlatList
-          ref={flatListRef}
+          key={selectedCategory}
           data={qaItems}
-          extraData={selectedCategory}
           renderItem={renderQAItem}
           keyExtractor={item => item.id}
           contentContainerStyle={listContentStyle}
