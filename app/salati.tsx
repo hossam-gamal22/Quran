@@ -13,7 +13,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -199,7 +199,14 @@ export default function SalatiScreen() {
   useKeepAwake();
 
   // Worship tracker integration
-  const { updatePrayerWithTime, todayPrayer } = usePrayerTracker();
+  const { updatePrayerWithTime, todayPrayer, refreshTodayRecords } = usePrayerTracker();
+
+  // Refresh prayer data when screen gains focus (daily reset)
+  useFocusEffect(
+    useCallback(() => {
+      refreshTodayRecords();
+    }, [refreshTodayRecords])
+  );
 
   // State
   const [currentView, setCurrentView] = useState<ViewState>('instructions');
@@ -771,7 +778,11 @@ export default function SalatiScreen() {
             <View style={[styles.statusBadge, { backgroundColor: isDarkMode ? 'rgba(13, 142, 98, 0.15)' : 'rgba(13, 142, 98, 0.12)' }]}>
               <View style={[styles.statusDot, { backgroundColor: ACCENT_GREEN }]} />
               <Text style={[styles.statusText, { color: ACCENT_GREEN }]}>
-                {detector.inCooldown ? t('smartTracker.cooldownActive') : t('smartTracker.proximityActive')}
+                {detector.inCooldown
+                  ? t('smartTracker.cooldownActive')
+                  : detector.sensorMode === 'proximity'
+                    ? t('smartTracker.proximityActive')
+                    : t('smartTracker.motionSensorActive')}
               </Text>
             </View>
           ) : (

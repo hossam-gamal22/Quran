@@ -7,8 +7,10 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 
 import {
   // أنواع
@@ -188,8 +190,10 @@ interface WorshipProviderProps {
 export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) => {
   // الحالات الأساسية
   const [isLoading, setIsLoading] = useState(true);
-  const [todayDate] = useState(getTodayDate());
+  const [todayDate, setTodayDate] = useState(getTodayDate());
   const [stats, setStats] = useState<WorshipStats | null>(null);
+  const todayDateRef = useRef(todayDate);
+  todayDateRef.current = todayDate;
   
   // سجلات اليوم
   const [todayPrayer, setTodayPrayer] = useState<DailyPrayerRecord | null>(null);
@@ -199,6 +203,25 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   
   // سجلات الأسبوع
   const [weekPrayers, setWeekPrayers] = useState<DailyPrayerRecord[]>([]);
+
+  // ========================================
+  // استماع لتغير اليوم عند العودة للتطبيق
+  // ========================================
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        const currentDate = getTodayDate();
+        if (currentDate !== todayDateRef.current) {
+          setTodayDate(currentDate);
+          await refreshTodayRecords();
+          await refreshStats();
+          await loadWeekPrayers();
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   // ========================================
   // تحميل البيانات الأولية
@@ -542,6 +565,7 @@ export const usePrayerTracker = () => {
     getPrayerForDate,
     getWeekPrayers,
     getMonthPrayers,
+    refreshTodayRecords,
   } = useWorship();
   
   return {
@@ -556,6 +580,7 @@ export const usePrayerTracker = () => {
     getPrayerForDate,
     getWeekPrayers,
     getMonthPrayers,
+    refreshTodayRecords,
   };
 };
 

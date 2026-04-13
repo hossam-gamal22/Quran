@@ -2453,6 +2453,7 @@ export interface TranslationKeys {
     rakats: string;
     touchToCount: string;
     proximityActive: string;
+    motionSensorActive: string;
     cooldownActive: string;
     prayerNotYet: string;
     willBeLate: string;
@@ -4858,6 +4859,7 @@ const ar: TranslationKeys = {
     rakats: 'ركعات',
     touchToCount: 'المس الشاشة أثناء السجود',
     proximityActive: 'مستشعر القرب نشط',
+    motionSensorActive: 'مستشعر الحركة نشط',
     cooldownActive: 'انتظر...',
     prayerNotYet: 'لم يحن موعد هذه الصلاة بعد',
     willBeLate: 'متأخرة',
@@ -7263,6 +7265,7 @@ const en: TranslationKeys = {
     rakats: 'rakats',
     touchToCount: 'Touch the screen during sujud',
     proximityActive: 'Proximity sensor active',
+    motionSensorActive: 'Motion sensor active',
     cooldownActive: 'Wait...',
     prayerNotYet: 'This prayer time has not arrived yet',
     willBeLate: 'Late',
@@ -9668,6 +9671,7 @@ const fr: TranslationKeys = {
     rakats: 'rakats',
     touchToCount: 'Touchez l\'écran pendant le sujud',
     proximityActive: 'Capteur de proximité actif',
+    motionSensorActive: 'Capteur de mouvement actif',
     cooldownActive: 'Attendez...',
     prayerNotYet: 'L\'heure de cette prière n\'est pas encore arrivée',
     willBeLate: 'En retard',
@@ -12074,6 +12078,7 @@ const de: TranslationKeys = {
     rakats: 'Rakat',
     touchToCount: 'Bildschirm während des Sujud berühren',
     proximityActive: 'Näherungssensor aktiv',
+    motionSensorActive: 'Bewegungssensor aktiv',
     cooldownActive: 'Warten...',
     prayerNotYet: 'Die Gebetszeit ist noch nicht eingetroffen',
     willBeLate: 'Verspätet',
@@ -14480,6 +14485,7 @@ const tr: TranslationKeys = {
     rakats: 'rekat',
     touchToCount: 'Secde sırasında ekrana dokunun',
     proximityActive: 'Yakınlık sensörü aktif',
+    motionSensorActive: 'Hareket sensörü aktif',
     cooldownActive: 'Bekleyin...',
     prayerNotYet: 'Bu namazın vakti henüz gelmedi',
     willBeLate: 'Geç',
@@ -16886,6 +16892,7 @@ const es: TranslationKeys = {
     rakats: 'rakats',
     touchToCount: 'Toca la pantalla durante el suyud',
     proximityActive: 'Sensor de proximidad activo',
+    motionSensorActive: 'Sensor de movimiento activo',
     cooldownActive: 'Espera...',
     prayerNotYet: 'La hora de esta oración aún no ha llegado',
     willBeLate: 'Tardía',
@@ -19291,6 +19298,7 @@ const ur: TranslationKeys = {
     rakats: 'رکعات',
     touchToCount: 'سجدے کے دوران اسکرین ٹچ کریں',
     proximityActive: 'قربت سینسر فعال',
+    motionSensorActive: 'حرکت سینسر فعال',
     cooldownActive: 'انتظار کریں...',
     prayerNotYet: 'اس نماز کا وقت ابھی نہیں آیا',
     willBeLate: 'تأخیر',
@@ -21697,6 +21705,7 @@ const id: TranslationKeys = {
     rakats: 'rakaat',
     touchToCount: 'Sentuh layar saat sujud',
     proximityActive: 'Sensor kedekatan aktif',
+    motionSensorActive: 'Sensor gerakan aktif',
     cooldownActive: 'Tunggu...',
     prayerNotYet: 'Waktu sholat ini belum tiba',
     willBeLate: 'Terlambat',
@@ -24103,6 +24112,7 @@ const ms: TranslationKeys = {
     rakats: 'rakaat',
     touchToCount: 'Sentuh skrin semasa sujud',
     proximityActive: 'Sensor kedekatan aktif',
+    motionSensorActive: 'Sensor pergerakan aktif',
     cooldownActive: 'Tunggu...',
     prayerNotYet: 'Waktu solat ini belum tiba',
     willBeLate: 'Lewat',
@@ -26509,6 +26519,7 @@ const hi: TranslationKeys = {
     rakats: 'रकात',
     touchToCount: 'सजदे के दौरान स्क्रीन टच करें',
     proximityActive: 'प्रॉक्सिमिटी सेंसर सक्रिय',
+    motionSensorActive: 'मोशन सेंसर सक्रिय',
     cooldownActive: 'रुकिए...',
     prayerNotYet: 'इस नमाज़ का समय अभी नहीं आया है',
     willBeLate: 'देरी से',
@@ -28915,6 +28926,7 @@ const bn: TranslationKeys = {
     rakats: 'রাকাত',
     touchToCount: 'সিজদার সময় স্ক্রিন স্পর্শ করুন',
     proximityActive: 'প্রক্সিমিটি সেন্সর সক্রিয়',
+    motionSensorActive: 'মোশন সেন্সর সক্রিয়',
     cooldownActive: 'অপেক্ষা করুন...',
     prayerNotYet: 'এই নামাযের সময় এখনো আসেনি',
     willBeLate: 'বিলম্বিত',
@@ -31320,6 +31332,7 @@ const ru: TranslationKeys = {
     rakats: 'ракатов',
     touchToCount: 'Коснитесь экрана во время суджуда',
     proximityActive: 'Датчик приближения активен',
+    motionSensorActive: 'Датчик движения активен',
     cooldownActive: 'Подождите...',
     prayerNotYet: 'Время этой молитвы ещё не наступило',
     willBeLate: 'Просрочено',

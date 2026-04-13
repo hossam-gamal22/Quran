@@ -263,7 +263,8 @@
       "./plugins/with-ios-widgets",
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
-      ["./plugins/with-notification-large-icon", { "icon": "./assets/images/icons/icon.png" }]
+      ["./plugins/with-notification-large-icon", { "icon": "./assets/images/icons/icon.png" }],
+      "./modules/proximity-sensor/plugin"
     ],
     "experiments": {
       "typedRoutes": true
