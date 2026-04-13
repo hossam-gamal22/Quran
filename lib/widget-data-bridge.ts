@@ -16,7 +16,7 @@ import {
   type SharedWidgetData,
 } from './widget-data';
 import { getLanguage } from './i18n';
-import { type PrayerTimes } from './prayer-times';
+import { type PrayerTimes, getStoredLocation, fetchPrayerTimes, cachePrayerTimes, parsePrayerTimes } from './prayer-times';
 import { getOfflinePrayerTimes } from './prayer-week-cache';
 
 const APP_GROUP = 'group.com.rooh.almuslim';
@@ -223,8 +223,26 @@ export function scheduleMidnightRefresh(onRefresh?: () => void): () => void {
   midnight.setHours(0, 0, 30, 0); // 00:00:30 next day (30s buffer)
   const msUntilMidnight = midnight.getTime() - now.getTime();
 
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     updateWidgetData().catch((e) => console.warn('⚠️ Midnight widget refresh failed:', e));
+
+    // Proactively cache tomorrow's prayer times so the prayer screen loads instantly
+    try {
+      const location = await getStoredLocation();
+      if (location) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+        const response = await fetchPrayerTimes(location, tomorrow);
+        if (response?.timings) {
+          const parsed = parsePrayerTimes(response);
+          await cachePrayerTimes(tomorrowStr, parsed);
+        }
+      }
+    } catch {
+      // Non-critical — prayer screen will fetch on demand
+    }
+
     onRefresh?.();
     scheduleMidnightRefresh(onRefresh);
   }, msUntilMidnight);

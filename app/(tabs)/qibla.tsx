@@ -102,22 +102,33 @@ const distanceToMecca = (lat: number, lng: number): number => {
 };
 
 // ---------------------------------------------------------------------------
-// Network connectivity check
+// Bearing cache helpers
 // ---------------------------------------------------------------------------
-const checkConnectivity = async (): Promise<boolean> => {
+const QIBLA_BEARING_CACHE_KEY = '@qibla_bearing';
+
+interface CachedBearing {
+  bearing: number;
+  lat: number;
+  lon: number;
+  timestamp: number;
+}
+
+async function getCachedBearing(): Promise<CachedBearing | null> {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch('https://clients3.google.com/generate_204', {
-      method: 'HEAD',
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return res.status === 204 || res.ok;
+    const raw = await AsyncStorage.getItem(QIBLA_BEARING_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as CachedBearing;
   } catch {
-    return false;
+    return null;
   }
-};
+}
+
+async function setCachedBearing(bearing: number, lat: number, lon: number): Promise<void> {
+  try {
+    const data: CachedBearing = { bearing, lat, lon, timestamp: Date.now() };
+    await AsyncStorage.setItem(QIBLA_BEARING_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // Fetch Qibla bearing from UmmahAPI
@@ -232,7 +243,7 @@ const QiblaScreen = () => {
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
   }, [currentStyleId]);
 
-  // ------ Fetch bearing for a given coordinate pair ------
+  // ------ Fetch bearing for a given coordinate pair (background upgrade) ------
   const fetchBearingForCoords = useCallback(async (lat: number, lng: number, mounted: { value: boolean }) => {
     // Distance to Mecca
     const dist = distanceToMecca(lat, lng);
@@ -244,19 +255,20 @@ const QiblaScreen = () => {
         setQiblaBearing(0);
         setIsLocalCalc(false);
       }
+      await setCachedBearing(0, lat, lng);
       return;
     }
 
+    // Try APIs directly (no connectivity check — just let them fail fast)
     let bearing: number | null = null;
-    const online = await checkConnectivity();
-    if (online) {
-      bearing = await fetchQiblaDirection(lat, lng);
-      if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
-    }
+    bearing = await fetchQiblaDirection(lat, lng);
+    if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
+
     if (mounted.value) {
       if (bearing != null) {
         setQiblaBearing(bearing);
         setIsLocalCalc(false);
+        await setCachedBearing(bearing, lat, lng);
       } else {
         setQiblaBearing(calculateQiblaBearingLocal(lat, lng));
         setIsLocalCalc(true);
@@ -270,36 +282,71 @@ const QiblaScreen = () => {
 
     (async () => {
       try {
-        // 1. Request location permission
+        // ── Phase 0: Instant bearing from cache (compass visible in ~20ms) ──
+        const cachedBearing = await getCachedBearing();
+        if (cachedBearing && mounted.value) {
+          setQiblaBearing(cachedBearing.bearing);
+          setUserCoords({ lat: cachedBearing.lat, lng: cachedBearing.lon });
+          setMeccaDistance(distanceToMecca(cachedBearing.lat, cachedBearing.lon));
+          setIsLocalCalc(false);
+          setUsingCachedLocation(true);
+        }
+
+        // If no cached bearing, try stored location for instant local calc
+        if (!cachedBearing) {
+          const storedLoc = await getStoredLocation();
+          if (storedLoc && mounted.value) {
+            const localBearing = calculateQiblaBearingLocal(storedLoc.latitude, storedLoc.longitude);
+            setQiblaBearing(localBearing);
+            setUserCoords({ lat: storedLoc.latitude, lng: storedLoc.longitude });
+            setMeccaDistance(distanceToMecca(storedLoc.latitude, storedLoc.longitude));
+            setIsLocalCalc(true);
+            setUsingCachedLocation(true);
+          }
+        }
+
+        // ── Phase 1: Request location permission ──
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          if (mounted.value) setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
+          // If we already have a bearing from cache, don't show error
+          if (!cachedBearing && mounted.value) {
+            setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
+          }
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
-          if (mounted.value)
+          if (!cachedBearing && mounted.value)
             setErrorMsg(
               t('qibla.servicesDisabled') || 'Location services disabled. Please enable them and try again.'
             );
           return;
         }
 
-        // 2. Get current position (with cached fallback)
+        // ── Phase 2: Get fresh GPS (Balanced accuracy + 3s timeout) ──
         let lat: number;
         let lng: number;
         let usedCache = false;
         try {
-          const position = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.High,
+          const gpsPromise = Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
           });
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('GPS timeout')), 3000)
+          );
+          const position = await Promise.race([gpsPromise, timeoutPromise]);
           lat = position.coords.latitude;
           lng = position.coords.longitude;
         } catch {
-          // GPS failed → try cached location from prayer system
+          // GPS failed/timed out → try cached location from prayer system
           const cached = await getStoredLocation();
           if (cached) {
             lat = cached.latitude;
             lng = cached.longitude;
+            usedCache = true;
+          } else if (cachedBearing) {
+            // We already have bearing from cache, just keep using it
+            lat = cachedBearing.lat;
+            lng = cachedBearing.lon;
             usedCache = true;
           } else {
             if (mounted.value)
@@ -315,10 +362,10 @@ const QiblaScreen = () => {
           setUsingCachedLocation(usedCache);
         }
 
-        // 3. Get Qibla bearing
-        await fetchBearingForCoords(lat, lng, mounted);
+        // ── Phase 3: Background API upgrade (silently improves bearing) ──
+        fetchBearingForCoords(lat, lng, mounted).catch(() => {});
 
-        // 4. Watch for location changes during travel (every 100m)
+        // ── Phase 4: Watch for location changes during travel (every 100m) ──
         if (!usedCache) {
           try {
             const watcher = await Location.watchPositionAsync(
@@ -329,7 +376,6 @@ const QiblaScreen = () => {
                 const newLng = pos.coords.longitude;
                 setUserCoords({ lat: newLat, lng: newLng });
                 setMeccaDistance(distanceToMecca(newLat, newLng));
-                // Recalculate bearing with local formula (instant, no API wait)
                 setQiblaBearing(calculateQiblaBearingLocal(newLat, newLng));
               },
             );
