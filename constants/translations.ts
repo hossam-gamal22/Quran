@@ -2458,6 +2458,14 @@ export interface TranslationKeys {
     prayerNotYet: string;
     willBeLate: string;
     done: string;
+    step1Title: string;
+    step1Desc: string;
+    step2Title: string;
+    step2Desc: string;
+    step3Title: string;
+    step3Desc: string;
+    tipTitle: string;
+    tipDesc: string;
   };
 }
 // ==================== العربية ====================
@@ -4864,6 +4872,14 @@ const ar: TranslationKeys = {
     prayerNotYet: 'لم يحن موعد هذه الصلاة بعد',
     willBeLate: 'متأخرة',
     done: 'تمت',
+    step1Title: 'اختر الصلاة',
+    step1Desc: 'حدد الصلاة التي تريد تتبعها من القائمة.',
+    step2Title: 'ضع الهاتف أمامك',
+    step2Desc: 'ضع الهاتف على الأرض بحيث تقترب جبهتك منه عند السجود. يعمل المستشعر تلقائياً.',
+    step3Title: 'صلِّ بخشوع',
+    step3Desc: 'سيتم احتساب كل سجدتين كركعة واحدة تلقائياً. يمكنك أيضاً لمس الشاشة للاحتساب يدوياً.',
+    tipTitle: 'نصيحة',
+    tipDesc: 'للحصول على أفضل نتيجة، ضع الهاتف مقلوباً (الشاشة لأسفل) في موضع السجود.',
   },
 };
 // ==================== English ====================
@@ -7270,6 +7286,14 @@ const en: TranslationKeys = {
     prayerNotYet: 'This prayer time has not arrived yet',
     willBeLate: 'Late',
     done: 'Done',
+    step1Title: 'Choose Prayer',
+    step1Desc: 'Select the prayer you want to track from the list.',
+    step2Title: 'Place Your Phone',
+    step2Desc: 'Place the phone on the ground so your forehead approaches it during sujud. The sensor works automatically.',
+    step3Title: 'Pray with Devotion',
+    step3Desc: 'Every 2 sujuds are automatically counted as one rakat. You can also tap the screen to count manually.',
+    tipTitle: 'Tip',
+    tipDesc: 'For best results, place the phone face-down (screen down) at your sujud position.',
   },
 };
 //==================== Français ====================
@@ -9676,6 +9700,14 @@ const fr: TranslationKeys = {
     prayerNotYet: 'L\'heure de cette prière n\'est pas encore arrivée',
     willBeLate: 'En retard',
     done: 'Terminé',
+    step1Title: 'Choisir la prière',
+    step1Desc: 'Sélectionnez la prière que vous souhaitez suivre.',
+    step2Title: 'Placez votre téléphone',
+    step2Desc: 'Placez le téléphone au sol pour que votre front s\'en approche lors du sujud. Le capteur fonctionne automatiquement.',
+    step3Title: 'Priez avec dévotion',
+    step3Desc: 'Chaque 2 sujuds sont comptés comme une rakat. Vous pouvez aussi toucher l\'écran pour compter manuellement.',
+    tipTitle: 'Conseil',
+    tipDesc: 'Pour de meilleurs résultats, placez le téléphone face vers le bas à l\'endroit du sujud.',
   },
 };
 
@@ -12083,6 +12115,14 @@ const de: TranslationKeys = {
     prayerNotYet: 'Die Gebetszeit ist noch nicht eingetroffen',
     willBeLate: 'Verspätet',
     done: 'Erledigt',
+    step1Title: 'Gebet wählen',
+    step1Desc: 'Wählen Sie das Gebet aus, das Sie verfolgen möchten.',
+    step2Title: 'Telefon platzieren',
+    step2Desc: 'Legen Sie das Telefon auf den Boden, sodass Ihre Stirn sich beim Sujud nähert. Der Sensor funktioniert automatisch.',
+    step3Title: 'Beten Sie mit Hingabe',
+    step3Desc: 'Jeweils 2 Sujuds werden als eine Rakat gezählt. Sie können auch den Bildschirm berühren, um manuell zu zählen.',
+    tipTitle: 'Tipp',
+    tipDesc: 'Für beste Ergebnisse legen Sie das Telefon mit dem Bildschirm nach unten an die Sujud-Position.',
   },
 };
 
@@ -14490,6 +14530,14 @@ const tr: TranslationKeys = {
     prayerNotYet: 'Bu namazın vakti henüz gelmedi',
     willBeLate: 'Geç',
     done: 'Tamamlandı',
+    step1Title: 'Namaz seçin',
+    step1Desc: 'Takip etmek istediğiniz namazı seçin.',
+    step2Title: 'Telefonunuzu yerleştirin',
+    step2Desc: 'Telefonu yere, secde ederken alnınızın yaklaşacağı şekilde koyun. Sensör otomatik çalışır.',
+    step3Title: 'Huşu ile namaz kılın',
+    step3Desc: 'Her 2 secde otomatik olarak bir rekat sayılır. Ekrana dokunarak da sayabilirsiniz.',
+    tipTitle: 'İpucu',
+    tipDesc: 'En iyi sonuç için telefonu ekranı aşağı bakacak şekilde secde yerine koyun.',
   },
 };
 
@@ -16897,6 +16945,14 @@ const es: TranslationKeys = {
     prayerNotYet: 'La hora de esta oración aún no ha llegado',
     willBeLate: 'Tardía',
     done: 'Hecho',
+    step1Title: 'Elegir oración',
+    step1Desc: 'Selecciona la oración que deseas seguir.',
+    step2Title: 'Coloca tu teléfono',
+    step2Desc: 'Coloca el teléfono en el suelo para que tu frente se acerque durante el sujud. El sensor funciona automáticamente.',
+    step3Title: 'Reza con devoción',
+    step3Desc: 'Cada 2 sujuds se cuentan como una rakat. También puedes tocar la pantalla para contar manualmente.',
+    tipTitle: 'Consejo',
+    tipDesc: 'Para mejores resultados, coloca el teléfono boca abajo en la posición de sujud.',
   },
 };
 // ==================== اردو (Urdu) ====================
@@ -19303,6 +19359,14 @@ const ur: TranslationKeys = {
     prayerNotYet: 'اس نماز کا وقت ابھی نہیں آیا',
     willBeLate: 'تأخیر',
     done: 'مکمل',
+    step1Title: 'نماز منتخب کریں',
+    step1Desc: 'فہرست سے وہ نماز منتخب کریں جسے آپ ٹریک کرنا چاہتے ہیں۔',
+    step2Title: 'فون رکھیں',
+    step2Desc: 'فون کو زمین پر اس طرح رکھیں کہ سجدے میں آپ کی پیشانی اس کے قریب آئے۔ سینسر خودکار کام کرتا ہے۔',
+    step3Title: 'خشوع سے نماز پڑھیں',
+    step3Desc: 'ہر 2 سجدے خودکار طور پر ایک رکعت شمار ہوں گے۔ آپ دستی طور پر اسکرین کو چھو کر بھی شمار کر سکتے ہیں۔',
+    tipTitle: 'مشورہ',
+    tipDesc: 'بہترین نتائج کے لیے فون کو الٹا (اسکرین نیچے) سجدے کی جگہ رکھیں۔',
   },
 };
 
@@ -21710,6 +21774,14 @@ const id: TranslationKeys = {
     prayerNotYet: 'Waktu sholat ini belum tiba',
     willBeLate: 'Terlambat',
     done: 'Selesai',
+    step1Title: 'Pilih Shalat',
+    step1Desc: 'Pilih shalat yang ingin Anda lacak dari daftar.',
+    step2Title: 'Letakkan Ponsel',
+    step2Desc: 'Letakkan ponsel di lantai agar dahi Anda mendekatinya saat sujud. Sensor bekerja otomatis.',
+    step3Title: 'Shalat dengan Khusyuk',
+    step3Desc: 'Setiap 2 sujud otomatis dihitung sebagai satu rakaat. Anda juga bisa menyentuh layar untuk menghitung manual.',
+    tipTitle: 'Tips',
+    tipDesc: 'Untuk hasil terbaik, letakkan ponsel menghadap ke bawah di posisi sujud.',
   },
 };
 
@@ -24117,6 +24189,14 @@ const ms: TranslationKeys = {
     prayerNotYet: 'Waktu solat ini belum tiba',
     willBeLate: 'Lewat',
     done: 'Selesai',
+    step1Title: 'Pilih Solat',
+    step1Desc: 'Pilih solat yang anda ingin jejak dari senarai.',
+    step2Title: 'Letakkan Telefon',
+    step2Desc: 'Letakkan telefon di lantai supaya dahi anda mendekat semasa sujud. Sensor berfungsi secara automatik.',
+    step3Title: 'Solat dengan Khusyuk',
+    step3Desc: 'Setiap 2 sujud dikira sebagai satu rakaat secara automatik. Anda juga boleh sentuh skrin untuk kira secara manual.',
+    tipTitle: 'Petua',
+    tipDesc: 'Untuk hasil terbaik, letakkan telefon menghadap ke bawah di posisi sujud.',
   },
 };
 // ==================== हिन्दी (Hindi) ======================================
@@ -26524,6 +26604,14 @@ const hi: TranslationKeys = {
     prayerNotYet: 'इस नमाज़ का समय अभी नहीं आया है',
     willBeLate: 'देरी से',
     done: 'पूर्ण',
+    step1Title: 'नमाज़ चुनें',
+    step1Desc: 'सूची से वह नमाज़ चुनें जिसे आप ट्रैक करना चाहते हैं।',
+    step2Title: 'फ़ोन रखें',
+    step2Desc: 'फ़ोन को ज़मीन पर रखें ताकि सजदे में आपका माथा उसके करीब आए। सेंसर अपने आप काम करता है।',
+    step3Title: 'खुशू से नमाज़ पढ़ें',
+    step3Desc: 'हर 2 सजदे अपने आप एक रकात गिने जाएंगे। आप स्क्रीन को छूकर भी मैन्युअल गिन सकते हैं।',
+    tipTitle: 'सुझाव',
+    tipDesc: 'सर्वोत्तम परिणाम के लिए फ़ोन को उल्टा (स्क्रीन नीचे) सजदे की जगह रखें।',
   },
 };
 
@@ -28931,6 +29019,14 @@ const bn: TranslationKeys = {
     prayerNotYet: 'এই নামাযের সময় এখনো আসেনি',
     willBeLate: 'বিলম্বিত',
     done: 'সম্পন্ন',
+    step1Title: 'নামাজ বাছাই করুন',
+    step1Desc: 'তালিকা থেকে আপনি যে নামাজ ট্র্যাক করতে চান সেটি নির্বাচন করুন।',
+    step2Title: 'ফোন রাখুন',
+    step2Desc: 'ফোনটি মাটিতে এমনভাবে রাখুন যাতে সেজদায় আপনার কপাল এর কাছে আসে। সেন্সর স্বয়ংক্রিয়ভাবে কাজ করে।',
+    step3Title: 'খুশুর সাথে নামাজ পড়ুন',
+    step3Desc: 'প্রতি ২টি সেজদা স্বয়ংক্রিয়ভাবে একটি রাকাত হিসেবে গণনা হবে। আপনি স্ক্রিন স্পর্শ করেও ম্যানুয়ালি গণনা করতে পারেন।',
+    tipTitle: 'পরামর্শ',
+    tipDesc: 'সেরা ফলাফলের জন্য ফোনটি উল্টো করে (স্ক্রিন নিচে) সেজদার জায়গায় রাখুন।',
   },
 };
 
@@ -31337,6 +31433,14 @@ const ru: TranslationKeys = {
     prayerNotYet: 'Время этой молитвы ещё не наступило',
     willBeLate: 'Просрочено',
     done: 'Выполнено',
+    step1Title: 'Выбрать молитву',
+    step1Desc: 'Выберите молитву, которую хотите отслеживать.',
+    step2Title: 'Положите телефон',
+    step2Desc: 'Положите телефон на пол так, чтобы ваш лоб приближался к нему во время суджуда. Датчик работает автоматически.',
+    step3Title: 'Молитесь с благоговением',
+    step3Desc: 'Каждые 2 суджуда автоматически считаются как один ракат. Вы также можете касаться экрана для ручного подсчёта.',
+    tipTitle: 'Совет',
+    tipDesc: 'Для лучших результатов положите телефон экраном вниз на место суджуда.',
   },
 };
 

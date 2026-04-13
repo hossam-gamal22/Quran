@@ -423,59 +423,109 @@ export default function SalatiScreen() {
         />
       </TouchableOpacity>
 
-      {/* Icon */}
-      <View style={styles.iconContainer}>
-        <View style={[styles.iconCircle, { backgroundColor: 'rgba(13, 142, 98, 0.15)' }]}>
-          <SujudIcon
-            width={80}
-            height={80}
-            fill={ACCENT_GREEN}
-          />
-        </View>
-      </View>
-
-      {/* Title */}
-      <Text style={[styles.title, { color: colors.text }]}>
-        {t('smartTracker.title')}
-      </Text>
-
-      {/* Subtitle */}
-      <Text style={[styles.subtitle, { color: colors.textLight }]}>
-        {t('smartTracker.placementDesc')}
-      </Text>
-
-      {/* Instructions */}
-      <View style={styles.instructionsList}>
-        <View style={[styles.instructionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={styles.bulletPoint} />
-          <Text style={[styles.instructionText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
-            {t('smartTracker.howItWorksDesc')}
-          </Text>
-        </View>
-
-        <View style={[styles.instructionItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <View style={styles.bulletPoint} />
-          <Text style={[styles.instructionText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
-            {t('smartTracker.touchModeDesc')}
-          </Text>
-        </View>
-      </View>
-
-      {/* Start Button */}
-      <TouchableOpacity
-        style={styles.primaryButton}
-        onPress={handleStartPrayer}
+      <ScrollView
+        contentContainerStyle={styles.instructionsScrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
       >
-        <MaterialCommunityIcons
-          name={isRTL ? 'arrow-left' : 'arrow-right'}
-          size={22}
-          color="#fff"
-          style={{ marginHorizontal: 8 }}
-        />
-        <Text style={styles.primaryButtonText}>
-          {t('smartTracker.startPrayer')}
+        {/* Icon */}
+        <View style={styles.iconContainer}>
+          <View style={[styles.iconCircle, { backgroundColor: 'rgba(13, 142, 98, 0.15)' }]}>
+            <SujudIcon
+              width={80}
+              height={80}
+              fill={ACCENT_GREEN}
+            />
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={[styles.title, { color: colors.text }]}>
+          {t('smartTracker.title')}
         </Text>
-      </TouchableOpacity>
+
+        {/* Steps */}
+        <View style={styles.instructionsList}>
+          {/* Step 1 */}
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+            <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
+                <Text style={styles.stepNumberText}>1</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={[styles.stepTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step1Title')}
+                </Text>
+                <Text style={[styles.stepDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step1Desc')}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Step 2 */}
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+            <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
+                <Text style={styles.stepNumberText}>2</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={[styles.stepTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step2Title')}
+                </Text>
+                <Text style={[styles.stepDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step2Desc')}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Step 3 */}
+          <View style={[styles.stepCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}>
+            <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.stepNumber, { backgroundColor: ACCENT_GREEN }]}>
+                <Text style={styles.stepNumberText}>3</Text>
+              </View>
+              <View style={styles.stepContent}>
+                <Text style={[styles.stepTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step3Title')}
+                </Text>
+                <Text style={[styles.stepDesc, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.step3Desc')}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Tip */}
+          <View style={[styles.tipCard, { backgroundColor: isDarkMode ? 'rgba(13, 142, 98, 0.12)' : 'rgba(13, 142, 98, 0.08)' }]}>
+            <View style={[styles.stepRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <MaterialCommunityIcons name="lightbulb-on-outline" size={22} color={ACCENT_GREEN} />
+              <View style={styles.stepContent}>
+                <Text style={[styles.tipText, { color: ACCENT_GREEN, textAlign: isRTL ? 'right' : 'left' }]}>
+                  {t('smartTracker.tipDesc')}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Start Button */}
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleStartPrayer}
+        >
+          <MaterialCommunityIcons
+            name={isRTL ? 'arrow-left' : 'arrow-right'}
+            size={22}
+            color="#fff"
+            style={{ marginHorizontal: 8 }}
+          />
+          <Text style={styles.primaryButtonText}>
+            {t('smartTracker.startPrayer')}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </Animated.View>
   );
 
@@ -894,8 +944,11 @@ const _styles = StyleSheet.create({
   instructionsContainer: {
     flex: 1,
     paddingHorizontal: 24,
-    justifyContent: 'center',
+  },
+  instructionsScrollContent: {
     alignItems: 'center',
+    paddingTop: 80,
+    paddingBottom: 32,
   },
   backButton: {
     position: 'absolute',
@@ -906,14 +959,15 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
+    zIndex: 10,
   },
   iconContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -923,7 +977,7 @@ const _styles = StyleSheet.create({
     fontSize: 28,
     fontFamily: fontBold(),
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 24,
     includeFontPadding: false,
   },
   subtitle: {
@@ -937,8 +991,57 @@ const _styles = StyleSheet.create({
   },
   instructionsList: {
     width: '100%',
-    gap: 16,
-    marginBottom: 40,
+    gap: 12,
+    marginBottom: 28,
+  },
+  stepCard: {
+    borderRadius: 14,
+    padding: 14,
+  },
+  stepRow: {
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  stepNumberText: {
+    fontSize: 14,
+    fontFamily: fontBold(),
+    color: '#fff',
+    includeFontPadding: false,
+  },
+  stepContent: {
+    flex: 1,
+    gap: 4,
+  },
+  stepTitle: {
+    fontSize: 16,
+    fontFamily: fontBold(),
+    includeFontPadding: false,
+  },
+  stepDesc: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  tipCard: {
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(13, 142, 98, 0.2)',
+  },
+  tipText: {
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    lineHeight: 22,
+    includeFontPadding: false,
   },
   instructionItem: {
     alignItems: 'flex-start',
