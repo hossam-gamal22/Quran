@@ -1,5 +1,5 @@
 // components/ads/BannerAd.tsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAds } from '@/lib/ads-context';
@@ -32,7 +32,11 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   const insets = useSafeAreaInsets();
   const [adLoaded, setAdLoaded] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryKey, setRetryKey] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const MAX_RETRIES = 2;
+  const RETRY_DELAY = 10_000; // 10 seconds between retries
 
   // Delay banner appearance to prevent layout shifts and reduce initial annoyance
   useEffect(() => {
@@ -52,6 +56,18 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     }
   }, [adLoaded, delayPassed, fadeAnim]);
 
+  // Retry logic for failed banner loads
+  const handleAdFailedToLoad = useCallback((error: any, label: string) => {
+    setAdLoaded(false);
+    console.log(`${label} failed:`, error);
+    if (retryCount < MAX_RETRIES) {
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setRetryKey(prev => prev + 1);
+      }, RETRY_DELAY);
+    }
+  }, [retryCount]);
+
   if (!GoogleBannerAd || Platform.OS === 'web') return null;
   if (!delayPassed) return null;
 
@@ -64,11 +80,12 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     return (
       <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
         <GoogleBannerAd
+          key={`slot-${slotKey}-${retryKey}`}
           unitId={slotUnitId}
           size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
           requestOptions={{ requestNonPersonalizedAdsOnly: true }}
           onAdLoaded={() => setAdLoaded(true)}
-          onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner slot failed:', error); }}
+          onAdFailedToLoad={(error: any) => handleAdFailedToLoad(error, 'Banner slot')}
         />
       </Animated.View>
     );
@@ -83,11 +100,12 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   return (
     <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
       <GoogleBannerAd
+        key={`screen-${screen}-${retryKey}`}
         unitId={adUnitId}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdLoaded={() => setAdLoaded(true)}
-        onAdFailedToLoad={(error: any) => { setAdLoaded(false); console.log('Banner failed:', error); }}
+        onAdFailedToLoad={(error: any) => handleAdFailedToLoad(error, 'Banner')}
       />
     </Animated.View>
   );

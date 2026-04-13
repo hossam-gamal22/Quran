@@ -4,7 +4,7 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from './firebase-config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { t } from '@/lib/i18n';
 import type { SeasonalOffer } from '@/types/premium';
 
@@ -52,8 +52,8 @@ const STORAGE_KEY = '@subscription_state';
 const CONFIG_CACHE_KEY = '@subscription_config_cache';
 
 export const DEFAULT_SUBSCRIPTION_CONFIG: SubscriptionConfig = {
-  enabled: false,
-  lifetimeEnabled: false,
+  enabled: true,
+  lifetimeEnabled: true,
   premiumBannerEnabled: true,
   products: {
     monthly: {
@@ -116,6 +116,31 @@ export const fetchSubscriptionConfig = async (): Promise<SubscriptionConfig> => 
 
   return DEFAULT_SUBSCRIPTION_CONFIG;
 };
+
+/**
+ * Real-time listener for subscription config changes from admin panel.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToSubscriptionConfig(
+  onUpdate: (config: SubscriptionConfig) => void
+): () => void {
+  try {
+    const docRef = doc(db, 'config', 'subscription-settings');
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const config = { ...DEFAULT_SUBSCRIPTION_CONFIG, ...data };
+        AsyncStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config)).catch(() => {});
+        onUpdate(config);
+      }
+    }, (error) => {
+      console.log('⚠️ Subscription config listener error:', error);
+    });
+  } catch (e) {
+    console.log('⚠️ Failed to subscribe to subscription config:', e);
+    return () => {};
+  }
+}
 
 // ==================== State Management ====================
 

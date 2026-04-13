@@ -578,6 +578,8 @@ const _styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
+    lineHeight: 38,
+    includeFontPadding: false,
   },
   viewToggle: {
     padding: 8,

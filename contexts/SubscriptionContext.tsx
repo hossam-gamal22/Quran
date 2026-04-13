@@ -10,6 +10,7 @@ import {
   SubscriptionPlan,
   SubscriptionProduct,
   fetchSubscriptionConfig,
+  subscribeToSubscriptionConfig,
   getSubscriptionState,
   setSubscriptionState,
   getPlanFromProductId,
@@ -19,7 +20,7 @@ import {
 import { fetchFeatureGatingConfig, isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
 import type { PremiumFeatureKey, PremiumSource, FeatureGatingConfig, AdminGrantedPremium } from '@/types/premium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { t } from '@/lib/i18n';
 import {
@@ -282,6 +283,23 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
               } catch (finishError) {
                 console.log('⚠️ finishTransaction failed (will retry on next launch):', finishError);
               }
+
+              // Record purchase in Firestore for admin visibility
+              try {
+                const userId = await AsyncStorage.getItem('@user_id');
+                if (userId) {
+                  await setDoc(doc(db, 'users', userId, 'purchases', purchase.transactionId || `purchase_${Date.now()}`), {
+                    productId: purchase.productId,
+                    plan,
+                    transactionId: purchase.transactionId || null,
+                    platform: Platform.OS,
+                    purchasedAt: serverTimestamp(),
+                    expiresAt: newState.expiresAt || null,
+                  });
+                }
+              } catch (firestoreError) {
+                console.log('⚠️ Purchase Firestore record failed (non-blocking):', firestoreError);
+              }
             }
           }
         );
@@ -338,11 +356,17 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     init();
 
+    // Subscribe to real-time subscription config updates from admin panel
+    const unsubConfigListener = subscribeToSubscriptionConfig((updatedConfig) => {
+      if (mounted) setConfig(updatedConfig);
+    });
+
     return () => {
       mounted = false;
       purchaseUpdateSubscription.current?.remove?.();
       purchaseErrorSubscription.current?.remove?.();
       IAP?.endConnection?.();
+      unsubConfigListener();
     };
   }, []);
 

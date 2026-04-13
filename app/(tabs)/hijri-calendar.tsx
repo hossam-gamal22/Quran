@@ -16,12 +16,14 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { getDateLocale, tArray } from '@/lib/i18n';
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from '@/lib/admin-data-api';
 import { getDayNames } from '@/constants/dayNames';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 // ─── Islamic Events ───────────────────────────────────────────────────────────
 // We will generate the events inside the component to support translations
@@ -34,6 +36,27 @@ interface IslamicEvent {
   icon: string;
   description: string;
   color: string;
+}
+
+// ─── Smart Cache Constants ────────────────────────────────────────────────────
+const CACHE_KEY = '@hijri_calendar_events';
+const CACHE_TTL_MONTHLY = 30 * 24 * 60 * 60 * 1000; // 30 days
+const CACHE_TTL_NEAR_RAMADAN = 2 * 24 * 60 * 60 * 1000; // 2 days
+
+/**
+ * Check if we're within 30 days before Ramadan (month 9)
+ * or currently in Ramadan or Shawwal (months 9-10)
+ */
+function isNearRamadan(hMonth: number): boolean {
+  // Near Ramadan: Shaban (8), Ramadan (9), or Shawwal (10)
+  return hMonth >= 8 && hMonth <= 10;
+}
+
+/**
+ * Get appropriate cache TTL based on current Hijri month
+ */
+function getCacheTTL(hMonth: number): number {
+  return isNearRamadan(hMonth) ? CACHE_TTL_NEAR_RAMADAN : CACHE_TTL_MONTHLY;
 }
 
 // ─── Hijri conversion (Kuwaiti algorithm) ────────────────────────────────────
@@ -111,22 +134,57 @@ export default function HijriCalendarScreen() {
   const [gcalEvents, setGcalEvents] = useState<IslamicEvent[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Fetch admin Google Calendar events
+  // Fetch admin Google Calendar events with smart caching
+  // TTL: 30 days normally, 2 days near Ramadan (months 8-10)
   useEffect(() => {
-    fetchGoogleCalendarEvents().then((events) => {
-      const mapped: IslamicEvent[] = events
-        .filter(e => e.hijriMonth && e.hijriDay)
-        .map(e => ({
-          month: e.hijriMonth!,
-          day: e.hijriDay!,
-          dayEnd: e.hijriDayEnd,
-          name: e.titleAr || e.title,
-          icon: e.icon || 'calendar',
-          description: e.descriptionAr || e.description || '',
-          color: e.color || '#607D8B',
+    const currentHMonth = todayHijri[1];
+    const ttl = getCacheTTL(currentHMonth);
+
+    const loadEvents = async () => {
+      // Try to load from cache first
+      try {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { events, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < ttl && events?.length > 0) {
+            // Cache is valid, use cached data
+            setGcalEvents(events);
+            return;
+          }
+        }
+      } catch {
+        // Cache read failed, continue to fetch
+      }
+
+      // Fetch fresh data from network
+      try {
+        const events = await fetchGoogleCalendarEvents();
+        const mapped: IslamicEvent[] = events
+          .filter(e => e.hijriMonth && e.hijriDay)
+          .map(e => ({
+            month: e.hijriMonth!,
+            day: e.hijriDay!,
+            dayEnd: e.hijriDayEnd,
+            name: e.titleAr || e.title,
+            icon: e.icon || 'calendar',
+            description: e.descriptionAr || e.description || '',
+            color: e.color || '#607D8B',
+          }));
+        setGcalEvents(mapped);
+
+        // Save to cache
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
+          events: mapped,
+          timestamp: Date.now(),
         }));
-      setGcalEvents(mapped);
-    }).catch(() => {});
+      } catch {
+        // Network fetch failed - show offline modal
+        showOfflineModal();
+      }
+    };
+
+    loadEvents();
   }, []);
 
   const daysInMonth = getDaysInHijriMonth(hYear, hMonth);

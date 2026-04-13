@@ -80,6 +80,7 @@ import { getDuaOfTheDay } from '@/data/daily-duas';
 import { getAyahOfTheDay } from '@/data/daily-ayahs';
 
 import NetInfo from '@react-native-community/netinfo';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import CountdownTimer from '@/components/ui/prayer/CountdownTimer';
 import PrayerCard from '@/components/ui/prayer/PrayerCard';
 import PrayerList from '@/components/ui/prayer/PrayerList';
@@ -601,6 +602,7 @@ export default function PrayerScreen() {
       const netState = await NetInfo.fetch();
       if (!(netState.isConnected && netState.isInternetReachable !== false)) {
         setError(t('messages.noInternet'));
+        showOfflineModal();
       } else {
         setError(t('messages.error'));
       }

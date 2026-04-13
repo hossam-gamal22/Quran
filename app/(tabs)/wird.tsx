@@ -342,6 +342,8 @@ const _styles = StyleSheet.create({
     fontFamily: fontBold(),
     fontSize: 20,
     color: '#fff',
+    lineHeight: 32,
+    includeFontPadding: false,
   },
   resetAllButton: {
     padding: 8,

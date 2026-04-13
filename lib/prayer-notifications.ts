@@ -189,7 +189,15 @@ export async function schedulePrayerNotifications(
         const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
         const dayData = source[targetDate.getDate() - 1];
         if (!dayData) continue;
-        scheduleDays.push({ date: targetDate, timings: dayData.timings as Record<string, string>, isOffline: false });
+        const timings: Record<string, string> = {
+          Fajr: dayData.timings.Fajr,
+          Sunrise: dayData.timings.Sunrise,
+          Dhuhr: dayData.timings.Dhuhr,
+          Asr: dayData.timings.Asr,
+          Maghrib: dayData.timings.Maghrib,
+          Isha: dayData.timings.Isha,
+        };
+        scheduleDays.push({ date: targetDate, timings, isOffline: false });
       }
     } catch (apiError) {
       console.warn('[prayer-notif] API fetch failed, trying offline fallback:', apiError);

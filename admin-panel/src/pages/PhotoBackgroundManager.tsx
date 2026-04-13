@@ -74,14 +74,12 @@ interface PexelsSearchResult {
 // ========================================
 
 const DEFAULT_CATEGORIES: CategoryConfig[] = [
-  { id: 'sky', name_ar: 'سماء', is_active: true, order_index: 0 },
-  { id: 'clouds', name_ar: 'سحاب', is_active: true, order_index: 1 },
-  { id: 'ocean', name_ar: 'بحر', is_active: true, order_index: 2 },
-  { id: 'nature', name_ar: 'طبيعة', is_active: true, order_index: 3 },
-  { id: 'mountains', name_ar: 'جبال', is_active: true, order_index: 4 },
-  { id: 'forest', name_ar: 'غابات', is_active: true, order_index: 5 },
-  { id: 'sunset', name_ar: 'غروب', is_active: true, order_index: 6 },
-  { id: 'flowers', name_ar: 'زهور', is_active: true, order_index: 7 },
+  { id: 'islamic', name_ar: 'مساجد', is_active: true, order_index: 0 },
+  { id: 'nature', name_ar: 'شجر وخضرة', is_active: true, order_index: 1 },
+  { id: 'clouds', name_ar: 'سحاب', is_active: true, order_index: 2 },
+  { id: 'sky', name_ar: 'سماء', is_active: true, order_index: 3 },
+  { id: 'sunset', name_ar: 'غروب', is_active: true, order_index: 4 },
+  { id: 'sunrise', name_ar: 'شروق', is_active: true, order_index: 5 },
 ];
 
 const PEXELS_API_KEY = (import.meta as any).env?.VITE_PEXELS_API_KEY || '';
@@ -368,6 +366,106 @@ const PhotoBackgroundManager: React.FC = () => {
     }
   };
 
+  // ============ تهيئة من القائمة المدمجة ============
+  const [seeding, setSeeding] = useState(false);
+
+  const CURATED_PHOTOS: { id: number; category: string; photographer: string; is_free: boolean }[] = [
+    // Free mosques
+    { id: 2079705, category: 'islamic', photographer: 'Emre Can Acer', is_free: true },
+    { id: 2475725, category: 'islamic', photographer: 'Konevi', is_free: true },
+    { id: 337897, category: 'islamic', photographer: 'Pavlo Luchkovski', is_free: true },
+    // Free nature
+    { id: 1179229, category: 'nature', photographer: 'Matthew Montrone', is_free: true },
+    { id: 189298, category: 'nature', photographer: 'Donald Tong', is_free: true },
+    // Free clouds
+    { id: 531767, category: 'clouds', photographer: 'Pixabay', is_free: true },
+    { id: 216597, category: 'clouds', photographer: 'icon0', is_free: true },
+    // Free sky
+    { id: 91216, category: 'sky', photographer: 'Stefan Stefancik', is_free: true },
+    // Free sunset
+    { id: 4699016, category: 'sunset', photographer: 'Allec Gomes', is_free: true },
+    { id: 3812773, category: 'sunset', photographer: 'Mudassir Ali', is_free: true },
+    // Free sunrise
+    { id: 1905054, category: 'sunrise', photographer: 'Time Grocery', is_free: true },
+    { id: 917317, category: 'sunrise', photographer: 'Lan Yao', is_free: true },
+    // Premium mosques
+    { id: 5075096, category: 'islamic', photographer: 'Max Avans', is_free: false },
+    { id: 2900796, category: 'islamic', photographer: 'Lucas Carlini', is_free: false },
+    { id: 36615787, category: 'islamic', photographer: 'Esra Süngün', is_free: false },
+    { id: 36471022, category: 'islamic', photographer: 'Hale Ş', is_free: false },
+    { id: 36402393, category: 'islamic', photographer: 'Konevi', is_free: false },
+    { id: 36279260, category: 'islamic', photographer: 'HD Pictures', is_free: false },
+    { id: 36338169, category: 'islamic', photographer: 'Hale Ş', is_free: false },
+    { id: 36025129, category: 'islamic', photographer: 'Ali Akdemir', is_free: false },
+    { id: 5854322, category: 'islamic', photographer: 'Ahmed Lemine', is_free: false },
+    { id: 36463798, category: 'islamic', photographer: 'Rizwan Khan', is_free: false },
+    // Premium nature
+    { id: 7581409, category: 'nature', photographer: 'Syed Qaarif Andrabi', is_free: false },
+    { id: 6294476, category: 'nature', photographer: 'Shashwat Goyar', is_free: false },
+    { id: 230978, category: 'nature', photographer: 'Terje Sollie', is_free: false },
+    { id: 3655865, category: 'nature', photographer: 'Mark Neal', is_free: false },
+    // Premium clouds
+    { id: 36161257, category: 'clouds', photographer: 'Saud Aloufi', is_free: false },
+    { id: 6059474, category: 'clouds', photographer: 'Jonathan Borba', is_free: false },
+    { id: 3289880, category: 'clouds', photographer: 'Andre Moura', is_free: false },
+    { id: 5005185, category: 'clouds', photographer: 'Jo Kassis', is_free: false },
+    // Premium sky
+    { id: 281260, category: 'sky', photographer: 'Francesco Ungaro', is_free: false },
+    { id: 96622, category: 'sky', photographer: 'AS Photography', is_free: false },
+    { id: 1421903, category: 'sky', photographer: 'eberhard grossgasteiger', is_free: false },
+    { id: 3408744, category: 'sky', photographer: 'stein egil liland', is_free: false },
+    // Premium sunset
+    { id: 7540553, category: 'sunset', photographer: 'Stanislav Kondratiev', is_free: false },
+    { id: 925742, category: 'sunset', photographer: 'João Jesus', is_free: false },
+    { id: 36460916, category: 'sunset', photographer: 'Will Chen', is_free: false },
+    { id: 92664, category: 'sunset', photographer: 'David McEachan', is_free: false },
+    // Premium sunrise
+    { id: 36617875, category: 'sunrise', photographer: 'Nothing Ahead', is_free: false },
+    { id: 106132, category: 'sunrise', photographer: 'Snapwire', is_free: false },
+  ];
+
+  const seedFromCurated = async () => {
+    if (photos.length > 0 && !confirm('هذا سيضيف الصور المدمجة. الصور الموجودة لن تتأثر. متأكد؟')) return;
+
+    try {
+      setSeeding(true);
+      const existingIds = new Set(photos.map(p => p.pexels_id));
+      let added = 0;
+
+      for (const item of CURATED_PHOTOS) {
+        if (existingIds.has(item.id)) continue;
+
+        const pxUrl = (id: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg`;
+        const catPhotos = photos.filter(p => p.category === item.category);
+
+        const newPhoto: Omit<PhotoBackground, 'id'> = {
+          pexels_id: item.id,
+          category: item.category,
+          thumbnail_url: `${pxUrl(item.id)}?auto=compress&cs=tinysrgb&h=130`,
+          full_url: `${pxUrl(item.id)}?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940`,
+          large2x_url: `${pxUrl(item.id)}?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940`,
+          photographer: item.photographer,
+          is_free: item.is_free,
+          is_active: true,
+          order_index: catPhotos.length + added,
+          created_at: new Date().toISOString(),
+        };
+
+        const docRef = doc(collection(db, 'photoBackgrounds'));
+        await setDoc(docRef, newPhoto);
+        added++;
+      }
+
+      alert(`تم إضافة ${added} صورة جديدة بنجاح`);
+      await loadData();
+    } catch (error) {
+      console.error('Error seeding:', error);
+      alert('حدث خطأ أثناء الإضافة');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   // ============ المتغيرات ============
   const filteredPhotos = photos
     .filter(p => p.category === selectedCategory)
@@ -400,6 +498,16 @@ const PhotoBackgroundManager: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {photos.length === 0 && (
+            <button
+              onClick={seedFromCurated}
+              disabled={seeding}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${seeding ? 'animate-spin' : ''}`} />
+              <span>{seeding ? 'جاري التهيئة...' : 'تهيئة الصور المدمجة (40)'}</span>
+            </button>
+          )}
           <button
             onClick={() => setShowCategoryManager(!showCategoryManager)}
             className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"

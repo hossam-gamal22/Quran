@@ -138,7 +138,7 @@ const _styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold() },
+  headerTitle: { fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false },
   resetBtn: { padding: 4 },
   resetText: { fontFamily: fontMedium(), fontSize: 14, color: '#ef5350' },
   scroll: { flex: 1 },

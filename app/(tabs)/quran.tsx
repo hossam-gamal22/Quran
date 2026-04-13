@@ -47,6 +47,7 @@ import { getFirstSurahOnPage } from '../../lib/qcf-page-data';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import {
   downloadSurah,
   isDownloading,
@@ -373,6 +374,7 @@ export default function QuranScreen() {
       setDownloadedSet(prev => new Set(prev).add(surahNumber));
     } catch (e: any) {
       setFailedSet(prev => new Set(prev).add(surahNumber));
+      showOfflineModal();
     } finally {
       setDownloadingSet(prev => {
         const next = new Set(prev);

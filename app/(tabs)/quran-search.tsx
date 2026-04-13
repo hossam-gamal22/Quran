@@ -26,6 +26,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SearchResult {
   number: number;
@@ -148,6 +149,7 @@ export default function QuranSearchScreen() {
     } catch {
       setResults([]);
       setResultCount(0);
+      showOfflineModal();
     } finally {
       setLoading(false);
     }
@@ -162,6 +164,7 @@ export default function QuranSearchScreen() {
       setTafsirDetail({ surahNum, ayahNum, arabicText, tafsirText, edition: selectedEdition });
     } catch {
       setTafsirDetail(prev => prev ? { ...prev, tafsirText: t('quranSearch.loadTafsirFailed') } : null);
+      showOfflineModal();
     } finally {
       setLoadingTafsir(false);
     }
@@ -219,6 +222,8 @@ export default function QuranSearchScreen() {
       fontWeight: '700',
       color: colors.text,
       textAlign: 'center',
+      lineHeight: 30,
+      includeFontPadding: false,
     },
     title: { fontSize: 17, fontWeight: '800', color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 12 },
     // Search row
@@ -687,7 +692,7 @@ export default function QuranSearchScreen() {
                       try {
                         const { tafsirText } = await fetchTafsir(tafsirDetail.surahNum, tafsirDetail.ayahNum, ed.identifier);
                         setTafsirDetail(prev => prev ? { ...prev, tafsirText, edition: ed.identifier } : null);
-                      } catch {}
+                      } catch { showOfflineModal(); }
                       setLoadingTafsir(false);
                     }}
                   >

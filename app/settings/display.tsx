@@ -12,6 +12,7 @@ import {
   Dimensions,
   Switch,
   Platform,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
@@ -29,12 +30,13 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { APP_BACKGROUNDS, BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
-import { fetchDynamicBackgrounds, type DynamicBackground } from '@/lib/app-config-api';
+
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing, Colors, DarkColors } from '@/constants/theme';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { FREE_PEXELS_BACKGROUNDS, PREMIUM_PEXELS_BACKGROUNDS, BACKGROUND_CATEGORIES, type PexelsBackground } from '@/constants/pexels-backgrounds';
-import { cacheBackgroundOnSelect, getCachedBackgroundUri } from '@/lib/background-cache';
+import { fetchPhotoBackgrounds } from '@/lib/photo-backgrounds-api';
+import { cacheBackground, getCachedBackgroundUri } from '@/lib/background-cache';
 
 const FONT_SIZES: { value: FontSize; labelKey: string; sample: number }[] = [
   { value: 'small', labelKey: 'settings.small', sample: 14 },
@@ -56,14 +58,20 @@ export default function DisplaySettingsScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const { isPremium } = useSubscription();
-  const [adminBackgrounds, setAdminBackgrounds] = useState<DynamicBackground[]>([]);
   const [mergedBuiltIn, setMergedBuiltIn] = useState(APP_BACKGROUNDS.map(bg => ({ ...bg, is_premium: false })));
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [premiumPreviewPhoto, setPremiumPreviewPhoto] = useState<PexelsBackground | null>(null);
+  const [freePexels, setFreePexels] = useState<PexelsBackground[]>(FREE_PEXELS_BACKGROUNDS);
+  const [premiumPexels, setPremiumPexels] = useState<PexelsBackground[]>(PREMIUM_PEXELS_BACKGROUNDS);
 
   useEffect(() => {
-    fetchDynamicBackgrounds().then(setAdminBackgrounds).catch(() => {});
     // Show all built-in backgrounds by default (7 color backgrounds)
     setMergedBuiltIn(APP_BACKGROUNDS.map(bg => ({ ...bg, is_premium: false })));
+    // Fetch admin-managed backgrounds (falls back to hardcoded)
+    fetchPhotoBackgrounds().then(({ free, premium }) => {
+      setFreePexels(free);
+      setPremiumPexels(premium);
+    }).catch(() => { /* keep hardcoded defaults */ });
   }, []);
 
   // Theme mode options
@@ -123,24 +131,9 @@ export default function DisplaySettingsScreen() {
     }
   };
 
-  const handleSelectAdminBackground = (bg: DynamicBackground) => {
-    if (bg.is_premium && !isPremium) {
-      router.push('/subscription');
-      return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updateDisplay({
-      appBackground: 'dynamic' as AppBackgroundKey,
-      appBackgroundUrl: bg.fullUrl,
-      appBackgroundTextColor: bg.textColor || 'white',
-      blurEnabled: false,
-      dimEnabled: true,
-    });
-  };
-
   const handleSelectPexelsPhoto = async (photo: PexelsBackground) => {
     if (photo.isPremium && !isPremium) {
-      router.push('/subscription');
+      setPremiumPreviewPhoto(photo);
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -156,9 +149,16 @@ export default function DisplaySettingsScreen() {
       dimEnabled: true,
     });
     
-    // Cache the background for offline use (in background)
+    // Cache the background for offline use and update settings with local URI
     if (!cachedUri) {
-      cacheBackgroundOnSelect(photo.id, photo.src.large2x);
+      try {
+        const localUri = await cacheBackground(photo.id, photo.src.large2x, 'large2x');
+        if (localUri) {
+          updateDisplay({ appBackgroundUrl: localUri });
+        }
+      } catch (error) {
+        console.warn('Background cache failed, using remote URL:', error);
+      }
     }
   };
 
@@ -444,7 +444,7 @@ export default function DisplaySettingsScreen() {
                               onPress={() => handleSelectBackground(bg.id, true)}
                               style={[
                                 styles.bgGridThumb,
-                                { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, backgroundColor: bg.dominantColor, opacity: isPremium ? 1 : 0.55 },
+                                { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, backgroundColor: bg.dominantColor, opacity: isPremium ? 1 : 0.85 },
                                 isSelected && styles.bgThumbSelected,
                               ]}
                             >
@@ -486,90 +486,7 @@ export default function DisplaySettingsScreen() {
                     <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                   )}
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-                  {/* Admin backgrounds — free section */}
-                  {adminBackgrounds.filter(bg => !bg.is_premium).length > 0 && (
-                    <View style={styles.bgGrid}>
-                      {adminBackgrounds.filter(bg => !bg.is_premium).map((bg) => {
-                        const isSelected = settings.display.appBackground === 'dynamic' && settings.display.appBackgroundUrl === bg.fullUrl;
-                        return (
-                          <TouchableOpacity
-                            key={bg.id}
-                            onPress={() => handleSelectAdminBackground(bg)}
-                            style={[
-                              styles.bgGridThumb,
-                              { width: THUMB_SIZE, height: THUMB_SIZE * 1.4 },
-                              isSelected && styles.bgThumbSelected,
-                            ]}
-                          >
-                            <ExpoImage
-                              source={{ uri: bg.thumbnailUrl }}
-                              style={[styles.bgGridImage, { width: THUMB_SIZE - 4, height: THUMB_SIZE * 1.4 - 4 }]}
-                              contentFit="cover"
-                              transition={200}
-                            />
-                            {isSelected && (
-                              <View style={[styles.bgCheck, { [isRTL ? 'left' : 'right']: 4 }]}>
-                                <MaterialCommunityIcons name="check-circle" size={20} color="#0d8e62" />
-                              </View>
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
-
-                  {/* Admin backgrounds — premium section */}
-                  {adminBackgrounds.filter(bg => bg.is_premium).length > 0 && (
-                    <>
-                      <View style={[styles.premiumDivider, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                        <MaterialCommunityIcons name="crown" size={14} color={isDarkMode ? "#FFC107" : "#9A7100"} />
-                        <Text style={[styles.premiumLabel, { color: colors.textLight }, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                          {t('common.premiumOnly')}
-                        </Text>
-                        {!isPremium && (
-                          <View style={styles.premiumLockBadge}>
-                            <MaterialCommunityIcons name="lock" size={12} color={colors.textLight} />
-                          </View>
-                        )}
-                      </View>
-                      <View style={styles.bgGrid}>
-                        {adminBackgrounds.filter(bg => bg.is_premium).map((bg) => {
-                          const isSelected = settings.display.appBackground === 'dynamic' && settings.display.appBackgroundUrl === bg.fullUrl;
-                          return (
-                            <TouchableOpacity
-                              key={bg.id}
-                              onPress={() => handleSelectAdminBackground(bg)}
-                              style={[
-                                styles.bgGridThumb,
-                                { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, opacity: isPremium ? 1 : 0.55 },
-                                isSelected && styles.bgThumbSelected,
-                              ]}
-                            >
-                              <ExpoImage
-                                source={{ uri: bg.thumbnailUrl }}
-                                style={[styles.bgGridImage, { width: THUMB_SIZE - 4, height: THUMB_SIZE * 1.4 - 4 }]}
-                                contentFit="cover"
-                                transition={200}
-                              />
-                              {!isPremium && (
-                                <View style={[styles.bgPremiumBadge, { [isRTL ? 'right' : 'left']: 4 }]}>
-                                  <MaterialCommunityIcons name="crown" size={12} color={isDarkMode ? "#FFC107" : "#9A7100"} />
-                                </View>
-                              )}
-                              {isSelected && (
-                                <View style={[styles.bgCheck, { [isRTL ? 'left' : 'right']: 4 }]}>
-                                  <MaterialCommunityIcons name="check-circle" size={20} color="#0d8e62" />
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </>
-                  )}
-
                   {/* Pexels photos — Category selector */}
-                  {adminBackgrounds.length > 0 && <View style={{ height: 8 }} />}
                   <ScrollView 
                     horizontal 
                     showsHorizontalScrollIndicator={false}
@@ -633,7 +550,7 @@ export default function DisplaySettingsScreen() {
                   
                   {/* Pexels photos — free (filtered by category) */}
                   <View style={styles.bgGrid}>
-                    {FREE_PEXELS_BACKGROUNDS
+                    {freePexels
                       .filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory)
                       .map((photo) => {
                       const isSelected = settings.display.appBackground === 'dynamic' && settings.display.appBackgroundUrl === photo.src.large2x;
@@ -664,7 +581,7 @@ export default function DisplaySettingsScreen() {
                   </View>
 
                   {/* Pexels photos — premium (filtered by category) */}
-                  {PREMIUM_PEXELS_BACKGROUNDS.filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory).length > 0 && (
+                  {premiumPexels.filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory).length > 0 && (
                     <>
                       <View style={[styles.premiumDivider, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                         <MaterialCommunityIcons name="crown" size={14} color={isDarkMode ? "#FFC107" : "#9A7100"} />
@@ -678,7 +595,7 @@ export default function DisplaySettingsScreen() {
                         )}
                       </View>
                       <View style={styles.bgGrid}>
-                        {PREMIUM_PEXELS_BACKGROUNDS
+                        {premiumPexels
                           .filter((photo) => selectedCategory === 'all' || photo.category === selectedCategory)
                           .map((photo) => {
                           const isSelected = settings.display.appBackground === 'dynamic' && settings.display.appBackgroundUrl === photo.src.large2x;
@@ -688,7 +605,7 @@ export default function DisplaySettingsScreen() {
                               onPress={() => handleSelectPexelsPhoto(photo)}
                               style={[
                                 styles.bgGridThumb,
-                                { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, opacity: isPremium ? 1 : 0.55 },
+                                { width: THUMB_SIZE, height: THUMB_SIZE * 1.4, opacity: isPremium ? 1 : 0.85 },
                                 isSelected && styles.bgThumbSelected,
                               ]}
                             >
@@ -722,6 +639,60 @@ export default function DisplaySettingsScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Premium Background Preview Modal */}
+      <Modal
+        visible={!!premiumPreviewPhoto}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setPremiumPreviewPhoto(null)}
+      >
+        <View style={styles.premiumModalOverlay}>
+          {premiumPreviewPhoto && (
+            <>
+              <ExpoImage
+                source={{ uri: premiumPreviewPhoto.src.portrait }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                transition={300}
+              />
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]} />
+              
+              {/* Close button — top-right, outside content */}
+              <TouchableOpacity
+                onPress={() => setPremiumPreviewPhoto(null)}
+                style={styles.premiumModalCloseBtn}
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <View style={styles.premiumModalContent}>
+                <View style={styles.premiumModalBadge}>
+                  <MaterialCommunityIcons name="crown" size={24} color="#FFC107" />
+                  <Text style={styles.premiumModalBadgeText}>
+                    {t('common.premiumOnly')}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="lock" size={48} color="rgba(255,255,255,0.9)" />
+                <Text style={styles.premiumModalTitle}>
+                  {t('common.premiumFeature')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPremiumPreviewPhoto(null);
+                    router.push('/subscription');
+                  }}
+                  style={styles.premiumModalButton}
+                >
+                  <Text style={styles.premiumModalButtonText}>
+                    {t('subscription.subscribe')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </Modal>
     </BackgroundWrapper>
   );
 }
@@ -869,5 +840,73 @@ const _styles = StyleSheet.create({
   },
   categoryChipTextSelected: {
     color: '#FFFFFF',
+  },
+  // Premium preview modal
+  premiumModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumModalContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    padding: 30,
+  },
+  premiumModalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginBottom: 10,
+  },
+  premiumModalBadgeText: {
+    fontSize: 16,
+    fontFamily: fontBold(),
+    color: '#FFC107',
+    lineHeight: 26,
+    includeFontPadding: false,
+  },
+  premiumModalTitle: {
+    fontSize: 18,
+    fontFamily: fontMedium(),
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 28,
+    includeFontPadding: false,
+  },
+  premiumModalButton: {
+    backgroundColor: '#0d8e62',
+    paddingHorizontal: 36,
+    paddingVertical: 14,
+    borderRadius: 30,
+    marginTop: 12,
+  },
+  premiumModalButtonText: {
+    fontSize: 16,
+    fontFamily: fontBold(),
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 26,
+    includeFontPadding: false,
+  },
+  premiumModalCloseBtn: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

@@ -497,6 +497,8 @@ const _styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontFamily: fontBold(),
+    lineHeight: 32,
+    includeFontPadding: false,
   },
   headerPlaceholder: {
     width: 40,

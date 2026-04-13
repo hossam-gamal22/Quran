@@ -71,32 +71,9 @@ import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
 import { hasQuranRefs } from '@/lib/azkar-quran-refs';
 import AzkarQcfVerse from '@/components/AzkarQcfVerse';
-import { searchPhotos, type Photo } from '@/lib/api/pexels';
+import { getListenModeBackgrounds } from '@/constants/pexels-backgrounds';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// Search terms per azkar category for background images
-const CATEGORY_PHOTO_TERMS: Record<string, string[]> = {
-  morning: ['beautiful sunrise sky', 'golden morning light nature', 'dawn sky clouds'],
-  evening: ['beautiful sunset sky', 'golden hour landscape', 'dusk sky orange'],
-  sleep: ['starry night sky', 'calm night moon', 'peaceful dark blue sky'],
-  wakeup: ['fresh morning sunrise', 'early morning dew nature', 'dawn light forest'],
-  after_prayer: ['peaceful mosque interior', 'calm nature green', 'serene landscape'],
-  quran_duas: ['beautiful sky clouds', 'peaceful nature light', 'calm ocean horizon'],
-  sunnah_duas: ['serene nature landscape', 'peaceful garden', 'calm river nature'],
-  ruqya: ['peaceful sky light rays', 'calm nature morning', 'green forest light'],
-  eating: ['nature garden flowers', 'peaceful green field', 'beautiful meadow'],
-  mosque: ['beautiful mosque architecture', 'islamic architecture', 'mosque minaret sky'],
-  house: ['peaceful home garden', 'calm interior plants', 'cozy nature'],
-  travel: ['beautiful road landscape', 'mountain path scenic', 'desert horizon'],
-  emotions: ['calm ocean waves', 'peaceful rain nature', 'serene lake reflection'],
-  wudu: ['clear water stream', 'crystal water nature', 'peaceful waterfall'],
-  nature: ['beautiful nature scenery', 'green forest aerial', 'mountain lake scenic'],
-  fasting: ['golden crescent moon', 'peaceful sunset dates', 'calm evening sky'],
-  protection: ['strong mountain landscape', 'peaceful fortress', 'calm sky light'],
-  prayerSupplications: ['beautiful clouds sky', 'peaceful light rays', 'calm nature morning'],
-  salawat: ['beautiful green dome', 'peaceful landscape green', 'serene garden light'],
-  istighfar: ['peaceful rain drops', 'calm misty morning', 'forest light rays'],
-};
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 // Map azkar category IDs → worship tracker keys
 const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>>> = {
@@ -190,7 +167,7 @@ export default function CategoryAzkarScreen() {
   });
 
   // Listen mode background photos
-  const [listenPhotos, setListenPhotos] = useState<{ url: string; avgColor?: string }[]>([]);
+  const [listenPhotos, setListenPhotos] = useState<{ url: string; localUri?: string; avgColor?: string }[]>([]);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const listenImageScale = useRef(new Animated.Value(1)).current;
   const listenImageOpacity = useRef(new Animated.Value(1)).current;
@@ -340,6 +317,7 @@ export default function CategoryAzkarScreen() {
     } catch (error) {
       console.error('Error loading category data:', error);
       setLoadError(true);
+      showOfflineModal();
     }
   }, [category, fadeAnim]);
 
@@ -671,13 +649,15 @@ export default function CategoryAzkarScreen() {
     if (!zikr.audio) return;
     const queueIdx = audioQueue.findIndex(q => q.zikr.id === zikr.id);
     if (queueIdx < 0) return;
-    if (isGlobalAzkarPlaying && audioQueueIndex === queueIdx) {
+    const isCurrentAzkarQueuePlaying = globalAudio.state.source === 'azkar';
+    const currentQueueIndex = isCurrentAzkarQueuePlaying ? globalAudio.state.queueIndex : -1;
+    if (isCurrentAzkarQueuePlaying && currentQueueIndex === queueIdx) {
       await globalAudio.togglePlayPause();
     } else {
       await globalAudio.playAzkarQueue(audioTracks, queueIdx, `/azkar/${category}`);
       setAudioPlaying(true);
     }
-  }, [audioQueue, audioTracks, globalAudio, category, isGlobalAzkarPlaying, audioQueueIndex]);
+  }, [audioQueue, audioTracks, globalAudio, category]);
 
   const hasAudio = audioQueue.length > 0;
 
@@ -757,42 +737,13 @@ export default function CategoryAzkarScreen() {
   // Audio continues playing when leaving page — GlobalAudioBar handles it
   // Stop only handled by explicit user action (close button / stop)
 
-  // Fetch background photos for listen mode
+  // Use curated backgrounds for listen mode (no live API calls)
   useEffect(() => {
     if (!listenMode || !category) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const cacheKey = `@azkar_listen_photos_${category}`;
-        const cached = await AsyncStorage.getItem(cacheKey);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          const oneDay = 24 * 60 * 60 * 1000;
-          if (parsed.ts && Date.now() - parsed.ts < oneDay && parsed.photos?.length > 0) {
-            if (!cancelled) setListenPhotos(parsed.photos);
-            return;
-          }
-        }
-        const terms = CATEGORY_PHOTO_TERMS[category] || CATEGORY_PHOTO_TERMS.morning;
-        const photos: { url: string; avgColor?: string }[] = [];
-        for (const term of terms) {
-          try {
-            const data = await searchPhotos(term, 1, 5, 'portrait');
-            if (data.photos?.length > 0) {
-              for (const p of data.photos) {
-                photos.push({ url: p.src.large || p.src.medium, avgColor: p.avg_color });
-              }
-            }
-          } catch { /* skip */ }
-          if (photos.length >= 8) break;
-        }
-        if (!cancelled && photos.length > 0) {
-          setListenPhotos(photos);
-          await AsyncStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), photos }));
-        }
-      } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
+    const photos = getListenModeBackgrounds(category);
+    if (photos.length > 0) {
+      setListenPhotos(photos);
+    }
   }, [listenMode, category]);
 
   // Animate listen mode image — subtle slow zoom
@@ -850,11 +801,16 @@ export default function CategoryAzkarScreen() {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: darkMode ? '#111827' : '#F3F4F6' }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <MaterialCommunityIcons name="alert-circle-outline" size={48} color={darkMode ? '#9CA3AF' : '#6B7280'} />
-        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16 }}>{t('azkar.noDataSection')}</Text>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#22C55E', borderRadius: 20 }}>
-          <Text style={{ color: '#FFF', fontSize: 16 }}>{t('azkar.goBack')}</Text>
-        </TouchableOpacity>
+        <MaterialCommunityIcons name="wifi-off" size={48} color={darkMode ? '#9CA3AF' : '#6B7280'} />
+        <Text style={{ color: darkMode ? '#FFF' : '#000', marginTop: 12, fontSize: 16, fontFamily: fontSemiBold() }}>{t('azkar.noDataSection')}</Text>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12, marginTop: 20 }}>
+          <TouchableOpacity onPress={() => { setLoadError(false); loadData(); }} style={{ paddingHorizontal: 24, paddingVertical: 12, backgroundColor: '#22C55E', borderRadius: 20 }}>
+            <Text style={{ color: '#FFF', fontSize: 16, fontFamily: fontSemiBold() }}>{t('common.retry')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20, borderWidth: 1, borderColor: darkMode ? '#4B5563' : '#D1D5DB' }}>
+            <Text style={{ color: darkMode ? '#FFF' : '#000', fontSize: 16, fontFamily: fontSemiBold() }}>{t('azkar.goBack')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -899,8 +855,8 @@ export default function CategoryAzkarScreen() {
               <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
             </TouchableOpacity>
             
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', flex: 1, gap: 4 }}>
+              <Text style={[styles.headerTitle, { color: darkMode ? '#F9FAFB' : '#1F2937', textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
                 {category === 'sunnah_duas' ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language)}
               </Text>
               <SectionInfoButton sectionKey="azkar" />
@@ -909,22 +865,16 @@ export default function CategoryAzkarScreen() {
             <View style={[styles.headerActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity
                 onPress={() => setViewMode(v => v === 'card' ? 'list' : 'card')}
-                style={styles.favoriteButton}
+                style={styles.headerIconButton}
               >
                 <MaterialCommunityIcons
                   name={viewMode === 'card' ? 'view-list' : 'card-text'}
-                  size={24}
+                  size={22}
                   color={darkMode ? '#F9FAFB' : '#1F2937'}
                 />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.favoriteButton}>
-                <MaterialCommunityIcons name="plus-circle-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/all-favorites' as any)} style={styles.favoriteButton}>
-                <MaterialCommunityIcons name="bookmark-outline" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => openShareOptions(currentZikr)} style={styles.shareButton}>
-                <MaterialCommunityIcons name="share-variant" size={24} color={darkMode ? '#F9FAFB' : '#1F2937'} />
+              <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.headerIconButton}>
+                <MaterialCommunityIcons name="plus-circle-outline" size={22} color={darkMode ? '#F9FAFB' : '#1F2937'} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1939,22 +1889,19 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    flex: 1,
+    flexShrink: 1,
     fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginHorizontal: 8,
-  },
-  shareButton: {
-    padding: 8,
+    fontFamily: fontBold(),
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: 4,
   },
-  favoriteButton: {
-    padding: 8,
+  headerIconButton: {
+    padding: 6,
   },
   progressBarContainer: {
     flexDirection: 'row',

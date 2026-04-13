@@ -10,6 +10,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { fetchTempPageById, TempPage, TempPageBlock } from '@/lib/app-config-api';
 import { t, getLanguage, isRTL } from '@/lib/i18n';
 import { useColors } from '@/hooks/use-colors';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { ScreenContainer } from '@/components/screen-container';
 
 function BlockItem({ block, lang, colors, isRtl }: {
@@ -59,6 +60,9 @@ export default function TempPageScreen() {
     fetchTempPageById(id).then(p => {
       setPage(p);
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+      showOfflineModal();
     });
   }, [id]);
 

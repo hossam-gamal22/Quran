@@ -19,6 +19,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getSurahName, fetchTafsir, TAFSIR_EDITIONS } from '@/lib/quran-api';
 import { t } from '@/lib/i18n';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useSettings } from '@/contexts/SettingsContext';
 import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
@@ -63,7 +64,10 @@ export default function TafsirScreen() {
         setArabicText(ar);
         setTafsirText(tf);
       })
-      .catch(() => setTafsirText(t('quranSearch.loadTafsirFailed')))
+      .catch(() => {
+        setTafsirText(t('quranSearch.loadTafsirFailed'));
+        showOfflineModal();
+      })
       .finally(() => setLoading(false));
   }, [surahNum, ayahNum, selectedEdition]);
 

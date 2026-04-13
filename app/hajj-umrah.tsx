@@ -27,6 +27,7 @@ import { localizeNumber } from '@/lib/format-number';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { s as _sharedS } from '@/components/hajj/shared';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import {
   fetchHajjUmrahContent,
   subscribeToHajjUmrahContent,
@@ -957,6 +958,8 @@ export function useHajjUmrahContent() {
     // Try to load CMS data, fall back to hardcoded
     fetchHajjUmrahContent().then((data) => {
       if (data) applyData(data);
+    }).catch(() => {
+      showOfflineModal();
     });
 
     // Subscribe for real-time updates

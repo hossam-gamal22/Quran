@@ -680,6 +680,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: Colors.text,
+    lineHeight: 30,
+    includeFontPadding: false,
   },
   addButton: {
     flexDirection: 'row',

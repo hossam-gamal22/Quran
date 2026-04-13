@@ -25,6 +25,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { fetchAppConfig } from '@/lib/app-config-api';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -141,7 +142,9 @@ export default function AboutScreen() {
   useEffect(() => {
     fetchAppConfig().then(config => {
       if (config.contact?.email) setContactEmail(config.contact.email);
-    }).catch(() => {});
+    }).catch(() => {
+      showOfflineModal();
+    });
   }, []);
 
   const handleLogoTap = () => {

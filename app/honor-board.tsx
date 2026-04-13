@@ -25,6 +25,8 @@ import { useRouter } from 'expo-router';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
+import NetInfo from '@react-native-community/netinfo';
 import { getMonthPrayerRecords, getAllQuranRecords, getAllAzkarRecords, formatDate, getMonthlyActivityStats } from '@/lib/worship-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -51,6 +53,7 @@ export default function HonorBoard() {
   const [monthlyActivities, setMonthlyActivities] = useState<Record<string, number>>({});
   const [leaderboard, setLeaderboard] = useState<Array<{ userId: string; displayName: string; score: number }>>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const isArabic = (settings.language || 'ar') === 'ar';
 
   useEffect(() => {
@@ -163,7 +166,11 @@ export default function HonorBoard() {
         }
       }
     } catch {
-      // Non-critical
+      setLoadError(true);
+      const netState = await NetInfo.fetch().catch(() => ({ isConnected: null, isInternetReachable: null }));
+      if (!(netState.isConnected && netState.isInternetReachable !== false)) {
+        showOfflineModal();
+      }
     } finally {
       setLoading(false);
     }
@@ -182,6 +189,36 @@ export default function HonorBoard() {
       <BackgroundWrapper style={{ flex: 1 }}>
         <View style={[styles.container, { backgroundColor: bgColor }]}>
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </BackgroundWrapper>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <BackgroundWrapper style={{ flex: 1 }}>
+        <View style={[styles.container, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
+          <MaterialCommunityIcons name="wifi-off" size={64} color={colors.muted} />
+          <Text style={[styles.emptyText, { color: colors.muted, marginTop: 16 }]}>
+            {isArabic ? 'تعذّر تحميل لوحة الشرف' : 'Failed to load honor board'}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.muted, fontSize: 14, marginTop: 8 }]}>
+            {isArabic ? 'تحقق من اتصالك بالإنترنت' : 'Check your internet connection'}
+          </Text>
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 12, marginTop: 20 }}>
+            <Text
+              onPress={() => { setLoadError(false); setLoading(true); loadData(); }}
+              style={{ color: colors.primary, fontFamily: fontSemiBold(), fontSize: 16, paddingVertical: 8, paddingHorizontal: 16 }}
+            >
+              {isArabic ? 'إعادة محاولة' : 'Retry'}
+            </Text>
+            <Text
+              onPress={() => router.back()}
+              style={{ color: colors.muted, fontFamily: fontRegular(), fontSize: 16, paddingVertical: 8, paddingHorizontal: 16 }}
+            >
+              {isArabic ? 'الرجوع' : 'Go Back'}
+            </Text>
+          </View>
         </View>
       </BackgroundWrapper>
     );

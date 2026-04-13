@@ -107,6 +107,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: fontBold(),
     fontSize: 18,
+    lineHeight: 30,
+    includeFontPadding: false,
     textAlign: 'center',
     flex: 1,
   },

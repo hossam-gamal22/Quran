@@ -217,6 +217,8 @@ const _styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: fontBold(),
     color: '#fff',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   skipBtn: {
     paddingVertical: 8,

@@ -55,6 +55,7 @@ import * as Notifications from 'expo-notifications';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { safeIcon } from '@/lib/safe-icon';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -822,6 +823,10 @@ export default function HomeScreen() {
         }
       } catch (e) {
         console.log('[Home] Failed to load prayer times:', e);
+        // If no cached prayer times were loaded, notify user
+        if (!cachedPrayerTimes) {
+          showOfflineModal();
+        }
       }
     };
     loadPrayerTimes();

@@ -22,6 +22,7 @@ import tafsirMuyassarData from '@/data/json/tafsir-muyassar.json';
 import * as Haptics from 'expo-haptics';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 interface SearchResult {
   number: number;
   text: string;
@@ -115,6 +116,7 @@ export default function TafsirSearchScreen() {
           tafsirTexts = result.ayahs.map((a: any) => a.text);
         } catch {
           tafsirTexts = surah.ayahs.map(() => t('tafsirSearch.loadError'));
+          showOfflineModal();
         }
       }
 
@@ -160,6 +162,7 @@ export default function TafsirSearchScreen() {
     } catch {
       setResults([]);
       setResultCount(0);
+      showOfflineModal();
     } finally {
       setLoading(false);
     }
@@ -194,6 +197,7 @@ export default function TafsirSearchScreen() {
       setTafsirDetail({ surahNum, ayahNum, arabicText, tafsirText, edition: selectedEdition });
     } catch {
       setTafsirDetail(prev => prev ? { ...prev, tafsirText: t('quranSearch.loadTafsirFailed') } : null);
+      showOfflineModal();
     } finally {
       setLoadingTafsir(false);
     }
@@ -502,7 +506,7 @@ export default function TafsirSearchScreen() {
                       try {
                         const { tafsirText } = await fetchTafsir(tafsirDetail.surahNum, tafsirDetail.ayahNum, ed.identifier);
                         setTafsirDetail(prev => prev ? { ...prev, tafsirText, edition: ed.identifier } : null);
-                      } catch {}
+                      } catch { showOfflineModal(); }
                       setLoadingTafsir(false);
                     }}
                   >

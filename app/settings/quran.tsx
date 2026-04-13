@@ -409,6 +409,8 @@ const _styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: fontBold(),
     textAlign: 'center',
+    lineHeight: 32,
+    includeFontPadding: false,
   },
   scrollContent: {
     paddingHorizontal: 16,

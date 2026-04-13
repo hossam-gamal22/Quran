@@ -131,6 +131,8 @@ import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
 import AppIconManager from './pages/AppIconManager';
 import SuggestionsPage from './pages/Suggestions';
+import PhotoBackgroundManager from './pages/PhotoBackgroundManager';
+import PurchaseHistory from './pages/PurchaseHistory';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -213,6 +215,7 @@ const NAV_GROUPS: NavGroup[] = [
       { path: '/users', icon: Users, label: 'المستخدمين' },
       { path: '/suggestions', icon: MessageSquare, label: 'الاقتراحات' },
       { path: '/subscriptions', icon: CreditCard, label: 'الاشتراكات' },
+      { path: '/purchase-history', icon: CreditCard, label: 'سجل المشتريات' },
       { path: '/rewards', icon: Trophy, label: 'المكافآت' },
       { path: '/analytics', icon: BarChart3, label: 'التحليلات' },
     ],
@@ -241,6 +244,7 @@ const NAV_GROUPS: NavGroup[] = [
       { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
       { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
       { path: '/app-icons', icon: ImageIcon, label: 'أيقونات التطبيق' },
+      { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
     ],
   },
@@ -499,6 +503,7 @@ const App: React.FC = () => {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/users" element={<UsersPage />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/purchase-history" element={<PurchaseHistory />} />
               <Route path="/feature-gating" element={<FeatureGating />} />
               <Route path="/rewards" element={<Rewards />} />
               <Route path="/ads" element={<Ads />} />
@@ -515,6 +520,7 @@ const App: React.FC = () => {
               <Route path="/suggestions" element={<SuggestionsPage />} />
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />
+              <Route path="/photo-backgrounds" element={<PhotoBackgroundManager />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

@@ -444,6 +444,11 @@ export default function RootLayout() {
       try {
         const { TurboModuleRegistry } = require('react-native');
         TurboModuleRegistry.getEnforcing('RNGoogleMobileAdsModule');
+
+        // Request ATT permission BEFORE initializing ads (iOS 14+ requirement)
+        const { requestTrackingPermission } = require('@/lib/att-prompt');
+        await requestTrackingPermission();
+
         const ads = require('react-native-google-mobile-ads');
         await ads.default().initialize();
         // Globally mute ad audio so ads never interrupt Quran/Radio playback

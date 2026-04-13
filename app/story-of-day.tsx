@@ -37,6 +37,7 @@ import {
   cacheVideoFile,
   invalidateCachedVideo,
 } from '@/lib/daily-video-prefetch';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 // Constants & Types
@@ -383,7 +384,10 @@ export default function StoryOfDayScreen() {
         }
       } catch (e: any) {
         console.error('[DailyVideo]', e?.name === 'AbortError' ? 'Timeout' : e);
-        if (!cancelled && !hasCacheData) setError(true);
+        if (!cancelled && !hasCacheData) {
+          setError(true);
+          showOfflineModal();
+        }
       } finally {
         clearTimeout(timeout);
         if (!cancelled) setLoading(false);

@@ -645,6 +645,7 @@ export default function SurahScreen() {
   const [showControls, setShowControls] = useState(true);
   const [bookmarks, setBookmarks] = useState<ColoredBookmark[]>([]);
   const [translationMap, setTranslationMap] = useState<Record<string, string>>({});
+  const [translationFailed, setTranslationFailed] = useState(false);
   const [showAyahMenu, setShowAyahMenu] = useState(false);
   const [selectedAyah, setSelectedAyah] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [showShareCard, setShowShareCard] = useState(false);
@@ -781,8 +782,11 @@ export default function SurahScreen() {
         }
         translationCacheRef.current[cacheKey] = map;
         setTranslationMap(prev => ({ ...prev, ...map }));
+        setTranslationFailed(false);
       })
-      .catch(() => {});
+      .catch(() => {
+        setTranslationFailed(true);
+      });
   }, [currentPage, showTranslation, translationEdition]);
 
   const currentLang = settings.language || 'ar';
@@ -1164,6 +1168,15 @@ export default function SurahScreen() {
     <ViewShot ref={pageViewShotRef} options={{ format: 'png', quality: 1 }} style={{ flex: 1 }}>
       <ImageBackground source={hasBgImage ? bgSource : undefined} style={{ flex: 1, backgroundColor: themeBgColor }} resizeMode="cover">
         <View style={{ flex: 1 }}>
+          {/* Translation unavailable banner */}
+          {showTranslation && translationFailed && (
+            <View style={{ backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)', paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <MaterialCommunityIcons name="wifi-off" size={14} color={isLightBg ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)'} />
+              <Text style={{ fontSize: 12, color: isLightBg ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)', fontFamily: fontRegular() }}>
+                {t('quran.translationUnavailableOffline') || (currentLang === 'ar' ? '\u0627\u0644\u062a\u0631\u062c\u0645\u0629 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d\u0629 \u0628\u062f\u0648\u0646 \u0625\u0646\u062a\u0631\u0646\u062a' : 'Translation unavailable offline')}
+              </Text>
+            </View>
+          )}
           {/* Mushaf pages */}
           <View style={{ flex: (showTafsirPanel && !tafsirMinimized) ? 2 : 1 }}>
             <FlatList

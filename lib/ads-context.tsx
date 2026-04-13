@@ -1,6 +1,6 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { fetchAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
+import { fetchAdsConfig, subscribeToAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 import {
   initSmartAdManager,
@@ -69,6 +69,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadConfig();
+
+    // Subscribe to real-time admin config updates from Firestore
+    const unsubscribe = subscribeToAdsConfig((updatedConfig) => {
+      setConfig(updatedConfig);
+    });
+    return () => unsubscribe();
   }, [loadConfig]);
 
   const onPageView = useCallback(() => {

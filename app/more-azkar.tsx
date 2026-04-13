@@ -412,6 +412,8 @@ const _styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    lineHeight: 32,
+    includeFontPadding: false,
   },
   backButton: {
     padding: 8,

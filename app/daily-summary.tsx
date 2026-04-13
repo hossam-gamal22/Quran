@@ -354,6 +354,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     textAlign: 'center',
+    lineHeight: 34,
+    includeFontPadding: false,
   },
   statCard: {
     marginBottom: 12,

@@ -218,7 +218,7 @@ const _styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold() },
+  headerTitle: { fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false },
   saveBtn: {
     backgroundColor: 'rgba(6,79,47,0.85)',
     paddingHorizontal: 16,

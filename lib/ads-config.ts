@@ -3,7 +3,7 @@
 
 import { Platform } from 'react-native';
 import { db } from './firebase-config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ==================== Ad Screen Keys ====================
@@ -102,13 +102,11 @@ export const PRODUCTION_AD_IDS = {
     banner: 'ca-app-pub-3645278220050673/9534813157',
     interstitial: 'ca-app-pub-3645278220050673/7064203695',
     appOpen: 'ca-app-pub-3645278220050673/6908649810',
-    nativeAdvanced: 'ca-app-pub-3645278220050673/8070163603',
   },
   android: {
     banner: 'ca-app-pub-3645278220050673/6453829605',
     interstitial: 'ca-app-pub-3645278220050673/5882983961',
     appOpen: 'ca-app-pub-3645278220050673/3627880358',
-    nativeAdvanced: 'ca-app-pub-3645278220050673/5595568144',
   },
 };
 
@@ -350,4 +348,31 @@ export function canShowGlobalAd(): boolean {
 
 export function recordGlobalAdShown(): void {
   _globalLastAdTime = Date.now();
+}
+
+/**
+ * Real-time listener for ads config changes from admin panel.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToAdsConfig(
+  onUpdate: (config: AdsConfig) => void
+): () => void {
+  try {
+    const docRef = doc(db, 'config', 'ads-settings');
+    return onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const raw = docSnap.data();
+        const normalized = normalizeAdminConfig(raw);
+        const config = { ...DEFAULT_ADS_CONFIG, ...normalized };
+        // Update local cache
+        AsyncStorage.setItem('ads_config_cache', JSON.stringify(config)).catch(() => {});
+        onUpdate(config);
+      }
+    }, (error) => {
+      console.log('⚠️ Ads config listener error:', error);
+    });
+  } catch (e) {
+    console.log('⚠️ Failed to subscribe to ads config:', e);
+    return () => {};
+  }
 }

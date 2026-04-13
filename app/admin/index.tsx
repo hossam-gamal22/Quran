@@ -331,6 +331,8 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: Colors.textLight,
+    lineHeight: 42,
+    includeFontPadding: false,
   },
   headerSubtitle: {
     fontSize: 14,

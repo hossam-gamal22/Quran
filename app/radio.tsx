@@ -37,6 +37,7 @@ import {
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
 import NetInfo from '@react-native-community/netinfo';
+import { showOfflineModal } from '@/components/ui/OfflineBanner';
 
 const ACCENT = '#0d8e62';
 
@@ -86,6 +87,7 @@ function RadioScreen() {
       const netState = await NetInfo.fetch();
       if (!(netState.isConnected && netState.isInternetReachable !== false)) {
         setError(t('radio.internetRequired'));
+        showOfflineModal();
       } else {
         setError(t('radio.errorLoading'));
       }
@@ -150,6 +152,7 @@ function RadioScreen() {
     const netState = await NetInfo.fetch();
     if (!(netState.isConnected && netState.isInternetReachable !== false)) {
       setError(t('radio.internetRequired'));
+      showOfflineModal();
       return;
     }
 

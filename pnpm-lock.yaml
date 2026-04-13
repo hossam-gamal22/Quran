@@ -152,6 +152,9 @@ importers:
       expo-task-manager:
         specifier: ^14.0.9
         version: 14.0.9(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
+      expo-tracking-transparency:
+        specifier: ^55.0.13
+        version: 55.0.13(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))
       expo-updates:
         specifier: ~29.0.16
         version: 29.0.16(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -2744,6 +2747,12 @@ packages:
 
   expo-task-manager@55.0.14:
     resolution: {integrity: sha512-KWee8OhusVJYkhCfFtZ1AqsjkbnTqErgcV595CY0mUQZK7Phhe1qJsv9xiIpxTI0nbOS/248nvm/FcVOrZPaPw==}
+    peerDependencies:
+      expo: '*'
+      react-native: '*'
+
+  expo-tracking-transparency@55.0.13:
+    resolution: {integrity: sha512-GfkKjmIufOQn1TzvUOP3s21V4roZWBlUwI0U+JC/7JVAdVMScEq3QonYdrjE9CPDarqon/g6726uftbqSLpzBA==}
     peerDependencies:
       expo: '*'
       react-native: '*'
@@ -7649,6 +7658,11 @@ snapshots:
       expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native-webview@13.15.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
       react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
       unimodules-app-loader: 55.0.4
+
+  expo-tracking-transparency@55.0.13(expo@54.0.33)(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)):
+    dependencies:
+      expo: 54.0.33(@babel/core@7.29.0)(@expo/metro-runtime@6.1.2)(expo-router@6.0.23)(react-native-webview@13.15.0(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
+      react-native: 0.81.5(@babel/core@7.29.0)(@types/react@19.1.17)(react@19.1.0)
 
   expo-updates-interface@2.0.0(expo@54.0.33):
     dependencies:

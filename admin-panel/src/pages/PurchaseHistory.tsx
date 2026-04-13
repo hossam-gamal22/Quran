@@ -1,0 +1,548 @@
+import { useState, useEffect, useMemo } from 'react';
+import { collection, getDocs, query, orderBy, Timestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import {
+  CreditCard,
+  Search,
+  Download,
+  RefreshCw,
+  Smartphone,
+  Apple,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  User,
+  Package,
+  Filter,
+} from 'lucide-react';
+
+// ==================== Types ====================
+
+interface PurchaseRecord {
+  id: string;
+  userId: string;
+  userName: string;
+  productId: string;
+  plan: string;
+  transactionId: string | null;
+  platform: 'android' | 'ios' | string;
+  purchasedAt: Date | null;
+  expiresAt: string | null;
+}
+
+type SortField = 'purchasedAt' | 'userName' | 'plan' | 'platform';
+type SortDirection = 'asc' | 'desc';
+
+// ==================== Helpers ====================
+
+function toDate(val: unknown): Date | null {
+  if (!val) return null;
+  if (val instanceof Timestamp) return val.toDate();
+  if (typeof (val as any)?.toDate === 'function') return (val as any).toDate();
+  if (typeof val === 'string' || typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function formatDate(date: Date | null): string {
+  if (!date) return '—';
+  return date.toLocaleDateString('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function planLabel(plan: string): string {
+  switch (plan) {
+    case 'monthly': return 'شهري';
+    case 'yearly': return 'سنوي';
+    case 'lifetime': return 'مدى الحياة';
+    default: return plan || '—';
+  }
+}
+
+function planColor(plan: string): string {
+  switch (plan) {
+    case 'monthly': return 'bg-blue-500/20 text-blue-400';
+    case 'yearly': return 'bg-emerald-500/20 text-emerald-400';
+    case 'lifetime': return 'bg-amber-500/20 text-amber-400';
+    default: return 'bg-slate-500/20 text-slate-400';
+  }
+}
+
+function isExpired(expiresAt: string | null): boolean {
+  if (!expiresAt) return false; // lifetime or no expiry
+  return new Date(expiresAt) < new Date();
+}
+
+// ==================== Component ====================
+
+export default function PurchaseHistory() {
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPlan, setFilterPlan] = useState('all');
+  const [filterPlatform, setFilterPlatform] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortField, setSortField] = useState<SortField>('purchasedAt');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+
+  // ==================== Data Loading ====================
+
+  const loadPurchases = async () => {
+    setLoading(true);
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const allPurchases: PurchaseRecord[] = [];
+
+      await Promise.allSettled(
+        usersSnap.docs.map(async (userDoc) => {
+          const userData = userDoc.data();
+          const userName = (userData.displayName || userData.name || '') as string;
+
+          try {
+            const purchasesSnap = await getDocs(
+              collection(db, 'users', userDoc.id, 'purchases')
+            );
+
+            purchasesSnap.forEach((purchaseDoc) => {
+              const data = purchaseDoc.data();
+              allPurchases.push({
+                id: `${userDoc.id}_${purchaseDoc.id}`,
+                userId: userDoc.id,
+                userName: userName || userDoc.id.slice(0, 8),
+                productId: data.productId || '',
+                plan: data.plan || '',
+                transactionId: data.transactionId || null,
+                platform: data.platform || 'unknown',
+                purchasedAt: toDate(data.purchasedAt),
+                expiresAt: data.expiresAt || null,
+              });
+            });
+          } catch {
+            // Skip users with no purchases subcollection
+          }
+        })
+      );
+
+      // Sort by purchase date (newest first)
+      allPurchases.sort((a, b) => {
+        const aTime = a.purchasedAt?.getTime() ?? 0;
+        const bTime = b.purchasedAt?.getTime() ?? 0;
+        return bTime - aTime;
+      });
+
+      setPurchases(allPurchases);
+    } catch (error) {
+      console.error('Error loading purchases:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPurchases();
+  }, []);
+
+  // ==================== Filtering & Sorting ====================
+
+  const filtered = useMemo(() => {
+    let result = purchases.filter((p) => {
+      const matchesSearch =
+        !searchTerm ||
+        p.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.transactionId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.productId || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesPlan = filterPlan === 'all' || p.plan === filterPlan;
+      const matchesPlatform = filterPlatform === 'all' || p.platform === filterPlatform;
+
+      let matchesStatus = true;
+      if (filterStatus === 'active') matchesStatus = !isExpired(p.expiresAt);
+      if (filterStatus === 'expired') matchesStatus = isExpired(p.expiresAt);
+
+      return matchesSearch && matchesPlan && matchesPlatform && matchesStatus;
+    });
+
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'purchasedAt':
+          cmp = (a.purchasedAt?.getTime() ?? 0) - (b.purchasedAt?.getTime() ?? 0);
+          break;
+        case 'userName':
+          cmp = a.userName.localeCompare(b.userName, 'ar');
+          break;
+        case 'plan':
+          cmp = a.plan.localeCompare(b.plan);
+          break;
+        case 'platform':
+          cmp = a.platform.localeCompare(b.platform);
+          break;
+      }
+      return sortDirection === 'desc' ? -cmp : cmp;
+    });
+
+    return result;
+  }, [purchases, searchTerm, filterPlan, filterPlatform, filterStatus, sortField, sortDirection]);
+
+  // ==================== Stats ====================
+
+  const stats = useMemo(() => {
+    const total = purchases.length;
+    const monthly = purchases.filter((p) => p.plan === 'monthly').length;
+    const yearly = purchases.filter((p) => p.plan === 'yearly').length;
+    const lifetime = purchases.filter((p) => p.plan === 'lifetime').length;
+    const android = purchases.filter((p) => p.platform === 'android').length;
+    const ios = purchases.filter((p) => p.platform === 'ios').length;
+    const active = purchases.filter((p) => !isExpired(p.expiresAt)).length;
+    const expired = purchases.filter((p) => isExpired(p.expiresAt)).length;
+    return { total, monthly, yearly, lifetime, android, ios, active, expired };
+  }, [purchases]);
+
+  // ==================== Export ====================
+
+  const handleExportCSV = () => {
+    if (filtered.length === 0) return;
+
+    const headers = ['المستخدم', 'معرّف المستخدم', 'الخطة', 'المنصة', 'معرّف المعاملة', 'تاريخ الشراء', 'تاريخ الانتهاء', 'الحالة'];
+    const rows = filtered.map((p) => [
+      p.userName,
+      p.userId,
+      planLabel(p.plan),
+      p.platform,
+      p.transactionId || '—',
+      p.purchasedAt ? p.purchasedAt.toISOString() : '—',
+      p.expiresAt || 'مدى الحياة',
+      isExpired(p.expiresAt) ? 'منتهي' : 'نشط',
+    ]);
+
+    const bom = '\uFEFF';
+    const csv = bom + [headers, ...rows].map((r) => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `purchase_history_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ==================== Sort Toggle ====================
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'desc' ? (
+      <ChevronDown className="w-3 h-3 inline mr-1" />
+    ) : (
+      <ChevronUp className="w-3 h-3 inline mr-1" />
+    );
+  };
+
+  // ==================== Render ====================
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 text-accent animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <CreditCard className="w-7 h-7 text-accent" />
+          <h1 className="text-2xl font-bold text-white">سجل المشتريات</h1>
+          <span className="text-sm text-admin-muted">({purchases.length} عملية)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-admin-surface border border-admin-border rounded-xl text-sm text-slate-300 hover:bg-admin-surface-light transition-colors disabled:opacity-40"
+          >
+            <Download className="w-4 h-4" />
+            تصدير CSV
+          </button>
+          <button
+            onClick={loadPurchases}
+            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-dark text-white rounded-xl text-sm transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            تحديث
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="إجمالي المشتريات" value={stats.total} icon={<Package className="w-5 h-5" />} color="text-white" />
+        <StatCard label="شهري" value={stats.monthly} icon={<Calendar className="w-5 h-5" />} color="text-blue-400" />
+        <StatCard label="سنوي" value={stats.yearly} icon={<Calendar className="w-5 h-5" />} color="text-emerald-400" />
+        <StatCard label="مدى الحياة" value={stats.lifetime} icon={<CreditCard className="w-5 h-5" />} color="text-amber-400" />
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Android" value={stats.android} icon={<Smartphone className="w-5 h-5" />} color="text-green-400" />
+        <StatCard label="iOS" value={stats.ios} icon={<Apple className="w-5 h-5" />} color="text-slate-300" />
+        <StatCard label="نشط" value={stats.active} icon={<CreditCard className="w-5 h-5" />} color="text-emerald-400" />
+        <StatCard label="منتهي" value={stats.expired} icon={<CreditCard className="w-5 h-5" />} color="text-red-400" />
+      </div>
+
+      {/* Filters */}
+      <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-admin-muted" />
+            <input
+              type="text"
+              placeholder="بحث بالاسم، المعرّف، أو رقم المعاملة..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pr-10 pl-4 py-2.5 bg-admin-bg border border-admin-border rounded-xl text-white text-sm placeholder-admin-muted focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-admin-muted" />
+
+            <select
+              value={filterPlan}
+              onChange={(e) => setFilterPlan(e.target.value)}
+              aria-label="تصفية حسب الخطة"
+              className="px-3 py-2.5 bg-admin-bg border border-admin-border rounded-xl text-white text-sm focus:outline-none focus:border-accent"
+            >
+              <option value="all">كل الخطط</option>
+              <option value="monthly">شهري</option>
+              <option value="yearly">سنوي</option>
+              <option value="lifetime">مدى الحياة</option>
+            </select>
+
+            <select
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value)}
+              aria-label="تصفية حسب المنصة"
+              className="px-3 py-2.5 bg-admin-bg border border-admin-border rounded-xl text-white text-sm focus:outline-none focus:border-accent"
+            >
+              <option value="all">كل المنصات</option>
+              <option value="android">Android</option>
+              <option value="ios">iOS</option>
+            </select>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              aria-label="تصفية حسب الحالة"
+              className="px-3 py-2.5 bg-admin-bg border border-admin-border rounded-xl text-white text-sm focus:outline-none focus:border-accent"
+            >
+              <option value="all">كل الحالات</option>
+              <option value="active">نشط</option>
+              <option value="expired">منتهي</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-admin-surface rounded-2xl border border-admin-border overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-admin-muted">
+            <CreditCard className="w-12 h-12 mb-3 opacity-40" />
+            <p className="text-lg">لا توجد مشتريات</p>
+            <p className="text-sm mt-1">لم يتم العثور على نتائج مطابقة</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-admin-border">
+                  <th
+                    onClick={() => toggleSort('userName')}
+                    className="px-4 py-3 text-right text-xs font-medium text-admin-muted uppercase cursor-pointer hover:text-white transition-colors"
+                  >
+                    المستخدم <SortIcon field="userName" />
+                  </th>
+                  <th
+                    onClick={() => toggleSort('plan')}
+                    className="px-4 py-3 text-right text-xs font-medium text-admin-muted uppercase cursor-pointer hover:text-white transition-colors"
+                  >
+                    الخطة <SortIcon field="plan" />
+                  </th>
+                  <th
+                    onClick={() => toggleSort('platform')}
+                    className="px-4 py-3 text-right text-xs font-medium text-admin-muted uppercase cursor-pointer hover:text-white transition-colors"
+                  >
+                    المنصة <SortIcon field="platform" />
+                  </th>
+                  <th
+                    onClick={() => toggleSort('purchasedAt')}
+                    className="px-4 py-3 text-right text-xs font-medium text-admin-muted uppercase cursor-pointer hover:text-white transition-colors"
+                  >
+                    تاريخ الشراء <SortIcon field="purchasedAt" />
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-admin-muted uppercase">
+                    الحالة
+                  </th>
+                  <th className="px-4 py-3 w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-admin-border/50">
+                {filtered.map((purchase) => (
+                  <PurchaseRow
+                    key={purchase.id}
+                    purchase={purchase}
+                    isExpanded={expandedRow === purchase.id}
+                    onToggle={() => setExpandedRow(expandedRow === purchase.id ? null : purchase.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Summary */}
+      {filtered.length > 0 && (
+        <p className="text-sm text-admin-muted text-center">
+          عرض {filtered.length} من {purchases.length} عملية شراء
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ==================== Sub-Components ====================
+
+function StatCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
+      <div className="flex items-center justify-between mb-2">
+        <span className={`${color} opacity-60`}>{icon}</span>
+        <span className={`text-2xl font-bold ${color}`}>{value}</span>
+      </div>
+      <p className="text-xs text-admin-muted">{label}</p>
+    </div>
+  );
+}
+
+function PurchaseRow({
+  purchase,
+  isExpanded,
+  onToggle,
+}: {
+  purchase: PurchaseRecord;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const expired = isExpired(purchase.expiresAt);
+
+  return (
+    <>
+      <tr
+        onClick={onToggle}
+        className="hover:bg-admin-surface-light/50 cursor-pointer transition-colors"
+      >
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-admin-muted" />
+            <div>
+              <p className="text-sm text-white font-medium">{purchase.userName}</p>
+              <p className="text-xs text-admin-muted font-mono">{purchase.userId.slice(0, 12)}...</p>
+            </div>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-medium ${planColor(purchase.plan)}`}>
+            {planLabel(purchase.plan)}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-1.5 text-sm text-slate-300">
+            {purchase.platform === 'ios' ? (
+              <Apple className="w-4 h-4" />
+            ) : (
+              <Smartphone className="w-4 h-4 text-green-400" />
+            )}
+            {purchase.platform === 'ios' ? 'iOS' : 'Android'}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <p className="text-sm text-slate-300">{formatDate(purchase.purchasedAt)}</p>
+        </td>
+        <td className="px-4 py-3">
+          {expired ? (
+            <span className="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium bg-red-500/20 text-red-400">
+              منتهي
+            </span>
+          ) : (
+            <span className="inline-flex px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400">
+              نشط
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          {isExpanded ? (
+            <ChevronUp className="w-4 h-4 text-admin-muted" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-admin-muted" />
+          )}
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr>
+          <td colSpan={6} className="px-4 py-3 bg-admin-bg/50">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <DetailItem label="معرّف المستخدم" value={purchase.userId} mono />
+              <DetailItem label="معرّف المنتج" value={purchase.productId || '—'} mono />
+              <DetailItem label="معرّف المعاملة" value={purchase.transactionId || '—'} mono />
+              <DetailItem label="تاريخ الشراء" value={formatDate(purchase.purchasedAt)} />
+              <DetailItem
+                label="تاريخ الانتهاء"
+                value={purchase.expiresAt ? new Date(purchase.expiresAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : 'مدى الحياة'}
+              />
+              <DetailItem label="المنصة" value={purchase.platform} />
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function DetailItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-xs text-admin-muted mb-1">{label}</p>
+      <p className={`text-slate-300 ${mono ? 'font-mono text-xs break-all' : ''}`}>{value}</p>
+    </div>
+  );
+}

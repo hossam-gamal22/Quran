@@ -603,6 +603,8 @@ const _styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    lineHeight: 32,
+    includeFontPadding: false,
   },
   headerActions: {
     flexDirection: 'row',
