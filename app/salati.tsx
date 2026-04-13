@@ -633,7 +633,7 @@ export default function SalatiScreen() {
           })}
         </View>
 
-        {/* Third row: Isha (centered) */
+        {/* Third row: Isha (centered) */}
         <View style={styles.prayerRowCenter}>
           {(['isha'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
