@@ -1184,7 +1184,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         },
         salawatTimes,
         notifSettings.salawatDays,
-        'general',
+        undefined, // channelId resolved from soundType
         salawatSound,
         iosBudget?.otherDays, // iOS dynamic budget
       );
@@ -1209,7 +1209,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         },
         tasbihTimes,
         notifSettings.tasbihDays,
-        'general',
+        undefined, // channelId resolved from soundType
         notifSettings.tasbihSoundType || 'tasbih',
         iosBudget?.otherDays, // iOS dynamic budget
       );
@@ -1234,7 +1234,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         },
         istighfarTimes,
         notifSettings.istighfarDays,
-        'general',
+        undefined, // channelId resolved from soundType
         notifSettings.istighfarSoundType || 'istighfar',
         iosBudget?.otherDays, // iOS dynamic budget
       );
@@ -1277,7 +1277,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         },
         customTimes,
         notifSettings.customReminderDays,
-        'general',
+        undefined, // channelId resolved from soundType
         notifSettings.customReminderSoundType || 'general_reminder',
         iosBudget?.otherDays, // iOS dynamic budget
       );
@@ -1311,7 +1311,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         },
         quranTimes,
         convertedDays,
-        'general',
+        undefined, // channelId resolved from soundType
         quranSound,
         iosBudget?.otherDays, // iOS dynamic budget
       );
@@ -1333,12 +1333,12 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           title: getNotifText('worship_daily', t('settings.worshipDailySummaryTitle'), t('settings.worshipDailySummaryBody'), lang).title,
           body: getNotifText('worship_daily', t('settings.worshipDailySummaryTitle'), t('settings.worshipDailySummaryBody'), lang).body,
           sound: resolveNotificationSound(dailySummarySound, notifSettings.sound),
-          data: { type: 'worship_summary', iconType: 'reminder', screen: '/daily-summary' },
+          data: { type: 'worship_summary', iconType: 'reminder', screen: '/daily-summary', soundType: dailySummarySound },
         },
         summaryTime.hour,
         summaryTime.minute,
         undefined,
-        'general',
+        undefined, // channelId resolved from soundType by scheduleWithDays
         dailySummarySound,
         iosBudget?.otherDays, // iOS dynamic budget
       );
