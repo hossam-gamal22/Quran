@@ -7,6 +7,14 @@
         { "fieldPath": "isActive", "order": "ASCENDING" },
         { "fieldPath": "priority", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "photoBackgrounds",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_active", "order": "ASCENDING" },
+        { "fieldPath": "order_index", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

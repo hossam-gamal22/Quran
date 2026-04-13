@@ -158,17 +158,13 @@ func getDhikrCategoryIcon(_ category: String) -> String {
 
 struct SmallDhikrWidgetView: View {
     let entry: DhikrWidgetEntry
-    
-    var category: String {
-        entry.data?.category ?? "misc"
-    }
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: getDhikrCategoryColor(category))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 6) {
-                // App icon
                 WidgetAppIcon(size: 32)
                 
                 Spacer()
@@ -177,20 +173,20 @@ struct SmallDhikrWidgetView: View {
                     .font(.system(size: 14, weight: .medium))
                     .multilineTextAlignment(.center)
                     .lineLimit(4)
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.textColor)
                     .environment(\.layoutDirection, .rightToLeft)
                 
                 Spacer()
                 
                 if (entry.data?.count ?? 1) > 1 {
-                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                    GlassPill(color: theme.badgeBg.opacity(0.6)) {
                         HStack(spacing: 4) {
                             Image(systemName: "repeat")
                                 .font(.system(size: 9))
                             Text("\(entry.data?.count ?? 1) \(entry.data?.timesLabel ?? "مرات")")
                                 .font(.system(size: 10, weight: .medium))
                         }
-                        .foregroundColor(WidgetConstants.Colors.gold)
+                        .foregroundColor(theme.badgeText)
                     }
                 }
             }
@@ -209,27 +205,23 @@ struct SmallDhikrWidgetView: View {
 
 struct MediumDhikrWidgetView: View {
     let entry: DhikrWidgetEntry
-    
-    var category: String {
-        entry.data?.category ?? "misc"
-    }
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: getDhikrCategoryColor(category))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 0) {
-                // Header
                 HStack {
                     WidgetAppIcon(size: 20)
                     Text("ذكر اليوم")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(theme.mutedColor)
                     Spacer()
-                    GlassPill {
+                    GlassPill(color: theme.badgeBg.opacity(0.4)) {
                         Text(entry.data?.categoryName ?? "أذكار")
                             .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(theme.mutedColor)
                     }
                 }
                 .padding(.horizontal)
@@ -237,13 +229,12 @@ struct MediumDhikrWidgetView: View {
                 .padding(.bottom, 6)
                 
                 HStack(spacing: 12) {
-                    // Right: dhikr text
                     VStack(alignment: .trailing, spacing: 6) {
                         Text(entry.data?.arabic ?? "سبحان الله")
                             .font(.system(size: 15, weight: .medium))
                             .multilineTextAlignment(.trailing)
                             .lineLimit(3)
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
                             .environment(\.layoutDirection, .rightToLeft)
                         
                         if entry.settings?.showBenefit ?? true,
@@ -252,21 +243,30 @@ struct MediumDhikrWidgetView: View {
                                 .font(.system(size: 10))
                                 .multilineTextAlignment(.trailing)
                                 .lineLimit(2)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(theme.mutedColor.opacity(0.5))
                                 .environment(\.layoutDirection, .rightToLeft)
+                        }
+                        
+                        if entry.settings?.showTranslation ?? false,
+                           let translation = entry.data?.translation, !translation.isEmpty {
+                            Text(translation)
+                                .font(.system(size: 10))
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(1)
+                                .foregroundColor(theme.mutedColor.opacity(0.45))
+                                .environment(\.layoutDirection, .leftToRight)
                         }
                     }
                     
-                    // Left: count
                     if (entry.data?.count ?? 1) > 1 {
-                        GlassPill(color: WidgetConstants.Colors.gold.opacity(0.25)) {
+                        GlassPill(color: theme.badgeBg.opacity(0.6)) {
                             HStack(spacing: 3) {
                                 Image(systemName: "repeat")
                                     .font(.system(size: 9))
                                 Text("\(entry.data?.count ?? 1)×")
                                     .font(.system(size: 11, weight: .bold))
                             }
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                         }
                     }
                 }
@@ -297,23 +297,107 @@ struct DhikrWidget: Widget {
         }
         .configurationDisplayName("ذكر اليوم")
         .description("ذكر يومي متجدد مع فضله")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
 struct DhikrWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: DhikrWidgetProvider.Entry
+    let theme = loadWidgetTheme()
     
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallDhikrWidgetView(entry: entry)
+            SmallDhikrWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-dhikr"))
         case .systemMedium:
-            MediumDhikrWidgetView(entry: entry)
+            MediumDhikrWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-dhikr"))
+        case .systemLarge:
+            LargeDhikrWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-dhikr"))
         default:
-            SmallDhikrWidgetView(entry: entry)
+            SmallDhikrWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://daily-dhikr"))
         }
+    }
+}
+
+// ========================================
+// واجهة الويدجت الكبير
+// ========================================
+
+struct LargeDhikrWidgetView: View {
+    let entry: DhikrWidgetEntry
+    let theme: IOSWidgetTheme
+    
+    var body: some View {
+        ZStack {
+            ThemedWidgetBackground(theme: theme)
+            
+            VStack(spacing: 10) {
+                HStack {
+                    WidgetAppIcon(size: 24)
+                    Text("ذكر اليوم")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(theme.mutedColor)
+                    Spacer()
+                    GlassPill(color: theme.badgeBg.opacity(0.4)) {
+                        Text(entry.data?.categoryName ?? "أذكار")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(theme.mutedColor)
+                    }
+                }
+                
+                Spacer()
+                
+                Text(entry.data?.arabic ?? "سبحان الله")
+                    .font(.system(size: 22, weight: .medium))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(5)
+                    .foregroundColor(theme.textColor)
+                    .environment(\.layoutDirection, .rightToLeft)
+                
+                if entry.settings?.showBenefit ?? true,
+                   let benefit = entry.data?.benefit, !benefit.isEmpty {
+                    Text(benefit)
+                        .font(.system(size: 13))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(4)
+                        .foregroundColor(theme.mutedColor.opacity(0.7))
+                        .environment(\.layoutDirection, .rightToLeft)
+                }
+                
+                if entry.settings?.showTranslation ?? false,
+                   let translation = entry.data?.translation, !translation.isEmpty {
+                    Text(translation)
+                        .font(.system(size: 12))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .foregroundColor(theme.mutedColor.opacity(0.6))
+                }
+                
+                Spacer()
+                
+                if (entry.data?.count ?? 1) > 1 {
+                    GlassPill(color: theme.badgeBg.opacity(0.6)) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "repeat")
+                                .font(.system(size: 10))
+                            Text("\(entry.data?.count ?? 1) \(entry.data?.timesLabel ?? "مرات")")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        .foregroundColor(theme.badgeText)
+                    }
+                }
+            }
+            .padding()
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(WidgetConstants.Glass.border, lineWidth: 1)
+        )
     }
 }
 
@@ -339,6 +423,14 @@ struct DhikrWidget_Previews: PreviewProvider {
             ))
             .previewContext(WidgetPreviewContext(family: .systemMedium))
             .previewDisplayName("Medium")
+            
+            DhikrWidgetEntryView(entry: DhikrWidgetEntry(
+                date: Date(),
+                data: nil,
+                settings: nil
+            ))
+            .previewContext(WidgetPreviewContext(family: .systemLarge))
+            .previewDisplayName("Large")
         }
     }
 }

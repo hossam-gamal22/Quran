@@ -40,6 +40,8 @@ const WIDGET_SWIFT_FILES = [
   'DhikrWidget.swift',
   'HijriDateWidget.swift',
   'PrayerLiveActivity.swift',
+  'AppIntents.swift',
+  'ControlWidgets.swift',
 ];
 
 // Shared Swift files compiled into BOTH main app and widget extension
@@ -310,8 +312,8 @@ const withIOSWidgets = (config) => {
       }
     }
 
-    // Add WidgetKit, SwiftUI, and ActivityKit frameworks to widget target
-    const frameworkNames = ['WidgetKit.framework', 'SwiftUI.framework', 'ActivityKit.framework'];
+    // Add WidgetKit, SwiftUI, ActivityKit, and AppIntents frameworks to widget target
+    const frameworkNames = ['WidgetKit.framework', 'SwiftUI.framework', 'ActivityKit.framework', 'AppIntents.framework'];
     for (const fwName of frameworkNames) {
       const fwRefUuid = xcodeProject.generateUuid();
       objects['PBXFileReference'][fwRefUuid] = {
@@ -324,11 +326,16 @@ const withIOSWidgets = (config) => {
       objects['PBXFileReference'][`${fwRefUuid}_comment`] = fwName;
 
       const fwBuildFileUuid = xcodeProject.generateUuid();
-      objects['PBXBuildFile'][fwBuildFileUuid] = {
+      const buildFileEntry = {
         isa: 'PBXBuildFile',
         fileRef: fwRefUuid,
         fileRef_comment: fwName,
       };
+      // AppIntents.framework should be Optional (weak) linked for iOS 16 compatibility
+      if (fwName === 'AppIntents.framework') {
+        buildFileEntry.settings = { ATTRIBUTES: ['Weak'] };
+      }
+      objects['PBXBuildFile'][fwBuildFileUuid] = buildFileEntry;
       objects['PBXBuildFile'][`${fwBuildFileUuid}_comment`] = `${fwName} in Frameworks`;
 
       objects['PBXFrameworksBuildPhase'][frameworksBuildPhaseUuid].files.push({

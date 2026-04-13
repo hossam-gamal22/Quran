@@ -4,7 +4,6 @@
 
 import WidgetKit
 import SwiftUI
-import Intents
 
 // ========================================
 // نموذج البيانات
@@ -93,11 +92,9 @@ struct PrayerWidgetEntry: TimelineEntry {
     let date: Date
     let data: PrayerWidgetData?
     let settings: WidgetSettings?
-    let configuration: ConfigurationIntent?
 }
 
-struct PrayerWidgetProvider: IntentTimelineProvider {
-    typealias Intent = ConfigurationIntent
+struct PrayerWidgetProvider: TimelineProvider {
     typealias Entry = PrayerWidgetEntry
     
     // App Group ID للمشاركة مع التطبيق الرئيسي
@@ -107,22 +104,20 @@ struct PrayerWidgetProvider: IntentTimelineProvider {
         PrayerWidgetEntry(
             date: Date(),
             data: sampleData,
-            settings: nil,
-            configuration: nil
+            settings: nil
         )
     }
     
-    func getSnapshot(for configuration: ConfigurationIntent, in context: Context, completion: @escaping (PrayerWidgetEntry) -> Void) {
+    func getSnapshot(in context: Context, completion: @escaping (PrayerWidgetEntry) -> Void) {
         let entry = PrayerWidgetEntry(
             date: Date(),
             data: loadData(),
-            settings: loadSettings(),
-            configuration: configuration
+            settings: loadSettings()
         )
         completion(entry)
     }
     
-    func getTimeline(for configuration: ConfigurationIntent, in context: Context, completion: @escaping (Timeline<PrayerWidgetEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<PrayerWidgetEntry>) -> Void) {
         let currentDate = Date()
         let data = loadData()
         let settings = loadSettings()
@@ -135,8 +130,7 @@ struct PrayerWidgetProvider: IntentTimelineProvider {
             let entry = PrayerWidgetEntry(
                 date: entryDate,
                 data: data,
-                settings: settings,
-                configuration: configuration
+                settings: settings
             )
             entries.append(entry)
         }
@@ -537,16 +531,15 @@ struct NextPrayerWidget: Widget {
     let kind: String = "NextPrayerWidget"
     
     var body: some WidgetConfiguration {
-        IntentConfiguration(
+        StaticConfiguration(
             kind: kind,
-            intent: ConfigurationIntent.self,
             provider: PrayerWidgetProvider()
         ) { entry in
             NextPrayerWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("مواقيت الصلاة")
         .description("عرض الصلاة القادمة والوقت المتبقي")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
 
@@ -566,6 +559,14 @@ struct NextPrayerWidgetEntryView: View {
         case .systemLarge:
             LargePrayerWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://prayer"))
+        case .accessoryCircular:
+            AccessoryCircularPrayerView(entry: entry)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
+        case .accessoryRectangular:
+            AccessoryRectangularPrayerView(entry: entry)
+                .widgetURL(URL(string: "rooh-almuslim://prayer"))
+        case .accessoryInline:
+            AccessoryInlinePrayerView(entry: entry)
         default:
             SmallPrayerWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://prayer"))
@@ -573,15 +574,109 @@ struct NextPrayerWidgetEntryView: View {
     }
 }
 
-// Color(hex:) extension is defined in WidgetBundle.swift
-
 // ========================================
-// Configuration Intent (Placeholder)
+// المعاينة
 // ========================================
 
-class ConfigurationIntent: INIntent {
-    // يمكن إضافة خيارات التخصيص هنا
+// ========================================
+// واجهات شاشة القفل — Lock Screen Accessories (iOS 16+)
+// ========================================
+
+/// accessoryRectangular — شبكة ٢×٣ لجميع مواقيت الصلاة
+struct AccessoryRectangularPrayerView: View {
+    let entry: PrayerWidgetEntry
+    
+    var prayers: [PrayerTime] {
+        entry.data?.allPrayers ?? []
+    }
+    
+    var body: some View {
+        let rightColumn = Array(prayers.prefix(3))
+        let leftColumn = Array(prayers.dropFirst(3).prefix(3))
+        
+        HStack(spacing: 8) {
+            // العمود الأيمن — الفجر، الشروق، الظهر
+            VStack(alignment: .trailing, spacing: 2) {
+                ForEach(rightColumn) { prayer in
+                    prayerRow(prayer)
+                }
+            }
+            
+            // العمود الأيسر — العصر، المغرب، العشاء
+            VStack(alignment: .trailing, spacing: 2) {
+                ForEach(leftColumn) { prayer in
+                    prayerRow(prayer)
+                }
+            }
+        }
+        .environment(\.layoutDirection, .rightToLeft)
+    }
+    
+    @ViewBuilder
+    func prayerRow(_ prayer: PrayerTime) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: prayer.isNext ? "circle.fill" : "circle")
+                .font(.system(size: 5))
+                .widgetAccentable()
+                .opacity(prayer.isPassed ? 0.4 : 1.0)
+            
+            Text(prayer.nameAr)
+                .font(.system(size: 10, weight: prayer.isNext ? .bold : .regular))
+                .lineLimit(1)
+                .opacity(prayer.isPassed ? 0.4 : 1.0)
+            
+            Text(prayer.time)
+                .font(.system(size: 10, weight: .medium, design: .rounded))
+                .lineLimit(1)
+                .opacity(prayer.isPassed ? 0.4 : 1.0)
+        }
+        .widgetAccentable(prayer.isNext)
+    }
 }
+
+/// accessoryInline — سطر واحد: اسم الصلاة القادمة + الوقت
+struct AccessoryInlinePrayerView: View {
+    let entry: PrayerWidgetEntry
+    
+    var body: some View {
+        ViewThatFits {
+            Text("\(entry.data?.nextPrayerNameAr ?? "الظهر") • \(entry.data?.nextPrayerTime ?? "12:15")")
+            Text("\(entry.data?.nextPrayerNameAr ?? "الظهر") \(entry.data?.nextPrayerTime ?? "12:15")")
+            Text(entry.data?.nextPrayerNameAr ?? "الظهر")
+        }
+    }
+}
+
+/// accessoryCircular — حلقة العد التنازلي للصلاة القادمة
+struct AccessoryCircularPrayerView: View {
+    let entry: PrayerWidgetEntry
+    
+    /// نسبة الوقت المتبقي (0..1) — تقدير لفترة بين الصلوات ~4 ساعات
+    var progress: Double {
+        let remaining = Double(entry.data?.timeRemainingMinutes ?? 0)
+        let total: Double = 240 // متوسط الفترة بين الصلوات
+        guard total > 0 else { return 0 }
+        return min(max(remaining / total, 0), 1)
+    }
+    
+    var body: some View {
+        Gauge(value: progress) {
+            // تسمية غير مرئية
+            Text("")
+        } currentValueLabel: {
+            VStack(spacing: 0) {
+                Text(entry.data?.nextPrayerNameAr ?? "الظهر")
+                    .font(.system(size: 10, weight: .bold))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+            }
+        }
+        .gaugeStyle(.accessoryCircularCapacity)
+        .widgetAccentable()
+    }
+}
+
+// Color(hex:) extension is defined in WidgetBundle.swift
 
 // ========================================
 // المعاينة
@@ -593,8 +688,7 @@ struct NextPrayerWidget_Previews: PreviewProvider {
             NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
                 date: Date(),
                 data: nil,
-                settings: nil,
-                configuration: nil
+                settings: nil
             ))
             .previewContext(WidgetPreviewContext(family: .systemSmall))
             .previewDisplayName("Small")
@@ -602,8 +696,7 @@ struct NextPrayerWidget_Previews: PreviewProvider {
             NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
                 date: Date(),
                 data: nil,
-                settings: nil,
-                configuration: nil
+                settings: nil
             ))
             .previewContext(WidgetPreviewContext(family: .systemMedium))
             .previewDisplayName("Medium")
@@ -611,11 +704,34 @@ struct NextPrayerWidget_Previews: PreviewProvider {
             NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
                 date: Date(),
                 data: nil,
-                settings: nil,
-                configuration: nil
+                settings: nil
             ))
             .previewContext(WidgetPreviewContext(family: .systemLarge))
             .previewDisplayName("Large")
+            
+            NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
+                date: Date(),
+                data: nil,
+                settings: nil
+            ))
+            .previewContext(WidgetPreviewContext(family: .accessoryRectangular))
+            .previewDisplayName("Lock Screen Rectangular")
+            
+            NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
+                date: Date(),
+                data: nil,
+                settings: nil
+            ))
+            .previewContext(WidgetPreviewContext(family: .accessoryCircular))
+            .previewDisplayName("Lock Screen Circular")
+            
+            NextPrayerWidgetEntryView(entry: PrayerWidgetEntry(
+                date: Date(),
+                data: nil,
+                settings: nil
+            ))
+            .previewContext(WidgetPreviewContext(family: .accessoryInline))
+            .previewDisplayName("Lock Screen Inline")
         }
     }
 }

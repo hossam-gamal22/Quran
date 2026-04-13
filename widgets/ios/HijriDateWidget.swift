@@ -421,7 +421,7 @@ struct HijriDateWidget: Widget {
         }
         .configurationDisplayName("التاريخ الهجري")
         .description("عرض التاريخ الهجري اليومي")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular])
     }
 }
 
@@ -441,9 +441,41 @@ struct HijriDateWidgetEntryView: View {
         case .systemLarge:
             LargeHijriDateWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://hijri"))
+        case .accessoryCircular:
+            AccessoryCircularHijriView(entry: entry)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
         default:
             SmallHijriDateWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://hijri"))
+        }
+    }
+}
+
+// ========================================
+// واجهة شاشة القفل — Lock Screen Accessory (iOS 16+)
+// ========================================
+
+/// accessoryCircular — رقم اليوم الهجري في دائرة
+struct AccessoryCircularHijriView: View {
+    let entry: HijriDateWidgetEntry
+    
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            
+            VStack(spacing: 0) {
+                Text(entry.displayHijriDay())
+                    .font(.system(size: 20, weight: .bold))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .widgetAccentable()
+                
+                Text(entry.displayMonth())
+                    .font(.system(size: 8))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .opacity(0.7)
+            }
         }
     }
 }

@@ -1,9 +1,10 @@
 // app/(tabs)/qibla.tsx
 // صفحة القبلة - روح المسلم
-// آخر تحديث: 2026-03-07
-// ✅ Uses Location.watchHeadingAsync for correct heading (like Google Qibla Finder)
+// آخر تحديث: 2026-04-13
+// ✅ Uses Magnetometer+Accelerometer for correct heading @ 60Hz
 // ✅ Kaaba is FIXED on screen, compass dial rotates behind it
-// ✅ Qibla bearing from Aladhan API
+// ✅ Qibla bearing from APIs with local fallback
+// ✅ Cached location fallback, travel refresh, distance to Mecca
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -30,7 +31,7 @@ import Animated, {
 import { useCompassHeading } from '@/hooks/use-compass-heading';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { QIBLA_STYLES, AVAILABLE_STYLES } from '@/lib/qiblaAssets';
-// Removed: interstitial ads on qibla style change to reduce user frustration
+import { getStoredLocation } from '@/lib/prayer-times';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -78,6 +79,27 @@ const POINTER_SIZE = COMPASS_SIZE * 0.72;
 const KAABA_SIZE = 90;
 const THUMBNAIL_SIZE = 62;
 const QIBLA_STYLE_KEY = '@qibla_style_v2';
+
+// Mecca (Al-Kaaba) coordinates
+const MECCA_LAT = 21.422487;
+const MECCA_LNG = 39.826206;
+
+// ---------------------------------------------------------------------------
+// Haversine distance (km) from user to Mecca
+// ---------------------------------------------------------------------------
+const toRad = (d: number) => (d * Math.PI) / 180;
+const toDeg = (r: number) => (r * 180) / Math.PI;
+
+const distanceToMecca = (lat: number, lng: number): number => {
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(MECCA_LAT - lat);
+  const dLng = toRad(MECCA_LNG - lng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat)) * Math.cos(toRad(MECCA_LAT)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 // ---------------------------------------------------------------------------
 // Network connectivity check
@@ -145,10 +167,6 @@ const fetchQiblaFromAladhan = async (
 
 // Local great-circle fallback (only used if both APIs fail)
 const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const toDeg = (r: number) => (r * 180) / Math.PI;
-  const MECCA_LAT = 21.422487;
-  const MECCA_LNG = 39.826206;
   const lat1 = toRad(lat);
   const lat2 = toRad(MECCA_LAT);
   const dLng = toRad(MECCA_LNG - lng);
@@ -174,8 +192,12 @@ const QiblaScreen = () => {
   const [guidance, setGuidance] = useState('');
   const [currentStyleId, setCurrentStyleId] = useState('style10');
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [usingCachedLocation, setUsingCachedLocation] = useState(false);
+  const [isLocalCalc, setIsLocalCalc] = useState(false);
+  const [meccaDistance, setMeccaDistance] = useState<number | null>(null);
   const isAlignedRef = useRef(false);
   const styleSwitcherRef = useRef<ScrollView>(null);
+  const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
 
   // High-frequency compass heading (Magnetometer + Accelerometer @ 60Hz)
   const { headingCumulative, accuracy: compassAccuracy } = useCompassHeading();
@@ -210,67 +232,124 @@ const QiblaScreen = () => {
     AsyncStorage.setItem(QIBLA_STYLE_KEY, styleId).catch(() => {});
   }, [currentStyleId]);
 
+  // ------ Fetch bearing for a given coordinate pair ------
+  const fetchBearingForCoords = useCallback(async (lat: number, lng: number, mounted: { value: boolean }) => {
+    // Distance to Mecca
+    const dist = distanceToMecca(lat, lng);
+    if (mounted.value) setMeccaDistance(dist);
+
+    // If user is at the Kaaba (< 1 km), skip API
+    if (dist < 1) {
+      if (mounted.value) {
+        setQiblaBearing(0);
+        setIsLocalCalc(false);
+      }
+      return;
+    }
+
+    let bearing: number | null = null;
+    const online = await checkConnectivity();
+    if (online) {
+      bearing = await fetchQiblaDirection(lat, lng);
+      if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
+    }
+    if (mounted.value) {
+      if (bearing != null) {
+        setQiblaBearing(bearing);
+        setIsLocalCalc(false);
+      } else {
+        setQiblaBearing(calculateQiblaBearingLocal(lat, lng));
+        setIsLocalCalc(true);
+      }
+    }
+  }, []);
+
   // ------ Location + Qibla Bearing ------
   useEffect(() => {
-    let mounted = true;
+    const mounted = { value: true };
 
     (async () => {
       try {
         // 1. Request location permission
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          if (mounted) setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
+          if (mounted.value) setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
-          if (mounted)
+          if (mounted.value)
             setErrorMsg(
               t('qibla.servicesDisabled') || 'Location services disabled. Please enable them and try again.'
             );
           return;
         }
 
-        // 2. Get current position
-        let position: Location.LocationObject;
+        // 2. Get current position (with cached fallback)
+        let lat: number;
+        let lng: number;
+        let usedCache = false;
         try {
-          position = await Location.getCurrentPositionAsync({
+          const position = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.High,
           });
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
         } catch {
-          if (mounted)
-            setErrorMsg(
-              t('qibla.locationFailed') || 'Could not determine location. Please enable location services.'
+          // GPS failed → try cached location from prayer system
+          const cached = await getStoredLocation();
+          if (cached) {
+            lat = cached.latitude;
+            lng = cached.longitude;
+            usedCache = true;
+          } else {
+            if (mounted.value)
+              setErrorMsg(
+                t('qibla.locationFailed') || 'Could not determine location. Please enable location services.'
+              );
+            return;
+          }
+        }
+
+        if (mounted.value) {
+          setUserCoords({ lat, lng });
+          setUsingCachedLocation(usedCache);
+        }
+
+        // 3. Get Qibla bearing
+        await fetchBearingForCoords(lat, lng, mounted);
+
+        // 4. Watch for location changes during travel (every 100m)
+        if (!usedCache) {
+          try {
+            const watcher = await Location.watchPositionAsync(
+              { accuracy: Location.Accuracy.Balanced, distanceInterval: 100 },
+              (pos) => {
+                if (!mounted.value) return;
+                const newLat = pos.coords.latitude;
+                const newLng = pos.coords.longitude;
+                setUserCoords({ lat: newLat, lng: newLng });
+                setMeccaDistance(distanceToMecca(newLat, newLng));
+                // Recalculate bearing with local formula (instant, no API wait)
+                setQiblaBearing(calculateQiblaBearingLocal(newLat, newLng));
+              },
             );
-          return;
+            locationWatcherRef.current = watcher;
+          } catch {
+            // watchPosition not critical — initial bearing still works
+          }
         }
-
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        if (mounted) setUserCoords({ lat, lng });
-
-        // 3. Get Qibla bearing: try APIs first, fall back to local calculation
-        let bearing: number | null = null;
-        const online = await checkConnectivity();
-        if (online) {
-          bearing = await fetchQiblaDirection(lat, lng);
-          if (bearing == null) bearing = await fetchQiblaFromAladhan(lat, lng);
-        }
-        if (mounted) {
-          setQiblaBearing(bearing ?? calculateQiblaBearingLocal(lat, lng));
-        }
-
-        // Heading is now handled by useCompassHeading hook (60Hz Magnetometer+Accelerometer)
       } catch (err) {
         console.warn('Qibla init error:', err);
-        if (mounted) setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
+        if (mounted.value) setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
       }
     })();
 
     return () => {
-      mounted = false;
+      mounted.value = false;
+      locationWatcherRef.current?.remove();
+      locationWatcherRef.current = null;
     };
-  }, [retryKey]);
+  }, [retryKey, fetchBearingForCoords]);
 
   // ------ Guidance ------
   const onGuidanceUpdate = useCallback(
@@ -419,6 +498,36 @@ const QiblaScreen = () => {
         </View>
       )}
 
+      {/* Medium accuracy subtle indicator */}
+      {compassAccuracy === 'medium' && (
+        <View style={styles.mediumAccuracyBadge}>
+          <View style={styles.yellowDot} />
+          <Text style={styles.mediumAccuracyText}>
+            {t('qibla.mediumAccuracy') || 'دقة متوسطة'}
+          </Text>
+        </View>
+      )}
+
+      {/* Cached location badge */}
+      {usingCachedLocation && (
+        <View style={styles.infoBadge}>
+          <MaterialCommunityIcons name="map-marker-alert-outline" size={14} color="#FFA726" />
+          <Text style={styles.infoBadgeText}>
+            {'📍 ' + (t('qibla.usingCachedLocation') || 'يستخدم آخر موقع محفوظ')}
+          </Text>
+        </View>
+      )}
+
+      {/* Local calculation badge */}
+      {isLocalCalc && !usingCachedLocation && (
+        <View style={styles.infoBadge}>
+          <MaterialCommunityIcons name="calculator-variant-outline" size={14} color="#90CAF9" />
+          <Text style={[styles.infoBadgeText, { color: '#90CAF9' }]}>
+            {t('qibla.localCalc') || 'حساب محلي'}
+          </Text>
+        </View>
+      )}
+
       {/* 2. Style Switcher */}
       <View style={styles.styleSwitcherWrap}>
         <BlurView 
@@ -496,7 +605,18 @@ const QiblaScreen = () => {
         </BlurView>
       </View>
 
-      {/* 3. Kaaba + Compass */}
+      {/* 3. Kaaba + Compass — or special message if at Mecca */}
+      {meccaDistance != null && meccaDistance < 1 ? (
+        <View style={styles.atMeccaContainer}>
+          <Text style={styles.atMeccaEmoji}>🕋</Text>
+          <Text style={[styles.atMeccaText, { color: colors.text }]}>
+            {t('qibla.atMecca') || 'أنت في مكة المكرمة 🕋'}
+          </Text>
+          <Text style={[styles.atMeccaSubtext, { color: colors.muted }]}>
+            {t('qibla.atMeccaDesc') || 'لا حاجة لتحديد اتجاه القبلة'}
+          </Text>
+        </View>
+      ) : (
       <View style={styles.compassArea}>
         {/* KAABA — static, fixed above compass */}
         <View style={styles.fixedKaabaContainer}>
@@ -550,11 +670,19 @@ const QiblaScreen = () => {
           </Animated.View>
         </View>
       </View>
+      )}
 
-      {/* 4. Title + degree + coordinates at the bottom */}
+      {/* 4. Title + degree + distance + coordinates at the bottom */}
       <View style={styles.header}>
         <Text style={[styles.titleText, { color: colors.text }]}>{t('tabs.qibla') || 'Qibla Direction'}</Text>
-        <Text style={[styles.subtitleText, { color: colors.muted }]}>{Math.round(qiblaBearing!)}°</Text>
+        {meccaDistance == null || meccaDistance >= 1 ? (
+          <Text style={[styles.subtitleText, { color: colors.muted }]}>{Math.round(qiblaBearing!)}°</Text>
+        ) : null}
+        {meccaDistance != null && (
+          <Text style={[styles.distanceText, { color: colors.muted }]}>
+            {(t('qibla.distanceToKaaba') || 'على بُعد {km} كم من الكعبة المشرفة').replace('{km}', Math.round(meccaDistance).toLocaleString())}
+          </Text>
+        )}
         {userCoords && (
           <Text style={[styles.coordsText, { color: colors.muted }]}>
             {userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)}
@@ -592,6 +720,13 @@ const _styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontRegular(),
     marginTop: 2,
+  },
+  distanceText: {
+    color: '#A3A3A3',
+    fontSize: 14,
+    fontFamily: fontRegular(),
+    marginTop: 4,
+    textAlign: 'center',
   },
   coordsText: {
     color: '#8E8E93',
@@ -667,6 +802,64 @@ const _styles = StyleSheet.create({
   calibrationText: {
     color: '#FFA726',
     fontSize: 13,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+  },
+  mediumAccuracyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    marginBottom: 2,
+  },
+  yellowDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#FFA726',
+  },
+  mediumAccuracyText: {
+    color: '#FFA726',
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    opacity: 0.8,
+  },
+  infoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginHorizontal: 40,
+    marginBottom: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 167, 38, 0.1)',
+  },
+  infoBadgeText: {
+    color: '#FFA726',
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+  },
+  atMeccaContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  atMeccaEmoji: {
+    fontSize: 72,
+    marginBottom: 16,
+  },
+  atMeccaText: {
+    fontSize: 22,
+    fontFamily: fontBold(),
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  atMeccaSubtext: {
+    fontSize: 15,
     fontFamily: fontRegular(),
     textAlign: 'center',
   },

@@ -136,6 +136,17 @@ export async function restoreBackupData(backupData: BackupData): Promise<Restore
   let failed = 0;
   const failedKeys: string[] = [];
 
+  // Snapshot current AsyncStorage for rollback on critical failure
+  let snapshot: [string, string | null][] = [];
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const result = await AsyncStorage.multiGet(allKeys as string[]);
+    snapshot = result.map(([k, v]) => [k, v] as [string, string | null]);
+  } catch (e) {
+    console.warn('⚠️ Could not snapshot current data for rollback:', e);
+  }
+
+  try {
   if (backupData.version === '2.0') {
     // V2: Raw dump of all keys
     const entries = Object.entries(backupData.data);
@@ -197,6 +208,31 @@ export async function restoreBackupData(backupData: BackupData): Promise<Restore
         }
       }
     }
+  }
+
+  // If majority of keys failed, rollback
+  if (restored === 0 && failed > 0 && snapshot.length > 0) {
+    console.error('🔄 [Restore] All keys failed — rolling back to snapshot');
+    try {
+      const pairs = snapshot.filter((p): p is [string, string] => p[1] !== null);
+      await AsyncStorage.multiSet(pairs);
+    } catch (rollbackErr) {
+      console.error('🔄 [Restore] Rollback also failed:', rollbackErr);
+    }
+  }
+
+  } catch (criticalError) {
+    // Catastrophic failure — attempt full rollback
+    console.error('🔄 [Restore] Critical failure — rolling back:', criticalError);
+    if (snapshot.length > 0) {
+      try {
+        const pairs = snapshot.filter((p): p is [string, string] => p[1] !== null);
+        await AsyncStorage.multiSet(pairs);
+      } catch (rollbackErr) {
+        console.error('🔄 [Restore] Rollback also failed:', rollbackErr);
+      }
+    }
+    throw criticalError;
   }
 
   return { restored, failed, failedKeys };

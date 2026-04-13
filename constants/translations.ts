@@ -1445,6 +1445,10 @@ export interface TranslationKeys {
     estimatedSize: string;
     uploading: string;
     downloading: string;
+    thisMonth: string;
+    freeUserWarning: string;
+    shareSettingsOnlyDesc: string;
+    autoBackupComplete: string;
   };
   notifications: {
     afterMinutes: string;
@@ -3856,6 +3860,10 @@ const ar: TranslationKeys = {
     estimatedSize: 'الحجم التقديري',
     uploading: 'جاري الرفع...',
     downloading: 'جاري الاستعادة...',
+    thisMonth: 'هذا الشهر',
+    freeUserWarning: 'احفظ نسخة احتياطية كملف لتجنب فقدان بياناتك عند تغيير الجهاز',
+    shareSettingsOnlyDesc: 'شارك إعدادات التطبيق فقط (بدون بيانات العبادة)',
+    autoBackupComplete: 'تم حفظ نسخة احتياطية تلقائياً',
   },
   notifications: {
     afterMinutes: 'بعد دقائق',
@@ -6251,6 +6259,10 @@ const en: TranslationKeys = {
     estimatedSize: 'Estimated size',
     uploading: 'Uploading...',
     downloading: 'Restoring...',
+    thisMonth: 'This month',
+    freeUserWarning: 'Save a backup file to avoid data loss when switching devices',
+    shareSettingsOnlyDesc: 'Share app settings only (without worship data)',
+    autoBackupComplete: 'Auto backup saved successfully',
   },
   notifications: {
     afterMinutes: 'after minutes',
@@ -8646,6 +8658,10 @@ const fr: TranslationKeys = {
     estimatedSize: 'Taille estimée',
     uploading: 'Téléversement...',
     downloading: 'Restauration...',
+    thisMonth: 'Ce mois-ci',
+    freeUserWarning: 'Sauvegardez un fichier pour éviter la perte de données',
+    shareSettingsOnlyDesc: 'Partager les paramètres uniquement (sans les données)',
+    autoBackupComplete: 'Sauvegarde automatique effectuée',
   },
   notifications: {
     afterMinutes: 'minutes après',
@@ -11042,6 +11058,10 @@ const de: TranslationKeys = {
     estimatedSize: 'Geschätzte Größe',
     uploading: 'Wird hochgeladen...',
     downloading: 'Wird wiederhergestellt...',
+    thisMonth: 'Diesen Monat',
+    freeUserWarning: 'Sichern Sie eine Datei, um Datenverlust beim Gerätewechsel zu vermeiden',
+    shareSettingsOnlyDesc: 'Nur App-Einstellungen teilen (ohne Gebetsdaten)',
+    autoBackupComplete: 'Automatische Sicherung gespeichert',
   },
   notifications: {
     afterMinutes: 'Minuten nach',
@@ -13438,6 +13458,10 @@ const tr: TranslationKeys = {
     estimatedSize: 'Tahmini boyut',
     uploading: 'Yükleniyor...',
     downloading: 'Geri yükleniyor...',
+    thisMonth: 'Bu ay',
+    freeUserWarning: 'Cihaz değiştirirken veri kaybını önlemek için yedek dosya kaydedin',
+    shareSettingsOnlyDesc: 'Yalnızca uygulama ayarlarını paylaş (ibadet verileri hariç)',
+    autoBackupComplete: 'Otomatik yedek kaydedildi',
   },
   notifications: {
     afterMinutes: 'dakika sonra',
@@ -15834,6 +15858,10 @@ const es: TranslationKeys = {
     estimatedSize: 'Tamaño estimado',
     uploading: 'Subiendo...',
     downloading: 'Restaurando...',
+    thisMonth: 'Este mes',
+    freeUserWarning: 'Guarda un archivo de respaldo para evitar perder datos al cambiar de dispositivo',
+    shareSettingsOnlyDesc: 'Compartir solo la configuración (sin datos de adoración)',
+    autoBackupComplete: 'Copia de seguridad automática guardada',
   },
   notifications: {
     afterMinutes: 'minutos después',
@@ -18229,6 +18257,10 @@ const ur: TranslationKeys = {
     estimatedSize: 'تخمینی سائز',
     uploading: 'اپ لوڈ ہو رہا ہے...',
     downloading: 'بحال ہو رہا ہے...',
+    thisMonth: 'اس مہینے',
+    freeUserWarning: 'ڈیوائس تبدیل کرتے وقت ڈیٹا کے نقصان سے بچنے کے لیے بیک اپ فائل محفوظ کریں',
+    shareSettingsOnlyDesc: 'صرف ایپ کی ترتیبات شیئر کریں (عبادت کے ڈیٹا کے بغیر)',
+    autoBackupComplete: 'خودکار بیک اپ محفوظ ہو گیا',
   },
   notifications: {
     afterMinutes: 'منٹ بعد',
@@ -20625,6 +20657,10 @@ const id: TranslationKeys = {
     estimatedSize: 'Perkiraan ukuran',
     uploading: 'Mengunggah...',
     downloading: 'Memulihkan...',
+    thisMonth: 'Bulan ini',
+    freeUserWarning: 'Simpan file cadangan untuk menghindari kehilangan data saat berganti perangkat',
+    shareSettingsOnlyDesc: 'Bagikan pengaturan aplikasi saja (tanpa data ibadah)',
+    autoBackupComplete: 'Cadangan otomatis tersimpan',
   },
   notifications: {
     afterMinutes: 'menit setelah',
@@ -23021,6 +23057,10 @@ const ms: TranslationKeys = {
     estimatedSize: 'Anggaran saiz',
     uploading: 'Memuat naik...',
     downloading: 'Memulihkan...',
+    thisMonth: 'Bulan ini',
+    freeUserWarning: 'Simpan fail sandaran untuk mengelakkan kehilangan data semasa menukar peranti',
+    shareSettingsOnlyDesc: 'Kongsi tetapan aplikasi sahaja (tanpa data ibadah)',
+    autoBackupComplete: 'Sandaran automatik tersimpan',
   },
   notifications: {
     afterMinutes: 'minit selepas',
@@ -25417,6 +25457,10 @@ const hi: TranslationKeys = {
     estimatedSize: 'अनुमानित आकार',
     uploading: 'अपलोड हो रहा है...',
     downloading: 'पुनर्स्थापित हो रहा है...',
+    thisMonth: 'इस महीने',
+    freeUserWarning: 'डिवाइस बदलते समय डेटा हानि से बचने के लिए बैकअप फ़ाइल सहेजें',
+    shareSettingsOnlyDesc: 'केवल ऐप सेटिंग्स साझा करें (इबादत डेटा के बिना)',
+    autoBackupComplete: 'स्वचालित बैकअप सहेजा गया',
   },
   notifications: {
     afterMinutes: 'मिनट बाद',
@@ -27813,6 +27857,10 @@ const bn: TranslationKeys = {
     estimatedSize: 'আনুমানিক আকার',
     uploading: 'আপলোড হচ্ছে...',
     downloading: 'পুনরুদ্ধার হচ্ছে...',
+    thisMonth: 'এই মাসে',
+    freeUserWarning: 'ডিভাইস পরিবর্তনের সময় ডেটা হারানো এড়াতে ব্যাকআপ ফাইল সেভ করুন',
+    shareSettingsOnlyDesc: 'শুধুমাত্র অ্যাপ সেটিংস শেয়ার করুন (ইবাদত ডেটা ছাড়া)',
+    autoBackupComplete: 'স্বয়ংক্রিয় ব্যাকআপ সেভ হয়েছে',
   },
   notifications: {
     afterMinutes: 'মিনিট পরে',
@@ -30208,6 +30256,10 @@ const ru: TranslationKeys = {
     estimatedSize: 'Примерный размер',
     uploading: 'Загрузка...',
     downloading: 'Восстановление...',
+    thisMonth: 'Этот месяц',
+    freeUserWarning: 'Сохраните файл резервной копии для защиты от потери данных при смене устройства',
+    shareSettingsOnlyDesc: 'Поделиться только настройками (без данных о поклонении)',
+    autoBackupComplete: 'Автоматическое резервное копирование сохранено',
   },
   notifications: {
     afterMinutes: 'минут после',

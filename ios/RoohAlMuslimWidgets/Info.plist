@@ -29,5 +29,10 @@
 	<true/>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Amiri-Regular.ttf</string>
+		<string>Amiri-Bold.ttf</string>
+	</array>
 </dict>
 </plist>

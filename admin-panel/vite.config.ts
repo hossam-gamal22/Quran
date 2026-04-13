@@ -11,7 +11,11 @@ export default defineConfig({
     alias: {
       '@app-lib': path.resolve(__dirname, '../lib'),
       '@app-data': path.resolve(__dirname, '../data'),
+      // Force single React instance — prevents duplicate React from root workspace
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   server: {
     proxy: {

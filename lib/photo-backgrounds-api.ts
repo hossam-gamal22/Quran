@@ -11,7 +11,7 @@ import {
 } from '@/constants/pexels-backgrounds';
 
 const CACHE_KEY = '@photo_backgrounds_cache';
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 interface CachedData {
   free: PexelsBackground[];
@@ -49,17 +49,19 @@ function docToBackground(doc: any): PexelsBackground {
  * Fetch active photo backgrounds from Firestore.
  * Falls back to hardcoded curated list on error or empty Firestore.
  */
-export async function fetchPhotoBackgrounds(): Promise<{ free: PexelsBackground[]; premium: PexelsBackground[] }> {
+export async function fetchPhotoBackgrounds(skipCache = false): Promise<{ free: PexelsBackground[]; premium: PexelsBackground[] }> {
   // 1. Check local cache
-  try {
-    const cached = await AsyncStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const entry: CachedData = JSON.parse(cached);
-      if (Date.now() - entry.timestamp < CACHE_TTL) {
-        return { free: entry.free, premium: entry.premium };
+  if (!skipCache) {
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const entry: CachedData = JSON.parse(cached);
+        if (Date.now() - entry.timestamp < CACHE_TTL) {
+          return { free: entry.free, premium: entry.premium };
+        }
       }
-    }
-  } catch { /* skip corrupted cache */ }
+    } catch { /* skip corrupted cache */ }
+  }
 
   // 2. Fetch from Firestore
   try {
@@ -90,4 +92,11 @@ export async function fetchPhotoBackgrounds(): Promise<{ free: PexelsBackground[
     // Fallback to hardcoded
     return { free: FREE_PEXELS_BACKGROUNDS, premium: PREMIUM_PEXELS_BACKGROUNDS };
   }
+}
+
+/** Clear cached photo backgrounds so next fetch pulls fresh data from Firestore */
+export async function clearPhotoBackgroundsCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(CACHE_KEY);
+  } catch { /* non-critical */ }
 }

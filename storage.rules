@@ -31,9 +31,9 @@ service firebase.storage {
     }
 
     // User cloud backups — per-user JSON blobs keyed by OAuth openId.
-    // App-level validation ensures openId matches the logged-in user.
+    // Users can only read/write their own backup files.
     match /userBackups/{userId}/{allPaths=**} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

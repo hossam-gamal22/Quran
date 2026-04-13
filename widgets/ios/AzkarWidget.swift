@@ -446,7 +446,7 @@ struct AzkarWidget: Widget {
         }
         .configurationDisplayName("أذكار المسلم")
         .description("عرض ذكر عشوائي يتغير تلقائياً")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular])
     }
 }
 
@@ -466,6 +466,9 @@ struct AzkarWidgetEntryView: View {
         case .systemLarge:
             LargeAzkarWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
+        case .accessoryRectangular:
+            AccessoryRectangularAzkarView(entry: entry)
+                .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
         default:
             SmallAzkarWidgetView(entry: entry, theme: theme)
                 .widgetURL(URL(string: "rooh-almuslim://more-azkar"))
@@ -474,6 +477,41 @@ struct AzkarWidgetEntryView: View {
 }
 
 // Color(hex:) extension is defined in WidgetBundle.swift
+
+// ========================================
+// واجهة شاشة القفل — Lock Screen Accessory (iOS 16+)
+// ========================================
+
+/// accessoryRectangular — اسم التصنيف + نص الذكر
+struct AccessoryRectangularAzkarView: View {
+    let entry: AzkarWidgetEntry
+    
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(getCategoryName(
+                entry.data?.randomZikr.category ?? "morning",
+                translatedName: entry.data?.randomZikr.categoryName
+            ))
+            .font(.system(size: 11, weight: .bold))
+            .lineLimit(1)
+            .widgetAccentable()
+            
+            Text(entry.data?.randomZikr.text ?? "سبحان الله وبحمده")
+                .font(.system(size: 10))
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
+                .opacity(0.8)
+            
+            if (entry.data?.randomZikr.count ?? 1) > 1 {
+                Text("\(entry.data?.randomZikr.count ?? 1) مرات")
+                    .font(.system(size: 9))
+                    .opacity(0.5)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .environment(\.layoutDirection, .rightToLeft)
+    }
+}
 
 // ========================================
 // المعاينة

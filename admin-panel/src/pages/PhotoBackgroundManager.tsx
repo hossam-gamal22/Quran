@@ -467,11 +467,14 @@ const PhotoBackgroundManager: React.FC = () => {
   };
 
   // ============ المتغيرات ============
-  const filteredPhotos = photos
-    .filter(p => p.category === selectedCategory)
-    .sort((a, b) => a.order_index - b.order_index);
+  const filteredPhotos = (selectedCategory === 'all'
+    ? [...photos]
+    : photos.filter(p => p.category === selectedCategory)
+  ).sort((a, b) => a.order_index - b.order_index);
 
-  const activeCategory = categories.find(c => c.id === selectedCategory);
+  const activeCategory = selectedCategory === 'all'
+    ? { id: 'all', name_ar: 'الكل', is_active: true, order_index: -1 }
+    : categories.find(c => c.id === selectedCategory);
 
   // ============ العرض ============
   if (loading) {
@@ -690,6 +693,22 @@ const PhotoBackgroundManager: React.FC = () => {
 
       {/* Category Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        {/* All tab */}
+        <button
+          onClick={() => setSelectedCategory('all')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+            selectedCategory === 'all'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+          }`}
+        >
+          الكل
+          <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+            selectedCategory === 'all' ? 'bg-emerald-600' : 'bg-slate-700'
+          }`}>
+            {photos.length}
+          </span>
+        </button>
         {categories.filter(c => c.is_active).map(cat => {
           const count = photos.filter(p => p.category === cat.id).length;
           return (

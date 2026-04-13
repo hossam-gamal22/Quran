@@ -75,6 +75,8 @@ import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezone
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
+import { uploadToCloud } from '@/lib/cloud-sync';
+import * as Auth from '@/lib/_core/auth';
 
 // Signal that notification channels have been initialized.
 // SettingsContext awaits this before scheduling to avoid race condition
@@ -366,6 +368,34 @@ const PaywallAutoTrigger = () => {
   return null;
 };
 
+const AUTO_BACKUP_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+async function autoBackupIfNeeded() {
+  try {
+    const user = await Auth.getUserInfo();
+    if (!user?.openId) return;
+    // Check premium — read subscription state from AsyncStorage
+    const subRaw = await AsyncStorage.getItem('@subscription_state');
+    if (!subRaw) return;
+    let sub: { isPremium?: boolean };
+    try { sub = JSON.parse(subRaw); } catch { return; }
+    if (!sub.isPremium) return;
+    // Check last backup date
+    const lastDate = await AsyncStorage.getItem('last_backup_date');
+    if (lastDate) {
+      const elapsed = Date.now() - new Date(lastDate).getTime();
+      if (elapsed < AUTO_BACKUP_INTERVAL_MS) return;
+    }
+    // Perform silent backup
+    const result = await uploadToCloud(user.openId);
+    if (result.success) {
+      await AsyncStorage.setItem('last_backup_date', new Date().toISOString());
+      console.log('☁️ [AutoBackup] Silent backup completed');
+    }
+  } catch (e) {
+    console.warn('☁️ [AutoBackup] Failed:', e);
+  }
+}
 
 export default function RootLayout() {
   const pathname = usePathname();
@@ -718,6 +748,8 @@ export default function RootLayout() {
         syncLocalStats().catch(() => {});
         // Sync widget data before app goes to background so widgets show fresh content
         syncWidgetDataToNative().catch(() => {});
+        // Auto-backup: silently upload to cloud if premium, logged in, and >7 days since last backup
+        autoBackupIfNeeded().catch(() => {});
       }
     };
 

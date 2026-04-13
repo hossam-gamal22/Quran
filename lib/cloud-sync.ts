@@ -79,7 +79,7 @@ export async function uploadToCloud(openId: string): Promise<CloudUploadResult> 
     });
     console.log('☁️ [CloudSync] JSON uploaded to Storage');
 
-    // 3. Write metadata to Firestore
+    // 3. Write metadata to Firestore (rollback Storage on failure)
     const deviceName = Device.deviceName || Device.modelName || Platform.OS;
     const appVersion = Constants.expoConfig?.version || 'unknown';
 
@@ -94,7 +94,13 @@ export async function uploadToCloud(openId: string): Promise<CloudUploadResult> 
       sizeFormatted: formatSize(sizeBytes),
     };
 
-    await setDoc(getFirestoreDocPath(openId), meta);
+    try {
+      await setDoc(getFirestoreDocPath(openId), meta);
+    } catch (firestoreError) {
+      console.error('☁️ [CloudSync] Firestore write failed, rolling back Storage upload');
+      try { await deleteObject(storageRef); } catch { /* best-effort cleanup */ }
+      throw firestoreError;
+    }
     console.log('☁️ [CloudSync] Metadata written to Firestore');
 
     // 4. Read back the server timestamp

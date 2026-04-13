@@ -125,7 +125,7 @@ struct HijriDateWidgetProvider: TimelineProvider {
         return HijriDateData(
             hijriDay: prayer.hijriDay,
             hijriMonth: prayer.hijriMonth,
-            hijriMonthEn: prayer.hijriMonth,
+            hijriMonthEn: prayer.hijriMonthEn ?? prayer.hijriMonth,
             hijriYear: prayer.hijriYear,
             hijriDate: prayer.hijriDate,
             gregorianDate: prayer.gregorianDate,
@@ -202,42 +202,37 @@ struct FullSettingsData: Codable {
 
 struct SmallHijriDateWidgetView: View {
     let entry: HijriDateWidgetEntry
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: Color(hex: "#1a237e"))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 4) {
-                // App icon
                 WidgetAppIcon(size: 32)
 
-                // اسم اليوم
                 Text(entry.displayDay())
                     .font(.custom("Amiri", size: 11))
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(theme.mutedColor)
 
-                // اليوم الهجري
                 Text(entry.displayHijriDay())
                     .font(.custom("Amiri-Bold", size: 40))
-                    .foregroundColor(WidgetConstants.Colors.gold)
+                    .foregroundColor(theme.badgeText)
 
-                // الشهر الهجري
-                GlassPill {
+                GlassPill(color: theme.badgeBg.opacity(0.5)) {
                     Text(entry.displayMonth())
                         .font(.custom("Amiri-Bold", size: 13))
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(theme.textColor.opacity(0.9))
                 }
 
-                // السنة الهجرية
                 Text(entry.displayYear())
                     .font(.custom("Amiri", size: 10))
-                    .foregroundColor(.white.opacity(0.6))
+                    .foregroundColor(theme.mutedColor.opacity(0.6))
 
-                // التاريخ الميلادي
                 if entry.showGregorian {
                     Text(entry.data?.gregorianDate ?? "2 مارس")
                         .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(theme.mutedColor.opacity(0.4))
                 }
             }
             .padding()
@@ -255,23 +250,23 @@ struct SmallHijriDateWidgetView: View {
 
 struct MediumHijriDateWidgetView: View {
     let entry: HijriDateWidgetEntry
+    let theme: IOSWidgetTheme
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: Color(hex: "#1a237e"))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 0) {
-                // Header
                 HStack {
                     WidgetAppIcon(size: 20)
                     Text("التقويم الهجري")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(theme.mutedColor)
                     Spacer()
                     if entry.showGregorian {
                         Text(entry.data?.gregorianDate ?? "2 مارس 2026")
                             .font(.system(size: 10))
-                            .foregroundColor(.white.opacity(0.5))
+                            .foregroundColor(theme.mutedColor.opacity(0.5))
                     }
                 }
                 .padding(.horizontal)
@@ -279,33 +274,30 @@ struct MediumHijriDateWidgetView: View {
                 .padding(.bottom, 6)
                 
                 HStack(spacing: 16) {
-                    // Left: day number
                     VStack(spacing: 2) {
                         Text(entry.displayDay())
                             .font(.custom("Amiri", size: 12))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(theme.mutedColor)
 
                         Text(entry.displayHijriDay())
                             .font(.custom("Amiri-Bold", size: 50))
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                     }
                     .frame(width: 90)
 
-                    // Divider
                     Rectangle()
                         .fill(WidgetConstants.Glass.border)
                         .frame(width: 1)
                         .padding(.vertical, 8)
 
-                    // Right: month + year
                     VStack(alignment: .trailing, spacing: 6) {
                         Text(entry.displayMonth())
                             .font(.custom("Amiri-Bold", size: 20))
-                            .foregroundColor(.white)
+                            .foregroundColor(theme.textColor)
 
                         Text(entry.displayYear())
                             .font(.custom("Amiri", size: 14))
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(theme.mutedColor)
                     }
                 }
                 .padding(.horizontal)
@@ -325,8 +317,8 @@ struct MediumHijriDateWidgetView: View {
 
 struct LargeHijriDateWidgetView: View {
     let entry: HijriDateWidgetEntry
+    let theme: IOSWidgetTheme
     
-    // الأشهر الهجرية
     let hijriMonths = [
         "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
         "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
@@ -339,54 +331,51 @@ struct LargeHijriDateWidgetView: View {
     
     var body: some View {
         ZStack {
-            GlassWidgetBackground(accentColor: Color(hex: "#1a237e"))
+            ThemedWidgetBackground(theme: theme)
             
             VStack(spacing: 12) {
-                // Header
                 HStack {
                     WidgetAppIcon(size: 20)
                     Text("التقويم الهجري")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                     Spacer()
-                    GlassPill(color: WidgetConstants.Colors.gold.opacity(0.2)) {
+                    GlassPill(color: theme.badgeBg.opacity(0.5)) {
                         Text("\(entry.data?.hijriYear ?? 1446) هـ")
                             .font(.custom("Amiri-Bold", size: 12))
-                            .foregroundColor(WidgetConstants.Colors.gold)
+                            .foregroundColor(theme.badgeText)
                     }
                 }
                 .padding(.horizontal)
                 
-                // Main date card
                 VStack(spacing: 6) {
                     Text(entry.data?.dayName ?? "الأحد")
                         .font(.custom("Amiri", size: 14))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(theme.mutedColor)
                     
                     Text(arabicNumber(entry.data?.hijriDay ?? 15))
                         .font(.custom("Amiri-Bold", size: 64))
-                        .foregroundColor(WidgetConstants.Colors.gold)
+                        .foregroundColor(theme.badgeText)
                     
                     Text(entry.data?.hijriMonth ?? "رمضان")
                         .font(.custom("Amiri-Bold", size: 22))
-                        .foregroundColor(.white)
+                        .foregroundColor(theme.textColor)
                 }
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
-                .background(WidgetConstants.Glass.highlight)
+                .background(theme.badgeBg.opacity(0.3))
                 .cornerRadius(16)
                 .padding(.horizontal)
                 
-                // Month scroller
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(0..<hijriMonths.count, id: \.self) { index in
                             Text(hijriMonths[index])
                                 .font(.system(size: 10, weight: index == currentMonthIndex ? .bold : .regular))
-                                .foregroundColor(index == currentMonthIndex ? WidgetConstants.Colors.gold : .white.opacity(0.4))
+                                .foregroundColor(index == currentMonthIndex ? theme.badgeText : theme.mutedColor.opacity(0.4))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(index == currentMonthIndex ? WidgetConstants.Glass.pill : Color.clear)
+                                .background(index == currentMonthIndex ? theme.badgeBg.opacity(0.5) : Color.clear)
                                 .cornerRadius(8)
                         }
                     }
@@ -395,16 +384,15 @@ struct LargeHijriDateWidgetView: View {
                 
                 Spacer()
                 
-                // Gregorian date
                 if entry.showGregorian {
-                    GlassPill {
+                    GlassPill(color: theme.badgeBg.opacity(0.3)) {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar")
                                 .font(.system(size: 11))
                             Text(entry.data?.gregorianDate ?? "2 مارس 2026")
                                 .font(.system(size: 12, weight: .medium))
                         }
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(theme.mutedColor.opacity(0.6))
                     }
                 }
             }
@@ -433,24 +421,61 @@ struct HijriDateWidget: Widget {
         }
         .configurationDisplayName("التاريخ الهجري")
         .description("عرض التاريخ الهجري اليومي")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular])
     }
 }
 
 struct HijriDateWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
     var entry: HijriDateWidgetProvider.Entry
+    let theme = loadWidgetTheme()
     
     var body: some View {
         switch family {
         case .systemSmall:
-            SmallHijriDateWidgetView(entry: entry)
+            SmallHijriDateWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
         case .systemMedium:
-            MediumHijriDateWidgetView(entry: entry)
+            MediumHijriDateWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
         case .systemLarge:
-            LargeHijriDateWidgetView(entry: entry)
+            LargeHijriDateWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
+        case .accessoryCircular:
+            AccessoryCircularHijriView(entry: entry)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
         default:
-            SmallHijriDateWidgetView(entry: entry)
+            SmallHijriDateWidgetView(entry: entry, theme: theme)
+                .widgetURL(URL(string: "rooh-almuslim://hijri"))
+        }
+    }
+}
+
+// ========================================
+// واجهة شاشة القفل — Lock Screen Accessory (iOS 16+)
+// ========================================
+
+/// accessoryCircular — رقم اليوم الهجري في دائرة
+struct AccessoryCircularHijriView: View {
+    let entry: HijriDateWidgetEntry
+    
+    var body: some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            
+            VStack(spacing: 0) {
+                Text(entry.displayHijriDay())
+                    .font(.system(size: 20, weight: .bold))
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .widgetAccentable()
+                
+                Text(entry.displayMonth())
+                    .font(.system(size: 8))
+                    .minimumScaleFactor(0.5)
+                    .lineLimit(1)
+                    .opacity(0.7)
+            }
         }
     }
 }

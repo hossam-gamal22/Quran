@@ -177,7 +177,9 @@ export default function BackupScreen() {
     loadBackupInfo();
     loadDataStats();
     loadAuthAndCloudMeta();
-    loadEstimatedSize();
+    // Delay size calculation to avoid blocking initial render
+    const timer = setTimeout(() => loadEstimatedSize(), 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   const loadBackupInfo = async () => {
@@ -199,17 +201,23 @@ export default function BackupScreen() {
     try {
       const bookmarks = await AsyncStorage.getItem('@quran_bookmarks');
       const khatmas = await AsyncStorage.getItem('@rooh_muslim_khatmas');
+      const azkarFavorites = await AsyncStorage.getItem('@azkar_favorites');
+      const allFavorites = await AsyncStorage.getItem('@favorites_all');
 
       let bookmarkCount = 0;
       try { bookmarkCount = bookmarks ? JSON.parse(bookmarks).length : 0; } catch { }
       let khatmaCount = 0;
       try { khatmaCount = khatmas ? JSON.parse(khatmas).length : 0; } catch { }
+      let azkarFavCount = 0;
+      try { azkarFavCount = azkarFavorites ? JSON.parse(azkarFavorites).length : 0; } catch { }
+      let allFavCount = 0;
+      try { allFavCount = allFavorites ? JSON.parse(allFavorites).length : 0; } catch { }
 
       // Use the same source of truth as honor board (current month)
       const monthlyStats = await getMonthlyActivityStats();
 
       setDataStats({
-        bookmarks: bookmarkCount,
+        bookmarks: bookmarkCount + azkarFavCount + allFavCount,
         khatmas: khatmaCount,
         prayers: monthlyStats.prayers,
         quranPages: monthlyStats.quranPages,
@@ -592,10 +600,10 @@ export default function BackupScreen() {
         <Animated.View entering={FadeInDown.delay(100).duration(500)}>
           <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.savedData')}</Text>
           <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
-            <InfoRow label={t('backup.quranProgress')} value={`${dataStats.quranPages} ${t('backup.page')}`} isDarkMode={isDarkMode} />
-            <InfoRow label={t('backup.prayersCount')} value={`${dataStats.prayers}`} isDarkMode={isDarkMode} />
-            <InfoRow label={t('backup.azkarCount')} value={`${dataStats.azkar}`} isDarkMode={isDarkMode} />
-            <InfoRow label={t('backup.tasbihCount')} value={`${dataStats.tasbih}`} isDarkMode={isDarkMode} />
+            <InfoRow label={`${t('backup.quranProgress')} (${t('backup.thisMonth')})`} value={`${dataStats.quranPages} ${t('backup.page')}`} isDarkMode={isDarkMode} />
+            <InfoRow label={`${t('backup.prayersCount')} (${t('backup.thisMonth')})`} value={`${dataStats.prayers}`} isDarkMode={isDarkMode} />
+            <InfoRow label={`${t('backup.azkarCount')} (${t('backup.thisMonth')})`} value={`${dataStats.azkar}`} isDarkMode={isDarkMode} />
+            <InfoRow label={`${t('backup.tasbihCount')} (${t('backup.thisMonth')})`} value={`${dataStats.tasbih}`} isDarkMode={isDarkMode} />
             <InfoRow label={t('backup.favoritesAndBookmarks')} value={`${dataStats.bookmarks} ${t('backup.item')}`} isDarkMode={isDarkMode} />
             <InfoRow label={t('backup.khatmasLabel')} value={`${dataStats.khatmas} ${t('backup.khatmaUnit')}`} isDarkMode={isDarkMode} />
             {estimatedSize && (
@@ -641,6 +649,18 @@ export default function BackupScreen() {
           </Animated.View>
         )}
 
+        {/* Free user warning */}
+        {!isPremium && (
+          <Animated.View entering={FadeInDown.delay(140).duration(500)} style={[styles.infoCard, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(245,166,35,0.15)' : '#fff8e1' }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={20} color="#f5a623" />
+            <View style={styles.infoContent}>
+              <Text style={[styles.infoText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {t('backup.freeUserWarning')}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Local File Actions */}
         <Animated.View entering={FadeInDown.delay(150).duration(500)}>
           <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('backup.actions')}</Text>
@@ -672,7 +692,7 @@ export default function BackupScreen() {
             iconColor="#fff"
             gradientColors={['#4a3d73', '#4a3d6e']}
             title={t('backup.shareSettings')}
-            subtitle={t('backup.shareSettingsDesc')}
+            subtitle={t('backup.shareSettingsOnlyDesc')}
             onPress={shareBackupAsText}
             isDarkMode={isDarkMode}
           />

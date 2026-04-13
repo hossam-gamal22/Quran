@@ -28,6 +28,15 @@ struct RoohMuslimWidgetBundle: WidgetBundle {
         
         // الأنشطة الحالية — Dynamic Island + Lock Screen (iOS 16.1+)
         PrayerLiveActivity()
+        
+        // عناصر مركز التحكم — Control Center (iOS 18+)
+        if #available(iOS 18.0, *) {
+            MorningAzkarControl()
+            EveningAzkarControl()
+            PrayerTimesControl()
+            QiblaControl()
+            TasbihControl()
+        }
     }
 }
 

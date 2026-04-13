@@ -116,15 +116,34 @@ service cloud.firestore {
 
     // ─── User Cloud Backups ─────────────────────────────────
     // Per-user backup metadata, keyed by OAuth openId.
-    // App-level validation ensures openId matches the logged-in user.
+    // Users can only read/write their own backup document.
     match /userBackups/{userId} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Suggestions — anyone can create, anyone can read (admin panel uses custom auth)
     match /suggestions/{docId} {
       allow read, create: if true;
       allow delete: if true;
+    }
+
+    // ─── Photo Backgrounds ──────────────────────────────────────
+    // Photo backgrounds for app wallpapers — admin writes, app reads
+    match /photoBackgrounds/{photoId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Photo background categories config
+    match /photoBackgroundCategories/{catId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // ─── Purchase History ────────────────────────────────────────
+    // User purchases subcollection — app writes, admin reads
+    match /users/{userId}/purchases/{purchaseId} {
+      allow read, write: if true;
     }
 
     // Deny everything else by default
