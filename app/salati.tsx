@@ -12,6 +12,7 @@ import {
   Platform,
   Dimensions,
   Image,
+  ScrollView,
 } from 'react-native';
 import { Stack, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -116,12 +117,12 @@ const isPrayerAvailable = (
 
   // Before Fajr time (midnight to Fajr):
   if (nowMinutes < fajrMinutes) {
-    // Fajr is NOT available yet - today's Fajr hasn't started
-    if (prayer === 'fajr') {
-      return false;
+    // Only Isha is still in its window (extends until Fajr)
+    if (prayer === 'isha') {
+      return true;
     }
-    // All other prayers available (Isha still in window, others as qada from yesterday)
-    return true;
+    // Fajr hasn't started, and Dhuhr/Asr/Maghrib belong to the previous day — disable them
+    return false;
   }
 
   // After Fajr: Prayer is available if its time has started
@@ -484,6 +485,11 @@ export default function SalatiScreen() {
       exiting={FadeOut.duration(200)}
       style={styles.selectionContainer}
     >
+    <ScrollView
+      contentContainerStyle={styles.selectionScrollContent}
+      showsVerticalScrollIndicator={false}
+      bounces={true}
+    >
       {/* Back button */}
       <TouchableOpacity
         style={[styles.backButton, { [isRTL ? 'left' : 'right']: 20 }]}
@@ -710,6 +716,7 @@ export default function SalatiScreen() {
           {timeValidationError}
         </Text>
       )}
+    </ScrollView>
     </Animated.View>
   );
 
@@ -978,8 +985,10 @@ const _styles = StyleSheet.create({
   selectionContainer: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 16,
+  },
+  selectionScrollContent: {
     alignItems: 'center',
+    paddingBottom: 32,
   },
   prayerGrid: {
     width: '100%',
