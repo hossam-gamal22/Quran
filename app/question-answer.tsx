@@ -2,7 +2,7 @@
 // صفحة سؤال وجواب من إذاعة القرآن الكريم من القاهرة - روح المسلم
 // البيانات مخزنة محلياً في ملف JSON - متاحة فوراً بدون إنترنت
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Pressable,
   Platform,
   ScrollView,
+  Dimensions,
   ViewStyle,
   TextStyle,
   StyleSheet,
@@ -37,6 +38,7 @@ import qaData from '@/data/json/qa-data.json';
 
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ========================================
 // أنواع البيانات
@@ -73,11 +75,28 @@ export default function QuestionAnswerScreen() {
 
   const qaItems = selectedCategory ? (allItems[selectedCategory] ?? []) : [];
 
+  const tabsScrollRef = useRef<ScrollView>(null);
+  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  const scrollContentWidthRef = useRef(0);
+
   const handleCategoryChange = useCallback((key: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedCategory(key);
     setExpandedItems(new Set());
-  }, []);
+
+    // Scroll to make the selected tab fully visible
+    const layout = tabLayoutsRef.current[key];
+    if (layout && tabsScrollRef.current && scrollContentWidthRef.current > 0) {
+      if (isRTL) {
+        const mirroredX = scrollContentWidthRef.current - layout.x - layout.width;
+        const centeredX = mirroredX - (SCREEN_WIDTH - layout.width) / 2;
+        tabsScrollRef.current.scrollTo({ x: Math.max(0, centeredX), animated: true });
+      } else {
+        const centeredX = layout.x - (SCREEN_WIDTH - layout.width) / 2;
+        tabsScrollRef.current.scrollTo({ x: Math.max(0, centeredX), animated: true });
+      }
+    }
+  }, [isRTL]);
 
   const toggleExpanded = useCallback((id: string) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -248,7 +267,6 @@ export default function QuestionAnswerScreen() {
   };
 
   const listContentStyle: ViewStyle = {
-    paddingTop: 8,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.xxl,
   };
@@ -274,9 +292,11 @@ export default function QuestionAnswerScreen() {
       {/* التبويبات */}
       {categories.length > 0 && (
         <ScrollView
+          ref={tabsScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={tabsContainerStyle}
+          onContentSizeChange={(w) => { scrollContentWidthRef.current = w; }}
           style={[{ flexGrow: 0, zIndex: 10 }, isRTL && { transform: [{ scaleX: -1 }] }]}
         >
           <View style={[chipsContainerStyle, isRTL && { transform: [{ scaleX: -1 }] }]}>
@@ -286,6 +306,10 @@ export default function QuestionAnswerScreen() {
                 <Pressable
                   key={cat.id}
                   onPress={() => handleCategoryChange(cat.id)}
+                  onLayout={(e) => {
+                    const { x, width } = e.nativeEvent.layout;
+                    tabLayoutsRef.current[cat.id] = { x, width };
+                  }}
                   style={[
                     chipStyle,
                     {
