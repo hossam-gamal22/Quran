@@ -211,10 +211,10 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextState) => {
       if (nextState === 'active') {
+        // Always refresh on foreground — refreshTodayRecords handles date internally
+        await refreshTodayRecords();
         const currentDate = getTodayDate();
         if (currentDate !== todayDateRef.current) {
-          setTodayDate(currentDate);
-          await refreshTodayRecords();
           await refreshStats();
           await loadWeekPrayers();
         }
@@ -234,13 +234,6 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   const loadInitialData = async () => {
     setIsLoading(true);
     try {
-      // Ensure new-day reset: if no record exists for today, create a blank one
-      const today = getTodayDate();
-      const storedRecord = await getPrayerRecord(today);
-      if (!storedRecord) {
-        await savePrayerRecord({ ...defaultPrayerRecord, date: today });
-      }
-
       await Promise.all([
         refreshTodayRecords(),
         refreshStats(),
@@ -259,6 +252,10 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
 
   const refreshTodayRecords = useCallback(async () => {
     const today = getTodayDate();
+
+    // Immediately clear stale data so UI never shows yesterday's statuses
+    setTodayDate(today);
+    setTodayPrayer({ ...defaultPrayerRecord, date: today });
     
     const [prayer, fasting, quran, azkar] = await Promise.all([
       getPrayerRecord(today),

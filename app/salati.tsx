@@ -277,8 +277,12 @@ export default function SalatiScreen() {
 
   // Helper to check prayer availability for UI
   const getPrayerAvailability = useCallback((prayer: SalatiPrayerType) => {
+    // Date guard: if todayPrayer is from a different day, ignore its statuses
+    const today = getTodayDate();
+    const isCurrentDay = todayPrayer?.date === today;
+
     // Check if prayer is already completed in worship tracker
-    const prayerStatus = todayPrayer?.[prayer as keyof typeof todayPrayer];
+    const prayerStatus = isCurrentDay ? todayPrayer?.[prayer as keyof typeof todayPrayer] : undefined;
     const isAlreadyCompleted = prayerStatus === 'prayed' || prayerStatus === 'late';
     
     if (isAlreadyCompleted) {
