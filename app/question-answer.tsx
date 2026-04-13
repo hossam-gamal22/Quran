@@ -250,6 +250,7 @@ export default function QuestionAnswerScreen() {
   };
 
   const listContentStyle: ViewStyle = {
+    paddingTop: 8,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.xxl,
   };
@@ -340,6 +341,7 @@ export default function QuestionAnswerScreen() {
         </View>
       ) : (
         <FlatList
+          key={selectedCategory}
           data={qaItems}
           renderItem={renderQAItem}
           keyExtractor={item => item.id}
