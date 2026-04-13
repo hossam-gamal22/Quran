@@ -545,7 +545,7 @@ export default function SalatiScreen() {
                   ) : willBeLate ? (
                     <MaterialCommunityIcons name="clock-alert-outline" size={12} color="#FFA500" />
                   ) : (
-                    <MaterialCommunityIcons name="check-circle-outline" size={12} color={ACCENT_GREEN} />
+                    <MaterialCommunityIcons name="circle-outline" size={12} color={ACCENT_GREEN} />
                   )}
                 </View>
                 
@@ -573,7 +573,7 @@ export default function SalatiScreen() {
           })}
         </View>
 
-        {/* Second row: Asr, Maghrib */}
+        {/* Second row: Asr, Maghrib */
         <View style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {(['asr', 'maghrib'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
@@ -605,7 +605,7 @@ export default function SalatiScreen() {
                   ) : willBeLate ? (
                     <MaterialCommunityIcons name="clock-alert-outline" size={12} color="#FFA500" />
                   ) : (
-                    <MaterialCommunityIcons name="check-circle-outline" size={12} color={ACCENT_GREEN} />
+                    <MaterialCommunityIcons name="circle-outline" size={12} color={ACCENT_GREEN} />
                   )}
                 </View>
                 
@@ -633,7 +633,7 @@ export default function SalatiScreen() {
           })}
         </View>
 
-        {/* Third row: Isha (centered) */}
+        {/* Third row: Isha (centered) */
         <View style={styles.prayerRowCenter}>
           {(['isha'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
@@ -665,7 +665,7 @@ export default function SalatiScreen() {
                   ) : willBeLate ? (
                     <MaterialCommunityIcons name="clock-alert-outline" size={12} color="#FFA500" />
                   ) : (
-                    <MaterialCommunityIcons name="check-circle-outline" size={12} color={ACCENT_GREEN} />
+                    <MaterialCommunityIcons name="circle-outline" size={12} color={ACCENT_GREEN} />
                   )}
                 </View>
                 
