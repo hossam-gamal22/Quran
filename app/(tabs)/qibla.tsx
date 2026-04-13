@@ -43,6 +43,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -813,6 +814,7 @@ const QiblaScreen = () => {
         )}
       </View>
     </ScrollView>
+    <BannerAdComponent screen="qibla" />
     </BackgroundWrapper>
   );
 };

@@ -28,7 +28,8 @@ export type AdScreenKey =
   | 'daily_ayah'
   | 'hadith'
   | 'ayat_universe'
-  | 'hadith_sifat';
+  | 'hadith_sifat'
+  | 'qibla';
 
 // ==================== Test Ad IDs ====================
 
@@ -129,7 +130,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     quran: false,
     azkar: true,
     tasbih: false,
-    prayer: false,
+    prayer: true,
     duas: false,
     names: false,
     ruqya: false,
@@ -145,6 +146,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     hadith: true,
     ayat_universe: true,
     hadith_sifat: true,
+    qibla: true,
   },
   showAdOnAppOpen: true,
   showAdOnQiblaStyleChange: true,
