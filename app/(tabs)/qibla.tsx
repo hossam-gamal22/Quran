@@ -28,7 +28,11 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  withRepeat,
+  withSequence,
   runOnJS,
+  interpolateColor,
+  cancelAnimation,
 } from 'react-native-reanimated';
 import { useCompassHeading } from '@/hooks/use-compass-heading';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -476,16 +480,46 @@ const QiblaScreen = () => {
     };
   }, [qiblaBearing, guidanceAligned, guidanceTurnRight, guidanceTurnLeft]);
 
-  // Green glow style for pointer when aligned
+  // Pulsing value for shine effect when aligned
+  const pulseValue = useSharedValue(1);
+
+  // Green glow style for pointer when aligned (scale pulse + shadow)
   const pointerGlowStyle = useAnimatedStyle(() => {
+    const s = 1 + (pulseValue.value - 1) * alignedProgress.value;
     return {
-      shadowColor: '#4CAF50',
-      shadowOpacity: alignedProgress.value * 0.9,
-      shadowRadius: alignedProgress.value * 20,
+      transform: [{ scale: s }],
+      shadowColor: '#00E676',
+      shadowOpacity: alignedProgress.value * 1,
+      shadowRadius: alignedProgress.value * 25,
       shadowOffset: { width: 0, height: 0 },
-      elevation: alignedProgress.value * 20,
+      elevation: alignedProgress.value * 24,
     };
   });
+
+  // Green luminous disc style (sits behind the pointer)
+  const glowDiscStyle = useAnimatedStyle(() => {
+    return {
+      opacity: alignedProgress.value * 0.5,
+      transform: [{ scale: 0.9 + pulseValue.value * 0.1 * alignedProgress.value }],
+    };
+  });
+
+  // Start / stop pulse when alignment changes
+  useEffect(() => {
+    if (isAlignedRef.current) {
+      pulseValue.value = withRepeat(
+        withSequence(
+          withTiming(1.06, { duration: 600 }),
+          withTiming(1, { duration: 600 }),
+        ),
+        -1,
+        true,
+      );
+    } else {
+      cancelAnimation(pulseValue);
+      pulseValue.value = withTiming(1, { duration: 200 });
+    }
+  }, [guidance]); // guidance changes when alignment state changes
 
   // ------ Loading / Error / Offline ------
   const bgProps = {
@@ -714,6 +748,28 @@ const QiblaScreen = () => {
               asset={activeAssets.dial}
               width={COMPASS_SIZE}
               height={COMPASS_SIZE}
+            />
+          </Animated.View>
+
+          {/* GREEN GLOW DISC — appears behind pointer when aligned */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFillObject,
+              styles.centered,
+              pointerAnimatedStyle,
+            ]}
+            pointerEvents="none"
+          >
+            <Animated.View
+              style={[
+                {
+                  width: POINTER_SIZE * 0.55,
+                  height: POINTER_SIZE * 0.55,
+                  borderRadius: POINTER_SIZE * 0.275,
+                  backgroundColor: '#00E676',
+                },
+                glowDiscStyle,
+              ]}
             />
           </Animated.View>
 
