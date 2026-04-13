@@ -573,7 +573,7 @@ export default function SalatiScreen() {
           })}
         </View>
 
-        {/* Second row: Asr, Maghrib */
+        {/* Second row: Asr, Maghrib */}
         <View style={[styles.prayerRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
           {(['asr', 'maghrib'] as SalatiPrayerType[]).map((prayer) => {
             const info = PRAYER_CONFIG[prayer];
