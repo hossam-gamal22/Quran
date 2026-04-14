@@ -47,7 +47,6 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
-import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { Dimensions } from 'react-native';
 import { getCachedPrayerTimes, getNextPrayer, getTimeRemaining, getPrayerNameAr, timeStringToDate, type PrayerTimes, type PrayerName } from '@/lib/prayer-times';
 import { schedulePrayerNotification, requestNotificationPermission, cancelNotification, scheduleLocalNotification } from '@/lib/push-notifications';
@@ -1698,10 +1697,8 @@ export default function HomeScreen() {
           </Animated.View>
         ))}
 
-        {/* Spacing before ad banner */}
         <View style={{ height: 24 }} />
       </ScrollView>
-      <BannerAdComponent screen="home" inTabScreen />
       </SafeAreaView>
 
       {/* Quick Access Customize Modal — rendered outside ScrollView to prevent stacking on mobile */}

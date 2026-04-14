@@ -16,7 +16,7 @@ const ENGAGEMENT_SESSIONS_KEY = '@smart_ads_engagement_sessions';
 /** Max interstitials per day (hard cap) */
 const MAX_INTERSTITIALS_PER_DAY = 4;
 /** Max app-open ads per day */
-const MAX_APP_OPEN_ADS_PER_DAY = 2;
+const MAX_APP_OPEN_ADS_PER_DAY = 6;
 /** Max banner impressions per session to avoid fatigue */
 const MAX_BANNERS_PER_SESSION = 8;
 /** Minimum session duration (seconds) before showing first interstitial */

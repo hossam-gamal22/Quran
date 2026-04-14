@@ -20,9 +20,10 @@ try {
   // Not available in Expo Go / web
 }
 
-// Clearance needed so a banner inside a (tabs) screen sits ABOVE the tab bar.
-// Covers the tab bar itself + the home indicator on iOS and the safe area on Android.
-const TAB_BAR_CLEARANCE = Platform.OS === 'ios' ? 85 : 64;
+// Clearance needed so a banner inside a (tabs) screen sits directly on top of
+// the tab bar with no visible gap. Tab bar content height only — the home
+// indicator / Android safe area is added on top via insets.bottom.
+const TAB_BAR_CLEARANCE = Platform.OS === 'ios' ? 49 : 56;
 
 interface BannerAdComponentProps {
   /** Legacy per-screen key */

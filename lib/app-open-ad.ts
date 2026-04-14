@@ -21,13 +21,11 @@ try {
 let adConfig: Awaited<ReturnType<typeof fetchAdsConfig>> | null = null;
 let adInstance: any = null;
 let adReady = false;
-let lastAdShownTime = 0;
 let appOpenCount = 0;
-const MIN_AD_INTERVAL = 1_800_000; // 30 minutes between app-open ads (was 7 min)
-const MIN_OPENS_BEFORE_AD = 5; // skip first 5 background→active transitions (was 3)
-const SESSION_GRACE_PERIOD = 120_000; // no ads in first 2 minutes after launch (was 30s)
-const MIN_BACKGROUND_DURATION = 300_000; // only show ad if user was away 5+ minutes
-const sessionStartTime = Date.now();
+/** Show the app-open ad once every N background→active transitions. */
+const SHOW_EVERY_N_OPENS = 3;
+/** Ignore brief inactive flickers (<10s) — not a real backgrounding. */
+const MIN_BACKGROUND_DURATION = 10_000;
 let lastBackgroundTime = 0;
 
 export const loadAppOpenAd = async (): Promise<void> => {
@@ -50,7 +48,6 @@ export const loadAppOpenAd = async (): Promise<void> => {
 
     adInstance.addAdEventListener(AdEventType.CLOSED, () => {
       adReady = false;
-      lastAdShownTime = Date.now();
       // Reload for next time
       adInstance.load();
     });
@@ -70,34 +67,21 @@ export const showAppOpenAd = async (): Promise<boolean> => {
     return false;
   }
 
-  // Skip first N background→active transitions
-  if (appOpenCount <= MIN_OPENS_BEFORE_AD) return false;
+  // Frequency cap: show once every N app opens (3rd, 6th, 9th, …).
+  if (appOpenCount === 0 || appOpenCount % SHOW_EVERY_N_OPENS !== 0) return false;
 
-  // Grace period after initial app launch
-  if (Date.now() - sessionStartTime < SESSION_GRACE_PERIOD) return false;
-
-  // Only show ad if user was in background for significant time
+  // Ignore brief inactive flickers (phone call, notification shade, etc.).
   if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {
     return false;
   }
 
-  // Enforce minimum interval between ads
-  if (Date.now() - lastAdShownTime < MIN_AD_INTERVAL) return false;
-
-  // Smart ad manager checks (daily cap, sacred context, engagement reward)
+  // Skip if user is inside a sacred context (reading Quran, praying, etc.).
   try {
-    const { canShowAppOpenAd, isInSacredContext } = require('./smart-ad-manager');
+    const { isInSacredContext } = require('./smart-ad-manager');
     if (isInSacredContext()) return false;
-    if (!(await canShowAppOpenAd())) return false;
   } catch {}
 
-  // Global ad cooldown check
-  try {
-    const { canShowGlobalAd } = require('./ads-config');
-    if (!canShowGlobalAd()) return false;
-  } catch {}
-
-  // Skip for premium users
+  // Skip for premium users.
   try {
     const sub = await getSubscriptionState();
     if (sub.isPremium) return false;
@@ -105,12 +89,10 @@ export const showAppOpenAd = async (): Promise<boolean> => {
 
   try {
     await adInstance.show();
-    // Record in global ad cooldown
     try {
       const { recordGlobalAdShown } = require('./ads-config');
       recordGlobalAdShown();
     } catch {}
-    // Record in smart ad manager for daily cap
     try {
       const { recordAppOpenAdShown } = require('./smart-ad-manager');
       await recordAppOpenAdShown();
