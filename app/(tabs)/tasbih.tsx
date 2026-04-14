@@ -783,10 +783,15 @@ export default function TasbihScreen() {
         </View>
 
         {/* Scrollable Content */}
-        <ScrollView 
-          contentContainerStyle={{ flexGrow: 1 }} 
+        <ScrollView
+          style={s.scrollView}
+          contentContainerStyle={s.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={true}
+          alwaysBounceVertical={true}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
+          nestedScrollEnabled
         >
           {/* Progress indicator */}
           <View style={[s.progressRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1426,9 +1431,17 @@ const _s = StyleSheet.create({
     includeFontPadding: false,
   },
 
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 4,
+    paddingBottom: 140,
+  },
+
   // Counter area
   counterArea: {
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 24,
