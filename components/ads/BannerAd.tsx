@@ -20,23 +20,22 @@ try {
   // Not available in Expo Go / web
 }
 
-// Approximate tab bar heights so banners in tab screens don't sit behind the
-// native/custom tab bar. iOS UITabBar ≈ 49pt, Android custom glass tab bar ≈ 56pt.
-const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
+// Clearance needed so a banner inside a (tabs) screen sits ABOVE the tab bar.
+// Covers the tab bar itself + the home indicator on iOS and the safe area on Android.
+const TAB_BAR_CLEARANCE = Platform.OS === 'ios' ? 85 : 64;
 
 interface BannerAdComponentProps {
   /** Legacy per-screen key */
   screen?: AdScreenKey;
   /** Named ad slot key (takes priority over screen) */
   slotKey?: string;
-  /** Pass true when rendered inside a (tabs) screen so the banner lifts above the tab bar */
+  /** Pass true when rendered inside a (tabs) screen so the banner floats above the tab bar */
   inTabScreen?: boolean;
 }
 
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey, inTabScreen }) => {
   const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
   const insets = useSafeAreaInsets();
-  const bottomOffset = insets.bottom + (inTabScreen ? TAB_BAR_HEIGHT : 0);
   const [adLoaded, setAdLoaded] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -78,6 +77,22 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!GoogleBannerAd || Platform.OS === 'web') return null;
   if (!delayPassed) return null;
 
+  // On tab screens, float the banner absolutely above the tab bar so it can
+  // never be rendered behind it regardless of how the parent SafeAreaView is
+  // configured. On normal stack screens, use flex layout + safe-area padding.
+  const wrapperStyle = inTabScreen
+    ? [
+        styles.container,
+        styles.floating,
+        { bottom: TAB_BAR_CLEARANCE + insets.bottom, opacity: fadeAnim },
+        !adLoaded && styles.hidden,
+      ]
+    : [
+        styles.container,
+        { paddingBottom: insets.bottom, opacity: fadeAnim },
+        !adLoaded && styles.hidden,
+      ];
+
   // Slot-based rendering (priority)
   if (slotKey) {
     if (!isSlotEnabled(slotKey)) return null;
@@ -85,7 +100,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: bottomOffset }]}>
+      <Animated.View pointerEvents="box-none" style={wrapperStyle}>
         <GoogleBannerAd
           key={`slot-${slotKey}-${retryKey}`}
           unitId={slotUnitId}
@@ -105,7 +120,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: bottomOffset }]}>
+    <Animated.View pointerEvents="box-none" style={wrapperStyle}>
       <GoogleBannerAd
         key={`screen-${screen}-${retryKey}`}
         unitId={adUnitId}
@@ -122,6 +137,11 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  floating: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
   },
   hidden: {
     height: 0,
