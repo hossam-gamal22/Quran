@@ -92,7 +92,7 @@ export const showInterstitial = async (): Promise<boolean> => {
     const { getSubscriptionState } = require('@/lib/subscription-manager');
 
     const [config, sub] = await Promise.all([fetchAdsConfig(), getSubscriptionState()]);
-    if (!config.enabled || sub.isPremium) return false;
+    if (!config.enabled || config.showInterstitials === false || sub.isPremium) return false;
 
     // Smart ad manager checks
     try {

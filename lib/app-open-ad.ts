@@ -22,8 +22,6 @@ let adConfig: Awaited<ReturnType<typeof fetchAdsConfig>> | null = null;
 let adInstance: any = null;
 let adReady = false;
 let appOpenCount = 0;
-/** Show the app-open ad once every N background→active transitions. */
-const SHOW_EVERY_N_OPENS = 3;
 /** Ignore brief inactive flickers (<10s) — not a real backgrounding. */
 const MIN_BACKGROUND_DURATION = 10_000;
 let lastBackgroundTime = 0;
@@ -67,8 +65,9 @@ export const showAppOpenAd = async (): Promise<boolean> => {
     return false;
   }
 
-  // Frequency cap: show once every N app opens (3rd, 6th, 9th, …).
-  if (appOpenCount === 0 || appOpenCount % SHOW_EVERY_N_OPENS !== 0) return false;
+  // Frequency cap: show once every N app opens (configured from admin panel).
+  const everyN = Math.max(1, adConfig.appOpenFrequency ?? 3);
+  if (appOpenCount === 0 || appOpenCount % everyN !== 0) return false;
 
   // Ignore brief inactive flickers (phone call, notification shade, etc.).
   if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {

@@ -19,6 +19,10 @@ interface AdSlot {
 
 interface AdsSettings {
   enabled: boolean;
+  // Master toggles per ad type
+  showBanners: boolean;
+  showInterstitials: boolean;
+  showAdOnAppOpen: boolean;
   // Ad Unit IDs per platform
   bannerAdId: AdUnitIds;
   interstitialAdId: AdUnitIds;
@@ -27,8 +31,10 @@ interface AdsSettings {
   adSlots: Record<string, AdSlot>;
   // Per-screen banner visibility
   bannerScreens: Record<string, boolean>;
-  // App Open Ad
-  showAdOnAppOpen: boolean;
+  // Per-screen interstitial visibility
+  interstitialScreens: Record<string, boolean>;
+  // App-open ad frequency — show once every N background→active transitions
+  appOpenFrequency: number;
   // Interstitial settings
   interstitialMode: 'pages' | 'time' | 'session';
   interstitialFrequency: number;
@@ -91,6 +97,10 @@ const SCREEN_LABELS: Record<string, string> = {
 
 const DEFAULT_SETTINGS: AdsSettings = {
   enabled: true,
+  showBanners: true,
+  showInterstitials: true,
+  showAdOnAppOpen: true,
+  appOpenFrequency: 3,
   bannerAdId: { android: PROD_IDS.android.banner, ios: PROD_IDS.ios.banner },
   interstitialAdId: { android: PROD_IDS.android.interstitial, ios: PROD_IDS.ios.interstitial },
   appOpenAdId: { android: PROD_IDS.android.appOpen, ios: PROD_IDS.ios.appOpen },
@@ -127,7 +137,7 @@ const DEFAULT_SETTINGS: AdsSettings = {
     ayat_universe: true,
     hadith_sifat: true,
   },
-  showAdOnAppOpen: true,
+  interstitialScreens: {},
   interstitialMode: 'pages',
   interstitialFrequency: 8,
   interstitialTimeInterval: 5,
@@ -214,6 +224,13 @@ export default function Ads() {
     setSettings({
       ...settings,
       bannerScreens: { ...settings.bannerScreens, [screen]: value },
+    });
+  };
+
+  const updateInterstitialScreen = (screen: string, value: boolean) => {
+    setSettings({
+      ...settings,
+      interstitialScreens: { ...(settings.interstitialScreens || {}), [screen]: value },
     });
   };
 
@@ -327,11 +344,61 @@ export default function Ads() {
             <p className="text-gray-500 text-sm">تشغيل أو إيقاف جميع الإعلانات في التطبيق</p>
           </div>
           <button
+            type="button"
             onClick={() => setSettings({ ...settings, enabled: !settings.enabled })}
             className={`px-6 py-3 rounded-lg font-medium ${settings.enabled ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}
           >
             {settings.enabled ? 'مفعّلة' : 'معطّلة'}
           </button>
+        </div>
+      </div>
+
+      {/* أنواع الإعلانات — Master toggles per type */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">أنواع الإعلانات</h2>
+        <p className="text-gray-500 text-sm mb-4">تحكم سريع لإيقاف نوع إعلان بالكامل بدون الحاجة لتعديل كل شاشة</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`border rounded-xl p-4 ${settings.showBanners ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-800">Banner</span>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, showBanners: !settings.showBanners })}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium ${settings.showBanners ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}
+              >
+                {settings.showBanners ? 'مفعّل' : 'معطّل'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">البانر أسفل الشاشات</p>
+          </div>
+
+          <div className={`border rounded-xl p-4 ${settings.showInterstitials ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-800">Interstitial</span>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, showInterstitials: !settings.showInterstitials })}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium ${settings.showInterstitials ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}
+              >
+                {settings.showInterstitials ? 'مفعّل' : 'معطّل'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">إعلان ملء الشاشة (يمكن تخطيه)</p>
+          </div>
+
+          <div className={`border rounded-xl p-4 ${settings.showAdOnAppOpen ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-medium text-gray-800">App Open</span>
+              <button
+                type="button"
+                onClick={() => setSettings({ ...settings, showAdOnAppOpen: !settings.showAdOnAppOpen })}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium ${settings.showAdOnAppOpen ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}
+              >
+                {settings.showAdOnAppOpen ? 'مفعّل' : 'معطّل'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">إعلان فتح التطبيق من الخلفية</p>
+          </div>
         </div>
       </div>
 
@@ -464,19 +531,55 @@ export default function Ads() {
         </div>
       </div>
 
-      {/* إعلان عند فتح التطبيق */}
+      {/* تردد إعلان فتح التطبيق */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">تردد إعلان فتح التطبيق</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          يتم عرض إعلان App Open مرة واحدة كل عدد من مرات رجوع المستخدم إلى التطبيق من الخلفية.
+        </p>
+        <div className="flex items-center gap-3">
+          <span className="text-gray-600">عرض مرة واحدة كل</span>
+          <input
+            type="number"
+            value={settings.appOpenFrequency}
+            onChange={(e) => setSettings({ ...settings, appOpenFrequency: Math.max(1, Number(e.target.value) || 1) })}
+            min="1"
+            max="20"
+            aria-label="تردد إعلان فتح التطبيق"
+            className="w-24 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent outline-none"
+            disabled={!settings.showAdOnAppOpen}
+          />
+          <span className="text-gray-600">مرة فتح للتطبيق</span>
+        </div>
+        <p className="text-gray-500 text-sm mt-2">
+          مثال: 3 = عرض الإعلان على الفتحة رقم 3، 6، 9 … {!settings.showAdOnAppOpen && '(إعلان App Open معطّل حالياً)'}
+        </p>
+      </div>
+
+      {/* أماكن عرض الإعلانات البينية */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">إعلان عند فتح التطبيق</h2>
-            <p className="text-gray-500 text-sm">عرض إعلان (يمكن تخطيه) عند كل فتح للتطبيق</p>
+            <h2 className="text-lg font-semibold text-gray-800">أماكن عرض الإعلانات البينية</h2>
+            <p className="text-gray-500 text-sm">
+              اختر الشاشات التي يُسمح فيها بظهور Interstitial. اترك الكل فارغاً = مسموح في كل الشاشات (حسب إعدادات التردد في الأسفل).
+            </p>
           </div>
-          <button
-            onClick={() => setSettings({ ...settings, showAdOnAppOpen: !settings.showAdOnAppOpen })}
-            className={`px-6 py-3 rounded-lg font-medium ${settings.showAdOnAppOpen ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'}`}
-          >
-            {settings.showAdOnAppOpen ? 'مفعّل' : 'معطّل'}
-          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {Object.entries(SCREEN_LABELS).map(([key, label]) => (
+            <label key={key} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
+              settings.interstitialScreens?.[key] ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+            }`}>
+              <input
+                type="checkbox"
+                checked={settings.interstitialScreens?.[key] ?? false}
+                onChange={(e) => updateInterstitialScreen(key, e.target.checked)}
+                className="w-5 h-5 text-purple-600 rounded"
+              />
+              <span className="text-gray-700 text-sm font-medium">{label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
@@ -845,7 +948,9 @@ export default function Ads() {
         <h3 className="font-semibold text-blue-800 mb-3">ملخص الإعدادات الحالية</h3>
         <ul className="space-y-2 text-blue-700 text-sm">
           <li>• الإعلانات: <span className="font-medium">{settings.enabled ? 'مفعّلة' : 'معطّلة'}</span></li>
-          <li>• إعلان فتح التطبيق: <span className="font-medium">{settings.showAdOnAppOpen ? 'مفعّل' : 'معطّل'}</span></li>
+          <li>• Banner: <span className="font-medium">{settings.showBanners ? 'مفعّل' : 'معطّل'}</span></li>
+          <li>• Interstitial: <span className="font-medium">{settings.showInterstitials ? 'مفعّل' : 'معطّل'}</span></li>
+          <li>• إعلان فتح التطبيق: <span className="font-medium">{settings.showAdOnAppOpen ? `مفعّل (كل ${settings.appOpenFrequency} فتحات)` : 'معطّل'}</span></li>
           <li>• البانر: <span className="font-medium">{enabledScreenCount} شاشة مفعّلة</span></li>
           <li>• مواضع إعلانية: <span className="font-medium">{Object.values(settings.adSlots || {}).filter(s => s.enabled).length} مفعّل من {Object.keys(settings.adSlots || {}).length}</span></li>
           <li>• الإعلانات البينية: <span className="font-medium">

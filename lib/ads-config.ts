@@ -70,6 +70,10 @@ export interface AdSlot {
 
 export interface AdsConfig {
   enabled: boolean;
+  // Master toggles per ad type (admin can kill an entire type in one click)
+  showBanners: boolean;
+  showInterstitials: boolean;
+  showAdOnAppOpen: boolean;
   // Legacy global Ad Unit IDs (fallback)
   bannerAdId: AdUnitIds;
   interstitialAdId: AdUnitIds;
@@ -78,8 +82,10 @@ export interface AdsConfig {
   adSlots?: Record<string, AdSlot>;
   // Per-screen banner visibility
   bannerScreens: Record<string, boolean>;
-  // App Open Ad
-  showAdOnAppOpen: boolean;
+  // Per-screen interstitial visibility (empty = allowed everywhere outside sacred contexts)
+  interstitialScreens?: Record<string, boolean>;
+  // App-open ad frequency — show once every N background→active transitions
+  appOpenFrequency: number;
   // Qibla compass style change ad
   showAdOnQiblaStyleChange: boolean;
   // Interstitial settings
@@ -113,6 +119,10 @@ export const PRODUCTION_AD_IDS = {
 
 export const DEFAULT_ADS_CONFIG: AdsConfig = {
   enabled: true,
+  showBanners: true,
+  showInterstitials: true,
+  showAdOnAppOpen: true,
+  appOpenFrequency: 3,
   bannerAdId: {
     android: PRODUCTION_AD_IDS.android.banner,
     ios: PRODUCTION_AD_IDS.ios.banner,
@@ -148,7 +158,6 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     hadith_sifat: true,
     qibla: true,
   },
-  showAdOnAppOpen: true,
   showAdOnQiblaStyleChange: true,
   interstitialMode: 'pages',
   interstitialFrequency: 8,
@@ -192,6 +201,10 @@ const normalizeAdminConfig = (data: Record<string, any>): Partial<AdsConfig> => 
   const normalized: Partial<AdsConfig> = {};
 
   if (data.enabled !== undefined) normalized.enabled = data.enabled;
+  if (data.showBanners !== undefined) normalized.showBanners = data.showBanners;
+  if (data.showInterstitials !== undefined) normalized.showInterstitials = data.showInterstitials;
+  if (data.appOpenFrequency !== undefined) normalized.appOpenFrequency = Number(data.appOpenFrequency) || 3;
+  if (data.interstitialScreens) normalized.interstitialScreens = data.interstitialScreens;
 
   // Ad Unit IDs - support both old flat format and new nested format
   if (data.bannerAdId) {
@@ -276,7 +289,20 @@ export const fetchAdsConfig = async (): Promise<AdsConfig> => {
  */
 export const isBannerEnabledForScreen = (config: AdsConfig, screen: AdScreenKey): boolean => {
   if (!config.enabled) return false;
+  if (config.showBanners === false) return false;
   return config.bannerScreens[screen] ?? false;
+};
+
+/**
+ * Check if interstitials are allowed on a given screen.
+ * Empty interstitialScreens map = allowed everywhere (subject to smart-ad-manager).
+ */
+export const isInterstitialEnabledForScreen = (config: AdsConfig, screen: string): boolean => {
+  if (!config.enabled) return false;
+  if (config.showInterstitials === false) return false;
+  const map = config.interstitialScreens;
+  if (!map || Object.keys(map).length === 0) return true;
+  return map[screen] ?? false;
 };
 
 /**

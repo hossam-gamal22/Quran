@@ -111,6 +111,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const canShowInterstitial = useCallback((): boolean => {
     if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
+    if (config.showInterstitials === false) return false;
     if (!canShowGlobalAd()) return false;
 
     // Smart ad manager checks (sacred context, daily caps, engagement reward)
@@ -149,7 +150,10 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     if (isPremiumUser) return false;
     if (!config?.enabled) return false;
     const slot = config.adSlots?.[slotKey];
-    return !!slot?.enabled;
+    if (!slot?.enabled) return false;
+    if (slot.type === 'banner' && config.showBanners === false) return false;
+    if (slot.type === 'interstitial' && config.showInterstitials === false) return false;
+    return true;
   }, [config, isPremiumUser]);
 
   const getSlotAdType = useCallback((slotKey: string): 'banner' | 'interstitial' | null => {
