@@ -1166,8 +1166,8 @@ export default function CompanionsScreen() {
             </Text>
           </View>
         </View>
-        <BannerAdComponent screen="companions" />
       </ScrollView>
+      <BannerAdComponent screen="companions" />
       <PdfTemplatePicker
         visible={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}

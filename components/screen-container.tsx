@@ -44,7 +44,6 @@ export function ScreenContainer({
       style={styles.safeArea}
     >
       <StatusBar style={colors.statusBarStyle} />
-      {screenKey && <DynamicScreenAds screen={screenKey} position="top" />}
       <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
         {children}
       </View>

@@ -481,8 +481,8 @@ export default function SeerahScreen() {
             </TranslatedText>
           </View>
         </View>
-        <BannerAdComponent screen="seerah" />
       </ScrollView>
+      <BannerAdComponent screen="seerah" />
       <PdfTemplatePicker
         visible={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}

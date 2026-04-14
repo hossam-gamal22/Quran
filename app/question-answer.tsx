@@ -309,10 +309,6 @@ export default function QuestionAnswerScreen() {
     includeFontPadding: false,
   };
 
-  const footerStyle: ViewStyle = {
-    paddingTop: Spacing.lg,
-  };
-
   return (
     <ScreenContainer>
       <UniversalHeader title={t('questionAnswer.title')} showBack />
@@ -398,13 +394,9 @@ export default function QuestionAnswerScreen() {
           contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={<View style={{ height: Spacing.md }} />}
-          ListFooterComponent={
-            <View style={footerStyle}>
-              <BannerAdComponent screen="home" />
-            </View>
-          }
         />
       )}
+      <BannerAdComponent screen="home" />
     </ScreenContainer>
   );
 }

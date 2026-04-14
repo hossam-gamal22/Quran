@@ -199,9 +199,8 @@ export default function HadithSifatScreen() {
             </Animated.View>
           );
         })}
-
-        <BannerAdComponent screen="hadith_sifat" />
       </ScrollView>
+      <BannerAdComponent screen="hadith_sifat" />
     </ScreenContainer>
   );
 }

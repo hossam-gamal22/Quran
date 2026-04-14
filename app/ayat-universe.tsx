@@ -212,9 +212,8 @@ export default function AyatUniverseScreen() {
             </Animated.View>
           );
         })}
-
-        <BannerAdComponent screen="ayat_universe" />
       </ScrollView>
+      <BannerAdComponent screen="ayat_universe" />
     </ScreenContainer>
   );
 }

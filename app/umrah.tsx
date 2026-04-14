@@ -177,8 +177,8 @@ export default function UmrahScreen() {
           </View>
         </View>
         <MissingTranslationCard pageName="Umrah" />
-        <BannerAdComponent screen="hajj_umrah" />
       </ScrollView>
+      <BannerAdComponent screen="hajj_umrah" />
       <PdfTemplatePicker
         visible={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}

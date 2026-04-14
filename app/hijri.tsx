@@ -634,8 +634,8 @@ export default function HijriScreen() {
           </Text>
         </View>
 
-        <BannerAdComponent screen="hijri" />
       </ScrollView>
+      <BannerAdComponent screen="hijri" />
 
       {/* ============================================ */}
       {/* نافذة إعدادات تعديل التاريخ الهجري */}
