@@ -1701,7 +1701,7 @@ export default function HomeScreen() {
         {/* Spacing before ad banner */}
         <View style={{ height: 24 }} />
       </ScrollView>
-      <BannerAdComponent screen="home" />
+      <BannerAdComponent screen="home" inTabScreen />
       </SafeAreaView>
 
       {/* Quick Access Customize Modal — rendered outside ScrollView to prevent stacking on mobile */}

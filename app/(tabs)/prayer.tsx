@@ -949,7 +949,7 @@ export default function PrayerScreen() {
           )}
         </ScrollView>
 
-        <BannerAdComponent screen="prayer" />
+        <BannerAdComponent screen="prayer" inTabScreen />
 
 
 

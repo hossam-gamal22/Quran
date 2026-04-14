@@ -1075,7 +1075,7 @@ export default function TasbihScreen() {
         </ScrollView>
 
         {/* Bottom actions */}
-        <BannerAdComponent screen="tasbih" />
+        <BannerAdComponent screen="tasbih" inTabScreen />
       </SafeAreaView>
 
       {/* Reset toast */}

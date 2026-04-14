@@ -814,7 +814,7 @@ const QiblaScreen = () => {
         )}
       </View>
     </ScrollView>
-    <BannerAdComponent screen="qibla" />
+    <BannerAdComponent screen="qibla" inTabScreen />
     </BackgroundWrapper>
   );
 };

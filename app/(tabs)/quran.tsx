@@ -1017,7 +1017,7 @@ export default function QuranScreen() {
         )}
 
         {/* شريط التشغيل */}
-        <BannerAdComponent screen="quran" />
+        <BannerAdComponent screen="quran" inTabScreen />
 
         {/* Modal اختيار القارئ - Glass Style */}
         <Modal

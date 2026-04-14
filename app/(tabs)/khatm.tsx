@@ -207,7 +207,7 @@ export default function KhatmScreen() {
   const s = useScaledStyles(_s, colors.fs);
 
   return (
-    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="khatma">
+    <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right']} screenKey="khatma" inTabScreen>
       {/* Header */}
       <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <TouchableOpacity style={s.addBtn} onPress={() => setShowNewModal(true)}>

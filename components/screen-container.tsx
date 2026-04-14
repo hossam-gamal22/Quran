@@ -15,6 +15,8 @@ export interface ScreenContainerProps extends ViewProps {
   useAppBackground?: boolean;
   /** When set, auto-renders admin-configured ads for this screen */
   screenKey?: string;
+  /** Pass true on (tabs) screens so bottom ads sit above the tab bar */
+  inTabScreen?: boolean;
 }
 
 /**
@@ -30,6 +32,7 @@ export function ScreenContainer({
   style,
   useAppBackground = true,
   screenKey,
+  inTabScreen,
   ...props
 }: ScreenContainerProps) {
   const { settings, isDarkMode } = useSettings();
@@ -47,7 +50,7 @@ export function ScreenContainer({
       <View className={cn("flex-1", className)} style={[styles.inner, style as any]}>
         {children}
       </View>
-      {screenKey && <DynamicScreenAds screen={screenKey} position="bottom" />}
+      {screenKey && <DynamicScreenAds screen={screenKey} position="bottom" inTabScreen={inTabScreen} />}
     </SafeAreaView>
   );
 

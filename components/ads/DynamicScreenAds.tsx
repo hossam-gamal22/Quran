@@ -10,9 +10,10 @@ import { BannerAdComponent } from './BannerAd';
 interface DynamicScreenAdsProps {
   screen: string;
   position: 'top' | 'bottom';
+  inTabScreen?: boolean;
 }
 
-export const DynamicScreenAds: React.FC<DynamicScreenAdsProps> = ({ screen, position }) => {
+export const DynamicScreenAds: React.FC<DynamicScreenAdsProps> = ({ screen, position, inTabScreen }) => {
   const { getScreenSlots } = useAds();
   const slots = getScreenSlots(screen, position);
 
@@ -21,7 +22,7 @@ export const DynamicScreenAds: React.FC<DynamicScreenAdsProps> = ({ screen, posi
   return (
     <View>
       {slots.map(({ key }) => (
-        <BannerAdComponent key={key} slotKey={key} />
+        <BannerAdComponent key={key} slotKey={key} inTabScreen={inTabScreen} />
       ))}
     </View>
   );

@@ -20,16 +20,23 @@ try {
   // Not available in Expo Go / web
 }
 
+// Approximate tab bar heights so banners in tab screens don't sit behind the
+// native/custom tab bar. iOS UITabBar ≈ 49pt, Android custom glass tab bar ≈ 56pt.
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 49 : 56;
+
 interface BannerAdComponentProps {
   /** Legacy per-screen key */
   screen?: AdScreenKey;
   /** Named ad slot key (takes priority over screen) */
   slotKey?: string;
+  /** Pass true when rendered inside a (tabs) screen so the banner lifts above the tab bar */
+  inTabScreen?: boolean;
 }
 
-export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey }) => {
+export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey, inTabScreen }) => {
   const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
   const insets = useSafeAreaInsets();
+  const bottomOffset = insets.bottom + (inTabScreen ? TAB_BAR_HEIGHT : 0);
   const [adLoaded, setAdLoaded] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -78,7 +85,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
+      <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: bottomOffset }]}>
         <GoogleBannerAd
           key={`slot-${slotKey}-${retryKey}`}
           unitId={slotUnitId}
@@ -98,7 +105,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: insets.bottom }]}>
+    <Animated.View style={[styles.container, !adLoaded && styles.hidden, { opacity: fadeAnim, paddingBottom: bottomOffset }]}>
       <GoogleBannerAd
         key={`screen-${screen}-${retryKey}`}
         unitId={adUnitId}
