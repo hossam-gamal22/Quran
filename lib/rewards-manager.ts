@@ -558,7 +558,7 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
 
     // Notify current user if they are among the winners
     try {
-      const currentUserId = await AsyncStorage.getItem('@user_id');
+      const currentUserId = await AsyncStorage.getItem('@rooh_user_id');
       if (currentUserId && winners.some(w => w.userId === currentUserId)) {
         await scheduleLocalNotification(
           {

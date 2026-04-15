@@ -24,6 +24,7 @@ import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'fir
 import { db } from '@/config/firebase';
 import { t } from '@/lib/i18n';
 import * as Notifications from 'expo-notifications';
+import { getUserId } from '@/lib/firebase-user';
 import {
   incrementPaywallOpenCount,
   shouldShowPaywall,
@@ -153,7 +154,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           setPremiumSource('iap');
         } else {
           try {
-            const userId = await AsyncStorage.getItem('@user_id');
+            const userId = await getUserId();
             if (userId) {
               const userRef = doc(db, 'users', userId);
               // Real-time listener for admin premium changes (grant/revoke/expiry)
@@ -334,7 +335,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
               // Record purchase in Firestore for admin visibility
               try {
-                const userId = await AsyncStorage.getItem('@user_id');
+                const userId = await getUserId();
                 if (userId) {
                   await setDoc(doc(db, 'users', userId, 'purchases', purchase.transactionId || `purchase_${Date.now()}`), {
                     productId: purchase.productId,
