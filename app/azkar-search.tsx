@@ -373,7 +373,7 @@ export default function AzkarSearchScreen() {
             <BackButton color={colors.text} />
 
             {isBenefitsMode ? (
-              <Text style={[styles.benefitsHeaderTitle, { color: colors.text }]}>
+              <Text numberOfLines={1} style={[styles.benefitsHeaderTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
                 {t('azkarSearch.virtueOfAzkar')}
               </Text>
             ) : (
@@ -790,9 +790,9 @@ const _styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: '700',
-    textAlign: 'center',
     lineHeight: 30,
     includeFontPadding: false,
+    paddingHorizontal: 6,
   },
   // Benefits Container
   benefitsContainer: {

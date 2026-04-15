@@ -1674,8 +1674,7 @@ export default function NotificationsScreen() {
         >
           <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('settings.prayerAndAzkarAlerts')}</Text>
-        <View style={styles.headerPlaceholder} />
+        <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('settings.prayerAndAzkarAlerts')}</Text>
       </Animated.View>
 
       <ScrollView
@@ -2000,7 +1999,6 @@ const _styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -2012,13 +2010,12 @@ const _styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontFamily: fontBold(),
     lineHeight: 34,
     includeFontPadding: false,
-  },
-  headerPlaceholder: {
-    width: 40,
+    paddingHorizontal: 8,
   },
   scrollView: {
     flex: 1,

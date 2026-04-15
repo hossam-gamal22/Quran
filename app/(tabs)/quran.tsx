@@ -374,6 +374,8 @@ export default function QuranScreen() {
       setDownloadedSet(prev => new Set(prev).add(surahNumber));
     } catch (e: any) {
       setFailedSet(prev => new Set(prev).add(surahNumber));
+      // showOfflineModal() self-checks NetInfo and does nothing if online,
+      // so online failures silently leave the failed flag for a retry tap.
       showOfflineModal();
     } finally {
       setDownloadingSet(prev => {
@@ -563,23 +565,42 @@ export default function QuranScreen() {
                           </Text>
                         </View>
                       ) : (
-                        <MaterialCommunityIcons
-                          name={
-                            downloadedSet.has(item.number)
-                              ? 'check-circle'
-                              : failedSet.has(item.number)
-                                ? 'alert-circle'
-                                : 'download'
-                          }
-                          size={22}
-                          color={
-                            downloadedSet.has(item.number)
-                              ? '#0d8e62'
-                              : failedSet.has(item.number)
-                                ? '#EF4444'
-                                : colors.textLight
-                          }
-                        />
+                        <View style={{ position: 'relative' }}>
+                          <MaterialCommunityIcons
+                            name={
+                              downloadedSet.has(item.number)
+                                ? 'check-circle'
+                                : failedSet.has(item.number)
+                                  ? 'alert-circle'
+                                  : 'download'
+                            }
+                            size={22}
+                            color={
+                              downloadedSet.has(item.number)
+                                ? '#0d8e62'
+                                : failedSet.has(item.number)
+                                  ? '#EF4444'
+                                  : isPremium
+                                    ? colors.textLight
+                                    : colors.textLight + '80'
+                            }
+                          />
+                          {!isPremium && !downloadedSet.has(item.number) && (
+                            <View style={{
+                              position: 'absolute',
+                              top: -4,
+                              right: -4,
+                              backgroundColor: '#FFD700',
+                              borderRadius: 8,
+                              width: 14,
+                              height: 14,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <MaterialCommunityIcons name="lock" size={10} color="#000" />
+                            </View>
+                          )}
+                        </View>
                       )}
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -1189,9 +1210,9 @@ export default function QuranScreen() {
                     onPress={() => { setShowSettings(false); router.push('/quran-reminder'); }}
                   >
                     <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.textSecondary} />
-                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 15, color: colors.text }}>{t('quran.reminderSettings')}</Text>
-                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 15, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>{t('quran.reminderSettings')}</Text>
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                         {(settings.notifications.quranReadingReminder ?? false) ? `${t('quran.enabled')} · ${settings.notifications.quranReadingReminderTime ?? '20:00'}` : t('quran.notEnabled')}
                       </Text>
                     </View>
@@ -1233,10 +1254,10 @@ export default function QuranScreen() {
                       >
                         <Text style={{ fontSize: 26 }}>{flag}</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text }}>
+                          <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                             {t('quran.chooseTranslationLanguage')}
                           </Text>
-                          <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                          <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                             {selLang ? `${langName} ${flag}` : t('quran.chooseTranslationDesc')}
                           </Text>
                         </View>
@@ -1271,10 +1292,10 @@ export default function QuranScreen() {
                   >
                     <MaterialCommunityIcons name="account-music" size={20} color={colors.primary} />
                     <View style={{ flex: 1, marginHorizontal: 10 }}>
-                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text }}>
+                      <Text style={{ fontFamily: fontSemiBold(), fontSize: 14, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                         {currentReciterName}
                       </Text>
-                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary }}>
+                      <Text style={{ fontFamily: fontRegular(), fontSize: 12, color: colors.textSecondary, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }}>
                         {t('quran.selectReciterDesc')}
                       </Text>
                     </View>

@@ -5,6 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import azkarData from '@/data/json/azkar.json';
 import categoriesData from '@/data/json/categories.json';
+import shortNamesData from '@/data/json/azkar-short-names.json';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { translateBenefit } from '@/lib/benefit-translations';
@@ -146,9 +147,22 @@ export const getZikrTranslation = (zikr: Zikr, language: Language): string => {
 };
 
 /**
+ * Short display names for categories whose original name in categories.json
+ * is too verbose for a page header or list row. Sourced from
+ * `data/json/azkar-short-names.json`, covering all 12 supported languages.
+ * Keeps titles consistent between outside buttons and the page header.
+ */
+const SHORT_NAMES = shortNamesData as Record<string, Partial<Record<Language, string>>>;
+
+/**
  * الحصول على اسم الفئة مترجم
  */
 export const getCategoryName = (category: AzkarCategory, language: Language): string => {
+  const short = SHORT_NAMES[category.id];
+  if (short) {
+    const override = short[language] || short.en || short.ar;
+    if (override) return override;
+  }
   // Fallback chain: requested lang → en → ar
   return category.name?.[language] || category.name?.en || category.name?.[DEFAULT_LANGUAGE] || '';
 };

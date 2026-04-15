@@ -283,7 +283,9 @@ const MushafPage = React.memo(function MushafPage({
   }
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
-  const usePlainArabicMode = shouldForcePlainArabic || (Platform.OS === 'android' && fontError);
+  // Fall back to plain Arabic rendering on any platform when the QCF font fails —
+  // user still sees the verses without a blocking "Font Load Error" screen.
+  const usePlainArabicMode = shouldForcePlainArabic || fontError;
 
   // Load QCF4 per-page font (use needsDarkFont based on actual background)
   useEffect(() => {

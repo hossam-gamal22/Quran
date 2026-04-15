@@ -1378,8 +1378,9 @@ export default function CategoryAzkarScreen() {
                       );
                     })()}
 
-                    {/* النطق */}
-                    {showTransliteration && currentZikr.transliteration && (
+                    {/* النطق — never auto-shown when the user's interface is
+                        Arabic; they must explicitly opt in via showTransliteration. */}
+                    {(!isArabic || showTransliteration) && showTransliteration && currentZikr.transliteration && (
                       <Text style={[styles.transliteration, { color: darkMode ? '#9CA3AF' : '#6B7280' }]}>
                         {currentZikr.transliteration}
                       </Text>

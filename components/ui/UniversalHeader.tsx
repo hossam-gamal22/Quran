@@ -1,12 +1,11 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BackButton } from './BackButton';
 import { fontBold } from '@/lib/fonts';
-import MarqueeText from './MarqueeText';
 
 export interface HeaderAction {
   icon: string;
@@ -53,7 +52,7 @@ export function UniversalHeader({
         style,
       ]}
     >
-      {/* Back button — fixed width, always at the edge */}
+      {/* Back button — fixed width, at the leading edge */}
       <View style={s.backSide}>
         {showBack && (
           <BackButton
@@ -64,25 +63,30 @@ export function UniversalHeader({
         )}
       </View>
 
-      {/* Center: title or custom children */}
-      <View style={s.center}>
+      {/* Title — sits right next to the back button (not centered) */}
+      <View
+        style={[
+          s.titleSide,
+          { flexDirection: isRTL ? 'row-reverse' : 'row' },
+        ]}
+      >
         {children || (
-          <MarqueeText
-            text={title || ''}
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
               s.title,
               { color: titleColor || colors.text },
-              { textAlign: 'center', writingDirection: isRTL ? 'rtl' : 'ltr' },
+              { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
               titleStyle,
             ]}
-            containerStyle={{ width: '100%' }}
-            speed={40}
-            delay={800}
-          />
+          >
+            {title || ''}
+          </Text>
         )}
       </View>
 
-      {/* Action buttons — natural width, at the opposite edge */}
+      {/* Action buttons — natural width, at the trailing edge */}
       <View
         style={[
           s.actionsSide,
@@ -118,13 +122,16 @@ const _s = StyleSheet.create({
     width: 44,
     justifyContent: 'center',
   },
-  center: {
+  titleSide: {
     flex: 1,
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
   },
   title: {
     fontFamily: fontBold(),
     fontSize: 20,
+    flexShrink: 1,
   },
   actionsSide: {
     alignItems: 'center',

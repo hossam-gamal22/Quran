@@ -73,7 +73,7 @@ export default function PrayerAdjustmentsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('prayerAdjustments.title')}</Text>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
           <TouchableOpacity onPress={handleReset} style={styles.resetBtn}>
             <Text style={styles.resetText}>{t('prayerAdjustments.reset')}</Text>
           </TouchableOpacity>
@@ -133,12 +133,11 @@ const _styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false },
+  headerTitle: { flex: 1, fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false, paddingHorizontal: 8 },
   resetBtn: { padding: 4 },
   resetText: { fontFamily: fontMedium(), fontSize: 14, color: '#ef5350' },
   scroll: { flex: 1 },

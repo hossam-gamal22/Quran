@@ -292,7 +292,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleLabel,
-              { color: colors.text, textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
             ]}
           >
             {label}
@@ -302,7 +302,7 @@ export function GlassToggle({
           <Text
             style={[
               styles.toggleSubtitle,
-              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left' },
+              { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
             ]}
           >
             {subtitle}

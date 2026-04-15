@@ -467,17 +467,20 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     needsWhiteText = getContrastTextColor(effectiveColor) === '#FFFFFF';
   }
 
-  // Calculate isDarkMode based on theme mode
+  // Calculate isDarkMode based on theme mode.
+  // Policy: only the explicit 'light' theme renders light. Every other choice
+  // ('dark', 'system', 'custom') is treated as dark so contrast rules stay
+  // consistent across the app regardless of OS scheme. Custom theme still
+  // allows an explicit light override when paired with a bright background.
   let isDarkMode: boolean;
-  if (settings.theme === 'custom') {
-    // Custom theme: default to dark mode, only override to light if we explicitly detect a light background
+  if (settings.theme === 'light') {
+    isDarkMode = false;
+  } else if (settings.theme === 'custom') {
     const hasLightBg = (hasDynamicPhotoBg || hasBuiltInBg) && !needsWhiteText;
     isDarkMode = !hasLightBg;
   } else {
-    // Standard themes: theme directly controls
-    isDarkMode = settings.theme === 'system' 
-      ? systemTheme === 'dark' 
-      : settings.theme === 'dark';
+    // 'dark' and 'system' → always dark for consistent contrast
+    isDarkMode = true;
   }
 
   // حساب اتجاه اللغة

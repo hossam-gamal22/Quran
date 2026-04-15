@@ -7,6 +7,16 @@
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
     "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "assets/fonts/qcf/**",
+      "assets/fonts/**",
+      "assets/images/**",
+      "assets/sounds/**",
+      "assets/stories/**",
+      "assets/design/**",
+      "assets/translations/**",
+      "assets/lottie/**"
+    ],
     "splash": {
       "image": "./assets/images/icons/App-icon.png",
       "resizeMode": "contain",

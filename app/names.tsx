@@ -1086,11 +1086,11 @@ export default function AllahNamesScreen() {
     >
     <SafeAreaView style={{ flex: 1 }} edges={['top']}>
       {/* الرأس */}
-      <View style={[styles.header, { backgroundColor: 'transparent', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+      <View style={[styles.header, { backgroundColor: 'transparent', flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
         <BackButton color={colors.text} style={[styles.headerBtn, { backgroundColor: isDarkMode ? colors.primary + '26' : colors.primary + '35' }]} />
-        
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('home.namesOfAllah')}</Text>
+
+        <View style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: 6 }}>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('home.namesOfAllah')}</Text>
           <SectionInfoButton sectionKey="names" />
         </View>
         

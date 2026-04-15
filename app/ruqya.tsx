@@ -1,8 +1,8 @@
 // app/ruqya.tsx
-// صفحة الرقية الشرعية - النظام الجديد
-// =====================================
+// الرقية الشرعية — قسمان (قرآن / أدعية) مع عداد لكل بطاقة
+// =========================================================
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,424 +15,426 @@ import {
   Dimensions,
   Platform,
   FlatList,
+  ImageBackground,
 } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { t } from '@/lib/i18n';
+import * as Font from 'expo-font';
+import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
 
-import {
-  Zikr,
-  Language,
-  getRuqya,
-  getZikrTranslation,
-  getZikrBenefit,
-  addToFavorites,
-  removeFromFavorites,
-  isFavorite,
-} from '@/lib/azkar-api';
+import { t } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
+import { useIsRTL } from '@/hooks/use-is-rtl';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
-import { BackButton } from '@/components/ui';
-import { TranslatedText } from '@/components/ui/TranslatedText';
-import { transliterateReference } from '@/lib/source-transliteration';
+import { BackButton, NativeTabs } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { useIsRTL } from '@/hooks/use-is-rtl';
-import { Colors, DarkColors, Spacing } from '@/constants/theme';
-import { stripVerseNumbers, stripAzkarBrackets } from '@/lib/basmala-utils';
+import { Spacing } from '@/constants/theme';
+import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
+import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
+import { getSurahName } from '@/lib/quran-api';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
+
+// =====================================
+// البيانات - قرآن وأدعية الرقية الشرعية
+// =====================================
+
+type QuranRef = {
+  surah: number;
+  startAyah: number;
+  endAyah: number;
+};
+
+type QuranSlide = {
+  id: string;
+  refs: QuranRef[];
+  count: number;
+  labelAr: string;
+  showBanner: boolean;
+};
+
+type DuaSlide = {
+  id: string;
+  arabic: string;
+  count: number;
+  reference: string;
+};
+
+const QURAN_SLIDES: QuranSlide[] = [
+  {
+    id: 'fatiha',
+    refs: [{ surah: 1, startAyah: 1, endAyah: 7 }],
+    count: 7,
+    labelAr: 'سورة الفاتحة',
+    showBanner: true,
+  },
+  {
+    id: 'kursi',
+    refs: [{ surah: 2, startAyah: 255, endAyah: 255 }],
+    count: 1,
+    labelAr: 'آية الكرسي',
+    showBanner: false,
+  },
+  {
+    id: 'ikhlas',
+    refs: [{ surah: 112, startAyah: 1, endAyah: 4 }],
+    count: 3,
+    labelAr: 'سورة الإخلاص',
+    showBanner: true,
+  },
+  {
+    id: 'falaq',
+    refs: [{ surah: 113, startAyah: 1, endAyah: 5 }],
+    count: 3,
+    labelAr: 'سورة الفلق',
+    showBanner: true,
+  },
+  {
+    id: 'nas',
+    refs: [{ surah: 114, startAyah: 1, endAyah: 6 }],
+    count: 3,
+    labelAr: 'سورة الناس',
+    showBanner: true,
+  },
+];
+
+const DUA_SLIDES: DuaSlide[] = [
+  {
+    id: 'shafi',
+    arabic:
+      'اللَّهُمَّ رَبَّ النَّاسِ، أَذْهِبِ الْبَأْسَ، وَاشْفِ أَنْتَ الشَّافِي، لَا شِفَاءَ إِلَّا شِفَاؤُكَ، شِفَاءً لَا يُغَادِرُ سَقَمًا',
+    count: 3,
+    reference: 'البخاري ومسلم',
+  },
+  {
+    id: 'urqeek',
+    arabic:
+      'بِسْمِ اللَّهِ أُرْقِيكَ، مِنْ كُلِّ شَيْءٍ يُؤْذِيكَ، مِنْ شَرِّ كُلِّ نَفْسٍ أَوْ عَيْنِ حَاسِدٍ، اللَّهُ يَشْفِيكَ، بِسْمِ اللَّهِ أُرْقِيكَ',
+    count: 3,
+    reference: 'مسلم',
+  },
+  {
+    id: 'hammah',
+    arabic: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّةِ مِنْ كُلِّ شَيْطَانٍ وَهَامَّةٍ، وَمِنْ كُلِّ عَيْنٍ لَامَّةٍ',
+    count: 3,
+    reference: 'البخاري',
+  },
+  {
+    id: 'bismillah',
+    arabic:
+      'بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الْأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ',
+    count: 3,
+    reference: 'أبو داود والترمذي',
+  },
+  {
+    id: 'maKhalaq',
+    arabic: 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ',
+    count: 3,
+    reference: 'مسلم',
+  },
+];
+
+// Unique pages we need QCF fonts for (Fatiha→1, Kursi→42, Mu'awwidhat→604)
+const QCF_PAGES_NEEDED = [1, 42, 604];
+const FAVORITES_KEY = '@ruqya_favorites';
 
 // =====================================
 // المكون الرئيسي
 // =====================================
 
+type TabKey = 'quran' | 'duas';
+
 export default function RuqyaScreen() {
   const isRTL = useIsRTL();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const flatListRef = useRef<FlatList>(null);
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
-  const darkMode = isDarkMode;
-  const language = (settings.language || 'ar') as Language;
-  const isArabic = language === 'ar';
 
-  // الحالة
-  const [ruqyaList, setRuqyaList] = useState<Zikr[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [favorites, setFavorites] = useState<Record<number, boolean>>({});
-  const [counts, setCounts] = useState<Record<number, number>>({});
-  const [showTranslation, setShowTranslation] = useState(true);
-  const [showTransliteration, setShowTransliteration] = useState(false);
-  const [viewMode, setViewMode] = useState<'single' | 'list'>('single');
+  // حالة التبويب والتنقل
+  const [activeTab, setActiveTab] = useState<TabKey>('quran');
+  const [quranIndex, setQuranIndex] = useState(0);
+  const [duasIndex, setDuasIndex] = useState(0);
+  const [quranCounts, setQuranCounts] = useState<Record<string, number>>({});
+  const [duasCounts, setDuasCounts] = useState<Record<string, number>>({});
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [fontsReady, setFontsReady] = useState(false);
 
-  // الأنيميشن
+  // تحميل/حفظ المفضلة
+  useEffect(() => {
+    AsyncStorage.getItem(FAVORITES_KEY)
+      .then((raw) => {
+        if (raw) setFavorites(JSON.parse(raw));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleFavorite = useCallback((slideId: string) => {
+    setFavorites((prev) => {
+      const next = { ...prev, [slideId]: !prev[slideId] };
+      AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
+
+  const resetCount = useCallback(
+    (slideId: string, tab: TabKey) => {
+      const setter = tab === 'quran' ? setQuranCounts : setDuasCounts;
+      setter((prev) => ({ ...prev, [slideId]: 0 }));
+      if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    },
+    [],
+  );
+
+  const quranListRef = useRef<FlatList>(null);
+  const duasListRef = useRef<FlatList>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // =====================================
-  // تحميل البيانات
+  // تحميل خطوط QCF للصفحات المطلوبة (أوفلاين)
   // =====================================
-
-  const loadData = useCallback(async () => {
-    try {
-      // تحميل الإعدادات
-      const [storedShowTranslation, storedShowTransliteration, storedViewMode] = 
-        await Promise.all([
-          AsyncStorage.getItem('ruqya_show_translation'),
-          AsyncStorage.getItem('ruqya_show_transliteration'),
-          AsyncStorage.getItem('ruqya_view_mode'),
-        ]);
-
-      if (storedShowTranslation !== null) setShowTranslation(JSON.parse(storedShowTranslation));
-      if (storedShowTransliteration !== null) setShowTransliteration(JSON.parse(storedShowTransliteration));
-      if (storedViewMode) setViewMode(storedViewMode as 'single' | 'list');
-
-      // تحميل الرقية من JSON
-      const ruqya = getRuqya();
-      setRuqyaList(ruqya);
-
-      // تحميل المفضلة
-      const initialFavorites: Record<number, boolean> = {};
-      for (const item of ruqya) {
-        initialFavorites[item.id] = await isFavorite(item.id);
-      }
-      setFavorites(initialFavorites);
-
-      // تشغيل الأنيميشن
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
-    } catch (error) {
-      console.error('Error loading ruqya data:', error);
-    }
-  }, [fadeAnim]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // =====================================
-  // التنقل
-  // =====================================
-
-  const goToNext = () => {
-    if (currentIndex < ruqyaList.length - 1) {
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
-      flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    let cancelled = false;
+    (async () => {
+      try {
+        await Promise.all(
+          QCF_PAGES_NEEDED.map((p) => loadPageFont(p, isDarkMode).catch(() => null)),
+        );
+      } finally {
+        if (!cancelled) {
+          setFontsReady(true);
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDarkMode, fadeAnim]);
+
+  // =====================================
+  // مشتقات الحالة الحالية حسب التبويب
+  // =====================================
+
+  const isQuran = activeTab === 'quran';
+  const currentList = isQuran ? QURAN_SLIDES : DUA_SLIDES;
+  const currentIndex = isQuran ? quranIndex : duasIndex;
+  const setCurrentIndex = isQuran ? setQuranIndex : setDuasIndex;
+  const currentListRef = isQuran ? quranListRef : duasListRef;
+  const currentCountsMap = isQuran ? quranCounts : duasCounts;
+  const setCurrentCountsMap = isQuran ? setQuranCounts : setDuasCounts;
+  const currentSlide = currentList[currentIndex];
+  const currentSlideCount = currentCountsMap[currentSlide?.id] || 0;
+  const currentSlideTarget = currentSlide?.count || 1;
+  const isSlideDone = currentSlideCount >= currentSlideTarget;
+
+  // =====================================
+  // التنقل بين الشرائح
+  // =====================================
+
+  const scrollTo = useCallback(
+    (list: FlatList | null, idx: number) => {
+      list?.scrollToIndex({ index: idx, animated: true });
+    },
+    [],
+  );
+
+  const goToNext = useCallback(() => {
+    const list = currentList;
+    if (currentIndex < list.length - 1) {
+      const next = currentIndex + 1;
+      setCurrentIndex(next);
+      scrollTo(currentListRef.current, next);
+      if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } else {
-      // Loop back to start
       setCurrentIndex(0);
-      flatListRef.current?.scrollToIndex({ index: 0, animated: true });
+      scrollTo(currentListRef.current, 0);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  };
+  }, [currentIndex, currentList, currentListRef, setCurrentIndex, scrollTo]);
 
-  const handleCount = (item: Zikr) => {
-    const currentCount = counts[item.id] || 0;
-    if (currentCount >= item.count) {
+  const goToPrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      const prev = currentIndex - 1;
+      setCurrentIndex(prev);
+      scrollTo(currentListRef.current, prev);
+      if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [currentIndex, currentListRef, setCurrentIndex, scrollTo]);
+
+  const handleCount = useCallback(() => {
+    if (!currentSlide) return;
+    const current = currentCountsMap[currentSlide.id] || 0;
+    if (current >= currentSlide.count) {
       goToNext();
       return;
     }
-    const newCount = currentCount + 1;
-    setCounts(prev => ({ ...prev, [item.id]: newCount }));
+    const next = current + 1;
+    setCurrentCountsMap((prev) => ({ ...prev, [currentSlide.id]: next }));
     if (Platform.OS === 'ios') {
-      Haptics.impactAsync(newCount >= item.count ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light);
+      Haptics.impactAsync(
+        next >= currentSlide.count ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light,
+      );
     } else {
-      Vibration.vibrate(newCount >= item.count ? 100 : 30);
+      Vibration.vibrate(next >= currentSlide.count ? 100 : 30);
     }
-    if (newCount >= item.count) {
+    if (next >= currentSlide.count) {
       setTimeout(() => goToNext(), 400);
     }
-  };
-
-  const goToPrevious = () => {
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
-      setCurrentIndex(newIndex);
-      flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-      
-      if (Platform.OS === 'ios') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    }
-  };
-
-  // =====================================
-  // المفضلة
-  // =====================================
-
-  const toggleFavorite = async (id: number) => {
-    const isCurrentlyFavorite = favorites[id];
-    
-    if (isCurrentlyFavorite) {
-      await removeFromFavorites(id);
-    } else {
-      await addToFavorites(id);
-    }
-    
-    setFavorites(prev => ({ ...prev, [id]: !isCurrentlyFavorite }));
-    
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
+  }, [currentSlide, currentCountsMap, setCurrentCountsMap, goToNext]);
 
   // =====================================
   // المشاركة
   // =====================================
 
-  const shareRuqya = async (item: Zikr) => {
-    try {
-      const translation = getZikrTranslation(item, language);
-      const message = `${stripAzkarBrackets(item.arabic)}\n\n${translation}\n\n📖 ${item.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
-      
-      await Share.share({ message });
-    } catch (error) {
-      console.error('Error sharing:', error);
+  const shareCurrent = useCallback(async () => {
+    if (!currentSlide) return;
+    let message = '';
+    if (isQuran) {
+      const slide = currentSlide as QuranSlide;
+      const glyphsText = collectSlideArabicText(slide);
+      message = `${slide.labelAr}\n\n${glyphsText}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n\n` : ''}🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
+    } else {
+      const slide = currentSlide as DuaSlide;
+      message = `${slide.arabic}\n\n${slide.count > 1 ? `— ${slide.count} مرات —\n` : ''}📖 ${slide.reference}\n\n🔒 ${t('azkar.ruqya')}\n${t('common.fromApp')}`;
     }
-  };
-
-  // =====================================
-  // مشاركة الكل
-  // =====================================
-
-  const shareAll = async () => {
     try {
-      let message = `🔒 ${t('azkar.ruqya')}\n\n`;
-      
-      ruqyaList.forEach((item, index) => {
-        message += `${index + 1}. ${item.arabic}\n`;
-        if (item.count > 1) message += `(${item.count} ${t('azkar.times')})\n`;
-        message += '\n';
-      });
-      
-      message += `\n${t('common.fromApp')}`;
-      
       await Share.share({ message });
-    } catch (error) {
-      console.error('Error sharing all:', error);
-    }
-  };
+    } catch {}
+  }, [currentSlide, isQuran]);
 
   // =====================================
-  // تبديل وضع العرض
+  // Renderers
   // =====================================
 
-  const toggleViewMode = async () => {
-    const newMode = viewMode === 'single' ? 'list' : 'single';
-    setViewMode(newMode);
-    await AsyncStorage.setItem('ruqya_view_mode', newMode);
-  };
+  const iconColor = isDarkMode ? '#9CA3AF' : '#6B7280';
 
-  // =====================================
-  // رندر العنصر الواحد (Single View)
-  // =====================================
+  const renderActionRow = useCallback(
+    (slideId: string, tab: TabKey) => (
+      <View style={[styles.actionButtons, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <TouchableOpacity onPress={() => toggleFavorite(slideId)} style={styles.actionButton}>
+          <MaterialCommunityIcons
+            name={favorites[slideId] ? 'heart' : 'heart-outline'}
+            size={24}
+            color={favorites[slideId] ? '#EF4444' : iconColor}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={shareCurrent} style={styles.actionButton}>
+          <MaterialCommunityIcons name="share-variant" size={22} color={iconColor} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => resetCount(slideId, tab)} style={styles.actionButton}>
+          <MaterialCommunityIcons name="refresh" size={22} color={iconColor} />
+        </TouchableOpacity>
+      </View>
+    ),
+    [styles, isRTL, favorites, iconColor, toggleFavorite, shareCurrent, resetCount],
+  );
 
-  const renderSingleItem = ({ item, index }: { item: Zikr; index: number }) => {
-    return (
-      <View style={[styles.singleItemContainer, { width }, isRTL && { transform: [{ scaleX: -1 }] }]}>
-        <ScrollView 
-          contentContainerStyle={styles.singleItemScroll}
-          showsVerticalScrollIndicator={false}
-        >
+  const renderQuranSlide = useCallback(
+    ({ item }: { item: QuranSlide }) => (
+      <View style={[styles.slideContainer, { width: SCREEN_WIDTH }, isRTL && { transform: [{ scaleX: -1 }] }]}>
+        <ScrollView contentContainerStyle={styles.slideScroll} showsVerticalScrollIndicator={false}>
           <Animated.View
             style={[
-              styles.ruqyaCard,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }],
-                borderColor: colors.glassBorder,
-              },
+              styles.slideCard,
+              { opacity: fadeAnim, borderColor: colors.glassBorder },
             ]}
           >
             {Platform.OS === 'ios' && (
-              <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              <BlurView
+                intensity={80}
+                tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+                style={StyleSheet.absoluteFill}
+              />
             )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-            {/* أزرار الإجراءات */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                onPress={() => toggleFavorite(item.id)}
-                style={styles.actionButton}
-              >
-                <Ionicons
-                  name={favorites[item.id] ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={favorites[item.id] ? '#EF4444' : colors.icon}
-                />
-              </TouchableOpacity>
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' },
+              ]}
+            />
 
-              <TouchableOpacity
-                onPress={() => shareRuqya(item)}
-                style={styles.actionButton}
-              >
-                <Ionicons
-                  name="share-outline"
-                  size={22}
-                  color={colors.icon}
-                />
-              </TouchableOpacity>
-            </View>
+            {renderActionRow(item.id, 'quran')}
 
+            <QuranSlideBody slide={item} textColor={colors.text} darkMode={isDarkMode} fontsReady={fontsReady} />
+          </Animated.View>
+        </ScrollView>
+      </View>
+    ),
+    [styles, isRTL, fadeAnim, colors.glassBorder, colors.text, isDarkMode, fontsReady, renderActionRow],
+  );
 
-
-            {/* النص الرئيسي — Arabic for Arabic users, translation for others */}
-            {(() => {
-              const hasVerseBrackets = item.arabic?.includes('﴿') || item.arabic?.includes('﴾');
-              const quranStyle = hasVerseBrackets ? {
-                fontFamily: 'KFGQPCUthmanic',
-                fontSize: 30,
-                lineHeight: 62,
-                letterSpacing: 0,
-                textAlign: 'center' as const,
-                writingDirection: 'rtl' as const,
-                paddingTop: 6,
-                paddingBottom: 4,
-              } : {};
-              const displayText = hasVerseBrackets ? stripVerseNumbers(stripAzkarBrackets(item.arabic)) : stripAzkarBrackets(item.arabic);
-              return isArabic ? (
-                <Text style={[styles.arabicText, { color: colors.text, writingDirection: 'rtl' }, quranStyle]}>
-                  {displayText}
-                </Text>
-              ) : (
-                <Text style={[styles.arabicText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }, quranStyle]}>
-                  {getZikrTranslation(item, language) || displayText}
-                </Text>
-              );
-            })()}
-
-            {/* النطق */}
-            {showTransliteration && item.transliteration && (
-              <Text style={[styles.transliteration, { color: colors.textLight }]}>
-                {item.transliteration}
-              </Text>
+  const renderDuaSlide = useCallback(
+    ({ item }: { item: DuaSlide }) => (
+      <View style={[styles.slideContainer, { width: SCREEN_WIDTH }, isRTL && { transform: [{ scaleX: -1 }] }]}>
+        <ScrollView contentContainerStyle={styles.slideScroll} showsVerticalScrollIndicator={false}>
+          <Animated.View
+            style={[
+              styles.slideCard,
+              { opacity: fadeAnim, borderColor: colors.glassBorder },
+            ]}
+          >
+            {Platform.OS === 'ios' && (
+              <BlurView
+                intensity={80}
+                tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+                style={StyleSheet.absoluteFill}
+              />
             )}
+            <View
+              style={[
+                StyleSheet.absoluteFill,
+                { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' },
+              ]}
+            />
 
-            {/* Translation — only for non-Arabic users */}
-            {!isArabic && showTranslation && (
-              <Text style={[styles.translation, { color: colors.textLight, writingDirection: 'ltr', textAlign: 'left' }]}>
-                {getZikrTranslation(item, 'en' as Language)}
-              </Text>
-            )}
+            {renderActionRow(item.id, 'duas')}
 
-            {/* عدد التكرار */}
-            {item.count > 1 && (
-              <View style={[styles.countBadge, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                <Ionicons name="repeat" size={16} color="#6366F1" />
-                <Text style={styles.countText}>
-                  {`${item.count} ${t('azkar.times')}`}
-                </Text>
-              </View>
-            )}
+            <Text
+              style={[styles.duaArabic, { color: colors.text, writingDirection: 'rtl' }]}
+              allowFontScaling
+            >
+              {item.arabic}
+            </Text>
 
-            {/* الفضل — benefit text */}
-            {item.benefit && (
-              <View style={styles.benefitStarWrapper}>
-                <View style={[styles.benefitStarCircle, { backgroundColor: '#6366F115' }]}>
-                  <Ionicons name="star" size={16} color="#6366F1" />
-                </View>
-                <View style={[styles.benefitContainer, { backgroundColor: '#6366F115' }]}>
-                  <Text style={[styles.benefitText, { color: '#6366F1' }]}>
-                    {getZikrBenefit(item, language) || ''}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* المرجع */}
-            <View style={[styles.referenceContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Ionicons name="book-outline" size={14} color={colors.icon} />
-              <Text style={[styles.referenceText, { color: colors.textLight }]}>
-                {transliterateReference(item.reference, language)}
-              </Text>
+              <Text style={[styles.referenceText, { color: colors.textLight }]}>{item.reference}</Text>
             </View>
           </Animated.View>
         </ScrollView>
       </View>
-    );
-  };
+    ),
+    [styles, isRTL, fadeAnim, colors.glassBorder, colors.text, colors.textLight, colors.icon, isDarkMode, renderActionRow],
+  );
 
   // =====================================
-  // رندر القائمة (List View)
+  // رندر التبويب النشط
   // =====================================
 
-  const renderListItem = ({ item, index }: { item: Zikr; index: number }) => {
-    return (
-      <TouchableOpacity
-        style={[
-          styles.listItem,
-          { flexDirection: isRTL ? 'row-reverse' : 'row', borderColor: colors.glassBorder },
-        ]}
-        onPress={() => {
-          setCurrentIndex(index);
-          setViewMode('single');
-        }}
-        activeOpacity={0.7}
-      >
-        {Platform.OS === 'ios' && (
-          <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-        )}
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-        <View style={[styles.listItemNumber]}>
-          <Text style={styles.listItemNumberText}>{index + 1}</Text>
-        </View>
-        
-        <View style={styles.listItemContent}>
-          <Text 
-            style={[styles.listItemArabic, { color: colors.text, textAlign: 'right', writingDirection: 'rtl' }]}
-            numberOfLines={2}
-          >
-            {(item.arabic?.includes('﴾') || item.arabic?.includes('﴿')) ? stripVerseNumbers(stripAzkarBrackets(item.arabic)) : stripAzkarBrackets(item.arabic)}
-          </Text>
-          <Text style={[styles.listItemReference, { color: colors.textLight }]}>
-            {transliterateReference(item.reference, language)}
-          </Text>
-        </View>
-
-        <View style={[styles.listItemActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          {item.count > 1 && (
-            <View style={styles.listCountBadge}>
-              <Text style={styles.listCountText}>{item.count}×</Text>
-            </View>
-          )}
-          <Ionicons name={isRTL ? 'chevron-back' : 'chevron-forward'} size={20} color={colors.icon} />
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // =====================================
-  // الرندر الرئيسي
-  // =====================================
-
-  if (ruqyaList.length === 0) {
-    return (
-      <View style={[styles.loadingContainer, { backgroundColor: 'transparent' }]}>
-        <Text style={{ color: colors.text }}>{t('common.loading')}</Text>
-      </View>
-    );
-  }
+  const progress = useMemo(() => ({
+    current: currentIndex + 1,
+    total: currentList.length,
+    percent: ((currentIndex + 1) / currentList.length) * 100,
+  }), [currentIndex, currentList.length]);
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      
+
       <BackgroundWrapper
         backgroundKey={settings.display.appBackground}
         backgroundUrl={settings.display.appBackgroundUrl}
@@ -440,135 +442,348 @@ export default function RuqyaScreen() {
         style={[styles.container, { backgroundColor: 'transparent' }]}
       >
         {/* Header */}
-        <View
-          style={[styles.header, { paddingTop: insets.top }]}
-        >
+        <View style={[styles.header, { paddingTop: insets.top }]}>
           {Platform.OS === 'ios' && (
-            <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+            <BlurView
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
           )}
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' },
+            ]}
+          />
+
           <View style={[styles.headerTop, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <BackButton color={colors.text} />
-            
-            <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
+
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                gap: Spacing.sm,
+                flex: 1,
+              }}
+            >
+              <Text
+                style={[
+                  styles.headerTitle,
+                  { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+                ]}
+                numberOfLines={1}
+              >
                 {t('azkar.ruqya')}
               </Text>
               <SectionInfoButton sectionKey="ruqya" />
             </View>
-            
-            <View style={[styles.headerActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity onPress={toggleViewMode} style={styles.headerButton}>
-                <Ionicons name={viewMode === 'single' ? 'list' : 'albums'} size={22} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={shareAll} style={styles.headerButton}>
-                <Ionicons name="share-outline" size={22} color={colors.text} />
-              </TouchableOpacity>
-            </View>
+
+          </View>
+
+          {/* Tabs — system-native segmented control (shared NativeTabs) */}
+          <View style={styles.tabsWrap}>
+            <NativeTabs
+              tabs={[
+                { key: 'quran', label: 'القرآن' },
+                { key: 'duas', label: 'الأدعية' },
+              ]}
+              selected={activeTab}
+              onSelect={(k) => setActiveTab(k as TabKey)}
+              indicatorColor="#0f987f"
+            />
           </View>
 
           {/* Progress */}
-          {viewMode === 'single' && (
-            <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <View style={[styles.progressBarBg, isRTL && { transform: [{ scaleX: -1 }] }]}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    { width: `${((currentIndex + 1) / ruqyaList.length) * 100}%`, backgroundColor: darkMode ? '#FFFFFF' : '#0f987f' },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.progressText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {currentIndex + 1} / {ruqyaList.length}
-              </Text>
+          <View style={[styles.progressContainer, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.progressBarBg, isRTL && { transform: [{ scaleX: -1 }] }]}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${progress.percent}%`, backgroundColor: isDarkMode ? '#FFFFFF' : '#0f987f' },
+                ]}
+              />
             </View>
-          )}
+            <Text
+              style={[
+                styles.progressText,
+                { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
+              ]}
+            >
+              {progress.current} / {progress.total}
+            </Text>
+          </View>
         </View>
 
-        {/* المحتوى */}
-        {viewMode === 'single' ? (
-          <>
-            <FlatList
-              ref={flatListRef}
-              data={ruqyaList}
-              renderItem={renderSingleItem}
-              keyExtractor={item => item.id.toString()}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
-              onMomentumScrollEnd={(e) => {
-                const index = Math.round(e.nativeEvent.contentOffset.x / width);
-                setCurrentIndex(index);
-              }}
-              initialScrollIndex={currentIndex}
-              getItemLayout={(_, index) => ({
-                length: width,
-                offset: width * index,
-                index,
-              })}
-            />
-
-            {/* شريط العداد والتنقل */}
-            <View style={[styles.bottomBar, { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border }]}>
-              {Platform.OS === 'ios' && (
-                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
-              )}
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-              <TouchableOpacity
-                onPress={goToPrevious}
-                disabled={currentIndex === 0}
-                style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
-              >
-                <Ionicons
-                  name={isRTL ? 'chevron-forward' : 'chevron-back'}
-                  size={28}
-                  color={currentIndex === 0 ? colors.muted : '#6366F1'}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => ruqyaList[currentIndex] && handleCount(ruqyaList[currentIndex])}
-                style={[
-                  styles.counterButton,
-                  {
-                    backgroundColor: (counts[ruqyaList[currentIndex]?.id] || 0) >= (ruqyaList[currentIndex]?.count || 1) ? '#10B981' : '#6366F1',
-                  },
-                ]}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.counterText}>
-                  {(counts[ruqyaList[currentIndex]?.id] || 0) >= (ruqyaList[currentIndex]?.count || 1) ? '✓' : `${counts[ruqyaList[currentIndex]?.id] || 0}/${ruqyaList[currentIndex]?.count || 1}`}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={goToNext}
-                style={styles.navButton}
-              >
-                <Ionicons
-                  name={isRTL ? 'chevron-back' : 'chevron-forward'}
-                  size={28}
-                  color={'#6366F1'}
-                />
-              </TouchableOpacity>
-            </View>
-          </>
+        {/* Content - single pager per tab (only mount active one) */}
+        {isQuran ? (
+          <FlatList
+            ref={quranListRef}
+            data={QURAN_SLIDES}
+            renderItem={renderQuranSlide}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              setQuranIndex(idx);
+            }}
+            initialScrollIndex={quranIndex}
+            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
+          />
         ) : (
           <FlatList
-            data={ruqyaList}
-            renderItem={renderListItem}
-            keyExtractor={item => item.id.toString()}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
+            ref={duasListRef}
+            data={DUA_SLIDES}
+            renderItem={renderDuaSlide}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              setDuasIndex(idx);
+            }}
+            initialScrollIndex={duasIndex}
+            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
           />
         )}
 
-        {/* مساحة آمنة */}
+        {/* Bottom Bar: Prev / Counter / Next */}
+        <View
+          style={[
+            styles.bottomBar,
+            { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border },
+          ]}
+        >
+          {Platform.OS === 'ios' && (
+            <BlurView
+              intensity={80}
+              tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' },
+            ]}
+          />
+
+          <TouchableOpacity
+            onPress={goToPrevious}
+            disabled={currentIndex === 0}
+            style={[styles.navButton, currentIndex === 0 && styles.navButtonDisabled]}
+          >
+            <Ionicons
+              name={isRTL ? 'chevron-forward' : 'chevron-back'}
+              size={28}
+              color={currentIndex === 0 ? colors.muted : '#6366F1'}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleCount}
+            style={[
+              styles.counterButton,
+              { backgroundColor: isSlideDone ? '#10B981' : '#6366F1' },
+            ]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.counterText}>
+              {isSlideDone ? '✓' : `${currentSlideCount}/${currentSlideTarget}`}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={goToNext} style={styles.navButton}>
+            <Ionicons
+              name={isRTL ? 'chevron-back' : 'chevron-forward'}
+              size={28}
+              color={'#6366F1'}
+            />
+          </TouchableOpacity>
+        </View>
+
         <BannerAdComponent screen="ruqya" />
       </BackgroundWrapper>
     </>
   );
+}
+
+// =====================================
+// QuranSlideBody - renders surah banner + QCF glyphs (with Uthmanic fallback)
+// =====================================
+
+interface QuranSlideBodyProps {
+  slide: QuranSlide;
+  textColor: string;
+  darkMode: boolean;
+  fontsReady: boolean;
+}
+
+interface SurahGroupData {
+  surah: number;
+  page: number;
+  glyphs: string;
+  fallbackText: string;
+}
+
+function QuranSlideBody({ slide, textColor, darkMode, fontsReady }: QuranSlideBodyProps) {
+  // Allow one render cycle for iOS CoreText to register pre-loaded fonts
+  const [renderReady, setRenderReady] = useState(false);
+  useEffect(() => {
+    if (!fontsReady) return;
+    const id = requestAnimationFrame(() => setRenderReady(true));
+    return () => cancelAnimationFrame(id);
+  }, [fontsReady]);
+
+  // One block per surah ref: verses flow inline (Mushaf-style) within each block,
+  // while multiple surahs (e.g. المعوذات الثلاث) stack with their own ornamental banners.
+  const groups = useMemo<SurahGroupData[]>(() => {
+    return slide.refs.map((ref) => {
+      const ayahPieces: string[] = [];
+      let firstPage: number | null = null;
+      for (let ayah = ref.startAyah; ayah <= ref.endAyah; ayah++) {
+        const data = getVerseQcfData(ref.surah, ayah);
+        if (data) {
+          if (firstPage === null) firstPage = data.page;
+          ayahPieces.push(data.glyphs.join(''));
+        }
+      }
+      // Fallback Uthmanic text flows as one continuous paragraph,
+      // with ornamental verse numbers between ayahs so they read inline
+      // rather than stacking one ayah per line.
+      const ayahTexts = collectAyahTexts(ref.surah, ref.startAyah, ref.endAyah);
+      const fallbackText = ayahTexts
+        .map((txt, i) => `${txt} ﴿${toArabicNumeral(ref.startAyah + i)}﴾`)
+        .join(' ');
+      return {
+        surah: ref.surah,
+        page: firstPage ?? 604,
+        glyphs: ayahPieces.join(''),
+        fallbackText,
+      };
+    });
+  }, [slide.refs]);
+
+  const ornamentColor = darkMode ? '#C9A84C' : '#8B7332';
+
+  return (
+    <View style={qcfStyles.container}>
+      {!slide.showBanner && (
+        <Text style={[qcfStyles.slideLabel, { color: ornamentColor }]} allowFontScaling={false}>
+          {slide.labelAr}
+        </Text>
+      )}
+
+      {groups.map((group, idx) => {
+        const fontFamily = getPageFontFamily(group.page, darkMode);
+        const qcfLoaded = renderReady && Font.isLoaded(fontFamily);
+        const fontSize = getQcfFontSize(group.page, SCREEN_WIDTH - 64);
+        const lineHeight = fontSize * 1.95;
+
+        return (
+          <View
+            key={`${slide.id}-${group.surah}-${idx}`}
+            style={groups.length > 1 ? qcfStyles.surahBlock : undefined}
+          >
+            {slide.showBanner && (
+              <View style={qcfStyles.bannerWrap}>
+                <ImageBackground
+                  source={surahOrnament}
+                  style={qcfStyles.bannerOrnament}
+                  resizeMode="contain"
+                  tintColor={ornamentColor}
+                >
+                  <View style={qcfStyles.bannerOverlay}>
+                    <Text
+                      style={[qcfStyles.bannerText, { color: ornamentColor }]}
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                    >
+                      {getSurahName(group.surah)}
+                    </Text>
+                  </View>
+                </ImageBackground>
+              </View>
+            )}
+
+            {qcfLoaded ? (
+              <Text
+                allowFontScaling={false}
+                style={{
+                  fontFamily,
+                  fontSize,
+                  textAlign: 'center',
+                  lineHeight,
+                  color: textColor,
+                  writingDirection: 'rtl',
+                  letterSpacing: 0,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                }}
+              >
+                {group.glyphs}
+              </Text>
+            ) : (
+              <Text
+                style={{
+                  fontFamily: 'KFGQPCUthmanic',
+                  fontSize: 26,
+                  lineHeight: 52,
+                  textAlign: 'center',
+                  color: textColor,
+                  writingDirection: 'rtl',
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                }}
+              >
+                {group.fallbackText}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// =====================================
+// Helpers
+// =====================================
+
+function collectAyahTexts(surah: number, startAyah: number, endAyah: number): string[] {
+  // Local require to avoid circular imports; quran-v4 is bundled
+  const quranV4 = require('@/data/json/quran-v4.json') as Array<{
+    number: number;
+    ayahs: Array<{ ns: number; t: string }>;
+  }>;
+  const s = quranV4.find((x) => x.number === surah);
+  if (!s) return [];
+  const out: string[] = [];
+  for (let a = startAyah; a <= endAyah; a++) {
+    const ayah = s.ayahs.find((x) => x.ns === a);
+    if (ayah) out.push(ayah.t);
+  }
+  return out;
+}
+
+function collectSlideArabicText(slide: QuranSlide): string {
+  return slide.refs
+    .map((ref) => collectAyahTexts(ref.surah, ref.startAyah, ref.endAyah).join(' '))
+    .join('\n\n');
+}
+
+const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+function toArabicNumeral(n: number): string {
+  return String(n)
+    .split('')
+    .map((d) => ARABIC_DIGITS[parseInt(d, 10)] ?? d)
+    .join('');
 }
 
 // =====================================
@@ -579,16 +794,11 @@ const _styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
   // Header
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
     overflow: 'hidden',
   },
   headerTop: {
@@ -596,9 +806,6 @@ const _styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
-  },
-  backButton: {
-    padding: 8,
   },
   headerTitle: {
     fontSize: 20,
@@ -613,6 +820,10 @@ const _styles = StyleSheet.create({
   headerButton: {
     padding: 8,
   },
+  tabsWrap: {
+    marginBottom: 12,
+  },
+
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -635,15 +846,15 @@ const _styles = StyleSheet.create({
     minWidth: 50,
   },
 
-  // Single View
-  singleItemContainer: {
+  // Slides
+  slideContainer: {
     flex: 1,
   },
-  singleItemScroll: {
+  slideScroll: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
-  ruqyaCard: {
+  slideCard: {
     borderRadius: 20,
     padding: 20,
     overflow: 'hidden',
@@ -651,96 +862,29 @@ const _styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
   },
   actionButtons: {
-    flexDirection: 'row-reverse',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginBottom: 16,
     gap: Spacing.md,
   },
   actionButton: {
     padding: 8,
   },
-  numberBadge: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#6366F1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  numberText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  arabicText: {
+
+  duaArabic: {
     fontSize: 24,
+    fontFamily: 'KFGQPCUthmanic',
     fontWeight: '500',
-    lineHeight: 42,
+    lineHeight: 48,
     textAlign: 'center',
-    marginBottom: 20,
-    marginTop: 20,
+    marginVertical: 16,
   },
-  transliteration: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  translation: {
-    fontSize: 16,
-    lineHeight: 26,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  countBadge: {
+  referenceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    marginBottom: 16,
-  },
-  countText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6366F1',
-    lineHeight: 24,
-    includeFontPadding: false,
-  },
-  benefitStarWrapper: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  benefitStarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: -16,
-    zIndex: 1,
-  },
-  benefitContainer: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    padding: 12,
-    paddingTop: 22,
-    borderRadius: 12,
-  },
-  benefitText: {
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
-    flexShrink: 1,
-    writingDirection: 'rtl',
-  },
-  referenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
+    marginTop: 8,
   },
   referenceText: {
     fontSize: 13,
@@ -778,67 +922,49 @@ const _styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
+});
 
-  // List View
-  listContainer: {
-    padding: 16,
-    gap: Spacing.md,
-  },
-  listItem: {
-    flexDirection: 'row',
+const qcfStyles = StyleSheet.create({
+  container: {
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    gap: Spacing.md,
+    width: '100%',
+    paddingVertical: 8,
   },
-  listItemNumber: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6366F1',
+  bannerWrap: {
+    marginBottom: 6,
+    height: 48,
+    width: '100%',
+  },
+  bannerOrnament: {
+    width: '100%',
+    height: 46,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listItemNumberText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+  bannerOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 46,
   },
-  listItemContent: {
-    flex: 1,
-  },
-  listItemArabic: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
-    textAlign: 'right',
-    writingDirection: 'rtl',
+  bannerText: {
+    fontSize: 17,
+    fontFamily: 'Amiri-Bold',
+    textAlign: 'center',
     lineHeight: 28,
     includeFontPadding: false,
   },
-  listItemReference: {
-    fontSize: 12,
-    lineHeight: 20,
-    includeFontPadding: false,
+  slideLabel: {
+    fontSize: 18,
+    fontFamily: 'Amiri-Bold',
+    textAlign: 'center',
+    marginBottom: 12,
+    writingDirection: 'rtl',
   },
-  listItemActions: {
-    flexDirection: 'row',
+  surahBlock: {
     alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  listCountBadge: {
-    backgroundColor: '#6366F115',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  listCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6366F1',
+    width: '100%',
+    marginBottom: 10,
   },
 });
-const styles = _styles;

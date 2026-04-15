@@ -17,7 +17,7 @@ import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
 import { useSettings } from '@/contexts/SettingsContext';
 
 import { initializeAppOpenAds } from '@/lib/app-open-ad';
-import { languageInitPromise, getLanguage } from '@/lib/i18n';
+import { languageInitPromise, getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
 import { syncAppIconOnStartup, checkForIconUpdate } from '@/lib/app-icon-manager';
 
 // Contexts
@@ -180,21 +180,46 @@ function westernizeChildren(children: any): any {
 
 const origTextRender = (Text as any).render;
 if (origTextRender) {
+  // Walk the style prop (object | array | nested array | falsy) and check
+  // whether any entry already sets one of the given keys. Used to let caller
+  // styles opt out of the global RTL/font defaults below.
+  const styleHasAny = (style: any, keys: string[]): boolean => {
+    if (!style) return false;
+    if (Array.isArray(style)) return style.some((s) => styleHasAny(s, keys));
+    if (typeof style === 'object') {
+      for (const k of keys) if (style[k] != null) return true;
+    }
+    return false;
+  };
+
   (Text as any).render = function(props: any, ref: any) {
     const style = props.style;
-    const hasFont = style && (
-      (Array.isArray(style) && style.some((s: any) => s && s.fontFamily)) ||
-      (!Array.isArray(style) && style.fontFamily)
-    );
+    const hasFont = styleHasAny(style, ['fontFamily']);
+    // Skip injecting RTL defaults if caller set textAlign/writingDirection.
+    // This preserves explicit 'center' titles, numeric alignment, etc.
+    const hasAlign = styleHasAny(style, ['textAlign', 'writingDirection']);
+
     const newProps = { ...props };
     // Convert Eastern Arabic numerals → Western in text children
     if (newProps.children != null) {
       newProps.children = westernizeChildren(newProps.children);
     }
-    if (!hasFont) {
-      // Evaluate fontRegular() at render time so it respects language changes
-      newProps.style = [{ fontFamily: fontRegular() }, style];
+
+    const defaults: any = {};
+    if (!hasFont) defaults.fontFamily = fontRegular();
+    // Global RTL default: Arabic/Urdu/Persian UI → text naturally right-aligned
+    // with RTL writing direction. Any Text that wants otherwise must opt out
+    // by setting textAlign or writingDirection explicitly.
+    if (!hasAlign) {
+      const rtl = isRTLLang();
+      defaults.textAlign = rtl ? 'right' : 'left';
+      defaults.writingDirection = rtl ? 'rtl' : 'ltr';
     }
+
+    if (Object.keys(defaults).length > 0) {
+      newProps.style = [defaults, style];
+    }
+
     return origTextRender.call(this, newProps, ref);
   };
 }

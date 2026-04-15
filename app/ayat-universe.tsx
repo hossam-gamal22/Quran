@@ -14,6 +14,7 @@ import { useSettings, useTranslation } from '@/contexts/SettingsContext';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { useRouter, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -103,9 +104,7 @@ export default function AyatUniverseScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <UniversalHeader
-        style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider }}
-      >
+      <UniversalHeader>
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('ayatUniverse.title')}</Text>
           <SectionInfoButton sectionKey="marifat_allah" />
@@ -117,23 +116,6 @@ export default function AyatUniverseScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Intro Card */}
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={[styles.introCard, { overflow: 'hidden' }]}>
-            {Platform.OS === 'ios' ? (
-              <BlurView
-                intensity={80}
-                tint={isDarkMode ? 'systemThickMaterialDark' : 'dark'}
-                style={StyleSheet.absoluteFill}
-              />
-            ) : null}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(35,75,100,0.85)' }]} />
-            <MaterialCommunityIcons name="creation" size={40} color="#fff" />
-            <Text style={[styles.introTitle, { color: '#fff' }]}>{t('ayatUniverse.introTitle')}</Text>
-            <Text style={[styles.introSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>{t('ayatUniverse.introSubtitle')}</Text>
-          </View>
-        </Animated.View>
-
         {/* Theme Filter */}
         <ScrollView
           horizontal
@@ -173,42 +155,44 @@ export default function AyatUniverseScreen() {
           const themeInfo = COSMIC_VERSE_THEMES.find(t => t.id === verse.theme);
           return (
             <Animated.View key={verse.id} entering={FadeInDown.delay(index * 50).duration(400)}>
-              <View style={[styles.verseCard, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: colors.surface, borderWidth: isDarkMode ? 0 : 0.5, borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)' }]}>
-                <View style={[styles.verseAccent, { backgroundColor: themeInfo?.color || '#3a7ca5' }]} />
-                <View style={styles.verseContent}>
-                  <Text style={[
-                    styles.verseArabic,
-                    { color: colors.text },
-                    !isArabic && translations[verse.id] ? { textAlign: 'left', writingDirection: 'ltr' } : undefined,
-                  ]}>
-                    {isArabic || !translations[verse.id] ? `﴿ ${verse.arabic} ﴾` : translations[verse.id]}
-                  </Text>
-                  <Text style={[styles.verseRef, { color: colors.muted, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {isArabic ? verse.reference : transliterateReference(verse.reference, language)}
-                  </Text>
-                  <View style={[styles.verseActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        goToSurah(verse);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="book-open-variant" size={16} color={themeInfo?.color || '#3a7ca5'} />
-                      <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('ayatUniverse.readInMushaf')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        shareVerse(verse);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="share-variant" size={16} color={colors.text} />
-                    </TouchableOpacity>
+              <GlassCard style={styles.verseCardGlass}>
+                <View style={[styles.verseRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.verseAccent, { backgroundColor: themeInfo?.color || '#3a7ca5' }]} />
+                  <View style={styles.verseContent}>
+                    <Text style={[
+                      styles.verseArabic,
+                      { color: colors.glassText },
+                      !isArabic && translations[verse.id] ? { textAlign: 'left', writingDirection: 'ltr' } : undefined,
+                    ]}>
+                      {isArabic || !translations[verse.id] ? `﴿ ${verse.arabic} ﴾` : translations[verse.id]}
+                    </Text>
+                    <Text style={[styles.verseRef, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                      {isArabic ? verse.reference : transliterateReference(verse.reference, language)}
+                    </Text>
+                    <View style={[styles.verseActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          goToSurah(verse);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="book-open-variant" size={16} color={themeInfo?.color || '#3a7ca5'} />
+                        <Text style={[styles.actionBtnText, { color: colors.glassText }]}>{t('ayatUniverse.readInMushaf')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }, { backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          shareVerse(verse);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="share-variant" size={16} color={colors.glassText} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
+              </GlassCard>
             </Animated.View>
           );
         })}
@@ -268,14 +252,19 @@ const _styles = StyleSheet.create({
   themeChipTextActive: {
     color: '#fff',
   },
-  verseCard: {
+  verseCardGlass: {
     borderRadius: 16,
     marginBottom: 12,
+    padding: 0,
+  },
+  verseRow: {
     flexDirection: 'row',
     overflow: 'hidden',
+    borderRadius: 16,
   },
   verseAccent: {
     width: 4,
+    alignSelf: 'stretch',
   },
   verseContent: {
     flex: 1,

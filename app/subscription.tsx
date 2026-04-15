@@ -25,8 +25,6 @@ import { useTranslation } from '@/contexts/SettingsContext';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { UniversalHeader } from '@/components/ui';
-import { showOfflineModal } from '@/components/ui/OfflineBanner';
-import NetInfo from '@react-native-community/netinfo';
 const ACCENT = '#0d8e62';
 
 // Hardcoded premium features that are ACTUALLY implemented and gated
@@ -156,44 +154,7 @@ export default function SubscriptionScreen() {
   }
 
   const isArabic = (t('app.language') || 'ar') === 'ar' || t('tabs.home') === 'الرئيسية';
-
-  // Products failed to load (no cache either)
-  if (products.length === 0) {
-    const handleRetryProducts = async () => {
-      const netState = await NetInfo.fetch().catch(() => ({ isConnected: null, isInternetReachable: null }));
-      if (!(netState.isConnected && netState.isInternetReachable !== false)) {
-        showOfflineModal();
-        return;
-      }
-      await refetchProducts();
-    };
-    return (
-      <ScreenContainer>
-        <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.premiumContainer}>
-          <UniversalHeader titleColor={colors.text} />
-          <View style={styles.premiumContent}>
-            <MaterialCommunityIcons name="wifi-off" size={64} color={colors.textLight} />
-            <Text style={[styles.premiumTitle, { color: colors.text }]}>
-              {isArabic ? '\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062a' : 'Could not load plans'}
-            </Text>
-            <Text style={[styles.premiumDesc, { color: colors.textLight }]}>
-              {isArabic ? '\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629' : 'Check your internet connection and try again'}
-            </Text>
-            <TouchableOpacity
-              onPress={handleRetryProducts}
-              style={{ marginTop: 20, paddingVertical: 10, paddingHorizontal: 24, backgroundColor: ACCENT, borderRadius: 12 }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ color: '#fff', fontFamily: fontBold(), fontSize: 16 }}>
-                {isArabic ? '\u0625\u0639\u0627\u062f\u0629 \u0645\u062d\u0627\u0648\u0644\u0629' : 'Retry'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScreenContainer>
-    );
-  }
+  const productsMissing = products.length === 0;
 
   const allPlanCards: { plan: SubscriptionPlan; badge?: string; popular?: boolean }[] = [
     ...(showMonthly ? [{ plan: 'monthly' as SubscriptionPlan }] : []),
@@ -226,6 +187,32 @@ export default function SubscriptionScreen() {
             {t('subscription.premiumSubtitle')}
           </Text>
         </View>
+
+        {/* Products missing banner — IAP hasn't returned prices yet. Non-blocking. */}
+        {productsMissing && (
+          <TouchableOpacity
+            onPress={() => refetchProducts()}
+            activeOpacity={0.8}
+            style={{
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 16,
+              backgroundColor: isDarkMode ? 'rgba(255,193,7,0.10)' : 'rgba(255,193,7,0.18)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,193,7,0.35)',
+              flexDirection: isRTL ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <MaterialCommunityIcons name="refresh" size={20} color={colors.text} />
+            <Text style={{ flex: 1, color: colors.text, fontFamily: fontMedium(), fontSize: 13, textAlign: isRTL ? 'right' : 'left' }}>
+              {isArabic
+                ? 'الأسعار غير متاحة حاليًا. اضغط لإعادة تحميل الأسعار.'
+                : 'Prices unavailable right now. Tap to reload.'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Seasonal Offer Banner */}
         {isSeasonalActive && seasonalOffer && (

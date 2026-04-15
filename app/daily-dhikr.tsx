@@ -271,15 +271,21 @@ export default function DailyDhikrScreen() {
             );
           })()}
 
-          {/* Reference */}
-          {dhikr.reference ? (
-            <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <MaterialCommunityIcons name="book-open-page-variant" size={18} color={ACCENT} />
-              <Text style={[styles.referenceText, { color: colors.textLight }]}>
-                {transliterateReference(dhikr.reference, language)}
-              </Text>
-            </View>
-          ) : null}
+          {/* Reference — hide if Arabic mode and the reference contains latin-script
+              content (e.g. transliteration accidentally stored in this field). */}
+          {(() => {
+            if (!dhikr.reference) return null;
+            const hasLatin = /[A-Za-z]/.test(dhikr.reference);
+            if (isArabic && hasLatin) return null;
+            return (
+              <View style={[styles.referenceRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name="book-open-page-variant" size={18} color={ACCENT} />
+                <Text style={[styles.referenceText, { color: colors.textLight }]}>
+                  {transliterateReference(dhikr.reference, language)}
+                </Text>
+              </View>
+            );
+          })()}
 
           {/* Refresh Button */}
           <TouchableOpacity

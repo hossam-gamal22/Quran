@@ -15,6 +15,7 @@ import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
+import { GlassCard } from '@/components/ui/GlassCard';
 import { useRouter, Stack } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -87,9 +88,7 @@ export default function HadithSifatScreen() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <UniversalHeader
-        style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.divider }}
-      >
+      <UniversalHeader>
         <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ fontSize: 18, fontFamily: fontBold(), color: colors.text }} numberOfLines={1}>{t('home.hadithAttributes')}</Text>
           <SectionInfoButton sectionKey="marifat_allah" />
@@ -101,19 +100,6 @@ export default function HadithSifatScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Intro Card */}
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <View style={[styles.introCard, { overflow: 'hidden' }]}>
-            {Platform.OS === 'ios' && (
-              <BlurView intensity={80} tint={isDarkMode ? 'systemThickMaterialDark' : 'dark'} style={StyleSheet.absoluteFill} />
-            )}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(140,85,55,0.85)' }]} />
-            <MaterialCommunityIcons name="format-quote-open" size={40} color="#fff" />
-            <Text style={[styles.introTitle, { color: '#fff' }]}>{t('hadithSifat.introTitle')}</Text>
-            <Text style={[styles.introSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>{t('hadithSifat.introSubtitle')}</Text>
-          </View>
-        </Animated.View>
-
         {/* Theme Filter */}
         <ScrollView
           horizontal
@@ -153,49 +139,51 @@ export default function HadithSifatScreen() {
           const themeInfo = HADITH_SIFAT_THEMES.find(t => t.id === hadith.theme);
           return (
             <Animated.View key={hadith.id} entering={FadeInDown.delay(index * 50).duration(400)}>
-              <View style={[styles.hadithCard, { backgroundColor: colors.surface, borderWidth: isDarkMode ? 0 : 0.5, borderColor: isDarkMode ? 'transparent' : 'rgba(0,0,0,0.06)' }]}>
-                <View style={[styles.hadithAccent, { backgroundColor: themeInfo?.color || '#c17f59' }]} />
-                <View style={styles.hadithContent}>
-                {isArabic ? (
-                  <Text style={[styles.hadithArabic, { color: colors.text }]}>
-                    {hadith.arabic}
-                  </Text>
-                ) : (
-                  <TranslatedText from="ar" type="section" style={[styles.hadithArabic, { color: colors.text }]}>
-                    {hadith.arabic}
-                  </TranslatedText>
-                )}
-                  <View style={styles.hadithMeta}>
-                    <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <MaterialCommunityIcons name="account" size={14} color={colors.muted} />
-                      <Text style={[styles.metaText, { color: colors.muted }]}>{transliterateReference(hadith.narrator, language)}</Text>
+              <GlassCard style={styles.hadithCardGlass}>
+                <View style={[styles.hadithRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                  <View style={[styles.hadithAccent, { backgroundColor: themeInfo?.color || '#c17f59' }]} />
+                  <View style={styles.hadithContent}>
+                    {isArabic ? (
+                      <Text style={[styles.hadithArabic, { color: colors.glassText }]}>
+                        {hadith.arabic}
+                      </Text>
+                    ) : (
+                      <TranslatedText from="ar" type="section" style={[styles.hadithArabic, { color: colors.glassText }]}>
+                        {hadith.arabic}
+                      </TranslatedText>
+                    )}
+                    <View style={styles.hadithMeta}>
+                      <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <MaterialCommunityIcons name="account" size={14} color={colors.glassTextLight} />
+                        <Text style={[styles.metaText, { color: colors.glassTextLight }]}>{transliterateReference(hadith.narrator, language)}</Text>
+                      </View>
+                      <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                        <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.glassTextLight} />
+                        <Text style={[styles.metaText, { color: colors.glassTextLight }]}>{transliterateReference(hadith.source, language)}</Text>
+                      </View>
                     </View>
-                    <View style={[styles.metaRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                      <MaterialCommunityIcons name="book-open-variant" size={14} color={colors.muted} />
-                      <Text style={[styles.metaText, { color: colors.muted }]}>{transliterateReference(hadith.source, language)}</Text>
+                    <View style={[styles.hadithActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
+                        onPress={() => handleToggleFav(hadith)}
+                      >
+                        <MaterialCommunityIcons name={favIds.has(hadith.id) ? 'heart' : 'heart-outline'} size={16} color={favIds.has(hadith.id) ? '#ef4444' : colors.glassText} />
+                        <Text style={[styles.actionBtnText, { color: colors.glassText }]}>{t('common.save')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          shareHadith(hadith);
+                        }}
+                      >
+                        <MaterialCommunityIcons name="share-variant" size={16} color={colors.glassText} />
+                        <Text style={[styles.actionBtnText, { color: colors.glassText }]}>{t('common.share')}</Text>
+                      </TouchableOpacity>
                     </View>
-                  </View>
-                  <View style={[styles.hadithActions, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
-                      onPress={() => handleToggleFav(hadith)}
-                    >
-                      <MaterialCommunityIcons name={favIds.has(hadith.id) ? 'heart' : 'heart-outline'} size={16} color={favIds.has(hadith.id) ? '#ef4444' : colors.text} />
-                      <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('common.save')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(13,142,98,0.08)' }]}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        shareHadith(hadith);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="share-variant" size={16} color={colors.text} />
-                      <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('common.share')}</Text>
-                    </TouchableOpacity>
                   </View>
                 </View>
-              </View>
+              </GlassCard>
             </Animated.View>
           );
         })}
@@ -255,14 +243,19 @@ const _styles = StyleSheet.create({
   themeChipTextActive: {
     color: '#fff',
   },
-  hadithCard: {
+  hadithCardGlass: {
     borderRadius: 16,
     marginBottom: 12,
+    padding: 0,
+  },
+  hadithRow: {
     flexDirection: 'row',
     overflow: 'hidden',
+    borderRadius: 16,
   },
   hadithAccent: {
     width: 4,
+    alignSelf: 'stretch',
   },
   hadithContent: {
     flex: 1,

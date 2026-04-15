@@ -20,6 +20,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { UniversalHeader } from '@/components/ui';
 import { t } from '@/lib/i18n';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -33,11 +34,10 @@ function getTodayISO(): string {
 }
 
 export default function TasbihStatsScreen() {
-  const { settings } = useSettings();
+  const { settings, isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const C = useColors();
   const s = useScaledStyles(_s, C.fs);
-  const isDarkMode = settings?.theme === 'dark';
 
   // Stats data
   const [dailyStats, setDailyStats] = useState<Record<string, number>>({});
@@ -100,15 +100,11 @@ export default function TasbihStatsScreen() {
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         {/* Header */}
-        <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <TouchableOpacity onPress={goToTasbih} style={s.headerBtn}>
-            <MaterialCommunityIcons name="counter" size={22} color={C.text} />
-          </TouchableOpacity>
-          <Text style={[s.headerTitle, { color: C.text }]}>{t('home.tasbihLog')}</Text>
-          <TouchableOpacity onPress={handleClose} style={s.headerBtn}>
-            <MaterialCommunityIcons name="close" size={22} color={C.text} />
-          </TouchableOpacity>
-        </View>
+        <UniversalHeader
+          title={t('home.tasbihLog')}
+          onBack={handleClose}
+          rightActions={[{ icon: 'counter', onPress: goToTasbih, color: C.text }]}
+        />
 
         {isLoading ? (
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -131,7 +127,7 @@ export default function TasbihStatsScreen() {
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                 <MaterialCommunityIcons name="calendar-today" size={28} color={C.glassText} />
                 <Text style={[s.statValue, { color: C.glassText }]}>{totalToday}</Text>
                 <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.todaysCount')}</Text>
@@ -145,7 +141,7 @@ export default function TasbihStatsScreen() {
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                 <MaterialCommunityIcons name="sync" size={28} color={C.glassText} />
                 <Text style={[s.statValue, { color: C.glassText }]}>{rounds}</Text>
                 <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.completedRounds')}</Text>
@@ -162,7 +158,7 @@ export default function TasbihStatsScreen() {
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                 <MaterialCommunityIcons name="sigma" size={28} color={C.glassText} />
                 <Text style={[s.statValue, { color: C.glassText }]}>{allTimeTotal}</Text>
                 <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.allTimeTotal')}</Text>
@@ -176,7 +172,7 @@ export default function TasbihStatsScreen() {
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                 <MaterialCommunityIcons name="chart-line" size={28} color={C.glassText} />
                 <Text style={[s.statValue, { color: C.glassText }]}>{avgPerDay}</Text>
                 <Text style={[s.statLabel, { color: C.glassTextLight }]}>{t('tasbih.dailyAverage')}</Text>
@@ -206,7 +202,7 @@ export default function TasbihStatsScreen() {
                         {Platform.OS === 'ios' && (
                           <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                         )}
-                        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                        <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                         <Text style={[s.statsRowVal, { color: C.text }]}>{cnt}</Text>
                         <Text style={[s.statsRowDate, { color: C.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
                           {text.length > 30 ? text.slice(0, 28) + '…' : text}
@@ -223,7 +219,7 @@ export default function TasbihStatsScreen() {
                 {Platform.OS === 'ios' && (
                   <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                 )}
-                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                 <MaterialCommunityIcons name="chart-bar" size={40} color={C.glassTextLight} style={{ opacity: 0.5 }} />
                 <Text style={[s.emptyText, { color: C.glassTextLight }]}>{t('tasbih.noDataYet')}</Text>
                 <Text style={[s.emptySubtext, { color: C.glassTextLight }]}>{t('tasbih.startTasbihHint')}</Text>
@@ -249,7 +245,7 @@ export default function TasbihStatsScreen() {
                       {Platform.OS === 'ios' && (
                         <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
                       )}
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(20,24,30,0.78)' : 'rgba(255,255,255,0.88)' }]} />
                       <View
                         style={{
                           flexDirection: isRTL ? 'row-reverse' : 'row',

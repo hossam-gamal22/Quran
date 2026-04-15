@@ -106,7 +106,9 @@ export default function SurahKahfScreen() {
       fontSize: 18,
       fontFamily: fontBold(),
       color: colors.text,
-      textAlign: 'center',
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
+      paddingHorizontal: 6,
     },
     tabsContainer: {
       paddingHorizontal: 16,
@@ -294,8 +296,7 @@ export default function SurahKahfScreen() {
                 height: 40,
               }}
             />
-            <Text style={styles.headerTitle}>{t('home.surahKahf')}</Text>
-            <View style={{ width: 40 }} />
+            <Text numberOfLines={1} style={styles.headerTitle}>{t('home.surahKahf')}</Text>
           </View>
 
           {/* NativeTabs — matches prayer page style */}

@@ -130,10 +130,9 @@ export default function QuranSettingsScreen() {
               color={colors.foreground}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('settings.quranSettings')}
           </Text>
-          <View style={{ width: 44 }} />
         </View>
 
         <ScrollView
@@ -395,7 +394,6 @@ const _styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
@@ -406,11 +404,12 @@ const _styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontFamily: fontBold(),
-    textAlign: 'center',
     lineHeight: 32,
     includeFontPadding: false,
+    paddingHorizontal: 8,
   },
   scrollContent: {
     paddingHorizontal: 16,

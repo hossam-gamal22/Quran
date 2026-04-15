@@ -15,6 +15,14 @@
         { "fieldPath": "is_active", "order": "ASCENDING" },
         { "fieldPath": "order_index", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "monthlyEngagement.month", "order": "ASCENDING" },
+        { "fieldPath": "monthlyEngagement.score", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

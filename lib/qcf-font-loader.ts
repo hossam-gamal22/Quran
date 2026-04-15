@@ -20,8 +20,7 @@ export { TOTAL_QURAN_PAGES, isValidPage };
 const loadedPages = new Map<number, boolean>(); // page -> darkMode used
 const loadingPromises = new Map<string, Promise<void>>();
 
-async function resolveAndroidFontSource(fontSource: any): Promise<any> {
-  if (Platform.OS !== 'android') return fontSource;
+async function resolveFontSource(fontSource: any): Promise<any> {
   try {
     const asset = Asset.fromModule(fontSource);
     if (!asset.downloaded) {
@@ -29,7 +28,7 @@ async function resolveAndroidFontSource(fontSource: any): Promise<any> {
     }
     return asset.localUri ?? asset.uri ?? fontSource;
   } catch (err) {
-    console.warn('[QCF4] Android asset resolve failed, falling back to bundled source:', err);
+    console.warn('[QCF4] Asset resolve failed, falling back to bundled source:', err);
     return fontSource;
   }
 }
@@ -80,11 +79,11 @@ export async function loadPageFont(
         throw new Error(`Font not found in bundle for page ${page}`);
       }
 
-      const resolvedFontSource = await resolveAndroidFontSource(fontSource);
+      const resolvedFontSource = await resolveFontSource(fontSource);
 
-      // Android can fail on first attempt (Metro asset fetch, memory pressure)
-      // Retry up to 3 times with increasing delay
-      const maxRetries = Platform.OS === 'android' ? 3 : 1;
+      // Both platforms can fail on first attempt (Metro dev server hiccup, LAN latency,
+      // memory pressure). Retry on both with increasing delay.
+      const maxRetries = 3;
       let lastErr: any;
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {

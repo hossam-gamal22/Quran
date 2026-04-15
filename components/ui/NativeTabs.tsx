@@ -1,22 +1,27 @@
 // components/ui/NativeTabs.tsx
-// تبويبات أصلية موحدة - روح المسلم
-// iOS: UISegmentedControl الأصلي
-// Android: Material Design 3 segmented button
+// System-native segmented tabs across the app.
+// iOS: UIKit UISegmentedControl (via @react-native-segmented-control/segmented-control).
+// Android: the same package's native-looking JS fallback.
+// Scrollable variant: horizontal chip row (used when there are too many tabs to fit).
 
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, ViewStyle, Platform, useColorScheme } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
-import { fontBold, fontSemiBold } from '@/lib/fonts';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ViewStyle,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import * as Haptics from 'expo-haptics';
+import { fontBold, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+
 // ========================================
 // Types
 // ========================================
@@ -33,110 +38,82 @@ export interface NativeTabsProps {
   onSelect: (key: string) => void;
   /** Primary indicator color (default: app green) */
   indicatorColor?: string;
-  /** Whether to use scrollable tabs for many items */
+  /** Whether to use a scrollable chip-row fallback instead of the segmented control */
   scrollable?: boolean;
   /** Container style overrides */
   style?: ViewStyle;
-  /** Height of the indicator line (ignored in native segmented mode) */
+  /** Height of the indicator line (kept for API compatibility) */
   indicatorHeight?: number;
   /** Minimal/transparent background style */
   transparent?: boolean;
 }
 
 // ========================================
-// Spring config
+// SegmentedTabs — real UISegmentedControl on iOS, native-looking JS fallback on Android
 // ========================================
 
-const SPRING_CONFIG = { damping: 22, stiffness: 260, mass: 0.8 };
-
-// ========================================
-// iOS: Native UISegmentedControl
-// ========================================
-
-let SegmentedControl: React.ComponentType<any> | null = null;
-if (Platform.OS === 'ios') {
-  try {
-    SegmentedControl = require('@react-native-segmented-control/segmented-control').default;
-  } catch {
-    // fallback to custom implementation
-  }
-}
-
-function IOSNativeTabs({
-  tabs,
-  selected,
-  onSelect,
-  indicatorColor,
-  style,
-  transparent,
-}: NativeTabsProps) {
+function SegmentedTabs({ tabs, selected, onSelect, indicatorColor, style }: NativeTabsProps) {
   const colors = useColors();
-  const iosStyles = useScaledStyles(_iosStyles, colors.fs);
   const { isDarkMode } = useSettings();
-  const isDark = isDarkMode || colors.hasBgOverride;
-  const activeColor = indicatorColor ?? colors.primary;
   const isRTL = useIsRTL();
-  const displayTabs = useMemo(() => isRTL ? [...tabs].reverse() : tabs, [tabs, isRTL]);
-  const selectedIndex = displayTabs.findIndex((t) => t.key === selected);
+  const activeColor = indicatorColor ?? colors.primary;
+  const isDark = isDarkMode || colors.hasBgOverride;
+
+  // UISegmentedControl doesn't know about RTL; we reverse the order manually so the
+  // first tab sits on the right in Arabic layouts.
+  const displayTabs = useMemo(() => (isRTL ? [...tabs].reverse() : tabs), [tabs, isRTL]);
   const values = useMemo(() => displayTabs.map((t) => t.label), [displayTabs]);
+  const selectedIndex = Math.max(
+    0,
+    displayTabs.findIndex((t) => t.key === selected),
+  );
 
-  if (!SegmentedControl) {
-    return <AndroidMaterialTabs tabs={tabs} selected={selected} onSelect={onSelect} indicatorColor={indicatorColor} style={style} transparent={transparent} />;
-  }
-
-  const bgColor = transparent
-    ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
-    : (isDark ? 'rgba(30,30,32,0.85)' : 'rgba(235,235,235,0.92)');
+  // Borderless: no explicit backgroundColor so the native control picks up its parent.
+  // Selected segment: primary green tint. Inactive label: white on dark, primary on light.
+  const inactiveLabel = isDark ? '#FFFFFF' : activeColor;
 
   return (
-    <View style={[iosStyles.outerClip, { backgroundColor: bgColor }, style]}>
+    <View style={style}>
       <SegmentedControl
         values={values}
-        selectedIndex={selectedIndex >= 0 ? selectedIndex : 0}
+        selectedIndex={selectedIndex}
         onChange={(event: any) => {
           const idx = event.nativeEvent.selectedSegmentIndex;
-          if (idx >= 0 && idx < displayTabs.length) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onSelect(displayTabs[idx].key);
-          }
+          const tab = displayTabs[idx];
+          if (!tab) return;
+          if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onSelect(tab.key);
         }}
         appearance={isDark ? 'dark' : 'light'}
-        activeFontStyle={{ ...iosStyles.activeFont, color: '#FFFFFF' }}
-        fontStyle={iosStyles.inactiveFont}
         tintColor={activeColor}
-        backgroundColor={bgColor}
-        style={iosStyles.segmented}
+        fontStyle={{
+          color: inactiveLabel,
+          fontSize: 14,
+          fontFamily: fontSemiBold(),
+        }}
+        activeFontStyle={{
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontFamily: fontBold(),
+          fontWeight: '700',
+        }}
+        style={segStyles.control}
       />
     </View>
   );
 }
 
-const _iosStyles = StyleSheet.create({
-  outerClip: {
-    borderRadius: 9,
-    overflow: 'hidden',
-  },
-  segmented: {
-    height: 40,
-    margin: -2,
-  },
-  activeFont: {
-    fontSize: 13,
-    fontFamily: fontBold(),
-    fontWeight: '700',
-  },
-  inactiveFont: {
-    fontSize: 13,
-    fontFamily: fontSemiBold(),
-    fontWeight: '600',
+const segStyles = StyleSheet.create({
+  control: {
+    height: 36,
   },
 });
 
 // ========================================
-// Android: Material Design 3 Segmented Button
+// Scrollable chip-row fallback (for radio categories, etc.)
 // ========================================
 
-function AndroidMaterialTabs({
+function ScrollableChipTabs({
   tabs,
   selected,
   onSelect,
@@ -145,124 +122,101 @@ function AndroidMaterialTabs({
   transparent,
 }: NativeTabsProps) {
   const colors = useColors();
-  const m3Styles = useScaledStyles(_m3Styles, colors.fs);
+  const chipStyles = useScaledStyles(_chipStyles, colors.fs);
   const { isDarkMode } = useSettings();
-  const isDark = isDarkMode || colors.hasBgOverride;
-  const activeColor = indicatorColor ?? colors.primary;
   const isRTL = useIsRTL();
+  const activeColor = indicatorColor ?? colors.primary;
+  const isDark = isDarkMode || colors.hasBgOverride;
 
-  const selectedIndex = tabs.findIndex((t) => t.key === selected);
-  const indicatorPos = useSharedValue(selectedIndex >= 0 ? selectedIndex : 0);
-
-  React.useEffect(() => {
-    const idx = tabs.findIndex((t) => t.key === selected);
-    if (idx >= 0) {
-      indicatorPos.value = withSpring(idx, SPRING_CONFIG);
-    }
-  }, [selected, tabs]);
-
-  // Transparent/minimal background colors
-  const bgColor = transparent
-    ? (isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)')
-    : (isDark ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.92)');
-  const borderColor = transparent
-    ? (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)')
-    : (isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)');
+  const orderedTabs = useMemo(() => (isRTL ? [...tabs].reverse() : tabs), [tabs, isRTL]);
 
   return (
-    <View style={[m3Styles.container, style]}>
-      <View
-        style={[
-          m3Styles.segmentRow,
-          {
-            flexDirection: isRTL ? 'row-reverse' : 'row',
-            borderColor: borderColor,
-            backgroundColor: bgColor,
-          },
-        ]}
-      >
-        {tabs.map((tab, index) => {
-          const isActive = tab.key === selected;
-          const isFirst = index === 0;
-          const isLast = index === tabs.length - 1;
-
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onSelect(tab.key);
-              }}
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[
+        chipStyles.row,
+        { flexDirection: isRTL ? 'row-reverse' : 'row' },
+      ]}
+      style={[
+        chipStyles.container,
+        !transparent && {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+        },
+        style,
+      ]}
+    >
+      {orderedTabs.map((tab) => {
+        const isActive = tab.key === selected;
+        return (
+          <Pressable
+            key={tab.key}
+            onPress={() => {
+              if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onSelect(tab.key);
+            }}
+            style={[
+              chipStyles.chip,
+              {
+                backgroundColor: isActive ? activeColor : 'transparent',
+                borderColor: isActive
+                  ? activeColor
+                  : isDark
+                    ? 'rgba(255,255,255,0.15)'
+                    : 'rgba(0,0,0,0.1)',
+              },
+            ]}
+          >
+            <Text
               style={[
-                m3Styles.segment,
+                chipStyles.chipLabel,
                 {
-                  backgroundColor: isActive
-                    ? activeColor
-                    : 'transparent',
-                  borderColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)',
-                  borderLeftWidth: !isRTL && !isFirst ? StyleSheet.hairlineWidth : 0,
-                  borderRightWidth: isRTL && !isFirst ? StyleSheet.hairlineWidth : 0,
-                  borderTopLeftRadius: (isRTL ? isLast : isFirst) ? 12 : 0,
-                  borderBottomLeftRadius: (isRTL ? isLast : isFirst) ? 12 : 0,
-                  borderTopRightRadius: (isRTL ? isFirst : isLast) ? 12 : 0,
-                  borderBottomRightRadius: (isRTL ? isFirst : isLast) ? 12 : 0,
+                  color: isActive ? '#FFFFFF' : isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)',
+                  fontFamily: isActive ? fontBold() : fontSemiBold(),
                 },
               ]}
+              numberOfLines={1}
             >
-              <Text
-                style={[
-                  m3Styles.segmentText,
-                  {
-                    color: isActive
-                      ? '#fff'
-                      : (isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)'),
-                    fontFamily: isActive ? fontBold() : fontSemiBold(),
-                  },
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-              >
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
+              {tab.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
   );
 }
 
-const _m3Styles = StyleSheet.create({
+const _chipStyles = StyleSheet.create({
   container: {
-    // No padding — let the segmented row fill the container fully
-  },
-  segmentRow: {
-    flexDirection: 'row',
     borderRadius: 12,
-    borderWidth: 1,
   },
-  segment: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentText: {
-    fontSize: 13,
+  row: {
     paddingHorizontal: 4,
+    paddingVertical: 4,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipLabel: {
+    fontSize: 13,
   },
 });
 
 // ========================================
-// NativeTabs — Platform router
+// NativeTabs — picks the segmented control or scrollable chips based on props
 // ========================================
 
 export function NativeTabs(props: NativeTabsProps) {
-  if (Platform.OS === 'ios') {
-    return <IOSNativeTabs {...props} />;
+  if (props.scrollable) {
+    return <ScrollableChipTabs {...props} />;
   }
-  return <AndroidMaterialTabs {...props} />;
+  return <SegmentedTabs {...props} />;
 }
 
 export default NativeTabs;

@@ -21,10 +21,19 @@ import { fontSemiBold, fontBold } from '@/lib/fonts';
 
 // ─── Imperative trigger ────────────────────────────────────────
 // Other screens can call showOfflineModal() when a network request
-// fails. It respects the session-dismissed flag automatically.
+// fails. It verifies the device is actually offline before showing,
+// so a request that failed for another reason (server 5xx, IAP error,
+// CORS) does not get mis-attributed to no-internet.
 let _triggerModal: (() => void) | null = null;
 
-export function showOfflineModal() {
+export async function showOfflineModal() {
+  try {
+    const state = await NetInfo.fetch();
+    const online = state.isConnected && state.isInternetReachable !== false;
+    if (online) return;
+  } catch {
+    // If NetInfo itself fails, fall through to showing the modal
+  }
   _triggerModal?.();
 }
 

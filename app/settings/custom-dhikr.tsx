@@ -105,7 +105,7 @@ export default function CustomDhikrScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('tasbih.customDhikr')}</Text>
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('tasbih.customDhikr')}</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
             <Text style={styles.saveText}>{t('common.save')}</Text>
           </TouchableOpacity>
@@ -213,12 +213,11 @@ const _styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false },
+  headerTitle: { flex: 1, fontSize: 20, fontFamily: fontBold(), lineHeight: 32, includeFontPadding: false, paddingHorizontal: 8 },
   saveBtn: {
     backgroundColor: 'rgba(6,79,47,0.85)',
     paddingHorizontal: 16,

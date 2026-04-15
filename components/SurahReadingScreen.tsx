@@ -297,7 +297,6 @@ export default function SurahReadingScreen({
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: 4,
       marginBottom: 16,
       marginTop: 8,
@@ -306,8 +305,10 @@ export default function SurahReadingScreen({
       fontSize: 20,
       fontFamily: fontBold(),
       color: colors.text,
-      textAlign: 'center',
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
       flex: 1,
+      paddingHorizontal: 8,
     },
     mushafCard: {
       borderRadius: 20,
@@ -452,10 +453,9 @@ export default function SurahReadingScreen({
                   height: 40,
                 }}
               />
-              <Text style={styles.title}>
+              <Text numberOfLines={1} style={styles.title}>
                 {titleKey.startsWith('__surah__') ? getSurahName(surahNumber) : t(titleKey)}
               </Text>
-              <View style={{ width: 40 }} />
             </View>
           )}
 

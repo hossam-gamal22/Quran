@@ -251,8 +251,7 @@ export default function WorshipTrackingSettingsScreen() {
         >
           <MaterialCommunityIcons name={isRTL ? 'arrow-right' : 'arrow-left'} size={28} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('worship.title')}</Text>
-        <View style={styles.headerPlaceholder} />
+        <Text numberOfLines={1} style={[styles.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('worship.title')}</Text>
       </Animated.View>
 
       <ScrollView
@@ -483,7 +482,6 @@ const _styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'transparent',
@@ -495,13 +493,12 @@ const _styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontFamily: fontBold(),
     lineHeight: 32,
     includeFontPadding: false,
-  },
-  headerPlaceholder: {
-    width: 40,
+    paddingHorizontal: 8,
   },
 
   textDisabled: {

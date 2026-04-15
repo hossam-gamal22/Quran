@@ -105,7 +105,6 @@ export default function AyatKursiScreen() {
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: 4,
       marginBottom: 16,
       marginTop: 8,
@@ -114,8 +113,10 @@ export default function AyatKursiScreen() {
       fontSize: 20,
       fontFamily: fontBold(),
       color: colors.text,
-      textAlign: 'center',
+      textAlign: isRTL ? 'right' : 'left',
+      writingDirection: isRTL ? 'rtl' : 'ltr',
       flex: 1,
+      paddingHorizontal: 8,
     },
     verseCard: {
       borderRadius: 20,
@@ -259,8 +260,7 @@ export default function AyatKursiScreen() {
                 height: 40,
               }}
             />
-            <Text style={styles.title}>{t('home.ayatKursi')}</Text>
-            <View style={{ width: 40 }} />
+            <Text numberOfLines={1} style={styles.title}>{t('home.ayatKursi')}</Text>
           </View>
 
           {/* Verse Card */}

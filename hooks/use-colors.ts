@@ -96,10 +96,12 @@ export function useColors() {
   // Glass card text colors — for cards with semi-transparent overlays like:
   // Dark mode: rgba(30,30,30,0.40) + BlurView → light text needed
   // Light mode: rgba(255,255,255,0.60) + BlurView → dark text needed
-  // These colors are INDEPENDENT of hasBgOverride and always match the card's own local background
-  const glassText = isDarkMode ? '#FFFFFF' : '#1C1C1E';
-  const glassTextLight = isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
-  const glassIcon = isDarkMode ? 'rgba(255,255,255,0.85)' : '#525252';
+  // These colors are INDEPENDENT of hasBgOverride and always match the card's own local background.
+  // Secondary text uses a darker tone (0.78) in light mode so labels sitting on
+  // frosted-white cards still clear WCAG AA against the pale backdrop.
+  const glassText = isDarkMode ? '#FFFFFF' : '#0F172A';
+  const glassTextLight = isDarkMode ? 'rgba(255,255,255,0.78)' : 'rgba(15,23,42,0.78)';
+  const glassIcon = isDarkMode ? 'rgba(255,255,255,0.9)' : '#334155';
 
   const hasDynamicBg = isActive && appBg === 'dynamic';
 

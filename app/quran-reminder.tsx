@@ -114,7 +114,7 @@ export default function QuranReminderScreen() {
         {/* Header */}
         <View style={[s.header, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
           <BackButton />
-          <Text style={[s.headerTitle, { color: colors.text }]}>{t('quranReminder.title')}</Text>
+          <Text numberOfLines={1} style={[s.headerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('quranReminder.title')}</Text>
           <TouchableOpacity
             onPress={() => router.back()}
             style={[s.saveBtn, { backgroundColor: accent }]}
@@ -319,7 +319,6 @@ const _s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -331,11 +330,12 @@ const _s = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 20,
     fontFamily: fontBold(),
-    textAlign: 'center',
     lineHeight: 34,
     includeFontPadding: false,
+    paddingHorizontal: 8,
   },
   saveBtn: {
     paddingHorizontal: 20,

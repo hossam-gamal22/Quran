@@ -265,7 +265,7 @@ export default function MoreAzkarScreen() {
           />
         )}
         <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-        <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.headerContent, { flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center' }]}>
           {/* Back button */}
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons
@@ -275,30 +275,32 @@ export default function MoreAzkarScreen() {
             />
           </TouchableOpacity>
 
-          {/* Title — absolutely centered */}
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, alignItems: 'center' }}>
-            <Text style={[styles.headerTitle, { color: colors.text, fontFamily: fontBold() }]}>
+          {/* Title — next to the back button */}
+          <View style={{ flex: 1, flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', paddingHorizontal: 6 }}>
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={[styles.headerTitle, { color: colors.text, fontFamily: fontBold(), textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}
+            >
               {t('home.moreAzkar')}
             </Text>
           </View>
 
           {/* View toggle */}
-          <View style={{ flex: 1, alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
-            <View style={{ minWidth: 100, maxWidth: 140 }}>
-              <NativeTabs
-                tabs={[
-                  { key: 'grid', label: t('azkar.grid') },
-                  { key: 'list', label: t('azkar.list') },
-                ]}
-                selected={viewMode}
-                onSelect={async (key) => {
-                  const newMode = key as 'grid' | 'list';
-                  setViewMode(newMode);
-                  await AsyncStorage.setItem('azkar_view_mode', newMode);
-                }}
-                indicatorColor="#0d8e62"
-              />
-            </View>
+          <View style={{ minWidth: 100, maxWidth: 140 }}>
+            <NativeTabs
+              tabs={[
+                { key: 'grid', label: t('azkar.grid') },
+                { key: 'list', label: t('azkar.list') },
+              ]}
+              selected={viewMode}
+              onSelect={async (key) => {
+                const newMode = key as 'grid' | 'list';
+                setViewMode(newMode);
+                await AsyncStorage.setItem('azkar_view_mode', newMode);
+              }}
+              indicatorColor="#0d8e62"
+            />
           </View>
         </View>
       </View>
