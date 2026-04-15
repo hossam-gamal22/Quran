@@ -16,7 +16,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncPendingScores, updateMonthlyScore, detectRankChange, checkAndCelebrateWinner } from '@/lib/rewards-manager';
+import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncPendingScores, updateMonthlyScore, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
 import { getUserId } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
@@ -116,7 +116,7 @@ export default function HonorBoard() {
         }
 
         // Recalculate score from merged activities
-        const weights = rewardsConfig.scoreWeights || { app_open: 1, azkar: 2, quran: 3, prayer: 5, tasbih: 1, khatma: 5 };
+        const weights = rewardsConfig.scoreWeights || DEFAULT_WEIGHTS;
         let totalScore = 0;
         for (const [key, count] of Object.entries(merged)) {
           totalScore += count * (weights[key as keyof typeof weights] || 1);
@@ -311,10 +311,11 @@ export default function HonorBoard() {
                 { key: 'tasbih', icon: 'counter' as const, labelAr: 'التسبيح', labelEn: 'Tasbih', weightKey: 'tasbih' as const },
                 { key: 'app_open', icon: 'cellphone' as const, labelAr: 'فتح التطبيق', labelEn: 'App Opens', weightKey: 'app_open' as const },
               ];
+              const weights = config?.scoreWeights || DEFAULT_WEIGHTS;
               return (
                 <>
                   {ACTIVITY_ROWS.map((item, i) => {
-                    const weight = config?.scoreWeights?.[item.weightKey] || 1;
+                    const weight = weights[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
                     const count = monthlyActivities[item.key] || 0;
                     const pts = count * weight;
                     return (
@@ -361,7 +362,7 @@ export default function HonorBoard() {
               { icon: 'counter' as const, labelAr: 'جولة تسبيح', labelEn: 'Tasbih round', weightKey: 'tasbih' as const },
               { icon: 'cellphone' as const, labelAr: 'فتح التطبيق يومياً', labelEn: 'Open app daily', weightKey: 'app_open' as const },
             ].map((item, i, arr) => {
-              const weight = config?.scoreWeights?.[item.weightKey] || 1;
+              const weight = (config?.scoreWeights || DEFAULT_WEIGHTS)[item.weightKey] || DEFAULT_WEIGHTS[item.weightKey] || 1;
               return (
                 <View key={item.weightKey}>
                   <View style={[styles.activityRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>

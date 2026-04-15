@@ -23,6 +23,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { t } from '@/lib/i18n';
+import * as Notifications from 'expo-notifications';
 import {
   incrementPaywallOpenCount,
   shouldShowPaywall,
@@ -163,8 +164,25 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 if (adminPremium?.granted) {
                   const notExpired = !adminPremium.expiresAt || new Date(adminPremium.expiresAt) > new Date();
                   if (notExpired) {
+                    // Detect false → true transition (new grant)
+                    const wasPremium = premiumSource === 'admin';
                     setState(prev => ({ ...prev, isPremium: true }));
                     setPremiumSource('admin');
+                    // Send local notification on new premium grant
+                    if (!wasPremium) {
+                      const isWinner = adminPremium.grantedBy === 'auto_reward_system';
+                      Notifications.scheduleNotificationAsync({
+                        content: {
+                          title: '🎉 تهانينا!',
+                          body: isWinner
+                            ? 'أنت بطل الشهر! تم منحك نسخة مميزة مجاناً 🏆'
+                            : 'تم منحك نسخة مميزة من الإدارة 🌟',
+                          sound: 'default',
+                          data: { type: 'premium_granted' },
+                        },
+                        trigger: null,
+                      }).catch(() => {});
+                    }
                   } else {
                     // Premium expired — clean up stale data in Firestore
                     setState(prev => ({ ...prev, isPremium: prev.plan ? prev.isPremium : false }));

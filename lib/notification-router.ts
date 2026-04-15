@@ -196,6 +196,11 @@ export function handleNotificationNavigation(
     case 'test':
       return { navigated: false };
 
+    // ─── Premium granted (honor board / admin) ───
+    case 'premium_granted':
+      router.push('/honor-board' as any);
+      return { navigated: true };
+
     default:
       return { navigated: false };
   }

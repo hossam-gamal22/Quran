@@ -10,7 +10,7 @@ import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winn
 const CACHE_KEY = '@rewards_config_cache';
 const PENDING_SCORES_KEY = '@pending_monthly_scores';
 
-const DEFAULT_WEIGHTS: ScoreWeights = {
+export const DEFAULT_WEIGHTS: ScoreWeights = {
   app_open: 1,
   azkar: 2,
   quran: 3,
@@ -18,6 +18,8 @@ const DEFAULT_WEIGHTS: ScoreWeights = {
   tasbih: 1,
   khatma: 5,
 };
+
+const APP_OPEN_LAST_DATE_KEY = '@app_open_last_scored_date';
 
 const DEFAULT_CONFIG: RewardsConfig = {
   enabled: false,
@@ -98,6 +100,17 @@ export const updateMonthlyScore = async (
   multiplier: number = 1
 ): Promise<void> => {
   try {
+    // Daily cap for app_open: max 1 point per day (unique days only)
+    if (activityType === 'app_open') {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const lastDate = await AsyncStorage.getItem(APP_OPEN_LAST_DATE_KEY);
+      if (lastDate === today) {
+        console.log('📊 app_open already scored today, skipping');
+        return;
+      }
+      await AsyncStorage.setItem(APP_OPEN_LAST_DATE_KEY, today);
+    }
+
     const config = await fetchRewardsConfig();
     const points = (config.scoreWeights[activityType] || 1) * multiplier;
     const currentMonth = getCurrentMonth();
