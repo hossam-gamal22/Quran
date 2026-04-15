@@ -9,7 +9,9 @@ export type PremiumFeatureKey =
   | 'cloud_backup'
   | 'advanced_stats'
   | 'custom_backgrounds'
-  | 'multiple_khatma';
+  | 'multiple_khatma'
+  | 'premium_widgets'
+  | 'widget_themes';
 
 /** إعدادات ميزة واحدة */
 export interface FeatureGateEntry {

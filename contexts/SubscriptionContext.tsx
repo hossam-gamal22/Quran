@@ -17,7 +17,7 @@ import {
   DEFAULT_SUBSCRIPTION_CONFIG,
 } from '@/lib/subscription-manager';
 
-import { fetchFeatureGatingConfig, isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
+import { fetchFeatureGatingConfig, subscribeToFeatureGating, isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
 import type { PremiumFeatureKey, PremiumSource, FeatureGatingConfig, AdminGrantedPremium } from '@/types/premium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
@@ -169,20 +169,30 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                     const wasPremium = premiumSource === 'admin';
                     setState(prev => ({ ...prev, isPremium: true }));
                     setPremiumSource('admin');
-                    // Send local notification on new premium grant
+                    // Send local notification on new premium grant (once per grantedAt)
                     if (!wasPremium) {
-                      const isWinner = adminPremium.grantedBy === 'auto_reward_system';
-                      Notifications.scheduleNotificationAsync({
-                        content: {
-                          title: '🎉 تهانينا!',
-                          body: isWinner
-                            ? 'أنت بطل الشهر! تم منحك نسخة مميزة مجاناً 🏆'
-                            : 'تم منحك نسخة مميزة من الإدارة 🌟',
-                          sound: 'default',
-                          data: { type: 'premium_granted' },
-                        },
-                        trigger: null,
-                      }).catch(() => {});
+                      const grantTs = adminPremium.grantedAt
+                        ? (typeof adminPremium.grantedAt === 'object' && 'seconds' in adminPremium.grantedAt
+                            ? (adminPremium.grantedAt as any).seconds
+                            : String(adminPremium.grantedAt))
+                        : 'unknown';
+                      const grantKey = `@admin_premium_notified_${grantTs}`;
+                      const alreadyNotified = await AsyncStorage.getItem(grantKey).catch(() => null);
+                      if (!alreadyNotified) {
+                        await AsyncStorage.setItem(grantKey, 'true').catch(() => {});
+                        const isWinner = adminPremium.grantedBy === 'auto_reward_system';
+                        Notifications.scheduleNotificationAsync({
+                          content: {
+                            title: '🎉 تهانينا!',
+                            body: isWinner
+                              ? 'أنت بطل الشهر! تم منحك نسخة مميزة مجاناً 🏆'
+                              : 'تم منحك نسخة مميزة من الإدارة 🌟',
+                            sound: 'default',
+                            data: { type: 'premium_granted' },
+                          },
+                          trigger: null,
+                        }).catch(() => {});
+                      }
                     }
                   } else {
                     // Premium expired — clean up stale data in Firestore
@@ -410,6 +420,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (mounted) setConfig(updatedConfig);
     });
 
+    // Subscribe to real-time feature gating config updates
+    const unsubFeatureGating = subscribeToFeatureGating((updatedGating) => {
+      if (mounted) setFeatureGating(updatedGating);
+    });
+
     return () => {
       mounted = false;
       purchaseUpdateSubscription.current?.remove?.();
@@ -417,6 +432,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       adminPremiumUnsub.current?.();
       IAP?.endConnection?.();
       unsubConfigListener();
+      unsubFeatureGating();
     };
   }, []);
 

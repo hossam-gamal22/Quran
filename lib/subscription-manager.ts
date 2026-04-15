@@ -149,18 +149,8 @@ export const getSubscriptionState = async (): Promise<SubscriptionState> => {
     const stored = await AsyncStorage.getItem(STORAGE_KEY);
     if (stored) {
       const state: SubscriptionState = JSON.parse(stored);
-
-      // Check if subscription has expired (non-lifetime)
-      if (state.isPremium && state.plan !== 'lifetime' && state.expiresAt) {
-        const expiryDate = new Date(state.expiresAt);
-        if (expiryDate < new Date()) {
-          // Expired — clear premium status
-          const expired = { ...DEFAULT_STATE };
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(expired));
-          return expired;
-        }
-      }
-
+      // Return raw state — expiry check is handled by SubscriptionContext
+      // after store revalidation (to avoid clearing before auto-renewal check)
       return state;
     }
   } catch (error) {

@@ -23,12 +23,27 @@ async function selectMonthlyWinners() {
 
   console.log(`Selecting winners for month: ${monthKey}`);
 
-  // Query top 3 users for previous month
+  // Dedup check: skip if already processed this month
+  const configRef = db.collection('config').doc('rewards-settings');
+  const configSnap = await configRef.get();
+  const configData = configSnap.data() || {};
+  if (configData.processedMonth === monthKey) {
+    console.log(`Already processed month ${monthKey}, skipping.`);
+    return;
+  }
+
+  // Mark as processing immediately (prevents dual execution)
+  await configRef.update({ processedMonth: monthKey });
+
+  // Read winnersCount from config (default 3)
+  const winnersCount = configData.winnersCount || 3;
+
+  // Query top users for previous month
   const snapshot = await db
     .collection('users')
     .where('monthlyEngagement.month', '==', monthKey)
     .orderBy('monthlyEngagement.score', 'desc')
-    .limit(3)
+    .limit(winnersCount)
     .get();
 
   if (snapshot.empty) {
@@ -71,16 +86,17 @@ async function selectMonthlyWinners() {
 
   await batch.commit();
 
-  // Save winners list to config
+  // Save winners list to config (use currentWinners to match client-side reader)
   await db.collection('config').doc('rewards-settings').update({
-    lastWinners: winners.map(w => ({
+    currentWinners: winners.map(w => ({
       userId: w.userId,
       displayName: w.displayName,
       score: w.score,
       rank: w.rank,
     })),
-    lastWinnersMonth: monthKey,
+    currentMonth: monthKey,
     lastProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+    processedMonth: monthKey,
   });
 
   // Send push notifications via Expo

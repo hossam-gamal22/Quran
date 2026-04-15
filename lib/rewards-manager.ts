@@ -135,17 +135,24 @@ export const updateMonthlyScore = async (
       if (!docExists || engagement.month !== currentMonth) {
         // New doc or new month — read pending WITHOUT clearing
         const pending = await getPendingScores(currentMonth);
-        const engagementData = {
+        const engagementUpdate: Record<string, any> = {
           monthlyEngagement: {
             month: currentMonth,
             score: pending.totalPoints,
             activities: pending.activities,
           },
         };
+        // Archive old month data before overwriting (if exists)
+        if (docExists && engagement.month && engagement.score > 0) {
+          engagementUpdate[`engagementHistory.${engagement.month}`] = {
+            score: engagement.score,
+            activities: (engagement as any).activities || {},
+          };
+        }
         if (docExists) {
-          await updateDoc(userRef, engagementData);
+          await updateDoc(userRef, engagementUpdate);
         } else {
-          await setDoc(userRef, engagementData, { merge: true });
+          await setDoc(userRef, engagementUpdate, { merge: true });
         }
         // Only clear local AFTER Firestore write confirmed
         await AsyncStorage.removeItem(PENDING_SCORES_KEY);
@@ -498,10 +505,13 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
 
     const previousMonth = getPreviousMonth();
 
-    // Already selected for this month?
+    // Already selected for this month (client or server)?
     if (config.currentMonth === previousMonth) return;
 
-    // Check if we already processed this month
+    // Check server-side processedMonth flag (set by GitHub Action or another client)
+    if ((config as any).processedMonth === previousMonth) return;
+
+    // Check if we already processed this month locally
     const alreadyProcessed = await AsyncStorage.getItem(`@winners_processed_${previousMonth}`);
     if (alreadyProcessed) return;
 

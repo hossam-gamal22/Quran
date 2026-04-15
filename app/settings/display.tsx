@@ -102,6 +102,9 @@ export default function DisplaySettingsScreen() {
 
   const handleSelectBackground = (key: AppBackgroundKey, bgIsPremium?: boolean) => {
     if (bgIsPremium && !isPremium) {
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
       router.push('/subscription');
       return;
     }

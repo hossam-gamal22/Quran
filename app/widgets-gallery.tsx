@@ -668,7 +668,7 @@ export default function WidgetsGalleryScreen() {
           <TouchableOpacity
             onPress={() => {
               if (isActiveWidgetLocked) {
-                guardPremiumFeature('advanced_stats', router, isPremium);
+                guardPremiumFeature('premium_widgets', router, isPremium);
                 return;
               }
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

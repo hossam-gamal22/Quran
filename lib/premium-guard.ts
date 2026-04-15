@@ -5,13 +5,18 @@ import { Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { Router } from 'expo-router';
 import type { PremiumFeatureKey } from '@/types/premium';
+import { getFeatureGatingMemoryCache, isFeaturePremium } from '@/lib/feature-gating';
 
 export function guardPremiumFeature(
-  _feature: PremiumFeatureKey,
+  feature: PremiumFeatureKey,
   router: Router,
   isPremium: boolean
 ): boolean {
   if (isPremium) return true;
+
+  // Check if this feature is actually premium-locked (admin can toggle)
+  const config = getFeatureGatingMemoryCache();
+  if (!isFeaturePremium(feature, config)) return true;
 
   if (Platform.OS !== 'web') {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);

@@ -31,3 +31,12 @@ jobs:
         run: |
           cd functions
           node scripts/select-winners.js
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          ADMIN_EXPO_TOKEN: ${{ secrets.ADMIN_EXPO_TOKEN }}
+        run: |
+          curl -s -X POST https://exp.host/--/api/v2/push/send \
+            -H "Content-Type: application/json" \
+            -d "{\"to\": \"$ADMIN_EXPO_TOKEN\", \"title\": \"⚠️ Honor Board Failed\", \"body\": \"Monthly winner selection failed! Check GitHub Actions.\"}"

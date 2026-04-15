@@ -489,7 +489,7 @@ export default function WidgetSettingsScreen() {
                   ]}
                   onPress={() => {
                     if (isLocked) {
-                      guardPremiumFeature('widget_themes' as any, router, isPremium);
+                      guardPremiumFeature('widget_themes', router, isPremium);
                       return;
                     }
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

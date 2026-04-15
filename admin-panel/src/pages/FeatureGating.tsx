@@ -16,7 +16,10 @@ type PremiumFeatureKey =
   | 'sound_downloads'
   | 'cloud_backup'
   | 'advanced_stats'
-  | 'custom_backgrounds';
+  | 'custom_backgrounds'
+  | 'multiple_khatma'
+  | 'premium_widgets'
+  | 'widget_themes';
 
 type FeatureGatingConfig = Record<PremiumFeatureKey, FeatureGateEntry>;
 
@@ -39,6 +42,15 @@ const DEFAULT_CONFIG: FeatureGatingConfig = {
   custom_backgrounds: {
     premiumOnly: true,
   },
+  multiple_khatma: {
+    premiumOnly: true,
+  },
+  premium_widgets: {
+    premiumOnly: true,
+  },
+  widget_themes: {
+    premiumOnly: true,
+  },
 };
 
 const FEATURE_KEYS: PremiumFeatureKey[] = [
@@ -48,6 +60,9 @@ const FEATURE_KEYS: PremiumFeatureKey[] = [
   'cloud_backup',
   'advanced_stats',
   'custom_backgrounds',
+  'multiple_khatma',
+  'premium_widgets',
+  'widget_themes',
 ];
 
 const FEATURE_LABELS: Record<PremiumFeatureKey, string> = {
@@ -57,6 +72,9 @@ const FEATURE_LABELS: Record<PremiumFeatureKey, string> = {
   cloud_backup: 'نسخ احتياطي سحابي',
   advanced_stats: 'إحصائيات متقدمة',
   custom_backgrounds: 'خلفيات مخصصة',
+  multiple_khatma: 'ختمات متعددة متزامنة',
+  premium_widgets: 'جميع الودجات',
+  widget_themes: 'ثيمات الودجات',
 };
 
 export default function FeatureGating() {
