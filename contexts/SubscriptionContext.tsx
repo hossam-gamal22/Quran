@@ -20,7 +20,7 @@ import {
 import { fetchFeatureGatingConfig, isFeaturePremium, DEFAULT_FEATURE_GATING } from '@/lib/feature-gating';
 import type { PremiumFeatureKey, PremiumSource, FeatureGatingConfig, AdminGrantedPremium } from '@/types/premium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { t } from '@/lib/i18n';
 import {
@@ -124,6 +124,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [featureGating, setFeatureGating] = useState<FeatureGatingConfig>(DEFAULT_FEATURE_GATING);
   const purchaseUpdateSubscription = useRef<any>(null);
   const purchaseErrorSubscription = useRef<any>(null);
+  const adminPremiumUnsub = useRef<(() => void) | null>(null);
   const [autoShowPaywall, setAutoShowPaywall] = useState(false);
 
   useEffect(() => {
@@ -153,17 +154,40 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           try {
             const userId = await AsyncStorage.getItem('@user_id');
             if (userId) {
-              const userSnap = await getDoc(doc(db, 'users', userId));
-              if (userSnap.exists()) {
-                const adminPremium = userSnap.data()?.adminPremium as AdminGrantedPremium | undefined;
+              const userRef = doc(db, 'users', userId);
+              // Real-time listener for admin premium changes (grant/revoke/expiry)
+              adminPremiumUnsub.current = onSnapshot(userRef, async (snap) => {
+                if (!mounted) return;
+                const data = snap.data();
+                const adminPremium = data?.adminPremium as AdminGrantedPremium | undefined;
                 if (adminPremium?.granted) {
                   const notExpired = !adminPremium.expiresAt || new Date(adminPremium.expiresAt) > new Date();
-                  if (notExpired && mounted) {
+                  if (notExpired) {
                     setState(prev => ({ ...prev, isPremium: true }));
                     setPremiumSource('admin');
+                  } else {
+                    // Premium expired — clean up stale data in Firestore
+                    setState(prev => ({ ...prev, isPremium: prev.plan ? prev.isPremium : false }));
+                    if (premiumSource === 'admin') setPremiumSource(null);
+                    try {
+                      await updateDoc(userRef, {
+                        'adminPremium.granted': false,
+                        'adminPremium.expiredAt': serverTimestamp(),
+                      });
+                    } catch (cleanupErr) {
+                      console.log('⚠️ Failed to clean stale admin premium:', cleanupErr);
+                    }
+                  }
+                } else {
+                  // Admin premium revoked or not granted
+                  if (premiumSource === 'admin') {
+                    setState(prev => ({ ...prev, isPremium: false }));
+                    setPremiumSource(null);
                   }
                 }
-              }
+              }, (err) => {
+                console.log('⚠️ Admin premium listener error:', err);
+              });
             }
           } catch (e) {
             console.log('⚠️ Admin premium check failed:', e);
@@ -217,14 +241,29 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
           }
           const results = await Promise.all(fetchPromises);
           const items = results.flat().filter(Boolean);
+          if (__DEV__) {
+            const requested = [lifetimeId, ...subIds].filter(Boolean);
+            const received = items.map((i: any) => i.id || i.productId);
+            console.log('🛒 IAP products requested:', requested);
+            console.log('🛒 IAP products received:', received);
+            const missing = requested.filter(id => !received.includes(id));
+            if (missing.length > 0) {
+              console.log('⚠️ IAP products missing from store:', missing, '— check App Store Connect / Play Console (metadata, pricing, approval status).');
+            }
+          }
           if (mounted && items) {
             rawProductsRef.current = items;
-            setProducts(
-              items.map((item: any) => {
-                const plan = getPlanFromProductId(item.id, fetchedConfig);
+            const mapped = items
+              .map((item: any) => {
+                const id = item.id || item.productId;
+                const plan = getPlanFromProductId(id, fetchedConfig);
+                if (!plan) {
+                  if (__DEV__) console.log('⚠️ Unrecognized product id from store (no plan match):', id);
+                  return null;
+                }
                 return {
-                  id: item.id,
-                  plan: plan || 'monthly',
+                  id,
+                  plan,
                   title: item.title || '',
                   price: item.displayPrice || '',
                   priceAmount: item.price ?? 0,
@@ -232,19 +271,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   description: item.description || '',
                 };
               })
-            );
-            // Cache product prices for offline display
+              .filter(Boolean) as SubscriptionProduct[];
+            setProducts(mapped);
             try {
-              const serializable = items.map((item: any) => ({
-                id: item.id,
-                plan: getPlanFromProductId(item.id, fetchedConfig) || 'monthly',
-                title: item.title || '',
-                price: item.displayPrice || '',
-                priceAmount: item.price ?? 0,
-                currency: item.currency || '',
-                description: item.description || '',
-              }));
-              await AsyncStorage.setItem('@subscription_products_cache', JSON.stringify(serializable));
+              await AsyncStorage.setItem('@subscription_products_cache', JSON.stringify(mapped));
             } catch {}
           }
         } catch (e) {
@@ -365,6 +395,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       mounted = false;
       purchaseUpdateSubscription.current?.remove?.();
       purchaseErrorSubscription.current?.remove?.();
+      adminPremiumUnsub.current?.();
       IAP?.endConnection?.();
       unsubConfigListener();
     };
@@ -518,12 +549,14 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const items = results.flat().filter(Boolean);
       if (items.length > 0) {
         rawProductsRef.current = items;
-        setProducts(
-          items.map((item: any) => {
-            const plan = getPlanFromProductId(item.id, config);
+        const mapped = items
+          .map((item: any) => {
+            const id = item.id || item.productId;
+            const plan = getPlanFromProductId(id, config);
+            if (!plan) return null;
             return {
-              id: item.id,
-              plan: plan || 'monthly',
+              id,
+              plan,
               title: item.title || '',
               price: item.displayPrice || '',
               priceAmount: item.price ?? 0,
@@ -531,7 +564,8 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
               description: item.description || '',
             };
           })
-        );
+          .filter(Boolean) as SubscriptionProduct[];
+        setProducts(mapped);
       }
     } catch (e) {
       console.log('⚠️ refetchProducts failed:', e);

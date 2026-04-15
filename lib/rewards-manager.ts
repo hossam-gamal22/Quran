@@ -2,8 +2,9 @@
 // نظام المكافآت الشهرية — إدارة النقاط والفائزين
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { db } from './firebase-config';
+import { scheduleLocalNotification } from './push-notifications';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
 
 const CACHE_KEY = '@rewards_config_cache';
@@ -491,9 +492,14 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
     const alreadyProcessed = await AsyncStorage.getItem(`@winners_processed_${previousMonth}`);
     if (alreadyProcessed) return;
 
-    // Query top users from last month
+    // Query top users from last month (filter by month in Firestore, not client-side)
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, orderBy('monthlyEngagement.score', 'desc'), limit(config.winnersCount));
+    const q = query(
+      usersRef,
+      where('monthlyEngagement.month', '==', previousMonth),
+      orderBy('monthlyEngagement.score', 'desc'),
+      limit(config.winnersCount)
+    );
     const snapshot = await getDocs(q);
 
     const winners: Winner[] = [];
@@ -503,7 +509,7 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
       const engagement = data.monthlyEngagement;
-      if (engagement && engagement.month === previousMonth && engagement.score > 0) {
+      if (engagement && engagement.score > 0) {
         winners.push({
           userId: docSnap.id,
           displayName: data.displayName || docSnap.id.slice(0, 8),
@@ -535,6 +541,23 @@ export const autoSelectMonthlyWinners = async (): Promise<void> => {
       } catch (err) {
         console.error('❌ Error granting premium to', winner.userId, err);
       }
+    }
+
+    // Notify current user if they are among the winners
+    try {
+      const currentUserId = await AsyncStorage.getItem('@user_id');
+      if (currentUserId && winners.some(w => w.userId === currentUserId)) {
+        await scheduleLocalNotification(
+          {
+            title: '🏆 مبروك! أنت في لوحة الشرف',
+            body: 'حصلت على اشتراك مجاني هذا الشهر مكافأة لك',
+            data: { type: 'honor_board_winner' },
+          },
+          null // immediate trigger
+        );
+      }
+    } catch (notifErr) {
+      console.log('⚠️ Winner notification failed:', notifErr);
     }
 
     // Update rewards config

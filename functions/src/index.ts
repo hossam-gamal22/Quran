@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -260,6 +261,157 @@ export const pushNotificationsTestEndpoint = functions.https.onRequest(
     } catch (error) {
       logger.error('HTTP endpoint error:', error);
       res.status(500).json({ error: String(error) });
+    }
+  }
+);
+
+// ==================== Monthly Honor Board Winner Selection ====================
+
+/**
+ * Scheduled Cloud Function: runs at 00:05 on the 1st of every month.
+ * Selects top winners from the previous month's leaderboard,
+ * grants them admin premium, and sends push notifications.
+ */
+export const selectMonthlyWinners = onSchedule(
+  { schedule: '5 0 1 * *', timeZone: 'Asia/Riyadh' },
+  async () => {
+    try {
+      // Calculate previous month key (YYYY-MM-v2 format)
+      const now = new Date();
+      const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-v2`;
+
+      logger.info(`🏆 Selecting winners for month: ${monthKey}`);
+
+      // Fetch rewards config
+      const configSnap = await db.doc('config/rewards-settings').get();
+      const config = configSnap.data() || {};
+      if (config.enabled === false) {
+        logger.info('Rewards system is disabled, skipping winner selection');
+        return;
+      }
+
+      // Check if already processed
+      if (config.currentMonth === monthKey) {
+        logger.info(`Winners already selected for ${monthKey}, skipping`);
+        return;
+      }
+
+      const winnersCount = config.winnersCount || 3;
+      const rewardDurationDays = config.rewardDurationDays || 30;
+
+      // Query top users for previous month
+      const snapshot = await db.collection('users')
+        .where('monthlyEngagement.month', '==', monthKey)
+        .orderBy('monthlyEngagement.score', 'desc')
+        .limit(winnersCount)
+        .get();
+
+      const winners: Array<{ userId: string; displayName: string; score: number; rewardedAt: string; notified: boolean; premiumExpiresAt: string }> = [];
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + rewardDurationDays);
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const engagement = data.monthlyEngagement;
+        if (engagement && engagement.score > 0) {
+          winners.push({
+            userId: docSnap.id,
+            displayName: data.displayName || docSnap.id.slice(0, 8),
+            score: engagement.score,
+            rewardedAt: new Date().toISOString(),
+            notified: false,
+            premiumExpiresAt: expiresAt.toISOString(),
+          });
+        }
+      });
+
+      if (winners.length === 0) {
+        logger.info(`No eligible winners found for ${monthKey}`);
+        await db.doc('config/rewards-settings').update({
+          currentMonth: monthKey,
+          lastProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      // Grant premium to each winner
+      const batch = db.batch();
+      for (const winner of winners) {
+        const userRef = db.doc(`users/${winner.userId}`);
+        batch.update(userRef, {
+          adminPremium: {
+            granted: true,
+            grantedBy: 'auto_reward_system',
+            grantedAt: new Date().toISOString(),
+            expiresAt: expiresAt.toISOString(),
+            reason: `فائز في مسابقة الشهر ${monthKey}`,
+          },
+        });
+      }
+      await batch.commit();
+
+      // Update rewards config
+      const historyEntry = {
+        month: monthKey,
+        winners,
+        selectedAt: new Date().toISOString(),
+        selectedBy: 'auto',
+      };
+
+      const existingHistory = config.history || [];
+      await db.doc('config/rewards-settings').update({
+        currentMonth: monthKey,
+        currentWinners: winners,
+        history: [historyEntry, ...existingHistory.slice(0, 11)],
+        lastProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Send push notifications to winners
+      const pushMessages: ExpoPushMessage[] = [];
+      for (const winner of winners) {
+        try {
+          const userSnap = await db.doc(`users/${winner.userId}`).get();
+          const fcmToken = userSnap.data()?.fcmToken;
+          if (fcmToken && fcmToken.startsWith('ExponentPushToken')) {
+            pushMessages.push({
+              to: fcmToken,
+              title: '🏆 مبروك! أنت في لوحة الشرف',
+              body: 'حصلت على اشتراك مجاني هذا الشهر مكافأة لك',
+              data: { type: 'honor_board_winner' },
+              sound: 'default',
+              priority: 'high',
+            });
+            winner.notified = true;
+          }
+        } catch (err) {
+          logger.warn(`Could not get push token for winner ${winner.userId}:`, err);
+        }
+      }
+
+      if (pushMessages.length > 0) {
+        try {
+          const response = await fetch(EXPO_PUSH_APIS[0], {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(pushMessages),
+          });
+          if (response.ok) {
+            logger.info(`Sent winner notifications to ${pushMessages.length} users`);
+          } else {
+            logger.warn('Winner notification push failed:', await response.text());
+          }
+        } catch (pushErr) {
+          logger.warn('Winner notification push error:', pushErr);
+        }
+      }
+
+      logger.info(`🏆 Selected ${winners.length} winners for ${monthKey}`);
+    } catch (error) {
+      logger.error('❌ selectMonthlyWinners failed:', error);
     }
   }
 );
