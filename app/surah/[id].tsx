@@ -754,7 +754,10 @@ export default function SurahScreen() {
 
   // Initial page
   const initialPage = useMemo(() => {
-    if (targetPageParam) return parseInt(targetPageParam);
+    if (targetPageParam) {
+      const p = parseInt(targetPageParam);
+      return isNaN(p) || p < 1 || p > 604 ? 1 : p;
+    }
     if (targetAyah) {
       const surah = getSurahData(surahNumber);
       const ayah = surah?.ayahs.find(a => a.ns === targetAyah);

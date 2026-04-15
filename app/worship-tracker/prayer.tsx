@@ -318,6 +318,7 @@ export default function PrayerTrackerScreen() {
   const [selectedDayRecord, setSelectedDayRecord] = useState<DailyPrayerRecord | null>(null);
   const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [historicalFajr, setHistoricalFajr] = useState<{ date: string; time: string; status: PrayerStatus }[]>([]);
+  const savingPrayerRef = useRef<Set<string>>(new Set());
   
   const { isDarkMode, settings } = useSettings();
   const colors = useColors();
@@ -411,22 +412,31 @@ export default function PrayerTrackerScreen() {
 
   // تغيير حالة الصلاة — يدعم اليوم الحالي والأيام السابقة
   const handleStatusChange = async (prayer: PrayerName, status: PrayerStatus) => {
-    // تسجيل إحصائيات الصلاة في Firebase عند تسجيل صلاة
-    if (status === 'prayed' || status === 'late') {
-      trackPrayer(prayer, status === 'prayed').catch(() => {});
-    }
+    // Prevent double-tap: skip if this prayer is already being saved
+    const key = `${selectedDateStr}_${prayer}`;
+    if (savingPrayerRef.current.has(key)) return;
+    savingPrayerRef.current.add(key);
 
-    if (isSelectedToday) {
-      // حفظ الحالة مع وقت الصلاة المُجدول
-      const scheduledTime = prayerTimes ? prayerTimes[prayer as keyof PrayerTimes] : undefined;
-      await updatePrayerWithTime(prayer, status, scheduledTime);
-    } else {
-      await updatePrayerForDate(selectedDateStr, prayer, status);
-      // تحديث السجل المحلي مباشرة
-      setSelectedDayRecord(prev => {
-        if (!prev) return { date: selectedDateStr, fajr: 'none', dhuhr: 'none', asr: 'none', maghrib: 'none', isha: 'none', [prayer]: status } as DailyPrayerRecord;
-        return { ...prev, [prayer]: status };
-      });
+    try {
+      // تسجيل إحصائيات الصلاة في Firebase عند تسجيل صلاة
+      if (status === 'prayed' || status === 'late') {
+        trackPrayer(prayer, status === 'prayed').catch(() => {});
+      }
+
+      if (isSelectedToday) {
+        // حفظ الحالة مع وقت الصلاة المُجدول
+        const scheduledTime = prayerTimes ? prayerTimes[prayer as keyof PrayerTimes] : undefined;
+        await updatePrayerWithTime(prayer, status, scheduledTime);
+      } else {
+        await updatePrayerForDate(selectedDateStr, prayer, status);
+        // تحديث السجل المحلي مباشرة
+        setSelectedDayRecord(prev => {
+          if (!prev) return { date: selectedDateStr, fajr: 'none', dhuhr: 'none', asr: 'none', maghrib: 'none', isha: 'none', [prayer]: status } as DailyPrayerRecord;
+          return { ...prev, [prayer]: status };
+        });
+      }
+    } finally {
+      savingPrayerRef.current.delete(key);
     }
   };
 

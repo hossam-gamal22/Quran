@@ -1,5 +1,6 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { AppState } from 'react-native';
 import { fetchAdsConfig, subscribeToAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 import {
@@ -77,6 +78,23 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [loadConfig]);
 
+  // Re-check premium status whenever app returns to foreground
+  // This ensures mid-session purchases instantly hide ads
+  useEffect(() => {
+    const updatePremiumStatus = async () => {
+      try {
+        const subState = await getSubscriptionState();
+        setIsPremiumUser(subState.isPremium);
+      } catch {}
+    };
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        updatePremiumStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   const onPageView = useCallback(() => {
     setPageViews(prev => prev + 1);
     smartRecordPageView();
@@ -90,11 +108,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
+    if (isLoading) return false;
     if (isPremiumUser) return false;
     if (!config) return false;
     if (!smartCanShowBanner()) return false;
     return isBannerEnabledForScreen(config, screen);
-  }, [config, isPremiumUser]);
+  }, [config, isPremiumUser, isLoading]);
 
   const getBannerAdUnitId = useCallback((): string => {
     return getAdUnitId('BANNER', config);
@@ -109,6 +128,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   }, [config]);
 
   const canShowInterstitial = useCallback((): boolean => {
+    if (isLoading) return false;
     if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
     if (config.showInterstitials === false) return false;
@@ -138,7 +158,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       default:
         return false;
     }
-  }, [config, isPremiumUser, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
+  }, [config, isPremiumUser, isLoading, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
 
   // Slot-based API
   const getSlotUnitId = useCallback((slotKey: string): string => {

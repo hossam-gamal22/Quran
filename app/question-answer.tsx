@@ -1,6 +1,6 @@
 // app/question-answer.tsx
-// صفحة سؤال وجواب من إذاعة القرآن الكريم من القاهرة - روح المسلم
-// البيانات مخزنة محلياً في ملف JSON - متاحة فوراً بدون إنترنت
+// صفحة سؤال وجواب - روح المسلم
+// البيانات من Firestore مع كاش محلي وفولباك على JSON
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
@@ -14,6 +14,12 @@ import {
   ViewStyle,
   TextStyle,
   StyleSheet,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -23,14 +29,14 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
-import { t } from '@/lib/i18n';
+import { useAuth } from '@/hooks/use-auth';
+import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
 import { Spacing, BorderRadius, FONT_SIZES } from '@/constants/theme';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-
-// البيانات المخزنة محلياً
-import qaData from '@/data/json/qa-data.json';
+import { fetchQAContent, subscribeToQAContent, filterVisibleContent } from '@/lib/qa-content-api';
+import { submitQuestion, checkRateLimit } from '@/lib/email-service';
 
 // ========================================
 // الألوان والثوابت
@@ -39,21 +45,29 @@ import qaData from '@/data/json/qa-data.json';
 const ACCENT = '#0d8e62';
 const ACCENT_LIGHT = 'rgba(6,79,47,0.12)';
 
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const isValidEmail = (email: string) => EMAIL_REGEX.test(email.trim());
+
 // ========================================
 // أنواع البيانات
 // ========================================
 
-interface Category {
+interface FilteredCategory {
   id: string;
   name: string;
-  image: string;
+  icon: string;
+  order: number;
+  isVisible: boolean;
+  questions: FilteredQuestion[];
 }
 
-interface QAItem {
+interface FilteredQuestion {
   id: string;
   question: string;
   answer: string;
-  audioUrl?: string;
+  order: number;
+  isVisible: boolean;
 }
 
 // ========================================
@@ -64,18 +78,58 @@ export default function QuestionAnswerScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
   const { isDarkMode } = useSettings();
+  const language = getLanguage();
+  const { user } = useAuth({ autoFetch: true });
 
-  // البيانات من الملف المخزن - جاهزة فوراً
-  const categories = useMemo(() => qaData.categories as Category[], []);
-  const allItems = useMemo(() => qaData.items as Record<string, QAItem[]>, []);
-
-  const [selectedCategory, setSelectedCategory] = useState<string>(categories[0]?.id ?? '');
+  // البيانات من Firestore مع كاش
+  const [categories, setCategories] = useState<FilteredCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
-  const qaItems = selectedCategory ? (allItems[selectedCategory] ?? []) : [];
+  // حالة نموذج السؤال
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [questionText, setQuestionText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const qaItems = useMemo(() => {
+    const cat = categories.find(c => c.id === selectedCategory);
+    return cat?.questions ?? [];
+  }, [categories, selectedCategory]);
+
   const tabsScrollRef = useRef<ScrollView>(null);
-  const listRef = useRef<FlatList<QAItem>>(null);
+  const listRef = useRef<FlatList<FilteredQuestion>>(null);
   const itemLayoutsRef = useRef<Record<string, number>>({});
+
+  // تحميل البيانات من Firestore مع كاش
+  useEffect(() => {
+    let mounted = true;
+    const selRef = { current: '' };
+
+    fetchQAContent().then(data => {
+      if (!mounted) return;
+      const filtered = filterVisibleContent(data, language);
+      setCategories(filtered);
+      if (filtered.length > 0 && !selRef.current) {
+        selRef.current = filtered[0].id;
+        setSelectedCategory(filtered[0].id);
+      }
+      setIsLoading(false);
+    });
+
+    const unsubscribe = subscribeToQAContent((data) => {
+      if (!mounted) return;
+      const filtered = filterVisibleContent(data, language);
+      setCategories(filtered);
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, [language]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -116,8 +170,53 @@ export default function QuestionAnswerScreen() {
     });
   }, []);
 
+  // ========================================
+  // إرسال سؤال
+  // ========================================
+
+  const handleSubmitQuestion = useCallback(async () => {
+    if (!questionText.trim()) return;
+    if (!userEmail.trim() || !isValidEmail(userEmail)) {
+      Alert.alert(t('common.error'), 'البريد الإلكتروني مطلوب للرد على سؤالك');
+      return;
+    }
+
+    const canSubmit = await checkRateLimit();
+    if (!canSubmit) {
+      Alert.alert(
+        t('questionAnswer.rateLimitTitle'),
+        t('questionAnswer.rateLimitBody')
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await submitQuestion({
+        userName: userName.trim() || user?.name || '',
+        userEmail: userEmail.trim(),
+        question: questionText.trim(),
+        language,
+        registeredName: user?.name || '',
+        userId: user?.id || '',
+      });
+      setShowQuestionModal(false);
+      setQuestionText('');
+      setUserName('');
+      setUserEmail('');
+      Alert.alert(
+        t('questionAnswer.questionSent'),
+        t('questionAnswer.questionSentBody')
+      );
+    } catch (e) {
+      Alert.alert(t('common.error'), t('questionAnswer.submitError') || 'حدث خطأ أثناء إرسال السؤال. حاول مرة أخرى.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [questionText, userName, userEmail, language, user]);
+
   // تصيير عنصر سؤال وجواب
-  const renderQAItem = useCallback(({ item }: { item: QAItem }) => {
+  const renderQAItem = useCallback(({ item }: { item: FilteredQuestion }) => {
     const isExpanded = expandedItems.has(item.id);
     
     const cardStyle: ViewStyle = {
@@ -296,7 +395,7 @@ export default function QuestionAnswerScreen() {
   const listContentStyle: ViewStyle = {
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.md,
-    paddingBottom: Spacing.xxl,
+    paddingBottom: 120,
   };
 
   const emptyTextStyle: TextStyle = {
@@ -309,9 +408,33 @@ export default function QuestionAnswerScreen() {
     includeFontPadding: false,
   };
 
+  if (isLoading) {
+    return (
+      <ScreenContainer>
+        <UniversalHeader title={t('questionAnswer.title')} showBack />
+        <View style={centerContainerStyle}>
+          <ActivityIndicator size="large" color={ACCENT} />
+          <Text style={[emptyTextStyle, { color: colors.textLight }]}>
+            {t('questionAnswer.loadingCategories')}
+          </Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer>
-      <UniversalHeader title={t('questionAnswer.title')} showBack />
+      <UniversalHeader
+        title={t('questionAnswer.title')}
+        showBack
+        rightActions={[{
+          icon: 'email-plus-outline',
+          onPress: () => {
+            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowQuestionModal(true);
+          },
+        }]}
+      />
 
       {/* التبويبات */}
       {categories.length > 0 && (
@@ -396,6 +519,96 @@ export default function QuestionAnswerScreen() {
           ListHeaderComponent={<View style={{ height: Spacing.md }} />}
         />
       )}
+
+      {/* نموذج إرسال السؤال */}
+      <Modal visible={showQuestionModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Pressable style={{ flex: 1 }} onPress={() => setShowQuestionModal(false)} />
+          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1a2535' : '#fff' }]}>
+            <View style={styles.modalHandle} />
+            <Text style={[styles.modalTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
+              {t('questionAnswer.sendQuestion')}
+            </Text>
+            <Text style={styles.replyTime}>
+              {t('questionAnswer.replyTime')}
+            </Text>
+
+            <TextInput
+              placeholder={t('questionAnswer.namePlaceholder')}
+              placeholderTextColor="#888"
+              value={userName}
+              onChangeText={setUserName}
+              style={[styles.input, {
+                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                color: isDarkMode ? '#fff' : '#1a1a1a',
+                textAlign: isRTL ? 'right' : 'left',
+              }]}
+            />
+            <TextInput
+              placeholder={t('questionAnswer.emailPlaceholder') + ' *'}
+              placeholderTextColor="#888"
+              value={userEmail}
+              onChangeText={setUserEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              style={[styles.input, {
+                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                color: isDarkMode ? '#fff' : '#1a1a1a',
+                textAlign: isRTL ? 'right' : 'left',
+                borderColor: !isValidEmail(userEmail) && userEmail.length > 0 ? '#e74c3c' : 'transparent',
+                borderWidth: 1,
+              }]}
+            />
+            <TextInput
+              placeholder={t('questionAnswer.questionPlaceholder')}
+              placeholderTextColor="#888"
+              value={questionText}
+              onChangeText={(val) => setQuestionText(val.slice(0, 500))}
+              multiline
+              numberOfLines={5}
+              style={[styles.input, styles.textArea, {
+                backgroundColor: isDarkMode ? '#243044' : '#f5f5f5',
+                color: isDarkMode ? '#fff' : '#1a1a1a',
+                textAlign: isRTL ? 'right' : 'left',
+              }]}
+            />
+            <Text style={[styles.charCount, { textAlign: isRTL ? 'left' : 'right' }]}>
+              {questionText.length}/500
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.submitBtn,
+                (isSubmitting || !questionText.trim() || !isValidEmail(userEmail)) && styles.submitBtnDisabled,
+              ]}
+              onPress={handleSubmitQuestion}
+              disabled={isSubmitting || !questionText.trim() || !isValidEmail(userEmail)}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>
+                  {t('questionAnswer.submitQuestion')}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowQuestionModal(false)}
+              style={{ paddingVertical: 12 }}
+            >
+              <Text style={styles.cancelText}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <BannerAdComponent screen="home" />
     </ScreenContainer>
   );
@@ -411,3 +624,73 @@ const centerContainerStyle: ViewStyle = {
   alignItems: 'center',
   padding: Spacing.xl,
 };
+
+const styles = StyleSheet.create({
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.4)',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  replyTime: {
+    fontSize: 13,
+    color: '#888',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  input: {
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    fontSize: 15,
+  },
+  textArea: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  submitBtn: {
+    backgroundColor: '#1B8A5A',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  submitBtnDisabled: {
+    opacity: 0.5,
+  },
+  submitBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cancelText: {
+    color: '#888',
+    textAlign: 'center',
+    fontSize: 15,
+  },
+});

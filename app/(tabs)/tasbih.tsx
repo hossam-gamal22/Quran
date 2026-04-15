@@ -12,6 +12,7 @@ import {
   Dimensions,
   Platform,
   FlatList,
+  AppState,
 } from 'react-native';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -290,6 +291,7 @@ export default function TasbihScreen() {
   const saveInFlightRef = useRef<Promise<void> | null>(null);
   // Per-tasbih count memory: remembers count for each tasbih when switching
   const perTasbihCountsRef = useRef<Record<number | string, number>>({});
+  const saveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showTasbihList, setShowTasbihList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -360,7 +362,11 @@ export default function TasbihScreen() {
       };
       doLoad();
       return () => {
-        // On blur: flush latest ref-based state to AsyncStorage
+        // On blur: cancel pending debounce and flush latest ref-based state to AsyncStorage
+        if (saveDebounceRef.current) {
+          clearTimeout(saveDebounceRef.current);
+          saveDebounceRef.current = null;
+        }
         const today = getTodayISO();
         const payload = JSON.stringify({
           date: today,
@@ -380,6 +386,29 @@ export default function TasbihScreen() {
       };
     }, [])
   );
+
+  // Flush tasbih progress when app goes to background (covers app kill scenario)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        if (saveDebounceRef.current) {
+          clearTimeout(saveDebounceRef.current);
+          saveDebounceRef.current = null;
+        }
+        const today = getTodayISO();
+        const payload = JSON.stringify({
+          date: today,
+          count: countRef.current,
+          totalCount: totalCountRef.current,
+          rounds: roundsRef.current,
+          selectedId: selectedIdRef.current,
+        });
+        AsyncStorage.setItem(STORAGE_KEYS.progress, payload).catch(() => {});
+        AsyncStorage.setItem(STORAGE_KEYS.lastDate, today).catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     progress.value = withTiming(count / selectedTasbih.target, {
@@ -426,13 +455,17 @@ export default function TasbihScreen() {
       console.log('📿 [Tasbih] loadData raw:', { progressRaw, lastDateRaw });
 
       if (settingsRaw) {
-        const p = JSON.parse(settingsRaw);
-        setVibrationEnabled(p.vibrationEnabled ?? true);
-        setShowVirtue(p.showVirtue ?? true);
-        setAutoAdvance(p.autoAdvance ?? true);
-        setShowTranslation(p.showTranslation ?? false);
+        try {
+          const p = JSON.parse(settingsRaw);
+          setVibrationEnabled(p.vibrationEnabled ?? true);
+          setShowVirtue(p.showVirtue ?? true);
+          setAutoAdvance(p.autoAdvance ?? true);
+          setShowTranslation(p.showTranslation ?? false);
+        } catch {}
       }
-      if (customRaw) setCustomTasbihat(JSON.parse(customRaw));
+      if (customRaw) {
+        try { setCustomTasbihat(JSON.parse(customRaw)); } catch {}
+      }
 
       // --- Daily auto-reset logic ---
       const todayISO = getTodayISO();
@@ -511,9 +544,11 @@ export default function TasbihScreen() {
       await AsyncStorage.setItem(STORAGE_KEYS.lastDate, todayISO);
 
       if (statsRaw) {
-        const parsed = JSON.parse(statsRaw);
-        setDailyStats(parsed);
-        dailyStatsRef.current = parsed;
+        try {
+          const parsed = JSON.parse(statsRaw);
+          setDailyStats(parsed);
+          dailyStatsRef.current = parsed;
+        } catch {}
       }
       if (!didReset && completedRaw) {
         try {
@@ -539,21 +574,30 @@ export default function TasbihScreen() {
   };
 
   const saveProgress = useCallback(async (c: number, t: number, r: number) => {
-    try {
-      const today = getTodayISO();
-      const payload = {
-        date: today, count: c, totalCount: t, rounds: r, selectedId: selectedIdRef.current,
-      };
-      console.log('📿 [Tasbih] saveProgress:', payload);
-      const saveOp = AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(payload));
-      saveInFlightRef.current = saveOp.then(() => { saveInFlightRef.current = null; }).catch(() => { saveInFlightRef.current = null; });
-      await saveOp;
-      await AsyncStorage.setItem(STORAGE_KEYS.lastDate, today);
-      const newStats = { ...dailyStatsRef.current, [today]: t };
-      dailyStatsRef.current = newStats;
-      setDailyStats(newStats);
-      await AsyncStorage.setItem(STORAGE_KEYS.dailyStats, JSON.stringify(newStats));
-    } catch (e) { console.error('📿 [Tasbih] saveProgress error:', e); }
+    // Update refs immediately so blur handler always has latest values
+    countRef.current = c;
+    totalCountRef.current = t;
+    roundsRef.current = r;
+
+    // Debounce actual AsyncStorage write to avoid thrashing on rapid taps
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+    saveDebounceRef.current = setTimeout(async () => {
+      try {
+        const today = getTodayISO();
+        const payload = {
+          date: today, count: c, totalCount: t, rounds: r, selectedId: selectedIdRef.current,
+        };
+        console.log('📿 [Tasbih] saveProgress:', payload);
+        const saveOp = AsyncStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(payload));
+        saveInFlightRef.current = saveOp.then(() => { saveInFlightRef.current = null; }).catch(() => { saveInFlightRef.current = null; });
+        await saveOp;
+        await AsyncStorage.setItem(STORAGE_KEYS.lastDate, today);
+        const newStats = { ...dailyStatsRef.current, [today]: t };
+        dailyStatsRef.current = newStats;
+        setDailyStats(newStats);
+        await AsyncStorage.setItem(STORAGE_KEYS.dailyStats, JSON.stringify(newStats));
+      } catch (e) { console.error('📿 [Tasbih] saveProgress error:', e); }
+    }, 500);
   }, []);
 
   const saveSettings = async () => {

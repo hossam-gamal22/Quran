@@ -253,9 +253,7 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   const refreshTodayRecords = useCallback(async () => {
     const today = getTodayDate();
 
-    // Immediately clear stale data so UI never shows yesterday's statuses
     setTodayDate(today);
-    setTodayPrayer({ ...defaultPrayerRecord, date: today });
     
     const [prayer, fasting, quran, azkar] = await Promise.all([
       getPrayerRecord(today),

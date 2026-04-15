@@ -32,6 +32,7 @@ import {
   sendWirdCompletionNotification,
   requestNotificationPermissions,
 } from '../lib/khatma-notifications';
+import { useSubscription } from './SubscriptionContext';
 
 // ===== TYPES =====
 interface KhatmaContextType {
@@ -104,8 +105,15 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
     await loadKhatmas();
   }, []);
 
+  const { isPremium } = useSubscription();
+
   const createKhatma = useCallback(
     async (name: string, duration: KhatmaDuration, reminderTime: string | null = null) => {
+      // Limit free users to 1 active khatma
+      const activeCount = khatmas.filter(k => !k.isCompleted).length;
+      if (activeCount >= 1 && !isPremium) {
+        return null;
+      }
       const newKhatma = await createKhatmaStorage(name, duration, reminderTime);
       if (newKhatma) {
         // Schedule reminder if enabled
@@ -117,7 +125,7 @@ export function KhatmaProvider({ children }: KhatmaProviderProps) {
       }
       return null;
     },
-    [refreshKhatmas]
+    [refreshKhatmas, khatmas, isPremium]
   );
 
   const deleteKhatma = useCallback(

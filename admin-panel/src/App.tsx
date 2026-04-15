@@ -133,6 +133,8 @@ import AppIconManager from './pages/AppIconManager';
 import SuggestionsPage from './pages/Suggestions';
 import PhotoBackgroundManager from './pages/PhotoBackgroundManager';
 import PurchaseHistory from './pages/PurchaseHistory';
+import QAManager from './pages/QAManager';
+import UserQuestions from './pages/UserQuestions';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -246,6 +248,15 @@ const NAV_GROUPS: NavGroup[] = [
       { path: '/app-icons', icon: ImageIcon, label: 'أيقونات التطبيق' },
       { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
+    ],
+  },
+  {
+    id: 'qa',
+    label: 'سؤال وجواب',
+    icon: MessageSquare,
+    items: [
+      { path: '/qa-manager', icon: BookOpen, label: 'إدارة الأسئلة' },
+      { path: '/user-questions', icon: MessageSquare, label: 'أسئلة المستخدمين' },
     ],
   },
   {
@@ -521,6 +532,8 @@ const App: React.FC = () => {
               <Route path="/translations" element={<TranslationOverrides />} />
               <Route path="/content-manager" element={<ContentManager />} />
               <Route path="/photo-backgrounds" element={<PhotoBackgroundManager />} />
+              <Route path="/qa-manager" element={<QAManager />} />
+              <Route path="/user-questions" element={<UserQuestions />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

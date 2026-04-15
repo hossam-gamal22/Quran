@@ -146,6 +146,18 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Q&A Content (read by app, managed by admin SDK)
+    match /qaContent/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // User-submitted questions (app creates, admin reads/updates)
+    match /userQuestions/{docId} {
+      allow create: if true;
+      allow read, update, delete: if true;
+    }
+
     // Deny everything else by default
     match /{document=**} {
       allow read, write: if false;

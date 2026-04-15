@@ -1,7 +1,7 @@
 // types/rewards.ts
 // أنواع نظام المكافآت الشهرية
 
-export type ActivityType = 'app_open' | 'azkar' | 'quran' | 'prayer' | 'tasbih' | 'khatma';
+export type ActivityType = 'app_open' | 'azkar' | 'quran' | 'prayer' | 'tasbih' | 'khatma' | 'fasting';
 
 export interface ScoreWeights {
   app_open: number;
@@ -10,6 +10,7 @@ export interface ScoreWeights {
   prayer: number;
   tasbih: number;
   khatma: number;
+  fasting: number;
 }
 
 export interface Winner {

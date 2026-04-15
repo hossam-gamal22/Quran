@@ -329,7 +329,9 @@ export default function SalatiScreen() {
         const currentNowMinutes = (now.getHours() * 60) + now.getMinutes();
         const status = determinePrayerStatus(selectedPrayer, prayerTimes, currentNowMinutes);
         const selectedPrayerTime = prayerTimes[selectedPrayer];
-        updatePrayerWithTime(selectedPrayer as PrayerName, status, selectedPrayerTime).catch(() => {});
+        updatePrayerWithTime(selectedPrayer as PrayerName, status, selectedPrayerTime).catch((error) => {
+          console.error('[Salati] Prayer save failed:', error);
+        });
       }
       
       // Haptic success feedback

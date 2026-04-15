@@ -17,6 +17,7 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
   prayer: 5,
   tasbih: 1,
   khatma: 5,
+  fasting: 4,
 };
 
 const APP_OPEN_LAST_DATE_KEY = '@app_open_last_scored_date';

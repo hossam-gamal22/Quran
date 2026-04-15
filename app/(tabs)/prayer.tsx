@@ -619,6 +619,26 @@ export default function PrayerScreen() {
     if (hijri) setHijriDate(`${hijri.day} ${hijri.monthName} ${hijri.year} ${ahSuffix}`);
   }, []));
 
+  // Auto-refresh prayer times at midnight for the new day
+  useEffect(() => {
+    const scheduleMidnight = () => {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setDate(midnight.getDate() + 1);
+      midnight.setHours(0, 0, 30, 0); // 30s past midnight
+      const ms = midnight.getTime() - now.getTime();
+      return setTimeout(() => {
+        console.log('🕛 Midnight — refreshing prayer times');
+        loadPrayerTimes(true);
+        const hijri = getLocalizedHijriDate();
+        const ahSuffix = t('calendar.ahSuffix');
+        if (hijri) setHijriDate(`${hijri.day} ${hijri.monthName} ${hijri.year} ${ahSuffix}`);
+      }, ms);
+    };
+    const timer = scheduleMidnight();
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-refresh when connectivity returns while showing stale/extrapolated data
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {

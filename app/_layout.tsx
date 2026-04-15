@@ -77,6 +77,12 @@ import { registerBackgroundNotificationTask } from '@/lib/background-notificatio
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
 import { uploadToCloud } from '@/lib/cloud-sync';
 import * as Auth from '@/lib/_core/auth';
+import {
+  recordSessionStart,
+  saveSessionTime,
+  shouldShowRating,
+  showRatingPrompt,
+} from '@/lib/app-rating';
 
 // Signal that notification channels have been initialized.
 // SettingsContext awaits this before scheduling to avoid race condition
@@ -759,6 +765,16 @@ export default function RootLayout() {
       5000
     );
     
+    // Rating: record session start + periodic check
+    recordSessionStart();
+    const ratingCheckInterval = setInterval(async () => {
+      const should = await shouldShowRating();
+      if (should) {
+        clearInterval(ratingCheckInterval);
+        showRatingPrompt();
+      }
+    }, 30_000);
+
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
         updateLastActive().catch(() => {});
@@ -773,12 +789,14 @@ export default function RootLayout() {
         // Refresh the 7-day DATE trigger window for all notification categories.
         // rescheduleAllFromStorage is internally throttled (60s) to avoid excessive work.
         rescheduleAllFromStorage().catch(() => {});
+        recordSessionStart();
       } else if (nextAppState === 'background') {
         syncLocalStats().catch(() => {});
         // Sync widget data before app goes to background so widgets show fresh content
         syncWidgetDataToNative().catch(() => {});
         // Auto-backup: silently upload to cloud if premium, logged in, and >7 days since last backup
         autoBackupIfNeeded().catch(() => {});
+        saveSessionTime().catch(() => {});
       }
     };
 
@@ -809,7 +827,9 @@ export default function RootLayout() {
       clearInterval(syncInterval);
       clearInterval(widgetSyncInterval);
       clearInterval(prayerCheckInterval);
+      clearInterval(ratingCheckInterval);
       cleanupMidnight();
+      saveSessionTime().catch(() => {});
     };
   }, []);
 
