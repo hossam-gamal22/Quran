@@ -110,9 +110,9 @@ const isPrayerAvailable = (
   const fajrMinutes = parseTimeToMinutes(prayerTimes.fajr);
   const prayerMinutes = parseTimeToMinutes(prayerTimes[prayer]);
 
-  // If we don't have prayer times data, allow all (fallback)
+  // If we don't have prayer times data, disable tracking (no valid times to compare)
   if (fajrMinutes === null || prayerMinutes === null) {
-    return true;
+    return false;
   }
 
   // Before Fajr time (midnight to Fajr):

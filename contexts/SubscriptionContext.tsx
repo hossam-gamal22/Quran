@@ -382,16 +382,51 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         // This handles auto-renewed subscriptions whose local expiry has passed
         if (savedState.isPremium && savedState.plan !== 'lifetime' && savedState.expiresAt) {
           const localExpiry = new Date(savedState.expiresAt);
-          if (localExpiry < new Date()) {
+          const now = new Date();
+          const daysUntilExpiry = (localExpiry.getTime() - now.getTime()) / (24 * 60 * 60 * 1000);
+
+          // Notify user if subscription expires within 3 days (once per expiry period)
+          if (daysUntilExpiry > 0 && daysUntilExpiry <= 3) {
+            const expiryNotifKey = `@sub_expiry_notified_${savedState.expiresAt}`;
+            const alreadyNotified = await AsyncStorage.getItem(expiryNotifKey).catch(() => null);
+            if (!alreadyNotified) {
+              await AsyncStorage.setItem(expiryNotifKey, 'true').catch(() => {});
+              Notifications.scheduleNotificationAsync({
+                content: {
+                  title: '⏳ تنبيه الاشتراك',
+                  body: `ينتهي اشتراكك خلال ${Math.ceil(daysUntilExpiry)} ${Math.ceil(daysUntilExpiry) === 1 ? 'يوم' : 'أيام'}. جدد اشتراكك للاستمرار بدون إعلانات.`,
+                  sound: 'default',
+                  data: { type: 'subscription_expiry' },
+                },
+                trigger: null,
+              }).catch(() => {});
+            }
+          }
+
+          if (localExpiry < now) {
             try {
               const activePurchases = await IAP.getAvailablePurchases();
               const stillActive = activePurchases.some((p: any) =>
                 getPlanFromProductId(p.productId, fetchedConfig) != null
               );
               if (stillActive && mounted) {
+                // Calculate new expiry based on the most recent transaction date,
+                // NOT from Date.now(). This prevents infinite premium on every app open.
+                const sorted = [...activePurchases]
+                  .filter((p: any) => getPlanFromProductId(p.productId, fetchedConfig) != null)
+                  .sort((a: any, b: any) => (b.transactionDate || 0) - (a.transactionDate || 0));
+                const latestTx = sorted[0];
+                const txDate = latestTx?.transactionDate ? new Date(latestTx.transactionDate) : now;
+                const renewalDays = savedState.plan === 'yearly' ? 370 : 35;
+                const storeExpiry = new Date(txDate.getTime() + renewalDays * 24 * 60 * 60 * 1000);
+
+                // Only update if the store-derived expiry is actually later than what we have
+                const currentExpiry = savedState.expiresAt ? new Date(savedState.expiresAt) : new Date(0);
+                const newExpiresAt = storeExpiry > currentExpiry ? storeExpiry.toISOString() : savedState.expiresAt;
+
                 const renewedState: SubscriptionState = {
                   ...savedState,
-                  expiresAt: new Date(Date.now() + (savedState.plan === 'yearly' ? 370 : 35) * 24 * 60 * 60 * 1000).toISOString(),
+                  expiresAt: newExpiresAt,
                 };
                 await setSubscriptionState(renewedState);
                 setState(renewedState);

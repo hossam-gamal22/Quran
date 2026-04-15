@@ -422,7 +422,9 @@ export const prepareVerseWidgetData = async (
     if (cached) {
       return JSON.parse(cached);
     }
-  } catch { /* proceed to fetch */ }
+  } catch (e) {
+    console.warn('[Widget] Failed to parse cached verse, re-fetching:', e);
+  }
 
   // Fetch from API
   try {

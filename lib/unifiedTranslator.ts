@@ -87,7 +87,7 @@ const QURANCOM_IDS: Record<string, number | null> = {
   ru: 79,     // Elmir Kuliev
 };
 
-const SUNNAH_API_KEY = 'SqD712P3E82xnwOAEOkGd5JZH8s9wRR24TnnTSSJ';
+const SUNNAH_API_KEY = process.env.EXPO_PUBLIC_SUNNAH_API_KEY || '';
 
 /** Sunnah.com language codes differ from ours */
 const SUNNAH_LANG_MAP: Partial<Record<string, string>> = {
