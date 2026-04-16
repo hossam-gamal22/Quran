@@ -6,6 +6,7 @@
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
+    "jsEngine": "hermes",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
       "assets/fonts/qcf/**",
@@ -35,11 +36,16 @@
         "GADApplicationIdentifier": "ca-app-pub-3645278220050673~7902167287",
         "NSSupportsLiveActivities": true,
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true,
-          "NSAllowsArbitraryLoadsForMedia": true
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsArbitraryLoadsForMedia": true,
+          "NSExceptionDomains": {
+            "api.aladhan.com": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            }
+          }
         },
-        "NSLocationWhenInUseUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
-        "NSLocationAlwaysUsageDescription": "نحتاج الموقع لتحديد اتجاه القبلة وأوقات الصلاة",
+        "NSLocationWhenInUseUsageDescription": "يُستخدم موقعك لحساب أوقات الصلاة واتجاه القبلة بدقة",
         "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
         "SKAdNetworkItems": [
           { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
@@ -288,7 +294,7 @@
       }
     },
     "owner": "hossamgamal",
-    "runtimeVersion": "1.0.3",
+    "runtimeVersion": "1.0.4",
     "updates": {
       "url": "https://u.expo.dev/12ffec15-6357-43b4-a309-8e71cc2afc8c",
       "enabled": true,
