@@ -78,3 +78,87 @@ struct TasbihControl: ControlWidget {
         .description("فتح المسبحة الإلكترونية بسرعة")
     }
 }
+
+/// زر أذكار النوم في مركز التحكم
+@available(iOS 18.0, *)
+struct SleepAzkarControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "SleepAzkarControl") {
+            ControlWidgetButton(action: OpenSleepAzkarIntent()) {
+                Label("أذكار النوم", systemImage: "bed.double.fill")
+            }
+        }
+        .displayName("أذكار النوم")
+        .description("فتح أذكار النوم بسرعة")
+    }
+}
+
+/// زر أذكار الاستيقاظ في مركز التحكم
+@available(iOS 18.0, *)
+struct WakeupAzkarControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "WakeupAzkarControl") {
+            ControlWidgetButton(action: OpenWakeupAzkarIntent()) {
+                Label("أذكار الاستيقاظ", systemImage: "sunrise.fill")
+            }
+        }
+        .displayName("أذكار الاستيقاظ")
+        .description("فتح أذكار الاستيقاظ من النوم بسرعة")
+    }
+}
+
+/// زر أذكار بعد الصلاة في مركز التحكم
+@available(iOS 18.0, *)
+struct AfterPrayerAzkarControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "AfterPrayerAzkarControl") {
+            ControlWidgetButton(action: OpenAfterPrayerAzkarIntent()) {
+                Label("أذكار بعد الصلاة", systemImage: "figure.kneeling")
+            }
+        }
+        .displayName("أذكار بعد الصلاة")
+        .description("فتح الأذكار بعد السلام من الصلاة بسرعة")
+    }
+}
+
+/// زر القرآن الكريم في مركز التحكم
+@available(iOS 18.0, *)
+struct HolyQuranControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "HolyQuranControl") {
+            ControlWidgetButton(action: OpenHolyQuranIntent()) {
+                Label("القرآن الكريم", systemImage: "book.fill")
+            }
+        }
+        .displayName("القرآن الكريم")
+        .description("فتح المصحف الشريف بسرعة")
+    }
+}
+
+/// زر إشارات المصحف في مركز التحكم
+@available(iOS 18.0, *)
+struct QuranBookmarksControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "QuranBookmarksControl") {
+            ControlWidgetButton(action: OpenQuranBookmarksIntent()) {
+                Label("الإشارات المرجعية", systemImage: "bookmark.fill")
+            }
+        }
+        .displayName("إشارات المصحف")
+        .description("فتح إشارات المصحف المحفوظة بسرعة")
+    }
+}
+
+/// زر أذكار متنوعة في مركز التحكم
+@available(iOS 18.0, *)
+struct MoreAzkarControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "MoreAzkarControl") {
+            ControlWidgetButton(action: OpenMoreAzkarIntent()) {
+                Label("أذكار متنوعة", systemImage: "text.book.closed")
+            }
+        }
+        .displayName("أذكار متنوعة")
+        .description("فتح صفحة الأذكار المتنوعة بسرعة")
+    }
+}

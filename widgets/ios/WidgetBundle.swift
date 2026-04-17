@@ -33,9 +33,15 @@ struct RoohMuslimWidgetBundle: WidgetBundle {
         if #available(iOS 18.0, *) {
             MorningAzkarControl()
             EveningAzkarControl()
+            SleepAzkarControl()
+            WakeupAzkarControl()
+            AfterPrayerAzkarControl()
             PrayerTimesControl()
             QiblaControl()
             TasbihControl()
+            HolyQuranControl()
+            QuranBookmarksControl()
+            MoreAzkarControl()
         }
     }
 }

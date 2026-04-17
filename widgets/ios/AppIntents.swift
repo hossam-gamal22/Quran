@@ -5,6 +5,18 @@
 import AppIntents
 
 // ========================================
+// مساعد لكتابة الرابط في App Group UserDefaults
+// ========================================
+
+private let kAppGroupId = "group.com.rooh.almuslim"
+private let kPendingDeepLinkKey = "pending_deep_link"
+
+/// Write the target deep link to shared storage so the RN app can read it on launch.
+private func writePendingDeepLink(_ url: String) {
+    UserDefaults(suiteName: kAppGroupId)?.set(url, forKey: kPendingDeepLinkKey)
+}
+
+// ========================================
 // أغراض فتح صفحات التطبيق
 // ========================================
 
@@ -16,6 +28,7 @@ struct OpenMorningAzkarIntent: AppIntent {
     static var openAppWhenRun: Bool = true
     
     func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://azkar/1")
         return .result()
     }
 }
@@ -28,6 +41,7 @@ struct OpenEveningAzkarIntent: AppIntent {
     static var openAppWhenRun: Bool = true
     
     func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://azkar/1b")
         return .result()
     }
 }
@@ -40,6 +54,7 @@ struct OpenPrayerTimesIntent: AppIntent {
     static var openAppWhenRun: Bool = true
     
     func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://prayer")
         return .result()
     }
 }
@@ -52,6 +67,7 @@ struct OpenQiblaIntent: AppIntent {
     static var openAppWhenRun: Bool = true
     
     func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://qibla")
         return .result()
     }
 }
@@ -64,6 +80,85 @@ struct OpenTasbihIntent: AppIntent {
     static var openAppWhenRun: Bool = true
     
     func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://tasbih")
+        return .result()
+    }
+}
+
+/// فتح أذكار النوم
+@available(iOS 16.0, *)
+struct OpenSleepAzkarIntent: AppIntent {
+    static var title: LocalizedStringResource = "أذكار النوم"
+    static var description = IntentDescription("فتح أذكار النوم في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://azkar/2")
+        return .result()
+    }
+}
+
+/// فتح أذكار الاستيقاظ
+@available(iOS 16.0, *)
+struct OpenWakeupAzkarIntent: AppIntent {
+    static var title: LocalizedStringResource = "أذكار الاستيقاظ"
+    static var description = IntentDescription("فتح أذكار الاستيقاظ من النوم في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://azkar/3")
+        return .result()
+    }
+}
+
+/// فتح أذكار بعد الصلاة
+@available(iOS 16.0, *)
+struct OpenAfterPrayerAzkarIntent: AppIntent {
+    static var title: LocalizedStringResource = "أذكار بعد الصلاة"
+    static var description = IntentDescription("فتح الأذكار بعد السلام من الصلاة في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://azkar/27")
+        return .result()
+    }
+}
+
+/// فتح القرآن الكريم
+@available(iOS 16.0, *)
+struct OpenHolyQuranIntent: AppIntent {
+    static var title: LocalizedStringResource = "القرآن الكريم"
+    static var description = IntentDescription("فتح المصحف الشريف في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://quran")
+        return .result()
+    }
+}
+
+/// فتح الإشارات المرجعية للمصحف
+@available(iOS 16.0, *)
+struct OpenQuranBookmarksIntent: AppIntent {
+    static var title: LocalizedStringResource = "الإشارات المرجعية"
+    static var description = IntentDescription("فتح إشارات المصحف المحفوظة في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://quran-bookmarks")
+        return .result()
+    }
+}
+
+/// فتح أذكار متنوعة
+@available(iOS 16.0, *)
+struct OpenMoreAzkarIntent: AppIntent {
+    static var title: LocalizedStringResource = "أذكار متنوعة"
+    static var description = IntentDescription("فتح صفحة الأذكار المتنوعة في تطبيق روح المسلم")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult {
+        writePendingDeepLink("rooh-almuslim://more-azkar")
         return .result()
     }
 }
