@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.0.4",
+    "version": "1.2.0",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -26,13 +26,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.rooh.almuslim"],
+        "com.apple.security.application-groups": [
+          "group.com.rooh.almuslim"
+        ],
         "com.apple.developer.usernotifications.time-sensitive": true
       },
       "infoPlist": {
-        "LSApplicationQueriesSchemes": ["whatsapp"],
+        "LSApplicationQueriesSchemes": [
+          "whatsapp"
+        ],
         "GADApplicationIdentifier": "ca-app-pub-3645278220050673~7902167287",
         "NSSupportsLiveActivities": true,
         "NSAppTransportSecurity": {
@@ -46,15 +50,30 @@
           }
         },
         "NSLocationWhenInUseUsageDescription": "يُستخدم موقعك لحساب أوقات الصلاة واتجاه القبلة بدقة",
-        "UIBackgroundModes": ["audio", "fetch", "remote-notification"],
-        "SKAdNetworkItems": [
-          { "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork" },
-          { "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork" },
-          { "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork" },
-          { "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork" },
-          { "SKAdNetworkIdentifier": "5a6flpkh64.skadnetwork" }
+        "UIBackgroundModes": [
+          "audio",
+          "fetch",
+          "remote-notification"
         ],
-        "NSUserTrackingUsageDescription": "يستخدم هذا التطبيق معرف الإعلانات لعرض إعلانات مخصصة"
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "4fzdc2evr5.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "2fnua5tdw4.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "ydx93a7ass.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "5a6flpkh64.skadnetwork"
+          }
+        ],
+        "NSUserTrackingUsageDescription": "يستخدم هذا التطبيق معرف الإعلانات لعرض إعلانات مخصصة",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -64,7 +83,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 5,
+      "versionCode": 15,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -76,7 +95,8 @@
         "POST_NOTIFICATIONS",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
-        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "com.google.android.gms.permission.AD_ID"
       ],
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
@@ -84,16 +104,16 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "rooh-almuslim" }
+            {
+              "scheme": "rooh-almuslim"
+            }
           ],
-          "category": ["DEFAULT", "BROWSABLE"]
+          "category": [
+            "DEFAULT",
+            "BROWSABLE"
+          ]
         }
       ]
-    },
-    "notification": {
-      "icon": "./assets/images/icons/notification-icon.png",
-      "color": "#22c55e",
-      "androidMode": "default"
     },
     "web": {
       "bundler": "metro",
@@ -279,7 +299,12 @@
       "./plugins/with-ios-widgets",
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
-      ["./plugins/with-notification-large-icon", { "icon": "./assets/images/icons/icon.png" }],
+      [
+        "./plugins/with-notification-large-icon",
+        {
+          "icon": "./assets/images/icons/icon.png"
+        }
+      ],
       "./modules/proximity-sensor/plugin"
     ],
     "experiments": {
@@ -290,11 +315,28 @@
         "origin": false
       },
       "eas": {
-        "projectId": "12ffec15-6357-43b4-a309-8e71cc2afc8c"
+        "projectId": "12ffec15-6357-43b4-a309-8e71cc2afc8c",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "RoohAlMuslimWidgets",
+                  "bundleIdentifier": "com.rooh.almuslim.widgets",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.rooh.almuslim"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "owner": "hossamgamal",
-    "runtimeVersion": "1.0.4",
+    "runtimeVersion": "1.2.0",
     "updates": {
       "url": "https://u.expo.dev/12ffec15-6357-43b4-a309-8e71cc2afc8c",
       "enabled": true,

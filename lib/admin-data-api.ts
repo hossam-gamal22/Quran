@@ -5,6 +5,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -177,7 +178,7 @@ export async function fetchGoogleCalendarEvents(): Promise<GoogleCalendarEvent[]
 
       const url = `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?key=${encodeURIComponent(config.apiKey)}&timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=100`;
       
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, {}, 10000);
       if (!response.ok) {
         console.log('⚠️ Google Calendar fetch failed:', response.status);
         return null;

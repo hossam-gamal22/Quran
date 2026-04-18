@@ -1,6 +1,7 @@
 // lib/quran-cache.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import localQuranData from '../data/json/quran-uthmani.json';
+import { fetchWithTimeout } from './fetch-with-timeout';
 
 const CACHE_KEYS = {
   QURAN_FULL: '@quran_full_data',
@@ -92,7 +93,7 @@ export async function fetchAndCacheReciters(): Promise<Reciter[]> {
       return JSON.parse(cached);
     }
 
-    const response = await fetch('https://api.alquran.cloud/v1/edition?format=audio&language=ar');
+    const response = await fetchWithTimeout('https://api.alquran.cloud/v1/edition?format=audio&language=ar', {}, 8000);
     const data = await response.json();
 
     if (data.code === 200 && data.data) {
@@ -113,9 +114,13 @@ export async function fetchAndCacheReciters(): Promise<Reciter[]> {
     throw new Error('Failed to fetch reciters');
   } catch (error) {
     console.error('Error fetching reciters:', error);
-    const cached = await AsyncStorage.getItem(CACHE_KEYS.RECITERS_LIST);
-    if (cached) return JSON.parse(cached);
-    
+    try {
+      const cached = await AsyncStorage.getItem(CACHE_KEYS.RECITERS_LIST);
+      if (cached) return JSON.parse(cached);
+    } catch (parseErr) {
+      console.warn('Reciters cache corrupted, using defaults:', parseErr);
+    }
+
     // قائمة افتراضية
     return [
       { identifier: 'ar.alafasy', name: 'مشاري العفاسي', englishName: 'Mishary Alafasy', format: 'audio', type: 'versebyverse' },

@@ -12,6 +12,8 @@
  *   6. Lingva         (general — needs review)
  */
 
+import { fetchWithTimeout } from './fetch-with-timeout';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export const LANGUAGES = [
@@ -231,7 +233,7 @@ async function tryQuranCom(
 
   try {
     const url = `https://api.quran.com/api/v4/quran/translations/${resourceId}?verse_key=${surah}:${ayah}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -260,9 +262,9 @@ async function trySunnahCom(
 
   try {
     const url = `https://api.sunnah.com/v1/hadiths/${collectionName}:${hadithNumber}`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: { 'x-api-key': SUNNAH_API_KEY },
-    });
+    }, 8000);
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -287,7 +289,7 @@ async function fetchHisnulData(lang: string): Promise<any[]> {
 
   try {
     const url = `${HISNUL_BASE}/${lang}.json`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return [];
 
     const data = await res.json();
@@ -362,7 +364,7 @@ async function tryMyMemory(
   try {
     const langpair = getMyMemoryLangPair(sourceLang, targetLang);
     const url = `${MYMEMORY_URL}?q=${encodeURIComponent(text)}&langpair=${langpair}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -391,7 +393,7 @@ async function tryLibreTranslate(
 ): Promise<TranslationResult | null> {
   for (const instance of LIBRE_INSTANCES) {
     try {
-      const res = await fetch(`${instance}/translate`, {
+      const res = await fetchWithTimeout(`${instance}/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -400,7 +402,7 @@ async function tryLibreTranslate(
           target: targetLang,
           format: 'text',
         }),
-      });
+      }, 8000);
       if (!res.ok) continue;
 
       const data = await res.json();
@@ -427,7 +429,7 @@ async function tryLingva(
   for (const instance of LINGVA_INSTANCES) {
     try {
       const url = `${instance}/api/v1/${sourceLang}/${targetLang}/${encodeURIComponent(text)}`;
-      const res = await fetch(url);
+      const res = await fetchWithTimeout(url, {}, 8000);
       if (!res.ok) continue;
 
       const data = await res.json();

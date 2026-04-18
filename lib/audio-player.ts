@@ -1,9 +1,55 @@
 // lib/audio-player.ts
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { Audio } from 'expo-av';
 import { getAyahAudioUrl, saveLastPlayback, getLastPlayback, getCachedSurah } from './quran-cache';
 import { audioCoordinator } from './audio-coordinator';
 import { addListeningTime } from './listening-tracker';
+import { fetchWithTimeout } from './fetch-with-timeout';
+
+// Throttle the offline alert to at most once per 30s so repeat taps don't spam.
+let _lastOfflineAlertAt = 0;
+async function notifyOfflineAudio() {
+  const now = Date.now();
+  if (now - _lastOfflineAlertAt < 30_000) return;
+  _lastOfflineAlertAt = now;
+
+  // Check premium so we surface the right CTA (download vs subscribe).
+  let isPremium = false;
+  try {
+    const { getSubscriptionState } = await import('./subscription-manager');
+    const state = await getSubscriptionState();
+    isPremium = !!state?.isPremium;
+  } catch {}
+
+  if (isPremium) {
+    Alert.alert(
+      'لا يوجد اتصال بالإنترنت',
+      'تشغيل التلاوة يحتاج إلى اتصال بالإنترنت. يمكنك تحميل السورة من زر التحميل للاستماع بدون نت.',
+      [{ text: 'حسناً' }],
+    );
+    return;
+  }
+
+  // Free user: route to subscription page so they understand offline = premium.
+  try {
+    const { router } = await import('expo-router');
+    Alert.alert(
+      'لا يوجد اتصال بالإنترنت',
+      'الاستماع بدون إنترنت متاح في النسخة المميزة، حيث يمكنك تحميل السور والاستماع إليها في أي وقت.',
+      [
+        { text: 'حسناً', style: 'cancel' },
+        { text: 'اشترك الآن', onPress: () => { try { router.push('/subscription'); } catch {} } },
+      ],
+    );
+  } catch {
+    Alert.alert(
+      'لا يوجد اتصال بالإنترنت',
+      'الاستماع بدون إنترنت متاح في النسخة المميزة.',
+      [{ text: 'حسناً' }],
+    );
+  }
+}
 
 // TrackPlayer is used for native platforms (iOS/Android) for lock screen controls
 // expo-av is used as fallback for web platform and Expo Go
@@ -296,6 +342,22 @@ class AudioPlayerManager {
       // Abort if a newer playAyah call was made while resolving URL
       if (myLoadId !== this.loadingId) return;
 
+      // Offline guard: if URL is remote (CDN) and device is offline, alert and bail
+      // gracefully instead of leaving the user staring at an infinite spinner.
+      const isRemote = !/^(file:|asset:|content:)/i.test(audioUrl);
+      if (isRemote) {
+        const net = await NetInfo.fetch().catch(() => null);
+        const offline = !!net && net.isConnected === false;
+        if (offline) {
+          console.warn('[audio-player] Offline + remote URL — aborting playback');
+          notifyOfflineAudio();
+          this.isTransitioning = false;
+          this.updateState({ isLoading: false, isPlaying: false });
+          try { audioCoordinator.releaseFocus('quran'); } catch {}
+          return;
+        }
+      }
+
       // If full surah mode and starting from a specific ayah, don't auto-play — seek first
       const needsSeek = this.playingFullSurah && ayahNumber > 1;
 
@@ -585,7 +647,7 @@ class AudioPlayerManager {
     }
 
     const url = `https://api.qurancdn.com/api/qdc/audio/reciters/${reciterId}/audio_files?chapter_number=${surahNumber}&segments=true`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 8000);
     if (!res.ok) return { offsets: [], audioUrl: null };
     const data = await res.json();
 
