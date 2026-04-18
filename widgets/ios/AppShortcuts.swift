@@ -16,7 +16,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenMorningAzkarIntent(),
             phrases: [
                 "افتح أذكار الصباح في \(.applicationName)",
-                "أذكار الصباح",
+                "أذكار الصباح في \(.applicationName)",
                 "Morning Azkar in \(.applicationName)",
             ],
             shortTitle: "أذكار الصباح",
@@ -26,7 +26,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenEveningAzkarIntent(),
             phrases: [
                 "افتح أذكار المساء في \(.applicationName)",
-                "أذكار المساء",
+                "أذكار المساء في \(.applicationName)",
                 "Evening Azkar in \(.applicationName)",
             ],
             shortTitle: "أذكار المساء",
@@ -36,7 +36,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenSleepAzkarIntent(),
             phrases: [
                 "افتح أذكار النوم في \(.applicationName)",
-                "أذكار النوم",
+                "أذكار النوم في \(.applicationName)",
             ],
             shortTitle: "أذكار النوم",
             systemImageName: "bed.double.fill"
@@ -45,7 +45,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenWakeupAzkarIntent(),
             phrases: [
                 "افتح أذكار الاستيقاظ في \(.applicationName)",
-                "أذكار الاستيقاظ",
+                "أذكار الاستيقاظ في \(.applicationName)",
             ],
             shortTitle: "أذكار الاستيقاظ",
             systemImageName: "sunrise.fill"
@@ -54,7 +54,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenAfterPrayerAzkarIntent(),
             phrases: [
                 "افتح أذكار بعد الصلاة في \(.applicationName)",
-                "أذكار بعد الصلاة",
+                "أذكار بعد الصلاة في \(.applicationName)",
             ],
             shortTitle: "أذكار بعد الصلاة",
             systemImageName: "figure.kneeling"
@@ -63,7 +63,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenPrayerTimesIntent(),
             phrases: [
                 "افتح مواقيت الصلاة في \(.applicationName)",
-                "مواقيت الصلاة",
+                "مواقيت الصلاة في \(.applicationName)",
                 "Prayer times in \(.applicationName)",
             ],
             shortTitle: "مواقيت الصلاة",
@@ -73,7 +73,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenQiblaIntent(),
             phrases: [
                 "افتح اتجاه القبلة في \(.applicationName)",
-                "اتجاه القبلة",
+                "اتجاه القبلة في \(.applicationName)",
                 "Qibla direction in \(.applicationName)",
             ],
             shortTitle: "اتجاه القبلة",
@@ -83,7 +83,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenTasbihIntent(),
             phrases: [
                 "افتح المسبحة في \(.applicationName)",
-                "التسبيح",
+                "التسبيح في \(.applicationName)",
                 "Tasbih in \(.applicationName)",
             ],
             shortTitle: "التسبيح",
@@ -93,7 +93,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenHolyQuranIntent(),
             phrases: [
                 "افتح القرآن في \(.applicationName)",
-                "القرآن الكريم",
+                "القرآن الكريم في \(.applicationName)",
                 "Quran in \(.applicationName)",
             ],
             shortTitle: "القرآن الكريم",
@@ -103,7 +103,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenQuranBookmarksIntent(),
             phrases: [
                 "افتح إشارات المصحف في \(.applicationName)",
-                "إشارات المصحف",
+                "إشارات المصحف في \(.applicationName)",
             ],
             shortTitle: "إشارات المصحف",
             systemImageName: "bookmark.fill"
@@ -112,7 +112,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             intent: OpenMoreAzkarIntent(),
             phrases: [
                 "افتح أذكار متنوعة في \(.applicationName)",
-                "أذكار متنوعة",
+                "أذكار متنوعة في \(.applicationName)",
             ],
             shortTitle: "أذكار متنوعة",
             systemImageName: "text.book.closed"
