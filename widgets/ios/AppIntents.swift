@@ -30,7 +30,6 @@ private func writePendingDeepLink(_ url: String) {
 struct OpenMorningAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار الصباح"
     static var description = IntentDescription("فتح أذكار الصباح في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://azkar/1"
@@ -43,7 +42,6 @@ struct OpenMorningAzkarIntent: AppIntent {
 struct OpenEveningAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار المساء"
     static var description = IntentDescription("فتح أذكار المساء في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://azkar/1b"
@@ -56,7 +54,6 @@ struct OpenEveningAzkarIntent: AppIntent {
 struct OpenPrayerTimesIntent: AppIntent {
     static var title: LocalizedStringResource = "مواقيت الصلاة"
     static var description = IntentDescription("فتح مواقيت الصلاة في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://prayer"
@@ -69,10 +66,12 @@ struct OpenPrayerTimesIntent: AppIntent {
 struct OpenQiblaIntent: AppIntent {
     static var title: LocalizedStringResource = "اتجاه القبلة"
     static var description = IntentDescription("فتح اتجاه القبلة في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
-        let url = "rooh-almuslim://qibla"
+        // Qibla is a sub-tab inside Prayer, not a standalone route.
+        // Use the Prayer tab with ?tab=qibla so expo-router matches in both
+        // cold-start (via pending deep link) and warm-start (via Linking event).
+        let url = "rooh-almuslim://prayer?tab=qibla"
         writePendingDeepLink(url)
         return .result(opensIntent: OpenURLIntent(URL(string: url)!))
     }
@@ -82,7 +81,6 @@ struct OpenQiblaIntent: AppIntent {
 struct OpenTasbihIntent: AppIntent {
     static var title: LocalizedStringResource = "التسبيح"
     static var description = IntentDescription("فتح المسبحة الإلكترونية في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://tasbih"
@@ -95,7 +93,6 @@ struct OpenTasbihIntent: AppIntent {
 struct OpenSleepAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار النوم"
     static var description = IntentDescription("فتح أذكار النوم في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://azkar/2"
@@ -108,7 +105,6 @@ struct OpenSleepAzkarIntent: AppIntent {
 struct OpenWakeupAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار الاستيقاظ"
     static var description = IntentDescription("فتح أذكار الاستيقاظ من النوم في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://azkar/3"
@@ -121,7 +117,6 @@ struct OpenWakeupAzkarIntent: AppIntent {
 struct OpenAfterPrayerAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار بعد الصلاة"
     static var description = IntentDescription("فتح الأذكار بعد السلام من الصلاة في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://azkar/27"
@@ -134,7 +129,6 @@ struct OpenAfterPrayerAzkarIntent: AppIntent {
 struct OpenHolyQuranIntent: AppIntent {
     static var title: LocalizedStringResource = "القرآن الكريم"
     static var description = IntentDescription("فتح المصحف الشريف في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://quran"
@@ -147,7 +141,6 @@ struct OpenHolyQuranIntent: AppIntent {
 struct OpenQuranBookmarksIntent: AppIntent {
     static var title: LocalizedStringResource = "الإشارات المرجعية"
     static var description = IntentDescription("فتح إشارات المصحف المحفوظة في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://quran-bookmarks"
@@ -160,7 +153,6 @@ struct OpenQuranBookmarksIntent: AppIntent {
 struct OpenMoreAzkarIntent: AppIntent {
     static var title: LocalizedStringResource = "أذكار متنوعة"
     static var description = IntentDescription("فتح صفحة الأذكار المتنوعة في تطبيق روح المسلم")
-    static var openAppWhenRun: Bool = true
     @MainActor
     func perform() async throws -> some IntentResult & OpensIntent {
         let url = "rooh-almuslim://more-azkar"

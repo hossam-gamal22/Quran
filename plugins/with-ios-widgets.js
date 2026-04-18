@@ -42,6 +42,7 @@ const WIDGET_SWIFT_FILES = [
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',
+  'AppShortcuts.swift',
 ];
 
 // Shared Swift files compiled into BOTH main app and widget extension
@@ -403,15 +404,17 @@ const withIOSWidgets = (config) => {
             bs.IPHONEOS_DEPLOYMENT_TARGET = DEPLOYMENT_TARGET;
             bs.TARGETED_DEVICE_FAMILY = '"1,2"';
             bs.CODE_SIGN_ENTITLEMENTS = `${WIDGET_EXTENSION_NAME}/${WIDGET_EXTENSION_NAME}.entitlements`;
-            bs.CODE_SIGN_STYLE = 'Automatic';
+            bs.CODE_SIGN_STYLE = 'Manual';
             bs.DEVELOPMENT_TEAM = 'UDCBW35NWT';
             bs.INFOPLIST_FILE = `${WIDGET_EXTENSION_NAME}/Info.plist`;
             bs.LD_RUNPATH_SEARCH_PATHS = '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"';
             bs.PRODUCT_BUNDLE_IDENTIFIER = WIDGET_BUNDLE_ID;
             bs.SKIP_INSTALL = 'YES';
             bs.GENERATE_INFOPLIST_FILE = 'NO';
-            bs.CURRENT_PROJECT_VERSION = '1';
-            bs.MARKETING_VERSION = '1.0';
+            // Match parent app version so App Store Connect doesn't reject upload
+            // (CFBundleShortVersionString of app extension must equal parent app's)
+            bs.CURRENT_PROJECT_VERSION = String(config.ios?.buildNumber ?? '1');
+            bs.MARKETING_VERSION = String(config.version ?? '1.0');
             bs.ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = 'YES';
           }
         }
