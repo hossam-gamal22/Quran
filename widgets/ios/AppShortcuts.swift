@@ -108,14 +108,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
             shortTitle: "إشارات المصحف",
             systemImageName: "bookmark.fill"
         )
-        AppShortcut(
-            intent: OpenMoreAzkarIntent(),
-            phrases: [
-                "افتح أذكار متنوعة في \(.applicationName)",
-                "أذكار متنوعة في \(.applicationName)",
-            ],
-            shortTitle: "أذكار متنوعة",
-            systemImageName: "text.book.closed"
-        )
+        // Note: OpenMoreAzkarIntent excluded from App Shortcuts (Apple limit: 10 max)
+        // It still works via Control Center widget in ControlWidgets.swift
     }
 }
