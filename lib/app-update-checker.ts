@@ -77,7 +77,7 @@ export async function checkAndNotifyUpdate(
   if (Platform.OS === 'web') return;
   if (!latestVersion) return;
 
-  const currentVersion = Constants.expoConfig?.version || '1.0.0';
+  const currentVersion = Constants.expoConfig?.version || '1.2.0';
 
   // No update available
   if (!isNewerVersion(currentVersion, latestVersion)) return;

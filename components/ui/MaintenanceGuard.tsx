@@ -43,7 +43,9 @@ export function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   // Force update
   const currentVersion = Constants.expoConfig?.version || '1.0.0';
   if (config.forceUpdate && config.minVersion && isVersionLessThan(currentVersion, config.minVersion)) {
-    const storeUrl = Platform.OS === 'ios' ? config.downloadLinks?.ios : config.downloadLinks?.android;
+    const storeUrl = Platform.OS === 'ios'
+      ? (config.storeUrlIos || config.downloadLinks?.ios)
+      : (config.storeUrlAndroid || config.downloadLinks?.android);
     return (
       <View style={styles.container}>
         <MaterialCommunityIcons name="cellphone-arrow-down" size={64} color="#007AFF" />

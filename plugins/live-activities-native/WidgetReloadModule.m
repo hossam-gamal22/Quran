@@ -16,4 +16,7 @@ RCT_EXTERN_METHOD(writeSharedDataFile:(NSString *)jsonString
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(readPendingDeepLink:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 @end

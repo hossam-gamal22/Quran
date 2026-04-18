@@ -16,8 +16,8 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { GlassCard } from '@/components/ui';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncPendingScores, updateMonthlyScore, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
-import { getUserId } from '@/lib/firebase-user';
+import { fetchRewardsConfig, getUserMonthlyInfo, getMonthlyLeaderboard, syncPendingScores, setMonthlyEngagement, detectRankChange, checkAndCelebrateWinner, DEFAULT_WEIGHTS } from '@/lib/rewards-manager';
+import { getUserId, getDisplayName } from '@/lib/firebase-user';
 import type { RewardsConfig } from '@/types/rewards';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
@@ -54,6 +54,7 @@ export default function HonorBoard() {
   const [leaderboard, setLeaderboard] = useState<Array<{ userId: string; displayName: string; score: number }>>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [hasDisplayName, setHasDisplayName] = useState(true);
   const isArabic = (settings.language || 'ar') === 'ar';
 
   useEffect(() => {
@@ -75,11 +76,21 @@ export default function HonorBoard() {
   };
 
   const loadData = async () => {
+    // Wrap Firestore work with a hard timeout so the screen never hangs
+    // forever on flaky / offline networks.
+    const timeoutMs = 15000;
+    const withTimeout = <T,>(p: Promise<T>): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error('honor-board-timeout')), timeoutMs),
+        ),
+      ]);
     try {
-      const [rewardsConfig, userId] = await Promise.all([
+      const [rewardsConfig, userId] = await withTimeout(Promise.all([
         fetchRewardsConfig(),
         getUserId(),
-      ]);
+      ]));
       setConfig(rewardsConfig);
 
       // Sync any pending local scores to Firestore before reading
@@ -88,15 +99,17 @@ export default function HonorBoard() {
       }
 
       // Fetch leaderboard (now includes just-synced scores)
-      const board = await getMonthlyLeaderboard(20);
+      const board = await withTimeout(getMonthlyLeaderboard(20));
       setLeaderboard(board);
 
       if (userId) {
         setCurrentUserId(userId);
-        const [info, worshipActivities] = await Promise.all([
+        const [info, worshipActivities, userName] = await Promise.all([
           getUserMonthlyInfo(userId),
           getActualActivitiesFromWorship(),
+          getDisplayName(),
         ]);
+        setHasDisplayName(!!userName && userName.trim().length > 0);
 
         // Worship storage is the SINGLE SOURCE OF TRUTH for all activities
         // Firestore tracking only used for activities without worship storage (app_open)
@@ -125,14 +138,13 @@ export default function HonorBoard() {
         setMonthlyActivities(merged);
         setUserScore(totalScore);
 
-        // Sync worship data to Firestore so leaderboard reflects true counts
-        for (const [key, worshipCount] of Object.entries(worshipActivities)) {
-          const trackedCount = tracked[key] || 0;
-          const diff = worshipCount - trackedCount;
-          if (diff > 0) {
-            updateMonthlyScore(userId, key as any, diff).catch(() => {});
-          }
-        }
+        // Overwrite Firestore with recalculated truth so leaderboard matches
+        setMonthlyEngagement(userId, merged, totalScore).then(() => {
+          // Patch local leaderboard state so UI is consistent immediately
+          setLeaderboard(prev => prev.map(u =>
+            u.userId === userId ? { ...u, score: totalScore } : u
+          ));
+        }).catch(() => {});
 
         if (info) {
           // Calculate rank from leaderboard
@@ -397,6 +409,26 @@ export default function HonorBoard() {
           <Text style={[styles.sectionTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {isArabic ? 'ترتيب المتسابقين' : 'Leaderboard'}
           </Text>
+          {/* Note: users must set their name to appear */}
+          {!hasDisplayName && (
+            <GlassCard style={[styles.nameWarningCard, { marginBottom: 12 }]}>
+              <View style={[styles.nameWarningInner, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={20} color={isDarkMode ? '#f59e0b' : '#B57200'} />
+                <Text style={[styles.nameWarningText, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {isArabic
+                    ? 'يجب إضافة اسمك في الإعدادات حتى تظهر في لوحة الشرف'
+                    : 'You must set your name in Settings to appear on the honor board'}
+                </Text>
+              </View>
+              <Text
+                onPress={() => router.push('/(tabs)/settings')}
+                style={[styles.nameWarningLink, { color: isDarkMode ? '#f59e0b' : '#B57200', textAlign: isRTL ? 'right' : 'left' }]}
+              >
+                {isArabic ? 'اذهب للإعدادات ←' : '→ Go to Settings'}
+              </Text>
+            </GlassCard>
+          )}
+
           {leaderboard.length > 0 ? (
             <GlassCard style={styles.activitiesCard}>
               {leaderboard.map((user, i) => {
@@ -848,6 +880,29 @@ const _styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: fontRegular(),
     lineHeight: 20,
+    includeFontPadding: false,
+  },
+  nameWarningCard: {
+    padding: 14,
+  },
+  nameWarningInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  nameWarningText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: fontSemiBold(),
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  nameWarningLink: {
+    fontSize: 13,
+    fontFamily: fontBold(),
+    marginTop: 8,
+    textDecorationLine: 'underline',
+    lineHeight: 22,
     includeFontPadding: false,
   },
 });

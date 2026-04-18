@@ -85,7 +85,7 @@ const STORAGE_KEYS = {
 
 const MAX_STORED_EVENTS = 500;
 const MAX_STORED_SESSIONS = 50;
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.2.0';
 
 // ========================================
 // متغيرات الجلسة

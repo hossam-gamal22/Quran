@@ -22,6 +22,14 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
+
+// Arabic character range (Arabic + Supplement + Extended-A + Presentation Forms)
+const ARABIC_RANGE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+const hasArabic = (s?: string) => !!s && ARABIC_RANGE.test(s);
+/** Pick the best name to display given the current UI language. */
+function resolveStationName(station: RadioStation, lang: string): string {
+  return station.nameTranslations?.[lang] || station.name;
+}
 import { useGlobalAudio } from '@/contexts/GlobalAudioContext';
 import { t } from '@/lib/i18n';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -53,7 +61,8 @@ function RadioScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
-  const { isDarkMode } = useSettings();
+  const { isDarkMode, settings } = useSettings();
+  const language = settings.language;
   const router = useRouter();
   const { state: audioState, playRadio, stopRadio } = useGlobalAudio();
   const radioState = audioState.radioState;
@@ -71,8 +80,8 @@ function RadioScreen() {
   const [isOffline, setIsOffline] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
 
-  // Interstitial ad — show after 20s of radio playback (every channel open)
-  const adTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Interstitial ad — show every 5 minutes of radio playback
+  const adTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Animation for search bar
   const searchAnim = useRef(new Animated.Value(0)).current;
@@ -86,7 +95,7 @@ function RadioScreen() {
     } catch {
       const netState = await NetInfo.fetch();
       if (!(netState.isConnected && netState.isInternetReachable !== false)) {
-        setError(t('radio.internetRequired'));
+        setError(t('radio.onlineOnlyMessage'));
         showOfflineModal();
       } else {
         setError(t('radio.errorLoading'));
@@ -151,7 +160,7 @@ function RadioScreen() {
     // Check network connectivity before trying to play
     const netState = await NetInfo.fetch();
     if (!(netState.isConnected && netState.isInternetReachable !== false)) {
-      setError(t('radio.internetRequired'));
+      setError(t('radio.onlineOnlyMessage'));
       showOfflineModal();
       return;
     }
@@ -161,18 +170,19 @@ function RadioScreen() {
       if (radioState.currentStation?.id === station.id && radioState.status === 'playing') {
         // Stopping — clear the ad timer
         if (adTimerRef.current) {
-          clearTimeout(adTimerRef.current);
+          clearInterval(adTimerRef.current);
           adTimerRef.current = null;
         }
         console.log('[Radio] Stopping current station');
         await stopRadio();
       } else {
-        // Starting a new station — schedule interstitial after 20s
-        if (adTimerRef.current) clearTimeout(adTimerRef.current);
-        adTimerRef.current = setTimeout(() => {
+        // Starting a new station — schedule interstitial every 6 minutes.
+        // 6 min (not 5) keeps each tick outside the 5-min global ad cooldown,
+        // otherwise the first tick at 5:00 lands inside the window and is dropped.
+        if (adTimerRef.current) clearInterval(adTimerRef.current);
+        adTimerRef.current = setInterval(() => {
           try { showInterstitial(); } catch {}
-          adTimerRef.current = null;
-        }, 60_000); // Show after 60s of listening (was 20s)
+        }, 360_000);
         console.log('[Radio] Starting playback for:', station.name);
         await playRadio(station);
         console.log('[Radio] playRadio call completed');
@@ -188,13 +198,20 @@ function RadioScreen() {
   // Cleanup ad timer on unmount
   useEffect(() => {
     return () => {
-      if (adTimerRef.current) clearTimeout(adTimerRef.current);
+      if (adTimerRef.current) clearInterval(adTimerRef.current);
     };
   }, []);
 
   // Filter stations based on tab
   const filteredStations = useMemo(() => {
     let result = stations;
+
+    // When the UI is Arabic, drop stations whose display name would be non-Arabic.
+    // Station qualifies if either the admin-provided Arabic translation or the
+    // primary name contains Arabic script — otherwise it's noise for ar users.
+    if (language === 'ar') {
+      result = result.filter(s => hasArabic(s.nameTranslations?.ar) || hasArabic(s.name));
+    }
 
     // Category filter based on tab
     if (activeTab === 'quran') {
@@ -215,7 +232,7 @@ function RadioScreen() {
     }
 
     return result;
-  }, [stations, activeTab, favorites, searchQuery]);
+  }, [stations, activeTab, favorites, searchQuery, language]);
 
   const tabs = useMemo(() => [
     { key: 'all' as const, label: t('radio.allStations') },
@@ -280,7 +297,7 @@ function RadioScreen() {
               ]}
               numberOfLines={1}
             >
-              {item.name}
+              {resolveStationName(item, language)}
             </Text>
             <View style={[styles.stationMeta, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {playing && (
@@ -315,7 +332,7 @@ function RadioScreen() {
         </View>
       </Pressable>
     );
-  }, [isCurrentlyPlaying, isCurrentlyLoading, favorites, isDarkMode, isRTL, colors, handlePlayStation, handleToggleFavorite]);
+  }, [isCurrentlyPlaying, isCurrentlyLoading, favorites, isDarkMode, isRTL, colors, handlePlayStation, handleToggleFavorite, language]);
 
   return (
     <ScreenContainer screenKey="radio" edges={['top', 'left', 'right']}>
@@ -362,13 +379,12 @@ function RadioScreen() {
         </View>
       </Animated.View>
 
-      {/* Tabs */}
+      {/* Tabs — iOS UISegmentedControl handles RTL ordering natively */}
       <View style={styles.tabsContainer}>
         <NativeTabs
           tabs={tabs}
           selected={activeTab}
           onSelect={(key) => setActiveTab(key as RadioTab)}
-          scrollable
           indicatorColor={ACCENT}
         />
       </View>
@@ -409,7 +425,7 @@ function RadioScreen() {
           />
           <View style={[styles.errorBannerInfo, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
             <Text style={[styles.errorBannerTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-              {radioState.currentStation.name}
+              {resolveStationName(radioState.currentStation, language)}
             </Text>
             <Text style={[styles.errorBannerMsg, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
               {isOffline ? t('radio.noInternet') : radioState.errorMessage === 'STREAM_OFFLINE' ? t('radio.stationOffline') : t('radio.connectionError')}
@@ -454,7 +470,7 @@ function RadioScreen() {
               {t('radio.nowPlaying')}
             </Text>
             <Text style={[styles.nowPlayingName, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]} numberOfLines={1}>
-              {radioState.currentStation.name}
+              {resolveStationName(radioState.currentStation, language)}
             </Text>
           </View>
           <Pressable
@@ -523,7 +539,7 @@ function RadioScreen() {
 
       {/* Fixed Banner at Bottom */}
       <View style={styles.fixedBannerContainer}>
-        <BannerAdComponent screen="home" />
+        <BannerAdComponent screen="radio" />
       </View>
     </ScreenContainer>
   );

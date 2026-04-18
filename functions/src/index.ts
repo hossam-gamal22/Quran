@@ -1,6 +1,10 @@
 import * as admin from 'firebase-admin';
 import * as functions from 'firebase-functions';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { defineSecret } from 'firebase-functions/params';
+
+// Expo Access Token for authenticated push API calls
+const expoAccessToken = defineSecret('EXPO_ACCESS_TOKEN');
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -56,7 +60,7 @@ const EXPO_REQUEST_TIMEOUT_MS = 15000;
  *   { messages: ExpoPushMessage[] }  — pre-built per-user messages (multi-language)
  *   { tokens, title, body, ... }     — flat payload (single language, legacy)
  */
-export const sendPushNotifications = functions.https.onCall(
+export const sendPushNotifications = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onCall(
   async (data: {
     messages?: ExpoPushMessage[];
     tokens?: string[];
@@ -114,6 +118,16 @@ export const sendPushNotifications = functions.https.onCall(
       // Send via Expo with failover
       let lastError: Error | null = null;
 
+      // Build auth headers
+      const token = expoAccessToken.value();
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       for (const endpoint of EXPO_PUSH_APIS) {
         try {
           const controller = new AbortController();
@@ -121,10 +135,7 @@ export const sendPushNotifications = functions.https.onCall(
 
           const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify(messages),
             signal: controller.signal as any,
           });
@@ -181,7 +192,7 @@ export const sendPushNotifications = functions.https.onCall(
  * HTTP Endpoint for testing (development only)
  * Remove in production or add security checks
  */
-export const pushNotificationsTestEndpoint = functions.https.onRequest(
+export const pushNotificationsTestEndpoint = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onRequest(
   async (req, res) => {
     // CORS headers
     res.set('Access-Control-Allow-Origin', '*');
@@ -221,6 +232,16 @@ export const pushNotificationsTestEndpoint = functions.https.onRequest(
         priority: 'high',
       }));
 
+      // Build auth headers
+      const token = expoAccessToken.value();
+      const authHeaders: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        authHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
       // Try both endpoints
       for (const endpoint of EXPO_PUSH_APIS) {
         try {
@@ -229,10 +250,7 @@ export const pushNotificationsTestEndpoint = functions.https.onRequest(
 
           const response = await fetch(endpoint, {
             method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
+            headers: authHeaders,
             body: JSON.stringify(messages),
             signal: controller.signal as any,
           });
@@ -273,7 +291,7 @@ export const pushNotificationsTestEndpoint = functions.https.onRequest(
  * grants them admin premium, and sends push notifications.
  */
 export const selectMonthlyWinners = onSchedule(
-  { schedule: '5 0 1 * *', timeZone: 'Asia/Riyadh' },
+  { schedule: '5 0 1 * *', timeZone: 'Asia/Riyadh', secrets: ['EXPO_ACCESS_TOKEN'] },
   async () => {
     try {
       // Calculate previous month key (YYYY-MM-v2 format)
@@ -391,12 +409,17 @@ export const selectMonthlyWinners = onSchedule(
 
       if (pushMessages.length > 0) {
         try {
+          const winnerToken = expoAccessToken.value();
+          const winnerHeaders: Record<string, string> = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          };
+          if (winnerToken) {
+            winnerHeaders['Authorization'] = `Bearer ${winnerToken}`;
+          }
           const response = await fetch(EXPO_PUSH_APIS[0], {
             method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
+            headers: winnerHeaders,
             body: JSON.stringify(pushMessages),
           });
           if (response.ok) {
@@ -412,6 +435,119 @@ export const selectMonthlyWinners = onSchedule(
       logger.info(`🏆 Selected ${winners.length} winners for ${monthKey}`);
     } catch (error) {
       logger.error('❌ selectMonthlyWinners failed:', error);
+    }
+  }
+);
+
+// ==================== Admin Authentication ====================
+
+/**
+ * Cloud Function: Verify admin password securely on the server.
+ * The password hash is stored in `appConfig/adminAuth` which is now
+ * read-restricted by Firestore rules — only this function (running with
+ * Admin SDK privileges) can read it.
+ *
+ * Returns a session token on success. The token is also stored in Firestore
+ * so admin panel can verify it on subsequent loads.
+ *
+ * Input:  { passwordHash: string }  (SHA-256 hex hash, computed in browser)
+ * Output: { sessionToken: string } on success
+ *         throws 'permission-denied' on wrong password
+ *         throws 'failed-precondition' if no admin password is configured
+ */
+export const verifyAdminPassword = functions.https.onCall(
+  async (data: { passwordHash?: string }) => {
+    try {
+      const submittedHash = (data?.passwordHash || '').trim().toLowerCase();
+      if (!submittedHash || submittedHash.length !== 64) {
+        throw new functions.https.HttpsError(
+          'invalid-argument',
+          'A valid SHA-256 password hash is required.'
+        );
+      }
+
+      const snap = await db.doc('appConfig/adminAuth').get();
+      if (!snap.exists) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Admin authentication is not configured.'
+        );
+      }
+
+      const stored = snap.data() as { passwordHash?: string } | undefined;
+      const storedHash = (stored?.passwordHash || '').trim().toLowerCase();
+      if (!storedHash) {
+        throw new functions.https.HttpsError(
+          'failed-precondition',
+          'Admin password hash is missing.'
+        );
+      }
+
+      // Constant-time comparison to mitigate timing attacks
+      if (storedHash.length !== submittedHash.length) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Incorrect password.'
+        );
+      }
+      let mismatch = 0;
+      for (let i = 0; i < storedHash.length; i++) {
+        mismatch |= storedHash.charCodeAt(i) ^ submittedHash.charCodeAt(i);
+      }
+      if (mismatch !== 0) {
+        throw new functions.https.HttpsError(
+          'permission-denied',
+          'Incorrect password.'
+        );
+      }
+
+      // Generate fresh session token (rotated on every login)
+      const sessionToken = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+      await db.doc('appConfig/adminAuth').set(
+        {
+          sessionToken,
+          sessionIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return { sessionToken };
+    } catch (error) {
+      if (error instanceof functions.https.HttpsError) throw error;
+      logger.error('verifyAdminPassword error:', error);
+      throw new functions.https.HttpsError('internal', 'Authentication failed.');
+    }
+  }
+);
+
+/**
+ * Cloud Function: Validate an existing admin session token.
+ * Called by admin panel on page load to confirm the cached token is still valid.
+ *
+ * Input:  { sessionToken: string }
+ * Output: { valid: boolean }
+ */
+export const validateAdminSession = functions.https.onCall(
+  async (data: { sessionToken?: string }) => {
+    try {
+      const submitted = (data?.sessionToken || '').trim();
+      if (!submitted) return { valid: false };
+
+      const snap = await db.doc('appConfig/adminAuth').get();
+      if (!snap.exists) return { valid: false };
+
+      const stored = (snap.data() as { sessionToken?: string } | undefined)?.sessionToken || '';
+      if (!stored || stored.length !== submitted.length) return { valid: false };
+
+      // Constant-time compare
+      let mismatch = 0;
+      for (let i = 0; i < stored.length; i++) {
+        mismatch |= stored.charCodeAt(i) ^ submitted.charCodeAt(i);
+      }
+      return { valid: mismatch === 0 };
+    } catch (error) {
+      logger.error('validateAdminSession error:', error);
+      return { valid: false };
     }
   }
 );

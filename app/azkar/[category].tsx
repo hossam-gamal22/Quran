@@ -69,6 +69,8 @@ import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
 import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
+import { prefetchAzkarFiles, isAzkarCached } from '@/lib/azkar-audio-cache';
+import NetInfo from '@react-native-community/netinfo';
 import { hasQuranRefs } from '@/lib/azkar-quran-refs';
 import AzkarQcfVerse from '@/components/AzkarQcfVerse';
 import { getListenModeBackgrounds } from '@/constants/pexels-backgrounds';
@@ -610,16 +612,20 @@ export default function CategoryAzkarScreen() {
   const shareAsText = async (zikr: Zikr | CustomDhikr) => {
     try {
       const isCustom = 'createdAt' in zikr;
-      let message = zikr.arabic;
+      const parts: string[] = [zikr.arabic];
       if (!isCustom) {
         const translation = getZikrTranslation(zikr as Zikr, language);
-        message = `${zikr.arabic}\n\n${translation}\n\n📖 ${(zikr as Zikr).reference}\n\n${t('azkar.fromApp')}`;
+        const stripped = (s: string) => s.replace(/[«»“”"'()\[\]﴾﴿]/g, '').replace(/\s+/g, ' ').trim();
+        if (translation && stripped(translation) !== stripped(zikr.arabic)) {
+          parts.push(translation);
+        }
+        const ref = (zikr as Zikr).reference;
+        if (ref) parts.push(`📖 ${ref}`);
       } else if ((zikr as CustomDhikr).translation) {
-        message = `${zikr.arabic}\n\n${(zikr as CustomDhikr).translation}\n\n${t('azkar.fromApp')}`;
-      } else {
-        message = `${zikr.arabic}\n\n${t('azkar.fromApp')}`;
+        parts.push((zikr as CustomDhikr).translation as string);
       }
-      await Share.share({ message });
+      parts.push(t('azkar.fromApp'));
+      await Share.share({ message: parts.join('\n\n') });
     } catch (error) {
       console.error('Error sharing:', error);
     }
@@ -631,6 +637,45 @@ export default function CategoryAzkarScreen() {
       .map((z, idx) => ({ zikr: z, originalIndex: idx }))
       .filter(item => !!item.zikr.audio);
   }, [azkar]);
+
+  // Prefetch this category's audio files in the background so Listen mode
+  // works fully offline on subsequent visits. Safe no-op for already-cached files.
+  useEffect(() => {
+    if (audioQueue.length === 0) return;
+    const filenames = audioQueue
+      .map(item => item.zikr.audio)
+      .filter((f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:)/i.test(f));
+    if (filenames.length === 0) return;
+    prefetchAzkarFiles(filenames).catch(err =>
+      console.warn('[azkar] prefetch failed:', err),
+    );
+  }, [audioQueue]);
+
+  // Verify audio is playable: online OR all required files already cached.
+  // Shows an alert and returns false if offline + uncached.
+  const ensureAudioReachable = useCallback(async (filenames: (string | undefined)[]): Promise<boolean> => {
+    const needed = filenames.filter(
+      (f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:)/i.test(f),
+    );
+    if (needed.length === 0) return true;
+    // If any needed file is missing from cache, we require network
+    let allCached = true;
+    for (const f of needed) {
+      if (!(await isAzkarCached(f))) { allCached = false; break; }
+    }
+    if (allCached) return true;
+    // Need network — check connectivity
+    const net = await NetInfo.fetch().catch(() => null);
+    const online = !!net && net.isConnected !== false && net.isInternetReachable !== false;
+    if (online) return true;
+    Alert.alert(
+      t('azkar.offlineAudioTitle') || 'لا يوجد اتصال بالإنترنت',
+      t('azkar.offlineAudioMessage') ||
+        'يحتاج تشغيل الأذكار لأول مرة إلى اتصال بالإنترنت لتنزيل ملفات الصوت. بعد التحميل يعمل بدون نت.',
+      [{ text: t('common.ok') || 'حسناً' }],
+    );
+    return false;
+  }, []);
 
   // Build GlobalAudioContext-compatible track list
   const audioTracks: AudioTrack[] = React.useMemo(() => {
@@ -654,6 +699,8 @@ export default function CategoryAzkarScreen() {
     if (isCurrentAzkarQueuePlaying && currentQueueIndex === queueIdx) {
       await globalAudio.togglePlayPause();
     } else {
+      const ok = await ensureAudioReachable([zikr.audio]);
+      if (!ok) return;
       await globalAudio.playAzkarQueue(audioTracks, queueIdx, `/azkar/${category}`);
       setAudioPlaying(true);
     }
@@ -688,11 +735,17 @@ export default function CategoryAzkarScreen() {
       await globalAudio.togglePlayPause();
       return;
     }
+    // Verify we can actually play (online OR cached)
+    const filenames = audioQueue
+      .map(item => item.zikr.audio)
+      .filter((f): f is string => !!f);
+    const ok = await ensureAudioReachable(filenames);
+    if (!ok) return;
     // Start from beginning
     setListenMode(true);
     setAudioPlaying(true);
     await globalAudio.playAzkarQueue(audioTracks, 0, `/azkar/${category}`);
-  }, [audioPlaying, audioTracks, globalAudio, category]);
+  }, [audioPlaying, audioTracks, audioQueue, globalAudio, category]);
 
   const handleStopListening = useCallback(async () => {
     await globalAudio.stop();

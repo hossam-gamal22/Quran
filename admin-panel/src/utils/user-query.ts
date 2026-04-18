@@ -22,6 +22,7 @@ export interface ActiveDevice extends DeviceUser {
   platform: string;
   language: string;
   country: string;
+  countrySource: string;
   lastActive: unknown;
   installSource: string;
   displayName?: string;
@@ -122,6 +123,7 @@ export async function fetchActiveDevices(
       platform: data.platform || 'unknown',
       language: data.language || 'ar',
       country: data.country || '',
+      countrySource: data.countrySource || '',
       lastActive: data.lastActive ?? null,
       installSource: data.installSource,
     } as ActiveDevice);

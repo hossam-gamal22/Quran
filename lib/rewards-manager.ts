@@ -2,7 +2,7 @@
 // نظام المكافآت الشهرية — إدارة النقاط والفائزين
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc, setDoc, increment as firestoreIncrement, collection, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 import { db } from './firebase-config';
 import { scheduleLocalNotification } from './push-notifications';
 import type { RewardsConfig, ScoreWeights, ActivityType, MonthlyEngagement, Winner } from '@/types/rewards';
@@ -89,6 +89,57 @@ const refreshRewardsFromFirestore = async (): Promise<RewardsConfig> => {
     cachedConfig = cachedConfig || DEFAULT_CONFIG;
   }
   return cachedConfig;
+};
+
+/**
+ * Real-time listener for rewards config changes from admin panel.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToRewardsConfig(
+  onUpdate: (config: RewardsConfig) => void,
+): () => void {
+  try {
+    return onSnapshot(
+      doc(db, 'config', 'rewards-settings'),
+      (snap) => {
+        const merged: RewardsConfig = snap.exists()
+          ? ({ ...DEFAULT_CONFIG, ...snap.data() } as RewardsConfig)
+          : DEFAULT_CONFIG;
+        cachedConfig = merged;
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(merged)).catch(() => {});
+        onUpdate(merged);
+      },
+      (error) => {
+        if (__DEV__) console.warn('[rewards-manager] subscribe error:', error);
+      },
+    );
+  } catch (e) {
+    if (__DEV__) console.warn('[rewards-manager] failed to subscribe:', e);
+    return () => {};
+  }
+}
+
+/**
+ * Overwrite monthly engagement in Firestore with recalculated values.
+ * Used to correct stale leaderboard scores by setting the absolute truth
+ * from worship storage instead of incrementing.
+ */
+export const setMonthlyEngagement = async (
+  userId: string,
+  activities: Record<string, number>,
+  totalScore: number
+): Promise<void> => {
+  try {
+    const currentMonth = getCurrentMonth();
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      'monthlyEngagement.score': totalScore,
+      'monthlyEngagement.activities': activities,
+      'monthlyEngagement.month': currentMonth,
+    });
+  } catch (error) {
+    console.log('📴 Failed to set monthly engagement:', error);
+  }
 };
 
 /**

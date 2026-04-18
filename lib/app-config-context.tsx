@@ -14,11 +14,11 @@ const DEFAULT_CONFIG: RemoteAppConfig = {
   name: 'رُوح المسلم',
   nameEn: 'Rooh Al-Muslim',
   description: 'تطبيق إسلامي شامل للقرآن والأذكار والصلاة',
-  version: '1.0.0',
+  version: '1.2.0',
   primaryColor: '#1B4332',
   maintenanceMode: false,
   forceUpdate: false,
-  minVersion: '1.0.0',
+  minVersion: '1.2.0',
   contact: { email: 'hossamgamal290@gmail.com', website: '' },
   downloadLinks: { android: '', ios: '' },
   features: {

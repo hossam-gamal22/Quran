@@ -49,7 +49,7 @@ function getAdhanCalcParams(methodId: number) {
     case 14: return AdhanCalcMethod.MuslimWorldLeague(); // Russia ≈ MWL
     case 15: return AdhanCalcMethod.MoonsightingCommittee();
     case 16: return AdhanCalcMethod.Dubai();
-    default: return AdhanCalcMethod.UmmAlQura();
+    default: return AdhanCalcMethod.MuslimWorldLeague();
   }
 }
 
@@ -89,13 +89,41 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   MY: { lat: 3.1390, lng: 101.6869, cityNameAr: 'كوالالمبور', cityNameEn: 'Kuala Lumpur', method: 11, asrSchool: 0 },
   SG: { lat: 1.3521, lng: 103.8198, cityNameAr: 'سنغافورة', cityNameEn: 'Singapore', method: 11, asrSchool: 0 },
 
-  // Turkey & Central Asia
+  // Turkey & Balkans
   TR: { lat: 41.0082, lng: 28.9784, cityNameAr: 'إسطنبول', cityNameEn: 'Istanbul', method: 13, asrSchool: 1 },
+  BA: { lat: 43.8563, lng: 18.4131, cityNameAr: 'سراييفو', cityNameEn: 'Sarajevo', method: 13, asrSchool: 1 },
+  AL: { lat: 41.3275, lng: 19.8187, cityNameAr: 'تيرانا', cityNameEn: 'Tirana', method: 13, asrSchool: 1 },
+  XK: { lat: 42.6629, lng: 21.1655, cityNameAr: 'بريشتينا', cityNameEn: 'Pristina', method: 13, asrSchool: 1 },
+  MK: { lat: 41.9973, lng: 21.4280, cityNameAr: 'سكوبيه', cityNameEn: 'Skopje', method: 13, asrSchool: 1 },
+
+  // Iran
+  IR: { lat: 35.6892, lng: 51.3890, cityNameAr: 'طهران', cityNameEn: 'Tehran', method: 7, asrSchool: 0 },
+
+  // Central Asia
+  AF: { lat: 34.5553, lng: 69.2075, cityNameAr: 'كابل', cityNameEn: 'Kabul', method: 1, asrSchool: 1 },
+  UZ: { lat: 41.2995, lng: 69.2401, cityNameAr: 'طشقند', cityNameEn: 'Tashkent', method: 14, asrSchool: 1 },
+  KZ: { lat: 51.1694, lng: 71.4491, cityNameAr: 'أستانا', cityNameEn: 'Astana', method: 14, asrSchool: 1 },
+  TJ: { lat: 38.5598, lng: 68.7738, cityNameAr: 'دوشنبه', cityNameEn: 'Dushanbe', method: 1, asrSchool: 1 },
+  KG: { lat: 42.8746, lng: 74.5698, cityNameAr: 'بشكيك', cityNameEn: 'Bishkek', method: 14, asrSchool: 1 },
+  TM: { lat: 37.9601, lng: 58.3261, cityNameAr: 'عشق آباد', cityNameEn: 'Ashgabat', method: 14, asrSchool: 1 },
+  AZ: { lat: 40.4093, lng: 49.8671, cityNameAr: 'باكو', cityNameEn: 'Baku', method: 13, asrSchool: 1 },
 
   // Sub-Saharan Africa
   NG: { lat: 9.0579, lng: 7.4951, cityNameAr: 'أبوجا', cityNameEn: 'Abuja', method: 3, asrSchool: 0 },
   SN: { lat: 14.7167, lng: -17.4677, cityNameAr: 'داكار', cityNameEn: 'Dakar', method: 3, asrSchool: 0 },
   SO: { lat: 2.0469, lng: 45.3182, cityNameAr: 'مقديشو', cityNameEn: 'Mogadishu', method: 3, asrSchool: 0 },
+  ML: { lat: 12.6392, lng: -8.0029, cityNameAr: 'باماكو', cityNameEn: 'Bamako', method: 3, asrSchool: 0 },
+  ZA: { lat: -33.9249, lng: 18.4241, cityNameAr: 'كيب تاون', cityNameEn: 'Cape Town', method: 3, asrSchool: 0 },
+
+  // Southeast Asia (additional)
+  TH: { lat: 13.7563, lng: 100.5018, cityNameAr: 'بانكوك', cityNameEn: 'Bangkok', method: 11, asrSchool: 0 },
+  PH: { lat: 14.5995, lng: 120.9842, cityNameAr: 'مانيلا', cityNameEn: 'Manila', method: 11, asrSchool: 0 },
+  BN: { lat: 4.9031, lng: 114.9398, cityNameAr: 'بندر سري بكاوان', cityNameEn: 'Bandar Seri Begawan', method: 11, asrSchool: 0 },
+
+  // East Asia
+  CN: { lat: 39.9042, lng: 116.4074, cityNameAr: 'بكين', cityNameEn: 'Beijing', method: 3, asrSchool: 1 },
+  JP: { lat: 35.6762, lng: 139.6503, cityNameAr: 'طوكيو', cityNameEn: 'Tokyo', method: 3, asrSchool: 0 },
+  KR: { lat: 37.5665, lng: 126.9780, cityNameAr: 'سيول', cityNameEn: 'Seoul', method: 3, asrSchool: 0 },
 
   // Western countries
   US: { lat: 38.9072, lng: -77.0369, cityNameAr: 'واشنطن', cityNameEn: 'Washington DC', method: 2, asrSchool: 0 },
@@ -113,8 +141,42 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   BE: { lat: 50.8503, lng: 4.3517, cityNameAr: 'بروكسل', cityNameEn: 'Brussels', method: 3, asrSchool: 0 },
 };
 
-// Default for unknown country codes
-const DEFAULT_COUNTRY: CountryDefaults = COUNTRY_DEFAULTS['SA'];
+// Default for unknown country codes — MWL is the most internationally recognized standard
+const DEFAULT_COUNTRY: CountryDefaults = {
+  lat: 21.4225, lng: 39.8262,
+  cityNameAr: 'مكة المكرمة', cityNameEn: 'Makkah',
+  method: 3, asrSchool: 0,
+};
+
+/**
+ * Resolve the AlAdhan calculation method + Asr school for a given country code.
+ * Returns `null` when the code is empty/unknown so callers can decide to fall back
+ * to MWL or keep existing settings.
+ */
+export function applyCountryPrayerDefaults(
+  countryCode: string | undefined | null,
+): { method: number; asrSchool: 0 | 1 } | null {
+  if (!countryCode) return null;
+  const defaults = COUNTRY_DEFAULTS[countryCode.toUpperCase()];
+  if (!defaults) return null;
+  return { method: defaults.method, asrSchool: defaults.asrSchool };
+}
+
+/**
+ * Like `applyCountryPrayerDefaults` but always returns a value — falling back to
+ * the Muslim World League method (3) when the country is unknown. Used to seed
+ * initial settings for a fresh install.
+ */
+export function getCountryPrayerDefaultsOrFallback(
+  countryCode: string | undefined | null,
+): { method: number; asrSchool: 0 | 1 } {
+  return (
+    applyCountryPrayerDefaults(countryCode) ?? {
+      method: DEFAULT_COUNTRY.method,
+      asrSchool: DEFAULT_COUNTRY.asrSchool,
+    }
+  );
+}
 
 // ────────────────────────────────────────────
 // Core Calculation (Pure Offline)

@@ -588,7 +588,7 @@ interface PdfLinks {
 }
 
 const DEFAULT_PDF_LINKS: PdfLinks = {
-  appStore: '',
+  appStore: 'https://apps.apple.com/app/rooh-muslim/id123456789',
   playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
 };
 

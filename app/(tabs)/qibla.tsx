@@ -44,6 +44,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { getLanguage } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -196,6 +197,20 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 };
 
 // ---------------------------------------------------------------------------
+// Arabic cardinal direction labels (overlay on SVG dials for RTL languages)
+// Positions map to the 300×300 SVG viewBox scaled to COMPASS_SIZE
+// ش=شمال(North), ق=شرق(East), ج=جنوب(South), غ=غرب(West)
+// ---------------------------------------------------------------------------
+const ARABIC_CARDINALS = [
+  { label: 'ش', top: 0.075, left: 0.5 },   // N — top center
+  { label: 'ج', top: 0.87, left: 0.5 },     // S — bottom center
+  { label: 'ق', top: 0.49, left: 0.91 },    // E — right center
+  { label: 'غ', top: 0.49, left: 0.09 },     // W — left center
+];
+
+const RTL_COMPASS_LANGUAGES = ['ar', 'ur'];
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 const QiblaScreen = () => {
@@ -277,8 +292,14 @@ const QiblaScreen = () => {
         setIsLocalCalc(false);
         await setCachedBearing(bearing, lat, lng);
       } else {
-        setQiblaBearing(calculateQiblaBearingLocal(lat, lng));
-        setIsLocalCalc(true);
+        // Only fall back to local calc if we don't already have a bearing
+        // (e.g., from Phase 0 cache). Avoid overwriting a cached API bearing
+        // with a less-accurate local calculation.
+        const existingCache = await getCachedBearing();
+        if (!existingCache) {
+          setQiblaBearing(calculateQiblaBearingLocal(lat, lng));
+          setIsLocalCalc(true);
+        }
       }
     }
   }, []);
@@ -614,7 +635,7 @@ const QiblaScreen = () => {
         <View style={styles.infoBadge}>
           <MaterialCommunityIcons name="map-marker-alert-outline" size={14} color="#FFA726" />
           <Text style={styles.infoBadgeText}>
-            {'📍 ' + (t('qibla.usingCachedLocation') || 'يستخدم آخر موقع محفوظ')}
+            {'📍 ' + t('qibla.usingCachedLocation')}
           </Text>
         </View>
       )}
@@ -624,7 +645,17 @@ const QiblaScreen = () => {
         <View style={styles.infoBadge}>
           <MaterialCommunityIcons name="calculator-variant-outline" size={14} color="#90CAF9" />
           <Text style={[styles.infoBadgeText, { color: '#90CAF9' }]}>
-            {t('qibla.localCalc') || 'حساب محلي'}
+            {t('qibla.localCalc')}
+          </Text>
+        </View>
+      )}
+
+      {/* Offline accuracy note — shown when using local calculation or cached location */}
+      {(isLocalCalc || usingCachedLocation) && (
+        <View style={styles.infoBadge}>
+          <MaterialCommunityIcons name="wifi-off" size={14} color="#FFA726" />
+          <Text style={styles.infoBadgeText}>
+            {t('qibla.offlineNote')}
           </Text>
         </View>
       )}
@@ -700,7 +731,7 @@ const QiblaScreen = () => {
           <View style={styles.swipeHintContainer}>
             <MaterialCommunityIcons name="gesture-swipe-horizontal" size={16} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
             <Text style={[styles.swipeHintText, { color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }]}>
-              {t('qibla.swipeToChange') || 'اسحب للتبديل بين الأنماط'}
+              {t('qibla.swipeToChange')}
             </Text>
           </View>
         </BlurView>
@@ -711,10 +742,10 @@ const QiblaScreen = () => {
         <View style={styles.atMeccaContainer}>
           <Text style={styles.atMeccaEmoji}>🕋</Text>
           <Text style={[styles.atMeccaText, { color: colors.text }]}>
-            {t('qibla.atMecca') || 'أنت في مكة المكرمة 🕋'}
+            {t('qibla.atMecca')}
           </Text>
           <Text style={[styles.atMeccaSubtext, { color: colors.muted }]}>
-            {t('qibla.atMeccaDesc') || 'لا حاجة لتحديد اتجاه القبلة'}
+            {t('qibla.atMeccaDesc')}
           </Text>
         </View>
       ) : (
@@ -750,6 +781,24 @@ const QiblaScreen = () => {
               width={COMPASS_SIZE}
               height={COMPASS_SIZE}
             />
+            {/* Arabic cardinal direction overlay for RTL languages */}
+            {RTL_COMPASS_LANGUAGES.includes(getLanguage()) && ARABIC_CARDINALS.map(({ label, top, left }) => (
+              <Text
+                key={label}
+                style={{
+                  position: 'absolute',
+                  top: COMPASS_SIZE * top - 10,
+                  left: COMPASS_SIZE * left - 10,
+                  width: 20,
+                  textAlign: 'center',
+                  fontFamily: fontBold(),
+                  fontSize: COMPASS_SIZE * 0.065,
+                  color: '#FFF',
+                }}
+              >
+                {label}
+              </Text>
+            ))}
           </Animated.View>
 
           {/* GREEN GLOW DISC — appears behind pointer when aligned */}

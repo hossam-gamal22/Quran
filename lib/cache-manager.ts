@@ -105,7 +105,7 @@ export async function checkAndClearCacheOnUpdate(): Promise<boolean> {
     // Always clear stale background caches (one-time migration)
     await clearBackgroundCaches();
 
-    const currentVersion = Constants.expoConfig?.version || '1.0.0';
+    const currentVersion = Constants.expoConfig?.version || '1.2.0';
     const storedVersion = await AsyncStorage.getItem(VERSION_KEY);
 
     if (storedVersion !== currentVersion) {

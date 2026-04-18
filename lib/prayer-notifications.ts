@@ -9,7 +9,8 @@ import { fetchMonthlyPrayerTimes, type PrayerTimesResponse } from './prayer-api'
 import { getPrayerLocation, getSettings } from './storage';
 import { t, getLanguage } from './i18n';
 import { getNotifText, fetchNotificationTexts } from './notification-texts';
-import { getAdhanChannelId } from '../services/notifications/channels';
+import { getAdhanChannelId, getReminderChannelId } from '../services/notifications/channels';
+import { registerDidYouPrayCategory, DID_YOU_PRAY_CATEGORY } from './did-you-pray-handler';
 import { dirText } from './notification-text-direction';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { getNotificationIconAttachment } from './notification-icons';
@@ -133,6 +134,9 @@ export async function schedulePrayerNotifications(
   const hasPermission = await requestNotificationPermissions();
   if (!hasPermission) return;
 
+  // Ensure the interactive action buttons are registered for did_you_pray notifications.
+  await registerDidYouPrayCategory();
+
   // Android 12+ (API 31+): verify SCHEDULE_EXACT_ALARM for DATE triggers
   const exactAlarmOk = await checkExactAlarmPermission();
   if (!exactAlarmOk) {
@@ -232,7 +236,7 @@ export async function schedulePrayerNotifications(
     // failure never wipes existing scheduled notifications (the "one-shot" bug).
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const n of scheduled) {
-      if (n.identifier.startsWith('prayer_')) {
+      if (n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_')) {
         await Notifications.cancelScheduledNotificationAsync(n.identifier);
       }
     }
@@ -312,6 +316,49 @@ export async function schedulePrayerNotifications(
         } catch (e) {
           console.error(`[prayer-notif] ❌ FAILED to schedule ${prayerKey} d+${dayOffset}:`, e);
         }
+
+        // ─── Schedule "هل صليت؟" reminder after the actual prayer time ───
+        // Delay is user-configurable (default 30 min). Skip sunrise.
+        // If the user uses Salati and completes the prayer, app/salati.tsx
+        // cancels did_you_pray_${prayerKey} and fires "أتممت صلاتك" immediately.
+        const didYouPrayEnabled = notifSettings.didYouPrayReminder !== false; // default true
+        const didYouPrayDelay = notifSettings.didYouPrayDelayMinutes ?? 30;
+        const didYouPraySnooze = notifSettings.didYouPraySnoozeMinutes ?? 15;
+        if (prayerKey !== 'sunrise' && didYouPrayEnabled) {
+          const reminderDate = prayerTimeToDateForDay(timeStr, targetDate, 0);
+          reminderDate.setMinutes(reminderDate.getMinutes() + didYouPrayDelay);
+          if (reminderDate > now) {
+            try {
+              const didYouPrayId = dayOffset === 0
+                ? `did_you_pray_${prayerKey}`
+                : `did_you_pray_${prayerKey}_d${dayOffset}`;
+              const didYouPrayChannelId = getReminderChannelId('general_reminder');
+              const didYouPraySound = resolveNotificationSound('general_reminder', true);
+              await Notifications.scheduleNotificationAsync({
+                identifier: didYouPrayId,
+                content: {
+                  title: dirText(t('notifications.didYouPray')),
+                  body: dirText(t('notifications.didYouPrayBody')),
+                  data: { type: 'did_you_pray', prayer: prayerKey, snoozeMinutes: didYouPraySnooze },
+                  sound: didYouPraySound,
+                  priority: Notifications.AndroidNotificationPriority.HIGH,
+                  categoryIdentifier: DID_YOU_PRAY_CATEGORY,
+                  ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+                  ...(Platform.OS === 'ios' && mosqueAttachments && { attachments: mosqueAttachments }),
+                  ...(Platform.OS === 'android' && { channelId: didYouPrayChannelId }),
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: reminderDate,
+                  ...(Platform.OS === 'android' && { channelId: didYouPrayChannelId }),
+                },
+              });
+              scheduledIds.push(didYouPrayId);
+            } catch (e) {
+              console.error(`[prayer-notif] ❌ FAILED to schedule did_you_pray ${prayerKey} d+${dayOffset}:`, e);
+            }
+          }
+        }
       }
     }
 
@@ -336,7 +383,7 @@ export async function schedulePrayerNotifications(
 export async function cancelAllPrayerNotifications(): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const n of scheduled) {
-    if (n.identifier.startsWith('prayer_')) {
+    if (n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_')) {
       await Notifications.cancelScheduledNotificationAsync(n.identifier);
     }
   }

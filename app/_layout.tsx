@@ -11,6 +11,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ErrorBoundary from '@/components/ui/ErrorBoundary';
 import { OfflineModal } from '@/components/ui/OfflineBanner';
 import { MaintenanceGuard } from '@/components/ui/MaintenanceGuard';
 import { DynamicSplashOverlay } from '@/components/ui/DynamicSplashOverlay';
@@ -55,6 +56,7 @@ import { syncWidgetDataToNative } from '@/lib/widget-native-sync';
 import { scheduleMidnightRefresh } from '@/lib/widget-data-bridge';
 import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
+import { ensureFirebaseUser } from '@/config/firebase';
 import { initTranslationOverrides } from '@/lib/auto-translate';
 import { initRemoteTranslations } from '@/lib/remote-translations';
 import { fontRegular } from '@/lib/fonts';
@@ -63,6 +65,8 @@ import { fetchQuranThemes } from '@/lib/admin-data-api';
 import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
 import { handleNotificationNavigation } from '@/lib/notification-router';
+import { handleDidYouPrayResponse } from '@/lib/did-you-pray-handler';
+import { consumePendingDeepLink, subscribeToDeepLinks } from '@/lib/deep-link-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadInstalledSoundsCache } from '@/lib/notification-sound-installer';
 import { ensureNotificationIconsCached } from '@/lib/notification-icons';
@@ -617,6 +621,12 @@ export default function RootLayout() {
         3000
       );
 
+      // Kick off Firebase anonymous sign-in early (non-blocking).
+      // Provides request.auth.uid for Firestore rules; survives restarts via AsyncStorage.
+      ensureFirebaseUser().catch((e) => {
+        if (__DEV__) console.warn('⚠️ ensureFirebaseUser failed (non-fatal):', e);
+      });
+
       // Initialize TrackPlayer in parallel (non-blocking) — runs alongside Firebase inits
       // so its startup cost doesn't gate the splash screen hide.
       const trackPlayerInitPromise = Platform.OS !== 'web' && trackPlayerAvailable
@@ -777,26 +787,28 @@ export default function RootLayout() {
 
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        updateLastActive().catch(() => {});
-        syncWidgetDataToNative().catch(() => {});
-        refreshLiveActivityIfEnabled().catch(() => {});
+        updateLastActive().catch((e) => console.warn('⚠️ [AppResume] updateLastActive:', e?.message));
+        syncWidgetDataToNative().catch((e) => console.warn('⚠️ [AppResume] syncWidgetDataToNative:', e?.message));
+        refreshLiveActivityIfEnabled().catch((e) => console.warn('⚠️ [AppResume] refreshLiveActivity:', e?.message));
+        // Check for a pending deep link from Control Center / Spotlight shortcut
+        consumePendingDeepLink(router);
         // Verify prayer notifications exist; if none, force reschedule.
         // This catches the case where all DATE triggers have fired and nothing is left.
-        ensurePrayerNotificationsExist().catch(() => {});
+        ensurePrayerNotificationsExist().catch((e) => console.warn('⚠️ [AppResume] ensurePrayerNotificationsExist:', e?.message));
         // Detect timezone/DST changes and force-reschedule if changed.
         // This catches travel, manual timezone change, and DST transitions.
-        checkTimezoneChange().catch(() => {});
+        checkTimezoneChange().catch((e) => console.warn('⚠️ [AppResume] checkTimezoneChange:', e?.message));
         // Refresh the 7-day DATE trigger window for all notification categories.
         // rescheduleAllFromStorage is internally throttled (60s) to avoid excessive work.
-        rescheduleAllFromStorage().catch(() => {});
+        rescheduleAllFromStorage().catch((e) => console.warn('⚠️ [AppResume] rescheduleAllFromStorage:', e?.message));
         recordSessionStart();
       } else if (nextAppState === 'background') {
-        syncLocalStats().catch(() => {});
+        syncLocalStats().catch((e) => console.warn('⚠️ [AppBackground] syncLocalStats:', e?.message));
         // Sync widget data before app goes to background so widgets show fresh content
-        syncWidgetDataToNative().catch(() => {});
+        syncWidgetDataToNative().catch((e) => console.warn('⚠️ [AppBackground] syncWidgetDataToNative:', e?.message));
         // Auto-backup: silently upload to cloud if premium, logged in, and >7 days since last backup
-        autoBackupIfNeeded().catch(() => {});
-        saveSessionTime().catch(() => {});
+        autoBackupIfNeeded().catch((e) => console.warn('⚠️ [AppBackground] autoBackupIfNeeded:', e?.message));
+        saveSessionTime().catch((e) => console.warn('⚠️ [AppBackground] saveSessionTime:', e?.message));
       }
     };
 
@@ -878,6 +890,11 @@ export default function RootLayout() {
 
         if (__DEV__) console.log('🔔 Cold-start notification tap:', notifId, data?.type);
 
+        // Handle "هل صليت؟" action buttons (prayed / will_pray) on cold start.
+        // If consumed, skip navigation — the user tapped an action, not the notification body.
+        const consumedByDidYouPray = await handleDidYouPrayResponse(response).catch(() => false);
+        if (consumedByDidYouPray) return;
+
         // Track notification open in Firestore
         if (data?.notificationDocId) {
           firestoreUpdateDoc(firestoreDoc(db, 'notifications', data.notificationDocId as string), {
@@ -897,6 +914,46 @@ export default function RootLayout() {
     checkLastNotification();
   }, [appReady, languageReady, router]);
 
+  // ── Cold-start deep link handler (AppIntent / Control Center / Spotlight) ──
+  // When the user taps a shortcut while the app is killed, the AppIntent writes
+  // a pending deep link to App Group UserDefaults. We consume it here once the
+  // navigation tree is ready.
+  const coldStartDeepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!appReady || !languageReady || coldStartDeepLinkHandled.current) return;
+    coldStartDeepLinkHandled.current = true;
+    consumePendingDeepLink(router);
+  }, [appReady, languageReady]);
+
+  // ── Warm/foreground URL listener ──
+  // Required for the case where the app is already open (AppState === 'active')
+  // and the user taps a Spotlight/Control Center shortcut. AppState does not
+  // fire in that case, so the AppState→'active' path never reaches
+  // consumePendingDeepLink. Subscribe independently of appReady so URLs fired
+  // early in the lifecycle are still caught; navigation on `router` is safe
+  // because the Stack is mounted synchronously with this effect.
+  useEffect(() => {
+    const unsubscribe = subscribeToDeepLinks(router);
+    return unsubscribe;
+  }, [router]);
+
+  // ── Background pre-download of azkar audio ──
+  // Caches all azkar mp3/m4a files to documentDirectory after first launch.
+  // Skipped if already complete. Failures are non-fatal — playback falls back
+  // to streaming via getAzkarAudioUri's race-with-timeout strategy.
+  useEffect(() => {
+    if (!appReady || !languageReady) return;
+    // Defer 3s after ready so we don't compete with critical startup network calls
+    const t = setTimeout(() => {
+      import('@/lib/azkar-audio-cache')
+        .then(({ preDownloadAll }) => preDownloadAll())
+        .catch((e) => {
+          if (__DEV__) console.warn('[azkar-cache] background pre-download failed:', e);
+        });
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [appReady, languageReady]);
+
   // Don't render tree until language is loaded from storage.
   // This prevents t() calls from returning Arabic on first render
   // when the user's language is different.
@@ -910,8 +967,9 @@ export default function RootLayout() {
   // manual flexDirection: 'row-reverse' patterns used throughout the codebase.
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
         <SettingsProvider>
           <SplashGate fontsReady={!!(fontsLoaded || fontError)} />
           <ThemeBootOverlay />
@@ -990,5 +1048,6 @@ export default function RootLayout() {
         </SettingsProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

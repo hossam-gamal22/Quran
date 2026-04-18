@@ -198,21 +198,21 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
   name: 'رُوح المسلم',
   nameEn: 'Rooh Al-Muslim',
   description: 'تطبيق إسلامي شامل للقرآن والأذكار والصلاة',
-  version: '1.0.0',
+  version: '1.2.0',
   primaryColor: '#1B4332',
   maintenanceMode: false,
   forceUpdate: false,
-  minVersion: '1.0.0',
+  minVersion: '1.2.0',
   contact: {
     email: 'hossamgamal290@gmail.com',
     website: '',
   },
   downloadLinks: {
-    android: '',
+    android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
     ios: '',
   },
   storeUrlIos: '',
-  storeUrlAndroid: '',
+  storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   features: {
     quran: true,
     azkar: true,
@@ -240,18 +240,31 @@ const DEFAULT_REMOTE_CONFIG: RemoteAppConfig = {
 export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
   try {
     console.log('🔄 جاري جلب الإعدادات من Firebase...');
-    
+
     const docRef = doc(db, 'config', 'app-settings');
-    const docSnap = await getDoc(docRef);
-    
+    // 8s timeout — Firestore can hang silently when offline / blocked, so we
+    // race getDoc against a timer and fall back to cache instead of leaving
+    // the splash/UI stuck on isLoading.
+    const docSnap = await Promise.race([
+      getDoc(docRef),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('app-config-timeout')), 8000)
+      ),
+    ]);
+
     if (docSnap.exists()) {
-      const data = docSnap.data() as RemoteAppConfig;
+      const data = docSnap.data() as Record<string, any>;
+      
+      // التوافق مع اسم الحقل القديم minSupportedVersion → minVersion
+      if (data.minSupportedVersion && !data.minVersion) {
+        data.minVersion = data.minSupportedVersion;
+      }
       
       // حفظ في AsyncStorage للاستخدام offline
       await AsyncStorage.setItem('remote_app_config', JSON.stringify(data));
       
       console.log('✅ تم جلب الإعدادات من Firebase بنجاح');
-      return { ...DEFAULT_REMOTE_CONFIG, ...data };
+      return { ...DEFAULT_REMOTE_CONFIG, ...data } as RemoteAppConfig;
     } else {
       console.log('⚠️ لا توجد إعدادات في Firebase، استخدام الافتراضية');
     }
@@ -264,7 +277,12 @@ export const fetchAppConfig = async (): Promise<RemoteAppConfig> => {
     const cached = await AsyncStorage.getItem('remote_app_config');
     if (cached) {
       console.log('✅ تم استخدام الإعدادات المحفوظة (Cache)');
-      return { ...DEFAULT_REMOTE_CONFIG, ...JSON.parse(cached) };
+      const parsed = JSON.parse(cached);
+      // التوافق مع اسم الحقل القديم
+      if (parsed.minSupportedVersion && !parsed.minVersion) {
+        parsed.minVersion = parsed.minSupportedVersion;
+      }
+      return { ...DEFAULT_REMOTE_CONFIG, ...parsed } as RemoteAppConfig;
     }
   } catch (error) {
     console.log('⚠️ فشل قراءة Cache');
@@ -298,8 +316,12 @@ export const subscribeToAppConfig = (
     docRef,
     async (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data() as RemoteAppConfig;
-        const mergedConfig = { ...DEFAULT_REMOTE_CONFIG, ...data };
+        const data = docSnap.data() as Record<string, any>;
+        // التوافق مع اسم الحقل القديم
+        if (data.minSupportedVersion && !data.minVersion) {
+          data.minVersion = data.minSupportedVersion;
+        }
+        const mergedConfig = { ...DEFAULT_REMOTE_CONFIG, ...data } as RemoteAppConfig;
         
         // حفظ في AsyncStorage للاستخدام offline
         await AsyncStorage.setItem('remote_app_config', JSON.stringify(mergedConfig));

@@ -32,7 +32,6 @@ interface UserPreferences {
   salawatReminder: boolean;
   dailyVerse: boolean;
   // New notification fields
-  afterPrayerAzkar: boolean;
   sleepAzkar: boolean;
   wakeupAzkar: boolean;
   quranReadingReminder: boolean;
@@ -111,7 +110,6 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   azkarNotifications: true,
   salawatReminder: true,
   dailyVerse: true,
-  afterPrayerAzkar: true,
   sleepAzkar: true,
   wakeupAzkar: true,
   quranReadingReminder: true,
@@ -309,7 +307,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         settings.notifications.eveningAzkar = preferences.azkarNotifications;
         settings.notifications.salawatReminder = preferences.salawatReminder;
         settings.notifications.dailyVerse = preferences.dailyVerse;
-        settings.notifications.afterPrayerAzkar = preferences.afterPrayerAzkar;
         settings.notifications.sleepAzkar = preferences.sleepAzkar;
         settings.notifications.wakeupAzkar = preferences.wakeupAzkar;
         settings.notifications.quranReadingReminder = preferences.quranReadingReminder;
@@ -379,7 +376,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
         settings.notifications.eveningAzkar = preferences.azkarNotifications;
         settings.notifications.salawatReminder = preferences.salawatReminder;
         settings.notifications.dailyVerse = preferences.dailyVerse;
-        settings.notifications.afterPrayerAzkar = preferences.afterPrayerAzkar;
         settings.notifications.sleepAzkar = preferences.sleepAzkar;
         settings.notifications.wakeupAzkar = preferences.wakeupAzkar;
         settings.notifications.quranReadingReminder = preferences.quranReadingReminder;

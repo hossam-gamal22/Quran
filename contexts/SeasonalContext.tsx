@@ -26,6 +26,8 @@ import { db } from '@/config/firebase';
 import { getLanguage } from '@/lib/i18n';
 import type { WelcomeBannerConfig } from '@/lib/app-config-api';
 
+const FIRESTORE_TIMEOUT_MS = 8000;
+
 // ========================================
 // الأنواع
 // ========================================
@@ -120,6 +122,15 @@ const defaultProgress: SeasonalProgress = {
     duaCount: 0,
   },
 };
+
+async function getDocsWithTimeout<T>(promise: Promise<T>, timeoutMs = FIRESTORE_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`seasonal-firestore-timeout-${timeoutMs}ms`)), timeoutMs)
+    ),
+  ]);
+}
 
 // ========================================
 // مفاتيح التخزين
@@ -222,7 +233,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
         where('isActive', '==', true),
         orderBy('priority', 'asc')
       );
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocsWithTimeout(getDocs(q));
       
       const firestoreContent: SeasonalContent[] = [];
       snapshot.forEach(doc => {
@@ -270,7 +281,7 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
         where('isActive', '==', true),
         orderBy('priority', 'asc')
       );
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocsWithTimeout(getDocs(q));
       if (snapshot.empty) {
         setAdminBanner(null);
         return;

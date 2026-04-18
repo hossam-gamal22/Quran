@@ -27,6 +27,7 @@ import { db } from '@/lib/firebase-config';
 import { doc, updateDoc, increment } from 'firebase/firestore';
 import { getAyahSoundUri } from '@/lib/notification-sound-cache';
 import { handleNotificationNavigation } from '@/lib/notification-router';
+import { handleDidYouPrayResponse } from '@/lib/did-you-pray-handler';
 import { useRouter } from 'expo-router';
 
 // ==================== Types ====================
@@ -190,11 +191,22 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
       const data = response.notification.request.content.data;
       const notifId = response.notification.request.identifier;
 
+      // Handle "هل صليت؟" action buttons. Returns true if consumed (prayed / will_pray),
+      // in which case we skip navigation — the user didn't tap the notification body.
+      handleDidYouPrayResponse(response).then((consumed) => {
+        if (consumed) return;
+      }).catch(() => {});
+
       // Track notification open in Firestore
       if (data?.notificationDocId) {
         updateDoc(doc(db, 'notifications', data.notificationDocId as string), {
           openedCount: increment(1),
         }).catch(() => {});
+      }
+
+      // Skip navigation for action-button presses on did_you_pray
+      if (data?.type === 'did_you_pray' && response.actionIdentifier !== 'default') {
+        return;
       }
 
       const result = handleNotificationNavigation(data, router, notifId);

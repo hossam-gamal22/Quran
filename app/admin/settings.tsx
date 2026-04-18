@@ -21,11 +21,11 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function AppSettingsScreen() {
   const [settings, setSettings] = useState<AppSettings>({
     appName: 'رُوح المسلم',
-    appVersion: '1.0.0',
+    appVersion: '1.2.0',
     maintenanceMode: false,
     maintenanceMessage: t('admin.defaultMaintenanceMsg'),
     forceUpdate: false,
-    minVersion: '1.0.0',
+    minVersion: '1.2.0',
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,7 +101,7 @@ export default function AppSettingsScreen() {
               style={styles.input}
               value={settings.appVersion}
               onChangeText={(value) => updateSetting('appVersion', value)}
-              placeholder="1.0.0"
+              placeholder="1.2.0"
               placeholderTextColor={Colors.textMuted}
             />
           </View>
@@ -179,7 +179,7 @@ export default function AppSettingsScreen() {
               style={styles.input}
               value={settings.minVersion}
               onChangeText={(value) => updateSetting('minVersion', value)}
-              placeholder="1.0.0"
+              placeholder="1.2.0"
               placeholderTextColor={Colors.textMuted}
             />
             <Text style={styles.inputHint}>

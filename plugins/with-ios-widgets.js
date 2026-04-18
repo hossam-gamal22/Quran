@@ -31,7 +31,13 @@ function copyDirectorySync(src, dest) {
   }
 }
 
-// Swift source files for the widget extension
+// Swift source files for the widget extension.
+// NOTE: AppShortcuts.swift is intentionally NOT here. Apple requires
+// AppShortcutsProvider to live in the MAIN APP target so Spotlight / Siri /
+// Shortcuts can execute the intent in the app process. AppIntents.swift stays
+// in the widget extension because ControlWidgets.swift references those
+// intents for Control Center buttons; a separate copy is also compiled into
+// the main app target (see MAIN_APP_INTENT_FILES below).
 const WIDGET_SWIFT_FILES = [
   'WidgetBundle.swift',
   'NextPrayerWidget.swift',
@@ -42,6 +48,13 @@ const WIDGET_SWIFT_FILES = [
   'PrayerLiveActivity.swift',
   'AppIntents.swift',
   'ControlWidgets.swift',
+];
+
+// Swift files copied from widgets/ios/ into the main app target so that
+// App Shortcuts (Spotlight / Siri / Shortcuts app) can be registered and
+// executed from the app process, not the widget extension.
+const MAIN_APP_INTENT_FILES = [
+  'AppIntents.swift',
   'AppShortcuts.swift',
 ];
 
@@ -430,6 +443,98 @@ const withIOSWidgets = (config) => {
         mainTarget.firstTarget.uuid,
         'app_extension'
       );
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Compile AppIntents.swift + AppShortcuts.swift into the MAIN APP target.
+    // Required so that App Shortcuts (Spotlight / Siri / Shortcuts app) can
+    // register the provider from the app process and execute intents there.
+    // Without this, shortcuts appear in Spotlight (via the widget extension's
+    // metadata) but tapping them does nothing because the system cannot
+    // resolve the intent in the app.
+    // ────────────────────────────────────────────────────────────────────
+    const appName = mod.modRequest.projectName || 'rwhalmslm';
+    const appDir = path.join(projectRoot, 'ios', appName);
+
+    // 1. Copy the Swift files from widgets/ios/ into the main app dir.
+    //    We use a separate on-disk copy (instead of sharing the widget
+    //    extension's file reference) to keep each target's compile unit
+    //    fully isolated — Xcode treats them as two independent sources that
+    //    each emit their own Swift classes into their own binary.
+    for (const fileName of MAIN_APP_INTENT_FILES) {
+      const src = path.join(sourceDir, fileName);
+      const dst = path.join(appDir, fileName);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, dst);
+      }
+    }
+
+    // 2. Find the main target's Sources build phase.
+    const mainTargetUuid = mainTarget?.firstTarget?.uuid;
+    const mainTargetObj = mainTargetUuid ? nativeTargets[mainTargetUuid] : null;
+    let mainSourcesPhaseUuid = null;
+    if (mainTargetObj?.buildPhases) {
+      for (const phase of mainTargetObj.buildPhases) {
+        if (objects['PBXSourcesBuildPhase']?.[phase.value]) {
+          mainSourcesPhaseUuid = phase.value;
+          break;
+        }
+      }
+    }
+
+    // 3. Find the main app PBXGroup (so the file shows up in the Xcode
+    //    navigator under the app folder).
+    let appGroupUuid = null;
+    const groups = objects['PBXGroup'];
+    for (const key in groups) {
+      if (key.endsWith('_comment')) continue;
+      const group = groups[key];
+      if (group && (group.name === appName || group.path === appName)) {
+        appGroupUuid = key;
+        break;
+      }
+    }
+
+    // 4. Register each file: PBXFileReference → app group → PBXBuildFile →
+    //    main target's Sources phase.
+    if (mainSourcesPhaseUuid) {
+      for (const fileName of MAIN_APP_INTENT_FILES) {
+        const filePath = path.join(appDir, fileName);
+        if (!fs.existsSync(filePath)) continue;
+
+        const fileRefUuid = xcodeProject.generateUuid();
+        objects['PBXFileReference'][fileRefUuid] = {
+          isa: 'PBXFileReference',
+          lastKnownFileType: 'sourcecode.swift',
+          name: fileName,
+          path: fileName,
+          sourceTree: '"<group>"',
+        };
+        objects['PBXFileReference'][`${fileRefUuid}_comment`] = fileName;
+
+        if (appGroupUuid && groups[appGroupUuid]) {
+          if (!groups[appGroupUuid].children) {
+            groups[appGroupUuid].children = [];
+          }
+          groups[appGroupUuid].children.push({
+            value: fileRefUuid,
+            comment: fileName,
+          });
+        }
+
+        const buildFileUuid = xcodeProject.generateUuid();
+        objects['PBXBuildFile'][buildFileUuid] = {
+          isa: 'PBXBuildFile',
+          fileRef: fileRefUuid,
+          fileRef_comment: fileName,
+        };
+        objects['PBXBuildFile'][`${buildFileUuid}_comment`] = `${fileName} in Sources`;
+
+        objects['PBXSourcesBuildPhase'][mainSourcesPhaseUuid].files.push({
+          value: buildFileUuid,
+          comment: `${fileName} in Sources`,
+        });
+      }
     }
 
     return mod;

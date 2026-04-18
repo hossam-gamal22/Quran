@@ -19,6 +19,7 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+import NetInfo from '@react-native-community/netinfo';
 
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useSettings } from '@/contexts/SettingsContext';
@@ -120,7 +121,43 @@ export default function StoryOfDayScreen() {
   const [saving, setSaving] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [videoUnavailable, setVideoUnavailable] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+  const isOfflineRef = useRef(false);
   const cdnRetryCount = useRef(0);
+
+  // Network state detection
+  useEffect(() => {
+    let mounted = true;
+    // Check initial state
+    NetInfo.fetch().then((state) => {
+      if (!mounted) return;
+      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      setIsOffline(offline);
+      isOfflineRef.current = offline;
+    });
+    // Subscribe to changes
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      if (!mounted) return;
+      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      setIsOffline(offline);
+      isOfflineRef.current = offline;
+    });
+    return () => { mounted = false; unsubscribe(); };
+  }, []);
+
+  // Auto-retry when network is restored
+  useEffect(() => {
+    if (isOffline) return;
+    // Network came back — retry if we were in error state or video unavailable
+    if (error && !dayData) {
+      retryFetch();
+    } else if (videoUnavailable && rawVideoUrl) {
+      cdnRetryCount.current = 0;
+      setVideoUnavailable(false);
+      resolvedSourceRef.current = 'cdn';
+      setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+    }
+  }, [isOffline]);
 
   // Player UI state
   const [positionSec, setPositionSec] = useState(0);
@@ -170,6 +207,12 @@ export default function StoryOfDayScreen() {
         }
       } catch { /* ignore cache errors */ }
       if (!cancelled) {
+        // If offline and no cache — skip CDN entirely, show ayah fallback immediately
+        if (isOfflineRef.current) {
+          console.log('[DailyVideo] Offline with no cache — showing ayah fallback');
+          setVideoUnavailable(true);
+          return;
+        }
         const cdnUrl = toJsDelivrUrl(rawVideoUrl);
         console.log('[DailyVideo] Playing from CDN:', cdnUrl.split('/').pop());
         resolvedSourceRef.current = 'cdn';
@@ -297,6 +340,12 @@ export default function StoryOfDayScreen() {
     if (status === 'error') {
       setIsBuffering(false);
       console.warn('[DailyVideo] Player error:', playerErrorObj?.message);
+      // If offline, skip all retries — show fallback immediately
+      if (isOfflineRef.current) {
+        console.log('[DailyVideo] Offline — showing ayah text fallback immediately');
+        setVideoUnavailable(true);
+        return;
+      }
       // If cached file failed, invalidate and retry with CDN
       if (resolvedSourceRef.current === 'cache' && rawVideoUrl) {
         console.log('[DailyVideo] Cache playback failed, falling back to CDN');
@@ -355,6 +404,15 @@ export default function StoryOfDayScreen() {
           setDayData(cached);
           setLoading(false);
           hasCacheData = true;
+        }
+
+        // If offline + have cache → use cache only, don't attempt network fetch
+        if (isOfflineRef.current) {
+          if (!hasCacheData && !cancelled) {
+            console.log('[DailyVideo] Offline with no cache — showing error immediately');
+            setError(true);
+          }
+          return;
         }
 
         const res = await fetch(DAILY_VIDEO_JSON_URL + `?_=${Date.now()}`, {
@@ -480,7 +538,8 @@ export default function StoryOfDayScreen() {
       const cachedUri = await getCachedVideoUri(rawVideoUrl);
       if (cachedUri) {
         const dest = FileSystem.cacheDirectory + 'save-video-' + Date.now() + '.mp4';
-        await FileSystem.copyAsync({ from: cachedUri.replace('file://', ''), to: dest });
+        // copyAsync requires file:// URIs on both platforms; keep the scheme.
+        await FileSystem.copyAsync({ from: cachedUri, to: dest });
         saveUri = dest;
       } else {
         const localPath = FileSystem.cacheDirectory + 'daily-video-' + Date.now() + '.mp4';
@@ -515,7 +574,7 @@ export default function StoryOfDayScreen() {
       const cachedUri = await getCachedVideoUri(rawVideoUrl);
       if (cachedUri) {
         const dest = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
-        await FileSystem.copyAsync({ from: cachedUri.replace('file://', ''), to: dest });
+        await FileSystem.copyAsync({ from: cachedUri, to: dest });
         shareUri = dest;
       } else {
         const localPath = FileSystem.cacheDirectory + 'share-video-' + Date.now() + '.mp4';
@@ -573,17 +632,23 @@ export default function StoryOfDayScreen() {
               backgroundColor: isDarkMode ? 'rgba(30,30,32,0.55)' : 'rgba(255,255,255,0.7)',
               borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
             }]}>
-              <MaterialCommunityIcons name="video-off-outline" size={64} color={colors.muted} />
+              <Ionicons name={isOffline ? 'cloud-offline-outline' : 'videocam-outline'} size={64} color={colors.muted} />
               <Text style={[styles.fallbackTitle, { color: colors.text, writingDirection: 'rtl' }]}>
-                {'\u0641\u064a\u062f\u064a\u0648 \u0627\u0644\u064a\u0648\u0645 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d \u062d\u0627\u0644\u064a\u0627\u064b'}
+                {isOffline
+                  ? (isArabic ? 'يرجى الاتصال بالإنترنت' : 'Please connect to the internet')
+                  : (isArabic ? 'فيديو اليوم غير متاح حالياً' : 'Video of the day is unavailable')}
               </Text>
               <Text style={[styles.fallbackSubtitle, { color: colors.muted, writingDirection: 'rtl' }]}>
-                {isArabic ? '\u062a\u0623\u0643\u062f \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629' : 'Check your connection and try again'}
+                {isOffline
+                  ? (isArabic ? 'المحتوى يحتاج اتصال بالإنترنت للتحميل أول مرة، وبعدها يُحفظ تلقائياً' : 'Content needs internet to load initially, then it\'s saved automatically')
+                  : (isArabic ? 'تأكد من اتصالك بالإنترنت وأعد المحاولة' : 'Check your connection and try again')}
               </Text>
-              <TouchableOpacity onPress={retryFetch} activeOpacity={0.7} style={styles.retryBtn}>
-                <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
-                <Text style={styles.retryBtnText}>{t('common.retry') || '\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629'}</Text>
-              </TouchableOpacity>
+              {!isOffline && (
+                <TouchableOpacity onPress={retryFetch} activeOpacity={0.7} style={styles.retryBtn}>
+                  <MaterialCommunityIcons name="refresh" size={20} color="#fff" />
+                  <Text style={styles.retryBtnText}>{t('common.retry') || 'إعادة المحاولة'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         ) : (
@@ -632,22 +697,28 @@ export default function StoryOfDayScreen() {
                     {isArabic ? dayData.surahName : dayData.surahEnglish}
                     {dayData.ayahNumber ? ` — ${isArabic ? 'آية' : 'Ayah'} ${dayData.ayahNumber}` : ''}
                   </Text>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => {
-                      cdnRetryCount.current = 0;
-                      setVideoUnavailable(false);
-                      if (rawVideoUrl) {
-                        resolvedSourceRef.current = 'cdn';
-                        setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
-                      }
-                    }}
-                    style={[styles.retrySmallBtn, { marginTop: 16 }]}
-                  >
-                    <Text style={styles.retrySmallText}>
-                      {t('common.retry') || 'إعادة المحاولة'}
+                  {isOffline ? (
+                    <Text style={[styles.ayahFallbackSurah, { fontSize: 13, marginTop: 16, opacity: 0.7 }]}>
+                      {isArabic ? 'الفيديو يحتاج اتصال بالإنترنت' : 'Video requires internet connection'}
                     </Text>
-                  </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        cdnRetryCount.current = 0;
+                        setVideoUnavailable(false);
+                        if (rawVideoUrl) {
+                          resolvedSourceRef.current = 'cdn';
+                          setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+                        }
+                      }}
+                      style={[styles.retrySmallBtn, { marginTop: 16 }]}
+                    >
+                      <Text style={styles.retrySmallText}>
+                        {t('common.retry') || 'إعادة المحاولة'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ) : (

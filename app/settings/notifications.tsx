@@ -118,6 +118,9 @@ const REMINDER_OPTIONS = [
   { value: 30, label: t('notificationSounds.minutesBefore', { count: '30' }) },
 ];
 
+const DID_YOU_PRAY_DELAY_OPTIONS = [15, 20, 30, 45, 60];
+const DID_YOU_PRAY_SNOOZE_OPTIONS = [5, 10, 15, 20, 30];
+
 const PRAYER_NAMES = [
   { key: 'fajr', name: t('prayer.fajr'), icon: 'weather-sunset-up' },
   { key: 'sunrise', name: t('prayer.sunrise'), icon: 'white-balance-sunny' },
@@ -284,6 +287,9 @@ export default function NotificationsScreen() {
   const [previewPlaying, setPreviewPlaying] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState<string | null>(null);
   const previewSoundRef = useRef<Audio.Sound | null>(null);
+  const reminderScrollRef = useRef<ScrollView | null>(null);
+  const didYouPrayDelayScrollRef = useRef<ScrollView | null>(null);
+  const didYouPraySnoozeScrollRef = useRef<ScrollView | null>(null);
 
   // Downloadable sounds state
   const [downloadableSounds, setDownloadableSounds] = useState<DownloadableSound[]>([]);
@@ -461,7 +467,7 @@ export default function NotificationsScreen() {
       case 'salawat': return settings.notifications.salawatReminder ?? false;
       case 'tasbih': return settings.notifications.tasbihReminder ?? false;
       case 'istighfar': return settings.notifications.istighfarReminder ?? false;
-      case 'azkar': return settings.notifications.morningAzkar || settings.notifications.eveningAzkar || settings.notifications.sleepAzkar || settings.notifications.wakeupAzkar || settings.notifications.afterPrayerAzkar;
+      case 'azkar': return settings.notifications.morningAzkar || settings.notifications.eveningAzkar || settings.notifications.sleepAzkar || settings.notifications.wakeupAzkar;
       case 'dailyVerse': return settings.notifications.dailyVerse;
       case 'customReminder': return settings.notifications.customReminder ?? false;
       case 'kahf': return settings.notifications.kahfReminder ?? false;
@@ -488,7 +494,7 @@ export default function NotificationsScreen() {
         updateNotifications({ istighfarReminder: value });
         break;
       case 'azkar':
-        updateNotifications({ morningAzkar: value, eveningAzkar: value, sleepAzkar: value, wakeupAzkar: value, afterPrayerAzkar: value });
+        updateNotifications({ morningAzkar: value, eveningAzkar: value, sleepAzkar: value, wakeupAzkar: value });
         break;
       case 'dailyVerse':
         updateNotifications({ dailyVerse: value });
@@ -798,7 +804,16 @@ export default function NotificationsScreen() {
           <Text style={[styles.smallLabel, { color: colors.textLight }]}>
             {t('notificationSounds.reminderBeforeAdhanBy')}
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }} style={[styles.reminderScroll, isRTL && { transform: [{ scaleX: -1 }] }]}>
+          <ScrollView
+            ref={reminderScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
+            style={styles.reminderScroll}
+            onContentSizeChange={(w) => {
+              if (isRTL) reminderScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
+            }}
+          >
             {REMINDER_OPTIONS.map((option) => (
               <TouchableOpacity
                 key={option.value}
@@ -806,7 +821,6 @@ export default function NotificationsScreen() {
                   styles.chipOption,
                   isDarkMode && { backgroundColor: colors.surface },
                   settings.notifications.reminderMinutes === option.value && styles.chipOptionSelected,
-                  isRTL && { transform: [{ scaleX: -1 }] },
                 ]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -860,6 +874,116 @@ export default function NotificationsScreen() {
           </View>
         ))}
       </View>
+
+      {/* "هل صليت؟" reminder controls */}
+      <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <MaterialCommunityIcons name="help-circle-outline" size={20} color="#0d8e62" />
+          <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+            <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('notificationSounds.didYouPrayReminderTitle')}
+            </Text>
+            <Text style={[{ fontSize: 12, color: colors.textLight, marginTop: 2, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              {t('notificationSounds.didYouPrayReminderSubtitle')}
+            </Text>
+          </View>
+        </View>
+        <Switch
+          value={settings.notifications.didYouPrayReminder !== false}
+          onValueChange={(val) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            updateNotifications({ didYouPrayReminder: val });
+          }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+          thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+          ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+          disabled={!isEnabled}
+        />
+      </View>
+
+      {settings.notifications.didYouPrayReminder !== false && (
+        <>
+          <View style={styles.reminderMinutesContainer}>
+            <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 16 }]}>
+              {t('notificationSounds.didYouPrayDelayLabel')}
+            </Text>
+            <ScrollView
+              ref={didYouPrayDelayScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
+              style={styles.reminderScroll}
+              onContentSizeChange={(w) => {
+                if (isRTL) didYouPrayDelayScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
+              }}
+            >
+              {DID_YOU_PRAY_DELAY_OPTIONS.map((value) => {
+                const selected = (settings.notifications.didYouPrayDelayMinutes ?? 30) === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.chipOption,
+                      isDarkMode && { backgroundColor: colors.surface },
+                      selected && styles.chipOptionSelected,
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      updateNotifications({ didYouPrayDelayMinutes: value });
+                    }}
+                    activeOpacity={0.7}
+                    disabled={!isEnabled}
+                  >
+                    <Text style={[styles.chipOptionText, { color: colors.textLight }, selected && styles.chipOptionTextSelected]}>
+                      {`${value} ${t('prayer.minutes')}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View style={styles.reminderMinutesContainer}>
+            <Text style={[styles.smallLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', paddingHorizontal: 16 }]}>
+              {t('notificationSounds.didYouPraySnoozeLabel')}
+            </Text>
+            <ScrollView
+              ref={didYouPraySnoozeScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8, paddingHorizontal: 16, flexDirection: isRTL ? 'row-reverse' : 'row' }}
+              style={styles.reminderScroll}
+              onContentSizeChange={(w) => {
+                if (isRTL) didYouPraySnoozeScrollRef.current?.scrollTo({ x: w, y: 0, animated: false });
+              }}
+            >
+              {DID_YOU_PRAY_SNOOZE_OPTIONS.map((value) => {
+                const selected = (settings.notifications.didYouPraySnoozeMinutes ?? 15) === value;
+                return (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.chipOption,
+                      isDarkMode && { backgroundColor: colors.surface },
+                      selected && styles.chipOptionSelected,
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      updateNotifications({ didYouPraySnoozeMinutes: value });
+                    }}
+                    activeOpacity={0.7}
+                    disabled={!isEnabled}
+                  >
+                    <Text style={[styles.chipOptionText, { color: colors.textLight }, selected && styles.chipOptionTextSelected]}>
+                      {`${value} ${t('prayer.minutes')}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </>
+      )}
 
       {/* Adhan sound selection */}
       <View style={styles.adhanSoundSection}>
@@ -1106,36 +1230,6 @@ export default function NotificationsScreen() {
       </View>
 
       {settings.notifications.wakeupAzkar && renderMultiTimePicker('wakeupAzkar', '#10B981')}
-
-      {/* After Prayer Azkar */}
-      <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-        <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-          <MaterialCommunityIcons name="hands-pray" size={18} color={isDarkMode ? '#EC4899' : '#BE185D'} />
-          <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            {t('notificationSounds.afterPrayerAzkar')}
-          </Text>
-        </View>
-        <Switch
-          value={settings.notifications.afterPrayerAzkar}
-          onValueChange={(val) => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            updateNotifications({ afterPrayerAzkar: val });
-          }}
-          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
-          thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
-          ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
-          disabled={!isEnabled}
-        />
-      </View>
-
-      {settings.notifications.afterPrayerAzkar && (
-        <View style={styles.soundInfoRow}>
-          <MaterialCommunityIcons name="information-outline" size={16} color={colors.textLight} />
-          <Text style={[styles.soundInfoText, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-            {t('notificationSounds.afterPrayerAutoMsg')}
-          </Text>
-        </View>
-      )}
 
       {/* Day-of-week picker for all azkar */}
       {renderDayPicker('azkar')}

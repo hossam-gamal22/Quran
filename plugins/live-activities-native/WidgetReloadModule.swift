@@ -64,4 +64,25 @@ class WidgetReloadModule: NSObject {
             reject("WRITE_ERROR", "Failed to write shared data file: \(error.localizedDescription)", error)
         }
     }
+
+    // MARK: - Pending Deep Link (AppIntent → RN bridge)
+
+    private static let pendingDeepLinkKey = "pending_deep_link"
+
+    /// Read and atomically clear the pending deep link written by an AppIntent.
+    @objc func readPendingDeepLink(
+        _ resolve: @escaping RCTPromiseResolveBlock,
+        rejecter reject: @escaping RCTPromiseRejectBlock
+    ) {
+        guard let defaults = UserDefaults(suiteName: WidgetReloadModule.appGroupId) else {
+            resolve(NSNull())
+            return
+        }
+        let value = defaults.string(forKey: WidgetReloadModule.pendingDeepLinkKey)
+        // Clear immediately so the same link isn't consumed twice
+        if value != nil {
+            defaults.removeObject(forKey: WidgetReloadModule.pendingDeepLinkKey)
+        }
+        resolve(value as Any)
+    }
 }

@@ -4,6 +4,29 @@ import { db } from '../firebase';
 import { type DeviceUser } from '../utils/device-dedup';
 import { fetchActiveDevices, invalidateActiveDevicesCache } from '../utils/user-query';
 
+/** ISO 3166-1 alpha-2 → Arabic country name */
+const COUNTRY_NAMES: Record<string, string> = {
+  EG: 'مصر', SA: 'السعودية', AE: 'الإمارات', KW: 'الكويت', QA: 'قطر',
+  BH: 'البحرين', OM: 'عُمان', IQ: 'العراق', JO: 'الأردن', PS: 'فلسطين',
+  LB: 'لبنان', SY: 'سوريا', YE: 'اليمن', LY: 'ليبيا', TN: 'تونس',
+  DZ: 'الجزائر', MA: 'المغرب', SD: 'السودان', MR: 'موريتانيا', SO: 'الصومال',
+  DJ: 'جيبوتي', KM: 'جزر القمر',
+  TR: 'تركيا', IR: 'إيران', PK: 'باكستان', AF: 'أفغانستان', BD: 'بنغلاديش',
+  IN: 'الهند', ID: 'إندونيسيا', MY: 'ماليزيا', SG: 'سنغافورة',
+  GB: 'بريطانيا', US: 'أمريكا', CA: 'كندا', AU: 'أستراليا', NZ: 'نيوزيلندا',
+  FR: 'فرنسا', DE: 'ألمانيا', ES: 'إسبانيا', IT: 'إيطاليا', NL: 'هولندا',
+  BE: 'بلجيكا', SE: 'السويد', NO: 'النرويج', DK: 'الدنمارك', CH: 'سويسرا',
+  AT: 'النمسا', PT: 'البرتغال', GR: 'اليونان', PL: 'بولندا', RO: 'رومانيا',
+  RU: 'روسيا', UA: 'أوكرانيا', BR: 'البرازيل', MX: 'المكسيك', AR: 'الأرجنتين',
+  NG: 'نيجيريا', KE: 'كينيا', ZA: 'جنوب أفريقيا', GH: 'غانا', TZ: 'تنزانيا',
+  CN: 'الصين', JP: 'اليابان', KR: 'كوريا الجنوبية', TH: 'تايلاند', PH: 'الفلبين',
+};
+
+const getCountryDisplay = (code: string): string => {
+  if (!code) return '-';
+  return COUNTRY_NAMES[code.toUpperCase()] || code;
+};
+
 // Helper function to format Firestore Timestamp or string dates
 const formatDate = (date: unknown): string => {
   if (!date) return '-';
@@ -323,7 +346,14 @@ export default function UsersPage() {
                       </button>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-slate-300">{user.country || '-'}</td>
+                  <td className="px-4 py-4 text-slate-300">
+                    {getCountryDisplay(user.country)}
+                    {(user as any).countrySource === 'gps' ? (
+                      <span title="موقع محقق عبر GPS" className="ml-1 text-xs">🛰️</span>
+                    ) : user.country ? (
+                      <span title="مصدر: لغة الجهاز (قد لا يكون دقيق)" className="ml-1 text-xs opacity-50">⚠️</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-4">{getStatusBadge(user.status || 'active')}</td>
                   <td className="px-4 py-4 text-sm text-slate-400">{formatDate(user.lastActive)}</td>
                   <td className="px-4 py-4">
@@ -374,10 +404,15 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">الدولة</label>
-                  <input type="text" value={selectedUser.country || ''}
-                    onChange={e => setSelectedUser({ ...selectedUser, country: e.target.value })}
-                    aria-label="الدولة" placeholder="الدولة"
-                    className="w-full px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg text-white placeholder-slate-500" />
+                  <div className="flex gap-2 items-center">
+                    <input type="text" value={selectedUser.country || ''}
+                      onChange={e => setSelectedUser({ ...selectedUser, country: e.target.value.toUpperCase() })}
+                      aria-label="الدولة" placeholder="EG, SA, AE..."
+                      maxLength={2}
+                      dir="ltr"
+                      className="w-24 px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg text-white placeholder-slate-500 text-center font-mono" />
+                    <span className="text-slate-300 text-sm">{getCountryDisplay(selectedUser.country || '')}</span>
+                  </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

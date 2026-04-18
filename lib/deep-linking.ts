@@ -25,7 +25,9 @@ export const DEEP_LINK_ROUTES = {
   azkarWakeup: `${URL_SCHEME}://azkar/3`,
   azkarAfterPrayer: `${URL_SCHEME}://azkar/27`,
   prayer: `${URL_SCHEME}://prayer`,
-  qibla: `${URL_SCHEME}://qibla`,
+  // Qibla is not a standalone tab — it's a sub-tab inside Prayer.
+  // Use query string so the Prayer screen selects the qibla view on mount.
+  qibla: `${URL_SCHEME}://prayer?tab=qibla`,
   quran: `${URL_SCHEME}://quran`,
   quranBookmarks: `${URL_SCHEME}://quran-bookmarks`,
   moreAzkar: `${URL_SCHEME}://more-azkar`,
@@ -60,7 +62,6 @@ export const LINKING_CONFIG = {
       '(tabs)': {
         screens: {
           prayer: 'prayer',
-          qibla: 'qibla',
           tasbih: 'tasbih',
           quran: 'quran',
           'hijri-calendar': 'hijri-calendar',
@@ -94,6 +95,8 @@ export function buildDeepLink(path: string): string {
 
 /**
  * Parse a deep link URL into a route path.
+ * Preserves query string and hash so that downstream consumers
+ * (e.g. screens reading `useLocalSearchParams`) receive their params.
  */
 export function parseDeepLink(url: string): string | null {
   const prefix = `${URL_SCHEME}://`;

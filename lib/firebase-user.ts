@@ -240,7 +240,7 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     const installSource = await detectInstallSource();
     
     const locales = Localization.getLocales();
-    const appVersion = Constants.expoConfig?.version || '1.0.0';
+    const appVersion = Constants.expoConfig?.version || '1.2.0';
     const userData: Partial<UserData> = {
       id: userId,
       platform: Platform.OS as 'ios' | 'android' | 'web',
@@ -315,6 +315,27 @@ export const updateLastActive = async (): Promise<void> => {
     await updateDoc(userRef, { lastActive: serverTimestamp() });
   } catch (error) {
     console.log('Could not update last active');
+  }
+};
+
+/**
+ * تحديث دولة المستخدم بناء على GPS الحقيقي (ISO country code)
+ * أدق من locales[0].regionCode اللي بيعكس لغة الجهاز مش الموقع الفعلي
+ */
+export const updateUserCountryFromGPS = async (isoCountryCode: string): Promise<void> => {
+  try {
+    const code = (isoCountryCode || '').toUpperCase().trim();
+    if (!code || code.length !== 2) return;
+    const userId = await getUserId();
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      country: code,
+      countrySource: 'gps',
+      updatedAt: serverTimestamp(),
+    });
+    console.log('🌍 Updated user country from GPS:', code);
+  } catch {
+    console.log('Could not update user country from GPS');
   }
 };
 

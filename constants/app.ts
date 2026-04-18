@@ -22,14 +22,14 @@ export const APP_CONFIG = {
   contact: {
     email: 'hossamgamal290@gmail.com',
     website: '',
-    playStore: '',
-    appStore: '',
+    playStore: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
+    appStore: 'https://apps.apple.com/app/rooh-muslim/id123456789',
   },
   
-  // روابط التحميل (تُضاف بعد النشر)
+  // روابط التحميل
   downloadLinks: {
-    android: '',
-    ios: '',
+    android: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
+    ios: 'https://apps.apple.com/app/rooh-muslim/id123456789',
   },
   
   // التوقيع للمشاركة (language-aware)

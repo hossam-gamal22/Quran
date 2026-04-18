@@ -94,7 +94,7 @@ export default function HadithOfDayScreen() {
           setHadith({ arabic: data.arabic, translation: data.translation, narrator: data.narrator, source: data.source });
           if ((data as any).translations) setAdminTranslations((data as any).translations);
         }
-      });
+      }).catch(() => {});
     }
   }, [params.favId]);
 

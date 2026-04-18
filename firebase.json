@@ -39,7 +39,7 @@
     },
     {
       "site": "rooh-almuslim",
-      "public": "admin-panel/dist",
+      "public": "redirect-site",
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "rewrites": [
         { "source": "**", "destination": "/index.html" }

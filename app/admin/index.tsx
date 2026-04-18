@@ -304,7 +304,7 @@ export default function AdminDashboard() {
         {/* App Info */}
         <View style={styles.appInfo}>
           <Text style={styles.appInfoText}>
-            الإصدار: {appSettings?.appVersion || '1.0.0'}
+            الإصدار: {appSettings?.appVersion || '1.2.0'}
           </Text>
           <Text style={styles.appInfoText}>
             الحالة: {appSettings?.maintenanceMode ? 'صيانة' : 'يعمل'}

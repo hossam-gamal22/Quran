@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, RefreshCw, AlertTriangle, Smartphone, ExternalLink, Mail, Bell } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { sendUpdatePushNotification } from '../services/pushNotifications';
+import { sendUpdatePushNotification, UPDATE_NOTIFICATION_TRANSLATIONS } from '../services/pushNotifications';
 
 // ========================================
 // الواجهة — الحقول المستخدمة فعلاً من التطبيق
@@ -11,7 +11,7 @@ import { sendUpdatePushNotification } from '../services/pushNotifications';
 interface AppSettings {
   maintenanceMode: boolean;
   forceUpdate: boolean;
-  minSupportedVersion: string;
+  minVersion: string;
   storeUrlIos: string;
   storeUrlAndroid: string;
   contactInfo: {
@@ -32,9 +32,9 @@ interface AppSettings {
 const DEFAULT_SETTINGS: AppSettings = {
   maintenanceMode: false,
   forceUpdate: false,
-  minSupportedVersion: '1.0.0',
+  minVersion: '1.0.0',
   storeUrlIos: '',
-  storeUrlAndroid: '',
+  storeUrlAndroid: 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
   contactInfo: {
     email: 'hossamgamal290@gmail.com',
     website: 'https://roohmuslim.com',
@@ -50,6 +50,19 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
+// إصدار التطبيق المنشور حاليًا — لا تحاول إجبار التحديث على رقم أعلى منه
+const CURRENT_PUBLISHED_VERSION = '1.2.0';
+
+function isVersionGreaterThan(a: string, b: string): boolean {
+  const aP = a.split('.').map(Number);
+  const bP = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((aP[i] || 0) > (bP[i] || 0)) return true;
+    if ((aP[i] || 0) < (bP[i] || 0)) return false;
+  }
+  return false;
+}
+
 // ========================================
 // المكون الرئيسي
 // ========================================
@@ -60,6 +73,7 @@ const SettingsPage: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
   const [sendingUpdate, setSendingUpdate] = useState(false);
   const [updateSendResult, setUpdateSendResult] = useState<{ success: boolean; count: number } | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -73,7 +87,7 @@ const SettingsPage: React.FC = () => {
         setSettings(prev => ({
           maintenanceMode: data.maintenanceMode ?? prev.maintenanceMode,
           forceUpdate: data.forceUpdate ?? prev.forceUpdate,
-          minSupportedVersion: data.minSupportedVersion ?? prev.minSupportedVersion,
+          minVersion: data.minVersion ?? data.minSupportedVersion ?? prev.minVersion,
           storeUrlIos: data.storeUrlIos ?? prev.storeUrlIos,
           storeUrlAndroid: data.storeUrlAndroid ?? prev.storeUrlAndroid,
           contactInfo: {
@@ -97,12 +111,35 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleSave = async () => {
+    // 🛡️ Safety check: warn if force-update would lock out current users
+    if (settings.forceUpdate && isVersionGreaterThan(settings.minVersion, CURRENT_PUBLISHED_VERSION)) {
+      const confirmed = window.confirm(
+        `⚠️ تحذير خطر!\n\n` +
+        `أنت على وشك إجبار كل المستخدمين على تحديث التطبيق، ` +
+        `لكن الإصدار المحدد (${settings.minVersion}) أعلى من الإصدار المنشور حاليًا (${CURRENT_PUBLISHED_VERSION}).\n\n` +
+        `سيرى كل المستخدمين شاشة "تحديث مطلوب" ولن يستطيعوا استخدام التطبيق ` +
+        `حتى تنشر تحديثًا جديدًا في المتاجر.\n\n` +
+        `هل أنت متأكد أنك تريد المتابعة؟`
+      );
+      if (!confirmed) return;
+    }
+
+    // 🛡️ Safety check: maintenance mode
+    if (settings.maintenanceMode) {
+      const confirmed = window.confirm(
+        `⚠️ تفعيل وضع الصيانة\n\n` +
+        `سيرى جميع المستخدمين شاشة الصيانة ولن يتمكنوا من استخدام التطبيق.\n\n` +
+        `هل توافق على المتابعة؟`
+      );
+      if (!confirmed) return;
+    }
+
     setIsSaving(true);
     try {
       await setDoc(doc(db, 'config', 'app-settings'), {
         maintenanceMode: settings.maintenanceMode,
         forceUpdate: settings.forceUpdate,
-        minSupportedVersion: settings.minSupportedVersion,
+        minVersion: settings.minVersion,
         storeUrlIos: settings.storeUrlIos,
         storeUrlAndroid: settings.storeUrlAndroid,
         contact: {
@@ -219,11 +256,11 @@ const SettingsPage: React.FC = () => {
             <label className="block text-sm text-gray-400 mb-2">أقل إصدار مدعوم</label>
             <input
               type="text"
-              value={settings.minSupportedVersion}
-              onChange={e => updateSetting('minSupportedVersion', e.target.value)}
+              value={settings.minVersion}
+              onChange={e => updateSetting('minVersion', e.target.value)}
               className="w-full bg-gray-700 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 outline-none"
               dir="ltr"
-              placeholder="1.0.0"
+              placeholder="1.2.0"
               aria-label="أقل إصدار مدعوم"
             />
           </div>
@@ -266,25 +303,12 @@ const SettingsPage: React.FC = () => {
           <div className="mt-5 pt-4 border-t border-gray-700">
             <div className="flex items-center gap-3">
               <button
-                onClick={async () => {
+                onClick={() => {
                   if (!settings.storeUrlIos && !settings.storeUrlAndroid) {
                     alert('يرجى إضافة رابط المتجر (App Store أو Google Play) أولاً');
                     return;
                   }
-                  if (!confirm('إرسال إشعار تحديث لجميع المستخدمين؟')) return;
-                  setSendingUpdate(true);
-                  setUpdateSendResult(null);
-                  try {
-                    const result = await sendUpdatePushNotification(
-                      settings.storeUrlIos,
-                      settings.storeUrlAndroid,
-                    );
-                    setUpdateSendResult({ success: result.success, count: result.sentCount });
-                  } catch {
-                    setUpdateSendResult({ success: false, count: 0 });
-                  } finally {
-                    setSendingUpdate(false);
-                  }
+                  setShowPreviewModal(true);
                 }}
                 disabled={sendingUpdate}
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
@@ -436,6 +460,80 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 📬 Push Notification Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowPreviewModal(false)}>
+          <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto border border-gray-700" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <Bell size={22} className="text-blue-500" />
+                معاينة إشعار التحديث
+              </h3>
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+                aria-label="إغلاق"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 mb-4 text-sm">
+              ⚠️ سيُرسل هذا الإشعار لجميع المستخدمين المسجلين. كل مستخدم سيستلم الترجمة بلغته،
+              ورابط المتجر المناسب لمنصته (iOS / Android).
+            </div>
+
+            <div className="space-y-3 mb-5">
+              {Object.entries(UPDATE_NOTIFICATION_TRANSLATIONS).map(([lang, t]) => (
+                <div key={lang} className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                  <div className="text-xs text-gray-500 uppercase mb-1">{lang}</div>
+                  <div className="font-bold text-sm" dir={['ar','ur','fa'].includes(lang) ? 'rtl' : 'ltr'}>{t.title}</div>
+                  <div className="text-sm text-gray-300 mt-1" dir={['ar','ur','fa'].includes(lang) ? 'rtl' : 'ltr'}>{t.body}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-gray-900 rounded-lg p-3 mb-5 text-xs text-gray-400">
+              <div className="mb-1"><span className="text-gray-500">رابط iOS:</span> {settings.storeUrlIos || <span className="text-red-400">(غير محدد)</span>}</div>
+              <div><span className="text-gray-500">رابط Android:</span> {settings.storeUrlAndroid || <span className="text-red-400">(غير محدد)</span>}</div>
+            </div>
+
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setShowPreviewModal(false)}
+                disabled={sendingUpdate}
+                className="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={async () => {
+                  setSendingUpdate(true);
+                  setUpdateSendResult(null);
+                  setShowPreviewModal(false);
+                  try {
+                    const result = await sendUpdatePushNotification(
+                      settings.storeUrlIos,
+                      settings.storeUrlAndroid,
+                    );
+                    setUpdateSendResult({ success: result.success, count: result.sentCount });
+                  } catch {
+                    setUpdateSendResult({ success: false, count: 0 });
+                  } finally {
+                    setSendingUpdate(false);
+                  }
+                }}
+                disabled={sendingUpdate}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg text-sm font-medium flex items-center gap-2"
+              >
+                <Bell size={16} />
+                تأكيد الإرسال لجميع المستخدمين
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

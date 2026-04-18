@@ -111,7 +111,7 @@ export const RemoteConfigProvider: React.FC<RemoteConfigProviderProps> = ({ chil
 
   // Check for app update
   const checkForUpdate = useCallback(() => {
-    const currentVersion = Constants.expoConfig?.version || '1.0.0';
+    const currentVersion = Constants.expoConfig?.version || '1.2.0';
     return checkAppVersion(currentVersion);
   }, []);
 

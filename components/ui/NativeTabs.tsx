@@ -128,8 +128,8 @@ function ScrollableChipTabs({
   const activeColor = indicatorColor ?? colors.primary;
   const isDark = isDarkMode || colors.hasBgOverride;
 
-  const orderedTabs = useMemo(() => (isRTL ? [...tabs].reverse() : tabs), [tabs, isRTL]);
-
+  // RTL is handled by `flexDirection: row-reverse` below — do NOT also reverse
+  // the array, the two cancel out and the first tab ends up on the wrong side.
   return (
     <ScrollView
       horizontal
@@ -146,7 +146,7 @@ function ScrollableChipTabs({
         style,
       ]}
     >
-      {orderedTabs.map((tab) => {
+      {tabs.map((tab) => {
         const isActive = tab.key === selected;
         return (
           <Pressable

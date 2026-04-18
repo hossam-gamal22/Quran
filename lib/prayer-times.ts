@@ -4,6 +4,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
+import { getCountryPrayerDefaultsOrFallback } from '@/lib/country-prayer-defaults';
+import { detectUserCountry } from '@/services/hijriCalendarService';
 
 // ========================================
 // الأنواع والواجهات
@@ -146,9 +148,14 @@ const STORAGE_KEYS = {
   LOCATION: 'user_location',
 };
 
+// Seed from device country so background consumers (notifications, widgets)
+// that read DEFAULT_SETTINGS before the user hits the prayer tab get the right
+// calculation method. Overridden by AsyncStorage-persisted settings when present.
+const _countryDefaults = getCountryPrayerDefaultsOrFallback(detectUserCountry());
+
 const DEFAULT_SETTINGS: PrayerSettings = {
-  calculationMethod: 4, // أم القرى
-  asrJuristic: 0, // الشافعي
+  calculationMethod: _countryDefaults.method as CalculationMethod,
+  asrJuristic: _countryDefaults.asrSchool,
   adjustments: {
     fajr: 0,
     sunrise: 0,
@@ -547,14 +554,23 @@ export const getStoredLocation = async (): Promise<Location | null> => {
 
 /**
  * حفظ مواقيت الصلاة في الكاش
+ * When method+school provided, also writes a method-specific key.
  */
 export const cachePrayerTimes = async (
   date: string,
-  times: PrayerTimes
+  times: PrayerTimes,
+  method?: number,
+  school?: number
 ): Promise<void> => {
   try {
-    const cacheKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}`;
-    await AsyncStorage.setItem(cacheKey, JSON.stringify(times));
+    // Always write generic key (for home, widgets, worship tracker, etc.)
+    const genericKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}`;
+    await AsyncStorage.setItem(genericKey, JSON.stringify(times));
+    // Also write method-specific key so a method change won't serve stale data
+    if (method !== undefined && school !== undefined) {
+      const specificKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}_M${method}_S${school}`;
+      await AsyncStorage.setItem(specificKey, JSON.stringify(times));
+    }
   } catch (error) {
     console.error('Error caching prayer times:', error);
   }
@@ -562,11 +578,19 @@ export const cachePrayerTimes = async (
 
 /**
  * جلب مواقيت الصلاة من الكاش
+ * When method+school provided, tries the method-specific key first.
  */
-export const getCachedPrayerTimes = async (date: string): Promise<PrayerTimes | null> => {
+export const getCachedPrayerTimes = async (date: string, method?: number, school?: number): Promise<PrayerTimes | null> => {
   try {
-    const cacheKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}`;
-    const data = await AsyncStorage.getItem(cacheKey);
+    // Try method-specific key first if provided
+    if (method !== undefined && school !== undefined) {
+      const specificKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}_M${method}_S${school}`;
+      const specificData = await AsyncStorage.getItem(specificKey);
+      if (specificData) return JSON.parse(specificData);
+    }
+    // Fallback to generic key
+    const genericKey = `${STORAGE_KEYS.PRAYER_TIMES}_${date}`;
+    const data = await AsyncStorage.getItem(genericKey);
     return data ? JSON.parse(data) : null;
   } catch (error) {
     console.error('Error getting cached prayer times:', error);

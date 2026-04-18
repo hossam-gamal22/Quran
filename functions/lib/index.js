@@ -33,9 +33,13 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pushNotificationsTestEndpoint = exports.sendPushNotifications = void 0;
+exports.validateAdminSession = exports.verifyAdminPassword = exports.selectMonthlyWinners = exports.pushNotificationsTestEndpoint = exports.sendPushNotifications = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
+const scheduler_1 = require("firebase-functions/v2/scheduler");
+const params_1 = require("firebase-functions/params");
+// Expo Access Token for authenticated push API calls
+const expoAccessToken = (0, params_1.defineSecret)('EXPO_ACCESS_TOKEN');
 // Initialize Firebase Admin
 if (!admin.apps.length) {
     admin.initializeApp();
@@ -56,7 +60,7 @@ const EXPO_REQUEST_TIMEOUT_MS = 15000;
  *   { messages: ExpoPushMessage[] }  — pre-built per-user messages (multi-language)
  *   { tokens, title, body, ... }     — flat payload (single language, legacy)
  */
-exports.sendPushNotifications = functions.https.onCall(async (data, context) => {
+exports.sendPushNotifications = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onCall(async (data, context) => {
     try {
         // Verify caller is admin
         if (!context.auth) {
@@ -89,16 +93,22 @@ exports.sendPushNotifications = functions.https.onCall(async (data, context) => 
         logger.info(`Sending ${messages.length} push notifications`);
         // Send via Expo with failover
         let lastError = null;
+        // Build auth headers
+        const token = expoAccessToken.value();
+        const headers = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
         for (const endpoint of EXPO_PUSH_APIS) {
             try {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
+                    headers,
                     body: JSON.stringify(messages),
                     signal: controller.signal,
                 });
@@ -147,7 +157,7 @@ exports.sendPushNotifications = functions.https.onCall(async (data, context) => 
  * HTTP Endpoint for testing (development only)
  * Remove in production or add security checks
  */
-exports.pushNotificationsTestEndpoint = functions.https.onRequest(async (req, res) => {
+exports.pushNotificationsTestEndpoint = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onRequest(async (req, res) => {
     // CORS headers
     res.set('Access-Control-Allow-Origin', '*');
     res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -178,6 +188,15 @@ exports.pushNotificationsTestEndpoint = functions.https.onRequest(async (req, re
             ...(notifData && { data: notifData }),
             priority: 'high',
         }));
+        // Build auth headers
+        const token = expoAccessToken.value();
+        const authHeaders = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            authHeaders['Authorization'] = `Bearer ${token}`;
+        }
         // Try both endpoints
         for (const endpoint of EXPO_PUSH_APIS) {
             try {
@@ -185,10 +204,7 @@ exports.pushNotificationsTestEndpoint = functions.https.onRequest(async (req, re
                 const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
                 const response = await fetch(endpoint, {
                     method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
+                    headers: authHeaders,
                     body: JSON.stringify(messages),
                     signal: controller.signal,
                 });
@@ -215,5 +231,232 @@ exports.pushNotificationsTestEndpoint = functions.https.onRequest(async (req, re
     catch (error) {
         logger.error('HTTP endpoint error:', error);
         res.status(500).json({ error: String(error) });
+    }
+});
+// ==================== Monthly Honor Board Winner Selection ====================
+/**
+ * Scheduled Cloud Function: runs at 00:05 on the 1st of every month.
+ * Selects top winners from the previous month's leaderboard,
+ * grants them admin premium, and sends push notifications.
+ */
+exports.selectMonthlyWinners = (0, scheduler_1.onSchedule)({ schedule: '5 0 1 * *', timeZone: 'Asia/Riyadh', secrets: ['EXPO_ACCESS_TOKEN'] }, async () => {
+    try {
+        // Calculate previous month key (YYYY-MM-v2 format)
+        const now = new Date();
+        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const monthKey = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}-v2`;
+        logger.info(`🏆 Selecting winners for month: ${monthKey}`);
+        // Fetch rewards config
+        const configSnap = await db.doc('config/rewards-settings').get();
+        const config = configSnap.data() || {};
+        if (config.enabled === false) {
+            logger.info('Rewards system is disabled, skipping winner selection');
+            return;
+        }
+        // Check if already processed
+        if (config.currentMonth === monthKey) {
+            logger.info(`Winners already selected for ${monthKey}, skipping`);
+            return;
+        }
+        const winnersCount = config.winnersCount || 3;
+        const rewardDurationDays = config.rewardDurationDays || 30;
+        // Query top users for previous month
+        const snapshot = await db.collection('users')
+            .where('monthlyEngagement.month', '==', monthKey)
+            .orderBy('monthlyEngagement.score', 'desc')
+            .limit(winnersCount)
+            .get();
+        const winners = [];
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + rewardDurationDays);
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const engagement = data.monthlyEngagement;
+            if (engagement && engagement.score > 0) {
+                winners.push({
+                    userId: docSnap.id,
+                    displayName: data.displayName || docSnap.id.slice(0, 8),
+                    score: engagement.score,
+                    rewardedAt: new Date().toISOString(),
+                    notified: false,
+                    premiumExpiresAt: expiresAt.toISOString(),
+                });
+            }
+        });
+        if (winners.length === 0) {
+            logger.info(`No eligible winners found for ${monthKey}`);
+            await db.doc('config/rewards-settings').update({
+                currentMonth: monthKey,
+                lastProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            return;
+        }
+        // Grant premium to each winner
+        const batch = db.batch();
+        for (const winner of winners) {
+            const userRef = db.doc(`users/${winner.userId}`);
+            batch.update(userRef, {
+                adminPremium: {
+                    granted: true,
+                    grantedBy: 'auto_reward_system',
+                    grantedAt: new Date().toISOString(),
+                    expiresAt: expiresAt.toISOString(),
+                    reason: `فائز في مسابقة الشهر ${monthKey}`,
+                },
+            });
+        }
+        await batch.commit();
+        // Update rewards config
+        const historyEntry = {
+            month: monthKey,
+            winners,
+            selectedAt: new Date().toISOString(),
+            selectedBy: 'auto',
+        };
+        const existingHistory = config.history || [];
+        await db.doc('config/rewards-settings').update({
+            currentMonth: monthKey,
+            currentWinners: winners,
+            history: [historyEntry, ...existingHistory.slice(0, 11)],
+            lastProcessedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        // Send push notifications to winners
+        const pushMessages = [];
+        for (const winner of winners) {
+            try {
+                const userSnap = await db.doc(`users/${winner.userId}`).get();
+                const fcmToken = userSnap.data()?.fcmToken;
+                if (fcmToken && fcmToken.startsWith('ExponentPushToken')) {
+                    pushMessages.push({
+                        to: fcmToken,
+                        title: '🏆 مبروك! أنت في لوحة الشرف',
+                        body: 'حصلت على اشتراك مجاني هذا الشهر مكافأة لك',
+                        data: { type: 'honor_board_winner' },
+                        sound: 'default',
+                        priority: 'high',
+                    });
+                    winner.notified = true;
+                }
+            }
+            catch (err) {
+                logger.warn(`Could not get push token for winner ${winner.userId}:`, err);
+            }
+        }
+        if (pushMessages.length > 0) {
+            try {
+                const winnerToken = expoAccessToken.value();
+                const winnerHeaders = {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                };
+                if (winnerToken) {
+                    winnerHeaders['Authorization'] = `Bearer ${winnerToken}`;
+                }
+                const response = await fetch(EXPO_PUSH_APIS[0], {
+                    method: 'POST',
+                    headers: winnerHeaders,
+                    body: JSON.stringify(pushMessages),
+                });
+                if (response.ok) {
+                    logger.info(`Sent winner notifications to ${pushMessages.length} users`);
+                }
+                else {
+                    logger.warn('Winner notification push failed:', await response.text());
+                }
+            }
+            catch (pushErr) {
+                logger.warn('Winner notification push error:', pushErr);
+            }
+        }
+        logger.info(`🏆 Selected ${winners.length} winners for ${monthKey}`);
+    }
+    catch (error) {
+        logger.error('❌ selectMonthlyWinners failed:', error);
+    }
+});
+// ==================== Admin Authentication ====================
+/**
+ * Cloud Function: Verify admin password securely on the server.
+ * The password hash is stored in `appConfig/adminAuth` which is now
+ * read-restricted by Firestore rules — only this function (running with
+ * Admin SDK privileges) can read it.
+ *
+ * Returns a session token on success. The token is also stored in Firestore
+ * so admin panel can verify it on subsequent loads.
+ *
+ * Input:  { passwordHash: string }  (SHA-256 hex hash, computed in browser)
+ * Output: { sessionToken: string } on success
+ *         throws 'permission-denied' on wrong password
+ *         throws 'failed-precondition' if no admin password is configured
+ */
+exports.verifyAdminPassword = functions.https.onCall(async (data) => {
+    try {
+        const submittedHash = (data?.passwordHash || '').trim().toLowerCase();
+        if (!submittedHash || submittedHash.length !== 64) {
+            throw new functions.https.HttpsError('invalid-argument', 'A valid SHA-256 password hash is required.');
+        }
+        const snap = await db.doc('appConfig/adminAuth').get();
+        if (!snap.exists) {
+            throw new functions.https.HttpsError('failed-precondition', 'Admin authentication is not configured.');
+        }
+        const stored = snap.data();
+        const storedHash = (stored?.passwordHash || '').trim().toLowerCase();
+        if (!storedHash) {
+            throw new functions.https.HttpsError('failed-precondition', 'Admin password hash is missing.');
+        }
+        // Constant-time comparison to mitigate timing attacks
+        if (storedHash.length !== submittedHash.length) {
+            throw new functions.https.HttpsError('permission-denied', 'Incorrect password.');
+        }
+        let mismatch = 0;
+        for (let i = 0; i < storedHash.length; i++) {
+            mismatch |= storedHash.charCodeAt(i) ^ submittedHash.charCodeAt(i);
+        }
+        if (mismatch !== 0) {
+            throw new functions.https.HttpsError('permission-denied', 'Incorrect password.');
+        }
+        // Generate fresh session token (rotated on every login)
+        const sessionToken = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+        await db.doc('appConfig/adminAuth').set({
+            sessionToken,
+            sessionIssuedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+        return { sessionToken };
+    }
+    catch (error) {
+        if (error instanceof functions.https.HttpsError)
+            throw error;
+        logger.error('verifyAdminPassword error:', error);
+        throw new functions.https.HttpsError('internal', 'Authentication failed.');
+    }
+});
+/**
+ * Cloud Function: Validate an existing admin session token.
+ * Called by admin panel on page load to confirm the cached token is still valid.
+ *
+ * Input:  { sessionToken: string }
+ * Output: { valid: boolean }
+ */
+exports.validateAdminSession = functions.https.onCall(async (data) => {
+    try {
+        const submitted = (data?.sessionToken || '').trim();
+        if (!submitted)
+            return { valid: false };
+        const snap = await db.doc('appConfig/adminAuth').get();
+        if (!snap.exists)
+            return { valid: false };
+        const stored = snap.data()?.sessionToken || '';
+        if (!stored || stored.length !== submitted.length)
+            return { valid: false };
+        // Constant-time compare
+        let mismatch = 0;
+        for (let i = 0; i < stored.length; i++) {
+            mismatch |= stored.charCodeAt(i) ^ submitted.charCodeAt(i);
+        }
+        return { valid: mismatch === 0 };
+    }
+    catch (error) {
+        logger.error('validateAdminSession error:', error);
+        return { valid: false };
     }
 });

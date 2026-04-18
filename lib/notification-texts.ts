@@ -51,6 +51,40 @@ async function refreshNotifTextsFromFirestore(): Promise<void> {
 }
 
 /**
+ * Real-time listener for notification text overrides from admin panel.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToNotificationTexts(
+  onUpdate?: (data: typeof _notifTextsCache) => void,
+): () => void {
+  let unsubscribe = () => {};
+  (async () => {
+    try {
+      const { getFirestore, doc, onSnapshot } = await import('firebase/firestore');
+      const { getApp } = await import('firebase/app');
+      const db = getFirestore(getApp());
+      unsubscribe = onSnapshot(
+        doc(db, 'appConfig', 'notificationTexts'),
+        (snap) => {
+          const data = snap.exists()
+            ? (snap.data() as typeof _notifTextsCache)
+            : ({} as typeof _notifTextsCache);
+          _notifTextsCache = data;
+          AsyncStorage.setItem(NOTIF_TEXTS_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+          onUpdate?.(data);
+        },
+        (err) => {
+          if (__DEV__) console.warn('[notification-texts] subscribe error:', err);
+        },
+      );
+    } catch (err) {
+      if (__DEV__) console.warn('[notification-texts] failed to subscribe:', err);
+    }
+  })();
+  return () => unsubscribe();
+}
+
+/**
  * Get notification title/body for a given type, with admin override → t() fallback.
  * @param typeId  e.g. 'morning', 'prayer_fajr', 'daily_ayah'
  * @param fallbackTitle  The t() translation key result to use as fallback

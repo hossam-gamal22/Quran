@@ -46,6 +46,8 @@ import {
   formatPrayerTime,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
+import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
+import { setUserCountry } from '@/services/hijriCalendarService';
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -311,6 +313,7 @@ export default function PrayerScreen() {
       // Try locale-aware geocoding first (3s timeout to avoid offline hang)
       let city = '';
       let country = '';
+      let countryCode = '';
       try {
         const lang = language || 'ar';
         const geocodeCtrl = new AbortController();
@@ -324,6 +327,7 @@ export default function PrayerScreen() {
           const data = await res.json();
           city = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.state || '';
           country = data?.address?.country || '';
+          countryCode = (data?.address?.country_code || '').toUpperCase();
         }
       } catch {}
 
@@ -332,6 +336,28 @@ export default function PrayerScreen() {
         const [geocode] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
         city = geocode?.city || geocode?.subregion || '';
         country = geocode?.country || '';
+        if (!countryCode) countryCode = (geocode?.isoCountryCode || '').toUpperCase();
+      }
+
+      // Update user's real country in Firestore (GPS-based) and persist locally
+      // so the SettingsContext reconcile effect can pick it up on next launch.
+      if (countryCode) {
+        import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
+          updateUserCountryFromGPS(countryCode).catch(() => {});
+        }).catch(() => {});
+        setUserCountry(countryCode).catch(() => {});
+      }
+
+      // Auto-detect calculation method from GPS country (current session).
+      if (countryCode && !settings.prayer.methodManuallySet) {
+        const cd = applyCountryPrayerDefaults(countryCode);
+        if (cd && (cd.method !== settings.prayer.calculationMethod || cd.asrSchool !== settings.prayer.asrJuristic)) {
+          console.log(`🌍 GPS prayer method for ${countryCode}: method=${cd.method}, asrSchool=${cd.asrSchool}`);
+          updatePrayer({
+            calculationMethod: cd.method as CalculationMethod,
+            asrJuristic: cd.asrSchool,
+          });
+        }
       }
 
       const locationData: LocationType = {
@@ -435,7 +461,15 @@ export default function PrayerScreen() {
     try {
       setError(null);
       setDataSource('live');
-      const settingsFromStore = await getPrayerSettings();
+      // Bug 1 fix: Use SettingsContext as source of truth for calculation params
+      // Only read notifications from local @prayer_settings storage
+      const localNotifSettings = await getPrayerSettings();
+      const settingsFromStore: PrayerSettings = {
+        ...localNotifSettings,
+        calculationMethod: settings.prayer.calculationMethod,
+        asrJuristic: settings.prayer.asrJuristic,
+        adjustments: settings.prayer.adjustments,
+      };
       setPrayerSettings(settingsFromStore);
 
       const today = getTodayDateString();
@@ -459,6 +493,7 @@ export default function PrayerScreen() {
               const data = await res.json();
               const city = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.state || '';
               const country = data?.address?.country || '';
+              const countryCode = (data?.address?.country_code || '').toUpperCase();
               if (city) {
                 currentLoc = { ...stored, city, country };
                 await saveLocation(currentLoc);
@@ -466,6 +501,27 @@ export default function PrayerScreen() {
                 import('@/lib/notifications-manager').then(({ rescheduleAllFromStorage }) => {
                   rescheduleAllFromStorage().catch(() => {});
                 }).catch(() => {});
+              }
+
+              // Update user's real country in Firestore + persist locally so
+              // SettingsContext reconcile picks it up next launch.
+              if (countryCode) {
+                import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
+                  updateUserCountryFromGPS(countryCode).catch(() => {});
+                }).catch(() => {});
+                setUserCountry(countryCode).catch(() => {});
+              }
+
+              // Auto-detect calculation method from country (cached location path)
+              if (countryCode && !settings.prayer.methodManuallySet) {
+                const cd = applyCountryPrayerDefaults(countryCode);
+                if (cd && (cd.method !== settings.prayer.calculationMethod || cd.asrSchool !== settings.prayer.asrJuristic)) {
+                  console.log(`🌍 Cached-location prayer method for ${countryCode}: method=${cd.method}, asrSchool=${cd.asrSchool}`);
+                  updatePrayer({
+                    calculationMethod: cd.method as CalculationMethod,
+                    asrJuristic: cd.asrSchool,
+                  });
+                }
               }
             }
           } catch (e) {
@@ -476,7 +532,7 @@ export default function PrayerScreen() {
       }
 
       if (!forceRefresh) {
-        const cached = await getCachedPrayerTimes(today);
+        const cached = await getCachedPrayerTimes(today, settings.prayer.calculationMethod, settings.prayer.asrJuristic);
         if (cached) {
           setPrayerTimes(cached);
           setDataSource('todayCache');
@@ -535,7 +591,7 @@ export default function PrayerScreen() {
       const response = await fetchPrayerTimes(loc, new Date(), settingsFromStore);
       let times = parsePrayerTimes(response);
       times = applyAdjustments(times, settingsFromStore.adjustments);
-      await cachePrayerTimes(today, times);
+      await cachePrayerTimes(today, times, settingsFromStore.calculationMethod, settingsFromStore.asrJuristic);
       setPrayerTimes(times);
       setDataSource('live');
       setCacheAgeDays(0);
@@ -618,6 +674,19 @@ export default function PrayerScreen() {
     const ahSuffix = t('calendar.ahSuffix');
     if (hijri) setHijriDate(`${hijri.day} ${hijri.monthName} ${hijri.year} ${ahSuffix}`);
   }, []));
+
+  // Bug 2 fix: Force-refresh when calculation method or Asr school changes
+  const prevMethodRef = useRef(settings.prayer.calculationMethod);
+  const prevAsrRef = useRef(settings.prayer.asrJuristic);
+  useEffect(() => {
+    if (prevMethodRef.current !== settings.prayer.calculationMethod ||
+        prevAsrRef.current !== settings.prayer.asrJuristic) {
+      console.log(`🔄 Prayer settings changed: method ${prevMethodRef.current}→${settings.prayer.calculationMethod}, asr ${prevAsrRef.current}→${settings.prayer.asrJuristic}`);
+      prevMethodRef.current = settings.prayer.calculationMethod;
+      prevAsrRef.current = settings.prayer.asrJuristic;
+      loadPrayerTimes(true);
+    }
+  }, [settings.prayer.calculationMethod, settings.prayer.asrJuristic]);
 
   // Auto-refresh prayer times at midnight for the new day
   useEffect(() => {
@@ -743,7 +812,7 @@ export default function PrayerScreen() {
           )}
 
           {/* Stale/extrapolated/offline data warning banner */}
-          {(dataSource === 'extrapolated' || dataSource === 'localCalc' || dataSource === 'countryFallback') && !error && (
+          {(dataSource === 'extrapolated' || dataSource === 'localCalc' || dataSource === 'countryFallback' || (dataSource === 'weekCache' && cacheAgeDays > 0)) && !error && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.staleBanner, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(255,152,0,0.15)' : 'rgba(255,243,224,0.95)' }]}>
               <MaterialCommunityIcons name={dataSource === 'countryFallback' ? 'earth' : 'clock-alert-outline'} size={22} color={isDarkMode ? '#ffb74d' : '#e65100'} />
               <View style={{ flex: 1 }}>
@@ -997,7 +1066,7 @@ export default function PrayerScreen() {
                 {showMethodPicker && (
                   <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
                     {PRAYER_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value }); setShowMethodPicker(false); }}>
+                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value, methodManuallySet: true }); setShowMethodPicker(false); }}>
                         <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
                         {settings.prayer.calculationMethod === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
                       </TouchableOpacity>
@@ -1019,7 +1088,7 @@ export default function PrayerScreen() {
                 {showAsrPicker && (
                   <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
                     {ASR_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1 }); setShowAsrPicker(false); }}>
+                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1, methodManuallySet: true }); setShowAsrPicker(false); }}>
                         <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
                         {settings.prayer.asrJuristic === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
                       </TouchableOpacity>

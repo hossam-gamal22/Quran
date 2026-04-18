@@ -10,6 +10,8 @@ const DAILY_AD_COUNT_KEY = '@smart_ads_daily_count';
 const DAILY_AD_DATE_KEY = '@smart_ads_daily_date';
 const USER_INSTALL_DATE_KEY = '@smart_ads_install_date';
 const ENGAGEMENT_SESSIONS_KEY = '@smart_ads_engagement_sessions';
+const SURAH_READ_KEY = '@smart_ads_surah_read_count';
+const SURAH_READ_EVERY = 3;
 
 // ==================== Limits ====================
 
@@ -267,4 +269,22 @@ async function _saveDailyCounts(counts: { interstitials: number; appOpen: number
     await AsyncStorage.setItem(DAILY_AD_COUNT_KEY, JSON.stringify(counts));
     await AsyncStorage.setItem(DAILY_AD_DATE_KEY, counts.date);
   } catch {}
+}
+
+// ==================== Surah Read Counter ====================
+
+/**
+ * Increment the persisted surah-read counter. Returns true on every Nth read
+ * (N = SURAH_READ_EVERY) so the caller can fire an interstitial. Persistence
+ * means a user who reads 1 surah per session still gets the ad at the 3rd read.
+ */
+export async function recordSurahRead(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(SURAH_READ_KEY);
+    const n = (Number(raw) || 0) + 1;
+    await AsyncStorage.setItem(SURAH_READ_KEY, String(n));
+    return n % SURAH_READ_EVERY === 0;
+  } catch {
+    return false;
+  }
 }

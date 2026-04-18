@@ -34,6 +34,7 @@ import { APP_BACKGROUNDS, BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing, Colors, DarkColors } from '@/constants/theme';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import { FREE_PEXELS_BACKGROUNDS, PREMIUM_PEXELS_BACKGROUNDS, BACKGROUND_CATEGORIES, type PexelsBackground } from '@/constants/pexels-backgrounds';
 import { fetchPhotoBackgrounds } from '@/lib/photo-backgrounds-api';
 import { cacheBackground, getCachedBackgroundUri } from '@/lib/background-cache';
@@ -101,11 +102,7 @@ export default function DisplaySettingsScreen() {
   };
 
   const handleSelectBackground = (key: AppBackgroundKey, bgIsPremium?: boolean) => {
-    if (bgIsPremium && !isPremium) {
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      }
-      router.push('/subscription');
+    if (bgIsPremium && !guardPremiumFeature('custom_backgrounds', router, isPremium)) {
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

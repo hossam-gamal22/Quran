@@ -3,7 +3,7 @@
 // آخر تحديث: 2026-03-04
 // محدث لدعم 12 لغة
 
-import { db, functions } from '../firebase';
+import { db } from '../firebase';
 import {
   collection,
   getDocs,
@@ -13,8 +13,6 @@ import {
   addDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-
 // ==================== الأنواع ====================
 
 // اللغات المدعومة (12 لغة)
@@ -193,6 +191,13 @@ const fetchUserTokens = async (
     if (targetCountries && targetCountries.length > 0) {
       users = users.filter(u => targetCountries.includes(u.country));
     }
+
+    // Deduplicate by fcmToken — keep latest (last in array = most recent Firestore doc)
+    const tokenMap = new Map<string, UserToken>();
+    for (const u of users) {
+      tokenMap.set(u.fcmToken, u);
+    }
+    users = Array.from(tokenMap.values());
     
     return users;
   } catch (error) {
@@ -237,61 +242,31 @@ const getTranslationForUser = (
 /**
  * إرسال دفعة من الإشعارات.
  * - في بيئة التطوير (localhost): يستخدم Vite proxy لتجاوز CORS
- * - في الإنتاج: يستخدم Firebase Cloud Function
+ * - في الإنتاج: يستخدم Netlify serverless function
  */
 const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
-  const isDev = import.meta.env.DEV;
+  // Both dev (Vite proxy) and production (Netlify function) use the same path pattern
+  const pushUrl = import.meta.env.DEV ? '/expo-push' : '/api/expo-push';
 
-  // ─── بيئة التطوير: Vite proxy (localhost) ───
-  if (isDev) {
-    try {
-      const res = await fetch('/expo-push', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = await res.json();
-      let ok = 0, fail = 0;
-      const errs: string[] = [];
-      (result.data ?? []).forEach((t: any, i: number) => {
-        if (t.status === 'ok') ok++;
-        else { fail++; errs.push(`Token ${i}: ${t.message ?? 'error'}`); }
-      });
-      console.log(`✅ Sent ${ok} via Vite proxy`);
-      return { successCount: ok, failureCount: fail, errors: errs };
-    } catch (error: any) {
-      console.error('Proxy error:', error);
-      return { successCount: 0, failureCount: messages.length, errors: [error.message] };
-    }
-  }
-
-  // ─── الإنتاج: Firebase Cloud Function ───
   try {
-    const sendPushNotifications = httpsCallable<
-      { messages: ExpoPushMessage[] },
-      { success: boolean; sentCount: number; tickets: { status: string; message?: string }[] }
-    >(functions, 'sendPushNotifications');
-
-    const result = await sendPushNotifications({ messages });
-    const { tickets = [] } = result.data;
-
+    const res = await fetch(pushUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(messages),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+    const result = await res.json();
     let ok = 0, fail = 0;
     const errs: string[] = [];
-    tickets.forEach((t, i) => {
+    (result.data ?? []).forEach((t: any, i: number) => {
       if (t.status === 'ok') ok++;
       else { fail++; errs.push(`Token ${i}: ${t.message ?? 'error'}`); }
     });
-
-    console.log(`✅ Sent ${ok} via Cloud Function`);
+    console.log(`✅ Sent ${ok} notifications`);
     return { successCount: ok, failureCount: fail, errors: errs };
   } catch (error: any) {
-    console.error('Cloud Function error:', error);
-    return {
-      successCount: 0,
-      failureCount: messages.length,
-      errors: [error.message || 'يجب ترقية Firebase إلى خطة Blaze لتفعيل Cloud Functions'],
-    };
+    console.error('Push send error:', error);
+    return { successCount: 0, failureCount: messages.length, errors: [error.message] };
   }
 };
 
@@ -600,7 +575,7 @@ export const sendReengagementNotification = async (params: {
 /**
  * ترجمات إشعار تحديث التطبيق (12 لغة)
  */
-const UPDATE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
+export const UPDATE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
   ar: { title: '🎉 تحديث جديد متاح', body: 'يتوفر إصدار جديد من روح المسلم. حدّث الآن للحصول على أفضل تجربة.' },
   en: { title: '🎉 New Update Available', body: 'A new version of Rooh Al-Muslim is available. Update now for the best experience.' },
   fr: { title: '🎉 Nouvelle mise à jour disponible', body: 'Une nouvelle version de Rooh Al-Muslim est disponible. Mettez à jour maintenant.' },
@@ -617,18 +592,96 @@ const UPDATE_NOTIFICATION_TRANSLATIONS: NotificationTranslations = {
 
 /**
  * إرسال إشعار تحديث التطبيق لجميع المستخدمين
- * يُستدعى من لوحة التحكم عند تعيين إصدار جديد
+ * يُرسل لينك المتجر المناسب حسب منصة كل مستخدم (iOS → App Store, Android → Play Store)
  */
 export const sendUpdatePushNotification = async (
   storeUrlIos: string,
   storeUrlAndroid: string,
 ): Promise<SendResult> => {
-  return sendPushNotification({
-    translations: UPDATE_NOTIFICATION_TRANSLATIONS,
-    targetAudience: 'all',
-    actionType: 'url',
-    actionUrl: storeUrlAndroid || storeUrlIos, // fallback
-  });
+  const errors: string[] = [];
+  let sentCount = 0;
+  let failedCount = 0;
+  const perLanguage: { [lang: string]: number } = {};
+  const fallbackUrl = storeUrlAndroid || storeUrlIos;
+
+  try {
+    const users = await fetchUserTokens('all');
+    if (users.length === 0) {
+      return { success: false, sentCount: 0, failedCount: 0, errors: ['لا يوجد مستخدمين'], perLanguage: {} };
+    }
+
+    const messages: ExpoPushMessage[] = users.map(user => {
+      const translation = getTranslationForUser(UPDATE_NOTIFICATION_TRANSLATIONS, user.language);
+      perLanguage[user.language] = (perLanguage[user.language] || 0) + 1;
+
+      // إرسال لينك المتجر المناسب حسب المنصة
+      const storeUrl = user.platform === 'ios'
+        ? (storeUrlIos || fallbackUrl)
+        : (storeUrlAndroid || fallbackUrl);
+
+      return {
+        to: user.fcmToken,
+        title: translation.title,
+        body: translation.body,
+        sound: 'default' as const,
+        priority: 'high' as const,
+        channelId: 'general',
+        ttl: 86400,
+        _displayInForeground: true,
+        data: {
+          actionType: 'url',
+          actionUrl: storeUrl,
+          language: user.language,
+          type: 'admin',
+        },
+      };
+    });
+
+    const notifDocRef = await addDoc(collection(db, 'notifications'), {
+      translations: UPDATE_NOTIFICATION_TRANSLATIONS,
+      targetAudience: 'all',
+      actionType: 'url',
+      actionUrl: fallbackUrl,
+      status: 'sending',
+      type: 'update',
+      sentCount: 0,
+      failedCount: 0,
+      perLanguage: {},
+      deliveredCount: 0,
+      openedCount: 0,
+      clickedCount: 0,
+      createdAt: serverTimestamp(),
+    });
+
+    for (const msg of messages) {
+      (msg as any).data = { ...(msg as any).data, notificationDocId: notifDocRef.id };
+    }
+
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const result = await sendBatch(batch);
+      sentCount += result.successCount;
+      failedCount += result.failureCount;
+      errors.push(...result.errors);
+      if (i + BATCH_SIZE < messages.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    const { updateDoc: updateDocFn } = await import('firebase/firestore');
+    await updateDocFn(notifDocRef, {
+      status: 'sent',
+      sentCount,
+      failedCount,
+      perLanguage,
+      deliveredCount: sentCount,
+      sentAt: serverTimestamp(),
+    });
+
+    return { success: sentCount > 0, sentCount, failedCount, errors: errors.slice(0, 10), perLanguage };
+  } catch (error) {
+    return { success: false, sentCount, failedCount, errors: [(error as Error).message], perLanguage };
+  }
 };
 
 /**

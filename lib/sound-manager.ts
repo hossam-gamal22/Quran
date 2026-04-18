@@ -143,6 +143,48 @@ export async function refreshSoundSettings(): Promise<SoundSettings | null> {
   return fetchSoundSettings();
 }
 
+/**
+ * Real-time listener for sound settings changes from admin panel.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToSoundSettings(
+  onUpdate?: (settings: SoundSettings) => void,
+): () => void {
+  let unsubscribe = () => {};
+  (async () => {
+    try {
+      const { onSnapshot } = await import('firebase/firestore');
+      unsubscribe = onSnapshot(
+        doc(db, 'appConfig', 'soundSettings'),
+        (snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data() as SoundSettings;
+          _settingsCache = data;
+          AsyncStorage.setItem(
+            SETTINGS_CACHE_KEY,
+            JSON.stringify({ data, timestamp: Date.now() } as CachedSettings),
+          ).catch(() => {});
+          // Also refresh disabled bundled sounds cache
+          const bundled: BundledSoundConfig[] = (data as { bundledSounds?: BundledSoundConfig[] }).bundledSounds || [];
+          const disabledIds = bundled.filter((s) => s.enabled === false).map((s) => s.id);
+          _disabledSoundsCache = new Set(disabledIds);
+          AsyncStorage.setItem(
+            DISABLED_SOUNDS_CACHE_KEY,
+            JSON.stringify({ ids: disabledIds, timestamp: Date.now() }),
+          ).catch(() => {});
+          onUpdate?.(data);
+        },
+        (error) => {
+          if (__DEV__) console.warn('[sound-manager] subscribe error:', error);
+        },
+      );
+    } catch (e) {
+      if (__DEV__) console.warn('[sound-manager] failed to subscribe:', e);
+    }
+  })();
+  return () => unsubscribe();
+}
+
 // ─── Bundled Sound Enable/Disable from Admin ─────────────────────────────────
 
 interface BundledSoundConfig {

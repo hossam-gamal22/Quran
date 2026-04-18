@@ -117,6 +117,8 @@ export default function QuestionAnswerScreen() {
         setSelectedCategory(filtered[0].id);
       }
       setIsLoading(false);
+    }).catch(() => {
+      if (mounted) setIsLoading(false);
     });
 
     const unsubscribe = subscribeToQAContent((data) => {
@@ -198,7 +200,7 @@ export default function QuestionAnswerScreen() {
         question: questionText.trim(),
         language,
         registeredName: user?.name || '',
-        userId: user?.id || '',
+        userId: user?.id != null ? String(user.id) : '',
       });
       setShowQuestionModal(false);
       setQuestionText('');

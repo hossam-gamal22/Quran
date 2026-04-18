@@ -29,7 +29,8 @@ export type AdScreenKey =
   | 'hadith'
   | 'ayat_universe'
   | 'hadith_sifat'
-  | 'qibla';
+  | 'qibla'
+  | 'radio';
 
 // ==================== Test Ad IDs ====================
 
@@ -157,6 +158,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     ayat_universe: true,
     hadith_sifat: true,
     qibla: true,
+    radio: true,
   },
   showAdOnQiblaStyleChange: true,
   interstitialMode: 'pages',

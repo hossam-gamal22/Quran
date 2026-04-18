@@ -37,6 +37,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 
 const APP_INFO = {
   email: 'hossamgamal290@gmail.com',
+  website: 'https://roohmuslim.com',
 };
 
 const FEATURES = [
@@ -138,10 +139,12 @@ export default function AboutScreen() {
   const [tapCount, setTapCount] = useState(0);
   const logoScale = useSharedValue(1);
   const [contactEmail, setContactEmail] = useState(APP_INFO.email);
+  const [contactWebsite, setContactWebsite] = useState(APP_INFO.website);
 
   useEffect(() => {
     fetchAppConfig().then(config => {
       if (config.contact?.email) setContactEmail(config.contact.email);
+      if (config.contact?.website) setContactWebsite(config.contact.website);
     }).catch(() => {
       showOfflineModal();
     });
@@ -198,7 +201,7 @@ export default function AboutScreen() {
             <Text style={styles.appTagline}>{t('aboutApp.subtitle')}</Text>
             <View style={styles.versionBadge}>
               <Text style={styles.versionText}>
-                {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.0.0'}
+                {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.2.0'}
               </Text>
             </View>
           </View>
@@ -261,6 +264,16 @@ export default function AboutScreen() {
               title={t('settings.contactUs')}
               subtitle={contactEmail}
               onPress={openEmail}
+              isDarkMode={isDarkMode}
+            />
+            <LinkItem
+              icon="web"
+              iconColor="#0d8e62"
+              title={t('aboutApp.website') || 'الموقع الإلكتروني'}
+              subtitle={contactWebsite}
+              onPress={() => Linking.openURL(contactWebsite).catch(() => {
+                Alert.alert(t('common.error'), t('messages.networkError'));
+              })}
               isDarkMode={isDarkMode}
             />
             <LinkItem

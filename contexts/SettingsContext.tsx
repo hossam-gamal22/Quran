@@ -27,6 +27,11 @@ import { translations, Language, TranslationKeys } from '@/constants/translation
 import { blendWithDimOverlay, getContrastTextColor } from '@/lib/contrast-helper';
 import { updateSharedData } from '@/lib/widget-data';
 import { switchAppIcon } from '@/lib/app-icon-manager';
+import {
+  applyCountryPrayerDefaults,
+  getCountryPrayerDefaultsOrFallback,
+} from '@/lib/country-prayer-defaults';
+import { detectUserCountry, getUserCountry } from '@/services/hijriCalendarService';
 
 // ========================================
 // Eager theme cache — read previous session's theme/background at module load
@@ -84,6 +89,10 @@ export interface NotificationSettings {
   prayerReminder: boolean;
   prayerReminderMinutes: number;
   reminderMinutes: number;
+  // "هل صليت؟" follow-up reminder
+  didYouPrayReminder?: boolean;
+  didYouPrayDelayMinutes?: number;
+  didYouPraySnoozeMinutes?: number;
   fajrSpecial: boolean;
   azkarMorning: boolean;
   azkarMorningTime: string;
@@ -235,6 +244,7 @@ export interface PrayerSettings {
   showDate: boolean;
   showLocation: boolean;
   layout?: 'list' | 'widget';
+  methodManuallySet?: boolean;
 }
 
 export interface AppSettings {
@@ -283,6 +293,9 @@ const defaultNotifications: NotificationSettings = {
   prayerReminder: false,
   prayerReminderMinutes: 0,
   reminderMinutes: 0,
+  didYouPrayReminder: true,
+  didYouPrayDelayMinutes: 30,
+  didYouPraySnoozeMinutes: 15,
   fajrSpecial: true,
   azkarMorning: true,
   azkarMorningTime: '06:00',
@@ -328,7 +341,8 @@ const defaultNotifications: NotificationSettings = {
   sleepAzkarTime: '22:00',
   wakeupAzkar: true,
   wakeupAzkarTime: '05:30',
-  afterPrayerAzkar: true,
+  // Retired: superseded by "هل صليت؟" (did_you_pray) reminder.
+  afterPrayerAzkar: false,
   // Friday Surah Al-Kahf reminder
   kahfReminder: true,
   kahfTime: '14:00',
@@ -361,9 +375,13 @@ const defaultDisplay: DisplaySettings = {
   showSectionInfo: true,
 };
 
+// Seed prayer defaults from the device's country at module load so a fresh
+// install in (e.g.) Egypt starts on method 5 rather than method 4 (Umm al-Qura).
+const _initialCountryDefaults = getCountryPrayerDefaultsOrFallback(detectUserCountry());
+
 const defaultPrayer: PrayerSettings = {
-  calculationMethod: 4, // أم القرى
-  asrJuristic: 0, // شافعي
+  calculationMethod: _initialCountryDefaults.method as CalculationMethod,
+  asrJuristic: _initialCountryDefaults.asrSchool,
   adjustments: {
     fajr: 0,
     sunrise: 0,
@@ -402,7 +420,7 @@ const STORAGE_KEY = 'app_settings';
 // Bump this version whenever default notification times change.
 // On app update, existing users will get their notification times
 // reset to the new defaults (toggles/booleans are preserved).
-const NOTIFICATION_DEFAULTS_VERSION = 5;
+const NOTIFICATION_DEFAULTS_VERSION = 6;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
@@ -557,7 +575,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             loadedSettings.notifications.worshipWeeklyReport = true;
             loadedSettings.notifications.sleepAzkar = true;
             loadedSettings.notifications.wakeupAzkar = true;
-            loadedSettings.notifications.afterPrayerAzkar = true;
+            // afterPrayerAzkar retired: force off for upgrading users so stale schedules stop firing.
+            loadedSettings.notifications.afterPrayerAzkar = false;
             // Persist migrated settings to AsyncStorage so they survive next cold start
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
             await AsyncStorage.setItem(NOTIF_DEFAULTS_VERSION_KEY, String(NOTIFICATION_DEFAULTS_VERSION));
@@ -682,6 +701,45 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   const reloadSettings = useCallback(async () => {
     await loadSettings();
   }, []);
+
+  // ========================================
+  // Country-based prayer method reconciliation
+  // Runs once after settings load. If the user hasn't manually picked a method
+  // (methodManuallySet !== true), apply the calculation method + Asr school
+  // that matches the device's stored/GPS country. This is the single source of
+  // truth — prayer.tsx and onboarding no longer duplicate this logic.
+  // ========================================
+  const hasReconciledCountryRef = React.useRef(false);
+  useEffect(() => {
+    if (isLoading) return;
+    if (hasReconciledCountryRef.current) return;
+    hasReconciledCountryRef.current = true;
+
+    if (settings.prayer.methodManuallySet === true) return;
+
+    (async () => {
+      try {
+        const countryCode = await getUserCountry();
+        const countryDefaults = applyCountryPrayerDefaults(countryCode);
+        if (!countryDefaults) return;
+        const { method, asrSchool } = countryDefaults;
+        const currentMethod = settings.prayer.calculationMethod;
+        const currentAsr = settings.prayer.asrJuristic;
+        if (method !== currentMethod || asrSchool !== currentAsr) {
+          console.log(
+            `🌍 Country default prayer method for ${countryCode}: ${currentMethod}→${method}, asr ${currentAsr}→${asrSchool}`,
+          );
+          await updatePrayer({
+            calculationMethod: method as CalculationMethod,
+            asrJuristic: asrSchool,
+          });
+        }
+      } catch (e) {
+        console.warn('Country prayer reconciliation failed:', e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
   // ========================================
   // حفظ الإعدادات
@@ -893,6 +951,19 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       prayer: { ...settings.prayer, ...prayer },
     };
     await saveSettings(newSettings);
+    // Sync calculation-relevant fields to @prayer_settings for background consumers (notifications, widgets)
+    if ('calculationMethod' in prayer || 'asrJuristic' in prayer || 'adjustments' in prayer) {
+      try {
+        const { getPrayerSettings: getLocal, savePrayerSettings: saveLocal } = require('@/lib/prayer-times');
+        const localSettings = await getLocal();
+        if ('calculationMethod' in prayer) localSettings.calculationMethod = prayer.calculationMethod;
+        if ('asrJuristic' in prayer) localSettings.asrJuristic = prayer.asrJuristic;
+        if ('adjustments' in prayer) localSettings.adjustments = { ...localSettings.adjustments, ...prayer.adjustments };
+        await saveLocal(localSettings);
+      } catch (e) {
+        console.warn('Failed to sync prayer settings:', e);
+      }
+    }
   }, [settings]);
 
   // ========================================

@@ -617,6 +617,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   prayerTimes: boolean;
   prayerReminder: boolean;
   reminderMinutes: number;
+  didYouPrayReminder?: boolean;
+  didYouPrayDelayMinutes?: number;
+  didYouPraySnoozeMinutes?: number;
   morningAzkar: boolean;
   morningAzkarTime: string;
   eveningAzkar: boolean;
@@ -783,7 +786,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
       iosBudget = calculateIosBudget({
         prayer: !!notifSettings.prayerTimes,
-        afterPrayer: !!notifSettings.afterPrayerAzkar,
+        // afterPrayerAzkar retired — no longer schedules, so budget it as off.
+        afterPrayer: false,
         azkarTimesPerDay,
         otherTimesPerDay,
         kahfEnabled: !!notifSettings.kahfReminder,
@@ -920,6 +924,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       adhanSound: notifSettings.sound,
       adhanSoundType: adhanSound,
       soundType: generalSound,
+      didYouPrayReminder: notifSettings.didYouPrayReminder,
+      didYouPrayDelayMinutes: notifSettings.didYouPrayDelayMinutes,
+      didYouPraySnoozeMinutes: notifSettings.didYouPraySnoozeMinutes,
       ...(iosBudget && { iosScheduleDays: iosBudget.prayerDays }),
     };
     // Phase B+C: Catch prayer scheduling errors so they don't kill the
@@ -1017,115 +1024,15 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       );
     }
 
-    // Schedule after-prayer azkar notifications (5 mins after each prayer)
-    // Uses multi-day DATE triggers (14 days) to survive when background fetch
-    // doesn't run. Previously used a single-shot DATE trigger for today/tomorrow
-    // which expired silently if the background task didn't reschedule in time.
-    if (notifSettings.afterPrayerAzkar) {
-      try {
-        const location = await getPrayerLocation();
-        if (location) {
-          const appSettings = await getSettings();
-          const today = new Date();
-          // iOS: use dynamic budget allocation; Android: 7 days
-          const AFTER_PRAYER_SCHEDULE_DAYS = (Platform.OS === 'ios' && iosBudget)
-            ? iosBudget.afterPrayerDays
-            : 7;
-          const lastDay = new Date(today);
-          lastDay.setDate(lastDay.getDate() + AFTER_PRAYER_SCHEDULE_DAYS - 1);
-
-          const currentMonth = today.getMonth() + 1;
-          const currentYear = today.getFullYear();
-
-          // Fetch monthly prayer times using same approach as prayer-notifications
-          const { fetchMonthlyPrayerTimes } = await import('./prayer-api');
-          const monthlyData = await fetchMonthlyPrayerTimes(
-            location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
-          );
-          let nextMonthData: any[] | null = null;
-          if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
-            nextMonthData = await fetchMonthlyPrayerTimes(
-              location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
-            );
-          }
-
-          // Cancel all existing after-prayer azkar (including multi-day variants)
-          const afterPrayerKeys = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'] as const;
-          for (const pKey of afterPrayerKeys) {
-            for (let d = 0; d < AFTER_PRAYER_SCHEDULE_DAYS; d++) {
-              const identifier = d === 0
-                ? `after_prayer_azkar_${pKey.toLowerCase()}`
-                : `after_prayer_azkar_${pKey.toLowerCase()}_d${d}`;
-              try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
-            }
-          }
-
-          const now = new Date();
-          const afterPrayerSound = 'notif_after_prayer';
-          const afterPrayerChannelId = getReminderChannelId(afterPrayerSound);
-          const afterPrayerAttachments = await getNotificationIconAttachment('prayer_beads');
-          let scheduledCount = 0;
-
-          for (let dayOffset = 0; dayOffset < AFTER_PRAYER_SCHEDULE_DAYS; dayOffset++) {
-            const targetDate = new Date(today);
-            targetDate.setDate(today.getDate() + dayOffset);
-
-            const isNextMonth = targetDate.getMonth() + 1 !== currentMonth || targetDate.getFullYear() !== currentYear;
-            const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
-            const dayData = source[targetDate.getDate() - 1];
-            if (!dayData) continue;
-
-            for (const pKey of afterPrayerKeys) {
-              const timeStr = dayData.timings[pKey as keyof typeof dayData.timings];
-              if (!timeStr) continue;
-              const cleaned = timeStr.replace(/\s*\([^)]*\)\s*/, '').trim();
-              const [hours, minutes] = cleaned.split(':').map(Number);
-              const triggerDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), hours, minutes + 5, 0, 0);
-              if (triggerDate <= now) continue;
-
-              const identifier = dayOffset === 0
-                ? `after_prayer_azkar_${pKey.toLowerCase()}`
-                : `after_prayer_azkar_${pKey.toLowerCase()}_d${dayOffset}`;
-
-              try {
-                await Notifications.scheduleNotificationAsync({
-                  identifier,
-                  content: {
-                    title: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).title),
-                    body: dirText(getNotifText('after_prayer', t('notificationSounds.afterPrayerAzkar'), t('notificationSounds.afterPrayerAutoMsg'), lang).body),
-                    sound: resolveNotificationSound(afterPrayerSound, notifSettings.sound),
-                    data: { type: 'after_prayer_azkar', prayer: pKey.toLowerCase(), soundType: afterPrayerSound, iconType: 'prayer_beads' },
-                    ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
-                    ...(Platform.OS === 'android' && { channelId: afterPrayerChannelId }),
-                    ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
-                    ...(Platform.OS === 'ios' && afterPrayerAttachments && { attachments: afterPrayerAttachments }),
-                  },
-                  trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: triggerDate,
-                    ...(Platform.OS === 'android' && { channelId: afterPrayerChannelId }),
-                  },
-                });
-                scheduledCount++;
-              } catch (e) {
-                console.warn(`Failed to schedule after_prayer_azkar ${pKey} d+${dayOffset}:`, e);
-              }
-            }
-          }
-          console.log(`🔔 Scheduled ${scheduledCount} after-prayer azkar notifications (${AFTER_PRAYER_SCHEDULE_DAYS} days)`);
-        }
-      } catch (e) {
-        console.warn('Failed to schedule after-prayer azkar:', e);
-      }
-    } else {
-      // Cancel all after-prayer azkar (including multi-day variants)
-      for (const pKey of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
-        for (let d = 0; d < 14; d++) {
-          const identifier = d === 0
-            ? `after_prayer_azkar_${pKey}`
-            : `after_prayer_azkar_${pKey}_d${d}`;
-          try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
-        }
+    // After-prayer adhkar reminder (5 mins after each prayer) is retired.
+    // Replaced by the new "هل صليت؟" (did_you_pray) flow scheduled by prayer-notifications.ts.
+    // Cancel any stale after_prayer_azkar_* notifications from prior installs.
+    for (const pKey of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+      for (let d = 0; d < 14; d++) {
+        const identifier = d === 0
+          ? `after_prayer_azkar_${pKey}`
+          : `after_prayer_azkar_${pKey}_d${d}`;
+        try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
       }
     }
 
@@ -1153,13 +1060,13 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: dailyAyahText.title,
           body: dailyAyahText.body,
-          sound: resolveNotificationSound(notifSettings.dailyVerseSoundType || 'general_reminder', notifSettings.sound),
-          data: { type: 'daily_ayah', soundType: notifSettings.dailyVerseSoundType || 'general_reminder', iconType: 'quran' },
+          sound: resolveNotificationSound(notifSettings.dailyVerseSoundType || 'notif_verse', notifSettings.sound),
+          data: { type: 'daily_ayah', soundType: notifSettings.dailyVerseSoundType || 'notif_verse', iconType: 'quran' },
         },
         dailyTimes,
         notifSettings.dailyVerseDays,
         'daily-ayah',
-        notifSettings.dailyVerseSoundType || 'general_reminder',
+        notifSettings.dailyVerseSoundType || 'notif_verse',
         iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
@@ -1204,13 +1111,13 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
         {
           title: tasbihText.title,
           body: tasbihText.body,
-          sound: resolveNotificationSound(notifSettings.tasbihSoundType || 'tasbih', notifSettings.sound),
-          data: { type: 'tasbih', soundType: notifSettings.tasbihSoundType || 'tasbih', iconType: 'prayer_beads' },
+          sound: resolveNotificationSound(notifSettings.tasbihSoundType || 'subhanallah', notifSettings.sound),
+          data: { type: 'tasbih', soundType: notifSettings.tasbihSoundType || 'subhanallah', iconType: 'prayer_beads' },
         },
         tasbihTimes,
         notifSettings.tasbihDays,
         undefined, // channelId resolved from soundType
-        notifSettings.tasbihSoundType || 'tasbih',
+        notifSettings.tasbihSoundType || 'subhanallah',
         iosBudget?.otherDays, // iOS dynamic budget
       );
     } else {
@@ -1459,7 +1366,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       const KAHF_FIRST_AYAH_TEXT = 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ';
       const KAHF_FIRST_AYAH_GLOBAL = 2141;
       const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
-      const kahfSoundType = notifSettings.soundType || 'general_reminder';
+      const kahfSoundType = notifSettings.soundType || 'notif_kahf';
       const kahfChannelId = getReminderChannelId(kahfSoundType);
 
       const kahfAttachments = await getNotificationIconAttachment('quran');

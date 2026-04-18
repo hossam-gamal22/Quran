@@ -12,8 +12,40 @@ import { radioPlayer } from '@/lib/radio-player';
 import { audioCoordinator } from '@/lib/audio-coordinator';
 import { markTrackPlayerSetupDone, isTrackPlayerSetupDone, onTrackPlayerSetupDone } from '@/lib/track-player-ready';
 import { getCategoryTrimMs } from '@/lib/azkar-audio-config';
+import { getAzkarAudioUri } from '@/lib/azkar-audio-cache';
 import { Asset } from 'expo-asset';
 import type { RadioStation, RadioPlaybackState } from '@/types/radio';
+
+// True if the value already looks like a playable URI (http(s)/file/asset/content/data).
+function isAbsoluteUri(value: string | undefined | null): boolean {
+  if (!value) return false;
+  return /^(https?:|file:|asset:|content:|data:)/i.test(value);
+}
+
+// Resolve a track's `url` field to a real playable URI.
+// If `localSource` is provided, prefer the bundled asset's localUri.
+// Otherwise, if `url` is a bare azkar filename (e.g. "75.m4a"), resolve it via
+// the azkar audio cache (returns cached file:// path or GitHub CDN URL).
+async function resolveAzkarTrackUri(t: { url: string; localSource?: any }): Promise<string> {
+  if (t.localSource) {
+    try {
+      const asset = Asset.fromModule(t.localSource);
+      if (!asset.localUri) await asset.downloadAsync();
+      const resolved = asset.localUri || asset.uri;
+      if (resolved) return resolved;
+    } catch {}
+  }
+  if (isAbsoluteUri(t.url)) return t.url;
+  if (t.url) {
+    try {
+      const uri = await getAzkarAudioUri(t.url);
+      if (uri) return uri;
+    } catch (e) {
+      console.warn('[GlobalAudio] Failed to resolve azkar URI for', t.url, e);
+    }
+  }
+  return t.url;
+}
 
 // Dynamic import of TrackPlayer - may not be available in Expo Go
 let TrackPlayer: typeof import('react-native-track-player').default | null = null;
@@ -302,14 +334,7 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
       if (isTrackPlayerReady() && TrackPlayer) {
         // Use TrackPlayer for native platforms (with lock screen controls)
         const tpTracks = await Promise.all(queue.map(async (t, i) => {
-          let resolvedUrl = t.url;
-          if (t.localSource) {
-            try {
-              const asset = Asset.fromModule(t.localSource);
-              if (!asset.localUri) await asset.downloadAsync();
-              resolvedUrl = asset.localUri || asset.uri || t.url;
-            } catch {}
-          }
+          const resolvedUrl = await resolveAzkarTrackUri(t);
           return {
             id: `azkar-${t.id}-${i}`,
             url: resolvedUrl,
@@ -356,8 +381,9 @@ export function GlobalAudioProvider({ children }: { children: React.ReactNode })
         // Check for intro trim for this category
         const trimMs = track.categoryId ? getCategoryTrimMs(track.categoryId) : 0;
 
+        const resolvedUri = await resolveAzkarTrackUri(track);
         const { sound } = await Audio.Sound.createAsync(
-          track.localSource ? track.localSource : { uri: track.url },
+          track.localSource ? track.localSource : { uri: resolvedUri },
           { shouldPlay: false, rate: playbackSpeed },
           async (status: any) => {
             if (status.isLoaded) {

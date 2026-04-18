@@ -130,7 +130,14 @@ export async function fetchPrayerTimesByCoords(
     }
     url += `?latitude=${latitude}&longitude=${longitude}&method=${method}`;
 
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const data = await response.json();
 
     if (data.code === 200) {
@@ -160,7 +167,14 @@ export async function fetchPrayerTimesByCity(
     }
     url += `?city=${encodeURIComponent(city)}&country=${encodeURIComponent(country)}&method=${method}`;
 
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const data = await response.json();
 
     if (data.code === 200) {

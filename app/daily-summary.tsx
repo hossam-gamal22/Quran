@@ -24,6 +24,8 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useWorship } from '@/contexts/WorshipContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { usePremiumFeature } from '@/hooks/use-premium-feature';
+import { guardPremiumFeature } from '@/lib/premium-guard';
 import { t } from '@/lib/i18n';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { localizeNumber } from '@/lib/format-number';
@@ -133,6 +135,8 @@ export default function DailySummaryScreen() {
   const { isDarkMode } = useSettings();
   const { todayPrayer, todayQuran, todayAzkar } = useWorship();
   const { isPremium } = useSubscription();
+  const { isLocked: statsLocked } = usePremiumFeature('advanced_stats');
+  const handleStatsLockPress = () => { guardPremiumFeature('advanced_stats', router, isPremium); };
 
   const [tasbihCount, setTasbihCount] = useState(0);
   const [tasbihTypes, setTasbihTypes] = useState(0);
@@ -253,8 +257,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={!isPremium}
-          onLockPress={() => router.push('/subscription' as any)}
+          locked={statsLocked}
+          onLockPress={handleStatsLockPress}
         />
 
         {/* الأذكار */}
@@ -268,8 +272,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={!isPremium}
-          onLockPress={() => router.push('/subscription' as any)}
+          locked={statsLocked}
+          onLockPress={handleStatsLockPress}
         />
 
         {/* التسبيح */}
@@ -283,8 +287,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={!isPremium}
-          onLockPress={() => router.push('/subscription' as any)}
+          locked={statsLocked}
+          onLockPress={handleStatsLockPress}
         />
 
         {/* سماع القرآن */}
@@ -298,8 +302,8 @@ export default function DailySummaryScreen() {
           colors={colors}
           isRTL={isRTL}
           isDarkMode={isDarkMode}
-          locked={!isPremium}
-          onLockPress={() => router.push('/subscription' as any)}
+          locked={statsLocked}
+          onLockPress={handleStatsLockPress}
         />
 
         {/* زرار عرض التفاصيل */}

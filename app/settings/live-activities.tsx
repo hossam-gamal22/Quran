@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Switch,
   Platform,
+  Linking,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -96,9 +97,22 @@ export default function LiveActivitiesSettingsScreen() {
               {t('liveActivities.description')}
             </Text>
             {!supported && Platform.OS === 'ios' && (
-              <Text style={[styles.compatibility, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                {t('liveActivities.notSupported')}
-              </Text>
+              <View style={styles.notEnabledBlock}>
+                <Text style={[styles.notEnabledText, { color: '#ef5350', textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {t('liveActivities.notEnabled')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    Linking.openSettings().catch(() => {});
+                  }}
+                  activeOpacity={0.8}
+                  style={styles.openSettingsBtn}
+                >
+                  <MaterialCommunityIcons name="cog-outline" size={18} color="#fff" />
+                  <Text style={styles.openSettingsBtnLabel}>{t('liveActivities.openSettings')}</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </GlassCard>
 
@@ -208,6 +222,31 @@ const _styles = StyleSheet.create({
     fontFamily: fontRegular(),
     lineHeight: 18,
     marginTop: 4,
+  },
+  notEnabledBlock: {
+    marginTop: 8,
+    gap: 10,
+  },
+  notEnabledText: {
+    fontSize: 13,
+    fontFamily: fontRegular(),
+    lineHeight: 20,
+  },
+  openSettingsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0d8e62',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  openSettingsBtnLabel: {
+    color: '#fff',
+    fontFamily: fontSemiBold(),
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 18,

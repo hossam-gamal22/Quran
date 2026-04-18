@@ -1,3 +1,16 @@
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/expo-push"
+  to = "/.netlify/functions/expo-push"
+  status = 200
+
+[[redirects]]
+  from = "/api/verify-admin"
+  to = "/.netlify/functions/verify-admin"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

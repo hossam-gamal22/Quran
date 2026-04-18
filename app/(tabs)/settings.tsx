@@ -183,7 +183,7 @@ export default function SettingsScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const { isPremium } = useSubscription();
 
-  const appVersion = Constants.expoConfig?.version || '1.0.0';
+  const appVersion = Constants.expoConfig?.version || '1.2.0';
 
   // مشاركة التطبيق — modal
   const [shareModalVisible, setShareModalVisible] = useState(false);
@@ -199,9 +199,9 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const storeUrls = await getStoreUrls();
     const url = Platform.select({
-      ios: storeUrls.ios || 'https://roohmuslim.app',
+      ios: storeUrls.ios || 'https://apps.apple.com/app/rooh-muslim/id123456789',
       android: storeUrls.android || 'https://play.google.com/store/apps/details?id=com.rooh.almuslim',
-      default: 'https://roohmuslim.app',
+      default: 'https://apps.apple.com/app/rooh-muslim/id123456789',
     });
     if (url) Linking.openURL(url);
   };

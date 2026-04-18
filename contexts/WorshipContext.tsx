@@ -11,6 +11,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { AppState } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 import {
   // أنواع
@@ -285,24 +286,29 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
   const updatePrayer = useCallback(async (prayer: PrayerName, status: PrayerStatus) => {
     const today = getTodayDate();
     await updatePrayerStatus(today, prayer, status);
-    
+
     // تحديث الحالة المحلية
     setTodayPrayer(prev => {
       if (!prev) return { ...defaultPrayerRecord, date: today, [prayer]: status };
       return { ...prev, [prayer]: status };
     });
-    
+
     // تحديث سجلات الأسبوع
     await loadWeekPrayers();
-    
+
     // تحديث الإحصائيات
     await refreshStats();
+
+    // إلغاء إشعار "هل صليت؟" عند تسجيل الصلاة
+    if (status === 'prayed' || status === 'late') {
+      try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayer}`); } catch {}
+    }
   }, [loadWeekPrayers, refreshStats]);
 
   const updatePrayerWithTime = useCallback(async (prayer: PrayerName, status: PrayerStatus, scheduledTime?: string) => {
     const today = getTodayDate();
     await updatePrayerStatusWithTime(today, prayer, status, scheduledTime);
-    
+
     setTodayPrayer(prev => {
       const base = prev || { ...defaultPrayerRecord, date: today };
       const updated = { ...base, [prayer]: status };
@@ -311,9 +317,13 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
       }
       return updated;
     });
-    
+
     await loadWeekPrayers();
     await refreshStats();
+
+    if (status === 'prayed' || status === 'late') {
+      try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${prayer}`); } catch {}
+    }
   }, [loadWeekPrayers, refreshStats]);
 
   const saveDayTimes = useCallback(async (date: string, times: { fajr?: string; dhuhr?: string; asr?: string; maghrib?: string; isha?: string }) => {

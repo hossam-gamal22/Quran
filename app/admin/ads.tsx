@@ -45,6 +45,7 @@ const BANNER_SCREENS: { key: AdScreenKey; label: string; icon: string }[] = [
   { key: 'tafsir', label: 'التفسير', icon: 'text-search' },
   { key: 'khatma', label: 'الختمة', icon: 'bookmark-check' },
   { key: 'worship', label: 'العبادات', icon: 'chart-line' },
+  { key: 'radio', label: 'الراديو', icon: 'radio' },
 ];
 export default function AdsSettingsScreen() {
   const [config, setConfig] = useState<AdsConfig>(DEFAULT_ADS_CONFIG);

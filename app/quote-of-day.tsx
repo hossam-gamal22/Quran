@@ -90,7 +90,7 @@ export default function QuoteOfDayScreen() {
           setQuote({ arabic: data.arabic, translation: data.translation, author: data.author, source: data.source });
           if ((data as any).translations) setAdminTranslations((data as any).translations);
         }
-      });
+      }).catch(() => {});
     }
   }, [params.favId]);
 

@@ -20,6 +20,9 @@ import * as Location from 'expo-location';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
+import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
+import { setUserCountry } from '@/services/hijriCalendarService';
 import { isRTL as checkIsRTL } from '@/lib/i18n';
 import { tOnboarding, tOnboardingStep } from '@/constants/onboarding-translations';
 import { useColors } from '@/hooks/use-colors';
@@ -34,6 +37,7 @@ export default function LocationScreen() {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const { preferences, updatePreferences, goToNextStep, goToPreviousStep, skipOnboarding } = useOnboarding();
+  const { settings, updatePrayer } = useSettings();
   
   const [isLoading, setIsLoading] = useState(false);
   const [locationGranted, setLocationGranted] = useState(false);
@@ -112,6 +116,32 @@ export default function LocationScreen() {
         city: info.city,
         country: info.country,
       });
+
+      // Update user's real country in Firestore + persist locally so the
+      // SettingsContext reconcile effect uses it on subsequent launches.
+      const countryCode = (reverseGeocode?.isoCountryCode || '').toUpperCase();
+      if (countryCode) {
+        import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
+          updateUserCountryFromGPS(countryCode).catch(() => {});
+        }).catch(() => {});
+        setUserCountry(countryCode).catch(() => {});
+      }
+
+      // Auto-detect calculation method from country (first-launch onboarding)
+      if (countryCode && !settings.prayer.methodManuallySet) {
+        const cd = applyCountryPrayerDefaults(countryCode);
+        if (
+          cd &&
+          (cd.method !== settings.prayer.calculationMethod ||
+            cd.asrSchool !== settings.prayer.asrJuristic)
+        ) {
+          console.log(`🌍 Onboarding prayer method for ${countryCode}: method=${cd.method}, asrSchool=${cd.asrSchool}`);
+          updatePrayer({
+            calculationMethod: cd.method as CalculationMethod,
+            asrJuristic: cd.asrSchool,
+          });
+        }
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {

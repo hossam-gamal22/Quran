@@ -181,7 +181,6 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   const centerX = W / 2;
   const verseY = H * 0.45;  // Vertically centered
   const maxTextWidth = W - 120; // 60px padding each side
-  let textBottomY = verseY; // Track where text ends for badge positioning
 
   if (qcfFamily && glyphText) {
     // QCF Mushaf calligraphy — larger for video
@@ -212,7 +211,6 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], centerX, startY + i * lineHeight);
     }
-    textBottomY = startY + (lines.length - 1) * lineHeight + lineHeight / 2;
   } else {
     // Fallback: Amiri font with ﴿ ﴾ brackets — larger for video
     const fontSize = 68;
@@ -243,7 +241,6 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     for (let i = 0; i < lines.length; i++) {
       ctx.fillText(lines[i], centerX, startY + i * lineHeight);
     }
-    textBottomY = startY + (lines.length - 1) * lineHeight + lineHeight / 2;
   }
 
   // ── Surah badge pill ──
@@ -260,7 +257,12 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   const badgeWidth = badgeMetrics.width + 80;
   const badgeHeight = 64;
   const badgeX = centerX - badgeWidth / 2;
-  const badgeY = textBottomY + 40; // Dynamically below verse text
+
+  // Anchor the badge relative to the logo so long ayat can't push it into the logo.
+  const logoSize = 180;
+  const logoY = H - 100 - logoSize;
+  const showLogo = showBranding && fs.existsSync(APP_ICON);
+  const badgeY = showLogo ? logoY - 30 - badgeHeight : H - 100 - badgeHeight;
 
   // Badge background
   ctx.shadowColor = 'transparent';
@@ -284,11 +286,9 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   ctx.fillText(badgeText, centerX, badgeY + badgeHeight / 2);
 
   // ── Branding logo (free version) ──
-  if (showBranding && fs.existsSync(APP_ICON)) {
+  if (showLogo) {
     ctx.shadowColor = 'transparent';
-    const logoSize = 180;
     const logoX = centerX - logoSize / 2;
-    const logoY = H - 100 - logoSize;
     try {
       const logoImg = await loadImage(APP_ICON);
       ctx.globalAlpha = 0.9;

@@ -43,6 +43,9 @@ import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
 import { getPrayerRecord, getTodayDate, type PrayerName } from '@/lib/worship-storage';
 import { getCachedPrayerTimes } from '@/lib/prayer-times';
+import * as Notifications from 'expo-notifications';
+import { getReminderChannelId } from '@/services/notifications/channels';
+import { resolveNotificationSound } from '@/lib/resolve-notification-sound';
 
 import { useSujoodDetector } from '@/hooks/use-sujood-detector';
 import {
@@ -332,6 +335,28 @@ export default function SalatiScreen() {
         updatePrayerWithTime(selectedPrayer as PrayerName, status, selectedPrayerTime).catch((error) => {
           console.error('[Salati] Prayer save failed:', error);
         });
+
+        // Send immediate "أتممت صلاتك" notification + cancel today's scheduled "هل صليت؟"
+        (async () => {
+          try {
+            const channelId = getReminderChannelId('general_reminder');
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: t('notifications.prayerAccepted'),
+                body: t('notifications.prayerAcceptedBody'),
+                sound: resolveNotificationSound('general_reminder', true),
+                data: { type: 'prayer_completed', prayer: selectedPrayer },
+                ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.HIGH }),
+                ...(Platform.OS === 'android' && { channelId }),
+                ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
+              },
+              trigger: null,
+            });
+            try { await Notifications.cancelScheduledNotificationAsync(`did_you_pray_${selectedPrayer}`); } catch {}
+          } catch (e) {
+            console.warn('[Salati] Failed to send completion notification:', e);
+          }
+        })();
       }
       
       // Haptic success feedback

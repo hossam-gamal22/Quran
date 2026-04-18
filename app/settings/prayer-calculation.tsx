@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
+import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
+import { getUserCountry } from '@/services/hijriCalendarService';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
@@ -63,12 +65,26 @@ export default function PrayerCalculationScreen() {
 
   const handleMethod = (method: CalculationMethod) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updatePrayer({ calculationMethod: method });
+    updatePrayer({ calculationMethod: method, methodManuallySet: true });
   };
 
   const handleAsr = (juristic: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updatePrayer({ asrJuristic: juristic as 0 | 1 });
+    updatePrayer({ asrJuristic: juristic as 0 | 1, methodManuallySet: true });
+  };
+
+  const handleResetToCountryDefault = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const countryCode = await getUserCountry();
+      const cd = applyCountryPrayerDefaults(countryCode);
+      if (!cd) return;
+      await updatePrayer({
+        calculationMethod: cd.method as CalculationMethod,
+        asrJuristic: cd.asrSchool,
+        methodManuallySet: false,
+      });
+    } catch {}
   };
 
   return (
@@ -118,6 +134,20 @@ export default function PrayerCalculationScreen() {
                 <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
               )}
               <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+              <TouchableOpacity
+                style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                onPress={handleResetToCountryDefault}
+              >
+                <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                  <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {isRTL ? 'استخدم الطريقة الافتراضية لبلدي' : 'Use country default method'}
+                  </Text>
+                  <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                    {isRTL ? 'يعيد ضبط الطريقة تلقائياً حسب الدولة' : 'Reset method based on your country'}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="earth" size={22} color={colors.glassText} />
+              </TouchableOpacity>
               {METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}

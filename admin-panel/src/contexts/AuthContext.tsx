@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
 
 const SESSION_KEY = 'rooh_admin_session';
-const FIRESTORE_DOC = 'appConfig/adminAuth';
+const VERIFY_URL = '/api/verify-admin';
 
 interface AuthContextValue {
   authenticated: boolean;
@@ -18,50 +16,70 @@ async function hashPassword(password: string): Promise<string> {
   const encoded = new TextEncoder().encode(password);
   const buffer = await crypto.subtle.digest('SHA-256', encoded);
   return Array.from(new Uint8Array(buffer))
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+async function callVerifyAdmin(payload: object): Promise<{ ok: boolean; data: any; status: number }> {
+  const res = await fetch(VERIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* ignore */
+  }
+  return { ok: res.ok, data, status: res.status };
 }
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Check localStorage session on mount
   useEffect(() => {
     const session = localStorage.getItem(SESSION_KEY);
-    if (session) {
-      // Verify session is still valid (hash matches Firestore)
-      getDoc(doc(db, FIRESTORE_DOC))
-        .then(snap => {
-          if (snap.exists() && snap.data().sessionToken === session) {
-            setAuthenticated(true);
-          } else {
-            localStorage.removeItem(SESSION_KEY);
-          }
-        })
-        .catch(() => {
-          // Offline — trust local session
-          setAuthenticated(true);
-        })
-        .finally(() => setLoading(false));
-    } else {
+    if (!session) {
       setLoading(false);
+      return;
     }
+    callVerifyAdmin({ mode: 'validate', sessionToken: session })
+      .then(({ ok, data }) => {
+        if (ok && data?.valid) {
+          setAuthenticated(true);
+        } else {
+          localStorage.removeItem(SESSION_KEY);
+        }
+      })
+      .catch(() => {
+        // Network/offline — trust local session for offline editing
+        setAuthenticated(true);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = async (password: string) => {
-    const hash = await hashPassword(password);
-    const snap = await getDoc(doc(db, FIRESTORE_DOC));
-
-    if (!snap.exists() || snap.data().passwordHash !== hash) {
+    const passwordHash = await hashPassword(password);
+    let result: { ok: boolean; data: any; status: number };
+    try {
+      result = await callVerifyAdmin({ mode: 'login', passwordHash });
+    } catch {
+      throw new Error('network-error');
+    }
+    if (result.ok && result.data?.sessionToken) {
+      localStorage.setItem(SESSION_KEY, result.data.sessionToken);
+      setAuthenticated(true);
+      return;
+    }
+    if (result.status === 401) {
       throw new Error('wrong-password');
     }
-
-    // Rotate session token on each login
-    const sessionToken = crypto.randomUUID();
-    await setDoc(doc(db, FIRESTORE_DOC), { sessionToken }, { merge: true });
-    localStorage.setItem(SESSION_KEY, sessionToken);
-    setAuthenticated(true);
+    if (result.status === 500 && result.data?.error === 'not-configured') {
+      throw new Error('not-configured');
+    }
+    throw new Error('network-error');
   };
 
   const logout = () => {

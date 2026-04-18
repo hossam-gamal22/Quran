@@ -65,6 +65,8 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getAppName } from '@/constants/app';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSacredContext } from '@/hooks/use-sacred-context';
+import { recordSurahRead } from '@/lib/smart-ad-manager';
+import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
 function getTargetAyahBg(themeIndex: number): string {
@@ -620,6 +622,22 @@ export default function SurahScreen() {
 
   // Block all ads during Quran reading
   useSacredContext('quran_reading');
+
+  // On unmount: if the user actually read ≥1 page, record it. Every 3rd read
+  // triggers an interstitial (handled inside recordSurahRead). Firing is
+  // deferred a tick so the sacred context cleanup runs first and the ad gate
+  // does not reject on isInSacredContext().
+  useEffect(() => {
+    return () => {
+      if (trackedPagesRef.current.size === 0) return;
+      recordSurahRead()
+        .then((shouldShow) => {
+          if (!shouldShow) return;
+          setTimeout(() => { showInterstitial().catch(() => {}); }, 50);
+        })
+        .catch(() => {});
+    };
+  }, []);
 
   // ══════════════════════════════════════════════════════════════════════════
   // CRITICAL: All hooks MUST be called before any early returns (Rules of Hooks)

@@ -60,13 +60,6 @@ const getNotificationGroups = (): NotificationGroup[] => [
         description: tOnboarding('prayerTimesDesc'),
         color: '#c17f59',
       },
-      {
-        id: 'afterPrayerAzkar',
-        icon: 'hands-pray',
-        title: tOnboarding('afterPrayerAzkar'),
-        description: tOnboarding('afterPrayerAzkarDesc'),
-        color: '#c17f59',
-      },
     ],
   },
   {
@@ -195,7 +188,6 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [enabledOptions, setEnabledOptions] = useState<{ [key: string]: boolean }>({
     prayer: true,
-    afterPrayerAzkar: true,
     azkar: true,
     sleepAzkar: true,
     wakeupAzkar: true,
@@ -259,7 +251,6 @@ export default function NotificationsScreen() {
       azkarNotifications: enabledOptions.azkar,
       salawatReminder: enabledOptions.salawat,
       dailyVerse: enabledOptions.dailyVerse,
-      afterPrayerAzkar: enabledOptions.afterPrayerAzkar,
       sleepAzkar: enabledOptions.sleepAzkar,
       wakeupAzkar: enabledOptions.wakeupAzkar,
       quranReadingReminder: enabledOptions.quranReadingReminder,

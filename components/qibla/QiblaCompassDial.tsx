@@ -3,7 +3,7 @@ import { Svg, Circle, G, Text, Line } from 'react-native-svg';
 import { useColorScheme } from 'react-native';
 
 // Amiri font must be loaded in the app for this to work
-const directions = [
+const directionsEn = [
   { label: 'N', angle: 0 },
   { label: 'E', angle: 90 },
   { label: 'S', angle: 180 },
@@ -14,13 +14,28 @@ const directions = [
   { label: 'NW', angle: 315 },
 ];
 
-export const QiblaCompassDial = ({ size = 260 }) => {
+// Arabic cardinal directions: ش=شمال(North), ق=شرق(East), ج=جنوب(South), غ=غرب(West)
+const directionsAr = [
+  { label: 'ش', angle: 0 },
+  { label: 'ق', angle: 90 },
+  { label: 'ج', angle: 180 },
+  { label: 'غ', angle: 270 },
+  { label: 'شق', angle: 45 },
+  { label: 'جق', angle: 135 },
+  { label: 'جغ', angle: 225 },
+  { label: 'شغ', angle: 315 },
+];
+
+const RTL_LANGUAGES = ['ar', 'ur'];
+
+export const QiblaCompassDial = ({ size = 260, language = 'en' }: { size?: number; language?: string }) => {
   const colorScheme = useColorScheme();
   const dialColor = colorScheme === 'dark' ? '#181C20' : '#F7F7F7';
   const textColor = '#FFF';
   const secondaryText = '#E5E5E5';
   const radius = size / 2;
   const fontSize = size * 0.11;
+  const directions = RTL_LANGUAGES.includes(language) ? directionsAr : directionsEn;
 
   return (
     <Svg width={size} height={size}>

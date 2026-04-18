@@ -37,7 +37,9 @@ async function ensureCacheDir(): Promise<void> {
 /**
  * Returns a playable URI for the given azkar audio filename.
  * - If cached locally → file:// URI (instant, offline)
- * - If not cached → GitHub raw URL (will stream) + kicks off background download
+ * - If not cached → tries a fast download (≤3s) then returns file://
+ * - On timeout/failure → returns GitHub raw URL (streaming fallback)
+ *   while still keeping the download running in background for next time.
  */
 export async function getAzkarAudioUri(filename: string): Promise<string> {
   if (!filename) return '';
@@ -61,8 +63,24 @@ export async function getAzkarAudioUri(filename: string): Promise<string> {
     // Fall through to remote URL
   }
 
-  // Not cached — kick off background download, return streaming URL
-  downloadSingleFile(filename).catch(() => {});
+  // Not cached — race a fast download against a 3s timeout.
+  // If the file lands quickly, we play locally (most common on decent networks).
+  // Otherwise we fall back to streaming so the user isn't stuck on silence.
+  const downloadPromise = downloadSingleFile(filename)
+    .then(() => true)
+    .catch(() => false);
+
+  const winner = await Promise.race([
+    downloadPromise,
+    new Promise<boolean>(resolve => setTimeout(() => resolve(false), 3000)),
+  ]);
+
+  if (winner === true) {
+    return localPath;
+  }
+
+  // Streaming fallback. The background download (if still running) will
+  // resolve later and populate the cache for the next play.
   return getRemoteUrl(filename);
 }
 
@@ -76,6 +94,31 @@ export async function isAzkarCached(filename: string): Promise<boolean> {
     return info.exists && (info.size ?? 0) > 0;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Pre-download a specific set of azkar audio files (e.g. one category).
+ * Skips files already cached. Downloads up to `concurrency` at a time.
+ * Resilient: individual failures don't stop the batch.
+ */
+export async function prefetchAzkarFiles(
+  filenames: string[],
+  concurrency: number = 3,
+): Promise<void> {
+  if (!filenames || filenames.length === 0) return;
+  await ensureCacheDir();
+
+  const pending: string[] = [];
+  for (const f of filenames) {
+    if (!f) continue;
+    if (!(await isAzkarCached(f))) pending.push(f);
+  }
+  if (pending.length === 0) return;
+
+  for (let i = 0; i < pending.length; i += concurrency) {
+    const batch = pending.slice(i, i + concurrency);
+    await Promise.allSettled(batch.map(name => downloadSingleFile(name)));
   }
 }
 

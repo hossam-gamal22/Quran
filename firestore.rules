@@ -1,6 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ─── Admin Authentication (HARDENED) ─────────────────────────
+    // Password hash + active session token live here.
+    // Reading/writing this document is FORBIDDEN from clients.
+    // The admin panel verifies passwords ONLY via the Netlify
+    // function `verify-admin`, which uses a server-side env var hash.
+    // NOTE: Firestore rules use OR-combination, so the wildcard rule
+    // below MUST also explicitly exclude `adminAuth`.
+    match /appConfig/adminAuth {
+      allow read, write: if false;
+    }
+
     // Website pages - public read/write for admin panel + dynamic pages
     match /websitePages/{pageId} {
       allow read, write: if true;
@@ -9,9 +20,10 @@ service cloud.firestore {
     // App config - public read, authenticated write
     // Mobile app reads sound settings, notification defaults, etc.
     // Admin panel writes assignments and config (requires login)
+    // EXPLICITLY excludes `adminAuth` (rules combine via OR).
     match /appConfig/{docId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if docId != 'adminAuth';
+      allow write: if docId != 'adminAuth';
     }
 
     // Config collection - app settings, subscriptions, feature gating, rewards, ads

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify that all replace_one patterns match the actual pbxproj content."""
 import os
-os.chdir('/Users/hossamgamal/Desktop/MobileApps/Quran')
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 with open('ios/rwhalmslm.xcodeproj/project.pbxproj') as f:
     content = f.read()
