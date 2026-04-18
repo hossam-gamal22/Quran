@@ -135,6 +135,13 @@ import PhotoBackgroundManager from './pages/PhotoBackgroundManager';
 import PurchaseHistory from './pages/PurchaseHistory';
 import QAManager from './pages/QAManager';
 import UserQuestions from './pages/UserQuestions';
+import ThemesPage from './pages/Themes';
+import BackgroundManager from './pages/BackgroundManager';
+import OnboardingManager from './pages/OnboardingManager';
+import Pricing from './pages/Pricing';
+import WidgetDesignManager from './pages/WidgetDesignManager';
+import RouteGuide from './pages/RouteGuide';
+import AppContentManager from './pages/AppContentManager';
 import MobilePreview from './components/MobilePreview';
 
 // ==================== Sidebar Groups ====================
@@ -179,6 +186,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: Fingerprint,
     items: [
       { path: '/quran-themes', icon: Fingerprint, label: 'ثيمات القرآن' },
+      { path: '/themes', icon: Palette, label: 'ثيمات التطبيق' },
     ],
   },
   {
@@ -198,7 +206,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/sounds', icon: Volume2, label: 'إعدادات الأصوات' },
       { path: '/bundled-sounds', icon: Music, label: 'أصوات الإشعارات' },
-      { path: '/radio', icon: Radio, label: 'الراديو' },
+      // { path: '/radio', icon: Radio, label: 'الراديو' }, // hidden: app/radio.tsx uses bundled list, doesn't read Firestore
     ],
   },
   {
@@ -228,6 +236,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: DollarSign,
     items: [
       { path: '/ads', icon: Megaphone, label: 'الإعلانات' },
+      // { path: '/pricing', icon: DollarSign, label: 'الأسعار الإقليمية' }, // hidden: subscription prices set in App Store / Play Console, no app reader for config/pricing
     ],
   },
   {
@@ -243,10 +252,13 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'إعدادات التطبيق',
     icon: Settings,
     items: [
-      { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' },
+      // { path: '/navigation-ui', icon: Smartphone, label: 'تخصيص التنقل' }, // hidden: writes to config/app-settings, no mobile-app reader
       { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
       { path: '/app-icons', icon: ImageIcon, label: 'أيقونات التطبيق' },
       { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
+      { path: '/backgrounds', icon: ImageIcon, label: 'خلفيات التطبيق' },
+      { path: '/onboarding', icon: Smartphone, label: 'شاشات الترحيب' },
+      { path: '/app-content', icon: FileText, label: 'محتوى التطبيق' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
     ],
   },
@@ -266,6 +278,8 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
       { path: '/pdf-templates', icon: FileText, label: 'قوالب PDF' },
+      // { path: '/widget-design', icon: Smartphone, label: 'تصميم الودجات' }, // hidden: native widgets use bundled assets, no app reader for widgetDesigns
+      { path: '/route-guide', icon: Globe, label: 'دليل المسارات' },
     ],
   },
 ];
@@ -534,6 +548,13 @@ const App: React.FC = () => {
               <Route path="/photo-backgrounds" element={<PhotoBackgroundManager />} />
               <Route path="/qa-manager" element={<QAManager />} />
               <Route path="/user-questions" element={<UserQuestions />} />
+              <Route path="/themes" element={<ThemesPage />} />
+              <Route path="/backgrounds" element={<BackgroundManager />} />
+              <Route path="/onboarding" element={<OnboardingManager />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/widget-design" element={<WidgetDesignManager />} />
+              <Route path="/route-guide" element={<RouteGuide />} />
+              <Route path="/app-content" element={<AppContentManager />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
