@@ -30,6 +30,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/hooks/use-auth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { UniversalHeader } from '@/components/ui';
@@ -80,6 +81,7 @@ export default function QuestionAnswerScreen() {
   const { isDarkMode } = useSettings();
   const language = getLanguage();
   const { user } = useAuth({ autoFetch: true });
+  const insets = useSafeAreaInsets();
 
   // البيانات من Firestore مع كاش
   const [categories, setCategories] = useState<FilteredCategory[]>([]);
@@ -529,7 +531,7 @@ export default function QuestionAnswerScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <Pressable style={{ flex: 1 }} onPress={() => setShowQuestionModal(false)} />
-          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1a2535' : '#fff' }]}>
+          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1a2535' : '#fff', paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={styles.modalHandle} />
             <Text style={[styles.modalTitle, { color: isDarkMode ? '#fff' : '#1a1a1a' }]}>
               {t('questionAnswer.sendQuestion')}
@@ -638,7 +640,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    paddingBottom: 40,
   },
   modalHandle: {
     width: 40,

@@ -1,6 +1,7 @@
 // hooks/use-colors.ts
 
 import { useCallback } from "react";
+import { Platform } from "react-native";
 import { useSettings, FontSize } from "@/contexts/SettingsContext";
 import { Colors, DarkColors } from "@/constants/theme";
 import { getContrastPalette, getContrastTextColor, blendWithDimOverlay, getLuminance } from "@/lib/contrast-helper";
@@ -84,9 +85,14 @@ export function useColors() {
   // When a background is active, use glass card colors for better integration
   // For dark bg (white text): use dark glass overlay so white text is readable on any part of the bg image
   // For light bg (black text): use subtle transparent overlay
-  const card = hasBgOverride
+  // On Android, elevation renders hard shadow outlines on semi-transparent backgrounds,
+  // so we make cards fully transparent on Android to avoid ugly visible boxes.
+  const cardSolid = hasBgOverride
     ? (bgTextColor === 'white' ? 'rgba(0,0,0,0.30)' : 'rgba(255,255,255,0.65)')
     : colors.card;
+  const card = (hasBgOverride && Platform.OS === 'android') ? 'transparent' : cardSolid;
+  // Elevation value: 0 on Android when card is transparent (avoids shadow artifacts)
+  const cardElevation = (hasBgOverride && Platform.OS === 'android') ? 0 : undefined;
 
   // Icon color override: adapt for bg-override mode
   const icon = hasBgOverride
@@ -163,6 +169,10 @@ export function useColors() {
     text,
     textLight,
     card,
+    /** Semi-transparent card bg for components that NEED a visible background (headers, search bars, modals) */
+    cardSolid,
+    /** Elevation override: 0 on Android when bg override is active, undefined otherwise */
+    cardElevation: cardElevation as number | undefined,
     icon,
     tabBarBackground,
     primaryText,

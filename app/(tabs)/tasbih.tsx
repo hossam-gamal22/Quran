@@ -18,7 +18,7 @@ import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Circle } from 'react-native-svg';
@@ -46,7 +46,6 @@ import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
 import { trackTasbih } from '@/lib/firebase-analytics';
-import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 import { fetchTasbihPresets } from '@/lib/admin-data-api';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -254,6 +253,7 @@ export default function TasbihScreen() {
   const { isDarkMode, settings } = useSettings();
   const isRTL = useIsRTL();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const s = useScaledStyles(_s, colors.fs);
 
   // Block all ads during tasbih counting
@@ -650,9 +650,6 @@ export default function TasbihScreen() {
 
       // تسجيل إحصائيات التسبيح في Firebase
       trackTasbih(selectedTasbih.target, selectedTasbih.text, rounds + 1).catch(() => {});
-
-      // Show interstitial ad on round completion (natural break point)
-      showInterstitial().catch(() => {});
 
       const newCompleted = { ...completedTasbihat, [selectedTasbih.id]: true };
       setCompletedTasbihat(newCompleted);
@@ -1135,7 +1132,7 @@ export default function TasbihScreen() {
       {/* ===== TASBIH LIST MODAL ===== */}
       <Modal visible={showTasbihList} animationType="slide" transparent onRequestClose={() => setShowTasbihList(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: colors.card }]}>
+          <View style={[s.modalSheet, { backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.selectDhikr')}</Text>
               <TouchableOpacity onPress={() => setShowTasbihList(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
@@ -1214,6 +1211,7 @@ export default function TasbihScreen() {
             backgroundColor: isDarkMode ? 'rgba(30,30,32,0.85)' : 'rgba(255,255,255,0.88)',
             borderWidth: 0.5,
             borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+            paddingBottom: Math.max(insets.bottom, 16) + 16,
           }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.addCustomDhikr')}</Text>
@@ -1271,7 +1269,7 @@ export default function TasbihScreen() {
       {/* ===== SETTINGS MODAL ===== */}
       <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { height: 'auto', backgroundColor: colors.card }]}>
+          <View style={[s.modalSheet, { height: 'auto', backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('common.settings')}</Text>
               <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
@@ -1292,7 +1290,7 @@ export default function TasbihScreen() {
       {/* ===== STATS MODAL ===== */}
       <Modal visible={showStatsModal} animationType="slide" transparent onRequestClose={() => setShowStatsModal(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: colors.card }]}>
+          <View style={[s.modalSheet, { backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.myStats')}</Text>
               <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>

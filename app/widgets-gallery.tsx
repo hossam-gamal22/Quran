@@ -683,7 +683,7 @@ export default function WidgetsGalleryScreen() {
               end={{ x: 1, y: 0 }}
               style={[styles.addButtonGradient, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
             >
-              <MaterialCommunityIcons name={isActiveWidgetLocked ? 'lock' : 'plus-circle-outline'} size={20} color="#fff" />
+              <MaterialCommunityIcons name={isActiveWidgetLocked ? 'lock' : 'information-outline'} size={20} color="#fff" />
               <Text style={styles.addButtonText}>
                 {isActiveWidgetLocked ? t('subscription.upgradeToPremium') : t('widgets.addToHomeScreen')}
               </Text>

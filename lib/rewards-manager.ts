@@ -350,11 +350,13 @@ export const checkAndApplyReward = async (userId: string): Promise<boolean> => {
 
 /**
  * Get user's monthly rank info (merges Firestore + local pending)
+ * Also returns mergeBonus if user received merged points from admin
  */
 export const getUserMonthlyInfo = async (userId: string): Promise<{
   score: number;
   month: string;
   activities?: Record<string, number>;
+  mergeBonus?: { activities: Record<string, number>; score: number; mergedFrom?: string };
 } | null> => {
   try {
     const config = await fetchRewardsConfig();
@@ -394,7 +396,10 @@ export const getUserMonthlyInfo = async (userId: string): Promise<{
       score += (count as number) * (weights[key as ActivityType] || 1);
     }
 
-    return { score, month: currentMonth, activities };
+    // Include mergeBonus if present (from admin merge operation)
+    const mergeBonus = data?.mergeBonus || undefined;
+
+    return { score, month: currentMonth, activities, mergeBonus };
   } catch {
     // Fallback to local-only if Firestore fails
     try {

@@ -21,7 +21,7 @@ import { t } from '@/lib/i18n';
 // Bump this whenever channel config changes (sounds, importance, etc.)
 // Forces a delete+recreate of all channels on next app launch.
 const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
-const CURRENT_CHANNELS_VERSION = '16';
+const CURRENT_CHANNELS_VERSION = '17';
 
 // ─── Adhan sound filename map (all files in assets/sounds/) ─────────────────
 export const ADHAN_SOUND_FILES: Record<string, string> = {

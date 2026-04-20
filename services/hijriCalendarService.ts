@@ -103,7 +103,7 @@ export function detectUserCountry(): string {
       return locales[0].regionCode;
     }
   } catch {}
-  return 'SA';
+  return '';
 }
 
 export async function getUserCountry(): Promise<string> {

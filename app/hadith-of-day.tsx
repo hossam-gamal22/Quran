@@ -256,6 +256,7 @@ const _styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 16,
+    paddingBottom: 80,
   },
   iconContainer: {
     alignItems: 'center',

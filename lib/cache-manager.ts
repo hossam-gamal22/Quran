@@ -28,6 +28,8 @@ const PRESERVED_KEYS = [
   '@quran_tracked_pages_khatma',
   // User identity & score — must never be cleared on update
   '@rooh_user_id',
+  '@rooh_display_name',
+  '@rooh_user_id_override',
   '@pending_monthly_scores',
   '@rewards_config_cache',
 ];

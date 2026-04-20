@@ -26,7 +26,8 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { ScreenContainer } from '@/components/screen-container';
-import { GlassCard, BackButton, BrandedCapture, type BrandedCaptureHandle } from '@/components/ui';
+import { GlassCard, BackButton } from '@/components/ui';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { getSurahData, buildPageBlocks, getQcfFontSize } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
@@ -217,7 +218,7 @@ export default function SurahReadingScreen({
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { playAyah, playbackState, togglePlayPause, stopPlayback } = useQuran();
-  const brandedRef = useRef<BrandedCaptureHandle>(null);
+  const shareCardRef = useRef<IslamicShareCardHandle>(null);
 
   // Calculate page range for this surah
   const surahData = getSurahData(surahNumber);
@@ -232,6 +233,22 @@ export default function SurahReadingScreen({
   }, [ayahs]);
 
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const currentPage = pages[currentPageIndex];
+
+  const shareArabicText = useMemo(() => {
+    if (!currentPage) return '';
+    const blocks = buildPageBlocks(currentPage).filter((block) => {
+      if (block.type === 'ayah') {
+        return block.segments.length > 0 && block.segments[0].surah === surahNumber;
+      }
+      return false;
+    });
+
+    return blocks
+      .map((block) => block.type === 'ayah' ? block.segments.map((seg) => seg.glyph).join('') : '')
+      .filter(Boolean)
+      .join('\n');
+  }, [currentPage, surahNumber]);
 
   // Sync page with audio playback - when ayah changes, navigate to correct page
   useEffect(() => {
@@ -259,9 +276,7 @@ export default function SurahReadingScreen({
 
   const handleShare = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (brandedRef.current) {
-      brandedRef.current.showSizePicker();
-    }
+    shareCardRef.current?.showSizePicker();
   }, []);
 
   const handlePlay = useCallback(() => {
@@ -459,35 +474,19 @@ export default function SurahReadingScreen({
             </View>
           )}
 
-          {/* BrandedCapture for screenshot sharing (hidden, renders in modal) */}
-          <BrandedCapture ref={brandedRef} storyOnly>
-            {(textColor) => pages[currentPageIndex] && (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <MushafPageBlock
-                  page={pages[currentPageIndex]}
-                  pageWidth={pageContentWidth * 0.85}
-                  isDarkMode={textColor === '#FFFFFF'}
-                  textColor={textColor}
-                  surahNumber={surahNumber}
-                />
-                <Text style={{
-                  fontFamily: fontRegular(),
-                  fontSize: 12,
-                  color: textColor === '#FFFFFF' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)',
-                  textAlign: 'center',
-                  marginTop: 8,
-                }}>
-                  {t('common.page')} {localizeNumber(pages[currentPageIndex])}
-                </Text>
-              </View>
-            )}
-          </BrandedCapture>
+          {/* Unified Islamic share card for image sharing */}
+          <IslamicShareCard
+            ref={shareCardRef}
+            categoryLabel={getSurahName(surahNumber)}
+            arabicText={shareArabicText}
+            sourceText={currentPage ? `${t('common.page')} ${localizeNumber(currentPage)}` : undefined}
+          />
 
           {/* Regular display card */}
           <GlassCard style={styles.mushafCard}>
-            {pages[currentPageIndex] && (
+            {currentPage && (
               <MushafPageBlock
-                page={pages[currentPageIndex]}
+                page={currentPage}
                 pageWidth={pageContentWidth}
                 isDarkMode={isDarkMode}
                 textColor={colors.text}

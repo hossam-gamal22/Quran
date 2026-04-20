@@ -61,11 +61,11 @@ import {
 import { QURAN_THEMES, getGoldenColor, getSafeThemeIndex, getThemeCount, isThemeLight } from '@/constants/quran-themes';
 import { Spacing, FONT_SIZES, DarkColors } from '@/constants/theme';
 import { useColors } from '@/hooks/use-colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { getAppName } from '@/constants/app';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSacredContext } from '@/hooks/use-sacred-context';
-import { recordSurahRead } from '@/lib/smart-ad-manager';
 import { showInterstitial } from '@/components/ads/InterstitialAdManager';
 
 /** Build a theme-appropriate highlight bg for the target ayah */
@@ -308,7 +308,7 @@ const MushafPage = React.memo(function MushafPage({
 
   // Dynamic font scaling: only boost very sparse pages, avoid cramping dense ones
   const contentLineCount = blocks.filter(b => b.type === 'ayah' || b.type === 'basmallah').length;
-  const dynamicBoost = contentLineCount <= 5 ? 3 : contentLineCount <= 7 ? 1 : 0;
+  const dynamicBoost = contentLineCount <= 5 ? 1.5 : contentLineCount <= 7 ? 0.5 : 0;
   const fontSize = getQcfFontSize(page, width - 32, fontSizeAdjust + dynamicBoost);
 
   // Use a tighter line height for dense pages to prevent overflow
@@ -408,6 +408,9 @@ const MushafPage = React.memo(function MushafPage({
                   paddingTop: extraTopPadding,
                   paddingBottom: extraTopPadding > 0 ? Math.ceil(fontSize * 0.1) : 0,
                 }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.85}
                 allowFontScaling={false}
               >
                 {ayahGroups.map((group, gi) => {
@@ -435,12 +438,12 @@ const MushafPage = React.memo(function MushafPage({
                           if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                           onAyahLongPress?.(group.surah, group.ayah, page);
                         }}
-                        style={{
+                        style={bgColor ? {
                           backgroundColor: bgColor,
-                          paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
-                          paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
-                          borderRadius: Math.round(fontSize * 0.28),
-                        }}
+                          paddingHorizontal: Math.max(4, Math.round(fontSize * 0.18)),
+                          paddingVertical: Math.max(1, Math.round(fontSize * 0.08)),
+                          borderRadius: Math.round(fontSize * 0.22),
+                        } : undefined}
                       >
                         {group.parts.map((part, pi) => {
                           const mapped = wordsFromAyah[wordIndex] ?? part.glyph;
@@ -462,12 +465,12 @@ const MushafPage = React.memo(function MushafPage({
                         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         onAyahLongPress?.(group.surah, group.ayah, page);
                       }}
-                      style={{
+                      style={bgColor ? {
                         backgroundColor: bgColor,
-                        paddingHorizontal: Math.max(6, Math.round(fontSize * 0.28)),
-                        paddingVertical: Math.max(2, Math.round(fontSize * 0.12)),
-                        borderRadius: Math.round(fontSize * 0.28),
-                      }}
+                        paddingHorizontal: Math.max(4, Math.round(fontSize * 0.18)),
+                        paddingVertical: Math.max(1, Math.round(fontSize * 0.08)),
+                        borderRadius: Math.round(fontSize * 0.22),
+                      } : undefined}
                     >
                       {group.parts.map((part, pi) => (
                         <Text key={pi} style={{ color: textColor }}>{part.glyph}</Text>
@@ -507,6 +510,23 @@ const MushafPage = React.memo(function MushafPage({
         }
         return null;
       })}
+
+      {/* Spacer to push page number to the bottom */}
+      <View style={{ flex: 1 }} />
+
+      {/* Page number at bottom center — Mushaf style */}
+      <Text
+        style={{
+          textAlign: 'center',
+          fontSize: 16,
+          color: textColor,
+          fontFamily: fontSemiBold(),
+          opacity: 0.6,
+          marginTop: 12,
+        }}
+      >
+        {page}
+      </Text>
     </ScrollView>
   );
 });
@@ -558,15 +578,12 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
           <TouchableOpacity hitSlop={8} onPress={onShare}>
             <MaterialCommunityIcons name="share-variant-outline" size={20} color={goldenColor} />
           </TouchableOpacity>
-          <TouchableOpacity hitSlop={8} onPress={onSettings}>
-            <MaterialCommunityIcons name="cog-outline" size={20} color={goldenColor} />
-          </TouchableOpacity>
         </View>
 
-        {/* Center: surah name + juz below */}
+        {/* Center-Right: surah name + page/juz, aligned to back arrow */}
         <View style={gh.center}>
-          <Text style={[gh.pageInfo, { color: goldenColor }]} numberOfLines={1}>
-            {toArabicNumber(currentPage)} - {surahName}
+          <Text style={[gh.pageInfo, { color: goldenColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {surahName}
           </Text>
           <Text style={[gh.juzLabel, { color: goldenColor }]} numberOfLines={1}>
             الجزء {toArabicNumber(juz)}
@@ -574,11 +591,9 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
         </View>
 
         {/* Right: back */}
-        <View style={gh.right}>
-          <TouchableOpacity hitSlop={8} onPress={onBack}>
-            <Ionicons name="chevron-forward" size={28} color={goldenColor} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity hitSlop={8} onPress={onBack} style={gh.right}>
+          <Ionicons name="chevron-forward" size={28} color={goldenColor} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -595,11 +610,11 @@ const gh = StyleSheet.create({
     height: 52,
     paddingHorizontal: 12,
   },
-  left: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  right: { flexDirection: 'row', alignItems: 'center', gap: 10, width: 50, justifyContent: 'flex-end' },
-  center: { alignItems: 'center', paddingHorizontal: 8, flexShrink: 0 },
-  pageInfo: { fontSize: 15, fontFamily: 'Rubik-Bold', lineHeight: 20, includeFontPadding: false },
-  juzLabel: { fontSize: 11, fontFamily: 'Rubik-Medium', lineHeight: 16, includeFontPadding: false, opacity: 0.75 },
+  left: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  right: { paddingLeft: 4 },
+  center: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 6 },
+  pageInfo: { fontSize: 15, fontFamily: 'Rubik-Bold', lineHeight: 20, includeFontPadding: false, textAlign: 'right' },
+  juzLabel: { fontSize: 11, fontFamily: 'Rubik-Medium', lineHeight: 16, includeFontPadding: false, opacity: 0.75, textAlign: 'right' },
 });
 
 // ══════════════════════════════════════════════
@@ -616,6 +631,7 @@ export default function SurahScreen() {
   const { settings, isDarkMode, updateDisplay, isLoading: settingsLoading, t } = useSettings();
   const { isPremium } = useSubscription();
   const surahColors = useColors();
+  const insets = useSafeAreaInsets();
   const s = useScaledStyles(_s, surahColors.fs);
   const stg = useScaledStyles(_stg, surahColors.fs);
   const isRTL = useIsRTL();
@@ -623,19 +639,13 @@ export default function SurahScreen() {
   // Block all ads during Quran reading
   useSacredContext('quran_reading');
 
-  // On unmount: if the user actually read ≥1 page, record it. Every 3rd read
-  // triggers an interstitial (handled inside recordSurahRead). Firing is
-  // deferred a tick so the sacred context cleanup runs first and the ad gate
-  // does not reject on isInSacredContext().
+  // On unmount: show an interstitial ad when user exits the Quran reader.
+  // Firing is deferred a tick so the sacred context cleanup runs first
+  // and the ad gate does not reject on isInSacredContext().
   useEffect(() => {
     return () => {
       if (trackedPagesRef.current.size === 0) return;
-      recordSurahRead()
-        .then((shouldShow) => {
-          if (!shouldShow) return;
-          setTimeout(() => { showInterstitial().catch(() => {}); }, 50);
-        })
-        .catch(() => {});
+      setTimeout(() => { showInterstitial().catch(() => {}); }, 50);
     };
   }, []);
 
@@ -658,10 +668,25 @@ export default function SurahScreen() {
   const verseShareRef = useRef<IslamicShareCardHandle>(null);
   const autoShareTriggeredRef = useRef(false);
   const targetIndicatorOpacity = useRef(new Animated.Value(targetAyah ? 1 : 0)).current;
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  // waitForInteraction prevents the inverted FlatList from firing a spurious
+  // onViewableItemsChanged during initial layout (which would overwrite the
+  // correctly-initialized currentPage with whatever index happens to be in the
+  // viewport before initialScrollIndex lands).
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 120, waitForInteraction: true }).current;
 
   // State declarations (must be before loading return)
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    if (targetPageParam) {
+      const p = parseInt(targetPageParam);
+      return !isNaN(p) && p >= 1 && p <= 604 ? p : 1;
+    }
+    if (targetAyah) {
+      const surah = getSurahData(surahNumber);
+      const ayah = surah?.ayahs.find(a => a.ns === targetAyah);
+      return ayah?.p || getSurahStartPage(surahNumber);
+    }
+    return getSurahStartPage(surahNumber);
+  });
   const [showControls, setShowControls] = useState(true);
   const [bookmarks, setBookmarks] = useState<ColoredBookmark[]>([]);
   const [translationMap, setTranslationMap] = useState<Record<string, string>>({});
@@ -770,7 +795,7 @@ export default function SurahScreen() {
     loadTrackedPages();
   }, []);
 
-  // Initial page
+  // Initial page — same source as the lazy useState initializer for currentPage
   const initialPage = useMemo(() => {
     if (targetPageParam) {
       const p = parseInt(targetPageParam);
@@ -949,18 +974,25 @@ export default function SurahScreen() {
     ensurePagesLoaded(currentPage, 3, forceLightText);
   }, [currentPage, forceLightText]);
 
-  // Surah names on current page
+  // Surah names on current page — all surahs in page order (top to bottom)
   const surahsOnPage = useMemo(() => {
     const lines = getPageLines(currentPage);
-    const nums = new Set<number>();
+    const ordered: number[] = [];
+    const seen = new Set<number>();
     for (const line of lines) {
-      if (line.lt === 'surah_name' && line.sn) nums.add(line.sn);
+      if (line.lt === 'surah_name' && line.sn && !seen.has(line.sn)) {
+        seen.add(line.sn);
+        ordered.push(line.sn);
+      }
       if (line.lt === 'ayah' && line.fw) {
         const w = getWord(line.fw);
-        if (w) nums.add(w.s);
+        if (w && !seen.has(w.s)) {
+          seen.add(w.s);
+          ordered.push(w.s);
+        }
       }
     }
-    return Array.from(nums).map(n => getSurahName(n)).filter(Boolean);
+    return ordered.map(n => getSurahName(n)).filter(Boolean);
   }, [currentPage]);
 
   const juz = getJuzForPage(currentPage);
@@ -1335,7 +1367,7 @@ export default function SurahScreen() {
     >
       <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }} style={{ flex: 1 }}>
         <View style={{ flex: 1, backgroundColor: themeBgColor }} collapsable={false}>
-          <ImageBackground source={hasBgImage ? bgSource : undefined} style={{ flex: 1, paddingTop: 80, paddingBottom: 80, backgroundColor: themeBgColor }} resizeMode="cover">
+          <ImageBackground source={hasBgImage ? bgSource : undefined} style={{ flex: 1, paddingTop: 80, paddingBottom: 130, backgroundColor: themeBgColor }} resizeMode="cover">
             {/* Render current page for capture — empty bookmarkMap to remove highlights */}
             <MushafPage
               page={currentPage}
@@ -1383,7 +1415,7 @@ export default function SurahScreen() {
               textColor={textColor}
               goldenColor={goldenColor}
               juz={juz}
-              surahName={surahsOnPage?.[0] || ''}
+              surahName={surahsOnPage?.join(' - ') || ''}
               tafsirActive={showTafsirPanel}
               isPageFavorited={isPageFavorited}
               currentPage={currentPage}
@@ -1598,7 +1630,7 @@ export default function SurahScreen() {
                       </View>
                     </View>
 
-                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}>
+                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
                       {tafsirAyah && (
                         <>
                           <View style={[s.tafsirAyahBox, { backgroundColor: isLightBg ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)', borderColor: isLightBg ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.06)' }]}>
@@ -1661,7 +1693,7 @@ export default function SurahScreen() {
                       </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+                    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(insets.bottom, 16) + 16 }} showsVerticalScrollIndicator={false}>
 
                       {/* ─── Mushaf Theme (Segmented: Colors | Backgrounds) ─── */}
                       <View style={[stg.section, { backgroundColor: settingsIsLight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.07)', borderWidth: StyleSheet.hairlineWidth, borderColor: settingsIsLight ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.08)' }]}>
@@ -2009,7 +2041,7 @@ const _s = StyleSheet.create({
   // Share watermark (visible in captures)
   shareWatermark: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 40,
     left: 0,
     right: 0,
     flexDirection: 'row-reverse',
@@ -2017,7 +2049,7 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  shareWatermarkIcon: { width: 48, height: 48, borderRadius: 12, opacity: 0.7 },
+  shareWatermarkIcon: { width: 40, height: 40, borderRadius: 10, opacity: 0.7 },
 
   // Long-press onboarding hint
   longPressHint: {

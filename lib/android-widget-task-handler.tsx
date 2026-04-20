@@ -18,8 +18,27 @@ import { AzkarProgressSmallWidget } from '@/components/widgets/android/AzkarProg
 import { AzkarProgressMediumWidget } from '@/components/widgets/android/AzkarProgressMediumWidget';
 import { HijriDateSmallWidget } from '@/components/widgets/android/HijriDateSmallWidget';
 import { HijriDateMediumWidget } from '@/components/widgets/android/HijriDateMediumWidget';
+import { LockedWidget } from '@/components/widgets/android/LockedWidget';
 
 const WIDGET_DATA_KEY = 'widget_shared_data';
+const SUBSCRIPTION_STATE_KEY = '@subscription_state';
+
+// Widgets available to all users (free tier)
+const FREE_WIDGET_NAMES = ['PrayerTimesSmall', 'PrayerTimesMedium'];
+
+async function isUserPremium(): Promise<boolean> {
+  try {
+    const raw = await AsyncStorage.getItem(SUBSCRIPTION_STATE_KEY);
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (!state.isPremium) return false;
+    // Check expiry (lifetime has null expiresAt)
+    if (state.expiresAt && new Date(state.expiresAt) < new Date()) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function loadWidgetData(): Promise<SharedWidgetData | null> {
   try {
@@ -157,6 +176,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
 
   switch (widgetAction) {
     case 'WIDGET_ADDED': {
+      // Premium gate: non-free widgets require premium subscription
+      if (!FREE_WIDGET_NAMES.includes(widgetName)) {
+        const premium = await isUserPremium();
+        if (!premium) {
+          renderWidget(<LockedWidget widgetName={widgetName} />);
+          return;
+        }
+      }
+
       // Widget just added — try to generate fresh data immediately
       let data = await loadWidgetData();
 
@@ -189,6 +217,15 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
 
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
+      // Premium gate: non-free widgets require premium subscription
+      if (!FREE_WIDGET_NAMES.includes(widgetName)) {
+        const premium = await isUserPremium();
+        if (!premium) {
+          renderWidget(<LockedWidget widgetName={widgetName} />);
+          return;
+        }
+      }
+
       let data = await loadWidgetData();
 
       // If no cached data, try sync then fallback

@@ -58,7 +58,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { BrandedCapture, BrandedCaptureHandle } from '@/components/ui';
+import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { TranslatedText } from '@/components/ui/TranslatedText';
 import { transliterateReference } from '@/lib/source-transliteration';
@@ -189,7 +189,7 @@ export default function CategoryAzkarScreen() {
 
   // Share options
   const [shareTargetZikr, setShareTargetZikr] = useState<Zikr | CustomDhikr | null>(null);
-  const brandedRef = useRef<BrandedCaptureHandle>(null);
+  const brandedRef = useRef<IslamicShareCardHandle>(null);
 
   // Toast for loop-back
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -1015,7 +1015,7 @@ export default function CategoryAzkarScreen() {
           <View style={{ flex: 1, backgroundColor: darkMode ? '#0a0a0a' : '#f0f0f0' }}>
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 16 }}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: Math.max(insets.bottom + 16, 80) }}
               showsVerticalScrollIndicator={false}
             >
               {/* Album Art */}
@@ -1524,7 +1524,7 @@ export default function CategoryAzkarScreen() {
             </ScrollView>
 
             {/* شريط العداد والتنقل */}
-            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <View style={[styles.bottomBar, { backgroundColor: 'rgba(120,120,128,0.12)', flexDirection: isRTL ? 'row-reverse' : 'row', paddingBottom: Math.max(insets.bottom, 16) }]}>
               <TouchableOpacity
                 onPress={goToPrevious}
                 disabled={currentIndex === 0}
@@ -1567,7 +1567,7 @@ export default function CategoryAzkarScreen() {
           <ScrollView
             ref={scrollViewRef}
             style={styles.content}
-            contentContainerStyle={[styles.contentContainer, { paddingBottom: 32 }]}
+            contentContainerStyle={styles.contentContainer}
             showsVerticalScrollIndicator={false}
           >
             {azkar.map((zikr, idx) => {
@@ -1891,25 +1891,31 @@ export default function CategoryAzkarScreen() {
         </View>
       </Modal>
 
-      {/* Unified BrandedCapture for image sharing */}
-      <BrandedCapture ref={brandedRef}>
-        <View style={{ alignItems: 'center', padding: 8 }}>
-          <Text style={{
-            fontSize: 18, fontFamily: fontBold(), textAlign: 'center',
-            lineHeight: 34, color: '#FFFFFF',
-          }}>
-            {shareTargetZikr?.arabic || ''}
-          </Text>
-          {'reference' in (shareTargetZikr || {}) && (shareTargetZikr as Zikr)?.reference ? (
-            <Text style={{
-              fontSize: 14, fontFamily: fontSemiBold(), textAlign: 'center',
-              color: 'rgba(255,255,255,0.7)', marginTop: 12,
-            }}>
-              {transliterateReference((shareTargetZikr as Zikr).reference, language)}
-            </Text>
-          ) : null}
-        </View>
-      </BrandedCapture>
+      {/* Unified IslamicShareCard for image sharing */}
+      {(() => {
+        const isZikr = shareTargetZikr && !('createdAt' in shareTargetZikr);
+        const zikrObj = isZikr ? (shareTargetZikr as Zikr) : null;
+        const zikrId = zikrObj?.id ?? 0;
+        const useQcf = isZikr && hasQuranRefs(zikrId);
+        const catLabel = categoryInfo
+          ? (category === 'sunnah_duas' ? t('azkar.selectedDuas') : getCategoryName(categoryInfo, language))
+          : t('azkar.title');
+        const refText = zikrObj?.reference ? transliterateReference(zikrObj.reference, language) : undefined;
+        const benefitVal = zikrObj ? getZikrBenefit(zikrObj, language) : undefined;
+
+        return (
+          <IslamicShareCard
+            ref={brandedRef}
+            categoryLabel={catLabel}
+            arabicText={shareTargetZikr?.arabic || ''}
+            sourceText={refText}
+            benefitText={benefitVal || undefined}
+            renderCustomContent={useQcf ? () => (
+              <AzkarQcfVerse azkarId={zikrId} textColor="#FFFFFF" fallbackText={shareTargetZikr?.arabic || ''} compact />
+            ) : undefined}
+          />
+        );
+      })()}
     </>
   );
 }
@@ -1985,6 +1991,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 80,
   },
   zikrCardAnimated: {
     borderRadius: 20,

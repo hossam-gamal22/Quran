@@ -36,7 +36,7 @@ import { db } from '@/config/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
 import ShareAppModal from '@/components/ui/ShareAppModal';
-import { getDisplayName, setDisplayName, getUserId } from '@/lib/firebase-user';
+import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
 import { saveDisplayName } from '@/lib/rewards-manager';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -230,9 +230,23 @@ export default function SettingsScreen() {
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
+    // Load local name first for instant UI, then sync from Firestore for updates
     getDisplayName().then((name) => {
       if (name) setDisplayNameState(name);
     });
+    // Sync profile from Firestore (catches admin name changes & merges)
+    getOriginalDeviceUserId().then((originalId) => {
+      syncUserProfileFromFirestore(originalId).then((result) => {
+        if (result.displayName) {
+          setDisplayNameState(result.displayName);
+        } else if (result.merged && result.targetId) {
+          // Name might be on the target doc — re-read local after sync
+          getDisplayName().then((name) => {
+            if (name) setDisplayNameState(name);
+          });
+        }
+      });
+    }).catch(() => {});
   }, []);
 
   const handleSaveName = async () => {

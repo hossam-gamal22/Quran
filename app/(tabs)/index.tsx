@@ -44,6 +44,7 @@ import { useFeatures } from '@/hooks/use-feature-enabled';
 import DailyHighlights from '@/components/ui/DailyHighlights';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -794,7 +795,7 @@ export default function HomeScreen() {
           const ExpoLocation = await import('expo-location');
           const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
           if (status === 'granted') {
-            const current = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.Balanced });
+            const current = await ExpoLocation.getCurrentPositionAsync({ accuracy: ExpoLocation.Accuracy.High });
             loc = { latitude: current.coords.latitude, longitude: current.coords.longitude, city: '', country: '' };
             await saveLocation(loc);
             // Location now available — reschedule prayer notifications that depend on it
@@ -1700,6 +1701,8 @@ export default function HomeScreen() {
         <View style={{ height: 24 }} />
       </ScrollView>
       </SafeAreaView>
+
+      <BannerAdComponent screen="home" inTabScreen />
 
       {/* Quick Access Customize Modal — rendered outside ScrollView to prevent stacking on mobile */}
       <Modal

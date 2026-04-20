@@ -303,7 +303,7 @@ const DuaCard: React.FC<DuaCardProps> = ({ dua, onPress, isDarkMode, index }) =>
       style={styles.duaCardContainer}
     >
       <TouchableOpacity
-        style={[styles.duaCard, { backgroundColor: colors.card }]}
+        style={[styles.duaCard, { backgroundColor: colors.card, elevation: colors.cardElevation ?? 2 }]}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           onPress();
@@ -341,7 +341,7 @@ const StatsCard: React.FC<StatsCardProps> = ({ icon, label, value, unit, color, 
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   return (
-    <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
+    <View style={[styles.statsCard, { backgroundColor: colors.card, elevation: colors.cardElevation ?? 2 }]}>
       <View style={[styles.statsIconBg, { backgroundColor: `${color}15` }]}>
         <MaterialCommunityIcons name={icon as any} size={24} color={color} />
       </View>
@@ -584,7 +584,7 @@ export default function RamadanScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
             {t('ramadan.dailyTasks')} {currentDay}
           </Text>
-          <View style={[styles.checklistContainer, { backgroundColor: colors.card }]}>
+          <View style={[styles.checklistContainer, { backgroundColor: colors.card, elevation: colors.cardElevation ?? 2 }]}>
             {dailyChecklistItems.map((item, index) => (
               <ChecklistItem
                 key={item.id}
@@ -601,7 +601,7 @@ export default function RamadanScreen() {
         {/* تقويم الشهر */}
         <Animated.View entering={FadeInDown.delay(300).duration(500)}>
           <Text style={[styles.sectionTitle, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('ramadan.ramadanCalendar')}</Text>
-          <View style={[styles.calendarCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.calendarCard, { backgroundColor: colors.card, elevation: colors.cardElevation ?? 2 }]}>
             <DayCalendar
               currentDay={currentDay}
               completedDays={completedDays}
@@ -657,7 +657,7 @@ export default function RamadanScreen() {
         >
           <Animated.View
             entering={FadeIn.duration(300)}
-            style={[styles.duaModal, { backgroundColor: colors.card }]}
+            style={[styles.duaModal, { backgroundColor: colors.cardSolid }]}
           >
             <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>

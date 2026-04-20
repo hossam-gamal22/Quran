@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { guardPremiumFeature } from '@/lib/premium-guard';
@@ -78,6 +79,7 @@ const STORAGE_KEY_RECITER = '@recitations_reciter';
 export default function RecitationsScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isPremium } = useSubscription();
   const language = getLanguage();
@@ -520,7 +522,7 @@ export default function RecitationsScreen() {
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
             <Text style={s.modalTitle}>{t('quran.chooseReciter')}</Text>
-            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
               {RECITERS.map(r => (
                 <TouchableOpacity
                   key={r.identifier}

@@ -160,8 +160,25 @@ const getNativeDeviceId = async (): Promise<string | null> => {
   return null;
 };
 
+/**
+ * Get the original device-based user ID (ignoring merge override).
+ * Used for checking merge status on the original user doc.
+ */
+export const getOriginalDeviceUserId = async (): Promise<string> => {
+  try {
+    const deviceId = await getDeviceId();
+    return deviceId;
+  } catch {
+    return generateFallbackId();
+  }
+};
+
 export const getUserId = async (): Promise<string> => {
   try {
+    // Check if user was merged into another account — use override ID
+    const override = await AsyncStorage.getItem('@rooh_user_id_override');
+    if (override) return override;
+
     // Use device-based ID instead of random
     const deviceId = await getDeviceId();
     
@@ -352,6 +369,66 @@ export const setDisplayName = async (name: string): Promise<void> => {
     await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, name.trim());
   } catch (error) {
     console.error('❌ Failed to save display name locally:', error);
+  }
+};
+
+/**
+ * Sync user profile from Firestore → local.
+ * - Updates local display name from Firestore if changed (e.g. admin merge).
+ * - Detects if user was merged into another account (placeholder + mergedInto).
+ * - Follows merge chains (A→B→C) to find the final target.
+ * Returns merge info so callers can react (e.g. migrate userId).
+ */
+export const syncUserProfileFromFirestore = async (
+  userId: string
+): Promise<{ merged: boolean; targetId?: string; displayName?: string }> => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) return { merged: false };
+
+    const data = userSnap.data();
+
+    // Check if this user was merged into another account
+    if (data.placeholder && data.mergedInto) {
+      // Follow merge chain (A→B→C) — max 5 hops to prevent infinite loops
+      let finalTargetId = data.mergedInto;
+      for (let i = 0; i < 5; i++) {
+        const targetSnap = await getDoc(doc(db, 'users', finalTargetId));
+        if (!targetSnap.exists()) break;
+        const targetData = targetSnap.data();
+        if (targetData.placeholder && targetData.mergedInto) {
+          finalTargetId = targetData.mergedInto;
+        } else {
+          // Found the final target — update local name and store override
+          const targetName = targetData.displayName;
+          if (targetName) {
+            await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, targetName);
+          }
+          // Store userId override so all future operations use the merged identity
+          await AsyncStorage.setItem('@rooh_user_id_override', finalTargetId);
+          console.log('🔀 User merged: redirecting', userId, '→', finalTargetId);
+          return { merged: true, targetId: finalTargetId, displayName: targetName };
+        }
+      }
+      // Chain too long or broken — just mark as merged with what we have
+      await AsyncStorage.setItem('@rooh_user_id_override', finalTargetId);
+      return { merged: true, targetId: finalTargetId };
+    }
+
+    // Not merged — just sync the display name from Firestore → local
+    if (data.displayName) {
+      const localName = await AsyncStorage.getItem(STORAGE_KEYS.DISPLAY_NAME);
+      if (localName !== data.displayName) {
+        await AsyncStorage.setItem(STORAGE_KEYS.DISPLAY_NAME, data.displayName);
+        console.log('📝 Display name synced from Firestore:', data.displayName);
+      }
+    }
+
+    return { merged: false, displayName: data.displayName };
+  } catch (error) {
+    console.log('⚠️ syncUserProfileFromFirestore failed (non-fatal):', error);
+    return { merged: false };
   }
 };
 

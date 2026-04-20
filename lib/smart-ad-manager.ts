@@ -168,11 +168,6 @@ export async function canShowAppOpenAd(): Promise<boolean> {
   const counts = await _getDailyCounts();
   if (counts.appOpen >= MAX_APP_OPEN_ADS_PER_DAY) return false;
 
-  // New users: max 1 app-open per day
-  if (await _isNewUser()) {
-    if (counts.appOpen >= 1) return false;
-  }
-
   return true;
 }
 

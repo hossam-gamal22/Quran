@@ -184,7 +184,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
 
       {/* القائمة المنسدلة */}
       {menuOpen && isAvailable && (
-        <View style={[styles.dropdownMenu, { backgroundColor: colors.card }]}>
+        <View style={[styles.dropdownMenu, { backgroundColor: colors.cardSolid }]}>
           {STATUS_OPTIONS.map(opt => (
             <TouchableOpacity
               key={opt.value}

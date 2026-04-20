@@ -104,10 +104,28 @@ export default function Rewards() {
   const [showHidden, setShowHidden] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
   const [merging, setMerging] = useState(false);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   useEffect(() => {
     loadConfig();
   }, []);
+
+  /**
+   * Save edited display name to Firestore and update local state
+   */
+  const saveUserName = async (userId: string) => {
+    const trimmed = editingNameValue.trim();
+    if (!trimmed) return;
+    try {
+      await updateDoc(doc(db, 'users', userId), { displayName: trimmed });
+      setLeaderboard(prev => prev.map(u => u.id === userId ? { ...u, displayName: trimmed } : u));
+      setEditingNameId(null);
+    } catch (err) {
+      console.error('Error saving user name:', err);
+      alert('حدث خطأ أثناء حفظ الاسم');
+    }
+  };
 
   const loadConfig = async () => {
     try {
@@ -235,10 +253,25 @@ export default function Rewards() {
         await updateDoc(targetRef, {
           'monthlyEngagement.score': mergedScore,
           'monthlyEngagement.activities': mergedActivities,
+          // Store merge bonus so app can preserve merged points alongside local worship data
+          mergeBonus: {
+            activities: sourceEngagement.activities || {},
+            score: sourceEngagement.score || 0,
+            mergedFrom: sourceId,
+            mergedAt: new Date().toISOString(),
+          },
         });
       } else if (sourceEngagement.score > (targetEngagement.score || 0)) {
         // Source has more recent/higher data — copy it
-        await updateDoc(targetRef, { monthlyEngagement: sourceEngagement });
+        await updateDoc(targetRef, {
+          monthlyEngagement: sourceEngagement,
+          mergeBonus: {
+            activities: sourceEngagement.activities || {},
+            score: sourceEngagement.score || 0,
+            mergedFrom: sourceId,
+            mergedAt: new Date().toISOString(),
+          },
+        });
       }
 
       // Mark source as placeholder (soft delete) so it never shows again
@@ -491,8 +524,43 @@ export default function Rewards() {
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium">
-                            {user.displayName}
+                          <div className="text-sm font-medium flex items-center gap-1">
+                            {editingNameId === user.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editingNameValue}
+                                  onChange={(e) => setEditingNameValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveUserName(user.id);
+                                    if (e.key === 'Escape') setEditingNameId(null);
+                                  }}
+                                  className="border rounded px-2 py-1 text-sm w-32 text-right"
+                                  autoFocus
+                                  dir="auto"
+                                />
+                                <button
+                                  onClick={() => saveUserName(user.id)}
+                                  className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
+                                >
+                                  حفظ
+                                </button>
+                                <button
+                                  onClick={() => setEditingNameId(null)}
+                                  className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <span
+                                className="cursor-pointer hover:text-blue-600 hover:underline"
+                                onClick={() => { setEditingNameId(user.id); setEditingNameValue(user.displayName || ''); }}
+                                title="انقر لتعديل الاسم"
+                              >
+                                {user.displayName}
+                              </span>
+                            )}
                             {user.hidden && <span className="text-xs text-red-400 mr-2">(مخفي)</span>}
                           </div>
                           {user.email && (

@@ -44,7 +44,6 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
-import { getLanguage } from '@/lib/i18n';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -197,20 +196,6 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 };
 
 // ---------------------------------------------------------------------------
-// Arabic cardinal direction labels (overlay on SVG dials for RTL languages)
-// Positions map to the 300×300 SVG viewBox scaled to COMPASS_SIZE
-// ش=شمال(North), ق=شرق(East), ج=جنوب(South), غ=غرب(West)
-// ---------------------------------------------------------------------------
-const ARABIC_CARDINALS = [
-  { label: 'ش', top: 0.075, left: 0.5 },   // N — top center
-  { label: 'ج', top: 0.87, left: 0.5 },     // S — bottom center
-  { label: 'ق', top: 0.49, left: 0.91 },    // E — right center
-  { label: 'غ', top: 0.49, left: 0.09 },     // W — left center
-];
-
-const RTL_COMPASS_LANGUAGES = ['ar', 'ur'];
-
-// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 const QiblaScreen = () => {
@@ -228,6 +213,7 @@ const QiblaScreen = () => {
   const [usingCachedLocation, setUsingCachedLocation] = useState(false);
   const [isLocalCalc, setIsLocalCalc] = useState(false);
   const [meccaDistance, setMeccaDistance] = useState<number | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const isAlignedRef = useRef(false);
   const styleSwitcherRef = useRef<ScrollView>(null);
   const locationWatcherRef = useRef<Location.LocationSubscription | null>(null);
@@ -340,6 +326,7 @@ const QiblaScreen = () => {
           if (!cachedBearing && mounted.value) {
             setErrorMsg(t('qibla.permissionRequired') || 'Permission required to determine Qibla direction');
           }
+          if (mounted.value) setIsInitializing(false);
           return;
         }
         if (!(await Location.hasServicesEnabledAsync())) {
@@ -347,6 +334,7 @@ const QiblaScreen = () => {
             setErrorMsg(
               t('qibla.servicesDisabled') || 'Location services disabled. Please enable them and try again.'
             );
+          if (mounted.value) setIsInitializing(false);
           return;
         }
 
@@ -388,6 +376,7 @@ const QiblaScreen = () => {
         if (mounted.value) {
           setUserCoords({ lat, lng });
           setUsingCachedLocation(usedCache);
+          setIsInitializing(false);
         }
 
         // ── Phase 3: Background API upgrade (silently improves bearing) ──
@@ -414,7 +403,10 @@ const QiblaScreen = () => {
         }
       } catch (err) {
         console.warn('Qibla init error:', err);
-        if (mounted.value) setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
+        if (mounted.value) {
+          setErrorMsg(t('qibla.sensorFailed') || 'Failed to initialize sensors.');
+          setIsInitializing(false);
+        }
       }
     })();
 
@@ -573,6 +565,7 @@ const QiblaScreen = () => {
           onPress={() => {
             setErrorMsg(null);
             setQiblaBearing(null);
+            setIsInitializing(true);
             setRetryKey((k) => k + 1);
           }}
           activeOpacity={0.7}
@@ -595,7 +588,8 @@ const QiblaScreen = () => {
       showsVerticalScrollIndicator={false}
       bounces={false}
     >
-      {/* 1. Guidance text */}
+      {/* 1. Guidance text — hidden during initialization to prevent flash */}
+      {!isInitializing && guidance ? (
       <View style={styles.guidanceContainer}>
         <BlurView
           intensity={80}
@@ -609,6 +603,7 @@ const QiblaScreen = () => {
           </Text>
         </BlurView>
       </View>
+      ) : null}
 
       {/* Calibration banner — shown when compass accuracy is low */}
       {compassAccuracy === 'low' && (
@@ -620,8 +615,8 @@ const QiblaScreen = () => {
         </View>
       )}
 
-      {/* Medium accuracy subtle indicator */}
-      {compassAccuracy === 'medium' && (
+      {/* Medium accuracy subtle indicator — hidden during init to prevent flash */}
+      {!isInitializing && compassAccuracy === 'medium' && (
         <View style={styles.mediumAccuracyBadge}>
           <View style={styles.yellowDot} />
           <Text style={styles.mediumAccuracyText}>
@@ -630,8 +625,8 @@ const QiblaScreen = () => {
         </View>
       )}
 
-      {/* Cached location badge */}
-      {usingCachedLocation && (
+      {/* Cached location badge — hidden during init to prevent flash */}
+      {!isInitializing && usingCachedLocation && (
         <View style={styles.infoBadge}>
           <MaterialCommunityIcons name="map-marker-alert-outline" size={14} color="#FFA726" />
           <Text style={styles.infoBadgeText}>
@@ -640,8 +635,8 @@ const QiblaScreen = () => {
         </View>
       )}
 
-      {/* Local calculation badge */}
-      {isLocalCalc && !usingCachedLocation && (
+      {/* Local calculation badge — hidden during init to prevent flash */}
+      {!isInitializing && isLocalCalc && !usingCachedLocation && (
         <View style={styles.infoBadge}>
           <MaterialCommunityIcons name="calculator-variant-outline" size={14} color="#90CAF9" />
           <Text style={[styles.infoBadgeText, { color: '#90CAF9' }]}>
@@ -650,8 +645,8 @@ const QiblaScreen = () => {
         </View>
       )}
 
-      {/* Offline accuracy note — shown when using local calculation or cached location */}
-      {(isLocalCalc || usingCachedLocation) && (
+      {/* Offline accuracy note — hidden during init to prevent flash */}
+      {!isInitializing && (isLocalCalc || usingCachedLocation) && (
         <View style={styles.infoBadge}>
           <MaterialCommunityIcons name="wifi-off" size={14} color="#FFA726" />
           <Text style={styles.infoBadgeText}>
@@ -781,24 +776,6 @@ const QiblaScreen = () => {
               width={COMPASS_SIZE}
               height={COMPASS_SIZE}
             />
-            {/* Arabic cardinal direction overlay for RTL languages */}
-            {RTL_COMPASS_LANGUAGES.includes(getLanguage()) && ARABIC_CARDINALS.map(({ label, top, left }) => (
-              <Text
-                key={label}
-                style={{
-                  position: 'absolute',
-                  top: COMPASS_SIZE * top - 10,
-                  left: COMPASS_SIZE * left - 10,
-                  width: 20,
-                  textAlign: 'center',
-                  fontFamily: fontBold(),
-                  fontSize: COMPASS_SIZE * 0.065,
-                  color: '#FFF',
-                }}
-              >
-                {label}
-              </Text>
-            ))}
           </Animated.View>
 
           {/* GREEN GLOW DISC — appears behind pointer when aligned */}

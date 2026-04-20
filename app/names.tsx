@@ -1414,7 +1414,7 @@ const _styles = StyleSheet.create({
   // القائمة
   listContent: {
     padding: Spacing.md,
-    paddingBottom: Spacing.xxl,
+    paddingBottom: 80,
   },
   
   // عنصر الشبكة

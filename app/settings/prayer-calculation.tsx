@@ -17,10 +17,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useRouter } from 'expo-router';
 
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
 import { getUserCountry } from '@/services/hijriCalendarService';
+import { calculationMethods } from '@/lib/prayer-times';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
 import { useColors } from '@/hooks/use-colors';
@@ -44,36 +46,53 @@ function getMethods(translate: typeof t): { value: CalculationMethod; label: str
     { value: 12, label: translate('prayer.methodFrance'), subtitle: translate('prayer.methodFranceDesc') },
     { value: 13, label: translate('prayer.methodTurkey'), subtitle: translate('prayer.methodTurkeyDesc') },
     { value: 14, label: translate('prayer.methodRussia'), subtitle: translate('prayer.methodRussiaDesc') },
-    { value: 15, label: translate('prayer.methodMalaysia'), subtitle: translate('prayer.methodMalaysiaDesc') },
+    { value: 15, label: translate('prayer.methodMoonsighting'), subtitle: translate('prayer.methodMoonsightingDesc') },
+    { value: 16, label: translate('prayer.methodDubai'), subtitle: translate('prayer.methodDubaiDesc') },
+    { value: 17, label: translate('prayer.methodJakim'), subtitle: translate('prayer.methodJakimDesc') },
+    { value: 18, label: translate('prayer.methodTunisia'), subtitle: translate('prayer.methodTunisiaDesc') },
+    { value: 19, label: translate('prayer.methodAlgeria'), subtitle: translate('prayer.methodAlgeriaDesc') },
+    { value: 20, label: translate('prayer.methodKemenag'), subtitle: translate('prayer.methodKemenagDesc') },
+    { value: 21, label: translate('prayer.methodMorocco'), subtitle: translate('prayer.methodMoroccoDesc') },
+    { value: 22, label: translate('prayer.methodLisboa'), subtitle: translate('prayer.methodLisboaDesc') },
+    { value: 23, label: translate('prayer.methodJordan'), subtitle: translate('prayer.methodJordanDesc') },
   ];
 }
 
 function getAsrMethods(translate: typeof t) {
   return [
-    { value: 0, label: translate('prayer.asrMethodHanafi'), subtitle: translate('prayer.asrMethodHanafiDesc') },
-    { value: 1, label: translate('prayer.asrMethodShafii'), subtitle: translate('prayer.asrMethodShafiiDesc') },
+    { value: 0, label: translate('prayer.asrMethodShafii'), subtitle: translate('prayer.asrMethodShafiiDesc') },
+    { value: 1, label: translate('prayer.asrMethodHanafi'), subtitle: translate('prayer.asrMethodHanafiDesc') },
   ];
 }
 
 export default function PrayerCalculationScreen() {
   const isRTL = useIsRTL();
+  const router = useRouter();
   const { settings, isDarkMode, updatePrayer } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
   const METHODS = React.useMemo(() => getMethods(t), []);
   const ASR_METHODS = React.useMemo(() => getAsrMethods(t), []);
+  const isAutoMode = settings.prayer.methodManuallySet !== true;
 
-  const handleMethod = (method: CalculationMethod) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updatePrayer({ calculationMethod: method, methodManuallySet: true });
-  };
+  // Detect country method name for the Auto subtitle
+  const [autoMethodLabel, setAutoMethodLabel] = React.useState('');
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const cc = await getUserCountry();
+        const cd = applyCountryPrayerDefaults(cc);
+        if (cd) {
+          const info = calculationMethods[cd.method as CalculationMethod];
+          if (info) {
+            setAutoMethodLabel(isRTL ? info.nameAr : info.name);
+          }
+        }
+      } catch {}
+    })();
+  }, [isRTL]);
 
-  const handleAsr = (juristic: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    updatePrayer({ asrJuristic: juristic as 0 | 1, methodManuallySet: true });
-  };
-
-  const handleResetToCountryDefault = async () => {
+  const handleAutomatic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const countryCode = await getUserCountry();
@@ -85,6 +104,16 @@ export default function PrayerCalculationScreen() {
         methodManuallySet: false,
       });
     } catch {}
+  };
+
+  const handleMethod = (method: CalculationMethod) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updatePrayer({ calculationMethod: method, methodManuallySet: true });
+  };
+
+  const handleAsr = (juristic: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updatePrayer({ asrJuristic: juristic as 0 | 1 });
   };
 
   return (
@@ -134,36 +163,64 @@ export default function PrayerCalculationScreen() {
                 <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
               )}
               <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+              {/* Automatic option */}
               <TouchableOpacity
-                style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                onPress={handleResetToCountryDefault}
+                style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isAutoMode && styles.optionSelected]}
+                onPress={handleAutomatic}
               >
+                <MaterialCommunityIcons name="earth" size={20} color={isAutoMode ? '#0d8e62' : colors.glassTextLight} style={{ marginEnd: 10 }} />
                 <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                   <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {isRTL ? 'استخدم الطريقة الافتراضية لبلدي' : 'Use country default method'}
+                    {t('prayer.methodAutomatic')}
                   </Text>
                   <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {isRTL ? 'يعيد ضبط الطريقة تلقائياً حسب الدولة' : 'Reset method based on your country'}
+                    {autoMethodLabel
+                      ? t('prayer.methodAutomaticDescWithMethod').replace('{method}', autoMethodLabel)
+                      : t('prayer.methodAutomaticDesc')}
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="earth" size={22} color={colors.glassText} />
+                {isAutoMode && (
+                  <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
+                )}
               </TouchableOpacity>
+              {/* Divider */}
+              <View style={{ height: 1, backgroundColor: 'rgba(120,120,128,0.15)', marginHorizontal: 16 }} />
+              {/* Manual methods */}
               {METHODS.map((m) => (
                 <TouchableOpacity
                   key={m.value}
-                  style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === m.value && styles.optionSelected]}
+                  style={[styles.option, { flexDirection: isRTL ? 'row-reverse' : 'row' }, !isAutoMode && settings.prayer.calculationMethod === m.value && styles.optionSelected]}
                   onPress={() => handleMethod(m.value)}
                 >
                   <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
                     <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.label}</Text>
                     <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{m.subtitle}</Text>
                   </View>
-                  {settings.prayer.calculationMethod === m.value && (
+                  {!isAutoMode && settings.prayer.calculationMethod === m.value && (
                     <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
+          </Animated.View>
+
+          {/* رابط معايرة الأوقات */}
+          <Animated.View entering={FadeInDown.delay(150).duration(400)}>
+            <TouchableOpacity
+              style={[styles.calibrationLink, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: colors.card }]}
+              onPress={() => router.push('/settings/prayer-calibration' as any)}
+            >
+              {Platform.OS === 'ios' && (
+                <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
+              )}
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
+              <MaterialCommunityIcons name="tune-vertical" size={20} color="#0d8e62" style={{ marginHorizontal: 6 }} />
+              <View style={{ flex: 1, alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+                <Text style={[styles.optionLabel, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.calibrationTitle')}</Text>
+                <Text style={[styles.optionSub, { color: colors.glassTextLight, textAlign: isRTL ? 'right' : 'left' }]}>{t('prayer.calibrationLinkDesc')}</Text>
+              </View>
+              <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={22} color={colors.glassTextLight} />
+            </TouchableOpacity>
           </Animated.View>
 
           <View style={{ height: 100 }} />
@@ -201,4 +258,12 @@ const _styles = StyleSheet.create({
   optionSelected: { backgroundColor: 'rgba(6,79,47,0.08)' },
   optionLabel: { fontFamily: fontSemiBold(), fontSize: 15 },
   optionSub: { fontFamily: fontRegular(), fontSize: 12, marginTop: 2 },
+  calibrationLink: {
+    marginTop: 20,
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
 });

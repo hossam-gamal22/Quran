@@ -117,7 +117,8 @@ export async function fetchPrayerTimesByCoords(
   latitude: number,
   longitude: number,
   method: number = 4,
-  date?: Date
+  date?: Date,
+  school: number = 0
 ): Promise<PrayerTimesResponse> {
   try {
     const dateStr = date 
@@ -128,7 +129,7 @@ export async function fetchPrayerTimesByCoords(
     if (dateStr) {
       url += `/${dateStr}`;
     }
-    url += `?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+    url += `?latitude=${latitude}&longitude=${longitude}&method=${method}&school=${school}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -195,9 +196,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PRAYER_CACHE_PREFIX = '@prayer_times_cache_';
 
-function prayerCacheKey(lat: number, lng: number, month: number, year: number, method: number): string {
+function prayerCacheKey(lat: number, lng: number, month: number, year: number, method: number, school: number = 0): string {
   // Round coords to 2 decimals to avoid cache misses from tiny GPS drift.
-  return `${PRAYER_CACHE_PREFIX}${lat.toFixed(2)}_${lng.toFixed(2)}_${month}_${year}_${method}`;
+  return `${PRAYER_CACHE_PREFIX}${lat.toFixed(2)}_${lng.toFixed(2)}_${month}_${year}_${method}_S${school}`;
 }
 
 async function getCachedPrayerTimes(key: string): Promise<PrayerTimesResponse[] | null> {
@@ -228,12 +229,13 @@ export async function fetchMonthlyPrayerTimes(
   longitude: number,
   month: number,
   year: number,
-  method: number = 4
+  method: number = 4,
+  school: number = 0
 ): Promise<PrayerTimesResponse[]> {
-  const cacheKey = prayerCacheKey(latitude, longitude, month, year, method);
+  const cacheKey = prayerCacheKey(latitude, longitude, month, year, method, school);
 
   try {
-    const url = `${ALADHAN_API_BASE}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}`;
+    const url = `${ALADHAN_API_BASE}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}&school=${school}`;
 
     // Fetch with timeout — never block scheduling for more than 8 seconds
     const controller = new AbortController();

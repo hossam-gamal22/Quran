@@ -13,7 +13,7 @@ import { getAyahAudioUrl } from './quran-cache';
 import { fetchPrayerTimesByCoords } from './prayer-api';
 import { getPrayerLocation, getSettings } from './storage';
 import type { NotificationSettings as PrayerNotifSettings } from './notification-types';
-import { getReminderChannelId } from '../services/notifications/channels';
+import { getReminderChannelId, getAdhanChannelId } from '../services/notifications/channels';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
 import { safeParseTime } from './safe-parse-time';
@@ -1005,7 +1005,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule wakeup azkar if enabled
     if (notifSettings.wakeupAzkar) {
-      const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '05:30');
+      const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
       const wakeupSound = 'notif_wakeup';
       await scheduleMultiTime(
@@ -1038,7 +1038,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 3) Schedule daily ayah
     if (notifSettings.dailyVerse) {
-      const dailyTimes = getTimesArray(notifSettings.dailyVerseTimes, notifSettings.dailyVerseTime, '08:00');
+      const dailyTimes = getTimesArray(notifSettings.dailyVerseTimes, notifSettings.dailyVerseTime, '13:30');
       const dayIndex = new Date().getDay();
       const ayahData = DAILY_AYAHS[dayIndex % DAILY_AYAHS.length];
       
@@ -1079,7 +1079,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 4) Schedule salawat reminder
     if (notifSettings.salawatReminder) {
-      const salawatTimes = getTimesArray(notifSettings.salawatReminderTimes, notifSettings.salawatReminderTime, '09:00');
+      const salawatTimes = getTimesArray(notifSettings.salawatReminderTimes, notifSettings.salawatReminderTime, '17:00');
       const salawatText = getNotifText('salawat', t('settings.salawatTitle'), t('settings.salawatBody'), lang);
       await scheduleMultiTime(
         'salawat_reminder',
@@ -1197,7 +1197,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // 8) Schedule Quran reading reminder
     if (notifSettings.quranReadingReminder) {
-      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '20:00');
+      const quranTimes = getTimesArray(notifSettings.quranReadingReminderTimes, notifSettings.quranReadingReminderTime, '19:00');
       // quranReminderDays uses 0=Sat..6=Fri, convert to 1=Sun..7=Sat
       const qDays = notifSettings.quranReminderDays;
       const convertedDays = qDays && qDays.length > 0 && qDays.length < 7
@@ -1232,7 +1232,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     // 9) Schedule worship tracking notifications
     // Daily summary
     if (notifSettings.worshipDailySummary) {
-      const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
+      const summaryTime = parseTime(notifSettings.worshipDailySummaryTime || '23:00');
       const dailySummarySound = 'notif_daily_summary';
       await scheduleWithDays(
         'worship_daily_summary',
@@ -1255,7 +1255,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Weekly report (every Friday — schedule next 4 Fridays as DATE triggers)
     if (notifSettings.worshipWeeklyReport) {
-      const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '22:00');
+      const weeklyTime = parseTime(notifSettings.worshipDailySummaryTime || '23:00');
       const worshipWeeklyChannelId = 'general'; // device default sound
       const worshipWeeklyAttachments = await getNotificationIconAttachment('reminder');
       const now = new Date();
@@ -1539,8 +1539,13 @@ export async function scheduleRefreshReminder(): Promise<void> {
     const location = await getPrayerLocation();
     if (location) {
       const appSettings = await getSettings();
+      let asrJuristic = 0;
+      try {
+        const raw = await AsyncStorage.getItem('app_settings');
+        if (raw) { asrJuristic = JSON.parse(raw)?.prayer?.asrJuristic ?? 0; }
+      } catch {}
       const prayerData = await fetchPrayerTimesByCoords(
-        location.latitude, location.longitude, appSettings.calculationMethod, triggerDate
+        location.latitude, location.longitude, appSettings.calculationMethod, triggerDate, asrJuristic
       );
       const fajrTime = prayerData?.timings?.Fajr;
       if (fajrTime) {
@@ -1650,7 +1655,7 @@ export async function rescheduleAllFromStorage(): Promise<void> {
       sleepAzkar: n.sleepAzkar ?? false,
       sleepAzkarTime: n.sleepAzkarTime ?? '22:00',
       wakeupAzkar: n.wakeupAzkar ?? false,
-      wakeupAzkarTime: n.wakeupAzkarTime ?? '05:30',
+      wakeupAzkarTime: n.wakeupAzkarTime ?? '10:00',
       afterPrayerAzkar: n.afterPrayerAzkar ?? false,
       dailyVerse: n.dailyVerse,
       dailyVerseTime: n.dailyVerseTime,
@@ -1698,6 +1703,17 @@ export async function rescheduleAllFromStorage(): Promise<void> {
   } catch (e) {
     console.warn('[notifications-manager] rescheduleAllFromStorage failed:', e);
   }
+}
+
+/**
+ * Force-reschedule all notifications, bypassing the 6-hour throttle.
+ * Call this when the user explicitly changes prayer settings (method, school, adjustments)
+ * so notifications immediately reflect the new times.
+ */
+export async function forceRescheduleAllFromStorage(): Promise<void> {
+  console.log('[notifications-manager] forceRescheduleAllFromStorage — bypassing throttle');
+  _lastRescheduleAt = 0;
+  await rescheduleAllFromStorage();
 }
 
 /**
@@ -1762,13 +1778,15 @@ export async function sendTestNotification(
 
   const meta = TEST_NOTIF_MAP[categoryId] ?? TEST_NOTIF_MAP.prayer;
 
-  // Resolve sound: prayer uses adhan sound, others use their category sound
+  // Resolve sound: prayer uses adhan sound/channel, others use reminder sound/channel
   const isAdhan = categoryId === 'prayer';
   const rawSoundType = isAdhan
     ? (opts.adhanSoundType || 'makkah')
     : (opts.soundType || 'general_reminder');
 
-  const resolvedChannelId = getReminderChannelId(rawSoundType);
+  const resolvedChannelId = isAdhan
+    ? getAdhanChannelId(rawSoundType)
+    : getReminderChannelId(rawSoundType);
   const soundValue = resolveNotificationSound(rawSoundType, opts.sound !== false);
 
   const identifier = `test_${categoryId}`;
@@ -1787,7 +1805,6 @@ export async function sendTestNotification(
       data: { type: 'test', category: categoryId, iconType: meta.iconType },
       ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
       ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
-      ...(Platform.OS === 'android' && opts.vibration === false && { vibrate: [0] }),
       ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       ...(Platform.OS === 'ios' && testAttachments && { attachments: testAttachments }),
     },
@@ -1831,9 +1848,12 @@ export interface NotificationDefaultsConfig {
   customReminder?: NotificationCategoryDefaults;
   quranReading?: NotificationCategoryDefaults;
   kahfFriday?: NotificationCategoryDefaults;
+  /** Admin bumps this when pushing new default times. App clears user overrides when it detects a newer version. */
+  configVersion?: number;
 }
 
 const DEFAULTS_CACHE_KEY = '@notif_defaults_cache';
+const DEFAULTS_APPLIED_VERSION_KEY = '@notif_defaults_applied_version';
 const DEFAULTS_FETCH_TIMEOUT_MS = 3000; // 3-second timeout to prevent hanging on bad network
 
 export const fetchNotificationDefaults = async (): Promise<NotificationDefaultsConfig | null> => {
@@ -1934,7 +1954,25 @@ export const syncNotificationDefaults = async (
     return null;
   }
   
-  const overrides = currentSettings.notifOverrides ?? {};
+  // If admin bumped configVersion, apply new defaults only to categories
+  // the user has NOT manually customized (preserve user overrides).
+  const overrides = { ...(currentSettings.notifOverrides ?? {}) };
+  if (defaults.configVersion != null) {
+    try {
+      const stored = await AsyncStorage.getItem(DEFAULTS_APPLIED_VERSION_KEY);
+      const appliedVersion = stored ? parseInt(stored, 10) : 0;
+      if (defaults.configVersion > appliedVersion) {
+        console.log(`🔄 Admin config version ${defaults.configVersion} > applied ${appliedVersion} — applying non-customized categories`);
+        await AsyncStorage.setItem(DEFAULTS_APPLIED_VERSION_KEY, String(defaults.configVersion));
+      } else {
+        // Already applied this version — skip entirely
+        console.log('📝 Admin config version already applied, skipping sync');
+        return null;
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to check notif defaults version:', e);
+    }
+  }
   const updates: Record<string, any> = {};
   
   for (const [categoryKey, config] of Object.entries(defaults) as [keyof NotificationDefaultsConfig, NotificationCategoryDefaults][]) {

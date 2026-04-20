@@ -1,6 +1,7 @@
 // lib/ads-context.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { AppState } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAdsConfig, subscribeToAdsConfig, AdsConfig, AdScreenKey, AdSlot, isBannerEnabledForScreen, getAdUnitId, getSlotAdUnitId, getSlotType, getSlotsForScreen, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 import {
@@ -46,6 +47,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const [config, setConfig] = useState<AdsConfig | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPremiumUser, setIsPremiumUser] = useState(false);
+  const [isOnboardingDone, setIsOnboardingDone] = useState(false);
   const [pageViews, setPageViews] = useState(0);
   const [sessionAdsShown, setSessionAdsShown] = useState(0);
   const [lastAdTime, setLastAdTime] = useState<number>(Date.now());
@@ -54,13 +56,15 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const loadConfig = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [adsConfig, subState] = await Promise.all([
+      const [adsConfig, subState, , onboardingFlag] = await Promise.all([
         fetchAdsConfig(),
         getSubscriptionState(),
         initSmartAdManager(),
+        AsyncStorage.getItem('onboarding_complete'),
       ]);
       setConfig(adsConfig);
       setIsPremiumUser(subState.isPremium);
+      setIsOnboardingDone(onboardingFlag === 'true');
     } catch (error) {
       console.error('Error loading ads config:', error);
     } finally {
@@ -78,18 +82,22 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [loadConfig]);
 
-  // Re-check premium status whenever app returns to foreground
+  // Re-check premium & onboarding status whenever app returns to foreground
   // This ensures mid-session purchases instantly hide ads
   useEffect(() => {
-    const updatePremiumStatus = async () => {
+    const updateStatus = async () => {
       try {
-        const subState = await getSubscriptionState();
+        const [subState, onboardingFlag] = await Promise.all([
+          getSubscriptionState(),
+          AsyncStorage.getItem('onboarding_complete'),
+        ]);
         setIsPremiumUser(subState.isPremium);
+        setIsOnboardingDone(onboardingFlag === 'true');
       } catch {}
     };
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        updatePremiumStatus();
+        updateStatus();
       }
     });
     return () => subscription.remove();
@@ -109,11 +117,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
 
   const isBannerVisible = useCallback((screen: AdScreenKey): boolean => {
     if (isLoading) return false;
+    if (!isOnboardingDone) return false;
     if (isPremiumUser) return false;
     if (!config) return false;
     if (!smartCanShowBanner()) return false;
     return isBannerEnabledForScreen(config, screen);
-  }, [config, isPremiumUser, isLoading]);
+  }, [config, isPremiumUser, isLoading, isOnboardingDone]);
 
   const getBannerAdUnitId = useCallback((): string => {
     return getAdUnitId('BANNER', config);
@@ -129,6 +138,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
 
   const canShowInterstitial = useCallback((): boolean => {
     if (isLoading) return false;
+    if (!isOnboardingDone) return false;
     if (isPremiumUser) return false;
     if (!config || !config.enabled) return false;
     if (config.showInterstitials === false) return false;
@@ -158,7 +168,7 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       default:
         return false;
     }
-  }, [config, isPremiumUser, isLoading, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
+  }, [config, isPremiumUser, isLoading, isOnboardingDone, pageViews, lastAdTime, sessionAdsShown, appStartTime]);
 
   // Slot-based API
   const getSlotUnitId = useCallback((slotKey: string): string => {

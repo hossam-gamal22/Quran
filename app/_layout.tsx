@@ -39,7 +39,7 @@ import { AppConfigProvider } from '@/lib/app-config-context';
 import { SubscriptionProvider, useSubscription } from '@/contexts/SubscriptionContext';
 
 // Firebase Integration
-import { registerUser, updateLastActive, getUserId } from '@/lib/firebase-user';
+import { registerUser, updateLastActive, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
 import { db } from '@/lib/firebase-config';
 import { doc as firestoreDoc, updateDoc as firestoreUpdateDoc, increment as firestoreIncrement } from 'firebase/firestore';
 import { 
@@ -66,7 +66,7 @@ import { QURAN_THEMES, setQuranThemes } from '@/constants/quran-themes';
 import * as ExpoNotifications from 'expo-notifications';
 import { handleNotificationNavigation } from '@/lib/notification-router';
 import { handleDidYouPrayResponse } from '@/lib/did-you-pray-handler';
-import { consumePendingDeepLink, subscribeToDeepLinks } from '@/lib/deep-link-handler';
+import { consumePendingDeepLink, consumeInitialURL, subscribeToDeepLinks, wasDeepLinkConsumed } from '@/lib/deep-link-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadInstalledSoundsCache } from '@/lib/notification-sound-installer';
 import { ensureNotificationIconsCached } from '@/lib/notification-icons';
@@ -292,7 +292,10 @@ const NavigationTracker = () => {
   useEffect(() => {
     if (pathname && pathname !== prevPathRef.current) {
       prevPathRef.current = pathname;
-      onPageView();
+      // Don't count onboarding screens as page views for ad triggers
+      if (!pathname.startsWith('/onboarding')) {
+        onPageView();
+      }
     }
   }, [pathname, onPageView]);
 
@@ -392,10 +395,13 @@ const PaywallAutoTrigger = () => {
     if (!isLoading && shouldAutoShowPaywall && !triggered.current) {
       triggered.current = true;
       markPaywallAutoShown();
-      // Small delay to ensure navigation stack is ready
+      // Delay to ensure navigation stack is ready + check if a deep link
+      // already navigated the user (don't override Control Center / Spotlight).
       const timer = setTimeout(() => {
-        router.push('/subscription' as any);
-      }, 500);
+        if (!wasDeepLinkConsumed()) {
+          router.push('/subscription' as any);
+        }
+      }, 800);
       return () => clearTimeout(timer);
     }
   }, [isLoading, shouldAutoShowPaywall]);
@@ -700,9 +706,14 @@ export default function RootLayout() {
           3000
         ),
         initWithTimeout(
-          () => registerUser().then(() => {}),
-          'User registration',
-          8000
+          async () => {
+            // Register user, then sync profile from Firestore (detect admin merge/name changes)
+            await registerUser();
+            const originalId = await getOriginalDeviceUserId();
+            await syncUserProfileFromFirestore(originalId);
+          },
+          'User registration + profile sync',
+          10000
         ),
         initWithTimeout(
           async () => {
@@ -917,12 +928,19 @@ export default function RootLayout() {
   // ── Cold-start deep link handler (AppIntent / Control Center / Spotlight) ──
   // When the user taps a shortcut while the app is killed, the AppIntent writes
   // a pending deep link to App Group UserDefaults. We consume it here once the
-  // navigation tree is ready.
+  // navigation tree is ready.  If that yields nothing, fall back to
+  // Linking.getInitialURL() so the standard iOS URL delivery still works.
   const coldStartDeepLinkHandled = useRef(false);
   useEffect(() => {
     if (!appReady || !languageReady || coldStartDeepLinkHandled.current) return;
     coldStartDeepLinkHandled.current = true;
-    consumePendingDeepLink(router);
+
+    (async () => {
+      const consumed = await consumePendingDeepLink(router);
+      if (!consumed) {
+        await consumeInitialURL(router);
+      }
+    })();
   }, [appReady, languageReady]);
 
   // ── Warm/foreground URL listener ──
@@ -946,7 +964,10 @@ export default function RootLayout() {
     // Defer 3s after ready so we don't compete with critical startup network calls
     const t = setTimeout(() => {
       import('@/lib/azkar-audio-cache')
-        .then(({ preDownloadAll }) => preDownloadAll())
+        .then(async ({ invalidateAzkarCacheIfNeeded, preDownloadAll }) => {
+          await invalidateAzkarCacheIfNeeded();
+          await preDownloadAll();
+        })
         .catch((e) => {
           if (__DEV__) console.warn('[azkar-cache] background pre-download failed:', e);
         });

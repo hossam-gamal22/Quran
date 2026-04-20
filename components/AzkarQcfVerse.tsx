@@ -23,6 +23,8 @@ interface AzkarQcfVerseProps {
   azkarId: number;
   textColor?: string;
   fallbackText?: string;
+  /** Compact mode for share images — smaller fonts & banners */
+  compact?: boolean;
 }
 
 interface VerseRenderData {
@@ -37,7 +39,7 @@ interface SurahGroup {
   verses: VerseRenderData[];
 }
 
-export default function AzkarQcfVerse({ azkarId, textColor, fallbackText }: AzkarQcfVerseProps) {
+export default function AzkarQcfVerse({ azkarId, textColor, fallbackText, compact }: AzkarQcfVerseProps) {
   const { isDarkMode } = useSettings();
   const colors = useColors();
   const color = textColor || colors.text;
@@ -119,7 +121,7 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText }: Azka
   }
 
   const hasMultipleSurahs = surahGroups.length > 1;
-  const ornamentColor = darkMode ? '#C9A84C' : '#8B7332';
+  const ornamentColor = compact ? '#8B7332' : (darkMode ? '#C9A84C' : '#8B7332');
 
   return (
     <View style={styles.container}>
@@ -129,24 +131,26 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText }: Azka
         const allGlyphs = group.verses.flatMap(v => v.glyphs);
         const page = group.verses[0]?.page ?? 604;
         const fontFamily = getPageFontFamily(page, darkMode);
-        const fontSize = getQcfFontSize(page, SCREEN_WIDTH - 48);
+        const fontSize = compact ? 12 : getQcfFontSize(page, SCREEN_WIDTH - 48);
         const lineHeight = fontSize * 1.85;
 
         return (
-          <View key={`surah-${group.surah}-${gi}`} style={showBanner ? styles.surahBlock : undefined}>
+          <View key={`surah-${group.surah}-${gi}`} style={showBanner ? (compact ? styles.surahBlockCompact : styles.surahBlock) : undefined}>
             {/* Ornamental surah banner */}
             {showBanner && (
-              <View style={styles.bannerWrap}>
+              <View style={compact ? styles.bannerWrapCompact : styles.bannerWrap}>
                 <ImageBackground
                   source={surahOrnament}
-                  style={styles.bannerOrnament}
+                  style={compact ? styles.bannerOrnamentCompact : styles.bannerOrnament}
                   resizeMode="contain"
                   tintColor={ornamentColor}
                 >
-                  <View style={styles.bannerOverlay}>
+                  <View style={compact ? styles.bannerOverlayCompact : styles.bannerOverlay}>
                     <Text
-                      style={[styles.bannerText, { color: ornamentColor }]}
+                      style={[compact ? styles.bannerTextCompact : styles.bannerText, { color: ornamentColor }]}
                       allowFontScaling={false}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={compact}
                     >
                       {getSurahName(group.surah)}
                     </Text>
@@ -155,7 +159,7 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText }: Azka
               </View>
             )}
 
-            {/* QCF verses — all glyphs inline like MushafÂ */}
+            {/* QCF verses — all glyphs inline like Mushaf */}
             <Text
               allowFontScaling={false}
               style={{
@@ -188,15 +192,32 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     width: '100%',
   },
+  surahBlockCompact: {
+    alignItems: 'center',
+    marginBottom: 4,
+    width: '100%',
+  },
   bannerWrap: {
     marginHorizontal: 8,
     marginBottom: 4,
     height: 48,
     width: '100%',
   },
+  bannerWrapCompact: {
+    alignSelf: 'stretch' as const,
+    marginHorizontal: 8,
+    marginBottom: 2,
+    height: 34,
+  },
   bannerOrnament: {
     width: '100%',
     height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bannerOrnamentCompact: {
+    width: '100%',
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -207,11 +228,25 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 46,
   },
+  bannerOverlayCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 32,
+  },
   bannerText: {
     fontSize: 17,
     fontFamily: 'Amiri-Bold',
     textAlign: 'center',
     lineHeight: 28,
+    includeFontPadding: false,
+  },
+  bannerTextCompact: {
+    fontSize: 13,
+    fontFamily: 'Amiri-Bold',
+    textAlign: 'center',
+    lineHeight: 20,
     includeFontPadding: false,
   },
 });

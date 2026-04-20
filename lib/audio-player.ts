@@ -560,20 +560,14 @@ class AudioPlayerManager {
 
   async playNextAyah(suppressLoading: boolean = false): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
-
-    if (this.playingFullSurah) {
-      if (currentSurah < 114) {
-        await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true, suppressLoading);
-      } else {
-        await this.stop();
-      }
-      return;
-    }
-
+    // Step one ayah forward regardless of full-surah mode. Only cross into the
+    // next surah when we're at the last ayah of the current one. playAyah()
+    // preserves full-surah mode via the `continuous` flag and seeks via the
+    // cached surahOffsets when ayah > 1.
     if (currentAyah < this.surahAyahsCount) {
-      await this.playAyah(currentSurah, currentAyah + 1, reciterIdentifier, true, suppressLoading);
+      await this.playAyah(currentSurah, currentAyah + 1, reciterIdentifier, this.playingFullSurah, suppressLoading);
     } else if (currentSurah < 114) {
-      await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true, suppressLoading);
+      await this.playAyah(currentSurah + 1, 1, reciterIdentifier, this.playingFullSurah, suppressLoading);
     } else {
       await this.stop();
     }
@@ -582,11 +576,11 @@ class AudioPlayerManager {
   async playPreviousAyah(): Promise<void> {
     const { currentSurah, currentAyah, reciterIdentifier } = this.state;
     if (currentAyah > 1) {
-      await this.playAyah(currentSurah, currentAyah - 1, reciterIdentifier, this.continuousPlay);
+      await this.playAyah(currentSurah, currentAyah - 1, reciterIdentifier, this.playingFullSurah);
     } else if (currentSurah > 1) {
       const prevSurah = await getCachedSurah(currentSurah - 1);
       if (prevSurah) {
-        await this.playAyah(currentSurah - 1, prevSurah.numberOfAyahs, reciterIdentifier, this.continuousPlay);
+        await this.playAyah(currentSurah - 1, prevSurah.numberOfAyahs, reciterIdentifier, this.playingFullSurah);
       }
     }
   }

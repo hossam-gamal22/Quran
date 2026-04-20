@@ -23,6 +23,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import { t, getLanguage } from '@/lib/i18n';
 import { useAutoTranslate } from '@/hooks/use-auto-translate';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -190,6 +191,7 @@ export default function QuoteOfDayScreen() {
           {/* Bottom Padding */}
           <View style={{ height: 40 }} />
         </ScrollView>
+        <BannerAdComponent screen="quote_of_day" />
       </BackgroundWrapper>
     </>
   );

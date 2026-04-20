@@ -284,7 +284,7 @@ export default function SunnahDuaDailyScreen() {
           </Text>
         </ScrollView>
 
-        <View style={{ height: insets.bottom }} />
+        <View style={{ height: Math.max(insets.bottom, 16) }} />
       </BackgroundWrapper>
     </>
   );

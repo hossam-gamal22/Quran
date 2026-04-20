@@ -18,6 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -73,6 +74,7 @@ export default function AlKahfReminderSheet({ visible, onDismiss }: AlKahfRemind
 
   const isLight = !isDarkMode;
   const accentColor = '#0f987f';
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={handleSkip}>
@@ -85,6 +87,7 @@ export default function AlKahfReminderSheet({ visible, onDismiss }: AlKahfRemind
             style={styles.blurView}
           >
             <View style={[styles.content, {
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
               backgroundColor: isLight ? 'rgba(255,255,255,0.85)' : 'rgba(28,28,30,0.85)',
             }]}>
               {/* Handle bar */}
@@ -211,7 +214,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
   },
   handleBar: {
     alignItems: 'center',

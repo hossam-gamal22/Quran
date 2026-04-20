@@ -14,6 +14,7 @@ import ViewShot, { captureRef } from 'react-native-view-shot';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
 import { fontBold, fontSemiBold, fontRegular } from '@/lib/fonts';
@@ -44,6 +45,8 @@ export interface IslamicShareCardProps {
   showBasmala?: boolean;
   noteText?: string;
   onCapture?: (uri: string) => void;
+  /** Render custom content (e.g. multi-page QCF verses) instead of arabicText */
+  renderCustomContent?: () => React.ReactNode;
 }
 
 // ─── SVG sub-components ───
@@ -191,11 +194,13 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       showBasmala,
       noteText,
       onCapture,
+      renderCustomContent,
     } = props;
 
     const viewShotRef = useRef<ViewShot>(null);
     const colors = useColors();
     const { isDarkMode, t } = useSettings();
+    const insets = useSafeAreaInsets();
 
     const [selectedSize, setSelectedSize] = useState<ImageSizeKey>('portrait');
     const [showPicker, setShowPicker] = useState(false);
@@ -239,15 +244,15 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       setCapturing(true);
       try {
         const uri = await doCapture(selectedSize);
-        setShowPicker(false);
-        await new Promise(r => setTimeout(r, Platform.OS === 'ios' ? 600 : 400));
         if (onCapture) {
+          setShowPicker(false);
           onCapture(uri);
         } else {
           const canShare = await Sharing.isAvailableAsync();
           if (canShare) {
             await Sharing.shareAsync(uri, { mimeType: 'image/png' });
           }
+          setShowPicker(false);
         }
       } catch (e) {
         console.warn('IslamicShareCard share failed:', e);
@@ -286,7 +291,9 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
           )}
 
           {/* Main text */}
-          {qcfGlyphs && qcfFontFamily ? (
+          {renderCustomContent ? (
+            renderCustomContent()
+          ) : qcfGlyphs && qcfFontFamily ? (
             <Text
               style={[s.mainText, { fontFamily: qcfFontFamily, fontSize: 24, lineHeight: 24 * 2.0 }]}
               allowFontScaling={false}
@@ -357,7 +364,7 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
               activeOpacity={1}
               onPress={() => !capturing && setShowPicker(false)}
             />
-            <View style={[s.sheet, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+            <View style={[s.sheet, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
               <View style={s.dragHandle} />
               <Text style={[s.sheetTitle, { color: colors.text }]}>
                 {t('common.shareImage')}
@@ -600,7 +607,6 @@ const s = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     alignItems: 'center',
   },
   dragHandle: {

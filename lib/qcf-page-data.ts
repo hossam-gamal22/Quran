@@ -337,7 +337,7 @@ export function getVerseQcfData(
 /** Font size helper — QPC V2 fonts from Tarteel CDN */
 export function getQcfFontSize(page: number, screenWidth: number, adjustment: number = 0): number {
   const baseFontSize = 23.55;
-  const scaleFactor = screenWidth / 392.73;
+  const scaleFactor = screenWidth / 420;
   let size = baseFontSize * scaleFactor + adjustment;
 
   // Pages 1-2 (Fatiha/Baqara start) slightly smaller

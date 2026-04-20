@@ -176,13 +176,11 @@ function RadioScreen() {
         console.log('[Radio] Stopping current station');
         await stopRadio();
       } else {
-        // Starting a new station — schedule interstitial every 6 minutes.
-        // 6 min (not 5) keeps each tick outside the 5-min global ad cooldown,
-        // otherwise the first tick at 5:00 lands inside the window and is dropped.
+        // Starting a new station — schedule interstitial every 5 minutes.
         if (adTimerRef.current) clearInterval(adTimerRef.current);
         adTimerRef.current = setInterval(() => {
           try { showInterstitial(); } catch {}
-        }, 360_000);
+        }, 300_000);
         console.log('[Radio] Starting playback for:', station.name);
         await playRadio(station);
         console.log('[Radio] playRadio call completed');
@@ -679,7 +677,7 @@ const _styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: 16,
+    paddingBottom: 80,
   },
   fixedBannerContainer: {
     paddingHorizontal: Spacing.md,

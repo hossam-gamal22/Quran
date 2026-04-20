@@ -57,7 +57,7 @@ struct RoohMuslimShortcuts: AppShortcutsProvider {
                 "أذكار بعد الصلاة في \(.applicationName)",
             ],
             shortTitle: "أذكار بعد الصلاة",
-            systemImageName: "hands.sparkles.fill"
+            systemImageName: "sparkles"
         )
         AppShortcut(
             intent: OpenPrayerTimesIntent(),

@@ -6,7 +6,8 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { fetchMonthlyPrayerTimes, type PrayerTimesResponse } from './prayer-api';
-import { getPrayerLocation, getSettings } from './storage';
+import { getPrayerLocation } from './storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t, getLanguage } from './i18n';
 import { getNotifText, fetchNotificationTexts } from './notification-texts';
 import { getAdhanChannelId, getReminderChannelId } from '../services/notifications/channels';
@@ -117,7 +118,37 @@ function prayerTimeToDateForDay(timeStr: string, day: Date, advanceMinutes: numb
   const parts = cleaned.split(':').map(Number);
   const hours = Number.isFinite(parts[0]) && parts[0] >= 0 && parts[0] <= 23 ? parts[0] : 0;
   const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
-  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes - advanceMinutes, 0, 0);
+  const result = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes, 0, 0);
+  if (advanceMinutes > 0) {
+    result.setMinutes(result.getMinutes() - advanceMinutes);
+  }
+  return result;
+}
+
+// ─── Apply per-prayer minute adjustments to notification timings ─────────────
+// Mirrors applyAdjustments() from prayer-times.ts so notifications match display.
+const ADJUSTMENT_KEY_MAP: Record<string, string> = {
+  Fajr: 'fajr', Sunrise: 'sunrise', Dhuhr: 'dhuhr',
+  Asr: 'asr', Maghrib: 'maghrib', Isha: 'isha',
+};
+
+function applyTimingAdjustments(
+  timings: Record<string, string>,
+  adjustments: Record<string, number>
+): Record<string, string> {
+  const result = { ...timings };
+  for (const [apiKey, settingsKey] of Object.entries(ADJUSTMENT_KEY_MAP)) {
+    const minutes = adjustments[settingsKey];
+    if (!minutes || !result[apiKey]) continue;
+    // Strip timezone info like "(EET)" if present
+    const clean = result[apiKey].replace(/\s*\([^)]*\)/g, '').trim();
+    const parts = clean.split(':').map(Number);
+    if (parts.length < 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) continue;
+    const d = new Date();
+    d.setHours(parts[0], parts[1] + minutes, 0, 0);
+    result[apiKey] = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  return result;
 }
 
 // عدد الأيام المجدولة مسبقاً — 7 days (default).
@@ -146,7 +177,26 @@ export async function schedulePrayerNotifications(
   const location = await getPrayerLocation();
   if (!location) return;
 
-  const appSettings = await getSettings();
+  // Read prayer settings from the SAME source as the prayer tab (app_settings)
+  // to ensure notifications use identical calculation method, school, and adjustments.
+  let calculationMethod = 4;
+  let asrJuristic = 0;
+  let prayerAdjustments: Record<string, number> = {};
+  try {
+    const raw = await AsyncStorage.getItem('app_settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.prayer) {
+        calculationMethod = parsed.prayer.calculationMethod ?? 4;
+        asrJuristic = parsed.prayer.asrJuristic ?? 0;
+        prayerAdjustments = parsed.prayer.adjustments ?? {};
+      }
+    }
+  } catch (e) {
+    console.warn('[prayer-notif] Failed to read app_settings, using defaults:', e);
+  }
+
+  console.log(`[prayer-notif] Using method=${calculationMethod}, school=${asrJuristic}, adjustments=${JSON.stringify(prayerAdjustments)}`);
   
   // Fetch admin text overrides (cached)
   await fetchNotificationTexts();
@@ -174,14 +224,14 @@ export async function schedulePrayerNotifications(
 
     try {
       const monthlyData = await fetchMonthlyPrayerTimes(
-        location.latitude, location.longitude, currentMonth, currentYear, appSettings.calculationMethod
+        location.latitude, location.longitude, currentMonth, currentYear, calculationMethod, asrJuristic
       );
 
       // If the scheduling window spans into next month, fetch that too
       let nextMonthData: PrayerTimesResponse[] | null = null;
       if (lastDay.getMonth() + 1 !== currentMonth || lastDay.getFullYear() !== currentYear) {
         nextMonthData = await fetchMonthlyPrayerTimes(
-          location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), appSettings.calculationMethod
+          location.latitude, location.longitude, lastDay.getMonth() + 1, lastDay.getFullYear(), calculationMethod, asrJuristic
         );
       }
 
@@ -193,7 +243,7 @@ export async function schedulePrayerNotifications(
         const source = isNextMonth && nextMonthData ? nextMonthData : monthlyData;
         const dayData = source[targetDate.getDate() - 1];
         if (!dayData) continue;
-        const timings: Record<string, string> = {
+        const rawTimings: Record<string, string> = {
           Fajr: dayData.timings.Fajr,
           Sunrise: dayData.timings.Sunrise,
           Dhuhr: dayData.timings.Dhuhr,
@@ -201,6 +251,8 @@ export async function schedulePrayerNotifications(
           Maghrib: dayData.timings.Maghrib,
           Isha: dayData.timings.Isha,
         };
+        // Apply user per-prayer adjustments so notifications match displayed times
+        const timings = applyTimingAdjustments(rawTimings, prayerAdjustments);
         scheduleDays.push({ date: targetDate, timings, isOffline: false });
       }
     } catch (apiError) {
@@ -214,7 +266,7 @@ export async function schedulePrayerNotifications(
       for (const entry of offlineRange) {
         const d = new Date(entry.date + 'T12:00:00');
         // Convert PrayerTimes (HH:MM keys) to API-style timings record
-        const timings: Record<string, string> = {
+        const rawTimings: Record<string, string> = {
           Fajr: entry.times.fajr,
           Sunrise: entry.times.sunrise,
           Dhuhr: entry.times.dhuhr,
@@ -222,6 +274,8 @@ export async function schedulePrayerNotifications(
           Maghrib: entry.times.maghrib,
           Isha: entry.times.isha,
         };
+        // Apply user per-prayer adjustments so notifications match displayed times
+        const timings = applyTimingAdjustments(rawTimings, prayerAdjustments);
         scheduleDays.push({ date: d, timings, isOffline: true });
       }
       console.log(`[prayer-notif] 📴 Using offline data for ${offlineRange.length} days (sources: ${offlineRange.map(r => r.source).join(', ')})`);
@@ -332,8 +386,8 @@ export async function schedulePrayerNotifications(
               const didYouPrayId = dayOffset === 0
                 ? `did_you_pray_${prayerKey}`
                 : `did_you_pray_${prayerKey}_d${dayOffset}`;
-              const didYouPrayChannelId = getReminderChannelId('general_reminder');
-              const didYouPraySound = resolveNotificationSound('general_reminder', true);
+              const didYouPrayChannelId = getReminderChannelId('notif_after_prayer');
+              const didYouPraySound = resolveNotificationSound('notif_after_prayer', true);
               await Notifications.scheduleNotificationAsync({
                 identifier: didYouPrayId,
                 content: {

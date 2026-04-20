@@ -14,7 +14,7 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { useSettings } from '@/contexts/SettingsContext';
-import { t } from '@/lib/i18n';
+import { t, getLanguage } from '@/lib/i18n';
 import { ScreenContainer } from '@/components/screen-container';
 import { getSurahName, TAFSIR_EDITIONS, fetchTafsir, searchQuran, TRANSLATION_EDITIONS, SURAH_NAMES_AR, SURAH_NAMES_EN, fetchSurahTranslation } from '@/lib/quran-api';
 import { getCachedSurah } from '@/lib/quran-cache';
@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 interface SearchResult {
   number: number;
   text: string;
@@ -53,16 +54,34 @@ function HighlightText({ text, query, color }: { text: string; query: string; co
     </Text>
   );
 }
+// Normalize Arabic text: strip tashkeel, unify alef/ya/ta-marbuta/hamza forms.
+// Makes surah-name matching forgiving of common typos like "البقره" vs "البقرة".
+function normalizeArabic(s: string): string {
+  return s
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .toLowerCase()
+    .trim();
+}
+
 function findSurahByName(query: string, lang: 'ar' | 'en'): number | null {
-  const normalized = query.trim().replace(/^سورة\s+/i, '').replace(/^surah\s+/i, '');
+  const raw = query.trim().replace(/^سورة\s+/i, '').replace(/^surah\s+/i, '');
   const names = lang === 'ar' ? SURAH_NAMES_AR : SURAH_NAMES_EN;
+  const normalize = lang === 'ar' ? normalizeArabic : (x: string) => x.toLowerCase().trim();
+  const normalizedQuery = normalize(raw);
+  if (!normalizedQuery) return null;
   // Exact match first
   for (const [num, name] of Object.entries(names)) {
-    if (name === normalized) return parseInt(num);
+    if (normalize(name) === normalizedQuery) return parseInt(num);
   }
-  // Partial match
+  // Partial match (in either direction)
   for (const [num, name] of Object.entries(names)) {
-    if (name.includes(normalized) || normalized.includes(name)) return parseInt(num);
+    const n = normalize(name);
+    if (n.includes(normalizedQuery) || normalizedQuery.includes(n)) return parseInt(num);
   }
   return null;
 }
@@ -71,11 +90,13 @@ export default function TafsirSearchScreen() {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchLang, setSearchLang] = useState<'ar' | 'en'>('ar');
-  const [selectedEdition, setSelectedEdition] = useState('ar.muyassar');
+  const appLang = getLanguage();
+  const searchLang: 'ar' | 'en' = appLang === 'ar' ? 'ar' : 'en';
+  const [selectedEdition, setSelectedEdition] = useState(appLang === 'ar' ? 'ar.muyassar' : 'en.sahih');
   const [tafsirDetail, setTafsirDetail] = useState<TafsirDetail | null>(null);
   const [loadingTafsir, setLoadingTafsir] = useState(false);
   const [resultCount, setResultCount] = useState(0);
@@ -92,15 +113,22 @@ export default function TafsirSearchScreen() {
   const englishEditions = TRANSLATION_EDITIONS.filter(e => e.language === 'en');
   const allModalEditions = [...TAFSIR_EDITIONS, ...englishEditions];
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestQueryRef = useRef('');
+  const surahLoadIdRef = useRef(0);
+  // Surah picker
+  const [showSurahPicker, setShowSurahPicker] = useState(false);
+  const [surahFilter, setSurahFilter] = useState('');
 
   const getEditionDisplayName = (ed: { name: string; nameEn?: string }) => {
     return searchLang === 'ar' ? ed.name : (ed.nameEn || ed.name);
   };
 
   const loadSurahTafsir = useCallback(async (surahNumber: number, edition: string) => {
+    const myLoadId = ++surahLoadIdRef.current;
     setLoadingSurah(true);
     try {
       const surah = await getCachedSurah(surahNumber);
+      if (myLoadId !== surahLoadIdRef.current) return; // stale
       if (!surah) { setLoadingSurah(false); return; }
 
       let tafsirTexts: string[] = [];
@@ -113,12 +141,15 @@ export default function TafsirSearchScreen() {
       } else {
         try {
           const result = await fetchSurahTranslation(surahNumber, edition);
+          if (myLoadId !== surahLoadIdRef.current) return; // stale
           tafsirTexts = result.ayahs.map((a: any) => a.text);
         } catch {
           tafsirTexts = surah.ayahs.map(() => t('tafsirSearch.loadError'));
           showOfflineModal();
         }
       }
+
+      if (myLoadId !== surahLoadIdRef.current) return;
 
       const ayahs = surah.ayahs.map((ayah, index) => ({
         numberInSurah: ayah.numberInSurah,
@@ -134,19 +165,21 @@ export default function TafsirSearchScreen() {
     } catch (error) {
       console.error('Error loading surah tafsir:', error);
     } finally {
-      setLoadingSurah(false);
+      if (myLoadId === surahLoadIdRef.current) setLoadingSurah(false);
     }
   }, []);
 
   const handleSearch = useCallback(async () => {
-    if (!query.trim() || query.trim().length < 2) return;
+    const myQuery = query.trim();
+    if (!myQuery || myQuery.length < 2) return;
+    latestQueryRef.current = myQuery;
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLoading(true);
     setHasSearched(true);
     setSurahTafsirResult(null);
 
-    // Check if query is a surah name
-    const surahNum = findSurahByName(query.trim(), searchLang);
+    // Check if query is a surah name (normalized match)
+    const surahNum = findSurahByName(myQuery, searchLang);
     if (surahNum) {
       setResults([]);
       setResultCount(0);
@@ -156,15 +189,17 @@ export default function TafsirSearchScreen() {
     }
 
     try {
-      const res = await searchQuran(query.trim(), editionForLang, 'all');
+      const res = await searchQuran(myQuery, editionForLang, 'all');
+      if (latestQueryRef.current !== myQuery) return; // stale
       setResults(res.matches || []);
       setResultCount(res.count || 0);
     } catch {
+      if (latestQueryRef.current !== myQuery) return;
       setResults([]);
       setResultCount(0);
       showOfflineModal();
     } finally {
-      setLoading(false);
+      if (latestQueryRef.current === myQuery) setLoading(false);
     }
   }, [query, editionForLang, searchLang, selectedEdition, loadSurahTafsir]);
 
@@ -299,7 +334,7 @@ export default function TafsirSearchScreen() {
     modalWrap: { flex: 1, backgroundColor: colors.background },
     modalHeader: {
       flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-      paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border,
+      paddingTop: insets.top + 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: colors.border,
     },
     modalTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '800', color: colors.text },
     closeBtn: { padding: 8, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)' },
@@ -358,20 +393,13 @@ export default function TafsirSearchScreen() {
             <TouchableOpacity style={s.searchBtn} onPress={handleSearch}>
               <Text style={s.searchBtnText}>{t('tafsirSearch.searchBtn')}</Text>
             </TouchableOpacity>
-          </View>
-          {/* Lang toggle */}
-          <View style={[s.langRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            {(['ar', 'en'] as const).map(lang => (
-              <TouchableOpacity
-                key={lang}
-                style={[s.langBtn, searchLang === lang && s.langBtnActive]}
-                onPress={() => setSearchLang(lang)}
-              >
-                <Text style={[s.langBtnText, searchLang === lang && s.langBtnTextActive]}>
-                  {lang === 'ar' ? t('tafsirSearch.arabicLang') : 'English'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            <TouchableOpacity
+              style={[s.searchBtn, { backgroundColor: '#0d8e62', paddingHorizontal: 14 }]}
+              onPress={() => { setSurahFilter(''); setShowSurahPicker(true); }}
+              accessibilityLabel={'اختر سورة'}
+            >
+              <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#fff" />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -522,6 +550,86 @@ export default function TafsirSearchScreen() {
             </ScrollView>
           )}
         </View>
+      </Modal>
+
+      {/* Surah Picker Modal */}
+      <Modal
+        visible={showSurahPicker}
+        animationType="slide"
+        onRequestClose={() => setShowSurahPicker(false)}
+      >
+        <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
+          <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            <TouchableOpacity style={s.closeBtn} onPress={() => setShowSurahPicker(false)}>
+              <MaterialCommunityIcons name="close" size={18} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={s.modalTitle}>{isRTL ? 'اختر سورة' : 'Pick Surah'}</Text>
+            <View style={{ width: 36 }} />
+          </View>
+          <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12 }}>
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', height: 50,
+              backgroundColor: colors.card, borderRadius: 14, borderWidth: 1,
+              borderColor: colors.border, paddingHorizontal: 14,
+            }}>
+              <MaterialCommunityIcons name="magnify" size={22} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} style={{ marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }} />
+              <TextInput
+                style={{ flex: 1, height: 50, fontSize: 16, color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', backgroundColor: 'transparent' }}
+                placeholder={searchLang === 'ar' ? 'ابحث عن سورة…' : 'Search surah…'}
+                placeholderTextColor={isDarkMode ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)'}
+                value={surahFilter}
+                onChangeText={setSurahFilter}
+                autoCorrect={false}
+                autoFocus
+              />
+              {surahFilter.length > 0 && (
+                <TouchableOpacity onPress={() => setSurahFilter('')} style={{ padding: 6 }}>
+                  <MaterialCommunityIcons name="close-circle" size={20} color={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+          <FlatList
+            data={(() => {
+              const all = Object.entries(SURAH_NAMES_AR).map(([num, name]) => ({ num: parseInt(num), nameAr: name, nameEn: (SURAH_NAMES_EN as any)[num] || '' }));
+              const q = surahFilter.trim();
+              if (!q) return all;
+              const nq = searchLang === 'ar' ? normalizeArabic(q) : q.toLowerCase();
+              return all.filter(it => {
+                const target = searchLang === 'ar' ? normalizeArabic(it.nameAr) : it.nameEn.toLowerCase();
+                return target.includes(nq) || String(it.num) === q;
+              });
+            })()}
+            keyExtractor={item => `picker_${item.num}`}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[s.resultCard, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)', borderColor: isDarkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)', paddingVertical: 14 }]}
+                onPress={() => {
+                  setShowSurahPicker(false);
+                  setResults([]);
+                  setResultCount(0);
+                  setHasSearched(true);
+                  loadSurahTafsir(item.num, selectedEdition);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={[s.surahBadge, { backgroundColor: colors.primary + '30', minWidth: 38, alignItems: 'center' }]}>
+                      <Text style={[s.surahBadgeText, { color: colors.primaryText }]}>{item.num}</Text>
+                    </View>
+                    <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{searchLang === 'ar' ? item.nameAr : item.nameEn}</Text>
+                  </View>
+                  {searchLang === 'en' ? (
+                    <Text style={{ fontSize: 15, color: colors.textLight }}>{item.nameAr}</Text>
+                  ) : null}
+                </View>
+              </TouchableOpacity>
+            )}
+            contentContainerStyle={{ paddingBottom: 40, paddingTop: 6 }}
+          />
+        </ScreenContainer>
       </Modal>
     </ScreenContainer>
   );

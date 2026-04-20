@@ -32,6 +32,7 @@ import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-fon
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const basmalaImg = require('@/assets/images/quran/basmala.png');
 
@@ -77,6 +78,7 @@ export function ShareableCard({
   const isRTL = useIsRTL();
   const { logoSource } = useAppIdentity();
   const { isPremium } = useSubscription();
+  const insets = useSafeAreaInsets();
   const viewShotRef = useRef<ViewShot>(null);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedBackground, setSelectedBackground] = useState(0);
@@ -238,6 +240,7 @@ export function ShareableCard({
           style={[
             styles.container,
             {
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
               backgroundColor: isDarkMode
                 ? 'rgba(30, 30, 32, 0.95)'
                 : 'rgba(255, 255, 255, 0.95)',
@@ -356,7 +359,6 @@ const styles = StyleSheet.create({
   container: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 34,
   },
   header: {
     flexDirection: 'row',

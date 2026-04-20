@@ -30,7 +30,10 @@ export type AdScreenKey =
   | 'ayat_universe'
   | 'hadith_sifat'
   | 'qibla'
-  | 'radio';
+  | 'radio'
+  | 'daily_dua'
+  | 'story_of_day'
+  | 'quote_of_day';
 
 // ==================== Test Ad IDs ====================
 
@@ -123,7 +126,7 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
   showBanners: true,
   showInterstitials: true,
   showAdOnAppOpen: true,
-  appOpenFrequency: 3,
+  appOpenFrequency: 1,
   bannerAdId: {
     android: PRODUCTION_AD_IDS.android.banner,
     ios: PRODUCTION_AD_IDS.ios.banner,
@@ -143,9 +146,9 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     tasbih: false,
     prayer: true,
     duas: false,
-    names: false,
-    ruqya: false,
-    hijri: false,
+    names: true,
+    ruqya: true,
+    hijri: true,
     surah: false,
     tafsir: false,
     khatma: false,
@@ -159,11 +162,14 @@ export const DEFAULT_ADS_CONFIG: AdsConfig = {
     hadith_sifat: true,
     qibla: true,
     radio: true,
+    daily_dua: true,
+    story_of_day: true,
+    quote_of_day: true,
   },
   showAdOnQiblaStyleChange: true,
-  interstitialMode: 'pages',
+  interstitialMode: 'time',
   interstitialFrequency: 8,
-  interstitialTimeInterval: 5,
+  interstitialTimeInterval: 10,
   interstitialSessionLimit: 2,
   delayFirstAd: true,
   firstAdDelay: 60,
@@ -370,7 +376,7 @@ export const getSlotsForScreen = (
 // Prevents ANY ad type from showing within 2 minutes of another ad
 
 let _globalLastAdTime = 0;
-const GLOBAL_AD_COOLDOWN = 300_000; // 5 minutes between any ad types (was 2 min)
+const GLOBAL_AD_COOLDOWN = 120_000; // 2 minutes between any ad types
 
 export function canShowGlobalAd(): boolean {
   return Date.now() - _globalLastAdTime >= GLOBAL_AD_COOLDOWN;

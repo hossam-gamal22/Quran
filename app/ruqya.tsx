@@ -557,7 +557,7 @@ export default function RuqyaScreen() {
         <View
           style={[
             styles.bottomBar,
-            { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border },
+            { flexDirection: isRTL ? 'row-reverse' : 'row', borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) },
           ]}
         >
           {Platform.OS === 'ios' && (

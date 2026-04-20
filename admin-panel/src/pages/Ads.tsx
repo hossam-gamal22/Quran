@@ -93,6 +93,9 @@ const SCREEN_LABELS: Record<string, string> = {
   hadith: 'أحاديث',
   ayat_universe: 'آيات كونية',
   hadith_sifat: 'أحاديث صفات',
+  daily_dua: 'دعاء اليوم',
+  story_of_day: 'قصة اليوم',
+  quote_of_day: 'حكمة اليوم',
 };
 
 const DEFAULT_SETTINGS: AdsSettings = {
@@ -122,9 +125,9 @@ const DEFAULT_SETTINGS: AdsSettings = {
     tasbih: false,
     prayer: false,
     duas: false,
-    names: false,
-    ruqya: false,
-    hijri: false,
+    names: true,
+    ruqya: true,
+    hijri: true,
     surah: false,
     tafsir: false,
     khatma: false,
@@ -136,6 +139,9 @@ const DEFAULT_SETTINGS: AdsSettings = {
     hadith: true,
     ayat_universe: true,
     hadith_sifat: true,
+    daily_dua: true,
+    story_of_day: true,
+    quote_of_day: true,
   },
   interstitialScreens: {},
   interstitialMode: 'pages',

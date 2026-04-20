@@ -61,6 +61,18 @@ import {
   FONT_SIZES,
 } from '../../constants/theme';
 
+// تنظيف النص العربي: إزالة التشكيل وتوحيد أشكال الحروف
+function normalizeArabic(s: string): string {
+  return s
+    .replace(/[\u064B-\u0652\u0670\u0640\u06D6-\u06ED]/g, '')
+    .replace(/[إأآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .trim();
+}
+
 // أرقام الصفحات لكل سورة
 const SURAH_PAGES: { [key: number]: number } = {
   1: 1, 2: 2, 3: 50, 4: 77, 5: 106, 6: 128, 7: 151, 8: 177, 9: 187,
@@ -407,12 +419,18 @@ export default function QuranScreen() {
   // فلترة السور حسب البحث
   const filteredSurahs = useMemo(() => {
     if (!searchQuery.trim()) return surahs;
-    const query = searchQuery.toLowerCase().trim();
+    const query = searchQuery.trim();
+    const normalizedQuery = normalizeArabic(query);
+    const queryLower = query.toLowerCase();
     return surahs.filter(
-      (surah: Surah) =>
-        surah.name.includes(query) ||
-        surah.englishName.toLowerCase().includes(query) ||
-        surah.number.toString() === query
+      (surah: Surah) => {
+        if (surah.number.toString() === query) return true;
+        if (surah.englishName.toLowerCase().includes(queryLower)) return true;
+        const normalizedName = normalizeArabic(surah.name);
+        const nameWithoutPrefix = normalizedName.replace(/^سوره\s*/, '');
+        return normalizedName.includes(normalizedQuery) ||
+          nameWithoutPrefix.includes(normalizedQuery);
+      }
     );
   }, [surahs, searchQuery]);
 
@@ -429,8 +447,10 @@ export default function QuranScreen() {
   const filteredJuz = useMemo(() => {
     if (!searchQuery.trim()) return JUZ_DATA;
     const query = searchQuery.trim();
+    const normalizedQuery = normalizeArabic(query);
     return JUZ_DATA.filter(
-      (j) => String(j.number) === query || j.name.includes(query)
+      (j) => String(j.number) === query ||
+        normalizeArabic(j.name).includes(normalizedQuery)
     );
   }, [searchQuery]);
 
@@ -1513,7 +1533,7 @@ const _styles = StyleSheet.create({
   // Surah List
   listContent: {
     paddingHorizontal: Spacing.lg,
-    paddingBottom: 120,
+    paddingBottom: 160,
     gap: 8,
   },
   surahItem: {

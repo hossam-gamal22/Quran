@@ -30,8 +30,10 @@ import { switchAppIcon } from '@/lib/app-icon-manager';
 import {
   applyCountryPrayerDefaults,
   getCountryPrayerDefaultsOrFallback,
+  COUNTRY_DEFAULTS,
 } from '@/lib/country-prayer-defaults';
 import { detectUserCountry, getUserCountry } from '@/services/hijriCalendarService';
+import { calculationMethods } from '@/lib/prayer-times';
 
 // ========================================
 // Eager theme cache — read previous session's theme/background at module load
@@ -75,7 +77,7 @@ export function getCachedThemeSnapshot(): ThemeCacheSnapshot | null {
 export type { Language } from '@/constants/translations';
 export type ThemeMode = 'light' | 'dark' | 'system' | 'custom';
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge';
-export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 99;
+export type CalculationMethod = 0 | 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 99;
 
 export type NotificationSoundType = 'default' | 'salawat' | 'istighfar' | 'tasbih' | 'subhanallah' | 'alhamdulillah' | 'general_reminder' | 'silent';
 
@@ -306,7 +308,7 @@ const defaultNotifications: NotificationSettings = {
   eveningAzkar: true,
   eveningAzkarTime: '17:45',
   dailyVerse: true,
-  dailyVerseTime: '13:00',
+  dailyVerseTime: '13:30',
   dailyHadith: false,
   khatmaReminder: true,
   sound: true,
@@ -316,7 +318,7 @@ const defaultNotifications: NotificationSettings = {
   // Worship tracking notifications
   worshipPrayerLogging: true,
   worshipDailySummary: true,
-  worshipDailySummaryTime: '21:30',
+  worshipDailySummaryTime: '23:00',
   worshipStreakAlerts: true,
   worshipWeeklyReport: true,
   worshipWeeklyReportTime: '21:00',
@@ -325,7 +327,7 @@ const defaultNotifications: NotificationSettings = {
   worshipQuietHoursEnd: '06:00',
   // Quran reading reminder
   quranReadingReminder: true,
-  quranReadingReminderTime: '15:00',
+  quranReadingReminderTime: '19:00',
   quranReminderDays: [0, 1, 2, 3, 4, 5, 6],
   quranReminder24Hour: true,
   quranReminderSoundType: 'default',
@@ -340,7 +342,7 @@ const defaultNotifications: NotificationSettings = {
   sleepAzkar: true,
   sleepAzkarTime: '22:00',
   wakeupAzkar: true,
-  wakeupAzkarTime: '05:30',
+  wakeupAzkarTime: '10:00',
   // Retired: superseded by "هل صليت؟" (did_you_pray) reminder.
   afterPrayerAzkar: false,
   // Friday Surah Al-Kahf reminder
@@ -420,7 +422,7 @@ const STORAGE_KEY = 'app_settings';
 // Bump this version whenever default notification times change.
 // On app update, existing users will get their notification times
 // reset to the new defaults (toggles/booleans are preserved).
-const NOTIFICATION_DEFAULTS_VERSION = 6;
+const NOTIFICATION_DEFAULTS_VERSION = 9;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
@@ -569,6 +571,22 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             for (const key of timeKeys) {
               (loadedSettings.notifications as any)[key] = (defaultNotifications as any)[key];
             }
+            // Also clear multi-time arrays so UI picks up the new single-time defaults
+            const multiTimeKeys = [
+              'morningAzkarTimes', 'eveningAzkarTimes', 'sleepAzkarTimes', 'wakeupAzkarTimes',
+              'dailyVerseTimes', 'salawatReminderTimes', 'istighfarReminderTimes',
+              'tasbihReminderTimes', 'customReminderTimes', 'quranReadingReminderTimes',
+            ] as const;
+            for (const key of multiTimeKeys) {
+              delete (loadedSettings.notifications as any)[key];
+            }
+            // Mark all categories as user-customized so Firestore admin defaults
+            // don't override the freshly migrated times on next sync.
+            loadedSettings.notifications.notifOverrides = {
+              morningAzkar: true, eveningAzkar: true, sleepAzkar: true, wakeupAzkar: true,
+              dailyVerse: true, quranReading: true, salawat: true, tasbih: true,
+              istighfar: true, customReminder: true, kahfFriday: true,
+            };
             // Enable newly-defaulted-on categories
             loadedSettings.notifications.istighfarReminder = true;
             loadedSettings.notifications.tasbihReminder = true;
@@ -704,18 +722,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   // ========================================
   // Country-based prayer method reconciliation
-  // Runs once after settings load. If the user hasn't manually picked a method
-  // (methodManuallySet !== true), apply the calculation method + Asr school
-  // that matches the device's stored/GPS country. This is the single source of
-  // truth — prayer.tsx and onboarding no longer duplicate this logic.
+  // Runs once after settings load.
+  // Case A: methodManuallySet !== true → auto-update silently
+  // Case B: methodManuallySet === true AND method mismatches GPS country
+  //         → show Alert warning the user about potential discrepancy
   // ========================================
   const hasReconciledCountryRef = React.useRef(false);
   useEffect(() => {
     if (isLoading) return;
     if (hasReconciledCountryRef.current) return;
     hasReconciledCountryRef.current = true;
-
-    if (settings.prayer.methodManuallySet === true) return;
 
     (async () => {
       try {
@@ -725,7 +741,12 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const { method, asrSchool } = countryDefaults;
         const currentMethod = settings.prayer.calculationMethod;
         const currentAsr = settings.prayer.asrJuristic;
-        if (method !== currentMethod || asrSchool !== currentAsr) {
+
+        // No mismatch — nothing to do
+        if (method === currentMethod && asrSchool === currentAsr) return;
+
+        // Case A: User never manually set method → auto-update silently
+        if (settings.prayer.methodManuallySet !== true) {
           console.log(
             `🌍 Country default prayer method for ${countryCode}: ${currentMethod}→${method}, asr ${currentAsr}→${asrSchool}`,
           );
@@ -733,7 +754,61 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             calculationMethod: method as CalculationMethod,
             asrJuristic: asrSchool,
           });
+          return;
         }
+
+        // Case B: User manually set method but it doesn't match their GPS country
+        // Check if user already dismissed this warning for this specific country
+        const dismissKey = `@prayer_mismatch_dismissed:${countryCode}`;
+        const dismissed = await AsyncStorage.getItem(dismissKey);
+        if (dismissed === 'true') return;
+
+        // Get display names
+        const countryData = COUNTRY_DEFAULTS[countryCode.toUpperCase()];
+        const countryName = countryData?.cityNameAr
+          ? countryCode.toUpperCase()
+          : countryCode;
+        const correctMethodInfo = calculationMethods[method as CalculationMethod];
+        const currentMethodInfo = calculationMethods[currentMethod];
+        const correctName = correctMethodInfo?.nameAr || correctMethodInfo?.name || `${method}`;
+        const currentName = currentMethodInfo?.nameAr || currentMethodInfo?.name || `${currentMethod}`;
+
+        // Show Alert warning
+        Alert.alert(
+          translate('prayer.methodMismatchTitle'),
+          translate('prayer.methodMismatchMessage')
+            .replace('{country}', countryName)
+            .replace('{correctMethod}', correctName)
+            .replace('{currentMethod}', currentName),
+          [
+            {
+              text: translate('prayer.methodMismatchUpdate'),
+              style: 'default',
+              onPress: async () => {
+                await updatePrayer({
+                  calculationMethod: method as CalculationMethod,
+                  asrJuristic: asrSchool,
+                  methodManuallySet: false,
+                });
+                // Clear any previous dismissal for other countries
+                try {
+                  const keys = await AsyncStorage.getAllKeys();
+                  const mismatchKeys = keys.filter(k => k.startsWith('@prayer_mismatch_dismissed:'));
+                  if (mismatchKeys.length > 0) await AsyncStorage.multiRemove(mismatchKeys);
+                } catch {}
+              },
+            },
+            {
+              text: translate('prayer.methodMismatchKeep'),
+              style: 'cancel',
+              onPress: async () => {
+                try {
+                  await AsyncStorage.setItem(dismissKey, 'true');
+                } catch {}
+              },
+            },
+          ],
+        );
       } catch (e) {
         console.warn('Country prayer reconciliation failed:', e);
       }
@@ -962,6 +1037,15 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         await saveLocal(localSettings);
       } catch (e) {
         console.warn('Failed to sync prayer settings:', e);
+      }
+      // Force-reschedule notifications so they use the updated prayer times
+      try {
+        const { forceRescheduleAllFromStorage } = require('@/lib/notifications-manager');
+        forceRescheduleAllFromStorage().catch((e: any) =>
+          console.warn('[updatePrayer] force-reschedule failed:', e)
+        );
+      } catch (e) {
+        console.warn('[updatePrayer] Could not trigger notification reschedule:', e);
       }
     }
   }, [settings]);

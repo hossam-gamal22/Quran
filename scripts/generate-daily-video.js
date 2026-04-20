@@ -183,8 +183,10 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
   const maxTextWidth = W - 120; // 60px padding each side
 
   if (qcfFamily && glyphText) {
-    // QCF Mushaf calligraphy — larger for video
-    const qcfFontSize = 72;
+    // QCF Mushaf calligraphy — scale font for long ayahs
+    const glyphCount = glyphText.length;
+    const qcfFontSize = glyphCount > 60 ? 48 : glyphCount > 40 ? 56 : glyphCount > 25 ? 64 : 72;
+    const lineHeight = glyphCount > 60 ? 90 : glyphCount > 40 ? 100 : glyphCount > 25 ? 115 : 130;
     ctx.font = `${qcfFontSize}px "${qcfFamily}"`;
     ctx.direction = 'rtl';
 
@@ -204,7 +206,6 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     }
     if (currentLine) lines.push(currentLine);
 
-    const lineHeight = 130;
     const totalHeight = lines.length * lineHeight;
     const startY = verseY - totalHeight / 2 + lineHeight / 2;
 
@@ -212,8 +213,10 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
       ctx.fillText(lines[i], centerX, startY + i * lineHeight);
     }
   } else {
-    // Fallback: Amiri font with ﴿ ﴾ brackets — larger for video
-    const fontSize = 68;
+    // Fallback: Amiri font with ﴿ ﴾ brackets — scale for long ayahs
+    const textLen = (ayah.text || '').length;
+    const fontSize = textLen > 500 ? 40 : textLen > 300 ? 48 : textLen > 150 ? 56 : 68;
+    const lineHeight = textLen > 500 ? 72 : textLen > 300 ? 86 : textLen > 150 ? 100 : 120;
     ctx.font = `${fontSize}px "Amiri"`;
     ctx.direction = 'rtl';
 
@@ -234,7 +237,6 @@ async function generateOverlayPNG(ayah, tmpDir, showBranding) {
     }
     if (currentLine) lines.push(currentLine);
 
-    const lineHeight = 120;
     const totalHeight = lines.length * lineHeight;
     const startY = verseY - totalHeight / 2 + lineHeight / 2;
 

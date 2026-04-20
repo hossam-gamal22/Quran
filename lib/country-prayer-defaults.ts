@@ -49,6 +49,13 @@ function getAdhanCalcParams(methodId: number) {
     case 14: return AdhanCalcMethod.MuslimWorldLeague(); // Russia ≈ MWL
     case 15: return AdhanCalcMethod.MoonsightingCommittee();
     case 16: return AdhanCalcMethod.Dubai();
+    case 17: return AdhanCalcMethod.Singapore();         // JAKIM ≈ Singapore
+    case 18: return AdhanCalcMethod.MuslimWorldLeague(); // Tunisia ≈ MWL
+    case 19: return AdhanCalcMethod.MuslimWorldLeague(); // Algeria ≈ MWL
+    case 20: return AdhanCalcMethod.Singapore();         // KEMENAG ≈ Singapore
+    case 21: return AdhanCalcMethod.MuslimWorldLeague(); // Morocco ≈ MWL
+    case 22: return AdhanCalcMethod.MuslimWorldLeague(); // Lisboa ≈ MWL
+    case 23: return AdhanCalcMethod.MuslimWorldLeague(); // Jordan ≈ MWL
     default: return AdhanCalcMethod.MuslimWorldLeague();
   }
 }
@@ -66,7 +73,7 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
 
   // Egypt & Levant
   EG: { lat: 30.0444, lng: 31.2357, cityNameAr: 'القاهرة', cityNameEn: 'Cairo', method: 5, asrSchool: 0 },
-  JO: { lat: 31.9454, lng: 35.9284, cityNameAr: 'عمّان', cityNameEn: 'Amman', method: 3, asrSchool: 0 },
+  JO: { lat: 31.9454, lng: 35.9284, cityNameAr: 'عمّان', cityNameEn: 'Amman', method: 23, asrSchool: 0 },
   PS: { lat: 31.9038, lng: 35.2034, cityNameAr: 'القدس', cityNameEn: 'Jerusalem', method: 3, asrSchool: 0 },
   SY: { lat: 33.5138, lng: 36.2765, cityNameAr: 'دمشق', cityNameEn: 'Damascus', method: 3, asrSchool: 0 },
   IQ: { lat: 33.3128, lng: 44.3615, cityNameAr: 'بغداد', cityNameEn: 'Baghdad', method: 3, asrSchool: 0 },
@@ -75,9 +82,9 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   SD: { lat: 15.5007, lng: 32.5599, cityNameAr: 'الخرطوم', cityNameEn: 'Khartoum', method: 5, asrSchool: 0 },
 
   // North Africa
-  MA: { lat: 34.0209, lng: -6.8416, cityNameAr: 'الرباط', cityNameEn: 'Rabat', method: 3, asrSchool: 0 },
-  DZ: { lat: 36.7538, lng: 3.0588, cityNameAr: 'الجزائر', cityNameEn: 'Algiers', method: 3, asrSchool: 0 },
-  TN: { lat: 36.8065, lng: 10.1815, cityNameAr: 'تونس', cityNameEn: 'Tunis', method: 3, asrSchool: 0 },
+  MA: { lat: 34.0209, lng: -6.8416, cityNameAr: 'الرباط', cityNameEn: 'Rabat', method: 21, asrSchool: 0 },
+  DZ: { lat: 36.7538, lng: 3.0588, cityNameAr: 'الجزائر', cityNameEn: 'Algiers', method: 19, asrSchool: 0 },
+  TN: { lat: 36.8065, lng: 10.1815, cityNameAr: 'تونس', cityNameEn: 'Tunis', method: 18, asrSchool: 0 },
 
   // South Asia
   PK: { lat: 33.6844, lng: 73.0479, cityNameAr: 'إسلام أباد', cityNameEn: 'Islamabad', method: 1, asrSchool: 1 },
@@ -85,8 +92,8 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   BD: { lat: 23.8103, lng: 90.4125, cityNameAr: 'دكا', cityNameEn: 'Dhaka', method: 1, asrSchool: 1 },
 
   // Southeast Asia
-  ID: { lat: -6.2088, lng: 106.8456, cityNameAr: 'جاكرتا', cityNameEn: 'Jakarta', method: 11, asrSchool: 0 },
-  MY: { lat: 3.1390, lng: 101.6869, cityNameAr: 'كوالالمبور', cityNameEn: 'Kuala Lumpur', method: 11, asrSchool: 0 },
+  ID: { lat: -6.2088, lng: 106.8456, cityNameAr: 'جاكرتا', cityNameEn: 'Jakarta', method: 20, asrSchool: 0 },
+  MY: { lat: 3.1390, lng: 101.6869, cityNameAr: 'كوالالمبور', cityNameEn: 'Kuala Lumpur', method: 17, asrSchool: 0 },
   SG: { lat: 1.3521, lng: 103.8198, cityNameAr: 'سنغافورة', cityNameEn: 'Singapore', method: 11, asrSchool: 0 },
 
   // Turkey & Balkans

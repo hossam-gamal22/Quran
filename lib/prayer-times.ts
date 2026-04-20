@@ -110,6 +110,13 @@ export type CalculationMethod =
   | 14 // Spiritual Administration of Muslims of Russia
   | 15 // Moonsighting Committee Worldwide
   | 16 // Dubai
+  | 17 // JAKIM, Malaysia
+  | 18 // Tunisia
+  | 19 // Algeria
+  | 20 // KEMENAG, Indonesia
+  | 21 // Morocco
+  | 22 // Comunidade Islâmica de Lisboa
+  | 23 // Ministry of Awqaf, Jordan
   | 99; // Custom
 
 export type AsrJuristic = 0 | 1; // 0 = Shafi, 1 = Hanafi
@@ -135,6 +142,13 @@ export const calculationMethods: Record<CalculationMethod, { name: string; nameA
   14: { name: 'Spiritual Administration of Muslims of Russia', nameAr: 'الإدارة الدينية لمسلمي روسيا' },
   15: { name: 'Moonsighting Committee Worldwide', nameAr: 'لجنة رؤية الهلال العالمية' },
   16: { name: 'Dubai', nameAr: 'دبي' },
+  17: { name: 'JAKIM, Malaysia', nameAr: 'دائرة الشؤون الإسلامية الماليزية — JAKIM' },
+  18: { name: 'Tunisia', nameAr: 'تونس — وزارة الشؤون الدينية' },
+  19: { name: 'Algeria', nameAr: 'الجزائر — وزارة الشؤون الدينية' },
+  20: { name: 'KEMENAG, Indonesia', nameAr: 'إندونيسيا — وزارة الشؤون الدينية' },
+  21: { name: 'Morocco', nameAr: 'المغرب — وزارة الأوقاف' },
+  22: { name: 'Comunidade Islâmica de Lisboa', nameAr: 'الجالية الإسلامية بلشبونة' },
+  23: { name: 'Ministry of Awqaf, Jordan', nameAr: 'الأردن — وزارة الأوقاف' },
   99: { name: 'Custom', nameAr: 'مخصص' },
 };
 

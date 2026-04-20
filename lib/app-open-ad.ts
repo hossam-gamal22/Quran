@@ -2,6 +2,7 @@
 // App Open Ad — يعرض إعلان عند رجوع المستخدم للتطبيق
 
 import { AppState, AppStateStatus, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchAdsConfig, getAdUnitId } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 
@@ -73,6 +74,12 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {
     return false;
   }
+
+  // Skip during onboarding
+  try {
+    const onboardingFlag = await AsyncStorage.getItem('onboarding_complete');
+    if (onboardingFlag !== 'true') return false;
+  } catch {}
 
   // Skip if user is inside a sacred context (reading Quran, praying, etc.).
   try {

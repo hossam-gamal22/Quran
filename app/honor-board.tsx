@@ -128,6 +128,14 @@ export default function HonorBoard() {
           merged[key] = worshipCount;
         }
 
+        // Add merge bonus from admin merge (preserves merged user's points)
+        const mergeBonus = info?.mergeBonus;
+        if (mergeBonus?.activities) {
+          for (const [key, bonusCount] of Object.entries(mergeBonus.activities)) {
+            merged[key] = (merged[key] || 0) + (bonusCount as number);
+          }
+        }
+
         // Recalculate score from merged activities
         const weights = rewardsConfig.scoreWeights || DEFAULT_WEIGHTS;
         let totalScore = 0;

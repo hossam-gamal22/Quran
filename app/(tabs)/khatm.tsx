@@ -24,6 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { Platform, StyleSheet as RNStyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
 
@@ -49,6 +50,7 @@ export default function KhatmScreen() {
   const { isDarkMode } = useSettings();
   const isRTL = useIsRTL();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [stats, setStats] = useState<KhatmStats | null>(null);
   const [allKhatm, setAllKhatm] = useState<KhatmRecord[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -170,7 +172,7 @@ export default function KhatmScreen() {
     deleteBtn: { padding: 6 },
     // Modal
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16 },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
     modalTitle: { fontSize: 18, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', marginBottom: 16 },
     input: {

@@ -709,6 +709,7 @@ const _styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.md,
+    paddingBottom: 80,
   },
 
   // ---- Month navigation ----

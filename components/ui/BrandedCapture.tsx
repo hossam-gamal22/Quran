@@ -13,11 +13,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { APP_BACKGROUNDS, BACKGROUND_SOURCE_MAP } from '@/lib/backgrounds';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { IslamicPatternOverlay } from '@/components/ui/IslamicPattern';
 
 export type ImageSizeKey = 'portrait' | 'story';
 
@@ -69,6 +71,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
     const { isDarkMode, t } = useSettings();
     const { logoSource } = useAppIdentity();
     const isRTL = useIsRTL();
+    const insets = useSafeAreaInsets();
 
     const availableSizes = storyOnly ? IMAGE_SIZE_OPTIONS.filter(o => o.key === 'story') : IMAGE_SIZE_OPTIONS;
     const [selectedSize, setSelectedSize] = useState<ImageSizeKey>(storyOnly ? 'story' : 'portrait');
@@ -177,15 +180,15 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
       setCapturing(true);
       try {
         const uri = await doCapture(selectedSize);
-        setShowPicker(false);
-        await new Promise(r => setTimeout(r, Platform.OS === 'ios' ? 600 : 400));
         if (onCapture) {
+          setShowPicker(false);
           onCapture(uri);
         } else {
           const canShare = await Sharing.isAvailableAsync();
           if (canShare) {
             await Sharing.shareAsync(uri, { mimeType: 'image/png' });
           }
+          setShowPicker(false);
         }
       } catch (e) {
         console.warn('Share failed:', e);
@@ -195,7 +198,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
     };
 
     const LOGO_SIZES: Record<ImageSizeKey, number> = {
-      portrait: 100,
+      portrait: 56,
       story: 200,
     };
     const logoSize = LOGO_SIZES[selectedSize];
@@ -207,9 +210,9 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
         <View style={{
           flex: 1,
           width: '100%',
-          paddingHorizontal: 20,
-          paddingTop: 24,
-          paddingBottom: 32,
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 16,
           justifyContent: 'center',
           alignItems: 'center',
         }}>
@@ -238,6 +241,10 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
 
     const renderWithBg = (inner: React.ReactNode, style?: object) => {
       const baseStyle = [styles.captureWrapper, { height: captureH }, style];
+      const isWhiteSolid = bgType === 'solid' && solidColor === '#FAFAFA';
+      const patternStroke = isWhiteSolid ? '#091E12' : '#C9A844';
+      const patternBg = isWhiteSolid ? '#FAFAFA' : '#091E12';
+
       if (bgType === 'gradient') {
         const grad = SHARE_BG_GRADIENTS.find(g => g.id === gradientId);
         return (
@@ -247,6 +254,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
+            <IslamicPatternOverlay w={CAPTURE_WIDTH} h={captureH} showGlow={false} />
             {inner}
           </LinearGradient>
         );
@@ -282,6 +290,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
       }
       return (
         <View style={[...baseStyle, { backgroundColor: solidColor } as any]}>
+          <IslamicPatternOverlay w={CAPTURE_WIDTH} h={captureH} strokeColor={patternStroke} bgColor={patternBg} showGlow={false} />
           {inner}
         </View>
       );
@@ -309,7 +318,7 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
               activeOpacity={1}
               onPress={() => !capturing && setShowPicker(false)}
             />
-            <View style={[styles.sheet, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }]}>
+            <View style={[styles.sheet, { backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF', paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
               <View style={styles.dragHandle} />
               <Text style={[styles.sheetTitle, { color: colors.text }]}>
                 {t('common.shareImage')}
@@ -556,7 +565,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     alignItems: 'center',
   },
   dragHandle: {

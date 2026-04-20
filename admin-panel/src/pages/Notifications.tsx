@@ -149,7 +149,7 @@ const ALL_NOTIFICATION_TYPES = [
     titleAr: 'نور صباحك بالذكر 🌅', bodyAr: 'حان الآن وقت أذكار الصباح.. حصن يومك بذكر الله.',
     titleEn: 'Morning Wird', bodyEn: 'Time for morning adhkar — start your day with Allah.',
     hasScheduling: true, firestoreCategory: 'morningAzkar' },
-  { id: 'evening', category: 'azkar', name: 'أذكار المساء', emoji: '🌙', time: '17:00',
+  { id: 'evening', category: 'azkar', name: 'أذكار المساء', emoji: '🌙', time: '17:45',
     titleAr: 'هدوء المساء بذكر الله 🌙', bodyAr: 'وقت أذكار المساء.. اطمئن بذكر خالقك قبل غروب يومك.',
     titleEn: 'Evening Wird', bodyEn: 'Time for evening adhkar — find peace before sunset.',
     hasScheduling: true, firestoreCategory: 'eveningAzkar' },
@@ -157,7 +157,7 @@ const ALL_NOTIFICATION_TYPES = [
     titleAr: 'في أمان الله 😴', bodyAr: 'لا تنسَ أذكار النوم.. لتنم في حفظ الله ورعايته.',
     titleEn: 'Sleep Azkar', bodyEn: 'Don\'t forget sleep adhkar — sleep under Allah\'s protection.',
     hasScheduling: true, firestoreCategory: 'sleepAzkar' },
-  { id: 'wakeup', category: 'azkar', name: 'أذكار الاستيقاظ', emoji: '☀️', time: '05:30',
+  { id: 'wakeup', category: 'azkar', name: 'أذكار الاستيقاظ', emoji: '☀️', time: '10:00',
     titleAr: 'الحمد لله الذي أحيانا ☀️', bodyAr: 'أذكار الاستيقاظ.. ابدأ يومك بالحمد لتنال البركة.',
     titleEn: 'Wakeup Azkar', bodyEn: 'Start your day with praise and gratitude.',
     hasScheduling: true, firestoreCategory: 'wakeupAzkar' },
@@ -191,33 +191,33 @@ const ALL_NOTIFICATION_TYPES = [
     titleEn: 'Isha Prayer', bodyEn: 'Time for Isha prayer — end your day in peace.',
     hasScheduling: false, note: 'يتم جدولتها تلقائياً حسب مواقيت الصلاة' },
   // --- 📖 القرآن ---
-  { id: 'daily_ayah', category: 'quran', name: 'آية اليوم', emoji: '📖', time: '08:00',
+  { id: 'daily_ayah', category: 'quran', name: 'آية اليوم', emoji: '📖', time: '13:30',
     titleAr: 'رسالة الله إليك اليوم 📖', bodyAr: '(يتم إضافة نص الآية تلقائياً)',
     titleEn: 'Verse of the Day', bodyEn: '(Verse text added automatically)',
     hasScheduling: true, firestoreCategory: 'dailyAyah', note: 'نص الآية يُضاف تلقائياً أسفل العنوان' },
-  { id: 'friday', category: 'quran', name: 'سورة الكهف', emoji: '🕯️', time: '10:00',
+  { id: 'friday', category: 'quran', name: 'سورة الكهف', emoji: '🕯️', time: '14:00',
     titleAr: 'نورٌ ما بين الجمعتين 🕯️', bodyAr: 'لا تنسَ قراءة سورة الكهف اليوم.. نورٌ وبركة ليومك.',
     titleEn: 'Friday — Surah Al-Kahf', bodyEn: 'Don\'t forget to read Surah Al-Kahf today.',
     hasScheduling: true, firestoreCategory: 'kahfFriday' },
-  { id: 'quran', category: 'quran', name: 'ورد القرآن', emoji: '📚', time: '20:00',
+  { id: 'quran', category: 'quran', name: 'ورد القرآن', emoji: '📚', time: '19:00',
     titleAr: 'وقت وردك القرآني 📖', bodyAr: 'القليل الدائم خيرٌ من الكثير المنقطع.. ابدأ وردك الآن.',
     titleEn: 'Quran Reading', bodyEn: 'Time for your daily Quran reading.',
     hasScheduling: true, firestoreCategory: 'quranReading' },
   // --- 🤲 تسبيح وصلاة ---
-  { id: 'salawat', category: 'dhikr', name: 'الصلاة على النبي', emoji: '💚', time: '09:00',
+  { id: 'salawat', category: 'dhikr', name: 'الصلاة على النبي', emoji: '💚', time: '17:00',
     titleAr: 'صلِّ على الحبيب ﷺ 💚', bodyAr: '"إن الله وملائكته يصلون على النبي".. عطر لسانك الآن.',
     titleEn: 'Salawat', bodyEn: 'Time to send blessings upon the Prophet ﷺ.',
     hasScheduling: true, firestoreCategory: 'salawat' },
-  { id: 'tasbih', category: 'dhikr', name: 'التسبيح', emoji: '📿', time: '15:00',
+  { id: 'tasbih', category: 'dhikr', name: 'التسبيح', emoji: '📿', time: '21:00',
     titleAr: 'سبّح ليرتاح قلبك 📿', bodyAr: '"سبحان الله وبحمده".. غراس الجنة تناديك.',
     titleEn: 'Tasbih Reminder', bodyEn: 'SubhanAllah wa bihamdihi — seeds of Paradise await.',
     hasScheduling: true, firestoreCategory: 'tasbih' },
-  { id: 'istighfar', category: 'dhikr', name: 'الاستغفار', emoji: '🤲', time: '12:00',
+  { id: 'istighfar', category: 'dhikr', name: 'الاستغفار', emoji: '🤲', time: '19:00',
     titleAr: 'استغفر.. يفتح الله لك الأبواب ✨', bodyAr: 'أستغفر الله العظيم وأتوب إليه.. طهّر صحيفتك الآن.',
     titleEn: 'Istighfar', bodyEn: 'Astaghfirullah — purify your record now.',
     hasScheduling: true, firestoreCategory: 'istighfar' },
   // --- 📊 العبادات ---
-  { id: 'worship_daily', category: 'worship', name: 'ملخص العبادات اليومي', emoji: '📊', time: '22:00',
+  { id: 'worship_daily', category: 'worship', name: 'ملخص العبادات اليومي', emoji: '📊', time: '23:00',
     titleAr: 'إنجازك الروحاني اليوم 📊', bodyAr: 'راجع جدول عباداتك اليوم.. خطوة بخطوة نحو الجنة.',
     titleEn: 'Daily Worship Summary', bodyEn: 'Review your daily worship — step by step to Jannah.',
     hasScheduling: false, note: 'يظهر يومياً في الوقت المحدد من المستخدم' },
@@ -707,7 +707,7 @@ const NotificationsPage: React.FC = () => {
   const saveRemindersToFirestore = async (updatedReminders: ScheduledReminder[]) => {
     setReminderSaving(true);
     try {
-      const updates: Record<string, { enabled: boolean; times: string[]; days: number[] }> = {};
+      const updates: Record<string, any> = {};
       for (const reminder of updatedReminders) {
         const categoryKey = REMINDER_TO_CATEGORY[reminder.id];
         if (!categoryKey) continue;
@@ -718,8 +718,12 @@ const NotificationsPage: React.FC = () => {
           days: reminder.repeatDays,
         };
       }
+      // Bump configVersion so the app knows to clear user overrides and apply new defaults
+      const currentDoc = await getDoc(doc(db, 'appConfig', 'notificationDefaults'));
+      const currentVersion = currentDoc.exists() ? (currentDoc.data()?.configVersion ?? 0) : 0;
+      updates.configVersion = currentVersion + 1;
       await setDoc(doc(db, 'appConfig', 'notificationDefaults'), updates, { merge: true });
-      console.log('✅ Reminder settings saved to Firestore');
+      console.log(`✅ Reminder settings saved to Firestore (configVersion: ${updates.configVersion})`);
     } catch (err) {
       console.error('❌ Error saving reminder settings:', err);
     } finally {

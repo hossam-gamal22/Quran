@@ -11,9 +11,28 @@ export const GITHUB_BASE =
   'https://raw.githubusercontent.com/hossam-gamal22/Quran/main/assets/sounds/azkar_authentic/';
 const DOWNLOAD_COMPLETE_KEY = '@azkar_audio_download_complete';
 const DOWNLOAD_PROGRESS_KEY = '@azkar_audio_download_progress';
+const CACHE_VERSION_KEY = '@azkar_audio_cache_version';
+const CURRENT_CACHE_VERSION = '2'; // Bump when audio files change on CDN
 
 // In-memory set of files known to be cached (avoids repeated filesystem reads)
 let _cachedSet: Set<string> | null = null;
+
+/**
+ * Clears cached audio if the CDN files have been updated (version mismatch).
+ * Call once at app startup before any audio playback.
+ */
+export async function invalidateAzkarCacheIfNeeded(): Promise<void> {
+  try {
+    const stored = await AsyncStorage.getItem(CACHE_VERSION_KEY);
+    if (stored !== CURRENT_CACHE_VERSION) {
+      console.log('[azkar-cache] Cache version mismatch — clearing old audio cache');
+      await clearAzkarCache();
+      await AsyncStorage.setItem(CACHE_VERSION_KEY, CURRENT_CACHE_VERSION);
+    }
+  } catch (e) {
+    console.warn('[azkar-cache] Cache version check failed:', e);
+  }
+}
 
 function getRemoteUrl(filename: string): string {
   return `${GITHUB_BASE}${encodeURIComponent(filename)}`;

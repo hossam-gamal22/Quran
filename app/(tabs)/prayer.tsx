@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { NativeTabs } from '../../components/ui/NativeTabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -46,8 +46,9 @@ import {
   formatPrayerTime,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
-import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
-import { setUserCountry } from '@/services/hijriCalendarService';
+import { applyCountryPrayerDefaults, COUNTRY_DEFAULTS } from '@/lib/country-prayer-defaults';
+import { setUserCountry, getUserCountry } from '@/services/hijriCalendarService';
+import { calculationMethods } from '@/lib/prayer-times';
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -105,10 +106,24 @@ const getPrayerMethods = (t: (key: string) => string): { value: CalculationMetho
   { value: 2, label: t('prayer.methodIsna'), subtitle: t('prayer.methodIsnaDesc') },
   { value: 5, label: t('prayer.methodEgyptian'), subtitle: t('prayer.methodEgyptianDesc') },
   { value: 1, label: t('prayer.methodKarachi'), subtitle: t('prayer.methodKarachiDesc') },
+  { value: 7, label: t('prayer.methodTehran'), subtitle: t('prayer.methodTehranDesc') },
+  { value: 0, label: t('prayer.methodOmdurman'), subtitle: t('prayer.methodOmdurmanDesc') },
   { value: 8, label: t('prayer.methodGulf'), subtitle: t('prayer.methodGulfDesc') },
   { value: 9, label: t('prayer.methodKuwait'), subtitle: t('prayer.methodKuwaitDesc') },
+  { value: 10, label: t('prayer.methodQatar'), subtitle: t('prayer.methodQatarDesc') },
+  { value: 11, label: t('prayer.methodSingapore'), subtitle: t('prayer.methodSingaporeDesc') },
+  { value: 12, label: t('prayer.methodFrance'), subtitle: t('prayer.methodFranceDesc') },
   { value: 13, label: t('prayer.methodTurkey'), subtitle: t('prayer.methodTurkeyDesc') },
-  { value: 15, label: t('prayer.methodMalaysia'), subtitle: t('prayer.methodMalaysiaDesc') },
+  { value: 14, label: t('prayer.methodRussia'), subtitle: t('prayer.methodRussiaDesc') },
+  { value: 15, label: t('prayer.methodMoonsighting'), subtitle: t('prayer.methodMoonsightingDesc') },
+  { value: 16, label: t('prayer.methodDubai'), subtitle: t('prayer.methodDubaiDesc') },
+  { value: 17, label: t('prayer.methodJakim'), subtitle: t('prayer.methodJakimDesc') },
+  { value: 18, label: t('prayer.methodTunisia'), subtitle: t('prayer.methodTunisiaDesc') },
+  { value: 19, label: t('prayer.methodAlgeria'), subtitle: t('prayer.methodAlgeriaDesc') },
+  { value: 20, label: t('prayer.methodKemenag'), subtitle: t('prayer.methodKemenagDesc') },
+  { value: 21, label: t('prayer.methodMorocco'), subtitle: t('prayer.methodMoroccoDesc') },
+  { value: 22, label: t('prayer.methodLisboa'), subtitle: t('prayer.methodLisboaDesc') },
+  { value: 23, label: t('prayer.methodJordan'), subtitle: t('prayer.methodJordanDesc') },
 ];
 
 const getAsrMethods = (t: (key: string) => string) => [
@@ -119,6 +134,7 @@ const getAsrMethods = (t: (key: string) => string) => [
 export default function PrayerScreen() {
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const { appName, iconSource, logoSource } = useAppIdentity();
@@ -160,6 +176,37 @@ export default function PrayerScreen() {
 
   const PRAYER_METHODS = useMemo(() => getPrayerMethods(t), [t]);
   const ASR_METHODS = useMemo(() => getAsrMethods(t), [t]);
+
+  // Automatic mode for calculation method
+  const isAutoMode = settings.prayer.methodManuallySet !== true;
+  const [autoMethodLabel, setAutoMethodLabel] = useState('');
+  useEffect(() => {
+    (async () => {
+      try {
+        const cc = await getUserCountry();
+        const cd = applyCountryPrayerDefaults(cc);
+        if (cd) {
+          const info = calculationMethods[cd.method as CalculationMethod];
+          if (info) setAutoMethodLabel(language === 'ar' || language === 'ur' ? info.nameAr : info.name);
+        }
+      } catch {}
+    })();
+  }, [language]);
+
+  const handleToggleAutoMethod = useCallback(async (turnOn: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (turnOn) {
+      try {
+        const cc = await getUserCountry();
+        const cd = applyCountryPrayerDefaults(cc);
+        if (cd) {
+          updatePrayer({ calculationMethod: cd.method as CalculationMethod, asrJuristic: cd.asrSchool, methodManuallySet: false });
+        }
+      } catch {}
+    } else {
+      updatePrayer({ methodManuallySet: true });
+    }
+  }, [updatePrayer]);
 
   // Persist clock style
   useEffect(() => {
@@ -306,7 +353,7 @@ export default function PrayerScreen() {
         throw new Error(t('messages.locationPermission'));
       }
 
-      const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const currentLocation = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const lat = currentLocation.coords.latitude;
       const lon = currentLocation.coords.longitude;
 
@@ -461,6 +508,30 @@ export default function PrayerScreen() {
     try {
       setError(null);
       setDataSource('live');
+
+      // One-time migration: reset per-prayer adjustments that were incorrectly set,
+      // so prayer times match the raw API output (Google/competitors).
+      try {
+        const resetFlag = await AsyncStorage.getItem('@prayer_adjustments_reset_v1');
+        if (!resetFlag) {
+          console.log('🔄 One-time prayer adjustments reset (v1)');
+          await AsyncStorage.setItem('@prayer_adjustments_reset_v1', '1');
+          const zeroAdj = { fajr: 0, sunrise: 0, dhuhr: 0, asr: 0, maghrib: 0, isha: 0 };
+          updatePrayer({ adjustments: zeroAdj });
+          // Clear today's cache so fresh API data is used
+          const todayKey = getTodayDateString();
+          const cacheKeys = await AsyncStorage.getAllKeys();
+          for (const k of cacheKeys) {
+            if (k.startsWith('@prayer_times_cache_') || (k.includes('prayer') && k.includes(todayKey))) {
+              await AsyncStorage.removeItem(k);
+            }
+          }
+          forceRefresh = true;
+        }
+      } catch (e) {
+        console.warn('Migration check failed:', e);
+      }
+
       // Bug 1 fix: Use SettingsContext as source of truth for calculation params
       // Only read notifications from local @prayer_settings storage
       const localNotifSettings = await getPrayerSettings();
@@ -733,6 +804,22 @@ export default function PrayerScreen() {
   const openSettings = () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSettings(true); };
 
   const locationName = location ? `${location.city}${location.country ? `, ${location.country}` : ''}` : '';
+
+  // Method badge: show current calculation method name + mismatch warning
+  const [gpsCountryCode, setGpsCountryCode] = useState<string | null>(null);
+  useEffect(() => {
+    getUserCountry().then(c => { if (c) setGpsCountryCode(c.toUpperCase()); }).catch(() => {});
+  }, []);
+  const currentMethodInfo = calculationMethods[settings.prayer.calculationMethod];
+  const methodBadgeLabel = currentMethodInfo
+    ? (language === 'ar' || language === 'ur' ? currentMethodInfo.nameAr : currentMethodInfo.name)
+    : '';
+  const isMethodMismatch = useMemo(() => {
+    if (!gpsCountryCode) return false;
+    const cd = applyCountryPrayerDefaults(gpsCountryCode);
+    if (!cd) return false;
+    return cd.method !== settings.prayer.calculationMethod;
+  }, [gpsCountryCode, settings.prayer.calculationMethod]);
   const inLastThird = prayerTimes ? isInLastThird(prayerTimes) : false;
 
   const gregorianDate = useMemo(() => {
@@ -789,6 +876,8 @@ export default function PrayerScreen() {
             </View>
           );
         })()}
+
+
 
         <View style={styles.topNavTabsWrap}>
           <NativeTabs
@@ -1051,62 +1140,103 @@ export default function PrayerScreen() {
                   <MaterialCommunityIcons name="close" size={18} color={colors.text} />
                 </TouchableOpacity>
               </View>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-                {/* طريقة الحساب — Dropdown */}
-                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.calculationMethod')}</Text>
-                <TouchableOpacity
-                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                  onPress={() => setShowMethodPicker(prev => !prev)}
-                >
-                  <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {PRAYER_METHODS.find(m => m.value === settings.prayer.calculationMethod)?.label || t('prayer.choose')}
-                  </Text>
-                  <MaterialCommunityIcons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textLight} />
-                </TouchableOpacity>
-                {showMethodPicker && (
-                  <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
-                    {PRAYER_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value, methodManuallySet: true }); setShowMethodPicker(false); }}>
-                        <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
-                        {settings.prayer.calculationMethod === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
+                {/* الضبط تلقائيًا — Switch toggle */}
+                <GlassToggle
+                  label={t('prayer.autoAdjust')}
+                  subtitle={isAutoMode ? (autoMethodLabel ? t('prayer.methodAutomaticDescWithMethod').replace('{method}', autoMethodLabel) : t('prayer.methodAutomaticDesc')) : undefined}
+                  icon="earth"
+                  iconColor={isAutoMode ? '#0d8e62' : colors.textLight}
+                  enabled={isAutoMode}
+                  onToggle={(val) => handleToggleAutoMethod(val)}
+                />
+
+                {/* Manual method picker — only when auto is OFF */}
+                {!isAutoMode && (
+                  <>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 16, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.calculationMethod')}</Text>
+                    <TouchableOpacity
+                      style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                      onPress={() => setShowMethodPicker(prev => !prev)}
+                    >
+                      <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        {PRAYER_METHODS.find(m => m.value === settings.prayer.calculationMethod)?.label || t('prayer.choose')}
+                      </Text>
+                      <MaterialCommunityIcons name={showMethodPicker ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textLight} />
+                    </TouchableOpacity>
+                    {showMethodPicker && (
+                      <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+                        {PRAYER_METHODS.map((method) => (
+                          <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.calculationMethod === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ calculationMethod: method.value, methodManuallySet: true }); setShowMethodPicker(false); }}>
+                            <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
+                            {settings.prayer.calculationMethod === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
 
-                {/* مذهب العصر — Dropdown */}
-                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.asrMethod')}</Text>
-                <TouchableOpacity
-                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-                  onPress={() => setShowAsrPicker(prev => !prev)}
-                >
-                  <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {ASR_METHODS.find(m => m.value === settings.prayer.asrJuristic)?.label || t('prayer.choose')}
-                  </Text>
-                  <MaterialCommunityIcons name={showAsrPicker ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textLight} />
-                </TouchableOpacity>
-                {showAsrPicker && (
-                  <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
-                    {ASR_METHODS.map((method) => (
-                      <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1, methodManuallySet: true }); setShowAsrPicker(false); }}>
-                        <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
-                        {settings.prayer.asrJuristic === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                {/* مذهب العصر — only when auto is OFF */}
+                {!isAutoMode && (
+                  <>
+                    <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.asrMethod')}</Text>
+                    <TouchableOpacity
+                      style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
+                      onPress={() => setShowAsrPicker(prev => !prev)}
+                    >
+                      <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                        {ASR_METHODS.find(m => m.value === settings.prayer.asrJuristic)?.label || t('prayer.choose')}
+                      </Text>
+                      <MaterialCommunityIcons name={showAsrPicker ? 'chevron-up' : 'chevron-down'} size={22} color={colors.textLight} />
+                    </TouchableOpacity>
+                    {showAsrPicker && (
+                      <View style={[settingsStyles.dropdownList, { backgroundColor: isDarkMode ? 'rgba(30,30,35,0.95)' : 'rgba(255,255,255,0.95)' }]}>
+                        {ASR_METHODS.map((method) => (
+                          <TouchableOpacity key={method.value} style={[settingsStyles.dropdownItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, settings.prayer.asrJuristic === method.value && { backgroundColor: 'rgba(6,79,47,0.12)' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); updatePrayer({ asrJuristic: method.value as 0 | 1 }); setShowAsrPicker(false); }}>
+                            <View style={{ flex: 1 }}><Text style={[settingsStyles.methodLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.label}</Text><Text style={[settingsStyles.methodSub, { color: colors.textLight, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{method.subtitle}</Text></View>
+                            {settings.prayer.asrJuristic === method.value && <MaterialCommunityIcons name="check" size={18} color="#0d8e62" />}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
 
-                {/* تعديل المواقيت — navigate to adjustments page */}
-                <TouchableOpacity
-                  style={[settingsStyles.dropdownBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)', flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 20 }]}
-                  onPress={() => { setShowSettings(false); router.push('/settings/prayer-adjustments' as any); }}
-                >
-                  <MaterialCommunityIcons name="tune-vertical" size={20} color="#0d8e62" style={{ marginHorizontal: 4 }} />
-                  <Text style={[settingsStyles.methodLabel, { color: colors.text, flex: 1, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
-                    {t('prayerAdjustments.title')}
-                  </Text>
-                  <MaterialCommunityIcons name={isRTL ? 'chevron-left' : 'chevron-right'} size={22} color={colors.textLight} />
-                </TouchableOpacity>
+                {/* ضبط يدوي لأوقات الصلاة — always visible */}
+                <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayerAdjustments.title')}</Text>
+                {(['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha'] as const).map((prayer) => {
+                  const adj = settings.prayer.adjustments?.[prayer] || 0;
+                  const prayerTime = prayerTimes ? formatPrayerTime(prayerTimes[prayer], settings.prayer.show24Hour) : '--:--';
+                  const prayerLabel = t(('prayer.' + prayer) as any);
+                  return (
+                    <View key={prayer} style={[settingsStyles.adjustRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      <Text style={[settingsStyles.adjustLabel, { color: colors.text, textAlign: isRTL ? 'right' : 'left' }]}>
+                        {prayerLabel}  :  {prayerTime}
+                      </Text>
+                      <View style={[settingsStyles.stepperWrap, { flexDirection: 'row' }]}>
+                        <TouchableOpacity
+                          style={settingsStyles.stepperBtn}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.min((adj || 0) + 1, 30) } });
+                          }}
+                        >
+                          <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={settingsStyles.stepperBtn}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            updatePrayer({ adjustments: { ...settings.prayer.adjustments, [prayer]: Math.max((adj || 0) - 1, -30) } });
+                          }}
+                        >
+                          <MaterialCommunityIcons name="minus" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
 
                 <Text style={[settingsStyles.sectionLabel, { color: colors.textLight, marginTop: 20, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('prayer.displayOptions')}</Text>
                 <GlassToggle label={t('prayer.showSunrise')} icon="weather-sunny" enabled={settings.prayer.showSunrise} onToggle={(val) => updatePrayer({ showSunrise: val })} />
@@ -1194,10 +1324,12 @@ const _styles = StyleSheet.create({
   dateRow: { justifyContent: 'center', alignItems: 'center', paddingBottom: 6, gap: Spacing.sm, flexWrap: 'wrap', paddingHorizontal: 16 },
   dateRowText: { fontSize: 12, fontFamily: fontMedium(), lineHeight: 20, includeFontPadding: false },
   dateRowSep: { fontSize: 12, opacity: 0.5, lineHeight: 20, includeFontPadding: false },
+  methodBadgeRow: { justifyContent: 'center', alignItems: 'center', paddingBottom: 4, gap: 2 },
+  methodBadgeText: { fontSize: 11, fontFamily: fontRegular(), opacity: 0.7, includeFontPadding: false },
   headerButton: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   scrollView: { flex: 1 },
   topNavTabsWrap: { paddingHorizontal: 16, paddingBottom: 8, marginTop: 10 },
-  scrollContent: { paddingVertical: 10, paddingBottom: 100 },
+  scrollContent: { paddingVertical: 10, paddingBottom: 160 },
   errorContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffebee', marginHorizontal: 16, marginVertical: 10, padding: 15, borderRadius: 12, gap: Spacing.sm },
   errorText: { flex: 1, fontSize: 14, fontFamily: fontMedium(), color: '#c62828', lineHeight: 24, includeFontPadding: false },
   retryButton: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#ef5350', borderRadius: 8 },
@@ -1292,5 +1424,9 @@ const settingsStyles = StyleSheet.create({
   dropdownBtn: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, marginBottom: 4 },
   dropdownList: { borderRadius: 12, marginBottom: 8, overflow: 'hidden' as const },
   dropdownItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 0.5, borderBottomColor: 'rgba(120,120,128,0.12)' },
+  adjustRow: { alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(120,120,128,0.15)' },
+  adjustLabel: { flex: 1, fontSize: 15, fontFamily: fontSemiBold() },
+  stepperWrap: { gap: 8 },
+  stepperBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(120,120,128,0.12)', alignItems: 'center' as const, justifyContent: 'center' as const },
 });
 const styles = _styles;

@@ -392,7 +392,7 @@ export default function MoreAzkarScreen() {
           </View>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: Math.max(insets.bottom + 84, 100) }} />
       </ScrollView>
     </BackgroundWrapper>
   );

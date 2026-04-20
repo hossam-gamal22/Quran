@@ -87,8 +87,8 @@ export async function handleDidYouPrayResponse(
 
 async function scheduleDidYouPrayIn(prayer: PrayerName, minutes: number): Promise<void> {
   const trigger = new Date(Date.now() + minutes * 60 * 1000);
-  const channelId = getReminderChannelId('general_reminder');
-  const sound = resolveNotificationSound('general_reminder', true);
+  const channelId = getReminderChannelId('notif_after_prayer');
+  const sound = resolveNotificationSound('notif_after_prayer', true);
   const mosqueAttachments = await getNotificationIconAttachment('mosque');
   const identifier = `did_you_pray_${prayer}`;
   try {

@@ -87,7 +87,7 @@ const SettingSection: React.FC<SettingSectionProps> = ({
   const styles = useScaledStyles(_styles, colors.fs);
   return (
     <Animated.View entering={FadeInDown.delay(index * 100).duration(500)}>
-      <View style={[styles.section, { backgroundColor: colors.card }]}>
+      <View style={[styles.section, { backgroundColor: colors.card, elevation: colors.cardElevation ?? 2 }]}>
         <View style={[styles.sectionHeader, { flexDirection: isRTL ? 'row-reverse' : 'row', borderBottomColor: colors.border }]}>
           <MaterialCommunityIcons
             name={icon}

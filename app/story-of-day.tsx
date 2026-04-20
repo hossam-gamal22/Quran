@@ -32,6 +32,7 @@ import { t } from '@/lib/i18n';
 import { UniversalHeader } from '@/components/ui';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { ScreenContainer } from '@/components/screen-container';
+import { BannerAdComponent } from '@/components/ads/BannerAd';
 import {
   getCachedDayData,
   getCachedVideoUri,
@@ -93,6 +94,29 @@ function toJsDelivrUrl(rawUrl: string): string {
   if (!match) return rawUrl;
   const [, owner, repo, branch, path] = match;
   return `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${path}`;
+}
+
+/**
+ * Follow 302 redirects to resolve the final direct URL.
+ * GitHub Releases serve via 302 → objects.githubusercontent.com.
+ * expo-video sometimes can't follow these; passing the final URL fixes playback.
+ */
+async function resolveDirectUrl(url: string, timeoutMs = 8000): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    // res.url is the final URL after all redirects
+    if (res.ok && res.url) return res.url;
+    return url; // fallback to original
+  } catch {
+    return url; // on error, return original
+  }
 }
 
 // \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -213,10 +237,15 @@ export default function StoryOfDayScreen() {
           setVideoUnavailable(true);
           return;
         }
+        // For GitHub Release URLs, resolve the 302 redirect to get the final direct URL.
+        // expo-video can struggle with 302 redirects; passing the resolved URL fixes playback.
         const cdnUrl = toJsDelivrUrl(rawVideoUrl);
-        console.log('[DailyVideo] Playing from CDN:', cdnUrl.split('/').pop());
+        const isGitHubRelease = cdnUrl.includes('/releases/download/');
+        const directUrl = isGitHubRelease ? await resolveDirectUrl(cdnUrl) : cdnUrl;
+        if (cancelled) return;
+        console.log('[DailyVideo] Playing from CDN:', directUrl.split('/').pop()?.split('?')[0]);
         resolvedSourceRef.current = 'cdn';
-        setResolvedVideoUrl(cdnUrl);
+        setResolvedVideoUrl(directUrl);
         // Background-cache for next visit
         cacheVideoFile(rawVideoUrl).then((uri) => {
           if (uri) console.log('[DailyVideo] Background cache saved:', uri.split('/').pop());
@@ -352,18 +381,36 @@ export default function StoryOfDayScreen() {
         invalidateCachedVideo(rawVideoUrl).catch(() => {});
         resolvedSourceRef.current = 'cdn';
         cdnRetryCount.current = 0;
-        setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+        // Resolve redirect for the CDN retry as well
+        const cdnUrl = toJsDelivrUrl(rawVideoUrl);
+        if (cdnUrl.includes('/releases/download/')) {
+          resolveDirectUrl(cdnUrl).then((direct) => setResolvedVideoUrl(direct)).catch(() => setResolvedVideoUrl(cdnUrl));
+        } else {
+          setResolvedVideoUrl(cdnUrl);
+        }
       } else {
         cdnRetryCount.current += 1;
-        // First CDN failure: retry with a cache-buster to force a fresh connection
+        // First CDN failure: retry with redirect resolution + cache-buster
         if (cdnRetryCount.current === 1 && rawVideoUrl && !rawVideoUrl.includes('file://')) {
-          console.log('[DailyVideo] First attempt failed, retrying with cache-bust');
+          console.log('[DailyVideo] First attempt failed, retrying with redirect resolution');
           resolvedSourceRef.current = 'cdn';
-          // Append cache-buster to force React state change + fresh network request
-          const separator = rawVideoUrl.includes('?') ? '&' : '?';
-          setResolvedVideoUrl(rawVideoUrl + separator + '_retry=' + Date.now());
+          const cdnUrl = toJsDelivrUrl(rawVideoUrl);
+          resolveDirectUrl(cdnUrl).then((direct) => {
+            // Append cache-buster to force React state change + fresh connection
+            const sep = direct.includes('?') ? '&' : '?';
+            setResolvedVideoUrl(direct + sep + '_retry=' + Date.now());
+          }).catch(() => {
+            const sep = rawVideoUrl.includes('?') ? '&' : '?';
+            setResolvedVideoUrl(rawVideoUrl + sep + '_retry=' + Date.now());
+          });
+        } else if (cdnRetryCount.current <= 2 && dayData && dayData.videos.length > 1) {
+          // Try next reciter as fallback before giving up
+          const nextIdx = (selectedReciterIdx + 1) % dayData.videos.length;
+          console.log('[DailyVideo] Trying next reciter:', dayData.videos[nextIdx].reciterLabel);
+          cdnRetryCount.current = 0;
+          setSelectedReciterIdx(nextIdx);
         } else {
-          // Both attempts failed — mark video as unavailable
+          // All attempts and reciters exhausted — mark video as unavailable
           console.warn('[DailyVideo] All sources exhausted — showing ayah text fallback');
           setVideoUnavailable(true);
         }
@@ -587,14 +634,14 @@ export default function StoryOfDayScreen() {
       if (Platform.OS === 'ios') {
         const label = isArabic ? dayData.surahName : dayData.surahEnglish;
         await Share.share({
-          message: `${dayData.ayahText}\n\n${label}\n\n${t('storyOfDay.shareText')}`,
+          message: `${dayData.ayahText}\n\n${label}`,
           url: shareUri,
         });
       } else {
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(shareUri, {
             mimeType: 'video/mp4',
-            dialogTitle: t('storyOfDay.shareText'),
+            dialogTitle: t('storyOfDay.shareVideo'),
           });
         }
       }
@@ -689,7 +736,10 @@ export default function StoryOfDayScreen() {
               <View style={[styles.videoCard, styles.ayahFallbackCard]}>
                 <View style={styles.ayahFallbackGradient}>
                   <MaterialCommunityIcons name="bookshelf" size={36} color="rgba(255,255,255,0.5)" style={{ marginBottom: 8 }} />
-                  <Text style={styles.ayahFallbackText}>
+                  <Text style={[styles.ayahFallbackText,
+                    dayData.ayahText.length > 300 ? { fontSize: 18, lineHeight: 36 } :
+                    dayData.ayahText.length > 150 ? { fontSize: 21, lineHeight: 40 } : undefined
+                  ]}>
                     {'\uFD3F'} {dayData.ayahText} {'\uFD3E'}
                   </Text>
                   <View style={styles.ayahFallbackDivider} />
@@ -704,12 +754,15 @@ export default function StoryOfDayScreen() {
                   ) : (
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={() => {
+                      onPress={async () => {
                         cdnRetryCount.current = 0;
                         setVideoUnavailable(false);
                         if (rawVideoUrl) {
                           resolvedSourceRef.current = 'cdn';
-                          setResolvedVideoUrl(toJsDelivrUrl(rawVideoUrl));
+                          const cdnUrl = toJsDelivrUrl(rawVideoUrl);
+                          const isRelease = cdnUrl.includes('/releases/download/');
+                          const directUrl = isRelease ? await resolveDirectUrl(cdnUrl) : cdnUrl;
+                          setResolvedVideoUrl(directUrl);
                         }
                       }}
                       style={[styles.retrySmallBtn, { marginTop: 16 }]}
@@ -752,7 +805,9 @@ export default function StoryOfDayScreen() {
                       try {
                         const cdnUrl = toJsDelivrUrl(rawVideoUrl);
                         resolvedSourceRef.current = 'cdn';
-                        setResolvedVideoUrl(cdnUrl);
+                        const isRelease = cdnUrl.includes('/releases/download/');
+                        const directUrl = isRelease ? await resolveDirectUrl(cdnUrl) : cdnUrl;
+                        setResolvedVideoUrl(directUrl);
                       } catch { /* noop */ }
                     }}
                     style={styles.retrySmallBtn}
@@ -861,6 +916,7 @@ export default function StoryOfDayScreen() {
           </>
         )}
       </ScrollView>
+      <BannerAdComponent screen="story_of_day" />
     </ScreenContainer>
   );
 }

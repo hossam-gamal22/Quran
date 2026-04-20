@@ -305,7 +305,7 @@ export default function DailyDhikrScreen() {
           </Text>
         </ScrollView>
 
-        <View style={{ height: insets.bottom }} />
+        <View style={{ height: Math.max(insets.bottom, 16) }} />
       </BackgroundWrapper>
     </>
   );

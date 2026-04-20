@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDateLocale, tArray } from '@/lib/i18n';
 import { fetchGoogleCalendarEvents, type GoogleCalendarEvent } from '@/lib/admin-data-api';
 import { getDayNames } from '@/constants/dayNames';
@@ -95,6 +96,7 @@ export default function HijriCalendarScreen() {
   const { t, settings, isDarkMode } = useSettings();
   const colors = useColors();
   const isRTL = useIsRTL();
+  const insets = useSafeAreaInsets();
   const today = new Date();
   
   // ─── Translations ────────────────────────────────────────────────────────────
@@ -365,7 +367,7 @@ export default function HijriCalendarScreen() {
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalCard: {
       backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-      padding: 24, paddingBottom: 40,
+      padding: 24, paddingBottom: Math.max(insets.bottom, 16) + 16,
     },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 16 },
     modalEventIcon: { fontSize: 48, textAlign: 'center', marginBottom: 8 },
