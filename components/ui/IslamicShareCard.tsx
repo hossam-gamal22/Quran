@@ -1,10 +1,10 @@
 // components/ui/IslamicShareCard.tsx
 // بطاقة مشاركة إسلامية فاخرة — زخارف هندسية SVG + خط أميري + التقاط صورة
 
-import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
-  Platform, ScrollView, Dimensions,
+  Platform, ScrollView, Dimensions, Image,
 } from 'react-native';
 import Svg, {
   G, Path, Circle, Rect, Polygon,
@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 import { fontBold, fontSemiBold, fontRegular } from '@/lib/fonts';
 import { IMAGE_SIZE_OPTIONS, type ImageSizeKey } from '@/components/ui/BrandedCapture';
 
@@ -27,6 +28,11 @@ const CARD_BG = '#091E12';
 const GOLD = '#C9A844';
 const FOOTER_BG = '#04100A';
 const TILE = 38;
+// Long-content mode: vertical chrome height inside the card (gold strips +
+// categoryBand + footer + contentArea vertical padding). Used to estimate
+// available vertical space for content.
+const CHROME_H = 6 /* gold strips */ + 56 /* category band */ + 100 /* footer (logo) */ + 32 /* contentArea v-padding */;
+const MIN_FONT_SCALE = 0.5;
 
 // ─── Public API ───
 export interface IslamicShareCardHandle {
@@ -200,32 +206,69 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
     const viewShotRef = useRef<ViewShot>(null);
     const colors = useColors();
     const { isDarkMode, t } = useSettings();
+    const { logoSource } = useAppIdentity();
     const insets = useSafeAreaInsets();
 
     const [selectedSize, setSelectedSize] = useState<ImageSizeKey>('portrait');
     const [showPicker, setShowPicker] = useState(false);
     const [capturing, setCapturing] = useState(false);
+    // Natural (unscaled) height of contentArea children, measured offscreen.
+    const [measuredContentH, setMeasuredContentH] = useState<number | null>(null);
 
     const getSizeConfig = (key: ImageSizeKey) =>
       IMAGE_SIZE_OPTIONS.find(o => o.key === key) || IMAGE_SIZE_OPTIONS[0];
 
-    const sizeConfig = getSizeConfig(selectedSize);
-    const captureH = CAPTURE_WIDTH * (sizeConfig.height / sizeConfig.width);
+    // Available vertical space for content area at a given size key.
+    const availableContentH = (key: ImageSizeKey) =>
+      CAPTURE_WIDTH * (getSizeConfig(key).height / getSizeConfig(key).width) - CHROME_H;
+
+    // Long-content detection: content overflows the 4:5 portrait canvas at
+    // base font scale. When true, we force 9:16 and shrink fonts.
+    const isLong = measuredContentH !== null && measuredContentH > availableContentH('portrait');
+
+    // Effective size key: long content is forced to story (9:16).
+    const effectiveSize: ImageSizeKey = isLong ? 'story' : selectedSize;
+    const effectiveSizeConfig = getSizeConfig(effectiveSize);
+
+    // Font scale applied to text styles in long mode.
+    const fontScale = useMemo(() => {
+      if (!isLong || measuredContentH === null) return 1;
+      const target = availableContentH('story');
+      const raw = target / measuredContentH;
+      return Math.max(MIN_FONT_SCALE, Math.min(1, raw));
+    }, [isLong, measuredContentH]);
+
+    // Card height: normally derived from selected ratio. If even at min scale
+    // the content still overflows, grow the card vertically as a final safety
+    // net so nothing is ever clipped.
+    const baseCaptureH = CAPTURE_WIDTH * (effectiveSizeConfig.height / effectiveSizeConfig.width);
+    const scaledContentH = measuredContentH !== null ? measuredContentH * fontScale : 0;
+    const captureH = isLong && scaledContentH + CHROME_H > baseCaptureH
+      ? Math.ceil(scaledContentH + CHROME_H)
+      : baseCaptureH;
 
     const previewH = PREVIEW_MAX_H;
-    const previewW = previewH * (sizeConfig.width / sizeConfig.height);
+    const previewW = previewH * (CAPTURE_WIDTH / captureH);
     const previewScale = previewW / CAPTURE_WIDTH;
 
     const doCapture = async (sizeKey: ImageSizeKey = selectedSize) => {
       if (!viewShotRef.current) throw new Error('ViewShot ref not ready');
-      const config = getSizeConfig(sizeKey);
+      // Honor long-content override: ignore caller's sizeKey if content is long.
+      const effKey: ImageSizeKey = isLong ? 'story' : sizeKey;
+      const config = getSizeConfig(effKey);
+      // Output dimensions: width fixed at config.width, height scales with the
+      // actual rendered card height (which may exceed config.height in the
+      // safety-net case where content overflows even at min font scale).
+      const scale = config.width / CAPTURE_WIDTH;
+      const outWidth = config.width;
+      const outHeight = Math.round(captureH * scale);
       await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 400 : 150));
       const uri = await Promise.race([
         captureRef(viewShotRef, {
           format: 'png',
           quality: 1,
-          width: config.width,
-          height: config.height,
+          width: outWidth,
+          height: outHeight,
         }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Capture timeout')), 10000)
@@ -261,6 +304,58 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
       }
     };
 
+    // ─── Content children (used by card + offscreen measurer) ───
+    // `scale` shrinks all text uniformly in long-content mode.
+    const renderContentChildren = (scale: number) => {
+      const scaleText = (size: number, lineHeight?: number) => ({
+        fontSize: size * scale,
+        ...(lineHeight !== undefined ? { lineHeight: lineHeight * scale } : {}),
+      });
+      return (
+        <>
+          <OrnamentDivider />
+
+          {showBasmala && (
+            <Text style={[s.basmalaText, scaleText(32)]}>{'\uFDFD'}</Text>
+          )}
+
+          {renderCustomContent ? (
+            renderCustomContent()
+          ) : qcfGlyphs && qcfFontFamily ? (
+            <Text
+              style={[s.mainText, { fontFamily: qcfFontFamily, fontSize: 30 * scale, lineHeight: 30 * 2.0 * scale }]}
+              allowFontScaling={false}
+            >
+              {qcfGlyphs.join('')}
+            </Text>
+          ) : (
+            <Text style={[s.mainText, scaleText(32, 32 * 2.1)]}>{arabicText}</Text>
+          )}
+
+          {translationText ? (
+            <Text style={[s.translationText, scaleText(15, 15 * 1.8)]}>{translationText}</Text>
+          ) : null}
+
+          {benefitText ? (
+            <Text style={[s.benefitText, scaleText(14, 14 * 1.8)]}>{benefitText}</Text>
+          ) : null}
+
+          {noteText ? (
+            <Text style={[s.noteText, scaleText(13)]}>{`"${noteText}"`}</Text>
+          ) : null}
+
+          <OrnamentDivider />
+
+          {sourceText ? (
+            <View style={s.sourceRow}>
+              <BookIcon />
+              <Text style={[s.sourceText, scaleText(15)]}>{sourceText}</Text>
+            </View>
+          ) : null}
+        </>
+      );
+    };
+
     // ─── Card content renderer (used by capture + preview) ───
     const renderCard = () => (
       <View style={[s.card, { height: captureH }]}>
@@ -281,58 +376,14 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
           </View>
         </View>
 
-        {/* Content area */}
-        <View style={s.contentArea}>
-          <OrnamentDivider />
-
-          {/* Optional Basmala */}
-          {showBasmala && (
-            <Text style={s.basmalaText}>{'\uFDFD'}</Text>
-          )}
-
-          {/* Main text */}
-          {renderCustomContent ? (
-            renderCustomContent()
-          ) : qcfGlyphs && qcfFontFamily ? (
-            <Text
-              style={[s.mainText, { fontFamily: qcfFontFamily, fontSize: 24, lineHeight: 24 * 2.0 }]}
-              allowFontScaling={false}
-            >
-              {qcfGlyphs.join('')}
-            </Text>
-          ) : (
-            <Text style={s.mainText}>{arabicText}</Text>
-          )}
-
-          {/* Translation */}
-          {translationText ? (
-            <Text style={s.translationText}>{translationText}</Text>
-          ) : null}
-
-          {/* Benefit */}
-          {benefitText ? (
-            <Text style={s.benefitText}>{benefitText}</Text>
-          ) : null}
-
-          {/* User note */}
-          {noteText ? (
-            <Text style={s.noteText}>{`"${noteText}"`}</Text>
-          ) : null}
-
-          <OrnamentDivider />
-
-          {/* Source */}
-          {sourceText ? (
-            <View style={s.sourceRow}>
-              <BookIcon />
-              <Text style={s.sourceText}>{sourceText}</Text>
-            </View>
-          ) : null}
+        {/* Content area — top-aligned in long mode so first line is always visible */}
+        <View style={[s.contentArea, isLong && { justifyContent: 'flex-start' }]}>
+          {renderContentChildren(fontScale)}
         </View>
 
-        {/* Footer */}
+        {/* Footer — app logo only */}
         <View style={s.footer}>
-          <Text style={s.footerBrand}>{'\u0631\u064F\u0648\u062D \u0627\u0644\u0645\u0633\u0644\u0645'}</Text>
+          <Image source={logoSource} style={s.footerLogo} resizeMode="contain" />
         </View>
 
         {/* Bottom gold strip */}
@@ -349,6 +400,20 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
           <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
             {renderCard()}
           </ViewShot>
+        </View>
+
+        {/* Hidden offscreen measurer — renders content children at base scale
+            with no height constraint to get the natural height. */}
+        <View style={s.hiddenMeasurer} pointerEvents="none">
+          <View
+            style={s.measurerInner}
+            onLayout={e => {
+              const h = Math.ceil(e.nativeEvent.layout.height);
+              if (h > 0 && h !== measuredContentH) setMeasuredContentH(h);
+            }}
+          >
+            {renderContentChildren(1)}
+          </View>
         </View>
 
         {/* Share modal */}
@@ -375,14 +440,15 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                 style={{ maxHeight: 420, width: '100%' }}
                 contentContainerStyle={{ paddingBottom: 8 }}
               >
-                {/* Size tabs */}
+                {/* Size tabs — 4:5 disabled when content is long */}
                 <View style={[s.segmented, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)' }]}>
                   {IMAGE_SIZE_OPTIONS.map(opt => {
-                    const active = selectedSize === opt.key;
+                    const disabled = isLong && opt.key === 'portrait';
+                    const active = effectiveSize === opt.key;
                     return (
                       <TouchableOpacity
                         key={opt.key}
-                        onPress={() => setSelectedSize(opt.key)}
+                        onPress={() => { if (!disabled) setSelectedSize(opt.key); }}
                         style={[
                           s.segTab,
                           active && {
@@ -391,8 +457,10 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                               ? { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3 }
                               : { elevation: 3 }),
                           },
+                          disabled && { opacity: 0.4 },
                         ]}
-                        activeOpacity={0.7}
+                        activeOpacity={disabled ? 1 : 0.7}
+                        disabled={disabled}
                       >
                         <Text style={[
                           s.segLabel,
@@ -405,6 +473,12 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                     );
                   })}
                 </View>
+
+                {isLong && (
+                  <Text style={[s.longHint, { color: colors.textLight }]}>
+                    {'\u062A\u0645 \u0627\u062E\u062A\u064A\u0627\u0631 9:16 \u062A\u0644\u0642\u0627\u0626\u064A\u0627\u064B \u0644\u064A\u0638\u0647\u0631 \u0627\u0644\u0646\u0635 \u0643\u0627\u0645\u0644\u0627\u064B'}
+                  </Text>
+                )}
 
                 {/* Live preview */}
                 <View style={s.previewArea}>
@@ -426,7 +500,7 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
                     </View>
                   </View>
                   <Text style={[s.dimText, { color: colors.textLight }]}>
-                    {sizeConfig.width} × {sizeConfig.height}
+                    {effectiveSizeConfig.width} × {Math.round(captureH * (effectiveSizeConfig.width / CAPTURE_WIDTH))}
                   </Text>
                 </View>
               </ScrollView>
@@ -519,8 +593,8 @@ const s = StyleSheet.create({
   },
   mainText: {
     color: '#FFFFFF',
-    fontSize: 26,
-    lineHeight: 26 * 2.1,
+    fontSize: 32,
+    lineHeight: 32 * 2.1,
     fontWeight: '700',
     fontFamily: 'Amiri-Bold',
     textAlign: 'center',
@@ -573,19 +647,17 @@ const s = StyleSheet.create({
   },
   // ── Footer ──
   footer: {
-    backgroundColor: FOOTER_BG,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(201,168,68,0.18)',
+    backgroundColor: 'transparent',
     paddingTop: 14,
-    paddingBottom: 15,
+    paddingBottom: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  footerBrand: {
-    color: '#EAD898',
-    fontSize: 13,
-    fontWeight: '700',
-    fontFamily: 'Amiri-Bold',
+  footerLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
   },
   // ── Hidden capture ──
   hiddenCapture: {
@@ -593,6 +665,27 @@ const s = StyleSheet.create({
     left: -9999,
     top: 0,
     opacity: 1, // Must be 1 for captureRef
+  },
+  // ── Hidden offscreen measurer (no height constraint) ──
+  hiddenMeasurer: {
+    position: 'absolute',
+    left: -9999,
+    top: 0,
+    opacity: 0,
+  },
+  measurerInner: {
+    width: CAPTURE_WIDTH - 56, // matches contentArea horizontal padding (28*2)
+    paddingHorizontal: 0,
+    alignItems: 'center',
+  },
+  longHint: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    textAlign: 'center',
+    marginTop: -6,
+    marginBottom: 10,
+    paddingHorizontal: 8,
+    writingDirection: 'rtl',
   },
   // ── Modal ──
   overlay: {

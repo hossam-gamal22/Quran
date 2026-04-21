@@ -88,11 +88,14 @@ export const showInterstitial = async (): Promise<boolean> => {
   if (!InterstitialAdClass || Platform.OS === 'web') return false;
 
   try {
-    const { fetchAdsConfig, getAdUnitId } = require('@/lib/ads-config');
+    const { fetchAdsConfig, getAdUnitId, canShowGlobalAd, recordGlobalAdShown } = require('@/lib/ads-config');
     const { getSubscriptionState } = require('@/lib/subscription-manager');
 
     const [config, sub] = await Promise.all([fetchAdsConfig(), getSubscriptionState()]);
     if (!config.enabled || config.showInterstitials === false || sub.isPremium) return false;
+
+    // Global cooldown: enforce ≥2 minutes between any two ads (shared with App Open / hook interstitials).
+    if (!canShowGlobalAd()) return false;
 
     // Smart ad manager checks
     try {
@@ -114,6 +117,7 @@ export const showInterstitial = async (): Promise<boolean> => {
       ad.addAdEventListener(AdEventType.LOADED, () => {
         ad.show().then(() => {
           clearTimeout(timeout);
+          try { recordGlobalAdShown(); } catch {}
           resolve(true);
         }).catch(() => {
           clearTimeout(timeout);

@@ -229,11 +229,12 @@ export default function DailyDhikrScreen() {
             </View>
           </View>
 
-          {/* Premium Islamic share card */}
+          {/* Premium Islamic share card — strip Isti'adha + brackets so the
+              shared image matches what the user sees on screen. */}
           <IslamicShareCard
             ref={brandedRef}
             categoryLabel={t('azkar.dailyAzkar')}
-            arabicText={dhikr.arabic}
+            arabicText={stripAzkarBrackets(dhikr.arabic)}
             sourceText={transliterateReference(dhikr.reference, language)}
             benefitText={dhikr.benefit}
           />

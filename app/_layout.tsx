@@ -121,6 +121,13 @@ LogBox.ignoreLogs([
   'LoadBundleFromServerRequestError',
   'Could not load bundle',
   "The action 'GO_BACK' was not handled",
+  // iOS Simulator / unsigned builds lack keychain + aps-environment entitlements.
+  // These errors never occur on real devices with a valid provisioning profile.
+  "A required entitlement isn't present",
+  'Keychain access failed',
+  'aps-environment',
+  'getValueWithKeyAsync',
+  'getRegistrationInfoAsync',
 ]);
 
 // Configure notification handler at the top level (before any component renders)
@@ -964,10 +971,7 @@ export default function RootLayout() {
     // Defer 3s after ready so we don't compete with critical startup network calls
     const t = setTimeout(() => {
       import('@/lib/azkar-audio-cache')
-        .then(async ({ invalidateAzkarCacheIfNeeded, preDownloadAll }) => {
-          await invalidateAzkarCacheIfNeeded();
-          await preDownloadAll();
-        })
+        .then(({ preDownloadAll }) => preDownloadAll())
         .catch((e) => {
           if (__DEV__) console.warn('[azkar-cache] background pre-download failed:', e);
         });

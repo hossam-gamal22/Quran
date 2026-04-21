@@ -1,3 +1,11 @@
+[build]
+  command = "pnpm install --no-frozen-lockfile && pnpm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--version"
+
 [functions]
   directory = "netlify/functions"
 

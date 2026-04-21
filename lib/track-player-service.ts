@@ -71,7 +71,16 @@ export async function PlaybackService() {
   });
 
   TrackPlayer.addEventListener(Event.PlaybackError, (event) => {
-    console.error('[TrackPlayer] Playback error:', event.message);
+    const message = event?.message;
+    const code = event?.code;
+    if (!message && !code) {
+      // Empty payload — happens during normal track transitions on some
+      // versions of react-native-track-player. Don't surface as a red
+      // LogBox error.
+      console.warn('[TrackPlayer] Playback event without payload', event);
+      return;
+    }
+    console.warn('[TrackPlayer] Playback error:', { code, message });
   });
 
   TrackPlayer.addEventListener(Event.PlaybackQueueEnded, (event) => {

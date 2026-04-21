@@ -39,6 +39,11 @@ interface AdsContextType {
   enterSacredContext: (ctx: SacredContext) => void;
   exitSacredContext: (ctx: SacredContext) => void;
   isInSacredContext: () => boolean;
+  // Measured height (in dp) of the active bottom banner. 0 when no banner is
+  // visible. Tab screens read this via useAdBottomInset() to add equivalent
+  // paddingBottom to their scroll containers so content is never hidden.
+  bannerHeight: number;
+  setBannerHeight: (h: number) => void;
 }
 
 const AdsContext = createContext<AdsContextType | undefined>(undefined);
@@ -52,6 +57,12 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
   const [sessionAdsShown, setSessionAdsShown] = useState(0);
   const [lastAdTime, setLastAdTime] = useState<number>(Date.now());
   const [appStartTime] = useState<number>(Date.now());
+  const [bannerHeight, setBannerHeightState] = useState<number>(0);
+
+  const setBannerHeight = useCallback((h: number) => {
+    // Avoid spurious re-renders if measurement hasn't actually changed.
+    setBannerHeightState((prev) => (Math.abs(prev - h) < 1 ? prev : h));
+  }, []);
 
   const loadConfig = useCallback(async () => {
     setIsLoading(true);
@@ -215,6 +226,8 @@ export const AdsProvider = ({ children }: { children: ReactNode }) => {
       enterSacredContext,
       exitSacredContext,
       isInSacredContext,
+      bannerHeight,
+      setBannerHeight,
     }}>
       {children}
     </AdsContext.Provider>
@@ -227,4 +240,18 @@ export const useAds = () => {
     throw new Error('useAds must be used within AdsProvider');
   }
   return context;
+};
+
+/**
+ * Returns the bottom inset (in dp) needed to keep scrollable content above the
+ * floating bottom banner ad on tab screens. Returns 0 when no banner is
+ * currently visible (premium users, ads disabled, ad failed to load, etc.).
+ *
+ * Add this to a ScrollView/FlatList `contentContainerStyle.paddingBottom`:
+ *   const adInset = useAdBottomInset();
+ *   contentContainerStyle={{ paddingBottom: 100 + adInset }}
+ */
+export const useAdBottomInset = (): number => {
+  const { bannerHeight } = useAds();
+  return bannerHeight > 0 ? bannerHeight + 8 : 0;
 };

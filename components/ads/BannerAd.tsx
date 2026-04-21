@@ -1,6 +1,6 @@
 // components/ads/BannerAd.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { View, StyleSheet, Platform, Animated, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAds } from '@/lib/ads-context';
 import { AdScreenKey } from '@/lib/ads-config';
@@ -35,7 +35,7 @@ interface BannerAdComponentProps {
 }
 
 export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, slotKey, inTabScreen }) => {
-  const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled } = useAds();
+  const { isBannerVisible, getBannerAdUnitId, getSlotUnitId, isSlotEnabled, setBannerHeight } = useAds();
   const insets = useSafeAreaInsets();
   const [adLoaded, setAdLoaded] = useState(false);
   const [delayPassed, setDelayPassed] = useState(false);
@@ -44,6 +44,27 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const MAX_RETRIES = 2;
   const RETRY_DELAY = 10_000; // 10 seconds between retries
+
+  // Publish measured height to AdsContext only on tab screens (where the banner
+  // floats absolutely and would otherwise overlap content). Reset to 0 whenever
+  // the banner is not actually visible so paddingBottom collapses cleanly.
+  const publishHeight = useCallback((h: number) => {
+    if (inTabScreen) setBannerHeight(h);
+  }, [inTabScreen, setBannerHeight]);
+
+  const handleLayout = useCallback((e: LayoutChangeEvent) => {
+    if (!inTabScreen) return;
+    const h = e.nativeEvent.layout.height;
+    if (h > 0 && adLoaded) publishHeight(h);
+  }, [inTabScreen, adLoaded, publishHeight]);
+
+  // Reset published height when ad unloads / component unmounts
+  useEffect(() => {
+    if (!adLoaded) publishHeight(0);
+  }, [adLoaded, publishHeight]);
+  useEffect(() => {
+    return () => publishHeight(0);
+  }, [publishHeight]);
 
   // Delay banner appearance to prevent layout shifts and reduce initial annoyance
   useEffect(() => {
@@ -101,7 +122,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
     if (!slotUnitId) return null;
 
     return (
-      <Animated.View pointerEvents="box-none" style={wrapperStyle}>
+      <Animated.View pointerEvents="box-none" style={wrapperStyle} onLayout={handleLayout}>
         <GoogleBannerAd
           key={`slot-${slotKey}-${retryKey}`}
           unitId={slotUnitId}
@@ -121,7 +142,7 @@ export const BannerAdComponent: React.FC<BannerAdComponentProps> = ({ screen, sl
   if (!adUnitId) return null;
 
   return (
-    <Animated.View pointerEvents="box-none" style={wrapperStyle}>
+    <Animated.View pointerEvents="box-none" style={wrapperStyle} onLayout={handleLayout}>
       <GoogleBannerAd
         key={`screen-${screen}-${retryKey}`}
         unitId={adUnitId}

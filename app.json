@@ -24,9 +24,9 @@
       "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -303,6 +303,39 @@
         "./plugins/with-notification-large-icon",
         {
           "icon": "./assets/images/icons/icon.png"
+        }
+      ],
+      [
+        "expo-dynamic-app-icon",
+        {
+          "app_icon_english": {
+            "image": "./assets/images/icons/icon_en.png",
+            "prerendered": true
+          },
+          "ramadan": {
+            "image": "./assets/images/icons/seasonal/ramadan.png",
+            "prerendered": true
+          },
+          "hajj": {
+            "image": "./assets/images/icons/seasonal/hajj.png",
+            "prerendered": true
+          },
+          "mawlid": {
+            "image": "./assets/images/icons/seasonal/mawlid.png",
+            "prerendered": true
+          },
+          "eid_fitr": {
+            "image": "./assets/images/icons/seasonal/eid_fitr.png",
+            "prerendered": true
+          },
+          "eid_adha": {
+            "image": "./assets/images/icons/seasonal/eid_adha.png",
+            "prerendered": true
+          },
+          "dhul_hijjah": {
+            "image": "./assets/images/icons/seasonal/dhul_hijjah.png",
+            "prerendered": true
+          }
         }
       ],
       "./modules/proximity-sensor/plugin"

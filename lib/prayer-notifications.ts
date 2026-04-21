@@ -288,11 +288,43 @@ export async function schedulePrayerNotifications(
     // ─── API fetch succeeded — NOW cancel old prayer notifications ──────────
     // We defer cancellation until AFTER fetching succeeds so that a network
     // failure never wipes existing scheduled notifications (the "one-shot" bug).
+    //
+    // RACE-CONDITION GUARD (Fix B): Skip cancellation for IMMINENT prayer
+    // notifications (firing within the next 15 minutes). Reason: the API fetch
+    // above can take several seconds. If we cancel an imminent prayer (e.g. Maghrib
+    // 3 min away) and then the freshly-recomputed triggerDate ends up in the past
+    // by the time we reach the scheduling loop, the loop's `triggerDate <= now`
+    // guard will SKIP it — leaving the user with no notification at all.
+    // The scheduling loop already does `continue` when triggerDate is past, so
+    // preserved imminent notifications won't be overwritten by `scheduleNotificationAsync`.
+    const IMMINENT_WINDOW_MS = 15 * 60 * 1000;
+    const cancelCheckNow = Date.now();
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    let preservedImminentCount = 0;
     for (const n of scheduled) {
-      if (n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_')) {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      const isPrayerNotif = n.identifier.startsWith('prayer_') || n.identifier.startsWith('did_you_pray_');
+      if (!isPrayerNotif) continue;
+
+      // Extract trigger date if this is a DATE trigger (expo-notifications shape)
+      const trig: any = n.trigger;
+      const triggerMs: number | null =
+        trig && typeof trig === 'object' && typeof trig.value === 'number' ? trig.value
+        : trig && typeof trig === 'object' && trig.date instanceof Date ? trig.date.getTime()
+        : trig && typeof trig === 'object' && typeof trig.date === 'number' ? trig.date
+        : null;
+
+      if (triggerMs !== null) {
+        const msUntilFire = triggerMs - cancelCheckNow;
+        if (msUntilFire > 0 && msUntilFire <= IMMINENT_WINDOW_MS) {
+          preservedImminentCount++;
+          console.log(`[prayer-notif] 🛡️ PRESERVE imminent ${n.identifier} (fires in ${Math.round(msUntilFire / 1000)}s)`);
+          continue; // Skip cancellation — keep this notification intact
+        }
       }
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+    if (preservedImminentCount > 0) {
+      console.log(`[prayer-notif] 🛡️ Preserved ${preservedImminentCount} imminent prayer notification(s) from cancellation`);
     }
 
     // Resolve the Android channel for the user's selected sound.

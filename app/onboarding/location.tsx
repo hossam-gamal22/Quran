@@ -122,8 +122,8 @@ export default function LocationScreen() {
       const countryCode = (reverseGeocode?.isoCountryCode || '').toUpperCase();
       if (countryCode) {
         import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
-          updateUserCountryFromGPS(countryCode).catch(() => {});
-        }).catch(() => {});
+          updateUserCountryFromGPS(countryCode).catch((err) => console.warn('⚠️ Onboarding GPS country update failed:', err));
+        }).catch((err) => console.warn('⚠️ Failed to import firebase-user for GPS country:', err));
         setUserCountry(countryCode).catch(() => {});
       }
 

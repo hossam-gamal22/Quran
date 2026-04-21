@@ -1,6 +1,6 @@
 <lint-module
     format="1"
-    dir="/Users/hossamgamal/Desktop/MobileApps/Quran/modules/proximity-sensor/android"
+    dir="/Users/hossamgamal/Desktop/MobileApps/RoohAlMuslim/opensource/modules/proximity-sensor/android"
     name=":proximity-sensor"
     type="LIBRARY"
     maven="com.rooh.almuslim.proximitysensor:proximity-sensor:1.0.0"

@@ -43,6 +43,7 @@ import { GlassCard, GlassToggle } from '../../components/ui/GlassCard';
 import { copyToClipboard } from '../../lib/clipboard';
 import { APP_CONFIG } from '../../constants/app';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { Share } from 'react-native';
 import { getTodayDate, getAzkarRecord, saveAzkarRecord } from '../../lib/worship-storage';
 import { trackTasbih } from '@/lib/firebase-analytics';
@@ -254,6 +255,7 @@ export default function TasbihScreen() {
   const isRTL = useIsRTL();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const s = useScaledStyles(_s, colors.fs);
 
   // Block all ads during tasbih counting
@@ -826,7 +828,7 @@ export default function TasbihScreen() {
         {/* Scrollable Content */}
         <ScrollView
           style={s.scrollView}
-          contentContainerStyle={s.scrollContent}
+          contentContainerStyle={[s.scrollContent, { paddingBottom: 140 + adBottomInset }]}
           showsVerticalScrollIndicator={false}
           bounces={true}
           alwaysBounceVertical={true}

@@ -29,6 +29,7 @@ import { t } from '@/lib/i18n';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { NativeTabs } from '@/components/ui/NativeTabs';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -55,6 +56,7 @@ export default function AzkarScreen() {
   const router = useRouter();
   const { exclude } = useLocalSearchParams<{ exclude?: string }>();
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
   const colors = useColors();
@@ -542,7 +544,7 @@ export default function AzkarScreen() {
         {renderQuickLinks()}
 
         {/* المسافة السفلية */}
-        <View style={{ height: Math.max(insets.bottom + 84, 100) }} />
+        <View style={{ height: Math.max(insets.bottom + 84, 100) + adBottomInset }} />
       </ScrollView>
       <BannerAdComponent screen="azkar" inTabScreen />
     </BackgroundWrapper>

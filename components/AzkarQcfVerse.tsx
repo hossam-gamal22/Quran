@@ -12,6 +12,7 @@ import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
 import { getPageFontFamily } from '@/lib/qcf-font-loader';
 import { getQuranRefs } from '@/lib/azkar-quran-refs';
 import { getSurahName } from '@/lib/quran-api';
+import { stripAzkarBrackets } from '@/lib/basmala-utils';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings } from '@/contexts/SettingsContext';
 
@@ -100,6 +101,9 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText, compac
   // Fallback: show plain Arabic with KFGQPCUthmanic if QCF fonts aren't ready
   if (!allFontsLoaded) {
     if (fallbackText) {
+      // Strip Isti'adha prefix + brackets so the fallback matches the
+      // on-screen QCF render (which only shows verse glyphs).
+      const cleanFallback = stripAzkarBrackets(fallbackText);
       return (
         <View style={styles.container}>
           <Text
@@ -112,7 +116,7 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText, compac
               writingDirection: 'rtl',
             }}
           >
-            {fallbackText}
+            {cleanFallback}
           </Text>
         </View>
       );

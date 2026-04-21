@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db as firebaseDb } from '../config/firebase';
 import { schedulePrayerNotifications } from './prayer-notifications';
 import { fetchTafsir } from './quran-api';
 import { getAyahAudioUrl } from './quran-cache';
@@ -892,6 +893,33 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       return [singleTime || fallback];
     };
 
+    // Safety guard: clamp times to a sensible window per category so a corrupted
+    // value (admin push, AsyncStorage corruption, stale cache) can NEVER fire
+    // a "sleep azkar" reminder at 5:30 AM, etc.
+    // Window is local-time hour range [startHour, endHour) — endHour exclusive.
+    type AzkarCategory = 'morning' | 'evening' | 'sleep' | 'wakeup';
+    const CATEGORY_WINDOWS: Record<AzkarCategory, { start: number; end: number; safe: string }> = {
+      morning: { start: 4, end: 11, safe: '06:00' },
+      evening: { start: 14, end: 20, safe: '17:45' },
+      sleep:   { start: 19, end: 24, safe: '22:00' }, // 19:00 – 23:59 only
+      wakeup:  { start: 4, end: 12, safe: '08:00' },
+    };
+    const clampTimes = (times: string[], category: AzkarCategory): string[] => {
+      const w = CATEGORY_WINDOWS[category];
+      const out: string[] = [];
+      for (const raw of times) {
+        const { hour } = parseTime(raw);
+        if (hour >= w.start && hour < w.end) {
+          out.push(raw);
+        } else {
+          console.warn(`🛡️ ${category} time "${raw}" outside window [${w.start}:00–${w.end}:00) — replacing with ${w.safe}`);
+          out.push(w.safe);
+        }
+      }
+      // Ensure at least one entry
+      return out.length > 0 ? out : [w.safe];
+    };
+
     // Helper: schedule a category for multiple times
     const scheduleMultiTime = async (
       baseId: string,
@@ -944,7 +972,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule morning wird if enabled
     if (notifSettings.morningAzkar) {
-      const morningTimes = getTimesArray(notifSettings.morningAzkarTimes, notifSettings.morningAzkarTime, '06:00');
+      const morningTimes = clampTimes(getTimesArray(notifSettings.morningAzkarTimes, notifSettings.morningAzkarTime, '06:00'), 'morning');
       const morningText = getNotifText('morning', t('settings.morningWirdTitle'), t('settings.morningWirdBody'), lang);
       await scheduleMultiTime(
         'wird_morning',
@@ -964,7 +992,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule evening wird if enabled
     if (notifSettings.eveningAzkar) {
-      const eveningTimes = getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '18:00');
+      const eveningTimes = clampTimes(getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '18:00'), 'evening');
       const eveningText = getNotifText('evening', t('settings.eveningWirdTitle'), t('settings.eveningWirdBody'), lang);
       await scheduleMultiTime(
         'wird_evening',
@@ -984,7 +1012,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule sleep azkar if enabled
     if (notifSettings.sleepAzkar) {
-      const sleepTimes = getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00');
+      const sleepTimes = clampTimes(getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00'), 'sleep');
       const sleepText = getNotifText('sleep', t('notifications.sleepAzkarTitle'), t('notifications.sleepAzkarBody'), lang);
       const sleepSound = 'notif_sleep';
       await scheduleMultiTime(
@@ -1005,7 +1033,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule wakeup azkar if enabled
     if (notifSettings.wakeupAzkar) {
-      const wakeupTimes = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00');
+      const wakeupTimes = clampTimes(getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00'), 'wakeup');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
       const wakeupSound = 'notif_wakeup';
       await scheduleMultiTime(
@@ -1859,11 +1887,8 @@ const DEFAULTS_FETCH_TIMEOUT_MS = 3000; // 3-second timeout to prevent hanging o
 export const fetchNotificationDefaults = async (): Promise<NotificationDefaultsConfig | null> => {
   // Helper: wrap Firestore fetch with timeout
   const fetchWithTimeout = async (): Promise<NotificationDefaultsConfig | null> => {
-    const { getFirestore, doc, getDoc } = await import('firebase/firestore');
-    const app = (await import('@/config/firebase')).default;
-    const db = getFirestore(app);
-    
-    const docRef = doc(db, 'appConfig', 'notificationDefaults');
+    const { doc, getDoc } = await import('firebase/firestore');
+    const docRef = doc(firebaseDb, 'appConfig', 'notificationDefaults');
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
@@ -1906,7 +1931,8 @@ export const fetchNotificationDefaults = async (): Promise<NotificationDefaultsC
 };
 
 // Map category keys to their corresponding settings keys
-const CATEGORY_TIMES_MAP: Record<keyof NotificationDefaultsConfig, { times: string; single: string; sound?: string; days?: string }> = {
+type NotificationCategoryKey = Exclude<keyof NotificationDefaultsConfig, 'configVersion'>;
+const CATEGORY_TIMES_MAP: Record<NotificationCategoryKey, { times: string; single: string; sound?: string; days?: string }> = {
   salawat: { times: 'salawatReminderTimes', single: 'salawatReminderTime', sound: 'salawatSoundType', days: 'salawatDays' },
   tasbih: { times: 'tasbihReminderTimes', single: 'tasbihReminderTime', sound: 'tasbihSoundType', days: 'tasbihDays' },
   istighfar: { times: 'istighfarReminderTimes', single: 'istighfarReminderTime', sound: 'istighfarSoundType', days: 'istighfarDays' },
@@ -1976,13 +2002,15 @@ export const syncNotificationDefaults = async (
   const updates: Record<string, any> = {};
   
   for (const [categoryKey, config] of Object.entries(defaults) as [keyof NotificationDefaultsConfig, NotificationCategoryDefaults][]) {
+    // Skip metadata key — not a category
+    if (categoryKey === 'configVersion') continue;
     // Skip if user has customized this category
     if (overrides[categoryKey]) {
       console.log(`⏭️ Skipping ${categoryKey} — user has customized`);
       continue;
     }
-    
-    const mapping = CATEGORY_TIMES_MAP[categoryKey];
+
+    const mapping = CATEGORY_TIMES_MAP[categoryKey as NotificationCategoryKey];
     if (!mapping) continue;
     
     // Apply times
@@ -2030,11 +2058,8 @@ export const subscribeToNotificationDefaults = (
   
   (async () => {
     try {
-      const { getFirestore, doc, onSnapshot } = await import('firebase/firestore');
-      const app = (await import('@/config/firebase')).default;
-      const db = getFirestore(app);
-      
-      const docRef = doc(db, 'appConfig', 'notificationDefaults');
+      const { doc, onSnapshot } = await import('firebase/firestore');
+      const docRef = doc(firebaseDb, 'appConfig', 'notificationDefaults');
       unsubscribe = onSnapshot(
         docRef,
         async (docSnap) => {

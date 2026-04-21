@@ -2,6 +2,21 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { SESSION_TOKEN_KEY, USER_INFO_KEY } from "@/constants/oauth";
 
+// iOS Simulator / unsigned builds lack keychain-access-groups entitlement.
+// Detect these errors so we can silence them instead of logging as ERROR.
+const isEntitlementError = (err: unknown): boolean => {
+  const msg = (err as { message?: string } | null)?.message ?? '';
+  return /entitlement isn'?t present|Keychain access failed|getValueWithKeyAsync|getRegistrationInfoAsync/i.test(msg);
+};
+
+const logAuthError = (label: string, err: unknown) => {
+  if (isEntitlementError(err)) {
+    // Expected on simulator / unsigned builds — noop.
+    return;
+  }
+  console.warn(label, err);
+};
+
 export type User = {
   id: number;
   openId: string;
@@ -28,7 +43,7 @@ export async function getSessionToken(): Promise<string | null> {
     );
     return token;
   } catch (error) {
-    console.error("[Auth] Failed to get session token:", error);
+    logAuthError("[Auth] Failed to get session token:", error);
     return null;
   }
 }
@@ -46,7 +61,7 @@ export async function setSessionToken(token: string): Promise<void> {
     await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
     console.log("[Auth] Session token stored in SecureStore successfully");
   } catch (error) {
-    console.error("[Auth] Failed to set session token:", error);
+    logAuthError("[Auth] Failed to set session token:", error);
     throw error;
   }
 }
@@ -64,7 +79,7 @@ export async function removeSessionToken(): Promise<void> {
     await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
     console.log("[Auth] Session token removed from SecureStore successfully");
   } catch (error) {
-    console.error("[Auth] Failed to remove session token:", error);
+    logAuthError("[Auth] Failed to remove session token:", error);
   }
 }
 
@@ -89,7 +104,7 @@ export async function getUserInfo(): Promise<User | null> {
     console.log("[Auth] User info retrieved:", user);
     return user;
   } catch (error) {
-    console.error("[Auth] Failed to get user info:", error);
+    logAuthError("[Auth] Failed to get user info:", error);
     return null;
   }
 }
@@ -109,7 +124,7 @@ export async function setUserInfo(user: User): Promise<void> {
     await SecureStore.setItemAsync(USER_INFO_KEY, JSON.stringify(user));
     console.log("[Auth] User info stored in SecureStore successfully");
   } catch (error) {
-    console.error("[Auth] Failed to set user info:", error);
+    logAuthError("[Auth] Failed to set user info:", error);
   }
 }
 
@@ -124,6 +139,6 @@ export async function clearUserInfo(): Promise<void> {
     // Use SecureStore for native
     await SecureStore.deleteItemAsync(USER_INFO_KEY);
   } catch (error) {
-    console.error("[Auth] Failed to clear user info:", error);
+    logAuthError("[Auth] Failed to clear user info:", error);
   }
 }

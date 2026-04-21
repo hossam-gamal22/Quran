@@ -62,34 +62,44 @@ function stripTashkeel(s: string): string {
 }
 
 /**
+ * Detect whether the inner content of a parenthesised group is just a
+ * repetition counter such as `(ثلاث)`, `(سبع )`, `(٣)`, `(3 times)`,
+ * `(ثلاث مرات)`. Counters must be preserved in display.
+ */
+function isCountOnly(content: string): boolean {
+  const stripped = content
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
+    .trim();
+  if (!stripped) return false;
+  // Numeric (Arabic-Indic / Eastern Arabic / Latin) optionally followed by مرة/مرات/مرتين/times
+  if (/^[\u0660-\u0669\u06F0-\u06F9\d]+(\s+(مرة|مرات|مرتين|times?))?\s*$/i.test(stripped)) return true;
+  // Word-based count, optionally followed by مرة/مرات/مرتين
+  const WORDS = '(?:مرة|مرات|مرتين|ثلاث(?:ة|ا|ًا)?|اثنت?ان|اثنت?ين|أربع(?:ة)?|خمس(?:ة)?|ست(?:ة)?|سبع(?:ة|ًا)?|ثمان(?:ية|يا)?|تسع(?:ة)?|عشر(?:ة|ون|ين|ًا)?|عشرون|عشرين|مائة|مئة|ألف)';
+  const re = new RegExp('^' + WORDS + '(\\s+' + WORDS + ')*\\s*$');
+  return re.test(stripped);
+}
+
+/**
  * Strip display brackets and annotations from azkar text:
- * - (( )) double parentheses (hadith wrappers)
- * - [[ ]] double square brackets (scholarly annotations)
- * - [ ] single square brackets (inline annotations)
- * - ( ) single parentheses ONLY when containing count instructions like (ثلاث مرات)
+ * - (( )) double parentheses (hadith wrappers) → ( )
+ * - [[ ]] double square brackets (scholarly annotations) → removed
+ * - [ ] single square brackets (inline annotations) → removed
+ * - ( ) outer parentheses wrapping the entire text → removed (unless they wrap a counter)
  * - أعوذ بالله من الشيطان الرجيم prefix before Quran verses (﴿)
- * Keeps the inner content for brackets, removes count instructions entirely.
+ * PRESERVES count parentheses such as (ثلاث), (سبع), (ثلاث مرات), (٣).
  */
 export function stripAzkarBrackets(text: string | undefined): string {
   if (!text) return '';
   let result = text
-    // Step 1: Remove square brackets
+    // Step 1: Remove square brackets (single + double), keep inner content
     .replace(/\[\[/g, '')
     .replace(/\]\]/g, '')
     .replace(/\[/g, '')
     .replace(/\]/g, '')
-    // Step 2: Remove count-only parentheses BEFORE bracket conversion
-    // so (instruction (count)) → (instruction ) then )) → ) works correctly
-    .replace(/\([^)]{0,30}م[\u064B-\u065F]*ر[\u064B-\u065F]*(?:ا[\u064B-\u065F]*ت[\u064B-\u065F]*|ة[\u064B-\u065F]*)[^)]{0,10}\)/g, '')
-    .replace(/\([\s\u064B-\u065F]*(?:ثلاث|ثَلاَثَ|أربع|سبع|عشر|مائة|مِائَة)[^)]{0,30}\)/g, '')
-    // Step 3: Convert (( → ( and )) → ) (preserves instruction text in parentheses)
+    // Step 2: Collapse (( → ( and )) → )
     .replace(/\)\)/g, ')')
     .replace(/\(\(/g, '(')
-    // Step 4: Remove trailing count instructions OUTSIDE parens: ". ثلاث مرَّاتٍ والثالثة..."
-    .replace(/[.\s]*(?:ثَ?لَ?ا?َ?ثَ?|ث[\u064B-\u065F]*ل[\u064B-\u065F]*ا[\u064B-\u065F]*ث[\u064B-\u065F]*)[\s\u064B-\u065F]*م[\u064B-\u065F]*ر[\u064B-\u065F]*(?:ا[\u064B-\u065F]*ت[\u064B-\u065F]*|ة[\u064B-\u065F]*).*$/g, '')
-    // Step 5: Remove standalone ثلاثاً (tanween fatha = "three times") — NOT ثلاثٌ/ثلاث+noun (hadith content)
-    .replace(/[،,\s]*ث[\u064B-\u065F]*ل[\u064B-\u065F]*ا[\u064B-\u065F]*ث[\u064B-\u065F]*ا[\u064B-\u065F]*ً[،,\s]*/g, ' ')
-    // Clean up: orphan dashes, space before parens, extra whitespace/dots
+    // Cleanup: orphan dashes, stray spaces around parens, double spaces
     .replace(/^\s*-\s*/, '')
     .replace(/\s*-\s*$/, '')
     .replace(/\s+\)/g, ')')
@@ -98,14 +108,15 @@ export function stripAzkarBrackets(text: string | undefined): string {
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // Strip outer wrapping parentheses only if the opening ( matches the closing )
+  // Strip outer wrapping parentheses only if:
+  //   1. The opening ( matches the closing ), AND
+  //   2. The wrapped content is NOT a counter we want to preserve.
   if (/^\(/.test(result) && /\)\s*\.?\s*$/.test(result)) {
     let depth = 0;
     let outerWraps = true;
     for (let i = 0; i < result.length; i++) {
       if (result[i] === '(') depth++;
       else if (result[i] === ')') depth--;
-      // If depth hits 0 before the end, the ( doesn't wrap the whole text
       if (depth === 0 && i < result.length - 1) {
         const remaining = result.substring(i + 1).trim();
         if (remaining && remaining !== '.' && remaining !== '،') {
@@ -115,7 +126,10 @@ export function stripAzkarBrackets(text: string | undefined): string {
       }
     }
     if (outerWraps) {
-      result = result.replace(/^\(\s*/, '').replace(/\s*\)\s*\.?\s*$/, '').trim();
+      const inner = result.replace(/^\(\s*/, '').replace(/\s*\)\s*\.?\s*$/, '').trim();
+      if (!isCountOnly(inner)) {
+        result = inner;
+      }
     }
   }
 

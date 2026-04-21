@@ -3,7 +3,7 @@
  * Renders verse 255 of Surah Al-Baqarah using QCF fonts
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,16 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Share,
+  Platform,
+  Image,
+  ImageBackground,
   useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -26,11 +30,15 @@ import { ScreenContainer } from '@/components/screen-container';
 import { GlassCard, BackButton } from '@/components/ui';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { getVerseQcfData, getQcfFontSize, getSurahData } from '@/lib/qcf-page-data';
-import { loadPageFont, getPageFontFamily } from '@/lib/qcf-font-loader';
+import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 import { getSurahName } from '@/lib/quran-api';
 import { localizeNumber } from '@/lib/format-number';
 import { useQuran } from '@/contexts/QuranContext';
 import { Spacing } from '@/constants/theme';
+import { QURAN_THEMES, getSafeThemeIndex, isThemeLight, getGoldenColor } from '@/constants/quran-themes';
+import { useAppIdentity } from '@/hooks/use-app-identity';
+
+const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
 
 const SURAH_NUM = 2;
 const AYAH_NUM = 255;
@@ -43,6 +51,16 @@ export default function AyatKursiScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { playAyah, playbackState, togglePlayPause } = useQuran();
+  const shareViewShotRef = useRef<ViewShot>(null);
+  const { logoSource: appIcon } = useAppIdentity();
+
+  // Use the same Quran theme as the Mushaf reader for share capture
+  const themeIndex = getSafeThemeIndex(settings?.display?.quranThemeIndex ?? 0);
+  const quranTheme = QURAN_THEMES[themeIndex];
+  const themeBgColor = quranTheme?.background || '#FFF8F0';
+  const themeTextColor = quranTheme?.primary || '#1A1000';
+  const isLightBg = isThemeLight(themeIndex);
+  const shareOrnamentColor = isLightBg ? '#11171d' : getGoldenColor(themeIndex);
 
   const [qcfFontLoaded, setQcfFontLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -73,12 +91,25 @@ export default function AyatKursiScreen() {
   }, [qcfPage, isDarkMode]);
 
   const handleShare = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const surahName = getSurahName(SURAH_NUM);
-    const text = `${arabicText}\n\n— ${surahName} — ${t('quran.ayah')} ${localizeNumber(AYAH_NUM)}\n\nروح المسلم`;
     try {
-      await Share.share({ message: text });
-    } catch {}
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (!shareViewShotRef.current) return;
+      if (!isPageFontLoaded(qcfPage, isDarkMode)) return;
+      // Small delay to ensure off-screen view is fully rendered
+      await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 400 : 150));
+      const uri = await captureRef(shareViewShotRef, {
+        format: 'png',
+        quality: 1,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          UTI: 'public.png',
+        });
+      }
+    } catch (e) {
+      console.warn('Error sharing Ayat Al-Kursi:', e);
+    }
   };
 
   const handlePlay = () => {
@@ -262,6 +293,59 @@ export default function AyatKursiScreen() {
             />
             <Text numberOfLines={1} style={styles.title}>{t('home.ayatKursi')}</Text>
           </View>
+
+          {/* Off-screen share capture — matches Mushaf reader style */}
+          {(() => {
+            const SHARE_CAPTURE_WIDTH = 375;
+            const shareFontSize = getQcfFontSize(qcfPage, SHARE_CAPTURE_WIDTH - 64) + 2;
+            const shareFontFamily = getPageFontFamily(qcfPage, !isLightBg);
+            return (
+              <View style={{ position: 'absolute', left: -9999, top: 0, width: SHARE_CAPTURE_WIDTH }} pointerEvents="none" collapsable={false}>
+                <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }}>
+                  <View style={{ backgroundColor: themeBgColor, paddingTop: 40, paddingBottom: 28, paddingHorizontal: 16 }} collapsable={false}>
+                    {/* Surah banner */}
+                    <View style={{ marginHorizontal: 8, marginBottom: 24, height: 54 }}>
+                      <ImageBackground
+                        source={surahOrnament}
+                        style={{ width: '100%', height: 50, justifyContent: 'center', alignItems: 'center' }}
+                        resizeMode="contain"
+                        tintColor={shareOrnamentColor}
+                      >
+                        <Text style={{ fontSize: 17, fontFamily: 'Amiri-Bold', textAlign: 'center', lineHeight: 28, color: shareOrnamentColor }} allowFontScaling={false}>
+                          {isRTL ? 'آية الكرسي' : 'Ayat Al-Kursi'}
+                        </Text>
+                      </ImageBackground>
+                    </View>
+                    {/* QCF Ayat Al-Kursi */}
+                    {qcfFontLoaded && qcfText ? (
+                      <Text
+                        allowFontScaling={false}
+                        style={{
+                          fontFamily: shareFontFamily,
+                          fontSize: shareFontSize,
+                          textAlign: 'center',
+                          lineHeight: shareFontSize * 1.85,
+                          color: themeTextColor,
+                          writingDirection: 'rtl',
+                          paddingHorizontal: 8,
+                        }}
+                      >
+                        {qcfText}
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 24, color: themeTextColor, textAlign: 'center', lineHeight: 46, fontFamily: 'Amiri-Bold', writingDirection: 'rtl' }}>
+                        {arabicText}
+                      </Text>
+                    )}
+                    {/* Branding watermark */}
+                    <View style={{ alignItems: 'center', marginTop: 28 }} pointerEvents="none" collapsable={false}>
+                      <Image source={appIcon} style={{ width: 40, height: 40, borderRadius: 10, opacity: 0.7 }} resizeMode="contain" />
+                    </View>
+                  </View>
+                </ViewShot>
+              </View>
+            );
+          })()}
 
           {/* Verse Card */}
           <GlassCard style={styles.verseCard}>

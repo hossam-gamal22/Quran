@@ -44,6 +44,7 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 
 // ---------------------------------------------------------------------------
 // SVG Renderer
@@ -200,6 +201,7 @@ const calculateQiblaBearingLocal = (lat: number, lng: number): number => {
 // ---------------------------------------------------------------------------
 const QiblaScreen = () => {
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const { settings, t, isDarkMode } = useSettings();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -584,7 +586,7 @@ const QiblaScreen = () => {
     <BackgroundWrapper {...bgProps}>
     <ScrollView
       style={styles.root}
-      contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 }]}
+      contentContainerStyle={[styles.scrollContainer, { paddingBottom: Math.max(insets.bottom, 16) + 60 + adBottomInset }]}
       showsVerticalScrollIndicator={false}
       bounces={false}
     >

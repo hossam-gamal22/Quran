@@ -34,7 +34,11 @@ const ALL_SOUND_FILES: Record<string, string> = {
  * NEVER returns 'default' in production builds — always a real bundled filename.
  * In Expo Go, returns 'default' because custom sounds aren't bundled.
  */
-const isExpoGo = Constants.appOwnership === 'expo';
+// SDK 54: Constants.appOwnership is deprecated and may be null inside Expo Go;
+// fall back to the modern executionEnvironment === 'storeClient' signal.
+const isExpoGo =
+  Constants.appOwnership === 'expo' ||
+  (Constants as any).executionEnvironment === 'storeClient';
 
 export function resolveNotificationSound(soundType?: string, soundEnabled?: boolean): string | false {
   if (soundEnabled === false || soundType === 'silent') {

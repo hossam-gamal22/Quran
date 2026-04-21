@@ -9,7 +9,7 @@ import { fetchWithTimeout } from './fetch-with-timeout';
 
 // Throttle the offline alert to at most once per 30s so repeat taps don't spam.
 let _lastOfflineAlertAt = 0;
-async function notifyOfflineAudio() {
+export async function notifyOfflineAudio() {
   const now = Date.now();
   if (now - _lastOfflineAlertAt < 30_000) return;
   _lastOfflineAlertAt = now;
@@ -149,10 +149,14 @@ class AudioPlayerManager {
   }
 
   private setupTrackPlayerListeners() {
-    if (!TrackPlayer || !Event || !State) return;
+    if (!TrackPlayer || !Event || !State) {
+      console.log('[audio-player] setupTrackPlayerListeners: deferred — TP=', !!TrackPlayer, 'Event=', !!Event, 'State=', !!State);
+      return;
+    }
     // Guard against duplicate listener setup (e.g. hot reload)
     if (this.listenersSetup) return;
     this.listenersSetup = true;
+    console.log('[audio-player] setupTrackPlayerListeners: OK — registering listeners');
     
     // Listen for playback state changes from TrackPlayer
     const playbackStateListener = TrackPlayer.addEventListener(
@@ -186,11 +190,58 @@ class AudioPlayerManager {
         if (currentSource !== null && currentSource !== 'quran') return;
 
         if (this.continuousPlay && !this.isTransitioning) {
-          await this.playNextAyah(true);
+          if (this.playingFullSurah) {
+            // Whole-surah file ended — advance to next surah, not next ayah
+            // of the same surah (that would re-load + replay the same file).
+            const { currentSurah, reciterIdentifier } = this.state;
+            if (currentSurah < 114) {
+              await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true, true);
+            } else {
+              await this.stop();
+            }
+          } else {
+            await this.playNextAyah(true);
+          }
         }
       }
     );
     this.trackPlayerListeners.push(() => queueEndListener.remove());
+
+    // Native progress event — fires on the player thread at the cadence set
+    // via TrackPlayer.updateOptions({ progressUpdateEventInterval }). This is
+    // independent of the JS setInterval poller so the per-ayah highlight stays
+    // accurate even when the JS thread is busy rendering pages.
+    if ((Event as any).PlaybackProgressUpdated) {
+      const progressListener = TrackPlayer.addEventListener(
+        (Event as any).PlaybackProgressUpdated,
+        (data: any) => {
+          const currentSource = audioCoordinator.getCurrentSource();
+          if (currentSource !== null && currentSource !== 'quran') return;
+          if (!this.playingFullSurah || this.state.currentSurah <= 0) return;
+          const key = `${this.state.reciterIdentifier}:${this.state.currentSurah}`;
+          const offsets = this.surahOffsets.get(key);
+          if (!offsets || offsets.length === 0) return;
+          const posMs = (data?.position || 0) * 1000;
+          let lo = 0, hi = offsets.length - 1, idx = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (offsets[mid] <= posMs) { idx = mid; lo = mid + 1; }
+            else hi = mid - 1;
+          }
+          const ayahIndex = idx + 1;
+          if (this.state.currentAyah !== ayahIndex) {
+            console.log('[audio-player] PROGRESS evt advancing ayah', this.state.currentAyah, '→', ayahIndex, 'pos=', Math.round(posMs), 'ms');
+            this.updateState({ currentAyah: ayahIndex, position: posMs });
+          } else {
+            this.updateState({ position: posMs });
+          }
+        }
+      );
+      this.trackPlayerListeners.push(() => progressListener.remove());
+      console.log('[audio-player] PlaybackProgressUpdated listener registered');
+    } else {
+      console.warn('[audio-player] Event.PlaybackProgressUpdated NOT available — falling back to setInterval poller only');
+    }
 
     // Start progress poller for TrackPlayer (since useProgress hook is for components only)
     this.startProgressPoller();
@@ -198,7 +249,8 @@ class AudioPlayerManager {
 
   private startProgressPoller() {
     if (this.progressPoller || !TrackPlayer || !State) return;
-    
+    console.log('[audio-player] startProgressPoller: STARTED');
+
     this.progressPoller = setInterval(async () => {
       if (!this.useTrackPlayer || !TrackPlayer || !State) return;
       // Only poll progress when Quran owns TrackPlayer
@@ -211,10 +263,48 @@ class AudioPlayerManager {
         const state = await TrackPlayer.getPlaybackState();
 
         if (state.state !== State.Stopped && state.state !== State.None) {
-          this.updateState({
+          const updates: Partial<PlaybackState> = {
             position: position * 1000, // Convert to ms
             duration: duration * 1000, // Convert to ms
-          });
+          };
+
+          // While playing a full surah on TrackPlayer, derive currentAyah from
+          // the audio position using cached per-ayah offsets. Without this,
+          // the sticky player text, the page highlight and the auto page-turn
+          // effect all stay frozen on the first ayah.
+          if (this.playingFullSurah && this.state.currentSurah > 0) {
+            const key = `${this.state.reciterIdentifier}:${this.state.currentSurah}`;
+            const offsets = this.surahOffsets.get(key);
+            // Heartbeat log every ~5s so we can confirm the poller is alive
+            if (Math.random() < 0.02) {
+              console.log('[audio-player] poller TICK pos=', Math.round(position * 1000), 'ms key=', key, 'offsets=', offsets?.length ?? 'NONE', 'currentAyah=', this.state.currentAyah);
+            }
+            if (offsets && offsets.length > 0) {
+              const posMs = position * 1000;
+              let lo = 0, hi = offsets.length - 1, idx = 0;
+              while (lo <= hi) {
+                const mid = (lo + hi) >> 1;
+                if (offsets[mid] <= posMs) {
+                  idx = mid;
+                  lo = mid + 1;
+                } else {
+                  hi = mid - 1;
+                }
+              }
+              const ayahIndex = idx + 1;
+              if (this.state.currentAyah !== ayahIndex) {
+                console.log('[audio-player] poller advancing ayah', this.state.currentAyah, '→', ayahIndex, 'pos=', Math.round(posMs), 'ms');
+                updates.currentAyah = ayahIndex;
+              }
+            } else {
+              // Helpful diagnostic — fires once per 500ms while offsets missing
+              if (Math.random() < 0.05) {
+                console.log('[audio-player] poller has no offsets for', key, 'cache size=', this.surahOffsets.size);
+              }
+            }
+          }
+
+          this.updateState(updates);
         }
       } catch {
         // Ignore errors when player is not ready
@@ -313,6 +403,13 @@ class AudioPlayerManager {
         if (localUri) {
           audioUrl = localUri;
           console.log('[audio-player] using offline file:', audioUrl);
+          // Still fetch timestamps (best-effort) so per-ayah tracking works
+          // when playing the locally downloaded surah file.
+          try {
+            await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
+          } catch (e) {
+            console.warn('[audio-player] Offline timestamps fetch failed (non-fatal):', e);
+          }
         } else {
           try {
             const { offsets, audioUrl: cdnUrl } = await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
@@ -416,7 +513,29 @@ class AudioPlayerManager {
       await saveLastPlayback({ surahNumber, ayahNumber, reciterIdentifier });
 
       if (this.playingFullSurah) {
-        this.startOffsetPoller(reciterIdentifier, surahNumber);
+        // Lazy-init the listeners (and the progress poller) the first time we
+        // actually play a surah. This works around the race where the module
+        // loaded before react-native-track-player exposed Event/State, which
+        // would otherwise leave the per-ayah tracker permanently disabled.
+        if (this.useTrackPlayer && !this.listenersSetup) {
+          this.setupTrackPlayerListeners();
+        }
+        // Tighten TrackPlayer's native progress event cadence to ~250ms so
+        // the per-ayah lookup advances close to real time.
+        if (this.useTrackPlayer && TrackPlayer?.updateOptions) {
+          try {
+            await TrackPlayer.updateOptions({ progressUpdateEventInterval: 0.25 });
+          } catch {}
+        }
+        // Only run the expo-av-only offset poller on the web/expo-av path.
+        // On TrackPlayer the per-ayah lookup is performed inside the unified
+        // progress poller (see startProgressPoller) using the same offsets cache.
+        if (!this.useTrackPlayer) {
+          this.startOffsetPoller(reciterIdentifier, surahNumber);
+        } else {
+          // Make absolutely sure the poller is running on TrackPlayer too.
+          this.startProgressPoller();
+        }
         // For expo-av, handle seek after playback starts
         if (!this.useTrackPlayer && ayahNumber > 1) {
           const key = `${reciterIdentifier}:${surahNumber}`;
@@ -484,20 +603,60 @@ class AudioPlayerManager {
       }
     }
     this.sound = sound;
+    // Tighten status update cadence so per-ayah tracking advances within ~100ms
+    // of the audio crossing each ayah boundary (default is 250-500ms).
+    try { await sound.setProgressUpdateIntervalAsync(100); } catch {}
   }
 
   private async onPlaybackStatusUpdate(status: any) {
     if (status.isLoaded) {
-      this.updateState({
+      const updates: Partial<PlaybackState> = {
         duration: status.durationMillis || 0,
         position: status.positionMillis || 0,
         isPlaying: status.isPlaying,
         playingFullSurah: this.playingFullSurah,
-      });
+      };
+
+      // Per-ayah tracking from the audio position using cached offsets.
+      // Doing this inside the status callback (which expo-av invokes ~10x/sec)
+      // is far more reliable than a separate setInterval poller. It drives
+      // the sticky player text, the on-page highlight, and the auto page-turn.
+      if (this.playingFullSurah && this.state.currentSurah > 0) {
+        const key = `${this.state.reciterIdentifier}:${this.state.currentSurah}`;
+        const offsets = this.surahOffsets.get(key);
+        if (offsets && offsets.length > 0) {
+          const pos = status.positionMillis || 0;
+          let lo = 0, hi = offsets.length - 1, idx = 0;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (offsets[mid] <= pos) { idx = mid; lo = mid + 1; }
+            else hi = mid - 1;
+          }
+          const ayahIndex = idx + 1;
+          if (this.state.currentAyah !== ayahIndex) {
+            updates.currentAyah = ayahIndex;
+          }
+        }
+      }
+
+      this.updateState(updates);
 
       if (status.didJustFinish) {
         if (this.continuousPlay) {
-          await this.playNextAyah(true);
+          if (this.playingFullSurah) {
+            // Whole-surah MP3 just ended — advance to the FIRST ayah of the
+            // NEXT surah. Calling playNextAyah() here would re-load the same
+            // surah file and seek to the next ayah offset, which causes the
+            // surah to replay from that point endlessly.
+            const { currentSurah, reciterIdentifier } = this.state;
+            if (currentSurah < 114) {
+              await this.playAyah(currentSurah + 1, 1, reciterIdentifier, true, true);
+            } else {
+              await this.stop();
+            }
+          } else {
+            await this.playNextAyah(true);
+          }
         }
       }
     }
@@ -633,7 +792,10 @@ class AudioPlayerManager {
     surahNumber: number,
   ): Promise<{ offsets: number[]; audioUrl: string | null }> {
     const reciterId = AudioPlayerManager.QURAN_CDN_RECITER_IDS[reciterIdentifier];
-    if (!reciterId) return { offsets: [], audioUrl: null };
+    if (!reciterId) {
+      console.warn('[audio-player] fetchSurahTimestamps: reciter', reciterIdentifier, 'has NO QuranCDN id mapping — per-ayah tracking will not work');
+      return { offsets: [], audioUrl: null };
+    }
 
     const key = `${reciterIdentifier}:${surahNumber}`;
     if (this.surahOffsets.has(key)) {
@@ -641,18 +803,31 @@ class AudioPlayerManager {
     }
 
     const url = `https://api.qurancdn.com/api/qdc/audio/reciters/${reciterId}/audio_files?chapter_number=${surahNumber}&segments=true`;
-    const res = await fetchWithTimeout(url, {}, 8000);
-    if (!res.ok) return { offsets: [], audioUrl: null };
+    let res: Response;
+    try {
+      res = await fetchWithTimeout(url, {}, 8000);
+    } catch (e) {
+      console.warn('[audio-player] fetchSurahTimestamps: network fetch failed for', key, e);
+      return { offsets: [], audioUrl: null };
+    }
+    if (!res.ok) {
+      console.warn('[audio-player] fetchSurahTimestamps: HTTP', res.status, 'for', key);
+      return { offsets: [], audioUrl: null };
+    }
     const data = await res.json();
 
     const file = data.audio_files?.[0];
-    if (!file?.verse_timings?.length) return { offsets: [], audioUrl: null };
+    if (!file?.verse_timings?.length) {
+      console.warn('[audio-player] fetchSurahTimestamps: no verse_timings in response for', key);
+      return { offsets: [], audioUrl: null };
+    }
 
     const offsets: number[] = file.verse_timings.map((t: any) => t.timestamp_from as number);
     // Use the audio_url from QuranCDN so timestamps and audio file are always in sync
     const cdnAudioUrl: string | null = file.audio_url || null;
     this.surahOffsets.set(key, offsets);
     if (cdnAudioUrl) this.surahAudioUrls.set(key, cdnAudioUrl);
+    console.log('[audio-player] fetchSurahTimestamps: cached', offsets.length, 'offsets for', key);
     return { offsets, audioUrl: cdnAudioUrl };
   }
 
@@ -660,7 +835,11 @@ class AudioPlayerManager {
     this.stopOffsetPoller();
     const key = `${reciterIdentifier}:${surahNumber}`;
     const offsets = this.surahOffsets.get(key) || null;
-    if (!offsets) return;
+    if (!offsets) {
+      console.warn('[audio-player] startOffsetPoller: NO offsets for', key, '— per-ayah tracking disabled');
+      return;
+    }
+    console.log('[audio-player] startOffsetPoller: OK for', key, 'offsets count=', offsets.length);
 
     this.offsetPoller = setInterval(async () => {
       if (!this.sound) return;
@@ -679,6 +858,7 @@ class AudioPlayerManager {
         }
         const ayahIndex = idx + 1;
         if (this.state.currentAyah !== ayahIndex) {
+          console.log('[audio-player] offset poller advancing ayah', this.state.currentAyah, '→', ayahIndex, 'pos=', pos, 'ms');
           this.updateState({ currentAyah: ayahIndex });
         }
       } catch (e) {

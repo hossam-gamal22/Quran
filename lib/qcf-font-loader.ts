@@ -42,9 +42,50 @@ export function getPageFontFamily(page: number, darkMode?: boolean): string {
 
 /** Whether the font for this page is already loaded in memory (optionally for a specific mode) */
 export function isPageFontLoaded(page: number, darkMode?: boolean): boolean {
+  // Check expo-font's own registry first — covers fonts loaded via useFonts() at app startup
+  // (those bypass our loadedPages map but are still usable by name).
+  try {
+    const familyName = getPageFontFamily(page, darkMode);
+    if (Font.isLoaded(familyName)) {
+      // Mirror into local map so subsequent calls without darkMode hint also pass
+      if (darkMode !== undefined) loadedPages.set(page, darkMode);
+      return true;
+    }
+  } catch {
+    // expo-font not ready, fall through
+  }
   if (!loadedPages.has(page)) return false;
   if (darkMode === undefined) return true;
   return loadedPages.get(page) === darkMode;
+}
+
+/**
+ * Preload a batch of critical pages in parallel with per-page timeout.
+ * Used at app startup and on Quran tab entry to guarantee instant rendering
+ * for the most-likely-accessed pages (Fatiha, start of Baqarah, Ayat Al-Kursi, etc.).
+ *
+ * Non-blocking by design: each font load has its own timeout; failures are logged
+ * but do not reject the overall promise.
+ */
+export async function preloadCriticalPages(
+  pages: number[],
+  darkMode: boolean = false,
+  perPageTimeoutMs: number = 1500,
+): Promise<void> {
+  const validPages = pages.filter(isValidPage);
+  if (validPages.length === 0) return;
+
+  const withTimeout = (page: number) =>
+    Promise.race([
+      loadPageFont(page, darkMode),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error(`timeout page ${page}`)), perPageTimeoutMs),
+      ),
+    ]).catch((err) => {
+      console.warn(`[QCF4] Preload skipped page ${page}:`, err?.message || err);
+    });
+
+  await Promise.all(validPages.map(withTimeout));
 }
 
 /**

@@ -113,7 +113,7 @@ struct AfterPrayerAzkarControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "AfterPrayerAzkarControl") {
             ControlWidgetButton(action: OpenAfterPrayerAzkarIntent()) {
-                Label("أذكار بعد الصلاة", systemImage: "figure.kneeling")
+                Label("أذكار بعد الصلاة", systemImage: "sparkles")
             }
         }
         .displayName("أذكار بعد الصلاة")

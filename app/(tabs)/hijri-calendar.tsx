@@ -12,6 +12,7 @@ import { BlurView } from 'expo-blur';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { ScreenContainer } from '@/components/screen-container';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -97,6 +98,7 @@ export default function HijriCalendarScreen() {
   const colors = useColors();
   const isRTL = useIsRTL();
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const today = new Date();
   
   // ─── Translations ────────────────────────────────────────────────────────────
@@ -481,7 +483,7 @@ export default function HijriCalendarScreen() {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + adBottomInset }}>
         {/* Weekday headers */}
         <View style={s.weekRowOuter}>
           {Platform.OS === 'ios' && (

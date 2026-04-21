@@ -23,6 +23,9 @@ export interface ActiveDevice extends DeviceUser {
   language: string;
   country: string;
   countrySource: string;
+  prayerCity?: string;
+  prayerLatitude?: number;
+  prayerLongitude?: number;
   lastActive: unknown;
   installSource: string;
   displayName?: string;
@@ -124,6 +127,9 @@ export async function fetchActiveDevices(
       language: data.language || 'ar',
       country: data.country || '',
       countrySource: data.countrySource || '',
+      prayerCity: data.prayerCity || '',
+      prayerLatitude: typeof data.prayerLatitude === 'number' ? data.prayerLatitude : undefined,
+      prayerLongitude: typeof data.prayerLongitude === 'number' ? data.prayerLongitude : undefined,
       lastActive: data.lastActive ?? null,
       installSource: data.installSource,
     } as ActiveDevice);

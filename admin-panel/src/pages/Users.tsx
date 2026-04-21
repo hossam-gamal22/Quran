@@ -1,8 +1,25 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, setDoc, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc, Timestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
-import { type DeviceUser } from '../utils/device-dedup';
 import { fetchActiveDevices, invalidateActiveDevicesCache } from '../utils/user-query';
+
+type TimestampLike = Timestamp | { toDate: () => Date } | { seconds: number; nanoseconds?: number } | string | Date | null | undefined;
+
+const toMillis = (value: TimestampLike): number => {
+  if (!value) return 0;
+  if (typeof value === 'object' && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    try { return (value as { toDate: () => Date }).toDate().getTime(); } catch { return 0; }
+  }
+  if (typeof value === 'object' && 'seconds' in value) {
+    return ((value as { seconds: number }).seconds || 0) * 1000;
+  }
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'string') {
+    const ms = new Date(value).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  }
+  return 0;
+};
 
 /** ISO 3166-1 alpha-2 → Arabic country name */
 const COUNTRY_NAMES: Record<string, string> = {
@@ -77,6 +94,7 @@ interface User {
   name: string;
   phone: string;
   country: string;
+  countrySource?: 'gps' | 'device_locale' | 'admin' | '';
   plan: 'free' | 'monthly' | 'yearly' | 'lifetime';
   status: 'active' | 'inactive' | 'banned';
   adsEnabled: boolean;
@@ -119,18 +137,17 @@ export default function UsersPage() {
           return !!displayName;
         })
         .map(u => ({
-          id: u.id,
           ...u,
+          id: u.id,
           name: (u.displayName || u.name || '') as string,
-        } as User));
+          adsEnabled: (u as Partial<User>).adsEnabled ?? false,
+          totalSpent: (u as Partial<User>).totalSpent ?? 0,
+          currency: (u as Partial<User>).currency ?? 'USD',
+        } as unknown as User));
 
       // Sort by registration date (oldest first) and assign display number
-      rawUsers.sort((a, b) => {
-        const aTime = a.registrationDate ? (typeof (a.registrationDate as any).toDate === 'function' ? (a.registrationDate as any).toDate().getTime() : new Date(a.registrationDate as string).getTime()) : 0;
-        const bTime = b.registrationDate ? (typeof (b.registrationDate as any).toDate === 'function' ? (b.registrationDate as any).toDate().getTime() : new Date(b.registrationDate as string).getTime()) : 0;
-        return aTime - bTime;
-      });
-      rawUsers.forEach((u, i) => { (u as any).displayNumber = i + 1; });
+      rawUsers.sort((a, b) => toMillis(a.registrationDate as TimestampLike) - toMillis(b.registrationDate as TimestampLike));
+      rawUsers.forEach((u, i) => { (u as User & { displayNumber?: number }).displayNumber = i + 1; });
       setUsers(rawUsers);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -166,7 +183,9 @@ export default function UsersPage() {
     setSaving(true);
     try {
       const { id, ...data } = selectedUser;
-      await setDoc(doc(db, 'users', id), { ...data, displayName: data.name }, { merge: true });
+      const originalUser = users.find(u => u.id === id);
+      const countryChanged = originalUser && originalUser.country !== data.country;
+      await setDoc(doc(db, 'users', id), { ...data, displayName: data.name, ...(countryChanged ? { countrySource: 'admin' } : {}) }, { merge: true });
       setUsers(users.map(u => u.id === selectedUser.id ? selectedUser : u));
       setShowModal(false);
       setSelectedUser(null);
@@ -336,7 +355,7 @@ export default function UsersPage() {
                   <td className="px-4 py-4">
                     <p className="font-medium text-white">{user.name}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs font-mono text-accent-light">user_{(user as any).displayNumber}</span>
+                      <span className="text-xs font-mono text-accent-light">user_{(user as User & { displayNumber?: number }).displayNumber}</span>
                       <button
                         onClick={() => { navigator.clipboard.writeText(user.id); alert('تم نسخ المعرّف'); }}
                         title={user.id}
@@ -348,8 +367,10 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-4 text-slate-300">
                     {getCountryDisplay(user.country)}
-                    {(user as any).countrySource === 'gps' ? (
+                    {user.countrySource === 'gps' ? (
                       <span title="موقع محقق عبر GPS" className="ml-1 text-xs">🛰️</span>
+                    ) : user.countrySource === 'admin' ? (
+                      <span title="تم تعديله بواسطة الأدمن" className="ml-1 text-xs">✏️</span>
                     ) : user.country ? (
                       <span title="مصدر: لغة الجهاز (قد لا يكون دقيق)" className="ml-1 text-xs opacity-50">⚠️</span>
                     ) : null}
@@ -404,15 +425,15 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">الدولة</label>
-                  <div className="flex gap-2 items-center">
-                    <input type="text" value={selectedUser.country || ''}
-                      onChange={e => setSelectedUser({ ...selectedUser, country: e.target.value.toUpperCase() })}
-                      aria-label="الدولة" placeholder="EG, SA, AE..."
-                      maxLength={2}
-                      dir="ltr"
-                      className="w-24 px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg text-white placeholder-slate-500 text-center font-mono" />
-                    <span className="text-slate-300 text-sm">{getCountryDisplay(selectedUser.country || '')}</span>
-                  </div>
+                  <select value={selectedUser.country || ''}
+                    onChange={e => setSelectedUser({ ...selectedUser, country: e.target.value })}
+                    aria-label="الدولة"
+                    className="w-full px-4 py-3 bg-admin-surface-light border border-admin-border rounded-lg text-white">
+                    <option value="">غير محدد</option>
+                    {Object.entries(COUNTRY_NAMES).map(([code, name]) => (
+                      <option key={code} value={code}>{name} ({code})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">

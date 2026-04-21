@@ -419,10 +419,12 @@ const STORAGE_KEY = 'app_settings';
 // ========================================
 // Notification Defaults Migration
 // ========================================
-// Bump this version whenever default notification times change.
-// On app update, existing users will get their notification times
-// reset to the new defaults (toggles/booleans are preserved).
-const NOTIFICATION_DEFAULTS_VERSION = 9;
+// Bump this version whenever default notification times/toggles change.
+// On app update, existing users will get their notification settings
+// reset to the new defaults (both times AND on/off toggles).
+// v10 (April 2026): force-enable all categories + reset times so every user
+// receives the full standardized notification schedule.
+const NOTIFICATION_DEFAULTS_VERSION = 10;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
 
 // ========================================
@@ -587,12 +589,27 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
               dailyVerse: true, quranReading: true, salawat: true, tasbih: true,
               istighfar: true, customReminder: true, kahfFriday: true,
             };
-            // Enable newly-defaulted-on categories
-            loadedSettings.notifications.istighfarReminder = true;
-            loadedSettings.notifications.tasbihReminder = true;
-            loadedSettings.notifications.worshipWeeklyReport = true;
+            // v10: Force-enable ALL standard notification categories so every user
+            // gets the full schedule after the update. customReminder is left untouched
+            // because it is a personal reminder with no sensible default.
+            loadedSettings.notifications.enabled = true;
+            loadedSettings.notifications.prayerTimes = true;
+            loadedSettings.notifications.didYouPrayReminder = true;
+            loadedSettings.notifications.morningAzkar = true;
+            loadedSettings.notifications.eveningAzkar = true;
             loadedSettings.notifications.sleepAzkar = true;
             loadedSettings.notifications.wakeupAzkar = true;
+            loadedSettings.notifications.dailyVerse = true;
+            loadedSettings.notifications.salawatReminder = true;
+            loadedSettings.notifications.tasbihReminder = true;
+            loadedSettings.notifications.istighfarReminder = true;
+            loadedSettings.notifications.quranReadingReminder = true;
+            loadedSettings.notifications.kahfReminder = true;
+            loadedSettings.notifications.worshipPrayerLogging = true;
+            loadedSettings.notifications.worshipDailySummary = true;
+            loadedSettings.notifications.worshipWeeklyReport = true;
+            loadedSettings.notifications.worshipStreakAlerts = true;
+            loadedSettings.notifications.sound = true;
             // afterPrayerAzkar retired: force off for upgrading users so stale schedules stop firing.
             loadedSettings.notifications.afterPrayerAzkar = false;
             // Persist migrated settings to AsyncStorage so they survive next cold start

@@ -198,8 +198,8 @@ export const BrandedCapture = forwardRef<BrandedCaptureHandle, BrandedCapturePro
     };
 
     const LOGO_SIZES: Record<ImageSizeKey, number> = {
-      portrait: 56,
-      story: 200,
+      portrait: 96,
+      story: 260,
     };
     const logoSize = LOGO_SIZES[selectedSize];
 

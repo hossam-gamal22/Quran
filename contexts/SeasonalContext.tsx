@@ -524,6 +524,21 @@ export const SeasonalProvider: React.FC<SeasonalProviderProps> = ({ children }) 
   }, [currentSeason]);
 
   // ========================================
+  // مزامنة أيقونة التطبيق مع الموسم النشط
+  // ========================================
+  useEffect(() => {
+    if (isLoading) return;
+    (async () => {
+      try {
+        const { syncAppIconOnStartup } = await import('@/lib/app-icon-manager');
+        await syncAppIconOnStartup(getLanguage() as any, currentSeason?.type ?? null);
+      } catch (e) {
+        if (__DEV__) console.log('Seasonal icon sync skipped:', e);
+      }
+    })();
+  }, [currentSeason?.type, isLoading]);
+
+  // ========================================
   // إدارة الإعدادات
   // ========================================
 

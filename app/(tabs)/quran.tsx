@@ -43,6 +43,7 @@ import {
 } from '../../components/ui/GlassCard';
 import { getColoredBookmarks } from '../../lib/quran-bookmarks';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { getFirstSurahOnPage } from '../../lib/qcf-page-data';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -239,6 +240,7 @@ export default function QuranScreen() {
   const { isDarkMode, settings, updateDisplay, updateNotifications, t } = useSettings();
   const { config } = useAppConfig();
   const colors = useColors();
+  const adBottomInset = useAdBottomInset();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const isArabic = settings.language === 'ar';
@@ -342,6 +344,38 @@ export default function QuranScreen() {
     };
 
     loadLastRead();
+
+    // Preload critical Mushaf page fonts on Quran tab focus.
+    // If the user opens Quran tab before the startup preload finishes (or it
+    // was skipped), this guarantees the most-likely-tapped pages are ready
+    // by the time they navigate into /surah/[id]. Idempotent + non-blocking.
+    (async () => {
+      try {
+        const { preloadCriticalPages } = require('@/lib/qcf-font-loader');
+        // Cover both modes (light + dark theme) and last-read continuation.
+        const lastRead = await getLastRead();
+        let lastPage: number | undefined;
+        try {
+          const pageData = await AsyncStorage.getItem('quran_last_page');
+          if (pageData) lastPage = JSON.parse(pageData)?.page;
+        } catch {}
+        const pages = new Set<number>([1, 2, 3, 4, 5, 6, 7, 42, 440, 562, 604]);
+        if (lastPage && lastPage >= 1 && lastPage <= 604) pages.add(lastPage);
+        if (lastRead?.surahNumber) {
+          try {
+            const { getSurahStartPage } = require('@/lib/qcf-page-data');
+            const sp = getSurahStartPage(lastRead.surahNumber);
+            if (sp >= 1 && sp <= 604) pages.add(sp);
+          } catch {}
+        }
+        await Promise.all([
+          preloadCriticalPages(Array.from(pages), false, 1500),
+          preloadCriticalPages(Array.from(pages), true, 1500),
+        ]);
+      } catch (err) {
+        if (__DEV__) console.warn('[Quran tab] preload skipped:', err);
+      }
+    })();
 
     return () => {
       mounted = false;
@@ -1017,7 +1051,7 @@ export default function QuranScreen() {
             data={filteredJuz}
             renderItem={renderJuzItem}
             keyExtractor={(item) => item.number.toString()}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 160 + adBottomInset }]}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -1037,7 +1071,7 @@ export default function QuranScreen() {
             data={filteredSurahs}
             renderItem={renderSurahItem}
             keyExtractor={(item) => item.number.toString()}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 160 + adBottomInset }]}
             showsVerticalScrollIndicator={false}
             initialNumToRender={15}
             maxToRenderPerBatch={10}

@@ -3,7 +3,7 @@
 
 import { AppState, AppStateStatus, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchAdsConfig, getAdUnitId } from './ads-config';
+import { fetchAdsConfig, getAdUnitId, canShowGlobalAd, recordGlobalAdShown } from './ads-config';
 import { getSubscriptionState } from './subscription-manager';
 
 // Dynamically import google-mobile-ads
@@ -70,6 +70,10 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   const everyN = Math.max(1, adConfig.appOpenFrequency ?? 3);
   if (appOpenCount === 0 || appOpenCount % everyN !== 0) return false;
 
+  // Global cooldown: at least 2 minutes between ANY two ads (interstitial / app-open / etc.).
+  // Prevents the "close interstitial → background → return → app-open ad" double-ad pattern.
+  if (!canShowGlobalAd()) return false;
+
   // Ignore brief inactive flickers (phone call, notification shade, etc.).
   if (lastBackgroundTime > 0 && (Date.now() - lastBackgroundTime) < MIN_BACKGROUND_DURATION) {
     return false;
@@ -96,7 +100,6 @@ export const showAppOpenAd = async (): Promise<boolean> => {
   try {
     await adInstance.show();
     try {
-      const { recordGlobalAdShown } = require('./ads-config');
       recordGlobalAdShown();
     } catch {}
     try {

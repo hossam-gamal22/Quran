@@ -56,6 +56,7 @@ import { useAppConfig } from '@/lib/app-config-context';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
@@ -135,6 +136,7 @@ export default function PrayerScreen() {
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const { appName, iconSource, logoSource } = useAppIdentity();
@@ -390,8 +392,8 @@ export default function PrayerScreen() {
       // so the SettingsContext reconcile effect can pick it up on next launch.
       if (countryCode) {
         import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
-          updateUserCountryFromGPS(countryCode).catch(() => {});
-        }).catch(() => {});
+          updateUserCountryFromGPS(countryCode).catch((err) => console.warn('⚠️ Prayer GPS country update failed:', err));
+        }).catch((err) => console.warn('⚠️ Failed to import firebase-user for GPS country:', err));
         setUserCountry(countryCode).catch(() => {});
       }
 
@@ -578,8 +580,8 @@ export default function PrayerScreen() {
               // SettingsContext reconcile picks it up next launch.
               if (countryCode) {
                 import('@/lib/firebase-user').then(({ updateUserCountryFromGPS }) => {
-                  updateUserCountryFromGPS(countryCode).catch(() => {});
-                }).catch(() => {});
+                  updateUserCountryFromGPS(countryCode).catch((err) => console.warn('⚠️ Cached-location GPS country update failed:', err));
+                }).catch((err) => console.warn('⚠️ Failed to import firebase-user for GPS country:', err));
                 setUserCountry(countryCode).catch(() => {});
               }
 
@@ -888,7 +890,7 @@ export default function PrayerScreen() {
           />
         </View>
 
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#0d8e62']} tintColor="#0d8e62" />}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={[styles.scrollContent, { paddingBottom: 160 + adBottomInset }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#0d8e62']} tintColor="#0d8e62" />}>
 
           {error && (
             <Animated.View entering={FadeInDown.duration(300)} style={[styles.errorContainer, { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: isDarkMode ? 'rgba(239,83,80,0.15)' : '#ffebee' }]}>

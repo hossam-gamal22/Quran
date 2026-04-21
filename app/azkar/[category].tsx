@@ -54,6 +54,7 @@ import { trackAzkarRead } from '@/lib/firebase-analytics';
 import { t } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useGlobalAudio, type AudioTrack } from '@/contexts/GlobalAudioContext';
+import { useCelebration } from '@/contexts/CelebrationContext';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
@@ -67,7 +68,7 @@ import { useSacredContext } from '@/hooks/use-sacred-context';
 import { Spacing } from '@/constants/theme';
 import { Image as ExpoImage } from 'expo-image';
 import { BasmalaHeader } from '@/components/BasmalaHeader';
-import { stripBasmalaPrefix, stripVerseNumbers } from '@/lib/basmala-utils';
+import { stripBasmalaPrefix, stripVerseNumbers, stripAzkarBrackets } from '@/lib/basmala-utils';
 import { getAzkarAudioSource } from '@/lib/azkar-audio-map';
 import { prefetchAzkarFiles, isAzkarCached } from '@/lib/azkar-audio-cache';
 import NetInfo from '@react-native-community/netinfo';
@@ -130,6 +131,7 @@ export default function CategoryAzkarScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const { isDarkMode, settings } = useSettings();
   const darkMode = isDarkMode;
+  const { showCelebration } = useCelebration();
 
   // Block all ads during azkar session
   useSacredContext('azkar_session');
@@ -155,7 +157,6 @@ export default function CategoryAzkarScreen() {
   const [audioLoading, setAudioLoading] = useState(() => {
     return globalAudio.state.source === 'azkar' && globalAudio.state.sourceRoute === `/azkar/${category}` && globalAudio.state.isLoading;
   });
-  const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [categoryLocked, setCategoryLocked] = useState(false);
   const [selectedSubcategory, setSelectedSubcategory] = useState('general');
   const [loadError, setLoadError] = useState(false);
@@ -449,8 +450,13 @@ export default function CategoryAzkarScreen() {
     }
 
     // عرض بوب أب التحفيز
-    setShowCompletionModal(true);
-  }, [category]);
+    showCelebration({
+      type: 'adhkar_complete',
+      title: t('azkar.completedSuccessfully', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') }),
+      subtitle: t('azkar.mayAllahAccept'),
+      onDismiss: () => router.back(),
+    });
+  }, [category, showCelebration, router, categoryInfo, language]);
 
   const checkAllCompleted = useCallback((updatedCounts: Record<number, number>) => {
     return azkar.every(z => (updatedCounts[z.id] || 0) >= z.count);
@@ -1377,7 +1383,8 @@ export default function CategoryAzkarScreen() {
                       const isQuranSurah = useQcf || knownQuranIds.includes(currentZikr.id) || hasVerseBrackets;
                       const { stripped, hadBasmala } = stripBasmalaPrefix(currentZikr.arabic);
                       const rawDisplay = hadBasmala ? stripped : currentZikr.arabic;
-                      const displayText = isQuranSurah ? stripVerseNumbers(rawDisplay) : rawDisplay;
+                      const cleanedDisplay = stripAzkarBrackets(rawDisplay);
+                      const displayText = isQuranSurah ? stripVerseNumbers(cleanedDisplay) : cleanedDisplay;
                       const quranFontStyle = (!useQcf && isQuranSurah) ? {
                         fontFamily: 'KFGQPCUthmanic',
                         fontSize: 30,
@@ -1759,38 +1766,6 @@ export default function CategoryAzkarScreen() {
         </View>
       )}
 
-      {/* بوب أب اكتمال الأذكار */}
-      <Modal
-        visible={showCompletionModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCompletionModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: darkMode ? '#1F2937' : '#FFFFFF' }]}>
-            <Text style={styles.modalEmoji}></Text>
-            <Text style={[styles.modalTitle, { color: darkMode ? '#F9FAFB' : '#1F2937' }]}>
-              {t('azkar.congratulations')}
-            </Text>
-            <Text style={[styles.modalSubtitle, { color: darkMode ? '#D1D5DB' : '#4B5563' }]}>
-              {t('azkar.completedSuccessfully', { name: categoryInfo ? getCategoryName(categoryInfo, language) : t('azkar.title') })}
-            </Text>
-            <Text style={[styles.modalDua, { color: categoryInfo?.color || '#10B981' }]}>
-              {t('azkar.mayAllahAccept')}
-            </Text>
-            <TouchableOpacity
-              style={[styles.modalButton, { backgroundColor: categoryInfo?.color || '#10B981' }]}
-              onPress={() => {
-                setShowCompletionModal(false);
-                router.back();
-              }}
-            >
-              <Text style={styles.modalButtonText}>{t('azkar.alhamdulillah')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* بوب أب القفل */}
       {categoryLocked && (
         <Modal visible={categoryLocked} transparent animationType="fade">
@@ -1902,16 +1877,20 @@ export default function CategoryAzkarScreen() {
           : t('azkar.title');
         const refText = zikrObj?.reference ? transliterateReference(zikrObj.reference, language) : undefined;
         const benefitVal = zikrObj ? getZikrBenefit(zikrObj, language) : undefined;
+        // Match on-screen display: strip wrapping brackets, count instructions,
+        // and any "أعوذ بالله من الشيطان الرجيم" prefix before the verse so the
+        // shared image is identical to what the user sees on screen.
+        const cleanArabic = stripAzkarBrackets(shareTargetZikr?.arabic || '');
 
         return (
           <IslamicShareCard
             ref={brandedRef}
             categoryLabel={catLabel}
-            arabicText={shareTargetZikr?.arabic || ''}
+            arabicText={cleanArabic}
             sourceText={refText}
             benefitText={benefitVal || undefined}
             renderCustomContent={useQcf ? () => (
-              <AzkarQcfVerse azkarId={zikrId} textColor="#FFFFFF" fallbackText={shareTargetZikr?.arabic || ''} compact />
+              <AzkarQcfVerse azkarId={zikrId} textColor="#FFFFFF" fallbackText={cleanArabic} compact />
             ) : undefined}
           />
         );

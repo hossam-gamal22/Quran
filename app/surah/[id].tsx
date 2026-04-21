@@ -77,8 +77,11 @@ function getTargetAyahBg(themeIndex: number): string {
   const b = parseInt(hex.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, 0.40)`;
 }
+import NetInfo from '@react-native-community/netinfo';
 import { setLastRead, addBookmark, removeBookmark, getBookmarks } from '@/lib/storage';
 import { copyAyah } from '@/lib/clipboard';
+import { isDownloaded, downloadSurah, deleteDownload } from '@/lib/audio-download-manager';
+import { notifyOfflineAudio } from '@/lib/audio-player';
 import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import { playPageSound, EFFECT_SOUNDS } from '@/lib/sound-manager';
 import { shareImage } from '@/lib/share-service';
@@ -258,6 +261,11 @@ const MushafPage = React.memo(function MushafPage({
   const shouldForcePlainArabic = !!forcePlainArabicForCapture && Platform.OS === 'android';
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, needsDarkFont));
   const [fontError, setFontError] = useState(false);
+  // Safety fallback: if QCF font load takes too long (or silently fails to
+  // register at the OS level — PUA glyphs render as invisible system-font
+  // fallback), switch to plain Uthmani text after a timeout so the user
+  // never sees a blank page.
+  const [fontTimedOut, setFontTimedOut] = useState(false);
   const baseTextColor = getQuranTextColor('', themeIndex);
   // Determine if the theme's primary color is dark (i.e., designed for light backgrounds)
   const isBaseColorDark = (() => {
@@ -287,20 +295,37 @@ const MushafPage = React.memo(function MushafPage({
   const targetAyahBg = getTargetAyahBg(themeIndex);
   // Fall back to plain Arabic rendering on any platform when the QCF font fails —
   // user still sees the verses without a blocking "Font Load Error" screen.
-  const usePlainArabicMode = shouldForcePlainArabic || fontError;
+  const usePlainArabicMode = shouldForcePlainArabic || fontError || fontTimedOut;
 
   // Load QCF4 per-page font (use needsDarkFont based on actual background)
   useEffect(() => {
     if (shouldForcePlainArabic) return;
     if (isPageFontLoaded(page, needsDarkFont)) {
       setFontLoaded(true);
+      setFontTimedOut(false);
       return;
     }
     setFontLoaded(false);
     setFontError(false);
+    setFontTimedOut(false);
+    // Hard 3s safety: if the font hasn't reported loaded by then, render plain
+    // Uthmani text from quran-v4.json so the page is never empty.
+    const timeoutId = setTimeout(() => {
+      if (!isPageFontLoaded(page, needsDarkFont)) {
+        setFontTimedOut(true);
+      }
+    }, 3000);
     loadPageFont(page, needsDarkFont)
-      .then(() => setFontLoaded(true))
-      .catch(() => setFontError(true));
+      .then(() => {
+        clearTimeout(timeoutId);
+        setFontLoaded(true);
+        setFontTimedOut(false);
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        setFontError(true);
+      });
+    return () => clearTimeout(timeoutId);
   }, [page, needsDarkFont, shouldForcePlainArabic]);
 
   const blocks = useMemo(() => buildPageBlocks(page), [page]);
@@ -321,11 +346,14 @@ const MushafPage = React.memo(function MushafPage({
   // Add top/bottom padding when using QCF per-page fonts to avoid glyph clipping (letters like ك، ل، ط)
   const extraTopPadding = fontLoaded ? Math.ceil(fontSize * 0.18) : 0;
 
-  // Font loading state
+  // Font loading state — show spinner with text fallback so user always sees something
   if (!usePlainArabicMode && !fontLoaded && !fontError) {
     return (
-      <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={goldenColor} />
+      <View style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <ActivityIndicator size="large" color={textColor} />
+        <Text style={{ marginTop: 16, color: textColor, opacity: 0.7, fontSize: 14, textAlign: 'center' }}>
+          {translate('quran.loadingPage') || translate('common.loading') || 'جاري التحميل...'}
+        </Text>
       </View>
     );
   }
@@ -544,15 +572,21 @@ interface GlassHeaderProps {
   tafsirActive: boolean;
   isPageFavorited: boolean;
   currentPage: number;
+  showLockBadge: boolean;
+  showDownloadButton: boolean;
+  downloadState: 'idle' | 'downloading' | 'done';
+  downloadProgress: number;
   onTafsir: () => void;
   onPlay: () => void;
   onBack: () => void;
   onToggleFavorite: () => void;
   onShare: () => void;
   onSettings: () => void;
+  onDownload: () => void;
+  onDownloadLongPress: () => void;
 }
 
-function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, onTafsir, onPlay, onBack, onToggleFavorite, onShare, onSettings }: GlassHeaderProps) {
+function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsirActive, isPageFavorited, currentPage, showLockBadge, showDownloadButton, downloadState, downloadProgress, onTafsir, onPlay, onBack, onToggleFavorite, onShare, onSettings, onDownload, onDownloadLongPress }: GlassHeaderProps) {
   return (
     <View style={gh.wrapper} collapsable={false}>
       <View style={gh.inner}>
@@ -566,8 +600,38 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
             />
           </TouchableOpacity>
           <TouchableOpacity hitSlop={8} onPress={onPlay}>
-            <MaterialCommunityIcons name="play-circle-outline" size={24} color={goldenColor} />
+            <View>
+              <MaterialCommunityIcons name="play-circle-outline" size={24} color={goldenColor} />
+              {showLockBadge && (
+                <View style={gh.lockBadge}>
+                  <MaterialCommunityIcons name="lock" size={9} color="#000" />
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
+          {showDownloadButton && (
+            <TouchableOpacity
+              hitSlop={8}
+              onPress={onDownload}
+              onLongPress={onDownloadLongPress}
+              disabled={downloadState === 'downloading'}
+            >
+              {downloadState === 'downloading' ? (
+                <View style={gh.downloadProgressWrap}>
+                  <ActivityIndicator size="small" color={goldenColor} />
+                  {downloadProgress > 0 && (
+                    <Text style={[gh.downloadProgressText, { color: goldenColor }]}>
+                      {Math.round(downloadProgress * 100)}%
+                    </Text>
+                  )}
+                </View>
+              ) : downloadState === 'done' ? (
+                <MaterialCommunityIcons name="check-circle" size={22} color="#0d8e62" />
+              ) : (
+                <MaterialCommunityIcons name="download-circle-outline" size={22} color={goldenColor} />
+              )}
+            </TouchableOpacity>
+          )}
           <TouchableOpacity hitSlop={8} onPress={onToggleFavorite}>
             <MaterialCommunityIcons
               name={isPageFavorited ? 'heart' : 'heart-outline'}
@@ -615,6 +679,27 @@ const gh = StyleSheet.create({
   center: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 6 },
   pageInfo: { fontSize: 15, fontFamily: 'Rubik-Bold', lineHeight: 20, includeFontPadding: false, textAlign: 'right' },
   juzLabel: { fontSize: 11, fontFamily: 'Rubik-Medium', lineHeight: 16, includeFontPadding: false, opacity: 0.75, textAlign: 'right' },
+  lockBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#FFD700',
+    borderRadius: 8,
+    width: 13,
+    height: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  downloadProgressWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  downloadProgressText: {
+    fontSize: 9,
+    fontFamily: 'Rubik-SemiBold',
+    includeFontPadding: false,
+  },
 });
 
 // ══════════════════════════════════════════════
@@ -672,7 +757,9 @@ export default function SurahScreen() {
   // onViewableItemsChanged during initial layout (which would overwrite the
   // correctly-initialized currentPage with whatever index happens to be in the
   // viewport before initialScrollIndex lands).
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50, minimumViewTime: 120, waitForInteraction: true }).current;
+  // Stricter thresholds reduce false positives during fast swipes on Android
+  // (where intermediate frames can briefly report wrong viewable items).
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 80, minimumViewTime: 250, waitForInteraction: true }).current;
 
   // State declarations (must be before loading return)
   const [currentPage, setCurrentPage] = useState(() => {
@@ -706,8 +793,32 @@ export default function SurahScreen() {
   const [highlightAyahKey, setHighlightAyahKey] = useState<string | null>(null);
 
   // FlatList onViewableItemsChanged callback - must be after setCurrentPage is available
+  // Picks the item with the largest visible area (most reliable on inverted lists
+  // where viewableItems[0] can be the partially-visible neighbor).
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) setCurrentPage(viewableItems[0].item);
+    if (!viewableItems || viewableItems.length === 0) return;
+    let best = viewableItems[0];
+    for (const v of viewableItems) {
+      // viewablePercent may not be present on all RN versions — fall back to isViewable
+      if ((v.viewablePercent ?? (v.isViewable ? 100 : 0)) > (best.viewablePercent ?? (best.isViewable ? 100 : 0))) {
+        best = v;
+      }
+    }
+    if (best?.item && typeof best.item === 'number') {
+      setCurrentPage(best.item);
+    }
+  }).current;
+
+  // Backup truth source for currentPage — fires after every swipe settles.
+  // Computes the page from contentOffset, immune to viewability race conditions
+  // that have been observed on Android with inverted horizontal FlatLists.
+  const onMomentumScrollEnd = useRef((e: any) => {
+    const offsetX = e?.nativeEvent?.contentOffset?.x ?? 0;
+    const idx = Math.round(offsetX / SCREEN_WIDTH);
+    const page = idx + 1; // PAGES is 1..604, indexed 0..603
+    if (page >= 1 && page <= TOTAL_PAGES) {
+      setCurrentPage(page);
+    }
   }).current;
 
   const themeIndex = getSafeThemeIndex(settings?.display?.quranThemeIndex ?? 0);
@@ -1055,11 +1166,118 @@ export default function SurahScreen() {
     }
   }, [showCelebration, router, t]);
 
-  const handlePlayPage = useCallback(() => {
+  // ── Audio: offline gate + per-surah download (Premium) ──
+  const currentAudioSurah = useMemo(
+    () => getFirstAyahOnPage(currentPage).surah,
+    [currentPage],
+  );
+  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'done'>('idle');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
+  const offlineAlertShownRef = useRef<Set<number>>(new Set());
+
+  // Track network connectivity (for free-user lock badge)
+  useEffect(() => {
+    NetInfo.fetch().then(net => setIsOffline(net?.isConnected === false)).catch(() => {});
+    const unsub = NetInfo.addEventListener(net => setIsOffline(net?.isConnected === false));
+    return () => unsub();
+  }, []);
+
+  // Refresh download state whenever surah or reciter changes
+  useEffect(() => {
+    if (!isPremium || !currentReciter) {
+      setDownloadState('idle');
+      setDownloadProgress(0);
+      return;
+    }
+    let cancelled = false;
+    isDownloaded(currentAudioSurah, currentReciter).then(exists => {
+      if (cancelled) return;
+      setDownloadState(exists ? 'done' : 'idle');
+      setDownloadProgress(exists ? 1 : 0);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [currentAudioSurah, currentReciter, isPremium]);
+
+  // One-time-per-surah offline upsell for free users
+  useEffect(() => {
+    if (isPremium) return;
+    if (offlineAlertShownRef.current.has(currentAudioSurah)) return;
+    let cancelled = false;
+    NetInfo.fetch().then(net => {
+      if (cancelled) return;
+      if (net?.isConnected === false) {
+        offlineAlertShownRef.current.add(currentAudioSurah);
+        notifyOfflineAudio();
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [currentAudioSurah, isPremium]);
+
+  const handleDownloadCurrentSurah = useCallback(async () => {
+    if (!isPremium || !currentReciter || downloadState === 'downloading') return;
+    if (downloadState === 'done') return;
+
+    // Need internet to download
+    const net = await NetInfo.fetch().catch(() => null);
+    if (net?.isConnected === false) {
+      Alert.alert('لا يوجد اتصال بالإنترنت', 'يحتاج تحميل السورة إلى اتصال بالإنترنت.');
+      return;
+    }
+
+    setDownloadState('downloading');
+    setDownloadProgress(0);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await downloadSurah(currentAudioSurah, currentReciter, (pct) => {
+        setDownloadProgress(pct);
+      });
+      setDownloadState('done');
+      setDownloadProgress(1);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      setDownloadState('idle');
+      setDownloadProgress(0);
+      Alert.alert('فشل التحميل', e?.message || 'تعذّر تحميل السورة. حاول مرة أخرى.');
+    }
+  }, [isPremium, currentReciter, currentAudioSurah, downloadState]);
+
+  const handleDeleteDownloadedSurah = useCallback(() => {
+    if (!isPremium || !currentReciter || downloadState !== 'done') return;
+    Alert.alert(
+      'حذف التحميل',
+      'هل تريد حذف الملف الصوتي المحمَّل لهذه السورة؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteDownload(currentAudioSurah, currentReciter);
+              setDownloadState('idle');
+              setDownloadProgress(0);
+              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } catch {}
+          },
+        },
+      ],
+    );
+  }, [isPremium, currentReciter, currentAudioSurah, downloadState]);
+
+  const handlePlayPage = useCallback(async () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const { surah, ayah } = getFirstAyahOnPage(currentPage);
+    // Free user offline gate — proactively show upsell instead of silent failure
+    if (!isPremium) {
+      const net = await NetInfo.fetch().catch(() => null);
+      if (net?.isConnected === false) {
+        notifyOfflineAudio();
+        return;
+      }
+    }
     playAyah(surah, ayah, true);
-  }, [currentPage, playAyah]);
+  }, [currentPage, playAyah, isPremium]);
 
   const handleAyahLongPress = useCallback((surah: number, ayah: number, page: number) => {
     setSelectedAyah({ surah, ayah, page });
@@ -1131,11 +1349,19 @@ export default function SurahScreen() {
     }
   }, [currentPage]);
 
-  const handlePlayAyah = useCallback(() => {
+  const handlePlayAyah = useCallback(async () => {
     if (!selectedAyah) return;
+    if (!isPremium) {
+      const net = await NetInfo.fetch().catch(() => null);
+      if (net?.isConnected === false) {
+        setShowAyahMenu(false);
+        notifyOfflineAudio();
+        return;
+      }
+    }
     playAyah(selectedAyah.surah, selectedAyah.ayah, true);
     setShowAyahMenu(false);
-  }, [selectedAyah, playAyah]);
+  }, [selectedAyah, playAyah, isPremium]);
 
   // Auto-share: when navigated with ?autoShare=true, capture and share the page after font loads
   useEffect(() => {
@@ -1247,6 +1473,7 @@ export default function SurahScreen() {
               getItemLayout={getItemLayout}
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={viewabilityConfig}
+              onMomentumScrollEnd={onMomentumScrollEnd}
               windowSize={5}
               maxToRenderPerBatch={2}
               initialNumToRender={3}
@@ -1419,12 +1646,18 @@ export default function SurahScreen() {
               tafsirActive={showTafsirPanel}
               isPageFavorited={isPageFavorited}
               currentPage={currentPage}
+              showLockBadge={!isPremium && isOffline}
+              showDownloadButton={isPremium}
+              downloadState={downloadState}
+              downloadProgress={downloadProgress}
               onTafsir={() => updateDisplay({ showTafsir: !showTafsirPanel } as any)}
               onPlay={handlePlayPage}
               onBack={handleBack}
               onToggleFavorite={handleToggleFavorite}
               onShare={handleSharePage}
               onSettings={() => setShowSettings(true)}
+              onDownload={handleDownloadCurrentSurah}
+              onDownloadLongPress={handleDeleteDownloadedSurah}
             />
           )}
 
@@ -2049,7 +2282,7 @@ const _s = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  shareWatermarkIcon: { width: 40, height: 40, borderRadius: 10, opacity: 0.7 },
+  shareWatermarkIcon: { width: 120, height: 120, borderRadius: 24, opacity: 0.95 },
 
   // Long-press onboarding hint
   longPressHint: {

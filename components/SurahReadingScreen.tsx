@@ -20,6 +20,8 @@ import {
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ViewShot, { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
@@ -27,7 +29,6 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { ScreenContainer } from '@/components/screen-container';
 import { GlassCard, BackButton } from '@/components/ui';
-import { IslamicShareCard, type IslamicShareCardHandle } from '@/components/ui/IslamicShareCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { getSurahData, buildPageBlocks, getQcfFontSize } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
@@ -35,6 +36,8 @@ import { getSurahName } from '@/lib/quran-api';
 import { localizeNumber } from '@/lib/format-number';
 import { useQuran } from '@/contexts/QuranContext';
 import { Spacing } from '@/constants/theme';
+import { QURAN_THEMES, getSafeThemeIndex, isThemeLight, getGoldenColor } from '@/constants/quran-themes';
+import { useAppIdentity } from '@/hooks/use-app-identity';
 
 // Assets for surah banner and basmala
 const surahOrnament = require('@/assets/images/quran/surah-ornament.png');
@@ -91,12 +94,14 @@ function MushafPageBlock({
   isDarkMode,
   textColor,
   surahNumber,
+  hideSurahName,
 }: {
   page: number;
   pageWidth: number;
   isDarkMode: boolean;
   textColor: string;
   surahNumber: number;
+  hideSurahName?: boolean;
 }) {
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, isDarkMode));
   const [fontError, setFontError] = useState(false);
@@ -117,14 +122,14 @@ function MushafPageBlock({
   // Filter blocks to only show content belonging to this surah
   const blocks = useMemo(() => {
     return allBlocks.filter((block) => {
-      if (block.type === 'surah_name') return block.surahNumber === surahNumber;
+      if (block.type === 'surah_name') return !hideSurahName && block.surahNumber === surahNumber;
       if (block.type === 'basmallah') return block.surahNumber === surahNumber;
       if (block.type === 'ayah') {
         return block.segments.length > 0 && block.segments[0].surah === surahNumber;
       }
       return false;
     });
-  }, [allBlocks, surahNumber]);
+  }, [allBlocks, surahNumber, hideSurahName]);
   const fontFamily = getPageFontFamily(page, isDarkMode);
 
   // Use FULL page line count for font sizing (keep QCF glyph size consistent)
@@ -218,7 +223,16 @@ export default function SurahReadingScreen({
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { playAyah, playbackState, togglePlayPause, stopPlayback } = useQuran();
-  const shareCardRef = useRef<IslamicShareCardHandle>(null);
+  const shareViewShotRef = useRef<ViewShot>(null);
+  const { logoSource: appIcon } = useAppIdentity();
+
+  // Use the same Quran theme as the Mushaf reader for share capture
+  const themeIndex = getSafeThemeIndex(settings?.display?.quranThemeIndex ?? 0);
+  const quranTheme = QURAN_THEMES[themeIndex];
+  const themeBgColor = quranTheme?.background || '#FFF8F0';
+  const themeTextColor = quranTheme?.primary || '#1A1000';
+  const isLightBg = isThemeLight(themeIndex);
+  const shareOrnamentColor = isLightBg ? '#11171d' : getGoldenColor(themeIndex);
 
   // Calculate page range for this surah
   const surahData = getSurahData(surahNumber);
@@ -235,20 +249,8 @@ export default function SurahReadingScreen({
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const currentPage = pages[currentPageIndex];
 
-  const shareArabicText = useMemo(() => {
-    if (!currentPage) return '';
-    const blocks = buildPageBlocks(currentPage).filter((block) => {
-      if (block.type === 'ayah') {
-        return block.segments.length > 0 && block.segments[0].surah === surahNumber;
-      }
-      return false;
-    });
-
-    return blocks
-      .map((block) => block.type === 'ayah' ? block.segments.map((seg) => seg.glyph).join('') : '')
-      .filter(Boolean)
-      .join('\n');
-  }, [currentPage, surahNumber]);
+  // Width for off-screen share capture
+  const SHARE_CAPTURE_WIDTH = 375;
 
   // Sync page with audio playback - when ayah changes, navigate to correct page
   useEffect(() => {
@@ -274,10 +276,27 @@ export default function SurahReadingScreen({
     };
   }, []);
 
-  const handleShare = useCallback(() => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    shareCardRef.current?.showSizePicker();
-  }, []);
+  const handleShare = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (!shareViewShotRef.current || !currentPage) return;
+      if (!isPageFontLoaded(currentPage, isDarkMode)) return;
+      // Small delay to ensure off-screen view is fully rendered
+      await new Promise(r => setTimeout(r, Platform.OS === 'android' ? 400 : 150));
+      const uri = await captureRef(shareViewShotRef, {
+        format: 'png',
+        quality: 1,
+      });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          UTI: 'public.png',
+        });
+      }
+    } catch (e) {
+      console.warn('Error sharing surah page:', e);
+    }
+  }, [currentPage, isDarkMode]);
 
   const handlePlay = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -474,13 +493,41 @@ export default function SurahReadingScreen({
             </View>
           )}
 
-          {/* Unified Islamic share card for image sharing */}
-          <IslamicShareCard
-            ref={shareCardRef}
-            categoryLabel={getSurahName(surahNumber)}
-            arabicText={shareArabicText}
-            sourceText={currentPage ? `${t('common.page')} ${localizeNumber(currentPage)}` : undefined}
-          />
+          {/* Off-screen share capture — matches Mushaf reader style */}
+          <View style={{ position: 'absolute', left: -9999, top: 0, width: SHARE_CAPTURE_WIDTH }} pointerEvents="none" collapsable={false}>
+            <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }}>
+              <View style={{ backgroundColor: themeBgColor, paddingTop: 40, paddingBottom: 90 }} collapsable={false}>
+                {/* Surah banner — always shown above, matches Mushaf ornament style */}
+                <View style={{ marginHorizontal: 24, marginBottom: 4, height: 54 }}>
+                  <ImageBackground
+                    source={surahOrnament}
+                    style={{ width: '100%', height: 50, justifyContent: 'center', alignItems: 'center' }}
+                    resizeMode="contain"
+                    tintColor={shareOrnamentColor}
+                  >
+                    <Text style={{ fontSize: 17, fontFamily: 'Amiri-Bold', textAlign: 'center', lineHeight: 28, color: shareOrnamentColor }} allowFontScaling={false}>
+                      {getSurahName(surahNumber)}
+                    </Text>
+                  </ImageBackground>
+                </View>
+                {/* QCF Mushaf content — hideSurahName to avoid duplication */}
+                {currentPage && (
+                  <MushafPageBlock
+                    page={currentPage}
+                    pageWidth={SHARE_CAPTURE_WIDTH - 32}
+                    isDarkMode={!isLightBg}
+                    textColor={themeTextColor}
+                    surahNumber={surahNumber}
+                    hideSurahName
+                  />
+                )}
+                {/* Branding watermark — app icon like Mushaf reader */}
+                <View style={{ alignItems: 'center', marginTop: 24 }} pointerEvents="none" collapsable={false}>
+                  <Image source={appIcon} style={{ width: 40, height: 40, borderRadius: 10, opacity: 0.7 }} resizeMode="contain" />
+                </View>
+              </View>
+            </ViewShot>
+          </View>
 
           {/* Regular display card */}
           <GlassCard style={styles.mushafCard}>

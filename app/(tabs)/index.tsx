@@ -45,6 +45,7 @@ import DailyHighlights from '@/components/ui/DailyHighlights';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BannerAdComponent } from '@/components/ads/BannerAd';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { ColoredButton } from '@/components/ui/colored-button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { SectionInfoButton } from '@/components/ui/SectionInfoButton';
@@ -577,6 +578,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { isDarkMode, settings, t } = useSettings();
   const colors = useColors();
+  const adBottomInset = useAdBottomInset();
   const styles = useScaledStyles(_styles, colors.fs);
   const isRTL = useIsRTL();
   const quickAccessScrollRef = useRef<ScrollView>(null);
@@ -1315,7 +1317,7 @@ export default function HomeScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + adBottomInset }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

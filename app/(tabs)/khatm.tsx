@@ -11,6 +11,7 @@ import {
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { ScreenContainer } from '@/components/screen-container';
+import { useAdBottomInset } from '@/lib/ads-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRouter } from 'expo-router';
 import {
@@ -24,6 +25,7 @@ import * as Haptics from 'expo-haptics';
 import { Platform, StyleSheet as RNStyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSettings } from '@/contexts/SettingsContext';
+import { useCelebration } from '@/contexts/CelebrationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useIsRTL } from '@/hooks/use-is-rtl';
@@ -51,13 +53,14 @@ export default function KhatmScreen() {
   const isRTL = useIsRTL();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const adBottomInset = useAdBottomInset();
   const [stats, setStats] = useState<KhatmStats | null>(null);
   const [allKhatm, setAllKhatm] = useState<KhatmRecord[]>([]);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showSurahsModal, setShowSurahsModal] = useState(false);
   const [newKhatmName, setNewKhatmName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [celebAnim] = useState(new Animated.Value(0));
+  const { showCelebration } = useCelebration();
 
   const loadData = useCallback(async () => {
     const [s, all] = await Promise.all([getKhatmStats(), getAllKhatm()]);
@@ -90,11 +93,11 @@ export default function KhatmScreen() {
       if (updated?.isCompleted) {
         // Celebration!
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Animated.sequence([
-          Animated.timing(celebAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.delay(3000),
-          Animated.timing(celebAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
-        ]).start();
+        showCelebration({
+          type: 'khatma_wird',
+          title: t('khatma.congratulations'),
+          subtitle: t('khatma.khatmaCompleted'),
+        });
       }
     }
     await loadData();
@@ -196,15 +199,6 @@ export default function KhatmScreen() {
     surahNumText: { fontSize: 12, fontWeight: '700' },
     surahName: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     checkCircle: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-    // Celebration overlay
-    celebOverlay: {
-      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 999,
-    },
-    celebCard: {
-      backgroundColor: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.97)', borderRadius: 28, padding: 40, alignItems: 'center',
-      borderWidth: 0.5, borderColor: isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)',
-    },
   });
   const s = useScaledStyles(_s, colors.fs);
 
@@ -219,7 +213,7 @@ export default function KhatmScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 + adBottomInset }}>
         {/* Stats */}
         <View style={[s.statsRow, { flexDirection: isRTL ? 'row-reverse' : 'row', marginTop: 16 }]}>
           <View style={s.statCard}>
@@ -368,16 +362,6 @@ export default function KhatmScreen() {
           />
         </View>
       </Modal>
-
-      {/* Celebration Overlay */}
-      <Animated.View style={[s.celebOverlay, { opacity: celebAnim, pointerEvents: 'none' }]}>
-        <View style={s.celebCard}>
-          <Text style={{ fontSize: 72, marginBottom: 10 }}></Text>
-          <Text style={{ fontSize: 22, fontWeight: '900', color: colors.primaryText, marginBottom: 8 }}>{t('khatma.congratulations')}</Text>
-          <Text style={{ fontSize: 16, color: colors.muted, textAlign: 'center' }}>{t('khatma.khatmaCompleted')}</Text>
-          <Text style={{ fontSize: 24, marginTop: 12 }}>{t('khatma.barakAllah')}</Text>
-        </View>
-      </Animated.View>
     </ScreenContainer>
   );
 }

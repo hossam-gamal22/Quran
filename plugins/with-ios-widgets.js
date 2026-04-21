@@ -358,7 +358,25 @@ const withIOSWidgets = (config) => {
       });
     }
 
-    // Add widget target as dependency of main target so it gets built
+    // Add widget target as dependency of main target so it gets built.
+    // NOTE: `xcodeProject.getFirstTarget()` returns { uuid, firstTarget: {...} }
+    // where `firstTarget` is the target's PROPERTIES dict and does NOT carry
+    // a nested `uuid` field. Earlier code referenced `mainTarget.firstTarget.uuid`
+    // which is `undefined`, silently breaking dependency / source / framework
+    // injection. Resolve the real UUID by name instead.
+    const appName = mod.modRequest.projectName || 'rwhalmslm';
+    let resolvedMainTargetUuid = null;
+    let resolvedMainTargetObj = null;
+    for (const key in nativeTargets) {
+      if (key.endsWith('_comment')) continue;
+      const nt = nativeTargets[key];
+      const ntName = nt && (nt.name || '').replace(/"/g, '');
+      if (ntName === appName) {
+        resolvedMainTargetUuid = key;
+        resolvedMainTargetObj = nt;
+        break;
+      }
+    }
     const mainTarget = xcodeProject.getFirstTarget();
     if (mainTarget && widgetTargetUuid) {
       const dependencyUuid = xcodeProject.generateUuid();
@@ -391,7 +409,7 @@ const withIOSWidgets = (config) => {
       objects['PBXTargetDependency'][`${dependencyUuid}_comment`] = 'PBXTargetDependency';
 
       // Add dependency to main target
-      const mainTargetObj = nativeTargets[mainTarget.firstTarget.uuid];
+      const mainTargetObj = resolvedMainTargetObj;
       if (mainTargetObj) {
         if (!mainTargetObj.dependencies) {
           mainTargetObj.dependencies = [];
@@ -435,12 +453,12 @@ const withIOSWidgets = (config) => {
     }
 
     // Add widget extension to the main target's "Embed App Extensions" build phase
-    if (mainTarget) {
+    if (resolvedMainTargetUuid) {
       xcodeProject.addBuildPhase(
         [],
         'PBXCopyFilesBuildPhase',
         'Embed App Extensions',
-        mainTarget.firstTarget.uuid,
+        resolvedMainTargetUuid,
         'app_extension'
       );
     }
@@ -453,7 +471,6 @@ const withIOSWidgets = (config) => {
     // metadata) but tapping them does nothing because the system cannot
     // resolve the intent in the app.
     // ────────────────────────────────────────────────────────────────────
-    const appName = mod.modRequest.projectName || 'rwhalmslm';
     const appDir = path.join(projectRoot, 'ios', appName);
 
     // 1. Copy the Swift files from widgets/ios/ into the main app dir.
@@ -470,8 +487,8 @@ const withIOSWidgets = (config) => {
     }
 
     // 2. Find the main target's Sources build phase.
-    const mainTargetUuid = mainTarget?.firstTarget?.uuid;
-    const mainTargetObj = mainTargetUuid ? nativeTargets[mainTargetUuid] : null;
+    const mainTargetUuid = resolvedMainTargetUuid;
+    const mainTargetObj = resolvedMainTargetObj;
     let mainSourcesPhaseUuid = null;
     if (mainTargetObj?.buildPhases) {
       for (const phase of mainTargetObj.buildPhases) {
@@ -507,7 +524,7 @@ const withIOSWidgets = (config) => {
           isa: 'PBXFileReference',
           lastKnownFileType: 'sourcecode.swift',
           name: fileName,
-          path: fileName,
+          path: `${appName}/${fileName}`,
           sourceTree: '"<group>"',
         };
         objects['PBXFileReference'][`${fileRefUuid}_comment`] = fileName;
@@ -533,6 +550,65 @@ const withIOSWidgets = (config) => {
         objects['PBXSourcesBuildPhase'][mainSourcesPhaseUuid].files.push({
           value: buildFileUuid,
           comment: `${fileName} in Sources`,
+        });
+      }
+    }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Link AppIntents.framework into the MAIN APP target.
+    // Required so that:
+    //   - `appintentsmetadataprocessor` extracts intent metadata at build
+    //     time (otherwise it logs "No AppIntents.framework dependency found"
+    //     and skips, leaving Spotlight/Siri/Shortcuts with zero registered
+    //     shortcuts).
+    //   - The system can resolve and execute intents inside the app process
+    //     when Control Center / Spotlight launches the app via openAppWhenRun.
+    // Weak-linked so iOS 15 still loads the binary (framework is iOS 16+).
+    // NOTE: We must look up the main app target by NAME — `getFirstTarget()`
+    // returns the widget extension after `addTarget()` shifted ordering.
+    // ────────────────────────────────────────────────────────────────────
+    let mainFrameworksPhaseUuid = null;
+    if (resolvedMainTargetObj?.buildPhases) {
+      for (const phase of resolvedMainTargetObj.buildPhases) {
+        if (objects['PBXFrameworksBuildPhase']?.[phase.value]) {
+          mainFrameworksPhaseUuid = phase.value;
+          break;
+        }
+      }
+    }
+
+    if (mainFrameworksPhaseUuid) {
+      const mainFrameworksPhase = objects['PBXFrameworksBuildPhase'][mainFrameworksPhaseUuid];
+      const alreadyLinked = (mainFrameworksPhase.files || []).some((f) => {
+        const comment = String(f?.comment || '');
+        return comment.includes('AppIntents.framework');
+      });
+
+      if (!alreadyLinked) {
+        const fwName = 'AppIntents.framework';
+        const fwRefUuid = xcodeProject.generateUuid();
+        objects['PBXFileReference'][fwRefUuid] = {
+          isa: 'PBXFileReference',
+          lastKnownFileType: 'wrapper.framework',
+          name: fwName,
+          path: `System/Library/Frameworks/${fwName}`,
+          sourceTree: 'SDKROOT',
+        };
+        objects['PBXFileReference'][`${fwRefUuid}_comment`] = fwName;
+
+        const fwBuildFileUuid = xcodeProject.generateUuid();
+        objects['PBXBuildFile'][fwBuildFileUuid] = {
+          isa: 'PBXBuildFile',
+          fileRef: fwRefUuid,
+          fileRef_comment: fwName,
+          settings: { ATTRIBUTES: ['Weak'] },
+        };
+        objects['PBXBuildFile'][`${fwBuildFileUuid}_comment`] = `${fwName} in Frameworks`;
+
+        if (!mainFrameworksPhase.files) mainFrameworksPhase.files = [];
+        mainFrameworksPhase.files.push({
+          value: fwBuildFileUuid,
+          comment: `${fwName} in Frameworks`,
         });
       }
     }

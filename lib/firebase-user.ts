@@ -34,6 +34,38 @@ const SECURE_KEYS = {
   DEVICE_ID: 'rooh_device_id',
 };
 
+// ==================== SecureStore safe wrappers ====================
+// iOS Simulator builds without code-signing (or missing keychain-access-groups
+// entitlement) throw "A required entitlement isn't present". These wrappers
+// silently fall back so callers never see entitlement errors; on real devices
+// with a valid provisioning profile, SecureStore works normally.
+
+const isEntitlementError = (err: unknown): boolean => {
+  const msg = (err as { message?: string } | null)?.message ?? '';
+  return /entitlement isn'?t present|Keychain access failed/i.test(msg);
+};
+
+const secureGetItem = async (key: string): Promise<string | null> => {
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch (err) {
+    if (!isEntitlementError(err)) {
+      console.warn('SecureStore getItemAsync failed:', err);
+    }
+    return null;
+  }
+};
+
+const secureSetItem = async (key: string, value: string): Promise<void> => {
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch (err) {
+    if (!isEntitlementError(err)) {
+      console.warn('SecureStore setItemAsync failed:', err);
+    }
+  }
+};
+
 // ==================== الأنواع ====================
 
 export interface UserData {
@@ -87,13 +119,13 @@ const generateFallbackId = (): string => {
 const getDeviceId = async (): Promise<string> => {
   try {
     // 1. Check SecureStore first (most persistent, survives reinstall on iOS)
-    const secureId = await SecureStore.getItemAsync(SECURE_KEYS.DEVICE_ID);
+    const secureId = await secureGetItem(SECURE_KEYS.DEVICE_ID);
     if (secureId) {
       // If SecureStore has a fallback_ ID and we can get a native one, upgrade it
       if (secureId.startsWith('fallback_')) {
         const nativeId = await getNativeDeviceId();
         if (nativeId) {
-          await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+          await secureSetItem(SECURE_KEYS.DEVICE_ID, nativeId);
           await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, nativeId);
           console.log('🔄 Upgraded fallback ID to native:', nativeId.substring(0, 20) + '...');
           return nativeId;
@@ -110,14 +142,14 @@ const getDeviceId = async (): Promise<string> => {
       if (asyncId.startsWith('fallback_')) {
         const nativeId = await getNativeDeviceId();
         if (nativeId) {
-          await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+          await secureSetItem(SECURE_KEYS.DEVICE_ID, nativeId);
           await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, nativeId);
           console.log('🔄 Upgraded fallback AsyncStorage ID to native:', nativeId.substring(0, 20) + '...');
           return nativeId;
         }
       }
       // Migrate existing non-fallback ID to SecureStore for persistence
-      await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, asyncId);
+      await secureSetItem(SECURE_KEYS.DEVICE_ID, asyncId);
       console.log('📦 Migrated existing ID to SecureStore:', asyncId.substring(0, 20) + '...');
       return asyncId;
     }
@@ -125,20 +157,20 @@ const getDeviceId = async (): Promise<string> => {
     // 3. New user — try native device ID
     const nativeId = await getNativeDeviceId();
     if (nativeId) {
-      await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, nativeId);
+      await secureSetItem(SECURE_KEYS.DEVICE_ID, nativeId);
       console.log('🆔 Native device ID saved:', nativeId.substring(0, 20) + '...');
       return nativeId;
     }
 
     // 4. Last resort: generate new ID and save everywhere
     const newId = generateFallbackId();
-    await SecureStore.setItemAsync(SECURE_KEYS.DEVICE_ID, newId);
+    await secureSetItem(SECURE_KEYS.DEVICE_ID, newId);
     await AsyncStorage.setItem(STORAGE_KEYS.USER_ID, newId);
     console.log('🆕 Generated new fallback ID:', newId);
     return newId;
 
   } catch (error) {
-    console.error('❌ Error getting device ID:', error);
+    console.warn('Error getting device ID (using fallback):', error);
     // Ultimate fallback
     return generateFallbackId();
   }
@@ -193,6 +225,12 @@ export const getUserId = async (): Promise<string> => {
 };
 
 export const getFCMToken = async (): Promise<string> => {
+  // APNs tokens require a real device + valid aps-environment entitlement from
+  // the provisioning profile. Simulators + unsigned sim builds cannot obtain
+  // them — skip silently so we don't spam LogBox with entitlement errors.
+  if (!Device.isDevice) {
+    return '';
+  }
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -216,7 +254,11 @@ export const getFCMToken = async (): Promise<string> => {
     console.log('🔔 FCM Token obtained:', token.substring(0, 20) + '...');
     return token;
   } catch (error) {
-    console.error('❌ Error getting FCM token:', error);
+    // aps-environment is unavailable on simulator and unsigned builds.
+    if (isEntitlementError(error)) {
+      return '';
+    }
+    console.warn('Error getting FCM token:', error);
     return '';
   }
 };
