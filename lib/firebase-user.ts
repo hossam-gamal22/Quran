@@ -299,7 +299,7 @@ export const registerUser = async (): Promise<{ success: boolean; userId: string
     const installSource = await detectInstallSource();
     
     const locales = Localization.getLocales();
-    const appVersion = Constants.expoConfig?.version || '1.2.0';
+    const appVersion = Constants.expoConfig?.version || '1.2.1';
     const userData: Partial<UserData> = {
       id: userId,
       platform: Platform.OS as 'ios' | 'android' | 'web',

@@ -80,6 +80,17 @@ export async function removeBookmark(id: string): Promise<void> {
   await AsyncStorage.setItem(KEYS.BOOKMARKS, JSON.stringify(filtered));
 }
 
+/**
+ * Update only the `note` field of an existing bookmark, preserving its `id`
+ * and `createdAt`. This is critical for page bookmarks (id pattern `page_{n}`)
+ * which would otherwise be corrupted by a remove+addBookmark cycle.
+ */
+export async function updateBookmarkNote(id: string, note: string): Promise<void> {
+  const bookmarks = await getBookmarks();
+  const updated = bookmarks.map(b => (b.id === id ? { ...b, note } : b));
+  await AsyncStorage.setItem(KEYS.BOOKMARKS, JSON.stringify(updated));
+}
+
 export async function isBookmarked(surahNumber: number, ayahNumber: number): Promise<boolean> {
   const bookmarks = await getBookmarks();
   return bookmarks.some(b => b.surahNumber === surahNumber && b.ayahNumber === ayahNumber);

@@ -63,6 +63,8 @@ import {
   formatDate,
   clearAllWorshipData,
 } from '@/lib/worship-storage';
+import { applyAutoMissed, extractScheduledTimes, type PrayerTimesMap } from '@/lib/prayer-availability';
+import { getCachedPrayerTimes } from '@/lib/prayer-times';
 
 
 // ========================================
@@ -262,12 +264,52 @@ export const WorshipProvider: React.FC<WorshipProviderProps> = ({ children }) =>
       getQuranRecord(today),
       getAzkarRecord(today),
     ]);
-    
-    setTodayPrayer(prayer || { ...defaultPrayerRecord, date: today });
+
+    // Smart auto-missed: if any prayer's window has fully expired and the user
+    // hasn't recorded it, flip it to `missed` and persist so streak/stats stay
+    // accurate. Already-recorded statuses are never overwritten.
+    let prayerRecord = prayer || { ...defaultPrayerRecord, date: today };
+    try {
+      let times: PrayerTimesMap = extractScheduledTimes(prayerRecord);
+      if (!times.fajr) {
+        const cached = await getCachedPrayerTimes(today);
+        if (cached) {
+          times = {
+            fajr: cached.fajr,
+            dhuhr: cached.dhuhr,
+            asr: cached.asr,
+            maghrib: cached.maghrib,
+            isha: cached.isha,
+          };
+        }
+      }
+      if (times.fajr) {
+        const { record: reconciled, changed } = applyAutoMissed(prayerRecord, times);
+        if (changed) {
+          await savePrayerRecord(reconciled);
+          prayerRecord = reconciled;
+        }
+      }
+    } catch (error) {
+      console.warn('[WorshipContext] auto-missed reconciliation failed:', error);
+    }
+
+    setTodayPrayer(prayerRecord);
     setTodayFasting(fasting);
     setTodayQuran(quran);
     setTodayAzkar(azkar || { ...defaultAzkarRecord, date: today });
   }, []);
+
+  // Re-run auto-missed every minute while the app is in the foreground so the UI
+  // flips a prayer to `missed` as soon as the next prayer's adhan starts.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        refreshTodayRecords().catch(() => {});
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [refreshTodayRecords]);
 
   const refreshStats = useCallback(async () => {
     const newStats = await getWorshipStats();

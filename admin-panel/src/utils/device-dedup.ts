@@ -41,7 +41,16 @@ function toEpoch(ts: unknown): number {
   return 0;
 }
 
-const GENERIC_NAMES = new Set(['unknown device', 'unknown', '']);
+const GENERIC_NAMES = new Set([
+  'unknown device',
+  'unknown',
+  '',
+  // iOS commonly reports these generic names for many different devices, so
+  // using them as a fingerprint collapses unrelated iPhone/iPad users together.
+  'iphone',
+  'ipad',
+  'ipod touch',
+]);
 
 /**
  * Pick the most recently active user from a group.

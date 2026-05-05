@@ -2,7 +2,14 @@
 import { Platform, Alert } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { Audio } from 'expo-av';
-import { getAyahAudioUrl, saveLastPlayback, getLastPlayback, getCachedSurah } from './quran-cache';
+import {
+  getAyahAudioUrl,
+  saveLastPlayback,
+  getLastPlayback,
+  getCachedSurah,
+  ReciterUnavailableError,
+} from './quran-cache';
+import { RECITERS_BY_ID, DEFAULT_RECITER_ID } from './reciters-registry';
 import { audioCoordinator } from './audio-coordinator';
 import { addListeningTime } from './listening-tracker';
 import { fetchWithTimeout } from './fetch-with-timeout';
@@ -84,6 +91,12 @@ export const useProgress = trackPlayerAvailable
   ? require('react-native-track-player').useProgress
   : () => ({ position: 0, duration: 0, buffered: 0 });
 
+export interface PlaybackError {
+  type: 'reciter_unavailable' | 'network' | 'unknown';
+  reciterId: string;
+  message: string;
+}
+
 export interface PlaybackState {
   isPlaying: boolean;
   isLoading: boolean;
@@ -93,6 +106,8 @@ export interface PlaybackState {
   duration: number;
   position: number;
   playingFullSurah?: boolean;
+  /** Latest playback error — cleared when a new ayah starts playing successfully. */
+  error?: PlaybackError | null;
 }
 
 type PlaybackCallback = (state: PlaybackState) => void;
@@ -109,10 +124,11 @@ class AudioPlayerManager {
     isLoading: false,
     currentSurah: 0,
     currentAyah: 0,
-    reciterIdentifier: 'ar.alafasy',
+    reciterIdentifier: DEFAULT_RECITER_ID,
     duration: 0,
     position: 0,
     playingFullSurah: false,
+    error: null,
   };
   private listeners: Set<PlaybackCallback> = new Set();
   private continuousPlay: boolean = true;
@@ -367,7 +383,8 @@ class AudioPlayerManager {
     suppressLoading: boolean = false
   ): Promise<void> {
     try {
-      if (!suppressLoading) this.updateState({ isLoading: true });
+      if (!suppressLoading) this.updateState({ isLoading: true, error: null });
+      else this.updateState({ error: null });
       this.continuousPlay = continuous;
       const myLoadId = ++this.loadingId;
 
@@ -391,47 +408,75 @@ class AudioPlayerManager {
       this.playingFullSurah = !!continuous;
 
       let audioUrl: string;
-      if (this.playingFullSurah) {
-        const { getSurahAudioUrl } = await import('./quran-cache');
-        // Check for locally downloaded file first
-        let localUri: string | null = null;
-        try {
-          const { getLocalUri } = await import('./audio-download-manager');
-          localUri = await getLocalUri(surahNumber, reciterIdentifier);
-        } catch {}
-
-        if (localUri) {
-          audioUrl = localUri;
-          console.log('[audio-player] using offline file:', audioUrl);
-          // Still fetch timestamps (best-effort) so per-ayah tracking works
-          // when playing the locally downloaded surah file.
+      try {
+        if (this.playingFullSurah) {
+          const { getSurahAudioUrl } = await import('./quran-cache');
+          // Check for locally downloaded file first
+          let localUri: string | null = null;
           try {
-            await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
-          } catch (e) {
-            console.warn('[audio-player] Offline timestamps fetch failed (non-fatal):', e);
+            const { getLocalUri } = await import('./audio-download-manager');
+            localUri = await getLocalUri(surahNumber, reciterIdentifier);
+          } catch {}
+
+          if (localUri) {
+            audioUrl = localUri;
+            console.log('[audio-player] using offline file:', audioUrl);
+            // Still fetch timestamps (best-effort) so per-ayah tracking works
+            // when playing the locally downloaded surah file.
+            try {
+              await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
+            } catch (e) {
+              console.warn('[audio-player] Offline timestamps fetch failed (non-fatal):', e);
+            }
+          } else {
+            try {
+              const { offsets, audioUrl: cdnUrl } = await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
+              audioUrl = cdnUrl || getSurahAudioUrl(reciterIdentifier, surahNumber);
+              console.log('[audio-player] full surah', reciterIdentifier, surahNumber, 'offsets:', offsets.length, 'url=', audioUrl);
+            } catch (e) {
+              if (e instanceof ReciterUnavailableError) throw e;
+              console.warn('[audio-player] Failed to fetch surah timestamps, falling back:', e);
+              audioUrl = getSurahAudioUrl(reciterIdentifier, surahNumber);
+            }
           }
         } else {
+          // compute global ayah number for single-ayah files
+          let globalAyahNumber = ayahNumber;
+          if (surah) {
+            const surahs = await import('./quran-cache').then(m => m.fetchAndCacheSurahsList());
+            let totalAyahs = 0;
+            for (const s of surahs) {
+              if (s.number < surahNumber) totalAyahs += s.numberOfAyahs;
+            }
+            globalAyahNumber = totalAyahs + ayahNumber;
+          }
+          audioUrl = getAyahAudioUrl(reciterIdentifier, globalAyahNumber, surahNumber, ayahNumber);
+        }
+      } catch (e) {
+        if (e instanceof ReciterUnavailableError) {
+          console.warn('[audio-player] Reciter unavailable:', reciterIdentifier, e.message);
+          this.isTransitioning = false;
+          this.updateState({
+            isLoading: false,
+            isPlaying: false,
+            error: {
+              type: 'reciter_unavailable',
+              reciterId: reciterIdentifier,
+              message: e.message,
+            },
+          });
+          try { audioCoordinator.releaseFocus('quran'); } catch {}
+          // User-facing alert so the failure isn't silent.
           try {
-            const { offsets, audioUrl: cdnUrl } = await this.fetchSurahTimestamps(reciterIdentifier, surahNumber);
-            audioUrl = cdnUrl || getSurahAudioUrl(reciterIdentifier, surahNumber);
-            console.log('[audio-player] full surah', reciterIdentifier, surahNumber, 'offsets:', offsets.length, 'url=', audioUrl);
-          } catch (e) {
-            console.warn('[audio-player] Failed to fetch surah timestamps, falling back:', e);
-            audioUrl = getSurahAudioUrl(reciterIdentifier, surahNumber);
-          }
+            Alert.alert(
+              'تعذّر تشغيل التلاوة',
+              `هذا القارئ غير متاح حالياً (${this.getReciterName(reciterIdentifier)}). الرجاء اختيار قارئ آخر.`,
+              [{ text: 'حسناً' }],
+            );
+          } catch {}
+          return;
         }
-      } else {
-        // compute global ayah number for single-ayah files
-        let globalAyahNumber = ayahNumber;
-        if (surah) {
-          const surahs = await import('./quran-cache').then(m => m.fetchAndCacheSurahsList());
-          let totalAyahs = 0;
-          for (const s of surahs) {
-            if (s.number < surahNumber) totalAyahs += s.numberOfAyahs;
-          }
-          globalAyahNumber = totalAyahs + ayahNumber;
-        }
-        audioUrl = getAyahAudioUrl(reciterIdentifier, globalAyahNumber);
+        throw e;
       }
 
       console.log('[audio-player] creating sound url=', audioUrl, 'playingFullSurah=', this.playingFullSurah);
@@ -558,18 +603,7 @@ class AudioPlayerManager {
   }
 
   private getReciterName(reciterIdentifier: string): string {
-    const reciterNames: Record<string, string> = {
-      'ar.alafasy': 'مشاري العفاسي',
-      'ar.abdullahbasfar': 'عبدالله بصفر',
-      'ar.abdurrahmaansudais': 'عبدالرحمن السديس',
-      'ar.shaatree': 'أبو بكر الشاطري',
-      'ar.husary': 'محمود خليل الحصري',
-      'ar.minshawi': 'محمد صديق المنشاوي',
-      'ar.hudhaify': 'علي الحذيفي',
-      'ar.ibrahim.akhdar': 'إبراهيم الأخضر',
-      'ar.muhammadjibreel': 'محمد جبريل',
-    };
-    return reciterNames[reciterIdentifier] || 'القارئ';
+    return RECITERS_BY_ID[reciterIdentifier]?.nameAr || 'القارئ';
   }
 
   // Helper method for expo-av playback (web platform)
@@ -588,16 +622,22 @@ class AudioPlayerManager {
         this.onPlaybackStatusUpdate.bind(this)
       ));
     } catch (urlError) {
-      // If CDN URL failed, retry with islamic.network fallback for full surah
+      // If CDN URL failed, retry with next candidate (e.g. mp3quran.net mirror).
+      // Defends against silent CDN drift on download.quranicaudio.com.
       if (this.playingFullSurah) {
-        const { getSurahAudioUrl } = await import('./quran-cache');
-        const fallbackUrl = getSurahAudioUrl(this.state.reciterIdentifier, this.state.currentSurah);
-        console.warn('[audio-player] CDN URL failed, retrying with fallback:', fallbackUrl);
-        ({ sound } = await Audio.Sound.createAsync(
-          { uri: fallbackUrl },
-          { shouldPlay: !needsSeek },
-          this.onPlaybackStatusUpdate.bind(this)
-        ));
+        const { getSurahAudioUrls } = await import('./quran-cache');
+        const candidates = getSurahAudioUrls(this.state.reciterIdentifier, this.state.currentSurah);
+        const fallbackUrl = candidates.find(u => u !== audioUrl);
+        if (fallbackUrl) {
+          console.warn('[audio-player] Primary URL failed, retrying with fallback:', fallbackUrl);
+          ({ sound } = await Audio.Sound.createAsync(
+            { uri: fallbackUrl },
+            { shouldPlay: !needsSeek },
+            this.onPlaybackStatusUpdate.bind(this)
+          ));
+        } else {
+          throw urlError;
+        }
       } else {
         throw urlError;
       }
@@ -769,19 +809,7 @@ class AudioPlayerManager {
     this.continuousPlay = enabled;
   }
 
-  // Map alquran.cloud reciter identifiers → QuranCDN reciter IDs
-  private static readonly QURAN_CDN_RECITER_IDS: Record<string, number> = {
-    'ar.alafasy': 7,
-    'ar.abdullahbasfar': 9,
-    'ar.abdurrahmaansudais': 3,
-    'ar.shaatree': 2,
-    'ar.husary': 1,
-    'ar.minshawi': 4,
-    'ar.hudhaify': 12,
-    'ar.ibrahim.akhdar': 130,
-    'ar.muhammadjibreel': 42,
-  };
-
+  // QuranCDN reciter id is now sourced from RECITERS_REGISTRY (entry.quranCdnId).
   // Fetch per-ayah start timestamps (ms) for a surah from QuranCDN in a single API call.
   // Returns { offsets, audioUrl } — audioUrl is the CDN file that matches these timestamps.
   // Cache audio URLs from QuranCDN alongside offsets so they stay in sync
@@ -791,7 +819,7 @@ class AudioPlayerManager {
     reciterIdentifier: string,
     surahNumber: number,
   ): Promise<{ offsets: number[]; audioUrl: string | null }> {
-    const reciterId = AudioPlayerManager.QURAN_CDN_RECITER_IDS[reciterIdentifier];
+    const reciterId = RECITERS_BY_ID[reciterIdentifier]?.quranCdnId;
     if (!reciterId) {
       console.warn('[audio-player] fetchSurahTimestamps: reciter', reciterIdentifier, 'has NO QuranCDN id mapping — per-ayah tracking will not work');
       return { offsets: [], audioUrl: null };

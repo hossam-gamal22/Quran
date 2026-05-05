@@ -33,9 +33,13 @@ import { PrayerStatus, PrayerName, DailyPrayerRecord } from '@/lib/worship-stora
 import {
   getCachedPrayerTimes,
   formatPrayerTime,
-  timeStringToDate,
   PrayerTimes,
 } from '@/lib/prayer-times';
+import {
+  getPrayerWindowState,
+  type PrayerWindowState,
+  type PrayerTimesMap,
+} from '@/lib/prayer-availability';
 import GlassCard from '@/components/ui/GlassCard';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -67,6 +71,12 @@ const STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: string; labelK
   { value: 'none', color: '#8E8E93', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
 ];
 
+// Theme-aware amber palette for the "upcoming" / "late only" pill — readable on
+// both light and dark backgrounds (passes WCAG AA against the worship card teal
+// and against light app backgrounds).
+const PENDING_COLOR = '#c07b10';
+const PENDING_BG = 'rgba(192,123,16,0.22)';
+
 const STATUS_CONFIG: Record<PrayerStatus, { color: string; icon: string; labelKey: string }> = {
   prayed: { color: '#0d8e62', icon: 'check-circle', labelKey: 'worship.onTime' },
   late: { color: '#c07b10', icon: 'clock-alert', labelKey: 'worship.late' },
@@ -87,7 +97,8 @@ interface PrayerItemProps {
   index: number;
   isDarkMode?: boolean;
   timeString?: string;
-  isAvailable: boolean;
+  windowState: PrayerWindowState;
+  isPastDay: boolean;
 }
 
 const PrayerItem: React.FC<PrayerItemProps> = ({
@@ -97,7 +108,8 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   index,
   isDarkMode = false,
   timeString,
-  isAvailable,
+  windowState,
+  isPastDay,
 }) => {
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -106,12 +118,41 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
   const scale = useSharedValue(1);
   const config = STATUS_CONFIG[status];
 
+  // Past days are always fully editable. For today: dropdown is open unless the
+  // prayer is `upcoming` (adhan hasn't fired yet).
+  const isInteractive = isPastDay || windowState !== 'upcoming';
+  const isUpcoming = !isPastDay && windowState === 'upcoming';
+
+  // Filter the dropdown options based on the smart window state:
+  // - onTime: full list (prayed / late / missed / none)
+  // - lateOnly: late + missed + none (no on-time option past the 60-min mark)
+  // - expired: late + missed + none (auto-missed already applied; user can still
+  //   correct via dropdown until end of day per spec)
+  // - past day: full list
+  // Always show full list (prayed / late / missed / none) so the user can
+  // freely correct any prayer's status. The smart window state only affects
+  // the visual hint (amber pill) — never restricts the dropdown choices.
+  const availableOptions = isInteractive ? STATUS_OPTIONS : [];
+
+  // Pill foreground/background:
+  // - upcoming → amber "غير متاح بعد" pill
+  // - lateOnly + not yet recorded → amber "متأخر فقط" pill
+  // - everything else → status-driven
+  const isLateOnlyUnrecorded = !isPastDay && windowState === 'lateOnly' && status === 'none';
+  const useAmber = isUpcoming || isLateOnlyUnrecorded;
+  const pillColor = useAmber ? PENDING_COLOR : config.color;
+  const pillBg = useAmber ? PENDING_BG : `${config.color}20`;
+  const pillIcon = isUpcoming ? 'clock-outline' : (isLateOnlyUnrecorded ? 'clock-alert' : config.icon);
+  const pillLabel = isUpcoming
+    ? t('worship.notYetAvailable')
+    : (isLateOnlyUnrecorded ? t('worship.lateOnly') : t(config.labelKey));
+
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handlePress = () => {
-    if (!isAvailable) {
+    if (!isInteractive) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
@@ -140,7 +181,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
         style={[
           styles.prayerItem,
           { backgroundColor: colors.card },
-          { borderLeftColor: isRTL ? undefined : (isAvailable ? config.color : colors.textLight), borderLeftWidth: isRTL ? 0 : 4, borderRightColor: isRTL ? (isAvailable ? config.color : colors.textLight) : undefined, borderRightWidth: isRTL ? 4 : 0, flexDirection: isRTL ? 'row-reverse' : 'row' },
+          { borderLeftColor: isRTL ? undefined : pillColor, borderLeftWidth: isRTL ? 0 : 4, borderRightColor: isRTL ? pillColor : undefined, borderRightWidth: isRTL ? 4 : 0, flexDirection: isRTL ? 'row-reverse' : 'row' },
         ]}
       >
         <View style={[styles.prayerLeft, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -148,7 +189,7 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
             <MaterialCommunityIcons
               name={prayer.icon as any}
               size={24}
-              color={isAvailable ? config.color : colors.textLight}
+              color={pillColor}
             />
           </View>
           <View style={styles.prayerInfo}>
@@ -162,20 +203,20 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
         </View>
         
         <View style={styles.prayerRight}>
-          <View style={[styles.statusBadge, { backgroundColor: `${isAvailable ? config.color : colors.textLight}20`, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: pillBg, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             <MaterialCommunityIcons
-              name={isAvailable ? config.icon as any : 'lock-clock'}
+              name={pillIcon as any}
               size={18}
-              color={isAvailable ? config.color : colors.textLight}
+              color={pillColor}
             />
-            <Text style={[styles.statusText, { color: isAvailable ? config.color : colors.textLight }]}>
-              {isAvailable ? t(config.labelKey) : t('worship.notYetAvailable')}
+            <Text style={[styles.statusText, { color: pillColor }]}>
+              {pillLabel}
             </Text>
-            {isAvailable && (
+            {isInteractive && (
               <MaterialCommunityIcons
                 name={menuOpen ? 'chevron-up' : 'chevron-down'}
                 size={16}
-                color={config.color}
+                color={pillColor}
               />
             )}
           </View>
@@ -183,9 +224,9 @@ const PrayerItem: React.FC<PrayerItemProps> = ({
       </TouchableOpacity>
 
       {/* القائمة المنسدلة */}
-      {menuOpen && isAvailable && (
-        <View style={[styles.dropdownMenu, { backgroundColor: colors.cardSolid }]}>
-          {STATUS_OPTIONS.map(opt => (
+      {menuOpen && isInteractive && (
+        <View style={[styles.dropdownMenu, { backgroundColor: colors.modalSurface }]}>
+          {availableOptions.map(opt => (
             <TouchableOpacity
               key={opt.value}
               style={[
@@ -358,14 +399,18 @@ export default function PrayerTrackerScreen() {
     }
   }, [selectedDateStr, isSelectedToday, todayPrayer, getPrayerForDate]);
 
-  // تحديد هل الصلاة حان وقتها (أو فات) — فقط لليوم الحالي
-  const isPrayerAvailable = useCallback((prayerKey: PrayerName): boolean => {
-    if (!isSelectedToday) return true; // الأيام السابقة كلها متاحة
-    if (!prayerTimes) return true;
-    const timeStr = prayerTimes[prayerKey as keyof PrayerTimes];
-    if (!timeStr) return true;
-    const prayerDate = timeStringToDate(timeStr);
-    return new Date() >= prayerDate;
+  // تحديد حالة نافذة الصلاة الذكية — فقط لليوم الحالي
+  const getWindowState = useCallback((prayerKey: PrayerName): PrayerWindowState => {
+    if (!isSelectedToday) return 'onTime'; // الأيام السابقة: تحرير كامل
+    if (!prayerTimes) return 'onTime';
+    const times: PrayerTimesMap = {
+      fajr: prayerTimes.fajr,
+      dhuhr: prayerTimes.dhuhr,
+      asr: prayerTimes.asr,
+      maghrib: prayerTimes.maghrib,
+      isha: prayerTimes.isha,
+    };
+    return getPrayerWindowState(prayerKey as any, times);
   }, [prayerTimes, isSelectedToday]);
 
   // جلب وقت الصلاة المنسق
@@ -572,7 +617,8 @@ export default function PrayerTrackerScreen() {
                 index={index}
                 isDarkMode={isDarkMode}
                 timeString={isSelectedToday ? getPrayerTimeDisplay(prayer.key) : undefined}
-                isAvailable={isPrayerAvailable(prayer.key)}
+                windowState={getWindowState(prayer.key)}
+                isPastDay={!isSelectedToday}
               />
             ))}
           </View>

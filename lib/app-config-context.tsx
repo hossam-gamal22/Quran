@@ -14,7 +14,7 @@ const DEFAULT_CONFIG: RemoteAppConfig = {
   name: 'رُوح المسلم',
   nameEn: 'Rooh Al-Muslim',
   description: 'تطبيق إسلامي شامل للقرآن والأذكار والصلاة',
-  version: '1.2.0',
+  version: '1.2.1',
   primaryColor: '#1B4332',
   maintenanceMode: false,
   forceUpdate: false,

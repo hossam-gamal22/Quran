@@ -11,24 +11,57 @@ import {
   LiveActivityData,
 } from '@/lib/live-activities';
 import { getCachedPrayerTimes, getTodayDateString, formatPrayerTime } from '@/lib/prayer-times';
+import { getOfflinePrayerTimes } from '@/lib/prayer-week-cache';
 import { getWidgetSettings } from '@/lib/widget-data';
 import { getLanguage, t } from '@/lib/i18n';
 import { getLocalizedHijriDate } from '@/lib/hijri-date';
 
+// Track last refresh outcome for UI surfacing
+let lastRefreshResult: { ok: boolean; reason?: string; source?: string } = { ok: false, reason: 'never_called' };
+export function getLastRefreshResult() { return lastRefreshResult; }
+
 /**
  * Refresh or auto-start the Live Activity using cached prayer data.
  * Safe to call from _layout.tsx — does nothing if disabled or no cached data.
+ * Returns true if Live Activity was started/updated successfully.
  */
-export async function refreshLiveActivityIfEnabled(): Promise<void> {
-  if (Platform.OS !== 'ios') return;
+export async function refreshLiveActivityIfEnabled(): Promise<boolean> {
+  if (Platform.OS !== 'ios') {
+    lastRefreshResult = { ok: false, reason: 'not_ios' };
+    return false;
+  }
 
   try {
     const laSettings = await getLiveActivitySettings();
-    if (!laSettings.enabled) return;
+    console.log('📍 LA refresh: settings =', JSON.stringify(laSettings));
+    if (!laSettings.enabled) {
+      lastRefreshResult = { ok: false, reason: 'disabled_in_settings' };
+      return false;
+    }
 
     const today = getTodayDateString();
-    const times = await getCachedPrayerTimes(today);
-    if (!times) return; // No cached data yet — prayer.tsx will handle it
+    let times = await getCachedPrayerTimes(today);
+    let source = 'today_cache';
+    if (!times) {
+      // Fallback chain: week cache → extrapolation → local calculation from stored coords
+      try {
+        const offline = await getOfflinePrayerTimes(today);
+        if (offline?.times) {
+          times = offline.times;
+          source = offline.source || 'offline';
+          console.log(`📍 LA refresh: using offline prayer times (source=${source})`);
+        }
+      } catch (e) {
+        console.warn('📍 LA refresh: offline fallback failed:', e);
+      }
+    } else {
+      console.log('📍 LA refresh: using today cache');
+    }
+    if (!times) {
+      console.log('📍 LA refresh skipped — no prayer times available (cache empty + no stored location)');
+      lastRefreshResult = { ok: false, reason: 'no_prayer_times' };
+      return false;
+    }
 
     const prayerDefs: { key: string; engKey: string }[] = [
       { key: 'fajr', engKey: 'fajr' },
@@ -53,7 +86,7 @@ export async function refreshLiveActivityIfEnabled(): Promise<void> {
       };
     }).filter(Boolean) as { name: string; nameAr: string; time: string; passed: boolean }[];
 
-    if (allPrayers.length === 0) return;
+    if (allPrayers.length === 0) return false;
 
     // Add sunrise if available
     if (times.sunrise) {
@@ -74,7 +107,7 @@ export async function refreshLiveActivityIfEnabled(): Promise<void> {
     if (allPassed) {
       await endLiveActivity();
       if (__DEV__) console.log('📍 Live Activity ended — all prayers passed');
-      return;
+      return false;
     }
 
     const nextPrayer = allPrayers.find(p => !p.passed && p.name !== 'sunrise') || allPrayers[allPrayers.length - 1];
@@ -113,13 +146,23 @@ export async function refreshLiveActivityIfEnabled(): Promise<void> {
     }
 
     // Try update first, fallback to start
+    console.log(`📍 LA refresh: calling updateLiveActivity (next=${nextPrayer.nameAr}, in=${remainingMinutes}m)`);
     const updated = await updateLiveActivity(data);
+    let started = false;
     if (!updated) {
-      await startLiveActivity(data);
+      console.log('📍 LA refresh: update returned false, calling startLiveActivity');
+      started = await startLiveActivity(data);
+      console.log(`📍 LA refresh: startLiveActivity returned ${started}`);
+    } else {
+      console.log('📍 LA refresh: update succeeded');
     }
 
-    if (__DEV__) console.log('📍 Live Activity refreshed from cached data');
-  } catch (e) {
-    console.log('📍 Live Activity auto-refresh failed:', e);
+    const ok = updated || started;
+    lastRefreshResult = { ok, reason: ok ? 'success' : 'native_failed', source };
+    return ok;
+  } catch (e: any) {
+    console.log('📍 LA refresh failed with exception:', e);
+    lastRefreshResult = { ok: false, reason: `exception: ${e?.message || String(e)}` };
+    return false;
   }
 }

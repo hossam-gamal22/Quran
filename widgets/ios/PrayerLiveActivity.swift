@@ -36,9 +36,11 @@ struct PrayerLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(formatRemaining(context.state.timeRemainingMinutes))
+                        Text(timerInterval: Date()...context.state.nextPrayerDate, countsDown: true)
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
                         Text("متبقي")
                             .font(.system(size: 11))
                             .foregroundColor(.gray)
@@ -52,25 +54,32 @@ struct PrayerLiveActivity: Widget {
                     ExpandedBottomView(state: context.state)
                 }
             } compactLeading: {
-                // Compact leading — mosque icon + prayer name
-                HStack(spacing: 4) {
-                    Image(systemName: "building.columns")
+                // Compact leading — prayer (hands) icon + prayer name
+                HStack(spacing: 3) {
+                    Image(systemName: "moon.stars.fill")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "#0f987f"))
                     Text(context.state.nextPrayerNameAr)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .fixedSize(horizontal: true, vertical: false)
                 }
             } compactTrailing: {
-                // Compact trailing — countdown
-                Text(formatRemaining(context.state.timeRemainingMinutes))
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+                // Compact trailing — live countdown timer
+                Text(timerInterval: Date()...context.state.nextPrayerDate, countsDown: true)
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(Color(hex: "#0f987f"))
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .frame(maxWidth: 56, alignment: .trailing)
             } minimal: {
-                // Minimal view — just mosque icon
-                Image(systemName: "building.columns")
-                    .font(.system(size: 12))
+                // Minimal view — Islamic crescent icon
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 13))
                     .foregroundColor(Color(hex: "#0f987f"))
             }
         }
@@ -109,9 +118,11 @@ struct LockScreenView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(formatRemaining(state.timeRemainingMinutes))
+                    Text(timerInterval: Date()...state.nextPrayerDate, countsDown: true)
                         .font(.system(size: 28, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.trailing)
+                        .monospacedDigit()
                     Text("متبقي")
                         .font(.system(size: 11))
                         .foregroundColor(.gray)
@@ -121,27 +132,31 @@ struct LockScreenView: View {
             // Optional: dua or ayah text
             if let duaText = state.duaText, state.style == "prayer_with_dua" {
                 Text(duaText)
-                    .font(.system(size: 11))
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(2)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(4)
                     .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.top, 6)
             }
 
             if let ayahText = state.ayahText, state.style == "prayer_with_ayah" {
-                VStack(alignment: .trailing, spacing: 1) {
+                VStack(alignment: .trailing, spacing: 2) {
                     Text(ayahText)
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.7))
-                        .lineLimit(2)
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(4)
                         .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let ref = state.ayahRef {
                         Text(ref)
-                            .font(.system(size: 9))
-                            .foregroundColor(Color(hex: "#0f987f").opacity(0.8))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(Color(hex: "#0f987f"))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.top, 6)
             }
 
             // Prayer times strip (compact)

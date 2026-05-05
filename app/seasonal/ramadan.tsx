@@ -657,7 +657,7 @@ export default function RamadanScreen() {
         >
           <Animated.View
             entering={FadeIn.duration(300)}
-            style={[styles.duaModal, { backgroundColor: colors.cardSolid }]}
+            style={[styles.duaModal, { backgroundColor: colors.modalSurface }]}
           >
             <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[styles.duaModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>

@@ -55,6 +55,9 @@ export interface TranslationKeys {
     version: string;
     noData: string;
     seeAll: string;
+    all: string;
+    occasion: string;
+    virtue: string;
     refresh: string;
     back: string;
     forward: string;
@@ -224,6 +227,7 @@ export interface TranslationKeys {
     quranSurahsSection: string;
     rosary: string;
     selectedDuas: string;
+    famousDuas: string;
     storiesSection: string;
     tasbihLog: string;
     tasbihSection: string;
@@ -232,6 +236,7 @@ export interface TranslationKeys {
     fridayGreeting: string;
     fridaySubtitle: string;
     remainingForAdhan: string;
+    adhanTimeFor: string;
   };
   
   // القرآن
@@ -421,6 +426,7 @@ export interface TranslationKeys {
   prayer: {
     title: string;
     times: string;
+    longPressToTrack: string;
     fajr: string;
     sunrise: string;
     dhuhr: string;
@@ -848,6 +854,11 @@ export interface TranslationKeys {
     backupRestore: string;
     shareAppSection: string;
     usefulLinks: string;
+    dangerZone: string;
+    deleteAccount: string;
+    deleteAccountTitle: string;
+    deleteAccountMessage: string;
+    deleteAccountConfirm: string;
     adhkarSettings: string;
     aboutApp: string;
     prayerAndAzkarAlerts: string;
@@ -1172,6 +1183,9 @@ export interface TranslationKeys {
     abdulbasit: string;
     abdulbasitDesc: string;
     silentDesc: string;
+    useFullAdhan: string;
+    useFullAdhanDesc: string;
+    useFullAdhanIosNotice: string;
     preview: string;
     stopPreview: string;
     minutesBefore: string;
@@ -1720,6 +1734,8 @@ export interface TranslationKeys {
     extraBackgrounds: string;
     supportDev: string;
     restorePurchases: string;
+    termsOfUse: string;
+    privacyPolicy: string;
     upgradeToPremium: string;
     upgradeToPremiumDesc: string;
     featureAdRemoval: string;
@@ -2042,6 +2058,7 @@ export interface TranslationKeys {
   aboutApp: {
     description: string;
     emailSubject: string;
+    website: string;
     features: string;
     stats: string;
     subtitle: string;
@@ -2175,6 +2192,7 @@ export interface TranslationKeys {
     mondayThursdayDesc: string;
     notRecorded: string;
     notYetAvailable: string;
+    lateOnly: string;
     notificationInfo: string;
     notificationSound: string;
     notificationSoundDesc: string;
@@ -2238,6 +2256,16 @@ export interface TranslationKeys {
     whiteDaysDesc: string;
     youAreFasting: string;
     yourStats: string;
+    todaySummary: string;
+    allPrayersDone: string;
+    pagesRead: string;
+    noPagesYet: string;
+    types: string;
+    noTasbihYet: string;
+    quranListening: string;
+    keepListening: string;
+    noListeningYet: string;
+    viewDetails: string;
   };
 
   // معلومات الأقسام
@@ -2489,6 +2517,7 @@ export interface TranslationKeys {
     questionSentBody: string;
     rateLimitTitle: string;
     rateLimitBody: string;
+    submitError: string;
   };
   // التتبع الذكي
   smartTracker: {
@@ -2580,6 +2609,9 @@ const ar: TranslationKeys = {
     version: 'الإصدار',
     noData: 'لا توجد بيانات',
     seeAll: 'عرض الكل',
+    all: 'الكل',
+    occasion: 'المناسبة',
+    virtue: 'فضل الدعاء',
     refresh: 'تحديث',
     back: 'رجوع',
     forward: 'تقدم',
@@ -2747,6 +2779,7 @@ const ar: TranslationKeys = {
     quranSurahsSection: 'سور وآيات قرآنية',
     rosary: 'المسبحة',
     selectedDuas: 'أدعية من السنة',
+    famousDuas: 'الأدعية المختارة',
     storiesSection: 'القصص',
     tasbihLog: 'سجل التسبيح',
     tasbihSection: 'تسبيح واستغفار',
@@ -2755,6 +2788,7 @@ const ar: TranslationKeys = {
     fridayGreeting: 'جمعة مباركة',
     fridaySubtitle: 'لا تنسَ قراءة سورة الكهف، فإنها نورٌ ما بين الجمعتين',
     remainingForAdhan: 'المتبقي على أذان',
+    adhanTimeFor: 'حان الآن وقت صلاة',
   },
   quran: {
     title: 'القرآن الكريم',
@@ -2938,6 +2972,7 @@ const ar: TranslationKeys = {
   prayer: {
     title: 'مواقيت الصلاة',
     times: 'المواقيت',
+    longPressToTrack: 'اضغط مطولًا على الصلاة لتسجيلها',
     fajr: 'الفجر',
     sunrise: 'الشروق',
     dhuhr: 'الظهر',
@@ -3361,6 +3396,11 @@ const ar: TranslationKeys = {
     backupRestore: 'النسخ الاحتياطي والاستعادة',
     shareAppSection: 'مشاركة التطبيق',
     usefulLinks: 'روابط مفيدة',
+    dangerZone: 'منطقة الخطر',
+    deleteAccount: 'حذف الحساب',
+    deleteAccountTitle: 'حذف الحساب',
+    deleteAccountMessage: 'هل أنت متأكد؟ سيتم حذف جميع بياناتك وإعداداتك نهائياً ولا يمكن استرجاعها.',
+    deleteAccountConfirm: 'حذف نهائي',
     adhkarSettings: 'إعدادات الأذكار',
     aboutApp: 'عن التطبيق',
     prayerAndAzkarAlerts: 'تنبيهات الصلاة والأذكار',
@@ -3670,6 +3710,9 @@ const ar: TranslationKeys = {
     abdulbasit: 'عبد الباسط',
     abdulbasitDesc: 'أذان الشيخ عبد الباسط',
     silentDesc: 'بدون صوت',
+    useFullAdhan: 'تشغيل الأذان الكامل',
+    useFullAdhanDesc: 'تشغيل النسخة الكاملة من الأذان عند موعد الصلاة',
+    useFullAdhanIosNotice: 'على iOS سيقوم النظام بإيقاف الصوت تلقائياً بعد 29 ثانية',
     preview: 'معاينة',
     stopPreview: 'إيقاف المعاينة',
     minutesBefore: '{count} دقائق قبل',
@@ -4217,6 +4260,8 @@ const ar: TranslationKeys = {
     extraBackgrounds: 'خلفيات إضافية',
     supportDev: 'دعم تطوير التطبيق',
     restorePurchases: 'استعادة المشتريات',
+    termsOfUse: 'شروط الاستخدام',
+    privacyPolicy: 'سياسة الخصوصية',
     upgradeToPremium: 'اشترك في النسخة المميزة',
     upgradeToPremiumDesc: 'تمتع بتجربة بدون إعلانات ومزايا حصرية',
     featureAdRemoval: 'إزالة جميع الإعلانات',
@@ -4539,6 +4584,7 @@ const ar: TranslationKeys = {
   aboutApp: {
     description: 'تطبيق إسلامي شامل',
     emailSubject: 'تواصل معنا - روح المسلم',
+    website: 'الموقع الإلكتروني',
     features: 'المزايا',
     stats: 'الإحصائيات',
     subtitle: 'رفيقك الإيماني',
@@ -4673,6 +4719,7 @@ const ar: TranslationKeys = {
     mondayThursdayDesc: 'تُعرض فيهما الأعمال على الله',
     notRecorded: 'لم يتم التسجيل',
     notYetAvailable: 'غير متاح بعد',
+    lateOnly: 'متأخر',
     notificationInfo: 'معلومات الإشعارات',
     notificationSound: 'صوت الإشعار',
     notificationSoundDesc: 'اختر صوت الإشعار المفضل',
@@ -4736,6 +4783,16 @@ const ar: TranslationKeys = {
     whiteDaysDesc: 'اليوم 13-14-15 من كل شهر هجري',
     youAreFasting: 'أنت صائم اليوم',
     yourStats: 'إحصائياتك',
+    todaySummary: 'إنجازات اليوم',
+    allPrayersDone: 'ما شاء الله! أتممت جميع الصلوات',
+    pagesRead: 'صفحات',
+    noPagesYet: 'لم تقرأ بعد',
+    types: 'أنواع',
+    noTasbihYet: 'لم تسبّح بعد',
+    quranListening: 'سماع القرآن',
+    keepListening: 'استمر في الاستماع',
+    noListeningYet: 'لم تستمع بعد',
+    viewDetails: 'عرض التفاصيل',
   },
   sectionInfo: {
     prayer: { title: 'مواقيت الصلاة', body: 'تعرض أوقات الصلوات الخمس بدقة حسب موقعك الجغرافي مع إمكانية تفعيل التنبيهات لكل صلاة.' },
@@ -4971,6 +5028,7 @@ const ar: TranslationKeys = {
     questionSentBody: 'شكراً لسؤالك. سنقوم بالرد عليك في أقرب وقت إن شاء الله.',
     rateLimitTitle: 'يرجى الانتظار',
     rateLimitBody: 'يمكنك إرسال سؤال جديد بعد 5 دقائق.',
+    submitError: 'حدث خطأ أثناء إرسال السؤال. حاول مرة أخرى.',
   },
   smartTracker: {
     title: 'صلاتي',
@@ -5061,6 +5119,9 @@ const en: TranslationKeys = {
     version: 'Version',
     noData: 'No data available',
     seeAll: 'See All',
+    all: 'All',
+    occasion: 'Occasion',
+    virtue: 'Virtue',
     refresh: 'Refresh',
     back: 'Back',
     forward: 'Forward',
@@ -5228,6 +5289,7 @@ const en: TranslationKeys = {
     quranSurahsSection: 'Quran Surahs & Verses',
     rosary: 'Rosary',
     selectedDuas: 'Duas from the Sunnah',
+    famousDuas: 'Famous Duas',
     storiesSection: 'Stories',
     tasbihLog: 'Tasbih Log',
     tasbihSection: 'Tasbih & Istighfar',
@@ -5236,6 +5298,7 @@ const en: TranslationKeys = {
     fridayGreeting: 'Jumu\'ah Mubarak',
     fridaySubtitle: 'Don\'t forget to read Surah Al-Kahf — it is a light between two Fridays',
     remainingForAdhan: 'Remaining for',
+    adhanTimeFor: 'It\'s time for',
   },
   quran: {
     title: 'Holy Quran',
@@ -5419,6 +5482,7 @@ const en: TranslationKeys = {
   prayer: {
     title: 'Prayer Times',
     times: 'Times',
+    longPressToTrack: 'Long-press a prayer to record it',
     fajr: 'Fajr',
     sunrise: 'Sunrise',
     dhuhr: 'Dhuhr',
@@ -5842,6 +5906,11 @@ const en: TranslationKeys = {
     backupRestore: 'Backup & Restore',
     shareAppSection: 'Share App',
     usefulLinks: 'Useful Links',
+    dangerZone: 'Danger Zone',
+    deleteAccount: 'Delete Account',
+    deleteAccountTitle: 'Delete Account',
+    deleteAccountMessage: 'Are you sure? All your data and settings will be permanently deleted and cannot be recovered.',
+    deleteAccountConfirm: 'Delete Permanently',
     adhkarSettings: 'Adhkar Settings',
     aboutApp: 'About the App',
     prayerAndAzkarAlerts: 'Prayer & Azkar Alerts',
@@ -6151,6 +6220,9 @@ const en: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Adhan by Sheikh Abdul Basit',
     silentDesc: 'No sound',
+    useFullAdhan: 'Use Full Adhan',
+    useFullAdhanDesc: 'Play the complete adhan recording at prayer time',
+    useFullAdhanIosNotice: 'On iOS, the system will stop the sound automatically after 29 seconds',
     preview: 'Preview',
     stopPreview: 'Stop preview',
     minutesBefore: '{count} minutes before',
@@ -6698,6 +6770,8 @@ const en: TranslationKeys = {
     extraBackgrounds: 'Extra Backgrounds',
     supportDev: 'Support App Development',
     restorePurchases: 'Restore Purchases',
+    termsOfUse: 'Terms of Use',
+    privacyPolicy: 'Privacy Policy',
     upgradeToPremium: 'Upgrade to Premium',
     upgradeToPremiumDesc: 'Enjoy an ad-free experience with exclusive features',
     featureAdRemoval: 'Remove all ads',
@@ -7020,6 +7094,7 @@ const en: TranslationKeys = {
   aboutApp: {
     description: 'A comprehensive Islamic app',
     emailSubject: 'Contact Us - Ruh Al-Muslim',
+    website: 'Website',
     features: 'Features',
     stats: 'Statistics',
     subtitle: 'Your spiritual companion',
@@ -7154,6 +7229,7 @@ const en: TranslationKeys = {
     mondayThursdayDesc: 'Deeds are presented to Allah on these days',
     notRecorded: 'Not Recorded',
     notYetAvailable: 'Not Yet Available',
+    lateOnly: 'Late',
     notificationInfo: 'Notification Info',
     notificationSound: 'Notification Sound',
     notificationSoundDesc: 'Choose your preferred notification sound',
@@ -7217,6 +7293,16 @@ const en: TranslationKeys = {
     whiteDaysDesc: 'The 13th, 14th, and 15th of each Hijri month',
     youAreFasting: 'You are fasting today',
     yourStats: 'Your Stats',
+    todaySummary: 'Today\'s Achievements',
+    allPrayersDone: 'Mashallah! You completed all prayers',
+    pagesRead: 'pages',
+    noPagesYet: 'No pages read yet',
+    types: 'types',
+    noTasbihYet: 'No tasbih yet',
+    quranListening: 'Quran Listening',
+    keepListening: 'Keep listening',
+    noListeningYet: 'No listening yet',
+    viewDetails: 'View Details',
   },
   sectionInfo: {
     prayer: { title: 'Prayer Times', body: 'Displays the five daily prayer times based on your location with notification alerts for each prayer.' },
@@ -7452,6 +7538,7 @@ const en: TranslationKeys = {
     questionSentBody: 'Thank you for your question. We will respond as soon as possible, God willing.',
     rateLimitTitle: 'Please wait',
     rateLimitBody: 'You can send a new question after 5 minutes.',
+    submitError: 'Failed to submit your question. Please try again.',
   },
   smartTracker: {
     title: 'My Prayer',
@@ -7543,6 +7630,9 @@ const fr: TranslationKeys = {
     version: 'Version',
     noData: 'Aucune donnée',
     seeAll: 'Voir tout',
+    all: 'Tout',
+    occasion: 'Occasion',
+    virtue: 'Vertu',
     refresh: 'Actualiser',
     back: 'Retour',
     forward: 'Avancer',
@@ -7710,6 +7800,7 @@ const fr: TranslationKeys = {
     quranSurahsSection: 'Sourates et Versets du Coran',
     rosary: 'Chapelet',
     selectedDuas: 'Duas de la Sunna',
+    famousDuas: 'Duas Célèbres',
     storiesSection: 'Histoires',
     tasbihLog: 'Journal du Tasbih',
     tasbihSection: 'Tasbih et Istighfar',
@@ -7718,6 +7809,7 @@ const fr: TranslationKeys = {
     fridayGreeting: 'Jumu\'ah Mubarak',
     fridaySubtitle: 'N\'oubliez pas de lire Sourate Al-Kahf — une lumière entre deux vendredis',
     remainingForAdhan: 'Restant pour',
+    adhanTimeFor: 'C\'est l\'heure de',
   },
   quran: {
     title: 'Saint Coran',
@@ -7901,6 +7993,7 @@ const fr: TranslationKeys = {
   prayer: {
     title: 'Heures de Prière',
     times: 'Horaires',
+    longPressToTrack: "Appui long sur une prière pour l'enregistrer",
     fajr: 'Fajr',
     sunrise: 'Lever du soleil',
     dhuhr: 'Dhouhr',
@@ -8324,6 +8417,11 @@ const fr: TranslationKeys = {
     backupRestore: 'Sauvegarde et restauration',
     shareAppSection: "Partager l'application",
     usefulLinks: 'Liens utiles',
+    dangerZone: 'Zone de danger',
+    deleteAccount: 'Supprimer le compte',
+    deleteAccountTitle: 'Supprimer le compte',
+    deleteAccountMessage: 'Êtes-vous sûr ? Toutes vos données seront définitivement supprimées.',
+    deleteAccountConfirm: 'Supprimer définitivement',
     adhkarSettings: 'Paramètres des adhkar',
     aboutApp: "À propos de l'application",
     prayerAndAzkarAlerts: 'Alertes prières et adhkar',
@@ -8633,6 +8731,9 @@ const fr: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Adhan par Sheikh Abdul Basit',
     silentDesc: 'Pas de son',
+    useFullAdhan: 'Utiliser l\'adhan complet',
+    useFullAdhanDesc: 'Jouer l\'enregistrement complet de l\'adhan à l\'heure de la prière',
+    useFullAdhanIosNotice: 'Sur iOS, le système arrêtera automatiquement le son après 29 secondes',
     preview: 'Aperçu',
     stopPreview: "Arrêter l'aperçu",
     minutesBefore: '{count} minutes avant',
@@ -9179,6 +9280,8 @@ const fr: TranslationKeys = {
     extraBackgrounds: 'Fonds supplémentaires',
     supportDev: 'Soutenir le développement',
     restorePurchases: 'Restaurer les achats',
+    termsOfUse: "Conditions d'utilisation",
+    privacyPolicy: 'Politique de confidentialité',
     upgradeToPremium: 'Passer à Premium',
     upgradeToPremiumDesc: 'Profitez d\'une expérience sans publicité avec des fonctionnalités exclusives',
     featureAdRemoval: 'Suppression de toutes les publicités',
@@ -9501,6 +9604,7 @@ const fr: TranslationKeys = {
   aboutApp: {
     description: 'Une application islamique complète',
     emailSubject: 'Contactez-nous - Ruh Al-Muslim',
+    website: 'Site web',
     features: 'Fonctionnalités',
     stats: 'Statistiques',
     subtitle: 'Votre compagnon spirituel',
@@ -9635,6 +9739,7 @@ const fr: TranslationKeys = {
     mondayThursdayDesc: 'Les actes sont présentés à Allah ces jours',
     notRecorded: 'Non enregistré',
     notYetAvailable: 'Pas encore disponible',
+    lateOnly: 'Tardif',
     notificationInfo: 'Informations de notification',
     notificationSound: 'Son de notification',
     notificationSoundDesc: 'Choisissez votre son de notification préféré',
@@ -9933,6 +10038,7 @@ const fr: TranslationKeys = {
     questionSentBody: 'Merci pour votre question. Nous vous répondrons dès que possible, si Dieu le veut.',
     rateLimitTitle: 'Veuillez patienter',
     rateLimitBody: 'Vous pouvez envoyer une nouvelle question après 5 minutes.',
+    submitError: "Échec de l'envoi de votre question. Veuillez réessayer.",
   },
   smartTracker: {
     title: 'Ma Prière',
@@ -10025,6 +10131,9 @@ const de: TranslationKeys = {
     version: 'Version',
     noData: 'Keine Daten',
     seeAll: 'Alle anzeigen',
+    all: 'Alle',
+    occasion: 'Anlass',
+    virtue: 'Tugend',
     refresh: 'Aktualisieren',
     back: 'Zurück',
     forward: 'Vorwärts',
@@ -10192,6 +10301,7 @@ const de: TranslationKeys = {
     quranSurahsSection: 'Quran-Suren und Verse',
     rosary: 'Gebetskette',
     selectedDuas: 'Duas aus der Sunna',
+    famousDuas: 'Berühmte Duas',
     storiesSection: 'Geschichten',
     tasbihLog: 'Tasbih-Protokoll',
     tasbihSection: 'Tasbih und Istighfar',
@@ -10200,6 +10310,7 @@ const de: TranslationKeys = {
     fridayGreeting: 'Gesegneten Freitag',
     fridaySubtitle: 'Vergiss nicht Sure Al-Kahf zu lesen — ein Licht zwischen zwei Freitagen',
     remainingForAdhan: 'Verbleibend für',
+    adhanTimeFor: 'Es ist Zeit für',
   },
   quran: {
     title: 'Heiliger Koran',
@@ -10383,6 +10494,7 @@ const de: TranslationKeys = {
   prayer: {
     title: 'Gebetszeiten',
     times: 'Zeiten',
+    longPressToTrack: 'Lange auf ein Gebet drücken, um es aufzuzeichnen',
     fajr: 'Fajr',
     sunrise: 'Sonnenaufgang',
     dhuhr: 'Dhuhr',
@@ -10806,6 +10918,11 @@ const de: TranslationKeys = {
     backupRestore: 'Sicherung & Wiederherstellung',
     shareAppSection: 'App teilen',
     usefulLinks: 'Nützliche Links',
+    dangerZone: 'Gefahrenzone',
+    deleteAccount: 'Konto löschen',
+    deleteAccountTitle: 'Konto löschen',
+    deleteAccountMessage: 'Sind Sie sicher? Alle Ihre Daten werden dauerhaft gelöscht.',
+    deleteAccountConfirm: 'Endgültig löschen',
     adhkarSettings: 'Adhkar-Einstellungen',
     aboutApp: 'Über die App',
     prayerAndAzkarAlerts: 'Gebets- und Adhkar-Benachrichtigungen',
@@ -11115,6 +11232,9 @@ const de: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Adhan von Sheikh Abdul Basit',
     silentDesc: 'Kein Ton',
+    useFullAdhan: 'Vollständigen Adhan verwenden',
+    useFullAdhanDesc: 'Vollständige Adhan-Aufnahme zur Gebetszeit abspielen',
+    useFullAdhanIosNotice: 'Auf iOS stoppt das System den Ton automatisch nach 29 Sekunden',
     preview: 'Vorschau',
     stopPreview: 'Vorschau stoppen',
     minutesBefore: '{count} Minuten vorher',
@@ -11661,6 +11781,8 @@ const de: TranslationKeys = {
     extraBackgrounds: 'Zusätzliche Hintergründe',
     supportDev: 'App-Entwicklung unterstützen',
     restorePurchases: 'Käufe wiederherstellen',
+    termsOfUse: 'Nutzungsbedingungen',
+    privacyPolicy: 'Datenschutzrichtlinie',
     upgradeToPremium: 'Auf Premium upgraden',
     upgradeToPremiumDesc: 'Genießen Sie ein werbefreies Erlebnis mit exklusiven Funktionen',
     featureAdRemoval: 'Alle Werbung entfernen',
@@ -11983,6 +12105,7 @@ const de: TranslationKeys = {
   aboutApp: {
     description: 'Eine umfassende islamische App',
     emailSubject: 'Kontakt - Ruh Al-Muslim',
+    website: 'Webseite',
     features: 'Funktionen',
     stats: 'Statistiken',
     subtitle: 'Ihr spiritueller Begleiter',
@@ -12117,6 +12240,7 @@ const de: TranslationKeys = {
     mondayThursdayDesc: 'Taten werden Allah an diesen Tagen vorgelegt',
     notRecorded: 'Nicht aufgezeichnet',
     notYetAvailable: 'Noch nicht verfügbar',
+    lateOnly: 'Verspätet',
     notificationInfo: 'Benachrichtigungsinfo',
     notificationSound: 'Benachrichtigungston',
     notificationSoundDesc: 'Wählen Sie Ihren bevorzugten Benachrichtigungston',
@@ -12415,6 +12539,7 @@ const de: TranslationKeys = {
     questionSentBody: 'Vielen Dank für Ihre Frage. Wir werden so schnell wie möglich antworten, so Gott will.',
     rateLimitTitle: 'Bitte warten',
     rateLimitBody: 'Sie können nach 5 Minuten eine neue Frage senden.',
+    submitError: 'Fehler beim Senden Ihrer Frage. Bitte erneut versuchen.',
   },
   smartTracker: {
     title: 'Mein Gebet',
@@ -12507,6 +12632,9 @@ const tr: TranslationKeys = {
     version: 'Sürüm',
     noData: 'Veri yok',
     seeAll: 'Tümünü Gör',
+    all: 'Tümü',
+    occasion: 'Vesile',
+    virtue: 'Fazilet',
     refresh: 'Yenile',
     back: 'Geri',
     forward: 'İleri',
@@ -12674,6 +12802,7 @@ const tr: TranslationKeys = {
     quranSurahsSection: 'Kur\'an Sureleri ve Ayetler',
     rosary: 'Tesbih',
     selectedDuas: 'Sünnetten Dualar',
+    famousDuas: 'Meşhur Dualar',
     storiesSection: 'Hikayeler',
     tasbihLog: 'Tesbih Kaydı',
     tasbihSection: 'Tesbih ve İstiğfar',
@@ -12682,6 +12811,7 @@ const tr: TranslationKeys = {
     fridayGreeting: 'Hayırlı Cumalar',
     fridaySubtitle: 'Kehf Suresi\'ni okumayı unutma — iki Cuma arası nurdur',
     remainingForAdhan: 'Ezana kalan',
+    adhanTimeFor: 'Vakti geldi',
   },
   quran: {
     title: 'Kuran-ı Kerim',
@@ -12865,6 +12995,7 @@ const tr: TranslationKeys = {
   prayer: {
     title: 'Namaz Saatleri',
     times: 'Saatler',
+    longPressToTrack: 'Kaydetmek için bir namaza uzun basın',
     fajr: 'İmsak',
     sunrise: 'Gündoğumu',
     dhuhr: 'Öğle',
@@ -13288,6 +13419,11 @@ const tr: TranslationKeys = {
     backupRestore: 'Yedekleme ve Geri Yükleme',
     shareAppSection: 'Uygulamayı Paylaş',
     usefulLinks: 'Faydalı Bağlantılar',
+    dangerZone: 'Tehlikeli Bölge',
+    deleteAccount: 'Hesabı Sil',
+    deleteAccountTitle: 'Hesabı Sil',
+    deleteAccountMessage: 'Emin misiniz? Tüm verileriniz kalıcı olarak silinecektir.',
+    deleteAccountConfirm: 'Kalıcı Olarak Sil',
     adhkarSettings: 'Zikir Ayarları',
     aboutApp: 'Uygulama Hakkında',
     prayerAndAzkarAlerts: 'Namaz ve Zikir Uyarıları',
@@ -13597,6 +13733,9 @@ const tr: TranslationKeys = {
     abdulbasit: 'Abdülbasit',
     abdulbasitDesc: 'Şeyh Abdülbasit Ezanı',
     silentDesc: 'Ses yok',
+    useFullAdhan: 'Tam ezanı kullan',
+    useFullAdhanDesc: 'Namaz vaktinde tam ezan kaydını çal',
+    useFullAdhanIosNotice: 'iOS\'ta sistem sesi 29 saniye sonra otomatik olarak durdurur',
     preview: 'Önizleme',
     stopPreview: 'Önizlemeyi durdur',
     minutesBefore: '{count} dakika önce',
@@ -14143,6 +14282,8 @@ const tr: TranslationKeys = {
     extraBackgrounds: 'Ekstra Arka Planlar',
     supportDev: 'Uygulama Geliştirmeyi Destekle',
     restorePurchases: 'Satın Alımları Geri Yükle',
+    termsOfUse: 'Kullanım Koşulları',
+    privacyPolicy: 'Gizlilik Politikası',
     upgradeToPremium: 'Premium\'a Yükselt',
     upgradeToPremiumDesc: 'Reklamsız ve özel özelliklerle deneyimin tadını çıkarın',
     featureAdRemoval: 'Tüm reklamları kaldır',
@@ -14465,6 +14606,7 @@ const tr: TranslationKeys = {
   aboutApp: {
     description: 'Kapsamlı bir İslami uygulama',
     emailSubject: 'Bize Ulaşın - Ruh Al-Muslim',
+    website: 'Web sitesi',
     features: 'Özellikler',
     stats: 'İstatistikler',
     subtitle: 'Manevi yoldaşınız',
@@ -14599,6 +14741,7 @@ const tr: TranslationKeys = {
     mondayThursdayDesc: 'Bu günlerde ameller Allah\'a arz edilir',
     notRecorded: 'Kaydedilmedi',
     notYetAvailable: 'Henüz Mevcut Değil',
+    lateOnly: 'Geç',
     notificationInfo: 'Bildirim Bilgisi',
     notificationSound: 'Bildirim Sesi',
     notificationSoundDesc: 'Tercih ettiğiniz bildirim sesini seçin',
@@ -14897,6 +15040,7 @@ const tr: TranslationKeys = {
     questionSentBody: 'Sorunuz için teşekkürler. İnşallah en kısa sürede yanıtlayacağız.',
     rateLimitTitle: 'Lütfen bekleyin',
     rateLimitBody: '5 dakika sonra yeni bir soru gönderebilirsiniz.',
+    submitError: 'Sorunuz gönderilemedi. Lütfen tekrar deneyin.',
   },
   smartTracker: {
     title: 'Namazım',
@@ -14989,6 +15133,9 @@ const es: TranslationKeys = {
     version: 'Versión',
     noData: 'Sin datos',
     seeAll: 'Ver todo',
+    all: 'Todo',
+    occasion: 'Ocasión',
+    virtue: 'Virtud',
     refresh: 'Actualizar',
     back: 'Atrás',
     forward: 'Adelante',
@@ -15156,6 +15303,7 @@ const es: TranslationKeys = {
     quranSurahsSection: 'Suras y Versículos del Corán',
     rosary: 'Rosario',
     selectedDuas: 'Duás de la Sunna',
+    famousDuas: 'Duás Famosas',
     storiesSection: 'Historias',
     tasbihLog: 'Registro de Tasbih',
     tasbihSection: 'Tasbih e Istighfar',
@@ -15164,6 +15312,7 @@ const es: TranslationKeys = {
     fridayGreeting: 'Feliz Viernes',
     fridaySubtitle: 'No olvides leer Sura Al-Kahf — es una luz entre dos viernes',
     remainingForAdhan: 'Restante para',
+    adhanTimeFor: 'Es hora de',
   },
   quran: {
     title: 'Sagrado Corán',
@@ -15347,6 +15496,7 @@ const es: TranslationKeys = {
   prayer: {
     title: 'Horarios de Oración',
     times: 'Horarios',
+    longPressToTrack: 'Mantén pulsada una oración para registrarla',
     fajr: 'Fajr',
     sunrise: 'Amanecer',
     dhuhr: 'Dhuhr',
@@ -15770,6 +15920,11 @@ const es: TranslationKeys = {
     backupRestore: 'Copia de seguridad y restauración',
     shareAppSection: 'Compartir aplicación',
     usefulLinks: 'Enlaces útiles',
+    dangerZone: 'Zona de peligro',
+    deleteAccount: 'Eliminar cuenta',
+    deleteAccountTitle: 'Eliminar cuenta',
+    deleteAccountMessage: '¿Estás seguro? Todos tus datos se eliminarán permanentemente.',
+    deleteAccountConfirm: 'Eliminar permanentemente',
     adhkarSettings: 'Configuración de adhkar',
     aboutApp: 'Acerca de la aplicación',
     prayerAndAzkarAlerts: 'Alertas de oraciones y adhkar',
@@ -16079,6 +16234,9 @@ const es: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Adhán del Sheikh Abdul Basit',
     silentDesc: 'Sin sonido',
+    useFullAdhan: 'Usar adhan completo',
+    useFullAdhanDesc: 'Reproducir la grabación completa del adhan a la hora de la oración',
+    useFullAdhanIosNotice: 'En iOS, el sistema detendrá el sonido automáticamente después de 29 segundos',
     preview: 'Vista previa',
     stopPreview: 'Detener vista previa',
     minutesBefore: '{count} minutos antes',
@@ -16625,6 +16783,8 @@ const es: TranslationKeys = {
     extraBackgrounds: 'Fondos adicionales',
     supportDev: 'Apoyar el desarrollo',
     restorePurchases: 'Restaurar compras',
+    termsOfUse: 'Términos de uso',
+    privacyPolicy: 'Política de privacidad',
     upgradeToPremium: 'Actualizar a Premium',
     upgradeToPremiumDesc: 'Disfruta de una experiencia sin anuncios con funciones exclusivas',
     featureAdRemoval: 'Eliminar todos los anuncios',
@@ -16947,6 +17107,7 @@ const es: TranslationKeys = {
   aboutApp: {
     description: 'Una aplicación islámica completa',
     emailSubject: 'Contáctenos - Ruh Al-Muslim',
+    website: 'Sitio web',
     features: 'Características',
     stats: 'Estadísticas',
     subtitle: 'Tu compañero espiritual',
@@ -17081,6 +17242,7 @@ const es: TranslationKeys = {
     mondayThursdayDesc: 'Las obras se presentan ante Allah estos días',
     notRecorded: 'No registrado',
     notYetAvailable: 'Aún no disponible',
+    lateOnly: 'Tarde',
     notificationInfo: 'Información de notificación',
     notificationSound: 'Sonido de notificación',
     notificationSoundDesc: 'Elige tu sonido de notificación preferido',
@@ -17379,6 +17541,7 @@ const es: TranslationKeys = {
     questionSentBody: 'Gracias por tu pregunta. Responderemos lo antes posible, si Dios quiere.',
     rateLimitTitle: 'Por favor espera',
     rateLimitBody: 'Puedes enviar una nueva pregunta después de 5 minutos.',
+    submitError: 'Error al enviar la pregunta. Inténtalo de nuevo.',
   },
   smartTracker: {
     title: 'Mi Oración',
@@ -17470,6 +17633,9 @@ const ur: TranslationKeys = {
     version: 'ورژن',
     noData: 'کوئی ڈیٹا نہیں',
     seeAll: 'سب دیکھیں',
+    all: 'سب',
+    occasion: 'موقع',
+    virtue: 'فضیلت',
     refresh: 'ریفریش',
     back: 'واپس',
     forward: 'آگے',
@@ -17637,6 +17803,7 @@ const ur: TranslationKeys = {
     quranSurahsSection: 'قرآنی سورتیں اور آیات',
     rosary: 'تسبیح',
     selectedDuas: 'سنت سے دعائیں',
+    famousDuas: 'مشہور دعائیں',
     storiesSection: 'کہانیاں',
     tasbihLog: 'تسبیح لاگ',
     tasbihSection: 'تسبیح اور استغفار',
@@ -17645,6 +17812,7 @@ const ur: TranslationKeys = {
     fridayGreeting: 'جمعہ مبارک',
     fridaySubtitle: 'سورۃ الکہف پڑھنا نہ بھولیں — یہ دو جمعوں کے درمیان نور ہے',
     remainingForAdhan: 'اذان تک باقی',
+    adhanTimeFor: 'وقت ہو گیا',
   },
   quran: {
     title: 'قرآن مجید',
@@ -17828,6 +17996,7 @@ const ur: TranslationKeys = {
   prayer: {
     title: 'نماز کے اوقات',
     times: 'اوقات',
+    longPressToTrack: 'ریکارڈ کرنے کے لیے نماز پر دیر تک دبائیں',
     fajr: 'فجر',
     sunrise: 'طلوع آفتاب',
     dhuhr: 'ظہر',
@@ -18251,6 +18420,11 @@ const ur: TranslationKeys = {
     backupRestore: 'بیک اپ اور بحالی',
     shareAppSection: 'ایپ شیئر کریں',
     usefulLinks: 'مفید لنکس',
+    dangerZone: 'خطرناک زون',
+    deleteAccount: 'اکاؤنٹ حذف کریں',
+    deleteAccountTitle: 'اکاؤنٹ حذف کریں',
+    deleteAccountMessage: 'کیا آپ واقعی یقین رکھتے ہیں؟ آپ کا تمام ڈیٹا مستقل طور پر حذف ہو جائے گا۔',
+    deleteAccountConfirm: 'مستقل طور پر حذف کریں',
     adhkarSettings: 'اذکار کی ترتیبات',
     aboutApp: 'ایپ کے بارے میں',
     prayerAndAzkarAlerts: 'نماز اور اذکار الرٹ',
@@ -18560,6 +18734,9 @@ const ur: TranslationKeys = {
     abdulbasit: 'عبدالباسط',
     abdulbasitDesc: 'شیخ عبدالباسط کی اذان',
     silentDesc: 'کوئی آواز نہیں',
+    useFullAdhan: 'مکمل اذان استعمال کریں',
+    useFullAdhanDesc: 'نماز کے وقت اذان کی مکمل ریکارڈنگ چلائیں',
+    useFullAdhanIosNotice: 'iOS پر سسٹم 29 سیکنڈ کے بعد آواز خودکار طور پر بند کر دے گا',
     preview: 'پیش نظر',
     stopPreview: 'پیش نظر بند کریں',
     minutesBefore: '{count} منٹ پہلے',
@@ -19106,6 +19283,8 @@ const ur: TranslationKeys = {
     extraBackgrounds: 'اضافی پس منظر',
     supportDev: 'ایپ کی ترقی کی حمایت کریں',
     restorePurchases: 'خریداریاں بحال کریں',
+    termsOfUse: 'استعمال کی شرائط',
+    privacyPolicy: 'رازداری کی پالیسی',
     upgradeToPremium: 'پریمیم میں اپ گریڈ کریں',
     upgradeToPremiumDesc: 'اشتہارات کے بغیر اور خصوصی فیچرز کے ساتھ لطف اٹھائیں',
     featureAdRemoval: 'تمام اشتہارات ہٹائیں',
@@ -19428,6 +19607,7 @@ const ur: TranslationKeys = {
   aboutApp: {
     description: 'ایک جامع اسلامی ایپ',
     emailSubject: 'ہم سے رابطہ - روح المسلم',
+    website: 'ویب سائٹ',
     features: 'خصوصیات',
     stats: 'اعداد و شمار',
     subtitle: 'آپ کا روحانی ساتھی',
@@ -19562,6 +19742,7 @@ const ur: TranslationKeys = {
     mondayThursdayDesc: 'ان دنوں میں اعمال الله کے سامنے پیش ہوتے ہیں',
     notRecorded: 'ریکارڈ نہیں ہوا',
     notYetAvailable: 'ابھی دستیاب نہیں',
+    lateOnly: 'تاخیر',
     notificationInfo: 'نوٹیفکیشن معلومات',
     notificationSound: 'نوٹیفکیشن کی آواز',
     notificationSoundDesc: 'اپنی پسندیدہ نوٹیفکیشن آواز منتخب کریں',
@@ -19860,6 +20041,7 @@ const ur: TranslationKeys = {
     questionSentBody: 'آپ کے سوال کا شکریہ۔ ان شاء الله جلد از جلد جواب دیا جائے گا۔',
     rateLimitTitle: 'براہ کرم انتظار کریں',
     rateLimitBody: 'آپ 5 منٹ بعد نیا سوال بھیج سکتے ہیں۔',
+    submitError: 'سوال بھیجنے میں خرابی۔ دوبارہ کوشش کریں۔',
   },
   smartTracker: {
     title: 'میری نماز',
@@ -19952,6 +20134,9 @@ const id: TranslationKeys = {
     version: 'Versi',
     noData: 'Tidak ada data',
     seeAll: 'Lihat Semua',
+    all: 'Semua',
+    occasion: 'Kesempatan',
+    virtue: 'Keutamaan',
     refresh: 'Refresh',
     back: 'Kembali',
     forward: 'Maju',
@@ -20119,6 +20304,7 @@ const id: TranslationKeys = {
     quranSurahsSection: 'Surah & Ayat Al-Quran',
     rosary: 'Tasbih',
     selectedDuas: 'Doa dari Sunnah',
+    famousDuas: 'Doa Terkenal',
     storiesSection: 'Kisah',
     tasbihLog: 'Catatan Tasbih',
     tasbihSection: 'Tasbih & Istighfar',
@@ -20127,6 +20313,7 @@ const id: TranslationKeys = {
     fridayGreeting: 'Jumat Berkah',
     fridaySubtitle: 'Jangan lupa membaca Surah Al-Kahfi — cahaya di antara dua Jumat',
     remainingForAdhan: 'Tersisa untuk',
+    adhanTimeFor: 'Saatnya shalat',
   },
   quran: {
     title: 'Al-Quran',
@@ -20310,6 +20497,7 @@ const id: TranslationKeys = {
   prayer: {
     title: 'Waktu Shalat',
     times: 'Waktu',
+    longPressToTrack: 'Tekan lama shalat untuk mencatatnya',
     fajr: 'Subuh',
     sunrise: 'Terbit',
     dhuhr: 'Dzuhur',
@@ -20733,6 +20921,11 @@ const id: TranslationKeys = {
     backupRestore: 'Cadangan & Pemulihan',
     shareAppSection: 'Bagikan Aplikasi',
     usefulLinks: 'Tautan Berguna',
+    dangerZone: 'Zona Bahaya',
+    deleteAccount: 'Hapus Akun',
+    deleteAccountTitle: 'Hapus Akun',
+    deleteAccountMessage: 'Apakah Anda yakin? Semua data Anda akan dihapus secara permanen.',
+    deleteAccountConfirm: 'Hapus Permanen',
     adhkarSettings: 'Pengaturan Dzikir',
     aboutApp: 'Tentang Aplikasi',
     prayerAndAzkarAlerts: 'Peringatan Shalat & Dzikir',
@@ -21042,6 +21235,9 @@ const id: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Adzan oleh Syaikh Abdul Basit',
     silentDesc: 'Tanpa suara',
+    useFullAdhan: 'Gunakan azan lengkap',
+    useFullAdhanDesc: 'Putar rekaman azan lengkap saat waktu shalat',
+    useFullAdhanIosNotice: 'Di iOS, sistem akan menghentikan suara otomatis setelah 29 detik',
     preview: 'Pratinjau',
     stopPreview: 'Hentikan pratinjau',
     minutesBefore: '{count} menit sebelum',
@@ -21588,6 +21784,8 @@ const id: TranslationKeys = {
     extraBackgrounds: 'Latar Belakang Tambahan',
     supportDev: 'Dukung Pengembangan Aplikasi',
     restorePurchases: 'Pulihkan Pembelian',
+    termsOfUse: 'Ketentuan Penggunaan',
+    privacyPolicy: 'Kebijakan Privasi',
     upgradeToPremium: 'Upgrade ke Premium',
     upgradeToPremiumDesc: 'Nikmati pengalaman tanpa iklan dengan fitur eksklusif',
     featureAdRemoval: 'Hapus semua iklan',
@@ -21910,6 +22108,7 @@ const id: TranslationKeys = {
   aboutApp: {
     description: 'Aplikasi Islam yang lengkap',
     emailSubject: 'Hubungi Kami - Ruh Al-Muslim',
+    website: 'Situs web',
     features: 'Fitur',
     stats: 'Statistik',
     subtitle: 'Teman spiritual Anda',
@@ -22044,6 +22243,7 @@ const id: TranslationKeys = {
     mondayThursdayDesc: 'Amal diangkat kepada Allah pada hari ini',
     notRecorded: 'Belum Dicatat',
     notYetAvailable: 'Belum Tersedia',
+    lateOnly: 'Terlambat',
     notificationInfo: 'Info Notifikasi',
     notificationSound: 'Nada Notifikasi',
     notificationSoundDesc: 'Pilih nada notifikasi pilihan Anda',
@@ -22342,6 +22542,7 @@ const id: TranslationKeys = {
     questionSentBody: 'Terima kasih atas pertanyaan Anda. Kami akan merespons sesegera mungkin, insyaAllah.',
     rateLimitTitle: 'Mohon tunggu',
     rateLimitBody: 'Anda dapat mengirim pertanyaan baru setelah 5 menit.',
+    submitError: 'Gagal mengirim pertanyaan. Silakan coba lagi.',
   },
   smartTracker: {
     title: 'Sholat Saya',
@@ -22434,6 +22635,9 @@ const ms: TranslationKeys = {
     version: 'Versi',
     noData: 'Tiada data',
     seeAll: 'Lihat Semua',
+    all: 'Semua',
+    occasion: 'Kesempatan',
+    virtue: 'Kelebihan',
     refresh: 'Muat Semula',
     back: 'Kembali',
     forward: 'Ke Hadapan',
@@ -22601,6 +22805,7 @@ const ms: TranslationKeys = {
     quranSurahsSection: 'Surah & Ayat Al-Quran',
     rosary: 'Tasbih',
     selectedDuas: 'Doa dari Sunnah',
+    famousDuas: 'Doa Terkenal',
     storiesSection: 'Kisah',
     tasbihLog: 'Log Tasbih',
     tasbihSection: 'Tasbih & Istighfar',
@@ -22609,6 +22814,7 @@ const ms: TranslationKeys = {
     fridayGreeting: 'Jumaat Mubarakah',
     fridaySubtitle: 'Jangan lupa baca Surah Al-Kahfi — cahaya antara dua Jumaat',
     remainingForAdhan: 'Baki untuk',
+    adhanTimeFor: 'Tiba waktu solat',
   },
   quran: {
     title: 'Al-Quran',
@@ -22792,6 +22998,7 @@ const ms: TranslationKeys = {
   prayer: {
     title: 'Waktu Solat',
     times: 'Waktu',
+    longPressToTrack: 'Tekan lama solat untuk mencatatnya',
     fajr: 'Subuh',
     sunrise: 'Syuruk',
     dhuhr: 'Zohor',
@@ -23215,6 +23422,11 @@ const ms: TranslationKeys = {
     backupRestore: 'Sandaran & Pemulihan',
     shareAppSection: 'Kongsi Aplikasi',
     usefulLinks: 'Pautan Berguna',
+    dangerZone: 'Zon Bahaya',
+    deleteAccount: 'Padam Akaun',
+    deleteAccountTitle: 'Padam Akaun',
+    deleteAccountMessage: 'Adakah anda pasti? Semua data anda akan dipadamkan secara kekal.',
+    deleteAccountConfirm: 'Padam Kekal',
     adhkarSettings: 'Tetapan Zikir',
     aboutApp: 'Tentang Aplikasi',
     prayerAndAzkarAlerts: 'Amaran Solat & Zikir',
@@ -23524,6 +23736,9 @@ const ms: TranslationKeys = {
     abdulbasit: 'Abdul Basit',
     abdulbasitDesc: 'Azan oleh Sheikh Abdul Basit',
     silentDesc: 'Tiada bunyi',
+    useFullAdhan: 'Gunakan azan penuh',
+    useFullAdhanDesc: 'Mainkan rakaman azan penuh pada waktu solat',
+    useFullAdhanIosNotice: 'Pada iOS, sistem akan menghentikan bunyi secara automatik selepas 29 saat',
     preview: 'Pratonton',
     stopPreview: 'Hentikan pratonton',
     minutesBefore: '{count} minit sebelum',
@@ -24070,6 +24285,8 @@ const ms: TranslationKeys = {
     extraBackgrounds: 'Latar Belakang Tambahan',
     supportDev: 'Sokong Pembangunan Aplikasi',
     restorePurchases: 'Pulihkan Pembelian',
+    termsOfUse: 'Syarat Penggunaan',
+    privacyPolicy: 'Dasar Privasi',
     upgradeToPremium: 'Naik Taraf ke Premium',
     upgradeToPremiumDesc: 'Nikmati pengalaman tanpa iklan dengan ciri eksklusif',
     featureAdRemoval: 'Alih keluar semua iklan',
@@ -24392,6 +24609,7 @@ const ms: TranslationKeys = {
   aboutApp: {
     description: 'Aplikasi Islam yang komprehensif',
     emailSubject: 'Hubungi Kami - Ruh Al-Muslim',
+    website: 'Laman web',
     features: 'Ciri-ciri',
     stats: 'Statistik',
     subtitle: 'Teman rohani anda',
@@ -24526,6 +24744,7 @@ const ms: TranslationKeys = {
     mondayThursdayDesc: 'Amalan diangkat kepada Allah pada hari ini',
     notRecorded: 'Belum Direkod',
     notYetAvailable: 'Belum Tersedia',
+    lateOnly: 'Terlambat',
     notificationInfo: 'Maklumat Pemberitahuan',
     notificationSound: 'Bunyi Pemberitahuan',
     notificationSoundDesc: 'Pilih bunyi pemberitahuan pilihan anda',
@@ -24824,6 +25043,7 @@ const ms: TranslationKeys = {
     questionSentBody: 'Terima kasih atas soalan anda. Kami akan menjawab secepat mungkin, insyaAllah.',
     rateLimitTitle: 'Sila tunggu',
     rateLimitBody: 'Anda boleh menghantar soalan baharu selepas 5 minit.',
+    submitError: 'Gagal menghantar soalan. Sila cuba lagi.',
   },
   smartTracker: {
     title: 'Solat Saya',
@@ -24915,6 +25135,9 @@ const hi: TranslationKeys = {
     version: 'संस्करण',
     noData: 'कोई डेटा नहीं',
     seeAll: 'सभी देखें',
+    all: 'सभी',
+    occasion: 'अवसर',
+    virtue: 'फ़ज़ीलत',
     refresh: 'रिफ्रेश',
     back: 'वापस',
     forward: 'आगे',
@@ -25082,6 +25305,7 @@ const hi: TranslationKeys = {
     quranSurahsSection: 'कुरान सूरतें और आयतें',
     rosary: 'तस्बीह',
     selectedDuas: 'सुन्नत से दुआएँ',
+    famousDuas: 'प्रसिद्ध दुआएँ',
     storiesSection: 'कहानियाँ',
     tasbihLog: 'तस्बीह लॉग',
     tasbihSection: 'तस्बीह और इस्तिग़फ़ार',
@@ -25090,6 +25314,7 @@ const hi: TranslationKeys = {
     fridayGreeting: 'जुमा मुबारक',
     fridaySubtitle: 'सूरह अल-कहफ़ पढ़ना न भूलें — दो जुमों के बीच नूर है',
     remainingForAdhan: 'अज़ान तक शेष',
+    adhanTimeFor: 'समय हो गया',
   },
   quran: {
     title: 'पवित्र कुरान',
@@ -25273,6 +25498,7 @@ const hi: TranslationKeys = {
   prayer: {
     title: 'नमाज़ के समय',
     times: 'समय',
+    longPressToTrack: 'रिकॉर्ड करने के लिए नमाज़ पर देर तक दबाएं',
     fajr: 'फज्र',
     sunrise: 'सूर्योदय',
     dhuhr: 'ज़ुहर',
@@ -25696,6 +25922,11 @@ const hi: TranslationKeys = {
     backupRestore: 'बैकअप और पुनर्स्थापना',
     shareAppSection: 'ऐप शेयर करें',
     usefulLinks: 'उपयोगी लिंक',
+    dangerZone: 'खतरनाक क्षेत्र',
+    deleteAccount: 'खाता हटाएं',
+    deleteAccountTitle: 'खाता हटाएं',
+    deleteAccountMessage: 'क्या आप वाकई सुनिश्चित हैं? आपका सारा डेटा स्थायी रूप से हटा दिया जाएगा।',
+    deleteAccountConfirm: 'स्थायी रूप से हटाएं',
     adhkarSettings: 'अज़कार सेटिंग्स',
     aboutApp: 'ऐप के बारे में',
     prayerAndAzkarAlerts: 'नमाज़ और अज़कार अलर्ट',
@@ -26006,6 +26237,9 @@ const hi: TranslationKeys = {
     abdulbasit: 'अब्दुल बासित',
     abdulbasitDesc: 'शेख अब्दुल बासित की अज़ान',
     silentDesc: 'कोई ध्वनि नहीं',
+    useFullAdhan: 'पूर्ण अज़ान का उपयोग करें',
+    useFullAdhanDesc: 'नमाज़ के समय पूरी अज़ान रिकॉर्डिंग चलाएं',
+    useFullAdhanIosNotice: 'iOS पर सिस्टम 29 सेकंड के बाद ध्वनि को अपने-आप बंद कर देगा',
     preview: 'पूर्वावलोकन',
     stopPreview: 'पूर्वावलोकन रोकें',
     minutesBefore: '{count} मिनट पहले',
@@ -26552,6 +26786,8 @@ const hi: TranslationKeys = {
     extraBackgrounds: 'अतिरिक्त पृष्ठभूमि',
     supportDev: 'ऐप विकास का समर्थन करें',
     restorePurchases: 'खरीदारी पुनर्स्थापित करें',
+    termsOfUse: 'उपयोग की शर्तें',
+    privacyPolicy: 'गोपनीयता नीति',
     upgradeToPremium: 'प्रीमियम में अपग्रेड करें',
     upgradeToPremiumDesc: 'विज्ञापन-मुक्त अनुभव और विशेष सुविधाओं का आनंद लें',
     featureAdRemoval: 'सभी विज्ञापन हटाएं',
@@ -26874,6 +27110,7 @@ const hi: TranslationKeys = {
   aboutApp: {
     description: 'एक व्यापक इस्लामी ऐप',
     emailSubject: 'संपर्क - रूह अल-मुस्लिम',
+    website: 'वेबसाइट',
     features: 'विशेषताएँ',
     stats: 'आँकड़े',
     subtitle: 'आपका आध्यात्मिक साथी',
@@ -27008,6 +27245,7 @@ const hi: TranslationKeys = {
     mondayThursdayDesc: 'इन दिनों अमल अल्लाह के सामने पेश होते हैं',
     notRecorded: 'रिकॉर्ड नहीं',
     notYetAvailable: 'अभी उपलब्ध नहीं',
+    lateOnly: 'देर से',
     notificationInfo: 'अधिसूचना जानकारी',
     notificationSound: 'अधिसूचना ध्वनि',
     notificationSoundDesc: 'अपनी पसंदीदा अधिसूचना ध्वनि चुनें',
@@ -27306,6 +27544,7 @@ const hi: TranslationKeys = {
     questionSentBody: 'आपके प्रश्न के लिए धन्यवाद। हम इंशाअल्लाह जल्द से जल्द जवाब देंगे।',
     rateLimitTitle: 'कृपया प्रतीक्षा करें',
     rateLimitBody: 'आप 5 मिनट बाद नया प्रश्न भेज सकते हैं।',
+    submitError: 'प्रश्न भेजने में त्रुटि। कृपया पुनः प्रयास करें।',
   },
   smartTracker: {
     title: 'मेरी नमाज़',
@@ -27398,6 +27637,9 @@ const bn: TranslationKeys = {
     version: 'সংস্করণ',
     noData: 'কোন ডেটা নেই',
     seeAll: 'সব দেখুন',
+    all: 'সব',
+    occasion: 'উপলক্ষ',
+    virtue: 'ফজিলত',
     refresh: 'রিফ্রেশ',
     back: 'পিছনে',
     forward: 'সামনে',
@@ -27565,6 +27807,7 @@ const bn: TranslationKeys = {
     quranSurahsSection: 'কুরআন সূরা ও আয়াত',
     rosary: 'তাসবিহ',
     selectedDuas: 'সুন্নাহ থেকে দোয়া',
+    famousDuas: 'বিখ্যাত দোয়া',
     storiesSection: 'কাহিনী',
     tasbihLog: 'তাসবিহ লগ',
     tasbihSection: 'তাসবিহ ও ইস্তিগফার',
@@ -27573,6 +27816,7 @@ const bn: TranslationKeys = {
     fridayGreeting: 'জুমা মোবারক',
     fridaySubtitle: 'সূরা আল-কাহফ পড়তে ভুলবেন না — দুই জুমার মধ্যে আলো',
     remainingForAdhan: 'আযানের জন্য বাকি',
+    adhanTimeFor: 'সময় হয়েছে',
   },
   quran: {
     title: 'পবিত্র কুরআন',
@@ -27756,6 +28000,7 @@ const bn: TranslationKeys = {
   prayer: {
     title: 'নামাজের সময়',
     times: 'সময়',
+    longPressToTrack: 'রেকর্ড করতে নামাজে দীর্ঘক্ষণ চাপুন',
     fajr: 'ফজর',
     sunrise: 'সূর্যোদয়',
     dhuhr: 'যোহর',
@@ -28179,6 +28424,11 @@ const bn: TranslationKeys = {
     backupRestore: 'ব্যাকআপ ও পুনরুদ্ধার',
     shareAppSection: 'অ্যাপ শেয়ার করুন',
     usefulLinks: 'উপকারী লিংক',
+    dangerZone: 'বিপদ অঞ্চল',
+    deleteAccount: 'অ্যাকাউন্ট মুছুন',
+    deleteAccountTitle: 'অ্যাকাউন্ট মুছুন',
+    deleteAccountMessage: 'আপনি কি নিশ্চিত? আপনার সমস্ত ডেটা স্থায়ীভাবে মুছে ফেলা হবে।',
+    deleteAccountConfirm: 'স্থায়ীভাবে মুছুন',
     adhkarSettings: 'যিকির সেটিংস',
     aboutApp: 'অ্যাপ সম্পর্কে',
     prayerAndAzkarAlerts: 'নামাজ ও আযকার সতর্কতা',
@@ -28488,6 +28738,9 @@ const bn: TranslationKeys = {
     abdulbasit: 'আবদুল বাসিত',
     abdulbasitDesc: 'শায়খ আবদুল বাসিতের আযান',
     silentDesc: 'কোনো শব্দ নেই',
+    useFullAdhan: 'সম্পূর্ণ আযান ব্যবহার করুন',
+    useFullAdhanDesc: 'সালাতের সময় সম্পূর্ণ আযান রেকর্ডিং চালান',
+    useFullAdhanIosNotice: 'iOS-এ সিস্টেম ২৯ সেকেন্ড পরে স্বয়ংক্রিয়ভাবে শব্দ বন্ধ করবে',
     preview: 'প্রিভিউ',
     stopPreview: 'প্রিভিউ বন্ধ করুন',
     minutesBefore: '{count} মিনিট আগে',
@@ -29034,6 +29287,8 @@ const bn: TranslationKeys = {
     extraBackgrounds: 'অতিরিক্ত পটভূমি',
     supportDev: 'অ্যাপ উন্নয়নে সহায়তা করুন',
     restorePurchases: 'ক্রয় পুনরুদ্ধার করুন',
+    termsOfUse: 'ব্যবহারের শর্তাবলী',
+    privacyPolicy: 'গোপনীয়তা নীতি',
     upgradeToPremium: 'প্রিমিয়ামে আপগ্রেড করুন',
     upgradeToPremiumDesc: 'বিজ্ঞাপন-মুক্ত অভিজ্ঞতা এবং বিশেষ সুবিধা উপভোগ করুন',
     featureAdRemoval: 'সব বিজ্ঞাপন সরান',
@@ -29356,6 +29611,7 @@ const bn: TranslationKeys = {
   aboutApp: {
     description: 'একটি ব্যাপক ইসলামী অ্যাপ',
     emailSubject: 'যোগাযোগ - রুহ আল-মুসলিম',
+    website: 'ওয়েবসাইট',
     features: 'বৈশিষ্ট্য',
     stats: 'পরিসংখ্যান',
     subtitle: 'আপনার আধ্যাত্মিক সঙ্গী',
@@ -29490,6 +29746,7 @@ const bn: TranslationKeys = {
     mondayThursdayDesc: 'এই দিনগুলোতে আমল আল্লাহর কাছে পেশ করা হয়',
     notRecorded: 'রেকর্ড করা হয়নি',
     notYetAvailable: 'এখনও উপলব্ধ নয়',
+    lateOnly: 'দেরি',
     notificationInfo: 'নোটিফিকেশন তথ্য',
     notificationSound: 'নোটিফিকেশন শব্দ',
     notificationSoundDesc: 'আপনার পছন্দের নোটিফিকেশন শব্দ বেছে নিন',
@@ -29788,6 +30045,7 @@ const bn: TranslationKeys = {
     questionSentBody: 'আপনার প্রশ্নের জন্য ধন্যবাদ। ইনশাআল্লাহ যত তাড়াতাড়ি উত্তর দেওয়া হবে।',
     rateLimitTitle: 'অনুগ্রহ করে অপেক্ষা করুন',
     rateLimitBody: 'আপনি 5 মিনিট পরে নতুন প্রশ্ন পাঠাতে পারবেন।',
+    submitError: 'প্রশ্ন পাঠাতে ব্যর্থ। আবার চেষ্টা করুন।',
   },
   smartTracker: {
     title: 'আমার নামাজ',
@@ -29880,6 +30138,9 @@ const ru: TranslationKeys = {
     version: 'Версия',
     noData: 'Нет данных',
     seeAll: 'Показать все',
+    all: 'Все',
+    occasion: 'Повод',
+    virtue: 'Достоинство',
     refresh: 'Обновить',
     back: 'Назад',
     forward: 'Вперёд',
@@ -30047,6 +30308,7 @@ const ru: TranslationKeys = {
     quranSurahsSection: 'Суры и аяты Корана',
     rosary: 'Тасбих',
     selectedDuas: 'Дуа из Сунны',
+    famousDuas: 'Известные дуа',
     storiesSection: 'Истории',
     tasbihLog: 'Журнал тасбиха',
     tasbihSection: 'Тасбих и истигфар',
@@ -30055,6 +30317,7 @@ const ru: TranslationKeys = {
     fridayGreeting: 'Благословенная пятница',
     fridaySubtitle: 'Не забудьте прочитать суру Аль-Кахф — свет между двумя пятницами',
     remainingForAdhan: 'Осталось до',
+    adhanTimeFor: 'Время намаза',
   },
   quran: {
     title: 'Священный Коран',
@@ -30238,6 +30501,7 @@ const ru: TranslationKeys = {
   prayer: {
     title: 'Время намаза',
     times: 'Времена',
+    longPressToTrack: 'Удерживайте молитву, чтобы записать',
     fajr: 'Фаджр',
     sunrise: 'Восход',
     dhuhr: 'Зухр',
@@ -30660,6 +30924,11 @@ const ru: TranslationKeys = {
     backupRestore: 'Резервное копирование и восстановление',
     shareAppSection: 'Поделиться приложением',
     usefulLinks: 'Полезные ссылки',
+    dangerZone: 'Опасная зона',
+    deleteAccount: 'Удалить аккаунт',
+    deleteAccountTitle: 'Удалить аккаунт',
+    deleteAccountMessage: 'Вы уверены? Все ваши данные будут безвозвратно удалены.',
+    deleteAccountConfirm: 'Удалить навсегда',
     adhkarSettings: 'Настройки зикра',
     aboutApp: 'О приложении',
     prayerAndAzkarAlerts: 'Оповещения молитв и азкаров',
@@ -30969,6 +31238,9 @@ const ru: TranslationKeys = {
     abdulbasit: 'Абдуль Басит',
     abdulbasitDesc: 'Азан шейха Абдуль Басита',
     silentDesc: 'Без звука',
+    useFullAdhan: 'Использовать полный азан',
+    useFullAdhanDesc: 'Воспроизводить полную запись азана во время молитвы',
+    useFullAdhanIosNotice: 'На iOS система автоматически остановит звук через 29 секунд',
     preview: 'Предпросмотр',
     stopPreview: 'Остановить предпросмотр',
     minutesBefore: '{count} минут до',
@@ -31515,6 +31787,8 @@ const ru: TranslationKeys = {
     extraBackgrounds: 'Дополнительные фоны',
     supportDev: 'Поддержать разработку',
     restorePurchases: 'Восстановить покупки',
+    termsOfUse: 'Условия использования',
+    privacyPolicy: 'Политика конфиденциальности',
     upgradeToPremium: 'Обновить до Премиум',
     upgradeToPremiumDesc: 'Наслаждайтесь без рекламы с эксклюзивными функциями',
     featureAdRemoval: 'Удаление всей рекламы',
@@ -31837,6 +32111,7 @@ const ru: TranslationKeys = {
   aboutApp: {
     description: 'Комплексное исламское приложение',
     emailSubject: 'Связаться - Рух Аль-Муслим',
+    website: 'Веб-сайт',
     features: 'Возможности',
     stats: 'Статистика',
     subtitle: 'Ваш духовный спутник',
@@ -31971,6 +32246,7 @@ const ru: TranslationKeys = {
     mondayThursdayDesc: 'В эти дни дела представляются Аллаху',
     notRecorded: 'Не записано',
     notYetAvailable: 'Пока недоступно',
+    lateOnly: 'Поздно',
     notificationInfo: 'Информация об уведомлении',
     notificationSound: 'Звук уведомления',
     notificationSoundDesc: 'Выберите предпочитаемый звук уведомления',
@@ -32269,6 +32545,7 @@ const ru: TranslationKeys = {
     questionSentBody: 'Спасибо за ваш вопрос. Мы ответим как можно скорее, иншаАллах.',
     rateLimitTitle: 'Пожалуйста, подождите',
     rateLimitBody: 'Вы можете отправить новый вопрос через 5 минут.',
+    submitError: 'Не удалось отправить вопрос. Попробуйте снова.',
   },
   smartTracker: {
     title: 'Моя молитва',

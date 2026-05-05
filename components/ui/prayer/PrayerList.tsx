@@ -29,11 +29,16 @@ import {
   isPrayerPassed,
   getNextPrayer,
 } from '@/lib/prayer-times';
+import { getPrayerWindowState, type PrayerWindowState, type TrackedPrayer } from '@/lib/prayer-availability';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import type { PrayerStatus } from '@/lib/worship-storage';
+
+const PENDING_COLOR = '#c07b10';
+const PENDING_BG = 'rgba(192,123,16,0.22)';
+const MISSED_COLOR = '#ef5350';
 
 interface PrayerListProps {
   prayerTimes: PrayerTimes | null;
@@ -45,7 +50,12 @@ interface PrayerListProps {
   showSunrise?: boolean;
   show24Hour?: boolean;
   prayerStatuses?: Record<string, PrayerStatus>;
-  onPrayerStatusToggle?: (prayer: PrayerName) => void;
+  /**
+   * Called when the user long-presses a prayer row. The host opens a modal with
+   * the full status options (prayed / late / missed / none). Sunrise and
+   * `upcoming` prayers do not invoke the callback (the row is gated client-side).
+   */
+  onPrayerLongPress?: (prayer: PrayerName, windowState: PrayerWindowState, currentStatus: PrayerStatus) => void;
 }
 
 interface PrayerItemProps {
@@ -60,7 +70,8 @@ interface PrayerItemProps {
   show24Hour?: boolean;
   index: number;
   prayerStatus?: PrayerStatus;
-  onPrayerStatusToggle?: () => void;
+  windowState: PrayerWindowState;
+  onPrayerLongPress?: (windowState: PrayerWindowState, currentStatus: PrayerStatus) => void;
 }
 
 const prayerColors: Record<PrayerName, { light: string; dark: string }> = {
@@ -89,7 +100,7 @@ export const PrayerList: React.FC<PrayerListProps> = ({
   showSunrise = true,
   show24Hour = false,
   prayerStatuses,
-  onPrayerStatusToggle,
+  onPrayerLongPress,
 }) => {
   const { t } = useSettings();
   const themeColors = useColors();
@@ -132,27 +143,39 @@ export const PrayerList: React.FC<PrayerListProps> = ({
         <BlurView intensity={80} tint={(isDarkMode ? 'systemThickMaterialDark' : 'systemThickMaterialLight') as any} style={StyleSheet.absoluteFill} />
       )}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: isDarkMode ? 'rgba(30,30,30,0.40)' : 'rgba(255,255,255,0.60)' }]} />
-      {prayers.map((prayer, index) => (
-        <PrayerItem
-          key={prayer.name}
-          name={prayer.name}
-          time={prayer.time}
-          isNext={nextPrayer?.name === prayer.name}
-          isPassed={isPrayerPassed(prayer.time)}
-          isDarkMode={isDarkMode}
-          notificationEnabled={notificationSettings[prayer.name]}
-          onToggleNotification={
-            onToggleNotification
-              ? (enabled) => onToggleNotification(prayer.name, enabled)
-              : undefined
-          }
-          showNotificationToggle={showNotificationToggle}
-          show24Hour={show24Hour}
-          index={index}
-          prayerStatus={prayerStatuses?.[prayer.name]}
-          onPrayerStatusToggle={onPrayerStatusToggle ? () => onPrayerStatusToggle(prayer.name) : undefined}
-        />
-      ))}
+      {prayers.map((prayer, index) => {
+        const windowState: PrayerWindowState = prayer.name === 'sunrise'
+          ? 'onTime'
+          : getPrayerWindowState(prayer.name as TrackedPrayer, {
+              fajr: prayerTimes.fajr,
+              dhuhr: prayerTimes.dhuhr,
+              asr: prayerTimes.asr,
+              maghrib: prayerTimes.maghrib,
+              isha: prayerTimes.isha,
+            });
+        return (
+          <PrayerItem
+            key={prayer.name}
+            name={prayer.name}
+            time={prayer.time}
+            isNext={nextPrayer?.name === prayer.name}
+            isPassed={isPrayerPassed(prayer.time)}
+            isDarkMode={isDarkMode}
+            notificationEnabled={notificationSettings[prayer.name]}
+            onToggleNotification={
+              onToggleNotification
+                ? (enabled) => onToggleNotification(prayer.name, enabled)
+                : undefined
+            }
+            showNotificationToggle={showNotificationToggle}
+            show24Hour={show24Hour}
+            index={index}
+            prayerStatus={prayerStatuses?.[prayer.name]}
+            windowState={windowState}
+            onPrayerLongPress={onPrayerLongPress ? (ws, current) => onPrayerLongPress(prayer.name, ws, current) : undefined}
+          />
+        );
+      })}
     </View>
   );
 };
@@ -169,7 +192,8 @@ const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
   show24Hour = false,
   index,
   prayerStatus,
-  onPrayerStatusToggle,
+  windowState,
+  onPrayerLongPress,
 }) => {
   const { t } = useSettings();
   const isRTL = useIsRTL();
@@ -182,19 +206,32 @@ const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
   const accentColor = isDarkMode ? colors.dark : colors.light;
   const activeGreen = '#0d8e62';
   const isPrayed = prayerStatus === 'prayed' || prayerStatus === 'late';
+  const isMissed = prayerStatus === 'missed';
+
+  // The row only opens the status modal via long-press when the prayer is in a
+  // trackable window (onTime / lateOnly / expired). Upcoming prayers and sunrise
+  // are not trackable. The small circle icon is a *visual indicator only*.
+  const isTrackable = name !== 'sunrise' && (windowState === 'onTime' || windowState === 'lateOnly' || windowState === 'expired');
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Tap is a no-op (visual feedback only). Tracking happens via long-press.
+    Haptics.selectionAsync();
+    scale.value = withSpring(0.97, {}, () => {
+      scale.value = withSpring(1);
+    });
+  };
+
+  const handleLongPress = () => {
+    if (!isTrackable) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     scale.value = withSpring(0.95, {}, () => {
       scale.value = withSpring(1);
     });
-    if (onPrayerStatusToggle && name !== 'sunrise') {
-      onPrayerStatusToggle();
-    }
+    onPrayerLongPress?.(windowState, (prayerStatus ?? 'none') as PrayerStatus);
   };
 
   const handleToggle = (value: boolean) => {
@@ -202,12 +239,28 @@ const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
     onToggleNotification?.(value);
   };
 
+  // Tracking circle visuals
+  let circleIcon: 'check-circle' | 'close-circle' | 'clock-outline' | 'checkbox-blank-circle-outline' = 'checkbox-blank-circle-outline';
+  let circleColor: string = themeColors.textLight;
+  if (isPrayed) {
+    circleIcon = 'check-circle';
+    circleColor = isDarkMode ? '#0d8e62' : '#2e7d32';
+  } else if (isMissed) {
+    circleIcon = 'close-circle';
+    circleColor = MISSED_COLOR;
+  } else if (name !== 'sunrise' && windowState === 'upcoming') {
+    circleIcon = 'clock-outline';
+    circleColor = PENDING_COLOR;
+  }
+
   return (
     <Animated.View entering={FadeInRight.delay(index * 100).duration(400)}>
     <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={handlePress}
+        onLongPress={handleLongPress}
+        delayLongPress={350}
         style={[
           styles.prayerItem,
           isNext && styles.prayerItemNext,
@@ -254,19 +307,19 @@ const PrayerItem: React.FC<PrayerItemProps> = React.memo(({
           )}
         </View>
 
-        {/* Leading: Tracking Circle */}
+        {/* Status indicator (visual only — tracking happens via long-press on the row) */}
         {name !== 'sunrise' && (
-          <TouchableOpacity
-            onPress={() => onPrayerStatusToggle?.()}
+          <View
+            pointerEvents="none"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{}}
           >
             <MaterialCommunityIcons
-              name={isPrayed ? 'check-circle' : 'checkbox-blank-circle-outline'}
+              name={circleIcon}
               size={22}
-              color={isPrayed ? (isDarkMode ? '#0d8e62' : '#2e7d32') : themeColors.textLight}
+              color={circleColor}
             />
-          </TouchableOpacity>
+          </View>
         )}
 
         {/* Spacer */}

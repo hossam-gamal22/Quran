@@ -235,6 +235,13 @@ export const schedulePrayerNotification = async (
   // Don't schedule if time is in the past
   if (triggerDate <= new Date()) return '';
 
+  const effectiveSoundKey = (!soundKey || soundKey === 'default') ? 'makkah' : soundKey.replace(/\.mp3$/, '');
+  // Layer 2 safety net: always play short adhan via system notification channel.
+  // Patched expo-notifications additionally starts AdhanPlaybackService when
+  // androidFullAdhan='true', so the full recording plays in parallel via STREAM_ALARM.
+  // If the service fails for any reason, the user still hears the short adhan.
+  const shouldUseAndroidFullAdhan = Platform.OS === 'android' && effectiveSoundKey !== 'silent';
+
   const notification: PushNotificationData = {
     title: minutesBefore > 0
       ? `⏰ ${prayerName} ${t('notifications.afterMinutes').replace('{0}', String(minutesBefore))}`
@@ -242,13 +249,18 @@ export const schedulePrayerNotification = async (
     body: minutesBefore > 0
       ? `${t('notifications.prepareForPrayer')} ${prayerName}`
       : t('notifications.prayNow'),
-    data: { type: 'prayer', prayer: prayerName },
+    data: {
+      type: 'prayer',
+      prayer: prayerName,
+      soundType: effectiveSoundKey,
+      ...(shouldUseAndroidFullAdhan && { androidFullAdhan: 'true' }),
+    },
   };
 
   return scheduleLocalNotification(notification, {
     type: Notifications.SchedulableTriggerInputTypes.DATE,
     date: triggerDate,
-    channelId: getAdhanChannelId(soundKey),
+    channelId: getAdhanChannelId(effectiveSoundKey),
   });
 };
 

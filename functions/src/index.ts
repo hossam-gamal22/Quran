@@ -551,3 +551,203 @@ export const validateAdminSession = functions.https.onCall(
     }
   }
 );
+
+// ==================== Phase 2: FCM Prayer Push Fallback ====================
+
+/**
+ * Helper: send batch of Expo push messages with retry across mirror endpoints.
+ */
+async function sendExpoBatch(messages: ExpoPushMessage[], token: string): Promise<number> {
+  if (messages.length === 0) return 0;
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  for (const endpoint of EXPO_PUSH_APIS) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(messages),
+        signal: controller.signal as any,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) continue;
+      const json = (await res.json()) as ExpoResponse;
+      const okCount = json.data.filter((t) => t.status === 'ok').length;
+      return okCount;
+    } catch (e) {
+      logger.warn(`[fcm-prayer] endpoint ${endpoint} failed:`, e);
+    }
+  }
+  return 0;
+}
+
+/**
+ * Map app calculation method ID to adhan lib CalculationParameters.
+ */
+function buildAdhanParams(methodId: number, asrSchool: number) {
+  // Lazy require so cold starts don't load adhan unless this function runs
+  const adhan = require('adhan');
+  let params;
+  switch (methodId) {
+    case 1: params = adhan.CalculationMethod.Karachi(); break;
+    case 2: params = adhan.CalculationMethod.NorthAmerica(); break;
+    case 3: params = adhan.CalculationMethod.MuslimWorldLeague(); break;
+    case 4: params = adhan.CalculationMethod.UmmAlQura(); break;
+    case 5: params = adhan.CalculationMethod.Egyptian(); break;
+    case 8: params = adhan.CalculationMethod.Dubai(); break;
+    case 9: params = adhan.CalculationMethod.Kuwait(); break;
+    case 10: params = adhan.CalculationMethod.Qatar(); break;
+    case 11: params = adhan.CalculationMethod.Singapore(); break;
+    case 13: params = adhan.CalculationMethod.Turkey(); break;
+    default: params = adhan.CalculationMethod.MuslimWorldLeague();
+  }
+  params.madhab = asrSchool === 1 ? adhan.Madhab.Hanafi : adhan.Madhab.Shafi;
+  return params;
+}
+
+const PRAYER_NAMES_AR: Record<string, string> = {
+  fajr: 'الفجر',
+  dhuhr: 'الظهر',
+  asr: 'العصر',
+  maghrib: 'المغرب',
+  isha: 'العشاء',
+};
+
+/**
+ * Scheduled Cloud Function: runs every 15 minutes.
+ * For every user with fcmToken + prayerLocation in Firestore:
+ *   - compute next prayer using adhan lib
+ *   - if prayer falls within next 15 minutes, send Expo push
+ *   - mark sent so we don't duplicate within 30 min
+ *
+ * هذا "حزام أمان" — الجدولة المحلية لا تزال الأساسية، لكن لو فشلت
+ * (force-stop, OEM kill, exact alarm denied) المستخدم يستلم push من السيرفر.
+ */
+export const sendPrayerPushFallback = onSchedule(
+  { schedule: '*/15 * * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' },
+  async () => {
+    const startedAt = Date.now();
+    try {
+      const token = expoAccessToken.value();
+      const settingsSnap = await db.collection('userPrayerSettings').get();
+      logger.info(`[fcm-prayer] فحص ${settingsSnap.size} مستخدم`);
+
+      const adhan = require('adhan');
+      const now = new Date();
+      const messages: ExpoPushMessage[] = [];
+      const updates: Promise<unknown>[] = [];
+
+      for (const docSnap of settingsSnap.docs) {
+        const uid = docSnap.id;
+        const s = docSnap.data();
+        if (s.disabled) continue;
+        if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number') continue;
+
+        // اقرأ FCM token من users/{uid}
+        let fcmToken: string | undefined;
+        try {
+          const userDoc = await db.doc(`users/${uid}`).get();
+          fcmToken = userDoc.data()?.fcmToken;
+          // احترم تعطيل الإشعارات من المستخدم
+          const notifEnabled = userDoc.data()?.notificationsEnabled !== false;
+          if (!notifEnabled) continue;
+        } catch { continue; }
+        if (!fcmToken || !fcmToken.startsWith('ExponentPushToken')) continue;
+
+        try {
+          const coords = new adhan.Coordinates(s.latitude, s.longitude);
+          const params = buildAdhanParams(s.calculationMethod || 4, s.asrJuristic || 0);
+          const todayPrayers = new adhan.PrayerTimes(coords, now, params);
+          const tomorrowPrayers = new adhan.PrayerTimes(
+            coords,
+            new Date(now.getTime() + 24 * 60 * 60 * 1000),
+            params,
+          );
+          const next = todayPrayers.nextPrayer();
+          const nextTime: Date = next === adhan.Prayer.None
+            ? tomorrowPrayers.fajr
+            : todayPrayers.timeForPrayer(next);
+          if (!nextTime) continue;
+
+          const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
+          // ضمن 15 دقيقة قبل الصلاة بالضبط (نحن نشتغل كل 15 دقيقة → exactly one match)
+          if (minutesUntil < 0 || minutesUntil > 15) continue;
+
+          // De-duplication: تجاهل لو أرسلنا نفس الصلاة لنفس المستخدم خلال 30 دقيقة
+          const prayerKey = String(next).toLowerCase();
+          const dedupeId = `${uid}_${prayerKey}_${nextTime.toISOString().slice(0, 13)}`;
+          const dedupeRef = db.doc(`fcmPrayerSent/${dedupeId}`);
+          const dedupeSnap = await dedupeRef.get();
+          if (dedupeSnap.exists) continue;
+
+          const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
+          messages.push({
+            to: fcmToken,
+            title: `🕌 ${nameAr}`,
+            body: `حان الآن وقت صلاة ${nameAr}`,
+            sound: 'default',
+            priority: 'high',
+            data: {
+              type: 'prayer_fallback',
+              prayer: prayerKey,
+              source: 'fcm',
+            },
+          });
+
+          updates.push(
+            dedupeRef.set({
+              uid,
+              prayer: prayerKey,
+              sentAt: admin.firestore.FieldValue.serverTimestamp(),
+              expireAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+            }),
+          );
+        } catch (e) {
+          logger.warn(`[fcm-prayer] فشل حساب ${uid}:`, e);
+        }
+      }
+
+      // أرسل في batches من 100
+      let sent = 0;
+      for (let i = 0; i < messages.length; i += 100) {
+        sent += await sendExpoBatch(messages.slice(i, i + 100), token);
+      }
+      await Promise.allSettled(updates);
+
+      logger.info(`[fcm-prayer] أُرسل ${sent}/${messages.length} push في ${Date.now() - startedAt}ms`);
+    } catch (e) {
+      logger.error('[fcm-prayer] failed:', e);
+    }
+  },
+);
+
+/**
+ * Cleanup function: حذف dedupe records الأقدم من 24 ساعة.
+ * يشتغل يومياً عشان firestore ما يمتلئ.
+ */
+export const cleanupFcmPrayerDedupe = onSchedule(
+  { schedule: '0 3 * * *', timeZone: 'UTC' },
+  async () => {
+    try {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const snap = await db
+        .collection('fcmPrayerSent')
+        .where('expireAt', '<', cutoff)
+        .limit(500)
+        .get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      logger.info(`[fcm-prayer-cleanup] حذف ${snap.size} سجل`);
+    } catch (e) {
+      logger.error('[fcm-prayer-cleanup] failed:', e);
+    }
+  },
+);
+

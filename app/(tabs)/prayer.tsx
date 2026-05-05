@@ -12,6 +12,8 @@ import {
   Modal,
   Platform,
   Image,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -46,8 +48,8 @@ import {
   formatPrayerTime,
 } from '@/lib/prayer-times';
 import { getHijriDate, getLocalizedHijriDate } from '@/lib/hijri-date';
-import { applyCountryPrayerDefaults, COUNTRY_DEFAULTS } from '@/lib/country-prayer-defaults';
-import { setUserCountry, getUserCountry } from '@/services/hijriCalendarService';
+import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
+import { setUserCountry, getSavedUserCountry } from '@/services/hijriCalendarService';
 import { calculationMethods } from '@/lib/prayer-times';
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
 import { useColors } from '@/hooks/use-colors';
@@ -69,6 +71,8 @@ import Svg, { Circle, Line, G } from 'react-native-svg';
 import SujudIcon from '@/assets/images/sujud.svg';
 import { usePrayerTracker } from '@/contexts/WorshipContext';
 import { trackPrayer } from '@/lib/firebase-analytics';
+import type { PrayerStatus } from '@/lib/worship-storage';
+import type { PrayerWindowState } from '@/lib/prayer-availability';
 
 import {
   startLiveActivity,
@@ -132,6 +136,11 @@ const getAsrMethods = (t: (key: string) => string) => [
   { value: 1, label: t('prayer.asrMethodShafii'), subtitle: t('prayer.asrMethodShafiiDesc') },
 ];
 
+const isMakkahFallbackLocation = (loc: LocationType | null | undefined) =>
+  !!loc &&
+  Math.abs(loc.latitude - MAKKAH_FALLBACK_DEFAULTS.lat) < 0.0001 &&
+  Math.abs(loc.longitude - MAKKAH_FALLBACK_DEFAULTS.lng) < 0.0001;
+
 export default function PrayerScreen() {
   const { isDarkMode, t, settings, updatePrayer } = useSettings();
   const colors = useColors();
@@ -162,6 +171,37 @@ export default function PrayerScreen() {
   const [usingMakkahFallback, setUsingMakkahFallback] = useState(false);
   const [showAsrPicker, setShowAsrPicker] = useState(false);
 
+  // Long-press status modal for the prayer-times list (matches the worship tracker UX).
+  const [statusModal, setStatusModal] = useState<{
+    visible: boolean;
+    prayer: PrayerName | null;
+    current: PrayerStatus;
+  }>({ visible: false, prayer: null, current: 'none' });
+
+  const PRAYER_STATUS_OPTIONS: { value: PrayerStatus; color: string; icon: any; labelKey: string }[] = [
+    { value: 'prayed', color: '#0d8e62', icon: 'check-circle', labelKey: 'worship.onTime' },
+    { value: 'late',   color: '#c07b10', icon: 'clock-alert',  labelKey: 'worship.late' },
+    { value: 'missed', color: '#ef5350', icon: 'close-circle', labelKey: 'worship.missed' },
+    { value: 'none',   color: '#8E8E93', icon: 'circle-outline', labelKey: 'worship.notRecorded' },
+  ];
+
+  const openPrayerStatusModal = useCallback((prayer: PrayerName, _ws: PrayerWindowState, current: PrayerStatus) => {
+    if (prayer === 'sunrise') return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setStatusModal({ visible: true, prayer, current: current ?? 'none' });
+  }, []);
+
+  const handleSelectPrayerStatus = useCallback((value: PrayerStatus) => {
+    const prayer = statusModal.prayer;
+    setStatusModal({ visible: false, prayer: null, current: 'none' });
+    if (!prayer || prayer === 'sunrise') return;
+    const key = prayer as 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+    updatePrayerWithTime(key, value, prayerTimes?.[key] || undefined);
+    if (value === 'prayed' || value === 'late') {
+      trackPrayer(key, value === 'prayed').catch(() => {});
+    }
+  }, [statusModal.prayer, updatePrayerWithTime, prayerTimes]);
+
   // Live Activity state (iOS only)
   const [liveActivityEnabled, setLiveActivityEnabled] = useState(false);
   const [liveActivityStyle, setLiveActivityStyle] = useState<LiveActivityData['style']>('prayer_times');
@@ -185,8 +225,8 @@ export default function PrayerScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const cc = await getUserCountry();
-        const cd = applyCountryPrayerDefaults(cc);
+        const cc = await getSavedUserCountry();
+        const cd = applyCountryPrayerDefaults(cc) ?? MAKKAH_FALLBACK_DEFAULTS;
         if (cd) {
           const info = calculationMethods[cd.method as CalculationMethod];
           if (info) setAutoMethodLabel(language === 'ar' || language === 'ur' ? info.nameAr : info.name);
@@ -199,8 +239,8 @@ export default function PrayerScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (turnOn) {
       try {
-        const cc = await getUserCountry();
-        const cd = applyCountryPrayerDefaults(cc);
+        const cc = await getSavedUserCountry();
+        const cd = applyCountryPrayerDefaults(cc) ?? MAKKAH_FALLBACK_DEFAULTS;
         if (cd) {
           updatePrayer({ calculationMethod: cd.method as CalculationMethod, asrJuristic: cd.asrSchool, methodManuallySet: false });
         }
@@ -427,7 +467,12 @@ export default function PrayerScreen() {
       const stored = await getStoredLocation();
       if (stored) return stored;
       setUsingMakkahFallback(true);
-      return { latitude: 21.4225, longitude: 39.8262, city: t('prayer.defaultCity'), country: t('prayer.defaultCountry') };
+      return {
+        latitude: MAKKAH_FALLBACK_DEFAULTS.lat,
+        longitude: MAKKAH_FALLBACK_DEFAULTS.lng,
+        city: t('prayer.defaultCity'),
+        country: t('prayer.defaultCountry'),
+      };
     }
   };
 
@@ -486,16 +531,6 @@ export default function PrayerScreen() {
         data.sunriseTime = formatPrayerTime(times.sunrise, settings.prayer.show24Hour);
       }
 
-      // Populate dua/ayah based on selected style
-      if (laSettings.style === 'prayer_with_dua') {
-        const dua = getDuaOfTheDay();
-        data.duaText = dua.arabic;
-      } else if (laSettings.style === 'prayer_with_ayah') {
-        const ayah = getAyahOfTheDay();
-        data.ayahText = ayah.arabic;
-        data.ayahRef = ayah.ref;
-      }
-
       // Try update first, if no active activity then start new one
       const updated = await updateLiveActivity(data);
       if (!updated) {
@@ -534,6 +569,26 @@ export default function PrayerScreen() {
         console.warn('Migration check failed:', e);
       }
 
+      // Migration v2: clear ALL prayer caches once. The previous unscoped
+      // week-cache key (`@prayer_week_cache`) could persist times calculated
+      // with a stale method. Forces a clean re-fetch with the correct method.
+      try {
+        const v2Flag = await AsyncStorage.getItem('@prayer_cache_reset_v2');
+        if (!v2Flag) {
+          console.log('🧹 One-time prayer cache reset (v2) — clearing all prayer caches');
+          const allKeys = await AsyncStorage.getAllKeys();
+          const toRemove = allKeys.filter((k) =>
+            k.startsWith('@prayer_times_cache_') ||
+            k.startsWith('@prayer_week_cache')
+          );
+          if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
+          await AsyncStorage.setItem('@prayer_cache_reset_v2', '1');
+          forceRefresh = true;
+        }
+      } catch (e) {
+        console.warn('Migration v2 failed:', e);
+      }
+
       // Bug 1 fix: Use SettingsContext as source of truth for calculation params
       // Only read notifications from local @prayer_settings storage
       const localNotifSettings = await getPrayerSettings();
@@ -544,6 +599,7 @@ export default function PrayerScreen() {
         adjustments: settings.prayer.adjustments,
       };
       setPrayerSettings(settingsFromStore);
+      console.log(`🕌 [prayer-times] method=${settings.prayer.calculationMethod}, school=${settings.prayer.asrJuristic}, source=app_settings`);
 
       const today = getTodayDateString();
       // Always load location for display
@@ -634,6 +690,13 @@ export default function PrayerScreen() {
       const loc = currentLoc || await fetchLocation();
       if (!loc) throw new Error(t('messages.locationRequired'));
       setLocation(loc);
+      const effectiveSettings = isMakkahFallbackLocation(loc) && settings.prayer.methodManuallySet !== true
+        ? {
+            ...settingsFromStore,
+            calculationMethod: MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod,
+            asrJuristic: MAKKAH_FALLBACK_DEFAULTS.asrSchool,
+          }
+        : settingsFromStore;
 
       // ─── Early network check: skip API when offline ───
       const netState = await NetInfo.fetch();
@@ -661,10 +724,10 @@ export default function PrayerScreen() {
         throw new Error('offline_no_data');
       }
 
-      const response = await fetchPrayerTimes(loc, new Date(), settingsFromStore);
+      const response = await fetchPrayerTimes(loc, new Date(), effectiveSettings);
       let times = parsePrayerTimes(response);
-      times = applyAdjustments(times, settingsFromStore.adjustments);
-      await cachePrayerTimes(today, times, settingsFromStore.calculationMethod, settingsFromStore.asrJuristic);
+      times = applyAdjustments(times, effectiveSettings.adjustments);
+      await cachePrayerTimes(today, times, effectiveSettings.calculationMethod, effectiveSettings.asrJuristic);
       setPrayerTimes(times);
       setDataSource('live');
       setCacheAgeDays(0);
@@ -674,9 +737,9 @@ export default function PrayerScreen() {
       try {
         const { fetchMonthlyPrayerTimes: fetchMonthly } = require('@/lib/prayer-times') as typeof import('@/lib/prayer-times');
         const now = new Date();
-        const monthlyData = await fetchMonthly(loc, now.getMonth() + 1, now.getFullYear(), settingsFromStore);
+        const monthlyData = await fetchMonthly(loc, now.getMonth() + 1, now.getFullYear(), effectiveSettings);
         if (monthlyData?.length) {
-          const weekEntries = buildWeekEntries(monthlyData, settingsFromStore);
+          const weekEntries = buildWeekEntries(monthlyData, effectiveSettings);
           if (weekEntries.length > 0) {
             await cacheWeekPrayerTimes(weekEntries, { latitude: loc.latitude, longitude: loc.longitude });
           }
@@ -738,8 +801,15 @@ export default function PrayerScreen() {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      lastFetchAtRef.current = Date.now();
+      lastFetchDayRef.current = new Date().toDateString();
     }
   };
+
+  // Track last successful fetch so we can force-refresh on long backgrounding
+  // or after a date change (root-cause guard for stale prayer-time displays).
+  const lastFetchAtRef = useRef<number>(0);
+  const lastFetchDayRef = useRef<string>('');
 
   useFocusEffect(useCallback(() => {
     loadPrayerTimes();
@@ -793,6 +863,27 @@ export default function PrayerScreen() {
     return () => unsubscribe();
   }, [dataSource]);
 
+  // Force-refresh on app foreground when cache is older than 6 hours or the
+  // calendar day has rolled over since the last successful fetch. Without this,
+  // a phone left in the pocket for half a day would display yesterday's times
+  // until the user manually pulled to refresh.
+  useEffect(() => {
+    const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state !== 'active') return;
+      const now = Date.now();
+      const ageMs = now - (lastFetchAtRef.current || 0);
+      const today = new Date().toDateString();
+      const dayChanged = lastFetchDayRef.current && lastFetchDayRef.current !== today;
+      if (lastFetchAtRef.current === 0) return; // initial load not done yet
+      if (dayChanged || ageMs > STALE_AFTER_MS) {
+        console.log(`🔄 [prayer-tab] Foreground refresh — ageMs=${ageMs}, dayChanged=${dayChanged}`);
+        loadPrayerTimes(true);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   const onRefresh = useCallback(() => { setIsRefreshing(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadPrayerTimes(true); }, []);
 
   const handleToggleNotification = async (prayer: PrayerName, enabled: boolean) => {
@@ -810,7 +901,7 @@ export default function PrayerScreen() {
   // Method badge: show current calculation method name + mismatch warning
   const [gpsCountryCode, setGpsCountryCode] = useState<string | null>(null);
   useEffect(() => {
-    getUserCountry().then(c => { if (c) setGpsCountryCode(c.toUpperCase()); }).catch(() => {});
+    getSavedUserCountry().then(c => { if (c) setGpsCountryCode(c.toUpperCase()); }).catch(() => {});
   }, []);
   const currentMethodInfo = calculationMethods[settings.prayer.calculationMethod];
   const methodBadgeLabel = currentMethodInfo
@@ -1047,15 +1138,19 @@ export default function PrayerScreen() {
               )}
 
               <Animated.View entering={FadeInDown.delay(300).duration(500)}>
-                <PrayerList prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} notificationSettings={prayerSettings?.notifications} onToggleNotification={handleToggleNotification} showNotificationToggle showSunrise={settings.prayer.showSunrise} show24Hour={settings.prayer.show24Hour} prayerStatuses={(todayPrayer || undefined) as any} onPrayerStatusToggle={(prayer) => {
-                  const key = prayer as 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
-                  const newStatus = todayPrayer?.[key] === 'prayed' ? 'none' : 'prayed';
-                  updatePrayerWithTime(key, newStatus, prayerTimes?.[key] || undefined);
-                  // Track prayer for honor board when marking as prayed
-                  if (newStatus === 'prayed') {
-                    trackPrayer(key, true).catch(() => {});
-                  }
-                }} />
+                <PrayerList prayerTimes={prayerTimes} language={language} isDarkMode={isDarkMode} notificationSettings={prayerSettings?.notifications} onToggleNotification={handleToggleNotification} showNotificationToggle showSunrise={settings.prayer.showSunrise} show24Hour={settings.prayer.show24Hour} prayerStatuses={(todayPrayer || undefined) as any} onPrayerLongPress={openPrayerStatusModal} />
+              </Animated.View>
+
+              {/* Long-press hint banner */}
+              <Animated.View entering={FadeInDown.delay(350).duration(500)} style={[styles.longPressHint, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                {Platform.OS === 'ios' && (
+                  <BlurView intensity={60} tint={(isDarkMode ? 'systemThinMaterialDark' : 'systemThinMaterialLight') as any} style={StyleSheet.absoluteFill} />
+                )}
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(192,123,16,0.14)' }]} />
+                <MaterialCommunityIcons name="gesture-tap-hold" size={18} color="#c07b10" />
+                <Text style={[styles.longPressHintText, { color: colors.glassText, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                  {t('prayer.longPressToTrack')}
+                </Text>
               </Animated.View>
 
               {prayerTimes && (
@@ -1313,6 +1408,47 @@ export default function PrayerScreen() {
             </GlassCard>
           </View>
         </Modal>
+
+        {/* Long-press status modal (mawaqit list → record prayer status) */}
+        <Modal
+          visible={statusModal.visible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setStatusModal({ visible: false, prayer: null, current: 'none' })}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.statusModalBackdrop}
+            onPress={() => setStatusModal({ visible: false, prayer: null, current: 'none' })}
+          >
+            <TouchableOpacity activeOpacity={1} style={[styles.statusModalSheet, { backgroundColor: colors.modalSurface }]} onPress={() => {}}>
+              <View style={[styles.statusModalHandle, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }]} />
+              <Text style={[styles.statusModalTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                {statusModal.prayer ? t(`prayer.${statusModal.prayer}`) : ''}
+              </Text>
+              {PRAYER_STATUS_OPTIONS.map(opt => {
+                const selected = statusModal.current === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    activeOpacity={0.7}
+                    onPress={() => handleSelectPrayerStatus(opt.value)}
+                    style={[
+                      styles.statusOptionRow,
+                      { flexDirection: isRTL ? 'row-reverse' : 'row', backgroundColor: selected ? `${opt.color}1f` : 'transparent', borderWidth: selected ? 1 : 0, borderColor: opt.color },
+                    ]}
+                  >
+                    <MaterialCommunityIcons name={opt.icon} size={24} color={opt.color} />
+                    <Text style={[styles.statusOptionLabel, { color: opt.color, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+                      {t(opt.labelKey)}
+                    </Text>
+                    {selected && <MaterialCommunityIcons name="check" size={20} color={opt.color} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
       </SafeAreaView>
     </BackgroundWrapper>
   );
@@ -1343,6 +1479,15 @@ const _styles = StyleSheet.create({
   circularContainer: { paddingVertical: 30 },
   lastThirdBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a237e', marginHorizontal: 16, marginVertical: 10, padding: 15, borderRadius: 12, gap: Spacing.sm },
   lastThirdText: { flex: 1, fontSize: 14, fontFamily: fontMedium(), color: '#fff', lineHeight: 24, includeFontPadding: false },
+  longPressHint: { alignItems: 'center', marginHorizontal: 16, marginTop: 8, marginBottom: 4, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, overflow: 'hidden', gap: 8, borderWidth: 1, borderColor: 'rgba(192,123,16,0.32)' },
+  longPressHintText: { flex: 1, fontSize: 13, fontFamily: fontMedium(), lineHeight: 20, includeFontPadding: false },
+  // Status modal (long-press → choose status)
+  statusModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  statusModalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
+  statusModalHandle: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, marginBottom: 14, opacity: 0.6 },
+  statusModalTitle: { fontSize: 17, fontFamily: fontBold(), marginBottom: 16 },
+  statusOptionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 14, gap: 14, marginBottom: 6 },
+  statusOptionLabel: { flex: 1, fontSize: 16, fontFamily: fontSemiBold() },
   extraInfo: { marginHorizontal: 16, marginVertical: 10, padding: 20, borderRadius: 20, overflow: 'hidden' },
   extraTitle: { fontSize: 16, fontFamily: fontBold(), marginBottom: 15, lineHeight: 28, includeFontPadding: false },
   extraRow: { flexDirection: 'row', justifyContent: 'space-around' },

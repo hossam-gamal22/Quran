@@ -30,13 +30,13 @@ describe('Quran API Utils', () => {
   });
 
   it('should generate correct ayah audio URL', () => {
-    const url = getAyahAudioUrl(1, 1, 'ar.alafasy');
+    const url = getAyahAudioUrl(1, 1, 'mishary_alafasy');
     expect(url).toBe('https://cdn.islamic.network/quran/audio/128/ar.alafasy/1.mp3');
   });
 
   it('should generate correct surah audio URL', () => {
-    const url = getSurahAudioUrl(1, 'ar.alafasy');
-    expect(url).toBe('https://cdn.islamic.network/quran/audio-surah/128/ar.alafasy/1.mp3');
+    const url = getSurahAudioUrl(1, 'mishary_alafasy');
+    expect(url).toBe('https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/001.mp3');
   });
 });
 

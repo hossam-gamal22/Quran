@@ -1,5 +1,6 @@
 // contexts/QuranContext.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   initializeQuranCache, 
   CachedSurah, 
@@ -8,7 +9,19 @@ import {
   fetchAndCacheSurahsList,
 } from '@/lib/quran-cache';
 import { audioPlayer, PlaybackState } from '@/lib/audio-player';
+import { DEFAULT_RECITER_ID, RECITERS_BY_ID, LEGACY_RECITER_ID_MAP, hasPerAyahSync } from '@/lib/reciters-registry';
 import { t } from '@/lib/i18n';
+
+const RECITER_STORAGE_KEY = '@quran_current_reciter';
+
+function migrateReciterId(stored: string | null | undefined): string {
+  if (!stored) return DEFAULT_RECITER_ID;
+  const candidate = RECITERS_BY_ID[stored] ? stored : (LEGACY_RECITER_ID_MAP[stored] ?? DEFAULT_RECITER_ID);
+  // The Mushaf reader requires per-ayah sync (timestamps). If the persisted
+  // reciter no longer supports it (e.g. we removed their quranCdnId), fall
+  // back to the default sync-capable reciter so the ▶ button works.
+  return hasPerAyahSync(candidate) ? candidate : DEFAULT_RECITER_ID;
+}
 
 interface QuranContextType {
   // البيانات
@@ -42,7 +55,23 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playbackState, setPlaybackState] = useState<PlaybackState>(audioPlayer.getState());
-  const [currentReciter, setCurrentReciter] = useState('ar.alafasy');
+  const [currentReciter, setCurrentReciter] = useState<string>(DEFAULT_RECITER_ID);
+
+  // Load saved reciter (with legacy id migration) on first mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(RECITER_STORAGE_KEY);
+        const migrated = migrateReciterId(saved);
+        setCurrentReciter(migrated);
+        if (saved !== migrated) {
+          await AsyncStorage.setItem(RECITER_STORAGE_KEY, migrated).catch(() => {});
+        }
+      } catch (e) {
+        console.warn('Failed to load saved reciter, using default:', e);
+      }
+    })();
+  }, []);
 
   // تحميل البيانات عند بدء التطبيق
   useEffect(() => {
@@ -96,11 +125,13 @@ export function QuranProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setReciter = useCallback((identifier: string) => {
-    setCurrentReciter(identifier);
+    const safe = RECITERS_BY_ID[identifier] ? identifier : migrateReciterId(identifier);
+    setCurrentReciter(safe);
+    AsyncStorage.setItem(RECITER_STORAGE_KEY, safe).catch(() => {});
     // If audio is currently playing, restart with the new reciter
     const state = audioPlayer.getState();
     if (state.isPlaying && state.currentSurah > 0) {
-      audioPlayer.playAyah(state.currentSurah, state.currentAyah, identifier, true);
+      audioPlayer.playAyah(state.currentSurah, state.currentAyah, safe, true);
     }
   }, []);
 

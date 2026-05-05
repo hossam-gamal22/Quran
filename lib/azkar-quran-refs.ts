@@ -49,6 +49,9 @@ export const AZKAR_QURAN_REFS: Record<number, QuranRef[]> = {
   // Sleep: Al-Baqarah 285-286
   47: [{ surah: 2, startAyah: 285, endAyah: 286 }],
 
+  // Evening: Al-Baqarah 285-286 (آخر آيتين من سورة البقرة)
+  200: [{ surah: 2, startAyah: 285, endAyah: 286 }],
+
   // Sleep: Al-Imran reference only (Sajdah + Mulk)
   56: [
     { surah: 32, startAyah: 1, endAyah: 3 },

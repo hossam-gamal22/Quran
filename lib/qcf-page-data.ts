@@ -334,6 +334,27 @@ export function getVerseQcfData(
   return glyphs.length > 0 ? { page, glyphs } : null;
 }
 
+/**
+ * Get QCF word glyphs for an entire Mushaf page.
+ * Returns concatenated glyphs from every ayah line on the page (skips
+ * surah-name and basmala lines, same convention as getVerseQcfData).
+ */
+export function getPageQcfData(
+  page: number,
+): { page: number; glyphs: string[] } | null {
+  if (page < 1 || page > 604) return null;
+  const lines = getPageLines(page);
+  const glyphs: string[] = [];
+  for (const line of lines) {
+    if (line.lt !== 'ayah' || !line.fw || !line.lw) continue;
+    for (let id = line.fw; id <= line.lw; id++) {
+      const w = words[String(id)];
+      if (w) glyphs.push(w.t);
+    }
+  }
+  return glyphs.length > 0 ? { page, glyphs } : null;
+}
+
 /** Font size helper — QPC V2 fonts from Tarteel CDN */
 export function getQcfFontSize(page: number, screenWidth: number, adjustment: number = 0): number {
   const baseFontSize = 23.55;

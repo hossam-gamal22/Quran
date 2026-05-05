@@ -1134,7 +1134,7 @@ export default function TasbihScreen() {
       {/* ===== TASBIH LIST MODAL ===== */}
       <Modal visible={showTasbihList} animationType="slide" transparent onRequestClose={() => setShowTasbihList(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+          <View style={[s.modalSheet, { backgroundColor: colors.modalSurface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.selectDhikr')}</Text>
               <TouchableOpacity onPress={() => setShowTasbihList(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
@@ -1271,7 +1271,7 @@ export default function TasbihScreen() {
       {/* ===== SETTINGS MODAL ===== */}
       <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { height: 'auto', backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+          <View style={[s.modalSheet, { height: 'auto', backgroundColor: colors.modalSurface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('common.settings')}</Text>
               <TouchableOpacity onPress={() => { saveSettings(); setShowSettings(false); }} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>
@@ -1292,7 +1292,7 @@ export default function TasbihScreen() {
       {/* ===== STATS MODAL ===== */}
       <Modal visible={showStatsModal} animationType="slide" transparent onRequestClose={() => setShowStatsModal(false)}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalSheet, { backgroundColor: colors.cardSolid, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+          <View style={[s.modalSheet, { backgroundColor: colors.modalSurface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={[s.modalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <Text style={[s.modalTitle, { color: C.text }]}>{t('tasbih.myStats')}</Text>
               <TouchableOpacity onPress={() => setShowStatsModal(false)} style={[s.closeBtn, { backgroundColor: 'rgba(34, 197, 94, 0.15)' }]}>

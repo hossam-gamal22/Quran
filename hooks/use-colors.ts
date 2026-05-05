@@ -32,11 +32,31 @@ const DarkColorsExtended = {
 export function useColors() {
   const { isDarkMode, settings } = useSettings();
   const { themeConfig } = useThemeConfig();
-  
+
   // Merge: hardcoded defaults → admin Firestore overrides
   const adminOverrides = isDarkMode ? themeConfig?.dark : themeConfig?.light;
   const baseColors = isDarkMode ? DarkColorsExtended : LightColors;
-  const colors = adminOverrides ? { ...baseColors, ...adminOverrides } : baseColors;
+  // Sanitize admin overrides: an admin can accidentally publish an unusable
+  // brand color (e.g. primary = "#FFFFFF" in light mode, primary = "#d6d6d6"
+  // in dark mode). Such values destroy contrast on every CTA / active tab /
+  // accent in the app. Reject overrides that are too extreme and keep the
+  // hardcoded brand green instead.
+  const sanitizedOverrides = (() => {
+    if (!adminOverrides) return adminOverrides;
+    const out: any = { ...adminOverrides };
+    const primary = (adminOverrides as any).primary as string | undefined;
+    if (primary) {
+      const lum = getLuminance(primary);
+      // In dark mode reject very-light primaries (would look like a white pill).
+      // In light mode reject very-light primaries (would vanish on white surfaces).
+      // Always reject pitch black (would vanish in dark mode).
+      if (lum > 0.7 || lum < 0.03) {
+        delete out.primary;
+      }
+    }
+    return out;
+  })();
+  const colors = sanitizedOverrides ? { ...baseColors, ...sanitizedOverrides } : baseColors;
 
   // Override text colors when a background is active
   const appBg = settings.display.appBackground;
@@ -171,6 +191,8 @@ export function useColors() {
     card,
     /** Semi-transparent card bg for components that NEED a visible background (headers, search bars, modals) */
     cardSolid,
+    /** Guaranteed FULLY OPAQUE surface for modals/bottom sheets — never affected by app background overrides */
+    modalSurface: colors.card,
     /** Elevation override: 0 on Android when bg override is active, undefined otherwise */
     cardElevation: cardElevation as number | undefined,
     icon,

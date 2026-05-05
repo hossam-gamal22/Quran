@@ -53,9 +53,20 @@ export async function handleDidYouPrayResponse(
   response: Notifications.NotificationResponse,
 ): Promise<boolean> {
   const data = response.notification.request.content.data;
-  if (!data || data.type !== 'did_you_pray') return false;
+  // Handle action buttons on either:
+  //   • the dedicated did_you_pray follow-up notification (Android), OR
+  //   • the prayer notification itself when it carries the did_you_pray category (iOS).
+  if (!data) return false;
+  const isDidYouPray = data.type === 'did_you_pray';
+  const isPrayerWithActions = data.type === 'prayer' && !!data.prayer;
+  if (!isDidYouPray && !isPrayerWithActions) return false;
 
   const action = response.actionIdentifier;
+  // Only consume the response when the user actually tapped one of our action buttons.
+  // Default tap (open app) is left for downstream listeners to route normally.
+  if (action !== DID_YOU_PRAY_ACTION_PRAYED && action !== DID_YOU_PRAY_ACTION_WILL_PRAY) {
+    return false;
+  }
   const prayer = toPrayerName(data.prayer);
   if (!prayer) return false;
 

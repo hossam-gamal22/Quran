@@ -21,7 +21,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 export default function AppSettingsScreen() {
   const [settings, setSettings] = useState<AppSettings>({
     appName: 'رُوح المسلم',
-    appVersion: '1.2.0',
+    appVersion: '1.2.1',
     maintenanceMode: false,
     maintenanceMessage: t('admin.defaultMaintenanceMsg'),
     forceUpdate: false,

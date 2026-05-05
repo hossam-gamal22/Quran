@@ -18,7 +18,10 @@ export interface QuranTheme {
 }
 
 // 17 ثيم من تطبيق Skoon
-let QURAN_THEMES: QuranTheme[] = [
+// NOTE: Declared as `const` and mutated in-place via setQuranThemes() so that
+// consumers using `import { QURAN_THEMES }` always see the updated array
+// (avoids ES module live-binding issues after Babel/Metro CJS transform).
+const QURAN_THEMES: QuranTheme[] = [
   // 0 — كلاسيك (الافتراضي) ✓ contrast OK
   { primary: '#1A1000', background: '#FFF8F0', secondary: '#6B4E2A', highlight: '#FFC936' },
   // 1 — أخضر طبيعي ✓ contrast OK
@@ -57,9 +60,30 @@ let QURAN_THEMES: QuranTheme[] = [
 
 export { QURAN_THEMES };
 
-/** Override themes with admin-managed data from Firestore */
+const HEX_COLOR_RE = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+function isValidTheme(t: any): t is QuranTheme {
+  return (
+    !!t &&
+    typeof t === 'object' &&
+    typeof t.background === 'string' && HEX_COLOR_RE.test(t.background) &&
+    typeof t.primary === 'string' && HEX_COLOR_RE.test(t.primary) &&
+    typeof t.secondary === 'string' && HEX_COLOR_RE.test(t.secondary) &&
+    typeof t.highlight === 'string' && HEX_COLOR_RE.test(t.highlight)
+  );
+}
+
+/**
+ * Override themes with admin-managed data from Firestore.
+ * Mutates the exported array in-place so all consumers see the update.
+ * Invalid entries (missing/malformed colors) are filtered out to avoid
+ * rendering invisible cards in the theme picker.
+ */
 export function setQuranThemes(themes: QuranTheme[]) {
-  if (themes.length > 0) QURAN_THEMES = themes;
+  if (!Array.isArray(themes)) return;
+  const valid = themes.filter(isValidTheme);
+  if (valid.length === 0) return; // keep defaults if admin data is unusable
+  QURAN_THEMES.splice(0, QURAN_THEMES.length, ...valid);
 }
 
 /** Get the total number of available themes (may change after admin edits) */

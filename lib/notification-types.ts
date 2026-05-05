@@ -8,6 +8,7 @@ export interface NotificationSettings {
   adhanSound: boolean;
   adhanSoundType?: string;
   soundType?: string;
+  useFullAdhan?: boolean;
   iosScheduleDays?: number; // Dynamic iOS budget — overrides PRAYER_SCHEDULE_DAYS on iOS
   // "هل صليت؟" follow-up reminder
   didYouPrayReminder?: boolean;          // default: true
@@ -28,6 +29,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   advanceMinutes: 0,
   adhanSound: false,
   adhanSoundType: 'makkah',
+  useFullAdhan: false,
   didYouPrayReminder: true,
   didYouPrayDelayMinutes: 30,
   didYouPraySnoozeMinutes: 15,

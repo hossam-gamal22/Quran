@@ -64,94 +64,63 @@ function calculateIosBudget(params: {
   kahfEnabled: boolean;
   worshipWeeklyEnabled: boolean;
 }): IosBudgetAllocation {
-  const IOS_MAX = 64;
+  // ─── iOS 3-day cap strategy ─────────────────────────────────────────────
+  // The 64-notification hard limit + the now-inline did-you-pray action buttons
+  // on the prayer notification itself (no separate follow-ups scheduled on iOS,
+  // see lib/prayer-notifications.ts) make the previous "up to 7 days" allocator
+  // unnecessary. We now schedule a tight 3-day window on iOS and rely on the
+  // refresh reminder + foreground reschedule to roll the window forward.
+  //
+  // Worst-case worked example (all reminders enabled, 1 time/day per reminder):
+  //   prayer 5 × 3      = 15
+  //   morning 1 × 3     = 3
+  //   evening 1 × 3     = 3
+  //   sleep 1 × 3       = 3
+  //   wakeup 1 × 3      = 3
+  //   verse 1 × 3       = 3
+  //   salawat 1 × 3     = 3
+  //   tasbih 1 × 3      = 3
+  //   istighfar 1 × 3   = 3
+  //   custom 1 × 3      = 3
+  //   quran 1 × 3       = 3
+  //   worship daily 1×3 = 3
+  //   refresh           = 1
+  //   kahf              = 2
+  //   weekly            = 2
+  //   ─────────────────────
+  //   TOTAL             = 53 / 64 ✅ (11-slot safety margin)
+  const IOS_PRAYER_DAYS = 3;
+  const IOS_AFTER_PRAYER_DAYS = 0; // retired on iOS — handled by inline action buttons
+  const IOS_AZKAR_DAYS = 3;
+  const IOS_OTHER_DAYS = 3;
+  // Refresh fires day 2 from today (= calendar day 3 with today=day 1) at 8 PM,
+  // nudging the user to open the app before the 3-day window expires.
+  const IOS_REFRESH_DAY = 2;
+
   const fixedSlots = 1 /* refresh */
     + (params.kahfEnabled ? 2 : 0)
     + (params.worshipWeeklyEnabled ? 2 : 0);
-  let remaining = IOS_MAX - fixedSlots;
-
   const prayerCost = params.prayer ? 5 : 0;
-  const afterPrayerCost = params.afterPrayer ? 5 : 0;
   const azkarCost = params.azkarTimesPerDay;
   const otherCost = params.otherTimesPerDay;
+  const used =
+    IOS_PRAYER_DAYS * prayerCost +
+    IOS_AZKAR_DAYS * azkarCost +
+    IOS_OTHER_DAYS * otherCost +
+    fixedSlots;
 
-  // Nothing enabled → max days for everything
-  if (prayerCost + afterPrayerCost + azkarCost + otherCost === 0) {
-    return { prayerDays: 7, afterPrayerDays: 7, azkarDays: 7, otherDays: 7, refreshDay: 6 };
-  }
-
-  // Step 1: Reserve minimum for each active tier
-  const prayerMin = prayerCost > 0 ? 3 : 0;
-  const afterPrayerMin = afterPrayerCost > 0 ? 1 : 0;
-  const azkarMin = azkarCost > 0 ? 1 : 0;
-  const otherMin = otherCost > 0 ? 1 : 0;
-
-  let prayerDays = prayerMin;
-  let afterPrayerDays = afterPrayerMin;
-  let azkarDays = azkarMin;
-  let otherDays = otherMin;
-
-  const minCost = prayerMin * prayerCost + afterPrayerMin * afterPrayerCost
-    + azkarMin * azkarCost + otherMin * otherCost;
-
-  // If minimums already exceed budget, do best-effort
-  if (minCost > remaining) {
-    // Give prayer whatever fits, others get 1 day if possible
-    const otherReserve = afterPrayerMin * afterPrayerCost + azkarMin * azkarCost + otherMin * otherCost;
-    prayerDays = prayerCost > 0 ? Math.max(1, Math.floor((remaining - otherReserve) / prayerCost)) : 0;
-    remaining -= prayerDays * prayerCost + afterPrayerDays * afterPrayerCost
-      + azkarDays * azkarCost + otherDays * otherCost;
-  } else {
-    remaining -= minCost;
-  }
-
-  // Step 2: Distribute surplus — prayer first (highest priority)
-  if (prayerCost > 0 && remaining > 0) {
-    const extra = Math.min(7 - prayerDays, Math.floor(remaining / prayerCost));
-    prayerDays += extra;
-    remaining -= extra * prayerCost;
-  }
-
-  // After-prayer follows prayer (capped at prayer days)
-  if (afterPrayerCost > 0 && remaining > 0) {
-    const extra = Math.min(prayerDays - afterPrayerDays, Math.floor(remaining / afterPrayerCost));
-    afterPrayerDays += extra;
-    remaining -= extra * afterPrayerCost;
-  }
-
-  // Azkar
-  if (azkarCost > 0 && remaining > 0) {
-    const extra = Math.min(7 - azkarDays, Math.floor(remaining / azkarCost));
-    azkarDays += extra;
-    remaining -= extra * azkarCost;
-  }
-
-  // Other
-  if (otherCost > 0 && remaining > 0) {
-    const extra = Math.min(7 - otherDays, Math.floor(remaining / otherCost));
-    otherDays += extra;
-    remaining -= extra * otherCost;
-  }
-
-  // Refresh fires 2 days before shortest window expires (minimum day 1)
-  // Extra day gives user more buffer before notifications expire
-  const allWindows = [
-    ...(prayerDays > 0 ? [prayerDays] : []),
-    ...(afterPrayerDays > 0 ? [afterPrayerDays] : []),
-    ...(azkarDays > 0 ? [azkarDays] : []),
-    ...(otherDays > 0 ? [otherDays] : []),
-  ];
-  const shortest = allWindows.length > 0 ? Math.min(...allWindows) : 7;
-  const refreshDay = Math.max(1, shortest - 2);
-
-  const used = prayerDays * prayerCost + afterPrayerDays * afterPrayerCost
-    + azkarDays * azkarCost + otherDays * otherCost + fixedSlots;
   console.log(
-    `📊 [iOS Budget] prayer=${prayerDays}d after=${afterPrayerDays}d azkar=${azkarDays}d other=${otherDays}d | ` +
-    `${used}/${IOS_MAX} slots | refresh=day${refreshDay}`
+    `📊 [iOS Budget] prayer=${IOS_PRAYER_DAYS}d afterPrayer=inline azkar=${IOS_AZKAR_DAYS}d other=${IOS_OTHER_DAYS}d | ` +
+    `${used}/64 slots | refresh=day+${IOS_REFRESH_DAY}`
   );
 
-  return { prayerDays, afterPrayerDays, azkarDays, otherDays, refreshDay };
+  return {
+    prayerDays: IOS_PRAYER_DAYS,
+    afterPrayerDays: IOS_AFTER_PRAYER_DAYS,
+    azkarDays: IOS_AZKAR_DAYS,
+    otherDays: IOS_OTHER_DAYS,
+    refreshDay: IOS_REFRESH_DAY,
+  };
 }
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
@@ -321,6 +290,7 @@ export async function scheduleWirdNotifications(
         data: { type: 'wird', period: 'morning', soundType, iconType: 'morning' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && morningAttachments && { attachments: morningAttachments }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -345,6 +315,7 @@ export async function scheduleWirdNotifications(
         data: { type: 'wird', period: 'evening', soundType, iconType: 'evening' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && eveningAttachments && { attachments: eveningAttachments }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -400,6 +371,7 @@ export async function scheduleDailyAyahNotification(
         data: { type: 'daily_ayah', soundType: verseSound, iconType: 'quran' },
         ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
         ...(Platform.OS === 'ios' && quranAttachments && { attachments: quranAttachments }),
+        ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
@@ -557,7 +529,7 @@ export async function scheduleKahfReminder(): Promise<void> {
     // First ayah of Surah Al-Kahf (18:1) - Arabic text for notification body
     const KAHF_FIRST_AYAH_TEXT = 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ';
     const KAHF_FIRST_AYAH_GLOBAL = 2141;
-    const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
+    const kahfAyahAudioUrl = getAyahAudioUrl('mishary_alafasy', KAHF_FIRST_AYAH_GLOBAL);
     const kahfSoundType = 'notif_kahf';
     const kahfChannelId = getReminderChannelId(kahfSoundType);
 
@@ -592,6 +564,7 @@ export async function scheduleKahfReminder(): Promise<void> {
           },
           ...(Platform.OS === 'android' && { channelId: kahfChannelId }),
           ...(Platform.OS === 'ios' && kahfAttachments && { attachments: kahfAttachments }),
+          ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -637,6 +610,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   // Sound type selections
   soundType?: string;
   adhanSoundType?: string;
+  useFullAdhan?: boolean;
   // Per-category sound types for foreground playback
   azkarSoundType?: string;
   dailyVerseSoundType?: string;
@@ -679,6 +653,10 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   // Friday Surah Al-Kahf reminder
   kahfReminder?: boolean;
   kahfTime?: string;
+  // Per-category sound overrides for hardcoded reminders
+  sleepSoundType?: string;
+  wakeupSoundType?: string;
+  kahfSoundType?: string;
   // Multi-time scheduling (up to 3 times per category)
   morningAzkarTimes?: string[];
   eveningAzkarTimes?: string[];
@@ -951,6 +929,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       advanceMinutes: notifSettings.prayerReminder ? notifSettings.reminderMinutes : 0,
       adhanSound: notifSettings.sound,
       adhanSoundType: adhanSound,
+      useFullAdhan: notifSettings.useFullAdhan === true,
       soundType: generalSound,
       didYouPrayReminder: notifSettings.didYouPrayReminder,
       didYouPrayDelayMinutes: notifSettings.didYouPrayDelayMinutes,
@@ -1014,7 +993,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     if (notifSettings.sleepAzkar) {
       const sleepTimes = clampTimes(getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00'), 'sleep');
       const sleepText = getNotifText('sleep', t('notifications.sleepAzkarTitle'), t('notifications.sleepAzkarBody'), lang);
-      const sleepSound = 'notif_sleep';
+      const sleepSound = notifSettings.sleepSoundType || 'notif_sleep';
       await scheduleMultiTime(
         'wird_sleep',
         {
@@ -1035,7 +1014,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
     if (notifSettings.wakeupAzkar) {
       const wakeupTimes = clampTimes(getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00'), 'wakeup');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
-      const wakeupSound = 'notif_wakeup';
+      const wakeupSound = notifSettings.wakeupSoundType || 'notif_wakeup';
       await scheduleMultiTime(
         'wird_wakeup',
         {
@@ -1308,7 +1287,7 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             content: {
               title: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).title),
               body: dirText(getNotifText('worship_weekly', t('settings.worshipWeeklyReportTitle'), t('settings.worshipWeeklyReportBody'), lang).body),
-              sound: 'default',
+              sound: resolveNotificationSound('general_reminder', true),
               data: { type: 'worship_weekly', iconType: 'reminder' },
               ...(Platform.OS === 'android' && { channelId: worshipWeeklyChannelId }),
               ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
@@ -1393,8 +1372,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
       // First ayah of Surah Al-Kahf (18:1) - Arabic text for notification body
       const KAHF_FIRST_AYAH_TEXT = 'الْحَمْدُ لِلَّهِ الَّذِي أَنزَلَ عَلَىٰ عَبْدِهِ الْكِتَابَ وَلَمْ يَجْعَل لَّهُ عِوَجًا ۜ';
       const KAHF_FIRST_AYAH_GLOBAL = 2141;
-      const kahfAyahAudioUrl = getAyahAudioUrl('ar.alafasy', KAHF_FIRST_AYAH_GLOBAL);
-      const kahfSoundType = notifSettings.soundType || 'notif_kahf';
+      const kahfAyahAudioUrl = getAyahAudioUrl('mishary_alafasy', KAHF_FIRST_AYAH_GLOBAL);
+      const kahfSoundType = notifSettings.kahfSoundType || 'notif_kahf';
       const kahfChannelId = getReminderChannelId(kahfSoundType);
 
       const kahfAttachments = await getNotificationIconAttachment('quran');
@@ -1592,7 +1571,7 @@ export async function scheduleRefreshReminder(): Promise<void> {
       content: {
         title: dirText(t('notifications.refreshReminderTitle')),
         body: dirText(body),
-        sound: 'default',
+        sound: resolveNotificationSound('general_reminder', true),
         data: { type: 'refresh_reminder' },
         ...(Platform.OS === 'android' && { channelId: 'general' }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
@@ -1811,6 +1790,14 @@ export async function sendTestNotification(
   const rawSoundType = isAdhan
     ? (opts.adhanSoundType || 'makkah')
     : (opts.soundType || 'general_reminder');
+  // Layer 2 safety net: always play short adhan via system notification.
+  // Patched expo-notifications additionally starts AdhanPlaybackService when
+  // androidFullAdhan='true' so the full recording plays via STREAM_ALARM.
+  const shouldUseAndroidFullAdhan =
+    Platform.OS === 'android' &&
+    isAdhan &&
+    opts.sound !== false &&
+    rawSoundType !== 'silent';
 
   const resolvedChannelId = isAdhan
     ? getAdhanChannelId(rawSoundType)
@@ -1830,7 +1817,13 @@ export async function sendTestNotification(
       title: dirText(t(meta.titleKey)),
       body: dirText(t(meta.bodyKey)),
       sound: soundValue,
-      data: { type: 'test', category: categoryId, iconType: meta.iconType },
+      data: {
+        type: shouldUseAndroidFullAdhan ? 'prayer' : 'test',
+        category: categoryId,
+        iconType: meta.iconType,
+        soundType: rawSoundType,
+        ...(shouldUseAndroidFullAdhan && { androidFullAdhan: 'true' }),
+      },
       ...(Platform.OS === 'android' && { channelId: resolvedChannelId }),
       ...(Platform.OS === 'android' && { priority: Notifications.AndroidNotificationPriority.MAX }),
       ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),

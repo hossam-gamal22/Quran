@@ -12,6 +12,8 @@ const SOUND_FILES: Record<string, string> = {
   salawat: 'salawat.mp3',
   istighfar: 'istighfar.mp3',
   tasbih: 'tasbih.mp3',
+  notif_khatma: 'notif_khatma.mp3',
+  notif_verse: 'notif_verse.mp3',
 };
 
 /**
@@ -128,7 +130,7 @@ export const scheduleKhatmaReminder = async (khatma: Khatma): Promise<string | n
     const minutes = Number.isFinite(parts[1]) && parts[1] >= 0 && parts[1] <= 59 ? parts[1] : 0;
 
     // Schedule daily notification with proper sound resolution
-    const khatmaSoundKey = 'notif_verse';
+    const khatmaSoundKey = 'notif_khatma';
     const soundValue = resolveKhatmaSound(khatmaSoundKey, true);
     
     const notificationId = await Notifications.scheduleNotificationAsync({

@@ -6,32 +6,88 @@ const BG_CACHE_CLEARED_KEY = '@bg_cache_cleared_v2';
 
 // Keys to preserve across cache clears
 const PRESERVED_KEYS = [
+  // App / system
   '@app_version',
   '@app_theme',
+  '@app_icon_variant',
   '@language',
+  '@app_language',
   '@user_settings',
   '@user_token',
+  'app_settings',
+
+  // Onboarding
   '@onboarding_completed',
   'onboarding_complete',
+
+  // Notifications & prayer
   '@notification_settings',
   '@prayer_notification_settings',
+  '@prayer_settings',
   '@prayer_location',
   '@calculation_method',
   '@hijri_date_offset',
+  '@hide_next_prayer_alert',
+
+  // Custom user content
   '@custom_tasbihat',
   '@custom_dhikr',
+  'custom_adhkar',
+
+  // Quran
   '@quran_bookmarks',
   '@quran_last_read',
+  'quran_last_page',
+  '@quran_tracked_pages_khatma',
+
+  // Favorites (المحفوظات) — all stores
   '@favorites',
+  '@favorites_all',
+  '@unified_favorites',
+  '@azkar_favorites',
+  '@recitation_favs',
+  'allah_names_favorites',
+  'allah_names_favorites_migrated_v2',
+
+  // Khatma & worship
   '@khatma_data',
   '@worship_data',
-  '@quran_tracked_pages_khatma',
-  // User identity & score — must never be cleared on update
+  '@rooh_muslim_khatmas',
+
+  // Tasbih
+  'tasbih_data',
+  'tasbih_type_stats',
+  '@tasbih_daily_history',
+
+  // Home customization
+  '@quick_access_items',
+  '@quick_access_customized',
+  '@quick_access_custom_items',
+
+  // Adhkar UI prefs
+  'azkar_show_translation',
+  'azkar_show_transliteration',
+  'azkar_view_mode',
+  'azkar_recent_searches',
+
+  // Share / export prefs
+  '@shareable_card_preferences',
+  '@share_preferences',
+  '@pdf_template',
+
+  // Backup
+  'last_backup_date',
+
+  // User identity, stats & rewards — must never be cleared on update
   '@rooh_user_id',
   '@rooh_display_name',
   '@rooh_user_id_override',
+  '@rooh_local_stats',
   '@pending_monthly_scores',
   '@rewards_config_cache',
+
+  // Subscription / premium — must never be cleared on update
+  '@subscription_state',
 ];
 
 const PRESERVED_PREFIXES = [
@@ -39,8 +95,15 @@ const PRESERVED_PREFIXES = [
   '@khatma_',
   '@bookmark_',
   '@favorite_',
+  '@favorites_',
   '@reward_applied_',
   '@winners_processed_',
+  '@tasbih_',
+  '@quran_',
+  '@azkar_',
+  '@adhkar_',
+  '@user_',
+  '@rooh_',
 ];
 
 // Prefixes for background-related caches that MUST be cleared
@@ -107,7 +170,7 @@ export async function checkAndClearCacheOnUpdate(): Promise<boolean> {
     // Always clear stale background caches (one-time migration)
     await clearBackgroundCaches();
 
-    const currentVersion = Constants.expoConfig?.version || '1.2.0';
+    const currentVersion = Constants.expoConfig?.version || '1.2.1';
     const storedVersion = await AsyncStorage.getItem(VERSION_KEY);
 
     if (storedVersion !== currentVersion) {

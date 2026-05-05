@@ -596,10 +596,14 @@ export default function StoryOfDayScreen() {
         // Also populate playback cache so future visits don't re-download
         cacheVideoFile(rawVideoUrl).catch(() => {});
       }
-      const perm = await MediaLibrary.requestPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert('', t('storyOfDay.photoPermissionRequired'));
-        return;
+      // Android: scoped storage allows app-generated writes without runtime permission.
+      // iOS: still requires Photo Library Add permission.
+      if (Platform.OS === 'ios') {
+        const perm = await MediaLibrary.requestPermissionsAsync();
+        if (!perm.granted) {
+          Alert.alert('', t('storyOfDay.photoPermissionRequired'));
+          return;
+        }
       }
       await MediaLibrary.saveToLibraryAsync(saveUri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

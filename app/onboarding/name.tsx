@@ -1,7 +1,7 @@
 // app/onboarding/name.tsx
 // شاشة إدخال اسم المستخدم — روح المسلم
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,7 +27,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 
 export default function NameScreen() {
-  const { goToNextStep, goToPreviousStep, updatePreferences } = useOnboarding();
+  const { goToNextStep, goToPreviousStep, updatePreferences, preferences, skippedToNameStep } = useOnboarding();
   const isRTL = checkIsRTL();
   const colors = useColors();
   const styles = useScaledStyles(_styles, colors.fs);
@@ -34,19 +35,48 @@ export default function NameScreen() {
   const [lastName, setLastName] = useState('');
   const [error, setError] = useState('');
 
+  // Pre-fill from preferences (back-nav) or restored AsyncStorage name (server fallback)
+  useEffect(() => {
+    const seed = (full: string) => {
+      const trimmed = full.trim();
+      if (!trimmed) return;
+      const idx = trimmed.indexOf(' ');
+      if (idx === -1) {
+        setFirstName(trimmed);
+      } else {
+        setFirstName(trimmed.slice(0, idx));
+        setLastName(trimmed.slice(idx + 1).trim());
+      }
+    };
+    if (preferences.displayName && preferences.displayName.trim()) {
+      seed(preferences.displayName);
+      return;
+    }
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@rooh_display_name');
+        if (stored) seed(stored);
+      } catch {
+        // silent
+      }
+    })();
+  }, []);
+
   const handleContinue = () => {
     const trimFirst = firstName.trim();
     const trimLast = lastName.trim();
 
-    if (!trimFirst || !trimLast) {
-      setError(tOnboarding('nameRequired'));
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
+    // Name is optional (Apple 5.1.1(v) compliance) — proceed even when blank.
+    const parts = [trimFirst, trimLast].filter(Boolean);
+    if (parts.length > 0) {
+      updatePreferences({ displayName: parts.join(' ') });
     }
-
-    const displayName = `${trimFirst} ${trimLast}`;
-    updatePreferences({ displayName });
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    goToNextStep();
+  };
+
+  const handleSkip = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     goToNextStep();
   };
 
@@ -57,24 +87,30 @@ export default function NameScreen() {
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           {/* Header */}
           <View style={[styles.header, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                goToPreviousStep();
-              }}
-            >
-              <MaterialCommunityIcons
-                name={isRTL ? 'arrow-right' : 'arrow-left'}
-                size={24}
-                color="#fff"
-              />
-            </TouchableOpacity>
+            {skippedToNameStep ? (
+              <View style={styles.backButton} />
+            ) : (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  goToPreviousStep();
+                }}
+              >
+                <MaterialCommunityIcons
+                  name={isRTL ? 'arrow-right' : 'arrow-left'}
+                  size={24}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            )}
             <View style={styles.headerContent}>
               <Text style={styles.stepText}>{tOnboardingStep(4, 6)}</Text>
               <Text style={styles.headerTitle}>{tOnboarding('nameTitle')}</Text>
             </View>
-            <View style={styles.skipBtn} />
+            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+              <Text style={styles.skipBtnText}>{tOnboarding('skip')}</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Progress */}
@@ -160,7 +196,7 @@ export default function NameScreen() {
           <SafeAreaView edges={['bottom']} style={styles.bottomContainer}>
             <Animated.View entering={FadeInUp.delay(600).duration(500)}>
               <TouchableOpacity
-                style={[styles.continueButton, (!firstName.trim() || !lastName.trim()) && styles.continueButtonDisabled]}
+                style={styles.continueButton}
                 onPress={handleContinue}
                 activeOpacity={0.8}
               >
@@ -225,6 +261,11 @@ const _styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   skipText: {
+    fontSize: 16,
+    fontFamily: fontMedium(),
+    color: 'rgba(255,255,255,0.7)',
+  },
+  skipBtnText: {
     fontSize: 16,
     fontFamily: fontMedium(),
     color: 'rgba(255,255,255,0.7)',

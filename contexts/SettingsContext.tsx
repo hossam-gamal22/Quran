@@ -29,11 +29,11 @@ import { updateSharedData } from '@/lib/widget-data';
 import { switchAppIcon } from '@/lib/app-icon-manager';
 import {
   applyCountryPrayerDefaults,
-  getCountryPrayerDefaultsOrFallback,
   COUNTRY_DEFAULTS,
+  MAKKAH_FALLBACK_DEFAULTS,
 } from '@/lib/country-prayer-defaults';
-import { detectUserCountry, getUserCountry } from '@/services/hijriCalendarService';
-import { calculationMethods } from '@/lib/prayer-times';
+import { getSavedUserCountry } from '@/services/hijriCalendarService';
+import { calculationMethods, getPrayerSettings, getStoredLocation, savePrayerSettings } from '@/lib/prayer-times';
 
 // ========================================
 // Eager theme cache — read previous session's theme/background at module load
@@ -112,6 +112,10 @@ export interface NotificationSettings {
   vibration: boolean;
   soundType: NotificationSoundType;
   adhanSoundType: AdhanSoundType;
+  // When true, prayer notifications use full adhan recordings from
+  // assets/sounds/adhan_full/. Android plays them via a foreground media
+  // service; iOS uses the bundled full sound and the system cuts it at ~29s.
+  useFullAdhan?: boolean;
   // Worship tracking notifications
   worshipPrayerLogging: boolean;
   worshipDailySummary: boolean;
@@ -167,6 +171,11 @@ export interface NotificationSettings {
   // Friday Surah Al-Kahf reminder (auto 2h after Jummah Dhuhr)
   kahfReminder?: boolean;
   kahfTime?: string;
+  // Per-category sound overrides for hardcoded reminders.
+  // Defaults: 'notif_sleep', 'notif_wakeup', 'notif_kahf'.
+  sleepSoundType?: string;
+  wakeupSoundType?: string;
+  kahfSoundType?: string;
   // Multi-time scheduling (up to 3 times per category)
   morningAzkarTimes?: string[];
   eveningAzkarTimes?: string[];
@@ -315,6 +324,7 @@ const defaultNotifications: NotificationSettings = {
   vibration: true,
   soundType: 'default',
   adhanSoundType: 'makkah',
+  useFullAdhan: false,
   // Worship tracking notifications
   worshipPrayerLogging: true,
   worshipDailySummary: true,
@@ -348,6 +358,10 @@ const defaultNotifications: NotificationSettings = {
   // Friday Surah Al-Kahf reminder
   kahfReminder: true,
   kahfTime: '14:00',
+  // Per-category sound overrides (null/undefined falls back to hardcoded keys)
+  sleepSoundType: 'notif_sleep',
+  wakeupSoundType: 'notif_wakeup',
+  kahfSoundType: 'notif_kahf',
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -377,13 +391,9 @@ const defaultDisplay: DisplaySettings = {
   showSectionInfo: true,
 };
 
-// Seed prayer defaults from the device's country at module load so a fresh
-// install in (e.g.) Egypt starts on method 5 rather than method 4 (Umm al-Qura).
-const _initialCountryDefaults = getCountryPrayerDefaultsOrFallback(detectUserCountry());
-
 const defaultPrayer: PrayerSettings = {
-  calculationMethod: _initialCountryDefaults.method as CalculationMethod,
-  asrJuristic: _initialCountryDefaults.asrSchool,
+  calculationMethod: MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod,
+  asrJuristic: MAKKAH_FALLBACK_DEFAULTS.asrSchool,
   adjustments: {
     fajr: 0,
     sunrise: 0,
@@ -426,6 +436,25 @@ const STORAGE_KEY = 'app_settings';
 // receives the full standardized notification schedule.
 const NOTIFICATION_DEFAULTS_VERSION = 10;
 const NOTIF_DEFAULTS_VERSION_KEY = '@notification_defaults_version';
+const MAKKAH_FALLBACK_MIGRATION_KEY = '@prayer_makkah_fallback_migration_v1';
+
+async function clearPrayerTimeFallbackCaches(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const toRemove = keys.filter((key) =>
+    key.startsWith('prayer_times_cache_') ||
+    key.startsWith('@prayer_week_cache')
+  );
+  if (toRemove.length > 0) {
+    await AsyncStorage.multiRemove(toRemove);
+  }
+}
+
+async function syncLocalPrayerFallbackSettings(): Promise<void> {
+  const localPrayerSettings = await getPrayerSettings();
+  localPrayerSettings.calculationMethod = MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod;
+  localPrayerSettings.asrJuristic = MAKKAH_FALLBACK_DEFAULTS.asrSchool;
+  await savePrayerSettings(localPrayerSettings);
+}
 
 // ========================================
 // السياق
@@ -621,6 +650,34 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
           console.warn('⚠️ Notification defaults migration failed:', migrationErr);
         }
 
+        try {
+          const migrated = await AsyncStorage.getItem(MAKKAH_FALLBACK_MIGRATION_KEY);
+          if (migrated !== 'true') {
+            const [savedGpsCountry, storedLocation] = await Promise.all([
+              getSavedUserCountry(),
+              getStoredLocation(),
+            ]);
+            const hasSavedGpsCountry = !!savedGpsCountry;
+            const hasStoredLocation = !!(storedLocation?.latitude && storedLocation?.longitude);
+
+            if (!hasSavedGpsCountry && !hasStoredLocation && loadedSettings.prayer.methodManuallySet !== true) {
+              loadedSettings.prayer = {
+                ...loadedSettings.prayer,
+                calculationMethod: MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod,
+                asrJuristic: MAKKAH_FALLBACK_DEFAULTS.asrSchool,
+              };
+              await syncLocalPrayerFallbackSettings();
+              await clearPrayerTimeFallbackCaches();
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(loadedSettings));
+              console.log('🕋 Migrated no-location prayer fallback to Makkah/Umm Al-Qura');
+            }
+
+            await AsyncStorage.setItem(MAKKAH_FALLBACK_MIGRATION_KEY, 'true');
+          }
+        } catch (migrationErr) {
+          console.warn('⚠️ Makkah prayer fallback migration failed:', migrationErr);
+        }
+
         setSettings(loadedSettings);
         
         // Cache theme snapshot for next cold start
@@ -738,7 +795,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   }, []);
 
   // ========================================
-  // Country-based prayer method reconciliation
+  // GPS-country prayer method reconciliation
   // Runs once after settings load.
   // Case A: methodManuallySet !== true → auto-update silently
   // Case B: methodManuallySet === true AND method mismatches GPS country
@@ -752,7 +809,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
     (async () => {
       try {
-        const countryCode = await getUserCountry();
+        const countryCode = await getSavedUserCountry();
+        if (!countryCode) return;
         const countryDefaults = applyCountryPrayerDefaults(countryCode);
         if (!countryDefaults) return;
         const { method, asrSchool } = countryDefaults;
@@ -1054,6 +1112,17 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         await saveLocal(localSettings);
       } catch (e) {
         console.warn('Failed to sync prayer settings:', e);
+      }
+      // Invalidate any week-cache built with a previous method/school so the next
+      // prayer-time fetch re-builds with the new params (root-cause fix for the
+      // "display shows 6:46, notifications fire 6:49" bug).
+      if ('calculationMethod' in prayer || 'asrJuristic' in prayer) {
+        try {
+          const { clearAllWeekCaches } = require('@/lib/prayer-week-cache');
+          await clearAllWeekCaches();
+        } catch (e) {
+          console.warn('[updatePrayer] clearAllWeekCaches failed:', e);
+        }
       }
       // Force-reschedule notifications so they use the updated prayer times
       try {

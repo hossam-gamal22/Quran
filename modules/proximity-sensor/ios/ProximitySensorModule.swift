@@ -35,13 +35,27 @@ public class ProximitySensorModule: Module {
     }
 
     Function("isAvailable") { () -> Bool in
-      // Check actual hardware: enable monitoring briefly and read the state
-      let device = UIDevice.current
-      let wasEnabled = device.isProximityMonitoringEnabled
-      device.isProximityMonitoringEnabled = true
-      let available = device.isProximityMonitoringEnabled
-      if !wasEnabled {
-        device.isProximityMonitoringEnabled = false
+      // UIKit must be accessed on the main thread. Use sync dispatch so we can
+      // return the value synchronously to JS without crashing the app.
+      var available = false
+      if Thread.isMainThread {
+        let device = UIDevice.current
+        let wasEnabled = device.isProximityMonitoringEnabled
+        device.isProximityMonitoringEnabled = true
+        available = device.isProximityMonitoringEnabled
+        if !wasEnabled {
+          device.isProximityMonitoringEnabled = false
+        }
+      } else {
+        DispatchQueue.main.sync {
+          let device = UIDevice.current
+          let wasEnabled = device.isProximityMonitoringEnabled
+          device.isProximityMonitoringEnabled = true
+          available = device.isProximityMonitoringEnabled
+          if !wasEnabled {
+            device.isProximityMonitoringEnabled = false
+          }
+        }
       }
       return available
     }

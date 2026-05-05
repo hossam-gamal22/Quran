@@ -38,53 +38,29 @@ import { useAppIdentity } from '@/hooks/use-app-identity';
 import { DAILY_AYAHS } from '@/data/daily-ayahs';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ─── Background image categories from Unsplash ───────────────────────────────
-// Images are sourced from Unsplash (free, no API key required for direct access)
-const BG_CATEGORIES = [
-  {
-    id: 'ocean',
-    label: 'محيط',
-    images: [
-      'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&q=80',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80',
-      'https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=800&q=80',
-    ],
-  },
-  {
-    id: 'sky',
-    label: 'سماء',
-    images: [
-      'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80',
-      'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=800&q=80',
-      'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=800&q=80',
-    ],
-  },
+// ─── Background image categories ────────────────────────────────────────────
+// Images are bundled locally (assets/images/backgrounds/) so they always work
+// offline — same approach as story-of-day video caching but using app assets.
+type BgSource = number | string; // number = require() result, string = '#hex' color
+const BUNDLED_BACKGROUNDS: number[] = [
+  require('@/assets/images/daily-ayah-bg/nature1.png'),
+  require('@/assets/images/daily-ayah-bg/nature2.png'),
+  require('@/assets/images/daily-ayah-bg/nature3.png'),
+  require('@/assets/images/daily-ayah-bg/nature4.png'),
+  require('@/assets/images/daily-ayah-bg/nature5.png'),
+  require('@/assets/images/daily-ayah-bg/nature6.png'),
+  require('@/assets/images/daily-ayah-bg/nature7.png'),
+  require('@/assets/images/daily-ayah-bg/nature8.png'),
+  require('@/assets/images/daily-ayah-bg/nature9.png'),
+  require('@/assets/images/daily-ayah-bg/nature10.png'),
+  require('@/assets/images/daily-ayah-bg/nature11.png'),
+];
+
+const BG_CATEGORIES: { id: string; label: string; images: BgSource[] }[] = [
   {
     id: 'nature',
     label: 'طبيعة',
-    images: [
-      'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80',
-      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
-      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80',
-    ],
-  },
-  {
-    id: 'desert',
-    label: 'صحراء',
-    images: [
-      'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=800&q=80',
-      'https://images.unsplash.com/photo-1530587191325-3db32d826c18?w=800&q=80',
-      'https://images.unsplash.com/photo-1527754046865-bfaed5b2aa2f?w=800&q=80',
-    ],
-  },
-  {
-    id: 'mosque',
-    label: 'مسجد',
-    images: [
-      'https://images.unsplash.com/photo-1584551246679-0daf3d275d0f?w=800&q=80',
-      'https://images.unsplash.com/photo-1542816417-0983c9c9ad53?w=800&q=80',
-      'https://images.unsplash.com/photo-1619608802079-d9c42e3d93fe?w=800&q=80',
-    ],
+    images: BUNDLED_BACKGROUNDS,
   },
   {
     id: 'solid',
@@ -102,12 +78,15 @@ const BG_CATEGORIES = [
   },
 ];
 
+const isSolidColor = (bg: BgSource): bg is string => typeof bg === 'string' && bg.startsWith('#');
+const resolveImageSource = (bg: BgSource) => (typeof bg === 'number' ? bg : { uri: bg });
+
 // ─── Card themes ──────────────────────────────────────────────────────────────
 const CARD_STYLES = [
-  { id: 'overlay_dark',  overlayColor: 'rgba(0,0,0,0.55)', textColor: '#FFFFFF', accentColor: '#F0C040' },
-  { id: 'overlay_green', overlayColor: 'rgba(10,50,20,0.65)', textColor: '#E8F5E9', accentColor: '#A5D6A7' },
-  { id: 'overlay_blue',  overlayColor: 'rgba(10,20,50,0.60)', textColor: '#E3F2FD', accentColor: '#90CAF9' },
-  { id: 'overlay_warm',  overlayColor: 'rgba(60,20,5,0.60)', textColor: '#FFF8E1', accentColor: '#FFCC02' },
+  { id: 'overlay_dark',  overlayColor: 'rgba(0,0,0,0.30)', textColor: '#FFFFFF', accentColor: '#F0C040' },
+  { id: 'overlay_green', overlayColor: 'rgba(10,50,20,0.40)', textColor: '#E8F5E9', accentColor: '#A5D6A7' },
+  { id: 'overlay_blue',  overlayColor: 'rgba(10,20,50,0.40)', textColor: '#E3F2FD', accentColor: '#90CAF9' },
+  { id: 'overlay_warm',  overlayColor: 'rgba(60,20,5,0.40)', textColor: '#FFF8E1', accentColor: '#FFCC02' },
 ];
 
 // ─── Ayah Image Card (off-screen for capture) ─────────────────────────────────
@@ -127,7 +106,7 @@ function TranslatedAyahTrans({ trans, isEnglish, textLight }: { trans: string; i
 
 interface AyahCardProps {
   ayah: typeof DAILY_AYAHS[0];
-  bgUrl: string;
+  bgUrl: BgSource;
   cardStyle: typeof CARD_STYLES[0];
   cardRef: React.RefObject<ViewShot>;
   showTranslation: boolean;
@@ -149,18 +128,19 @@ const TEXT_SHADOW = {
 function AyahImageCard({ ayah, bgUrl, cardStyle, cardRef, showTranslation, qcfGlyphs, qcfFontFamily, isArabic: isArabicCard = true, verseTranslation: cardTranslation, language: cardLang = 'ar' }: AyahCardProps) {
   const { Image: RNImage } = require('react-native');
   const { logoSource } = useAppIdentity();
-  const isSolidBg = bgUrl.startsWith('#');
+  const isSolidBg = isSolidColor(bgUrl);
   const verseWithNumber = `${ayah.arabic} ﴿${toArabicNumeral(ayah.ayah)}﴾`;
 
   return (
     <ViewShot ref={cardRef} options={{ format: 'png', quality: 1.0, result: 'tmpfile' }}>
-      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: isSolidBg ? bgUrl : '#000' }}>
-        {/* Background image */}
+      <View style={{ width: 360, height: 640, overflow: 'hidden', position: 'relative', backgroundColor: isSolidBg ? (bgUrl as string) : '#000' }}>
+        {/* Background image with subtle blur for elegant readability */}
         {!isSolidBg && (
           <RNImage
-            source={{ uri: bgUrl }}
+            source={resolveImageSource(bgUrl)}
             style={{ width: '100%', height: '100%', position: 'absolute' }}
             resizeMode="cover"
+            blurRadius={Platform.OS === 'ios' ? 2 : 1.5}
           />
         )}
         {/* Color overlay */}
@@ -420,14 +400,6 @@ export default function DailyAyahVideoScreen() {
     <>
     <Stack.Screen options={{ headerShown: false }} />
     <ScreenContainer containerClassName="bg-background" edges={['top', 'left', 'right', 'bottom']} screenKey="daily_ayah">
-      {/* Full-page blurred nature background */}
-      <Image
-        source={{ uri: pageBgUrl }}
-        style={StyleSheet.absoluteFill}
-        blurRadius={Platform.OS === 'ios' ? 20 : 15}
-        resizeMode="cover"
-      />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.80)' }]} />
       {/* Header */}
       <UniversalHeader
         style={{ borderBottomWidth: 1, borderBottomColor: colors.border }}

@@ -51,6 +51,16 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Phase 2: FCM Prayer Push Fallback
+    // الـ app يكتب موقع وإعدادات الصلاة، Cloud Function تقرأ
+    match /userPrayerSettings/{userId} {
+      allow read, write: if true;
+    }
+    // dedupe records — Cloud Function only
+    match /fcmPrayerSent/{docId} {
+      allow read, write: if false;
+    }
+
     // Notifications - history and tracking from admin panel
     match /notifications/{docId} {
       allow read, write: if true;

@@ -9,7 +9,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, ImageBackground, Dimensions, StyleSheet } from 'react-native';
 import * as Font from 'expo-font';
 import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
-import { getPageFontFamily } from '@/lib/qcf-font-loader';
+import { getPageFontFamily, loadPageFont } from '@/lib/qcf-font-loader';
 import { getQuranRefs } from '@/lib/azkar-quran-refs';
 import { getSurahName } from '@/lib/quran-api';
 import { stripAzkarBrackets } from '@/lib/basmala-utils';
@@ -53,6 +53,12 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText, compac
     return () => cancelAnimationFrame(id);
   }, []);
 
+  // Actively load the QCF page fonts needed for this azkar's verses on first
+  // mount. The global preloader may not have reached these pages yet (e.g. on
+  // first cold launch), so without this the component would silently fall back
+  // to plain Uthmanic — or render nothing if no fallbackText is provided.
+  const [fontsTick, setFontsTick] = useState(0);
+
   // Collect all verse data for this azkar
   const verseDataList = useMemo(() => {
     const refs = getQuranRefs(azkarId);
@@ -94,35 +100,29 @@ export default function AzkarQcfVerse({ azkarId, textColor, fallbackText, compac
     if (!renderReady) return false;
     const pages = new Set(verseDataList.map(v => v.page));
     return [...pages].every(page => Font.isLoaded(getPageFontFamily(page, darkMode)));
-  }, [verseDataList, darkMode, renderReady]);
+    // fontsTick included so we re-evaluate after on-demand loads complete
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verseDataList, darkMode, renderReady, fontsTick]);
+
+  // Trigger on-demand load for any missing pages and bump fontsTick when done.
+  useEffect(() => {
+    if (verseDataList.length === 0) return;
+    const pages = [...new Set(verseDataList.map(v => v.page))];
+    const missing = pages.filter(p => !Font.isLoaded(getPageFontFamily(p, darkMode)));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map(p => loadPageFont(p, darkMode).catch(() => null))).then(() => {
+      if (!cancelled) setFontsTick(t => t + 1);
+    });
+    return () => { cancelled = true; };
+  }, [verseDataList, darkMode]);
 
   if (verseDataList.length === 0) return null;
 
-  // Fallback: show plain Arabic with KFGQPCUthmanic if QCF fonts aren't ready
-  if (!allFontsLoaded) {
-    if (fallbackText) {
-      // Strip Isti'adha prefix + brackets so the fallback matches the
-      // on-screen QCF render (which only shows verse glyphs).
-      const cleanFallback = stripAzkarBrackets(fallbackText);
-      return (
-        <View style={styles.container}>
-          <Text
-            style={{
-              fontFamily: 'KFGQPCUthmanic',
-              fontSize: 28,
-              lineHeight: 56,
-              textAlign: 'center',
-              color,
-              writingDirection: 'rtl',
-            }}
-          >
-            {cleanFallback}
-          </Text>
-        </View>
-      );
-    }
-    return null;
-  }
+  // While QCF fonts load, render nothing — avoids any flash of plain text or
+  // empty placeholder. The card background remains; once fonts are ready the
+  // Mushaf glyphs appear in place.
+  if (!allFontsLoaded) return null;
 
   const hasMultipleSurahs = surahGroups.length > 1;
   const ornamentColor = compact ? '#8B7332' : (darkMode ? '#C9A84C' : '#8B7332');

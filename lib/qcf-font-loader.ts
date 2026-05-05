@@ -178,6 +178,39 @@ export async function ensurePagesLoaded(
   );
 }
 
+/**
+ * Preload ALL 604 QCF page fonts in the background after app startup.
+ * Loads in chunks so we never block the JS thread; failures are logged but never thrown.
+ * Called once from `app/_layout.tsx` after the initial useFonts() resolves so that
+ * any subsequent navigation to a Quran page (deep-link, favorite, ayat-kursi, etc.)
+ * finds its per-page font already in memory.
+ */
+let allPagesPreloadStarted: { light: boolean; dark: boolean } = { light: false, dark: false };
+export function preloadAllPagesInBackground(darkMode: boolean = false): void {
+  const key = darkMode ? 'dark' : 'light';
+  if (allPagesPreloadStarted[key]) return;
+  allPagesPreloadStarted[key] = true;
+
+  const CHUNK_SIZE = 25;
+  const CHUNK_DELAY_MS = 60;
+
+  const loadChunk = async (start: number) => {
+    const end = Math.min(start + CHUNK_SIZE, TOTAL_QURAN_PAGES + 1);
+    const tasks: Promise<unknown>[] = [];
+    for (let p = start; p < end; p++) {
+      if (!isValidPage(p)) continue;
+      if (loadedPages.has(p) && loadedPages.get(p) === darkMode) continue;
+      tasks.push(loadPageFont(p, darkMode).catch(() => null));
+    }
+    await Promise.all(tasks);
+    if (end <= TOTAL_QURAN_PAGES) {
+      setTimeout(() => loadChunk(end), CHUNK_DELAY_MS);
+    }
+  };
+  // Defer first chunk so we yield to the JS thread after splash hide.
+  setTimeout(() => loadChunk(1), 1000);
+}
+
 /** Preload fonts spiraling outward from a start page */
 export function preloadFontsInBackground(startPage: number, darkMode: boolean = false): void {
   let i = 0;
@@ -198,6 +231,42 @@ export function preloadFontsInBackground(startPage: number, darkMode: boolean = 
     }
   };
   setTimeout(step, 500);
+}
+
+/**
+ * Guarantee a page's QCF font is registered with the OS before sharing.
+ *
+ * Used by the share-page / share-ayah flows so the off-screen capture and
+ * the IslamicShareCard always render real Mushaf glyphs (never the
+ * Amiri-Regular fallback). Returns true on success, false on timeout/error
+ * — callers should still proceed (the on-screen fallback chain handles it).
+ */
+export async function ensureSharePageFontReady(
+  page: number,
+  darkMode: boolean = false,
+  timeoutMs: number = 5000,
+): Promise<boolean> {
+  if (!isValidPage(page)) return false;
+  const family = getPageFontFamily(page, darkMode);
+  if (Font.isLoaded(family)) return true;
+  try {
+    await Promise.race([
+      loadPageFont(page, darkMode),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`ensureSharePageFontReady timeout page ${page}`)), timeoutMs),
+      ),
+    ]);
+  } catch (err) {
+    console.warn('[QCF4] ensureSharePageFontReady failed:', err);
+    return false;
+  }
+  // Poll briefly in case Font.loadAsync resolved before native registration completed.
+  const deadline = Date.now() + 1500;
+  while (Date.now() < deadline) {
+    if (Font.isLoaded(family)) return true;
+    await new Promise(r => setTimeout(r, 80));
+  }
+  return Font.isLoaded(family);
 }
 
 /**

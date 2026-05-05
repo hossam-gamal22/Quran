@@ -466,7 +466,7 @@ const RitualDetailModal: React.FC<RitualDetailModalProps> = ({
       <View style={styles.modalOverlay}>
         <Animated.View
           entering={FadeIn.duration(300)}
-          style={[styles.ritualModal, { backgroundColor: colors.cardSolid }]}
+          style={[styles.ritualModal, { backgroundColor: colors.modalSurface }]}
         >
           {/* Header */}
           <View
@@ -754,7 +754,7 @@ export default function HajjScreen() {
         >
           <Animated.View
             entering={FadeIn.duration(300)}
-            style={[styles.duaModal, { backgroundColor: colors.cardSolid }]}
+            style={[styles.duaModal, { backgroundColor: colors.modalSurface }]}
           >
             <View style={[styles.duaModalHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               {isArabic ? (

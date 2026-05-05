@@ -4,8 +4,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguage, isRTL as isRTLLang } from '@/lib/i18n';
-import { getCountryPrayerDefaultsOrFallback } from '@/lib/country-prayer-defaults';
-import { detectUserCountry } from '@/services/hijriCalendarService';
+import { MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
 
 // ========================================
 // الأنواع والواجهات
@@ -162,14 +161,9 @@ const STORAGE_KEYS = {
   LOCATION: 'user_location',
 };
 
-// Seed from device country so background consumers (notifications, widgets)
-// that read DEFAULT_SETTINGS before the user hits the prayer tab get the right
-// calculation method. Overridden by AsyncStorage-persisted settings when present.
-const _countryDefaults = getCountryPrayerDefaultsOrFallback(detectUserCountry());
-
 const DEFAULT_SETTINGS: PrayerSettings = {
-  calculationMethod: _countryDefaults.method as CalculationMethod,
-  asrJuristic: _countryDefaults.asrSchool,
+  calculationMethod: MAKKAH_FALLBACK_DEFAULTS.method as CalculationMethod,
+  asrJuristic: MAKKAH_FALLBACK_DEFAULTS.asrSchool,
   adjustments: {
     fajr: 0,
     sunrise: 0,

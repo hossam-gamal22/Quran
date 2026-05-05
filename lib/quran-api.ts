@@ -4,9 +4,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t, getLanguage } from '@/lib/i18n';
+import { RECITERS_REGISTRY } from './reciters-registry';
+import {
+  getAyahAudioUrl as resolveAyahUrl,
+  getSurahAudioUrl as resolveSurahUrl,
+  ReciterUnavailableError,
+} from './quran-cache';
 
 const QURAN_API_BASE = 'https://api.alquran.cloud/v1';
-const QURAN_AUDIO_BASE = 'https://cdn.islamic.network/quran/audio';
 
 // ============================================
 // الأنواع
@@ -56,34 +61,16 @@ export interface Juz {
 // قائمة القراء
 // ============================================
 
-export const RECITERS: Reciter[] = [
-  { id: 'ar.alafasy', identifier: 'ar.alafasy', name: 'Mishary Alafasy', nameAr: 'مشاري العفاسي', bitrate: 128 },
-  { id: 'ar.abdulbasitmurattal', identifier: 'ar.abdulbasitmurattal', name: 'Abdul Basit (Murattal)', nameAr: 'عبد الباسط عبد الصمد - مرتل', bitrate: 128 },
-  { id: 'ar.abdulsamad', identifier: 'ar.abdulsamad', name: 'Abdul Samad', nameAr: 'عبد الباسط عبد الصمد - مجود', bitrate: 64 },
-  { id: 'ar.husary', identifier: 'ar.husary', name: 'Mahmoud Khalil Al-Husary', nameAr: 'محمود خليل الحصري', bitrate: 128 },
-  { id: 'ar.husarymujawwad', identifier: 'ar.husarymujawwad', name: 'Al-Husary (Mujawwad)', nameAr: 'الحصري - مجود', bitrate: 128 },
-  { id: 'ar.minshawi', identifier: 'ar.minshawi', name: 'Mohamed Siddiq Al-Minshawi', nameAr: 'محمد صديق المنشاوي', bitrate: 128 },
-  { id: 'ar.minshawimujawwad', identifier: 'ar.minshawimujawwad', name: 'Al-Minshawi (Mujawwad)', nameAr: 'المنشاوي - مجود', bitrate: 64 },
-  { id: 'ar.ahmedajamy', identifier: 'ar.ahmedajamy', name: 'Ahmed Al-Ajamy', nameAr: 'أحمد العجمي', bitrate: 128 },
-  { id: 'ar.muhammadayyoub', identifier: 'ar.muhammadayyoub', name: 'Muhammad Ayyoub', nameAr: 'محمد أيوب', bitrate: 128 },
-  { id: 'ar.muhammadjibreel', identifier: 'ar.muhammadjibreel', name: 'Muhammad Jibreel', nameAr: 'محمد جبريل', bitrate: 128 },
-  { id: 'ar.maaborimatar', identifier: 'ar.maaborimatar', name: 'Maher Al Muaiqly', nameAr: 'ماهر المعيقلي', bitrate: 128 },
-  { id: 'ar.saaborimatar', identifier: 'ar.saaborimatar', name: 'Saud Al-Shuraim', nameAr: 'سعود الشريم', bitrate: 128 },
-  { id: 'ar.abduraborimatar', identifier: 'ar.abduraborimatar', name: 'Abdurrahman As-Sudais', nameAr: 'عبدالرحمن السديس', bitrate: 128 },
-  { id: 'ar.haborimatar', identifier: 'ar.haborimatar', name: 'Hani Ar-Rifai', nameAr: 'هاني الرفاعي', bitrate: 128 },
-  { id: 'ar.abdullahbasfar', identifier: 'ar.abdullahbasfar', name: 'Abdullah Basfar', nameAr: 'عبدالله بصفر', bitrate: 128 },
-  { id: 'ar.ibrahimakhbar', identifier: 'ar.ibrahimakhbar', name: 'Ibrahim Al-Akhdar', nameAr: 'إبراهيم الأخضر', bitrate: 128 },
-  { id: 'ar.shaaborimatar', identifier: 'ar.shaaborimatar', name: 'Abu Bakr Al-Shatri', nameAr: 'أبو بكر الشاطري', bitrate: 128 },
-  { id: 'ar.parhizgar', identifier: 'ar.parhizgar', name: 'Nasser Al-Qatami', nameAr: 'ناصر القطامي', bitrate: 128 },
-  { id: 'ar.aaborimatar', identifier: 'ar.aaborimatar', name: 'Yasser Al-Dosari', nameAr: 'ياسر الدوسري', bitrate: 128 },
-  { id: 'ar.abdulbarimatar', identifier: 'ar.abdulbarimatar', name: 'Saad Al-Ghamdi', nameAr: 'سعد الغامدي', bitrate: 128 },
-  { id: 'ar.akaborimatar', identifier: 'ar.akaborimatar', name: 'Ahmed Al-Hudhaify', nameAr: 'أحمد الحذيفي', bitrate: 128 },
-  { id: 'ar.abdulrahmanalsudais', identifier: 'ar.abdulrahmanalsudais', name: 'Ali Al-Huthaify', nameAr: 'علي الحذيفي', bitrate: 128 },
-  { id: 'ar.bandarbalila', identifier: 'ar.bandarbalila', name: 'Bandar Baleela', nameAr: 'بندر بليلة', bitrate: 128 },
-  { id: 'ar.faborimatar', identifier: 'ar.faborimatar', name: 'Fares Abbad', nameAr: 'فارس عباد', bitrate: 128 },
-  { id: 'ar.khalifatulttaniji', identifier: 'ar.khalifatulttaniji', name: 'Khalifa Al-Tunaiji', nameAr: 'خليفة الطنيجي', bitrate: 128 },
-  { id: 'ar.mahmoudalielbanna', identifier: 'ar.mahmoudalielbanna', name: 'Mahmoud Ali Al-Banna', nameAr: 'محمود علي البنا', bitrate: 128 },
-];
+// Derived from the verified RECITERS_REGISTRY — single source of truth.
+// Each `identifier` here is the new internal id (e.g. 'mishary_alafasy').
+export const RECITERS: Reciter[] = RECITERS_REGISTRY.map(r => ({
+  id: r.id,
+  identifier: r.id,
+  name: r.nameEn,
+  nameAr: r.nameAr,
+  style: r.style,
+  bitrate: r.bitrate,
+}));
 
 // ============================================
 // قائمة الأجزاء
@@ -401,39 +388,28 @@ export async function fetchTafsir(
 // روابط الصوت
 // ============================================
 
-export function getSurahAudioUrl(
-  surahNumber: number, 
-  reciterId: string = 'ar.alafasy',
-  bitrate: number = 128
-): string {
-  // للسور الكاملة
-  const paddedNumber = String(surahNumber).padStart(3, '0');
-  return `${QURAN_AUDIO_BASE}/${bitrate}/${reciterId}/${paddedNumber}.mp3`;
+// Re-export the canonical resolver from quran-cache so all consumers go through one path.
+// Both signatures kept for back-compat — these wrappers convert (surahNumber, reciterId)
+// into the unified resolver call.
+export { ReciterUnavailableError } from './quran-cache';
+
+export function getSurahAudioUrl(surahNumber: number, reciterId: string = 'mishary_alafasy'): string {
+  return resolveSurahUrl(reciterId, surahNumber);
 }
 
 export function getAyahAudioUrl(
   surahNumber: number,
   ayahNumber: number,
-  reciterId: string = 'ar.alafasy',
-  bitrate: number = 128
+  reciterId: string = 'mishary_alafasy',
 ): string {
-  // حساب رقم الآية الكلي من رقم السورة والآية
+  // Compute global ayah number from surah/ayah for CDNs that need it.
   const ayahCounts = [7,286,200,176,120,165,206,75,129,109,123,111,43,52,99,128,111,110,98,135,112,78,118,64,77,227,93,88,69,60,34,30,73,54,45,83,182,88,75,85,54,53,89,59,37,35,38,29,18,45,60,49,62,55,78,96,29,22,24,13,14,11,11,18,12,12,30,52,52,44,28,28,20,56,40,31,50,45,33,27,57,29,19,18,12,11,82,8,11,98,5,8,8,19,5,8,8,11,11,8,3,9,5,4,7,3,6,3,5,4,5,6,4,4];
   let globalAyah = ayahNumber;
-  for (let i = 0; i < surahNumber - 1; i++) {
-    globalAyah += ayahCounts[i];
-  }
-  return `${QURAN_AUDIO_BASE}/${bitrate}/${reciterId}/${globalAyah}.mp3`;
+  for (let i = 0; i < surahNumber - 1; i++) globalAyah += ayahCounts[i];
+  return resolveAyahUrl(reciterId, globalAyah, surahNumber, ayahNumber);
 }
 
-export function getFullAyahAudioUrl(
-  globalAyahNumber: number,
-  reciterId: string = 'ar.alafasy',
-  bitrate: number = 128
-): string {
-  const paddedNumber = String(globalAyahNumber).padStart(6, '0');
-  return `${QURAN_AUDIO_BASE}/${bitrate}/${reciterId}/${paddedNumber}.mp3`;
-}
+// getFullAyahAudioUrl removed — use getAyahAudioUrl(surah, ayah, reciterId) instead.
 
 // ============================================
 // أسماء السور بالعربية

@@ -114,6 +114,14 @@ export async function getUserCountry(): Promise<string> {
   return detectUserCountry();
 }
 
+export async function getSavedUserCountry(): Promise<string> {
+  try {
+    return (await AsyncStorage.getItem(USER_COUNTRY_KEY)) || '';
+  } catch {
+    return '';
+  }
+}
+
 export async function setUserCountry(countryCode: string): Promise<void> {
   try {
     await AsyncStorage.setItem(USER_COUNTRY_KEY, countryCode);

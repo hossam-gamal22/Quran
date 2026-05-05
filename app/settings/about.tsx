@@ -201,7 +201,7 @@ export default function AboutScreen() {
             <Text style={styles.appTagline}>{t('aboutApp.subtitle')}</Text>
             <View style={styles.versionBadge}>
               <Text style={styles.versionText}>
-                {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.2.0'}
+                {t('common.version')} {Constants.expoConfig?.version || Application.nativeApplicationVersion || '1.2.1'}
               </Text>
             </View>
           </View>

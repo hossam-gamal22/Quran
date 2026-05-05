@@ -33,6 +33,11 @@ const TILE = 38;
 // available vertical space for content.
 const CHROME_H = 6 /* gold strips */ + 56 /* category band */ + 100 /* footer (logo) */ + 32 /* contentArea v-padding */;
 const MIN_FONT_SCALE = 0.5;
+// Short-content mode: when natural content height is well below the available
+// canvas, upscale all text uniformly so the card looks visually balanced
+// instead of leaving large empty space below the source reference.
+const MAX_UPSCALE = 1.5;
+const TARGET_FILL = 0.85;
 
 // ─── Public API ───
 export interface IslamicShareCardHandle {
@@ -230,13 +235,22 @@ export const IslamicShareCard = forwardRef<IslamicShareCardHandle, IslamicShareC
     const effectiveSize: ImageSizeKey = isLong ? 'story' : selectedSize;
     const effectiveSizeConfig = getSizeConfig(effectiveSize);
 
-    // Font scale applied to text styles in long mode.
+    // Font scale applied to text styles. In long mode we shrink so content
+    // fits the 9:16 canvas; in short mode we grow so content fills ~85% of
+    // the selected canvas (avoiding a big empty area below the source line).
     const fontScale = useMemo(() => {
-      if (!isLong || measuredContentH === null) return 1;
-      const target = availableContentH('story');
-      const raw = target / measuredContentH;
-      return Math.max(MIN_FONT_SCALE, Math.min(1, raw));
-    }, [isLong, measuredContentH]);
+      if (measuredContentH === null || measuredContentH <= 0) return 1;
+      if (isLong) {
+        const target = availableContentH('story');
+        const raw = target / measuredContentH;
+        return Math.max(MIN_FONT_SCALE, Math.min(1, raw));
+      }
+      const avail = availableContentH(selectedSize);
+      if (avail <= 0) return 1;
+      const raw = (avail * TARGET_FILL) / measuredContentH;
+      return Math.max(1, Math.min(MAX_UPSCALE, raw));
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLong, measuredContentH, selectedSize]);
 
     // Card height: normally derived from selected ratio. If even at min scale
     // the content still overflows, grow the card vertically as a final safety

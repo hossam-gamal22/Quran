@@ -143,11 +143,6 @@ export default function QuranDuaDailyScreen() {
     );
   };
 
-  const handleViewAll = () => {
-    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/azkar/26');
-  };
-
   if (!currentDua?.arabic) return null;
 
   return (
@@ -245,16 +240,6 @@ export default function QuranDuaDailyScreen() {
           >
             <MaterialCommunityIcons name="refresh" size={20} color={ACCENT} />
             <Text style={[styles.refreshButtonText, { color: ACCENT }]}>{t('azkar.anotherDua')}</Text>
-          </TouchableOpacity>
-
-          {/* View All Button */}
-          <TouchableOpacity
-            style={[styles.viewAllButton, { borderColor: ACCENT + '30', flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={handleViewAll}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="format-list-bulleted" size={20} color={ACCENT} />
-            <Text style={[styles.refreshButtonText, { color: ACCENT }]}>{t('common.seeAll')}</Text>
           </TouchableOpacity>
 
           <Text style={[styles.footerText, { color: colors.textLight }]}>

@@ -20,8 +20,8 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 
 import { useSettings, CalculationMethod } from '@/contexts/SettingsContext';
-import { applyCountryPrayerDefaults } from '@/lib/country-prayer-defaults';
-import { getUserCountry } from '@/services/hijriCalendarService';
+import { applyCountryPrayerDefaults, MAKKAH_FALLBACK_DEFAULTS } from '@/lib/country-prayer-defaults';
+import { getSavedUserCountry } from '@/services/hijriCalendarService';
 import { calculationMethods } from '@/lib/prayer-times';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { UniversalHeader } from '@/components/ui';
@@ -80,8 +80,8 @@ export default function PrayerCalculationScreen() {
   React.useEffect(() => {
     (async () => {
       try {
-        const cc = await getUserCountry();
-        const cd = applyCountryPrayerDefaults(cc);
+        const cc = await getSavedUserCountry();
+        const cd = applyCountryPrayerDefaults(cc) ?? MAKKAH_FALLBACK_DEFAULTS;
         if (cd) {
           const info = calculationMethods[cd.method as CalculationMethod];
           if (info) {
@@ -95,8 +95,8 @@ export default function PrayerCalculationScreen() {
   const handleAutomatic = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const countryCode = await getUserCountry();
-      const cd = applyCountryPrayerDefaults(countryCode);
+      const countryCode = await getSavedUserCountry();
+      const cd = applyCountryPrayerDefaults(countryCode) ?? MAKKAH_FALLBACK_DEFAULTS;
       if (!cd) return;
       await updatePrayer({
         calculationMethod: cd.method as CalculationMethod,

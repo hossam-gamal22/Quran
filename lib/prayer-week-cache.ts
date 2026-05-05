@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrayerTimes, parsePrayerTimes, applyAdjustments, PrayerSettings, getCachedPrayerTimes, cachePrayerTimes, getTodayDateString } from '@/lib/prayer-times';
 import { calculateLocalPrayerTimes, getCountryFallbackPrayerTimes } from '@/lib/country-prayer-defaults';
 import { getStoredLocation } from '@/lib/prayer-times';
+import { getEffectivePrayerCalcSettings } from '@/lib/prayer-settings-source';
 
 // ────────────────────────────────────────────
 // Types
@@ -25,8 +26,36 @@ export interface WeekCacheData {
 // Constants
 // ────────────────────────────────────────────
 
-const WEEK_CACHE_KEY = '@prayer_week_cache';
+const WEEK_CACHE_KEY_PREFIX = '@prayer_week_cache';
+// Legacy key (pre-method-aware). Read for backward compat, never written.
+const LEGACY_WEEK_CACHE_KEY = '@prayer_week_cache';
 const MAX_EXTRAPOLATION_DAYS = 30;
+
+/** Method/school-scoped cache key. Prevents reusing a cache built with a
+ *  different calculation method (the root cause of the Dubai 6:46/6:49 bug). */
+function getWeekCacheKey(method: number, school: number): string {
+  return `${WEEK_CACHE_KEY_PREFIX}_M${method}_S${school}`;
+}
+
+async function resolveActiveWeekCacheKey(): Promise<string> {
+  const eff = await getEffectivePrayerCalcSettings();
+  return getWeekCacheKey(eff.calculationMethod, eff.asrJuristic);
+}
+
+/** Remove every week-cache key (all methods/schools + legacy). Called when the
+ *  user changes calculation method, school, or location to prevent stale data. */
+export async function clearAllWeekCaches(): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const toRemove = keys.filter((k) => k.startsWith(WEEK_CACHE_KEY_PREFIX));
+    if (toRemove.length > 0) {
+      await AsyncStorage.multiRemove(toRemove);
+      console.log(`🧹 [prayer-week-cache] Cleared ${toRemove.length} week cache keys`);
+    }
+  } catch (e) {
+    console.warn('[prayer-week-cache] clearAllWeekCaches failed:', e);
+  }
+}
 const PRAYER_KEYS: (keyof PrayerTimes)[] = ['fajr', 'sunrise', 'dhuhr', 'asr', 'maghrib', 'isha', 'midnight', 'lastThird'];
 
 // ────────────────────────────────────────────
@@ -75,13 +104,14 @@ export async function cacheWeekPrayerTimes(
       createdAt: new Date().toISOString(),
       location,
     };
-    await AsyncStorage.setItem(WEEK_CACHE_KEY, JSON.stringify(data));
+    const key = await resolveActiveWeekCacheKey();
+    await AsyncStorage.setItem(key, JSON.stringify(data));
 
     // Also populate per-day caches for instant lookup
     for (const entry of data.entries) {
       await cachePrayerTimes(entry.date, entry.times);
     }
-    console.log(`📅 Week cache saved: ${data.entries.length} days starting ${data.entries[0]?.date}`);
+    console.log(`📅 Week cache saved (${key}): ${data.entries.length} days starting ${data.entries[0]?.date}`);
   } catch (e) {
     console.warn('[prayer-week-cache] Failed to cache:', e);
   }
@@ -89,8 +119,20 @@ export async function cacheWeekPrayerTimes(
 
 export async function getWeekCache(): Promise<WeekCacheData | null> {
   try {
-    const raw = await AsyncStorage.getItem(WEEK_CACHE_KEY);
-    if (!raw) return null;
+    const key = await resolveActiveWeekCacheKey();
+    let raw = await AsyncStorage.getItem(key);
+    // Backward-compat: if no scoped cache exists, try the legacy unscoped key once.
+    // We do NOT migrate it (would require knowing what method built it), but we
+    // also don't return it as it may be from a different method.
+    if (!raw) {
+      const legacyRaw = await AsyncStorage.getItem(LEGACY_WEEK_CACHE_KEY);
+      if (legacyRaw) {
+        // Drop the legacy key — it's untrusted because we can't verify its method.
+        await AsyncStorage.removeItem(LEGACY_WEEK_CACHE_KEY).catch(() => {});
+        console.log('🧹 [prayer-week-cache] Removed untyped legacy week cache (method unknown)');
+      }
+      return null;
+    }
     const data: WeekCacheData = JSON.parse(raw);
     if (!data.entries || !Array.isArray(data.entries) || data.entries.length === 0) return null;
     return data;
@@ -212,7 +254,7 @@ export interface OfflinePrayerResult {
 
 /**
  * Try to load prayer times from any available offline source.
- * Priority: today's cache → week cache → extrapolation → local calc (stored coords) → country fallback → null
+ * Priority: today's cache → week cache → extrapolation → local calc (stored coords) → Makkah fallback → null
  */
 export async function getOfflinePrayerTimes(targetDate?: string): Promise<OfflinePrayerResult> {
   const today = targetDate || getTodayDateString();
@@ -267,7 +309,7 @@ export async function getOfflinePrayerTimes(targetDate?: string): Promise<Offlin
     console.warn('Local calculation from stored coords failed:', e);
   }
 
-  // 6. Country fallback — device region → capital city calculation
+  // 6. App-wide fallback — Makkah calculation
   try {
     const result = getCountryFallbackPrayerTimes(new Date(today + 'T12:00:00'));
     console.log(`🌍 Offline: used country fallback (${result.countryCode} → ${result.cityNameEn})`);

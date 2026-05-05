@@ -284,6 +284,19 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
             delegate.setupScheduledNotifications()
             Log.i(TAG, "Successfully restored all notification alarms after boot")
+
+            // Phase 1.D: Set boot flag so JS can detect reboot on next app launch
+            // and force-reschedule FullAdhan AlarmManager entries (which DON'T survive reboot).
+            try {
+                val prefs = ctx.getSharedPreferences("rooh_boot_state", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putLong("last_boot_at", now.time)
+                    .putBoolean("boot_pending_reschedule", true)
+                    .apply()
+                Log.i(TAG, "Boot flag set — JS will force-reschedule FullAdhan on next launch")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to set boot flag: \${e.message}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to restore notification alarms after boot: \${e.message}")
         }

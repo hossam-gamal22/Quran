@@ -12,9 +12,7 @@ const LiveActivityModule = NativeModules.LiveActivityModule;
 
 export type LiveActivityStyle =
   | 'prayer_times'
-  | 'prayer_times_sunrise'
-  | 'prayer_with_dua'
-  | 'prayer_with_ayah';
+  | 'prayer_times_sunrise';
 
 export interface LiveActivitySettings {
   enabled: boolean;
@@ -71,8 +69,11 @@ export const saveLiveActivitySettings = async (settings: LiveActivitySettings): 
 export const startLiveActivity = async (data: LiveActivityData): Promise<boolean> => {
   if (Platform.OS !== 'ios' || !LiveActivityModule) return false;
   try {
-    return await LiveActivityModule.startPrayerLiveActivity(data);
+    const result = await LiveActivityModule.startPrayerLiveActivity(data);
+    if (result) setLastError(null);
+    return result;
   } catch (e) {
+    setLastError(e);
     console.log('📍 Live Activity start failed:', e);
     return false;
   }
@@ -84,8 +85,11 @@ export const startLiveActivity = async (data: LiveActivityData): Promise<boolean
 export const updateLiveActivity = async (data: LiveActivityData): Promise<boolean> => {
   if (Platform.OS !== 'ios' || !LiveActivityModule) return false;
   try {
-    return await LiveActivityModule.updatePrayerLiveActivity(data);
+    const result = await LiveActivityModule.updatePrayerLiveActivity(data);
+    if (result) setLastError(null);
+    return result;
   } catch (e) {
+    setLastError(e);
     console.warn('📍 Live Activity update failed:', e);
     return false;
   }
@@ -130,6 +134,42 @@ export const areActivitiesEnabled = async (): Promise<boolean> => {
   }
 };
 
+// ===================================================
+// Diagnostics — distinguish "bridge missing" from "user disabled"
+// ===================================================
+
+export type LiveActivityStatus =
+  | 'not_ios'                 // Running on Android/web
+  | 'bridge_missing'          // Native module not linked (build issue)
+  | 'system_disabled'         // ActivityKit available but user disabled in iOS Settings
+  | 'enabled';                // Ready to use
+
+let lastNativeError: string | null = null;
+
+const setLastError = (err: unknown) => {
+  if (!err) { lastNativeError = null; return; }
+  if (typeof err === 'string') { lastNativeError = err; return; }
+  const anyErr = err as { message?: string; code?: string | number };
+  lastNativeError = `${anyErr.code ?? ''} ${anyErr.message ?? String(err)}`.trim();
+};
+
+export const getLastLiveActivityError = (): string | null => lastNativeError;
+
+export const getLiveActivityStatus = async (): Promise<LiveActivityStatus> => {
+  if (Platform.OS !== 'ios') return 'not_ios';
+  if (!LiveActivityModule) return 'bridge_missing';
+  try {
+    const enabled: boolean = await LiveActivityModule.areActivitiesEnabled();
+    return enabled ? 'enabled' : 'system_disabled';
+  } catch (e) {
+    setLastError(e);
+    return 'system_disabled';
+  }
+};
+
+export const isLiveActivityBridgeAvailable = (): boolean =>
+  Platform.OS === 'ios' && !!LiveActivityModule;
+
 export const LIVE_ACTIVITY_STYLES: {
   id: LiveActivityStyle;
   nameAr: string;
@@ -147,17 +187,5 @@ export const LIVE_ACTIVITY_STYLES: {
     nameAr: 'أوقات الصلاة مع الشروق',
     nameEn: 'Prayer Times with Sunrise',
     descAr: 'مع إضافة وقت الشروق',
-  },
-  {
-    id: 'prayer_with_dua',
-    nameAr: 'مع دعاء',
-    nameEn: 'With Dua',
-    descAr: 'الصلاة القادمة مع دعاء متجدد',
-  },
-  {
-    id: 'prayer_with_ayah',
-    nameAr: 'مع آية',
-    nameEn: 'With Verse',
-    descAr: 'الصلاة القادمة مع آية قرآنية',
   },
 ];

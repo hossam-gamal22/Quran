@@ -1,0 +1,2392 @@
+[
+  {
+    "id": "mishary_alafasy",
+    "nameAr": "مشاري العفاسي",
+    "nameEn": "Mishary Alafasy",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.alafasy",
+    "everyAyahFolder": "Alafasy_128kbps",
+    "quranicAudioDir": "mishaari_raashid_al_3afaasee",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "afs"
+    },
+    "quranCdnId": 7,
+    "everyAyahFolders": [
+      "Alafasy_128kbps"
+    ],
+    "quranicAudioDirs": [
+      "mishaari_raashid_al_3afaasee"
+    ],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "afs"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.alafasy/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Alafasy_128kbps": {
+        "url": "https://everyayah.com/data/Alafasy_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:mishaari_raashid_al_3afaasee": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "mp3Quran:server8/afs": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/afs/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/afs/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/afs/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/afs/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/afs/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/7/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/mishari_al_afasy/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.alafasy",
+      "everyAyah": "Alafasy_128kbps",
+      "quranicAudio": "mishaari_raashid_al_3afaasee",
+      "mp3Quran": "server8/afs",
+      "quranCdnSync": 7
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "abdulbasit_murattal",
+    "nameAr": "عبد الباسط عبد الصمد - مرتل",
+    "nameEn": "Abdul Basit Abdus Samad (Murattal)",
+    "style": "murattal",
+    "bitrate": 64,
+    "alquranCloudId": "ar.abdulsamad",
+    "everyAyahFolder": "Abdul_Basit_Murattal_64kbps",
+    "mp3Quran": {
+      "server": 7,
+      "folder": "basit"
+    },
+    "quranCdnId": 2,
+    "everyAyahFolders": [
+      "Abdul_Basit_Murattal_64kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 7,
+        "f": "basit"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/64/ar.abdulsamad/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Abdul_Basit_Murattal_64kbps": {
+        "url": "https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server7/basit": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server7.mp3quran.net/basit/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server7.mp3quran.net/basit/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server7.mp3quran.net/basit/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server7.mp3quran.net/basit/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server7.mp3quran.net/basit/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/2/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/abdul_baset/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.abdulsamad",
+      "everyAyah": "Abdul_Basit_Murattal_64kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server7/basit",
+      "quranCdnSync": 2
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "husary",
+    "nameAr": "محمود خليل الحصري",
+    "nameEn": "Mahmoud Khalil Al-Husary",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.husary",
+    "everyAyahFolder": "Husary_128kbps",
+    "quranicAudioDir": "mahmood_khaleel_al-husaree",
+    "quranCdnId": 6,
+    "everyAyahFolders": [
+      "Husary_128kbps"
+    ],
+    "quranicAudioDirs": [
+      "mahmood_khaleel_al-husaree"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.husary/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Husary_128kbps": {
+        "url": "https://everyayah.com/data/Husary_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:mahmood_khaleel_al-husaree": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/6/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/khalil_al_husary/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.husary",
+      "everyAyah": "Husary_128kbps",
+      "quranicAudio": "mahmood_khaleel_al-husaree",
+      "mp3Quran": null,
+      "quranCdnSync": 6
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "minshawi_murattal",
+    "nameAr": "محمد صديق المنشاوي - مرتل",
+    "nameEn": "Mohamed Siddiq Al-Minshawi (Murattal)",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.minshawi",
+    "everyAyahFolder": "Minshawy_Murattal_128kbps",
+    "quranicAudioDir": "muhammad_siddeeq_al-minshaawee",
+    "quranCdnId": 9,
+    "everyAyahFolders": [
+      "Minshawy_Murattal_128kbps"
+    ],
+    "quranicAudioDirs": [
+      "muhammad_siddeeq_al-minshaawee"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.minshawi/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Minshawy_Murattal_128kbps": {
+        "url": "https://everyayah.com/data/Minshawy_Murattal_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:muhammad_siddeeq_al-minshaawee": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/9/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/siddiq_minshawi/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.minshawi",
+      "everyAyah": "Minshawy_Murattal_128kbps",
+      "quranicAudio": "muhammad_siddeeq_al-minshaawee",
+      "mp3Quran": null,
+      "quranCdnSync": 9
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "sudais",
+    "nameAr": "عبد الرحمن السديس",
+    "nameEn": "Abdurrahman As-Sudais",
+    "style": "murattal",
+    "bitrate": 192,
+    "alquranCloudId": "ar.abdurrahmaansudais",
+    "everyAyahFolder": "Abdurrahmaan_As-Sudais_192kbps",
+    "mp3Quran": {
+      "server": 11,
+      "folder": "sds"
+    },
+    "quranCdnId": 3,
+    "everyAyahFolders": [
+      "Abdurrahmaan_As-Sudais_192kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 11,
+        "f": "sds"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/192/ar.abdurrahmaansudais/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Abdurrahmaan_As-Sudais_192kbps": {
+        "url": "https://everyayah.com/data/Abdurrahmaan_As-Sudais_192kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server11/sds": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server11.mp3quran.net/sds/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server11.mp3quran.net/sds/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server11.mp3quran.net/sds/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server11.mp3quran.net/sds/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server11.mp3quran.net/sds/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/3/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/abdurrahmaan_as_sudais/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.abdurrahmaansudais",
+      "everyAyah": "Abdurrahmaan_As-Sudais_192kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server11/sds",
+      "quranCdnSync": 3
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "shuraim",
+    "nameAr": "سعود الشريم",
+    "nameEn": "Saud Al-Shuraim",
+    "style": "murattal",
+    "bitrate": 64,
+    "alquranCloudId": "ar.saoodshuraym",
+    "everyAyahFolder": "Saood_ash-Shuraym_128kbps",
+    "mp3Quran": {
+      "server": 7,
+      "folder": "shur"
+    },
+    "quranCdnId": 10,
+    "everyAyahFolders": [
+      "Saood_ash-Shuraym_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 7,
+        "f": "shur"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/64/ar.saoodshuraym/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Saood_ash-Shuraym_128kbps": {
+        "url": "https://everyayah.com/data/Saood_ash-Shuraym_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server7/shur": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server7.mp3quran.net/shur/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server7.mp3quran.net/shur/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server7.mp3quran.net/shur/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server7.mp3quran.net/shur/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server7.mp3quran.net/shur/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/10/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/saud_ash-shuraym/murattal/001.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.saoodshuraym",
+      "everyAyah": "Saood_ash-Shuraym_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server7/shur",
+      "quranCdnSync": 10
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "maher_muaiqly",
+    "nameAr": "ماهر المعيقلي",
+    "nameEn": "Maher Al Muaiqly",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.mahermuaiqly",
+    "everyAyahFolder": "MaherAlMuaiqly128kbps",
+    "mp3Quran": {
+      "server": 12,
+      "folder": "maher"
+    },
+    "everyAyahFolders": [
+      "MaherAlMuaiqly128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 12,
+        "f": "maher"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.mahermuaiqly/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:MaherAlMuaiqly128kbps": {
+        "url": "https://everyayah.com/data/MaherAlMuaiqly128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server12/maher": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server12.mp3quran.net/maher/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server12.mp3quran.net/maher/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server12.mp3quran.net/maher/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server12.mp3quran.net/maher/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server12.mp3quran.net/maher/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.mahermuaiqly",
+      "everyAyah": "MaherAlMuaiqly128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server12/maher",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "shatri",
+    "nameAr": "أبو بكر الشاطري",
+    "nameEn": "Abu Bakr Al-Shatri",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.shaatree",
+    "everyAyahFolder": "Abu_Bakr_Ash-Shaatree_128kbps",
+    "quranicAudioDir": "abu_bakr_ash-shaatree",
+    "quranCdnId": 4,
+    "everyAyahFolders": [
+      "Abu_Bakr_Ash-Shaatree_128kbps"
+    ],
+    "quranicAudioDirs": [
+      "abu_bakr_ash-shaatree"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.shaatree/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Abu_Bakr_Ash-Shaatree_128kbps": {
+        "url": "https://everyayah.com/data/Abu_Bakr_Ash-Shaatree_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:abu_bakr_ash-shaatree": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/abu_bakr_ash-shaatree/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/abu_bakr_ash-shaatree/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/abu_bakr_ash-shaatree/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/abu_bakr_ash-shaatree/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/abu_bakr_ash-shaatree/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/4/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/abu_bakr_shatri/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.shaatree",
+      "everyAyah": "Abu_Bakr_Ash-Shaatree_128kbps",
+      "quranicAudio": "abu_bakr_ash-shaatree",
+      "mp3Quran": null,
+      "quranCdnSync": 4
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "ali_hudhaify",
+    "nameAr": "علي بن عبد الرحمن الحذيفي",
+    "nameEn": "Ali Al-Hudhaify",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.hudhaify",
+    "everyAyahFolder": "Hudhaify_128kbps",
+    "mp3Quran": {
+      "server": 9,
+      "folder": "hthfi"
+    },
+    "everyAyahFolders": [
+      "Hudhaify_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 9,
+        "f": "hthfi"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.hudhaify/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Hudhaify_128kbps": {
+        "url": "https://everyayah.com/data/Hudhaify_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server9/hthfi": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server9.mp3quran.net/hthfi/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server9.mp3quran.net/hthfi/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server9.mp3quran.net/hthfi/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server9.mp3quran.net/hthfi/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server9.mp3quran.net/hthfi/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.hudhaify",
+      "everyAyah": "Hudhaify_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server9/hthfi",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "abdullah_basfar",
+    "nameAr": "عبد الله بصفر",
+    "nameEn": "Abdullah Basfar",
+    "style": "murattal",
+    "bitrate": 192,
+    "alquranCloudId": "ar.abdullahbasfar",
+    "everyAyahFolder": "Abdullah_Basfar_192kbps",
+    "quranicAudioDir": "abdullaah_basfar",
+    "everyAyahFolders": [
+      "Abdullah_Basfar_192kbps"
+    ],
+    "quranicAudioDirs": [
+      "abdullaah_basfar"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/192/ar.abdullahbasfar/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Abdullah_Basfar_192kbps": {
+        "url": "https://everyayah.com/data/Abdullah_Basfar_192kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:abdullaah_basfar": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/abdullaah_basfar/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/abdullaah_basfar/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/abdullaah_basfar/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/abdullaah_basfar/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/abdullaah_basfar/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.abdullahbasfar",
+      "everyAyah": "Abdullah_Basfar_192kbps",
+      "quranicAudio": "abdullaah_basfar",
+      "mp3Quran": null,
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "ahmed_ajamy",
+    "nameAr": "أحمد بن علي العجمي",
+    "nameEn": "Ahmed Al-Ajamy",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.ahmedajamy",
+    "everyAyahFolder": "ahmed_ibn_3ali_al-3ajamy_128kbps",
+    "mp3Quran": {
+      "server": 10,
+      "folder": "ajm"
+    },
+    "quranCdnId": 19,
+    "everyAyahFolders": [
+      "ahmed_ibn_3ali_al-3ajamy_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 10,
+        "f": "ajm"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.ahmedajamy/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:ahmed_ibn_3ali_al-3ajamy_128kbps": {
+        "url": "https://everyayah.com/data/ahmed_ibn_3ali_al-3ajamy_128kbps/001001.mp3",
+        "ok": false,
+        "status": 404
+      },
+      "mp3Quran:server10/ajm": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server10.mp3quran.net/ajm/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server10.mp3quran.net/ajm/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server10.mp3quran.net/ajm/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server10.mp3quran.net/ajm/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server10.mp3quran.net/ajm/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/19/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/quran/ahmed_ibn_3ali_al-3ajamy//001.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.ahmedajamy",
+      "everyAyah": null,
+      "quranicAudio": null,
+      "mp3Quran": "server10/ajm",
+      "quranCdnSync": 19
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "hani_rifai",
+    "nameAr": "هاني الرفاعي",
+    "nameEn": "Hani Ar-Rifai",
+    "style": "murattal",
+    "bitrate": 192,
+    "alquranCloudId": "ar.hanirifai",
+    "everyAyahFolder": "Hani_Rifai_192kbps",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "hani"
+    },
+    "quranCdnId": 5,
+    "everyAyahFolders": [
+      "Hani_Rifai_192kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "hani"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/192/ar.hanirifai/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Hani_Rifai_192kbps": {
+        "url": "https://everyayah.com/data/Hani_Rifai_192kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server8/hani": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/hani/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/hani/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/hani/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/hani/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/hani/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/5/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/hani_ar_rifai/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.hanirifai",
+      "everyAyah": "Hani_Rifai_192kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server8/hani",
+      "quranCdnSync": 5
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "yasser_dosari",
+    "nameAr": "ياسر الدوسري",
+    "nameEn": "Yasser Al-Dosari",
+    "style": "murattal",
+    "bitrate": 128,
+    "everyAyahFolder": "Yasser_Ad-Dussary_128kbps",
+    "mp3Quran": {
+      "server": 11,
+      "folder": "yasser"
+    },
+    "quranCdnId": 97,
+    "everyAyahFolders": [
+      "Yasser_Ad-Dussary_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 11,
+        "f": "yasser"
+      }
+    ],
+    "probes": {
+      "everyAyah:Yasser_Ad-Dussary_128kbps": {
+        "url": "https://everyayah.com/data/Yasser_Ad-Dussary_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server11/yasser": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server11.mp3quran.net/yasser/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server11.mp3quran.net/yasser/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server11.mp3quran.net/yasser/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server11.mp3quran.net/yasser/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server11.mp3quran.net/yasser/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/97/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/quran/yasser_ad-dussary//001.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Yasser_Ad-Dussary_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server11/yasser",
+      "quranCdnSync": 97
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "saad_ghamdi",
+    "nameAr": "سعد الغامدي",
+    "nameEn": "Saad Al-Ghamdi",
+    "style": "murattal",
+    "bitrate": 64,
+    "everyAyahFolder": "Ghamadi_40kbps",
+    "mp3Quran": {
+      "server": 7,
+      "folder": "s_gmd"
+    },
+    "quranCdnId": 13,
+    "everyAyahFolders": [
+      "Ghamadi_40kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 7,
+        "f": "s_gmd"
+      }
+    ],
+    "probes": {
+      "everyAyah:Ghamadi_40kbps": {
+        "url": "https://everyayah.com/data/Ghamadi_40kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server7/s_gmd": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server7.mp3quran.net/s_gmd/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server7.mp3quran.net/s_gmd/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server7.mp3quran.net/s_gmd/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server7.mp3quran.net/s_gmd/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server7.mp3quran.net/s_gmd/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/13/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/quran/sa3d_al-ghaamidi/complete//001.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Ghamadi_40kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server7/s_gmd",
+      "quranCdnSync": 13
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "abdulbasit_mujawwad",
+    "nameAr": "عبد الباسط عبد الصمد - مجود",
+    "nameEn": "Abdul Basit Abdus Samad (Mujawwad)",
+    "style": "mujawwad",
+    "bitrate": 128,
+    "everyAyahFolder": "Abdul_Basit_Mujawwad_128kbps",
+    "mp3Quran": {
+      "server": 7,
+      "folder": "basit/Almusshaf-Al-Mojawwad"
+    },
+    "everyAyahFolders": [
+      "Abdul_Basit_Mujawwad_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 7,
+        "f": "basit/Almusshaf-Al-Mojawwad"
+      }
+    ],
+    "probes": {
+      "everyAyah:Abdul_Basit_Mujawwad_128kbps": {
+        "url": "https://everyayah.com/data/Abdul_Basit_Mujawwad_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server7/basit/Almusshaf-Al-Mojawwad": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server7.mp3quran.net/basit/Almusshaf-Al-Mojawwad/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server7.mp3quran.net/basit/Almusshaf-Al-Mojawwad/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server7.mp3quran.net/basit/Almusshaf-Al-Mojawwad/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server7.mp3quran.net/basit/Almusshaf-Al-Mojawwad/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server7.mp3quran.net/basit/Almusshaf-Al-Mojawwad/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Abdul_Basit_Mujawwad_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server7/basit/Almusshaf-Al-Mojawwad",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "husary_mujawwad",
+    "nameAr": "محمود خليل الحصري - مجود",
+    "nameEn": "Al-Husary (Mujawwad)",
+    "style": "mujawwad",
+    "bitrate": 128,
+    "alquranCloudId": "ar.husarymujawwad",
+    "everyAyahFolder": "Husary_Mujawwad_64kbps",
+    "mp3Quran": {
+      "server": 13,
+      "folder": "husr/Almusshaf-Al-Mojawwad"
+    },
+    "everyAyahFolders": [
+      "Husary_Mujawwad_64kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 13,
+        "f": "husr/Almusshaf-Al-Mojawwad"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.husarymujawwad/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Husary_Mujawwad_64kbps": {
+        "url": "https://everyayah.com/data/Husary_Mujawwad_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server13/husr/Almusshaf-Al-Mojawwad": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server13.mp3quran.net/husr/Almusshaf-Al-Mojawwad/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server13.mp3quran.net/husr/Almusshaf-Al-Mojawwad/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server13.mp3quran.net/husr/Almusshaf-Al-Mojawwad/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server13.mp3quran.net/husr/Almusshaf-Al-Mojawwad/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server13.mp3quran.net/husr/Almusshaf-Al-Mojawwad/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.husarymujawwad",
+      "everyAyah": "Husary_Mujawwad_64kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server13/husr/Almusshaf-Al-Mojawwad",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "minshawi_mujawwad",
+    "nameAr": "محمد صديق المنشاوي - مجود",
+    "nameEn": "Al-Minshawi (Mujawwad)",
+    "style": "mujawwad",
+    "bitrate": 64,
+    "everyAyahFolder": "Minshawy_Mujawwad_64kbps",
+    "mp3Quran": {
+      "server": 10,
+      "folder": "minsh/Almusshaf-Al-Mojawwad"
+    },
+    "everyAyahFolders": [
+      "Minshawy_Mujawwad_64kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 10,
+        "f": "minsh/Almusshaf-Al-Mojawwad"
+      }
+    ],
+    "probes": {
+      "everyAyah:Minshawy_Mujawwad_64kbps": {
+        "url": "https://everyayah.com/data/Minshawy_Mujawwad_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server10/minsh/Almusshaf-Al-Mojawwad": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server10.mp3quran.net/minsh/Almusshaf-Al-Mojawwad/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Minshawy_Mujawwad_64kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server10/minsh/Almusshaf-Al-Mojawwad",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "jibreel",
+    "nameAr": "محمد جبريل",
+    "nameEn": "Muhammad Jibreel",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.muhammadjibreel",
+    "everyAyahFolder": "Muhammad_Jibreel_128kbps",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "jbrl"
+    },
+    "everyAyahFolders": [
+      "Muhammad_Jibreel_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "jbrl"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.muhammadjibreel/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Muhammad_Jibreel_128kbps": {
+        "url": "https://everyayah.com/data/Muhammad_Jibreel_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server8/jbrl": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/jbrl/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/jbrl/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/jbrl/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/jbrl/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/jbrl/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.muhammadjibreel",
+      "everyAyah": "Muhammad_Jibreel_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server8/jbrl",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "ayyoub",
+    "nameAr": "محمد أيوب",
+    "nameEn": "Muhammad Ayyoub",
+    "style": "murattal",
+    "bitrate": 128,
+    "alquranCloudId": "ar.muhammadayyoub",
+    "everyAyahFolder": "Muhammad_Ayyoub_128kbps",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "ayyub"
+    },
+    "everyAyahFolders": [
+      "Muhammad_Ayyoub_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "ayyub"
+      }
+    ],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/128/ar.muhammadayyoub/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Muhammad_Ayyoub_128kbps": {
+        "url": "https://everyayah.com/data/Muhammad_Ayyoub_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server8/ayyub": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/ayyub/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/ayyub/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/ayyub/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/ayyub/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/ayyub/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.muhammadayyoub",
+      "everyAyah": "Muhammad_Ayyoub_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server8/ayyub",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "ibrahim_akhdar",
+    "nameAr": "إبراهيم الأخضر",
+    "nameEn": "Ibrahim Al-Akhdar",
+    "style": "murattal",
+    "bitrate": 32,
+    "alquranCloudId": "ar.ibrahimakhbar",
+    "everyAyahFolder": "Ibrahim_Akhdar_32kbps",
+    "quranicAudioDir": "ibrahim_al_akhdar",
+    "everyAyahFolders": [
+      "Ibrahim_Akhdar_32kbps"
+    ],
+    "quranicAudioDirs": [
+      "ibrahim_al_akhdar"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/32/ar.ibrahimakhbar/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Ibrahim_Akhdar_32kbps": {
+        "url": "https://everyayah.com/data/Ibrahim_Akhdar_32kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:ibrahim_al_akhdar": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/ibrahim_al_akhdar/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/ibrahim_al_akhdar/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/ibrahim_al_akhdar/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/ibrahim_al_akhdar/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/ibrahim_al_akhdar/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.ibrahimakhbar",
+      "everyAyah": "Ibrahim_Akhdar_32kbps",
+      "quranicAudio": "ibrahim_al_akhdar",
+      "mp3Quran": null,
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "ayman_swoaid",
+    "nameAr": "أيمن سويد",
+    "nameEn": "Ayman Sowaid",
+    "style": "murattal",
+    "bitrate": 64,
+    "alquranCloudId": "ar.aymanswoaid",
+    "everyAyahFolder": "Ayman_Sowaid_64kbps",
+    "everyAyahFolders": [
+      "Ayman_Sowaid_64kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "alquranCloud": {
+        "url": "https://cdn.islamic.network/quran/audio/64/ar.aymanswoaid/1.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "everyAyah:Ayman_Sowaid_64kbps": {
+        "url": "https://everyayah.com/data/Ayman_Sowaid_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": "ar.aymanswoaid",
+      "everyAyah": "Ayman_Sowaid_64kbps",
+      "quranicAudio": null,
+      "mp3Quran": null,
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": false,
+    "visibleInFullSurahPicker": false,
+    "status": "AYAH-ONLY-HIDDEN"
+  },
+  {
+    "id": "bandar_baleela",
+    "nameAr": "بندر بليلة",
+    "nameEn": "Bandar Baleela",
+    "style": "murattal",
+    "bitrate": 128,
+    "quranicAudioDir": "bandar_baleela",
+    "mp3Quran": {
+      "server": 6,
+      "folder": "balilah"
+    },
+    "everyAyahFolders": [],
+    "quranicAudioDirs": [
+      "bandar_baleela"
+    ],
+    "mp3QuranCandidates": [
+      {
+        "s": 6,
+        "f": "balilah"
+      }
+    ],
+    "probes": {
+      "quranicAudio:bandar_baleela": {
+        "ok": false,
+        "status": 404,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/bandar_baleela/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/bandar_baleela/018.mp3",
+            "ok": false,
+            "status": 404
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/bandar_baleela/036.mp3",
+            "ok": false,
+            "status": 404
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/bandar_baleela/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/bandar_baleela/114.mp3",
+            "ok": false,
+            "status": 404
+          }
+        ]
+      },
+      "mp3Quran:server6/balilah": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server6.mp3quran.net/balilah/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server6.mp3quran.net/balilah/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server6.mp3quran.net/balilah/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server6.mp3quran.net/balilah/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server6.mp3quran.net/balilah/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": null,
+      "quranicAudio": null,
+      "mp3Quran": "server6/balilah",
+      "quranCdnSync": null
+    },
+    "perAyahOk": false,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "fares_abbad",
+    "nameAr": "فارس عباد",
+    "nameEn": "Fares Abbad",
+    "style": "murattal",
+    "bitrate": 64,
+    "everyAyahFolder": "Fares_Abbad_64kbps",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "frs_a"
+    },
+    "everyAyahFolders": [
+      "Fares_Abbad_64kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "frs_a"
+      }
+    ],
+    "probes": {
+      "everyAyah:Fares_Abbad_64kbps": {
+        "url": "https://everyayah.com/data/Fares_Abbad_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server8/frs_a": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/frs_a/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/frs_a/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/frs_a/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/frs_a/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/frs_a/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Fares_Abbad_64kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server8/frs_a",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "khalifa_tunaiji",
+    "nameAr": "خليفة الطنيجي",
+    "nameEn": "Khalifa Al-Tunaiji",
+    "style": "murattal",
+    "bitrate": 64,
+    "everyAyahFolder": "khalefa_al_tunaiji_64kbps",
+    "quranicAudioDir": "khalifah_taniji",
+    "quranCdnId": 161,
+    "everyAyahFolders": [
+      "khalefa_al_tunaiji_64kbps"
+    ],
+    "quranicAudioDirs": [
+      "khalifah_taniji"
+    ],
+    "mp3QuranCandidates": [],
+    "probes": {
+      "everyAyah:khalefa_al_tunaiji_64kbps": {
+        "url": "https://everyayah.com/data/khalefa_al_tunaiji_64kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "quranicAudio:khalifah_taniji": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/khalifah_taniji/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/khalifah_taniji/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/khalifah_taniji/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/khalifah_taniji/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/khalifah_taniji/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "url": "https://api.qurancdn.com/api/qdc/audio/reciters/161/audio_files?chapter_number=1&segments=true",
+        "ok": true,
+        "status": 200,
+        "segmentsCount": 7,
+        "audioUrl": "https://download.quranicaudio.com/qdc/khalifah_taniji/murattal/1.mp3",
+        "audioReachable": true
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "khalefa_al_tunaiji_64kbps",
+      "quranicAudio": "khalifah_taniji",
+      "mp3Quran": null,
+      "quranCdnSync": 161
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL"
+  },
+  {
+    "id": "nasser_qatami",
+    "nameAr": "ناصر القطامي",
+    "nameEn": "Nasser Al-Qatami",
+    "style": "murattal",
+    "bitrate": 128,
+    "everyAyahFolder": "Nasser_Alqatami_128kbps",
+    "mp3Quran": {
+      "server": 6,
+      "folder": "qtm"
+    },
+    "everyAyahFolders": [
+      "Nasser_Alqatami_128kbps"
+    ],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 6,
+        "f": "qtm"
+      }
+    ],
+    "probes": {
+      "everyAyah:Nasser_Alqatami_128kbps": {
+        "url": "https://everyayah.com/data/Nasser_Alqatami_128kbps/001001.mp3",
+        "ok": true,
+        "status": 200
+      },
+      "mp3Quran:server6/qtm": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server6.mp3quran.net/qtm/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server6.mp3quran.net/qtm/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server6.mp3quran.net/qtm/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server6.mp3quran.net/qtm/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server6.mp3quran.net/qtm/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": "Nasser_Alqatami_128kbps",
+      "quranicAudio": null,
+      "mp3Quran": "server6/qtm",
+      "quranCdnSync": null
+    },
+    "perAyahOk": true,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "khalid_jalil",
+    "nameAr": "خالد الجليل",
+    "nameEn": "Khalid Al-Jalil",
+    "style": "murattal",
+    "bitrate": 128,
+    "mp3Quran": {
+      "server": 10,
+      "folder": "jleel"
+    },
+    "everyAyahFolders": [],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 10,
+        "f": "jleel"
+      }
+    ],
+    "probes": {
+      "mp3Quran:server10/jleel": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server10.mp3quran.net/jleel/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server10.mp3quran.net/jleel/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server10.mp3quran.net/jleel/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server10.mp3quran.net/jleel/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server10.mp3quran.net/jleel/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": null,
+      "quranicAudio": null,
+      "mp3Quran": "server10/jleel",
+      "quranCdnSync": null
+    },
+    "perAyahOk": false,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "raad_kurdi",
+    "nameAr": "رعد محمد الكردي",
+    "nameEn": "Raad Al-Kurdi",
+    "style": "murattal",
+    "bitrate": 64,
+    "mp3Quran": {
+      "server": 6,
+      "folder": "kurdi"
+    },
+    "everyAyahFolders": [],
+    "quranicAudioDirs": [],
+    "mp3QuranCandidates": [
+      {
+        "s": 6,
+        "f": "kurdi"
+      }
+    ],
+    "probes": {
+      "mp3Quran:server6/kurdi": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server6.mp3quran.net/kurdi/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server6.mp3quran.net/kurdi/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server6.mp3quran.net/kurdi/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server6.mp3quran.net/kurdi/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server6.mp3quran.net/kurdi/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": null,
+      "quranicAudio": null,
+      "mp3Quran": "server6/kurdi",
+      "quranCdnSync": null
+    },
+    "perAyahOk": false,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  },
+  {
+    "id": "mostafa_ismail",
+    "nameAr": "مصطفى إسماعيل",
+    "nameEn": "Mostafa Ismail",
+    "style": "mujawwad",
+    "bitrate": 128,
+    "quranicAudioDir": "mostafa_ismaeel",
+    "mp3Quran": {
+      "server": 8,
+      "folder": "mustafa/Almusshaf-Al-Mojawwad"
+    },
+    "everyAyahFolders": [],
+    "quranicAudioDirs": [
+      "mostafa_ismaeel"
+    ],
+    "mp3QuranCandidates": [
+      {
+        "s": 8,
+        "f": "mustafa/Almusshaf-Al-Mojawwad"
+      }
+    ],
+    "probes": {
+      "quranicAudio:mostafa_ismaeel": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://download.quranicaudio.com/quran/mostafa_ismaeel/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://download.quranicaudio.com/quran/mostafa_ismaeel/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://download.quranicaudio.com/quran/mostafa_ismaeel/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://download.quranicaudio.com/quran/mostafa_ismaeel/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://download.quranicaudio.com/quran/mostafa_ismaeel/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "mp3Quran:server8/mustafa/Almusshaf-Al-Mojawwad": {
+        "ok": true,
+        "status": 200,
+        "samples": [
+          {
+            "surah": 1,
+            "url": "https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/001.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 18,
+            "url": "https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/018.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 36,
+            "url": "https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/036.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 67,
+            "url": "https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/067.mp3",
+            "ok": true,
+            "status": 200
+          },
+          {
+            "surah": 114,
+            "url": "https://server8.mp3quran.net/mustafa/Almusshaf-Al-Mojawwad/114.mp3",
+            "ok": true,
+            "status": 200
+          }
+        ]
+      },
+      "quranCdnSync": {
+        "ok": false
+      }
+    },
+    "working": {
+      "alquranCloud": null,
+      "everyAyah": null,
+      "quranicAudio": "mostafa_ismaeel",
+      "mp3Quran": "server8/mustafa/Almusshaf-Al-Mojawwad",
+      "quranCdnSync": null
+    },
+    "perAyahOk": false,
+    "perSurahOk": true,
+    "visibleInFullSurahPicker": true,
+    "status": "FULL-SURAH"
+  }
+]

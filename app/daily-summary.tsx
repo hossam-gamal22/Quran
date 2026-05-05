@@ -77,7 +77,7 @@ function StatCard({ icon, iconColor, title, value, subtitle, details, delay, col
           >
             <MaterialCommunityIcons name="lock" size={28} color={isDarkMode ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)'} />
             <Text style={{ color: isDarkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)', fontFamily: fontSemiBold(), fontSize: 13, marginTop: 4 }}>
-              {t('subscription.premiumFeature') || 'ميزة مميزة'}
+              {t('common.premiumFeature') || 'ميزة مميزة'}
             </Text>
           </TouchableOpacity>
         )}
@@ -236,7 +236,7 @@ export default function DailySummaryScreen() {
         <StatCard
           icon="mosque"
           iconColor="#c17f59"
-          title={t('prayer.prayer') || 'الصلاة'}
+          title={t('tabs.prayer') || 'الصلاة'}
           value={`${localizeNumber(prayedCount)}/٥`}
           subtitle={prayedCount === 5 ? (t('worship.allPrayersDone') || 'ما شاء الله! أتممت جميع الصلوات') : undefined}
           details={prayerDetails}
@@ -250,7 +250,7 @@ export default function DailySummaryScreen() {
         <StatCard
           icon="book-open-variant"
           iconColor="#3a7ca5"
-          title={t('quran.quran') || 'القرآن'}
+          title={t('tabs.quran') || 'القرآن'}
           value={localizeNumber(pagesRead)}
           subtitle={pagesRead > 0 ? (t('worship.pagesRead') || 'صفحات') : (t('worship.noPagesYet') || 'لم تقرأ بعد')}
           delay={200}

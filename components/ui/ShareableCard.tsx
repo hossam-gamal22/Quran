@@ -53,13 +53,13 @@ interface ShareableCardProps {
 const CARD_COLORS = THEME_CARD_COLORS;
 
 const APP_BACKGROUNDS = [
-  require('@/assets/images/backgrounds/background1.webp'),
-  require('@/assets/images/backgrounds/background2.webp'),
-  require('@/assets/images/backgrounds/background3.webp'),
-  require('@/assets/images/backgrounds/background4.webp'),
-  require('@/assets/images/backgrounds/background5.webp'),
-  require('@/assets/images/backgrounds/background6.webp'),
-  require('@/assets/images/backgrounds/background7.webp'),
+  require('@/assets/images/backgrounds/background1.png'),
+  require('@/assets/images/backgrounds/background2.png'),
+  require('@/assets/images/backgrounds/background3.png'),
+  require('@/assets/images/backgrounds/background4.png'),
+  require('@/assets/images/backgrounds/background5.png'),
+  require('@/assets/images/backgrounds/background6.png'),
+  require('@/assets/images/backgrounds/background7.png'),
 ];
 
 export function ShareableCard({

@@ -80,6 +80,12 @@ const withIOSWidgets = (config) => {
   });
 
   // 2. Add the widget extension target to PBXProject
+  // Capture parent app version BEFORE entering the callback — the outer
+  // `config` is shadowed inside the build-settings loop below by
+  // `const config = configurations[key]` (Xcode XCBuildConfiguration).
+  const appVersion = String(config.version ?? '1.0');
+  const appBuildNumber = String(config.ios?.buildNumber ?? '1');
+
   config = withXcodeProject(config, (mod) => {
     const xcodeProject = mod.modResults;
     const projectRoot = mod.modRequest.projectRoot;
@@ -444,8 +450,8 @@ const withIOSWidgets = (config) => {
             bs.GENERATE_INFOPLIST_FILE = 'NO';
             // Match parent app version so App Store Connect doesn't reject upload
             // (CFBundleShortVersionString of app extension must equal parent app's)
-            bs.CURRENT_PROJECT_VERSION = String(config.ios?.buildNumber ?? '1');
-            bs.MARKETING_VERSION = String(config.version ?? '1.0');
+            bs.CURRENT_PROJECT_VERSION = appBuildNumber;
+            bs.MARKETING_VERSION = appVersion;
             bs.ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = 'YES';
           }
         }

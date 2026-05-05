@@ -50,6 +50,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from 'expo-blur';
 import ViewShot from 'react-native-view-shot';
 import { useQuran } from '@/contexts/QuranContext';
+import { hasPerAyahSync } from '@/lib/reciters-registry';
 import { useSettings } from '@/contexts/SettingsContext';
 import { t as translate, getLanguage } from '@/lib/i18n';
 import { useQuranTracker } from '@/contexts/WorshipContext';
@@ -103,6 +104,7 @@ import {
   ensurePagesLoaded,
   getPageFontFamily,
   isPageFontLoaded,
+  ensureSharePageFontReady,
 } from '@/lib/qcf-font-loader';
 // AudioPlayerBar moved to global _layout.tsx
 import {
@@ -261,11 +263,11 @@ const MushafPage = React.memo(function MushafPage({
   const shouldForcePlainArabic = !!forcePlainArabicForCapture && Platform.OS === 'android';
   const [fontLoaded, setFontLoaded] = useState(isPageFontLoaded(page, needsDarkFont));
   const [fontError, setFontError] = useState(false);
-  // Safety fallback: if QCF font load takes too long (or silently fails to
-  // register at the OS level — PUA glyphs render as invisible system-font
-  // fallback), switch to plain Uthmani text after a timeout so the user
-  // never sees a blank page.
-  const [fontTimedOut, setFontTimedOut] = useState(false);
+  // Safety fallback: only used for Android share-card capture (when the QCF
+  // font would otherwise render as invisible PUA glyphs in viewshot). The
+  // 604 QCF page fonts are bundled with the app and preloaded in background
+  // at startup (see app/_layout.tsx → preloadAllPagesInBackground), so for
+  // normal navigation the font is already in memory.
   const baseTextColor = getQuranTextColor('', themeIndex);
   // Determine if the theme's primary color is dark (i.e., designed for light backgrounds)
   const isBaseColorDark = (() => {
@@ -293,43 +295,42 @@ const MushafPage = React.memo(function MushafPage({
   }
   const goldenColor = getGoldenColor(themeIndex);
   const targetAyahBg = getTargetAyahBg(themeIndex);
-  // Fall back to plain Arabic rendering on any platform when the QCF font fails —
-  // user still sees the verses without a blocking "Font Load Error" screen.
-  const usePlainArabicMode = shouldForcePlainArabic || fontError || fontTimedOut;
+  // Plain-Arabic rendering is reserved for the Android share-card capture path
+  // (forcePlainArabicForCapture). It is NOT triggered by load timeouts — the
+  // QCF fonts are bundled, so we always wait for the proper font to register.
+  const usePlainArabicMode = shouldForcePlainArabic || fontError;
 
-  // Load QCF4 per-page font (use needsDarkFont based on actual background)
+  // Load QCF4 per-page font (use needsDarkFont based on actual background).
+  // Fonts are bundled locally — no network, no timeout. Spinner shows briefly
+  // (a few frames) on cold first-use; subsequent visits are instant because
+  // the font registers in expo-font's global registry.
   useEffect(() => {
     if (shouldForcePlainArabic) return;
     if (isPageFontLoaded(page, needsDarkFont)) {
       setFontLoaded(true);
-      setFontTimedOut(false);
       return;
     }
     setFontLoaded(false);
     setFontError(false);
-    setFontTimedOut(false);
-    // Hard 3s safety: if the font hasn't reported loaded by then, render plain
-    // Uthmani text from quran-v4.json so the page is never empty.
-    const timeoutId = setTimeout(() => {
-      if (!isPageFontLoaded(page, needsDarkFont)) {
-        setFontTimedOut(true);
-      }
-    }, 3000);
     loadPageFont(page, needsDarkFont)
       .then(() => {
-        clearTimeout(timeoutId);
         setFontLoaded(true);
-        setFontTimedOut(false);
       })
       .catch(() => {
-        clearTimeout(timeoutId);
         setFontError(true);
       });
-    return () => clearTimeout(timeoutId);
   }, [page, needsDarkFont, shouldForcePlainArabic]);
 
   const blocks = useMemo(() => buildPageBlocks(page), [page]);
   const fontFamily = getPageFontFamily(page, needsDarkFont);
+
+  // Page-scoped per-ayah word offset tracker for the plain-Arabic fallback.
+  // Reset on every render so word indices are sequential across Mushaf lines
+  // (prevents the same opening words from being re-printed on each line).
+  const ayahWordOffsets = useMemo(() => new Map<string, number>(), [page, blocks, usePlainArabicMode]);
+  // Reset offsets at the start of each render pass so the map state stays
+  // consistent with the current blocks iteration.
+  ayahWordOffsets.clear();
 
   // Dynamic font scaling: only boost very sparse pages, avoid cramping dense ones
   const contentLineCount = blocks.filter(b => b.type === 'ayah' || b.type === 'basmallah').length;
@@ -456,9 +457,20 @@ const MushafPage = React.memo(function MushafPage({
                   const ayahObj = surahData?.ayahs.find(a => a.ns === group.ayah);
                   const ayahText = ayahObj?.t;
 
-                  if (ayahText && (usePlainArabicMode || !fontLoaded)) {
+                  // Plain-Arabic fallback (Android share-card capture only):
+                  // render each glyph slot as the matching Uthmani word from
+                  // quran-v4.json. The previous implementation reset
+                  // `wordIndex = 0` on every Mushaf line, which caused the
+                  // opening words of each ayah to be re-printed on every line
+                  // that contained a fragment of that ayah (visible as
+                  // duplicated text on Quran pages). We now build a
+                  // page-level word offset per ayah so each word renders
+                  // exactly once across the page.
+                  if (ayahText && usePlainArabicMode) {
                     const wordsFromAyah = ayahText.split(/\s+/).filter(Boolean);
-                    let wordIndex = 0;
+                    const startIdx = ayahWordOffsets.get(ayahKey) ?? 0;
+                    const slice = wordsFromAyah.slice(startIdx, startIdx + group.parts.length);
+                    ayahWordOffsets.set(ayahKey, startIdx + group.parts.length);
                     return (
                       <Text
                         key={gi}
@@ -474,8 +486,7 @@ const MushafPage = React.memo(function MushafPage({
                         } : undefined}
                       >
                         {group.parts.map((part, pi) => {
-                          const mapped = wordsFromAyah[wordIndex] ?? part.glyph;
-                          wordIndex += 1;
+                          const mapped = slice[pi] ?? part.glyph;
                           return (
                             <Text key={pi} style={{ color: textColor }}>
                               {mapped}{' '}
@@ -642,6 +653,9 @@ function GlassHeader({ isLightBg, textColor, goldenColor, juz, surahName, tafsir
           <TouchableOpacity hitSlop={8} onPress={onShare}>
             <MaterialCommunityIcons name="share-variant-outline" size={20} color={goldenColor} />
           </TouchableOpacity>
+          <TouchableOpacity hitSlop={8} onPress={onSettings}>
+            <MaterialCommunityIcons name="cog-outline" size={22} color={goldenColor} />
+          </TouchableOpacity>
         </View>
 
         {/* Center-Right: surah name + page/juz, aligned to back arrow */}
@@ -781,7 +795,7 @@ export default function SurahScreen() {
   const [showAyahMenu, setShowAyahMenu] = useState(false);
   const [selectedAyah, setSelectedAyah] = useState<{ surah: number; ayah: number; page: number } | null>(null);
   const [showShareCard, setShowShareCard] = useState(false);
-  const [shareData, setShareData] = useState<{ text: string; title: string; reference: string; surahNumber?: number; ayahNumber?: number; page?: number } | null>(null);
+  const [shareData, setShareData] = useState<{ text: string; title: string; reference: string; surahNumber?: number; ayahNumber?: number; page?: number; qcfGlyphs?: string[]; qcfFontFamily?: string } | null>(null);
   const [showTafsir, setShowTafsir] = useState(false);
   const [tafsirAyah] = useState<{ surah: number; ayah: number; surahName: string; text: string; tafsir: string; translation?: string } | null>(null);
   const [tafsirLocked, setTafsirLocked] = useState(false);
@@ -1034,6 +1048,14 @@ export default function SurahScreen() {
     if (playbackState.currentSurah === 0) return null;
     return `${playbackState.currentSurah}:${playbackState.currentAyah}`;
   }, [playbackState.isPlaying, playbackState.isLoading, playbackState.currentSurah, playbackState.currentAyah]);
+
+  // When the user deep-links to a specific ayah (e.g. from المحفوظات / آية اليوم
+  // → `/surah/{n}?ayah={a}`), highlight that ayah on first render. The
+  // existing fade/clear effect below removes it after ~5s.
+  useEffect(() => {
+    if (!targetAyah) return;
+    setHighlightAyahKey(`${surahNumber}:${targetAyah}`);
+  }, [targetAyah, surahNumber]);
 
   useEffect(() => {
     if (!highlightAyahKey) return;
@@ -1318,28 +1340,43 @@ export default function SurahScreen() {
     setShowAyahMenu(false);
   }, [selectedAyah]);
 
-  const handleShareAyah = useCallback(() => {
+  const handleShareAyah = useCallback(async () => {
     if (!selectedAyah) return;
     const surah = getSurahData(selectedAyah.surah);
     const ayahData = surah?.ayahs.find(a => a.ns === selectedAyah.ayah);
-    if (ayahData && surah) {
-      setShareData({
-        text: ayahData.t,
-        title: getSurahName(selectedAyah.surah),
-        reference: `${getSurahName(selectedAyah.surah)} - ${t('quran.ayah')} ${selectedAyah.ayah}`,
-        surahNumber: selectedAyah.surah,
-        ayahNumber: selectedAyah.ayah,
-        page: ayahData.p,
-      });
-      setShowAyahMenu(false);
-      // Use timeout to ensure shareData is set before showing picker
-      setTimeout(() => verseShareRef.current?.showSizePicker(), 100);
-    }
-  }, [selectedAyah]);
+    if (!ayahData || !surah) return;
+    setShowAyahMenu(false);
+
+    // Render the verse in the real QCF Mushaf font (never the Amiri fallback).
+    const qcfData = getVerseQcfData(selectedAyah.surah, selectedAyah.ayah);
+    const sharePage = qcfData?.page ?? ayahData.p;
+    // Block until the page font is registered so the IslamicShareCard renders
+    // glyphs correctly on the very first share (no flash of system font).
+    await ensureSharePageFontReady(sharePage, forceLightText ?? isDarkMode);
+    const qcfFontFamily = getPageFontFamily(sharePage, forceLightText ?? isDarkMode);
+
+    setShareData({
+      text: ayahData.t,
+      title: getSurahName(selectedAyah.surah),
+      reference: `${getSurahName(selectedAyah.surah)} - ${t('quran.ayah')} ${selectedAyah.ayah}`,
+      surahNumber: selectedAyah.surah,
+      ayahNumber: selectedAyah.ayah,
+      page: sharePage,
+      qcfGlyphs: qcfData?.glyphs,
+      qcfFontFamily: qcfData?.glyphs ? qcfFontFamily : undefined,
+    });
+    // Use timeout to ensure shareData is set before showing picker
+    setTimeout(() => verseShareRef.current?.showSizePicker(), 100);
+  }, [selectedAyah, forceLightText, isDarkMode, t]);
 
   const handleSharePage = useCallback(async () => {
     try {
+      // Block capture until the real QCF page font is registered so the
+      // exported image always shows real Mushaf glyphs (never Amiri fallback).
+      await ensureSharePageFontReady(currentPage, forceLightText ?? isDarkMode);
       if (shareViewShotRef.current?.capture) {
+        // Small delay so the off-screen MushafPage re-renders with the now-loaded font.
+        await new Promise(r => setTimeout(r, 250));
         const uri = await shareViewShotRef.current.capture();
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await shareImage(uri, `${translate('quran.page')} ${currentPage} - ${getAppName()}`);
@@ -1347,7 +1384,7 @@ export default function SurahScreen() {
     } catch (e) {
       console.error('Error sharing page:', e);
     }
-  }, [currentPage]);
+  }, [currentPage, forceLightText, isDarkMode]);
 
   const handlePlayAyah = useCallback(async () => {
     if (!selectedAyah) return;
@@ -1585,32 +1622,48 @@ export default function SurahScreen() {
     </ViewShot>
   );
 
-  // Off-screen capture view for sharing — always rendered with watermark, never visible
+  // Off-screen capture view for sharing — always rendered with watermark, never visible.
+  // Layout: vertical flex column so the logo lives in a reserved footer band
+  // and never overlaps the verses (the previous absolute watermark sat on top
+  // of the last lines causing the apparent "duplicate verse" artifact).
+  // Compute an explicit capture height that fully contains the MushafPage
+  // (which uses minHeight = WINDOW_HEIGHT - 140 internally) plus the top
+  // padding and the branding footer band — so no verses are clipped on
+  // Android where ScrollView content is otherwise cropped at the visible
+  // viewport during captureRef.
+  const SHARE_TOP_PADDING = 60;
+  const SHARE_FOOTER_HEIGHT = 160;
+  const SHARE_PAGE_HEIGHT = Dimensions.get('window').height - 140; // matches MushafPage minHeight
+  const SHARE_TOTAL_HEIGHT = SHARE_TOP_PADDING + SHARE_PAGE_HEIGHT + SHARE_FOOTER_HEIGHT;
+
   const offScreenShareView = (
     <View
-      style={{ position: 'absolute', left: -9999, top: 0, width: SCREEN_WIDTH, height: Dimensions.get('window').height }}
+      style={{ position: 'absolute', left: -9999, top: 0, width: SCREEN_WIDTH, height: SHARE_TOTAL_HEIGHT }}
       pointerEvents="none"
       collapsable={false}
     >
-      <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }} style={{ flex: 1 }}>
-        <View style={{ flex: 1, backgroundColor: themeBgColor }} collapsable={false}>
-          <ImageBackground source={hasBgImage ? bgSource : undefined} style={{ flex: 1, paddingTop: 80, paddingBottom: 130, backgroundColor: themeBgColor }} resizeMode="cover">
-            {/* Render current page for capture — empty bookmarkMap to remove highlights */}
-            <MushafPage
-              page={currentPage}
-              themeIndex={themeIndex}
-              width={SCREEN_WIDTH}
-              fontSizeAdjust={fontSizeAdjust}
-              forceLightText={forceLightText}
-              forcePlainArabicForCapture={Platform.OS === 'android'}
-              useCdnImage={settings?.display?.quranUseCdnPages}
-              bookmarkMap={{}}
-              playingAyahKey={null}
-              highlightAyahKey={null}
-            />
-            {/* Branding watermark — always present in capture */}
-            <View style={s.shareWatermark} pointerEvents="none" collapsable={false}>
-              <Image source={appIcon} style={s.shareWatermarkIcon} resizeMode="contain" />
+      <ViewShot ref={shareViewShotRef} options={{ format: 'png', quality: 1 }} style={{ width: SCREEN_WIDTH, height: SHARE_TOTAL_HEIGHT }}>
+        <View style={{ width: SCREEN_WIDTH, height: SHARE_TOTAL_HEIGHT, backgroundColor: themeBgColor }} collapsable={false}>
+          <ImageBackground source={hasBgImage ? bgSource : undefined} style={{ width: SCREEN_WIDTH, height: SHARE_TOTAL_HEIGHT, backgroundColor: themeBgColor }} resizeMode="cover">
+            <View style={{ width: SCREEN_WIDTH, height: SHARE_TOP_PADDING + SHARE_PAGE_HEIGHT, paddingTop: SHARE_TOP_PADDING }} collapsable={false}>
+              {/* Render current page for capture — empty bookmarkMap to remove highlights.
+                  We intentionally do NOT pass forcePlainArabicForCapture so the real
+                  QCF page font is used on every platform (Android included). */}
+              <MushafPage
+                page={currentPage}
+                themeIndex={themeIndex}
+                width={SCREEN_WIDTH}
+                fontSizeAdjust={fontSizeAdjust}
+                forceLightText={forceLightText}
+                useCdnImage={settings?.display?.quranUseCdnPages}
+                bookmarkMap={{}}
+                playingAyahKey={null}
+                highlightAyahKey={null}
+              />
+            </View>
+            {/* Branding footer band — reserved space, no overlap with verses */}
+            <View style={[s.shareFooter, { height: SHARE_FOOTER_HEIGHT }]} pointerEvents="none" collapsable={false}>
+              <Image source={appIcon} style={s.shareFooterLogo} resizeMode="contain" />
             </View>
           </ImageBackground>
         </View>
@@ -1961,7 +2014,9 @@ export default function SurahScreen() {
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined} contentContainerStyle={{ gap: 12, paddingVertical: 8, paddingHorizontal: 16 }}>
                             {Array.from({ length: getThemeCount() }, (_, i) => {
                               const th = QURAN_THEMES[i];
-                              if (!th) return null;
+                              // Defensive guard: skip entries missing required color fields
+                              // so we never render an invisible (transparent) card.
+                              if (!th || !th.background || !th.primary) return null;
                               const isSelected = themeIndex === i && (!quranBgKey || quranBgKey === 'none');
                               const lang = getLanguage();
                               const themeName = th.name?.[lang] || th.name?.ar || th.name?.en || '';
@@ -2144,9 +2199,27 @@ export default function SurahScreen() {
                           <MaterialCommunityIcons name="microphone-outline" size={20} color={goldenColor} />
                           <Text style={[stg.sectionTitle, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{translate('quran.reciterLabel')}</Text>
                         </View>
+                        <Text
+                          style={{
+                            color: settingsIsLight ? '#666' : '#aaa',
+                            fontSize: 11,
+                            fontFamily: 'Cairo-Regular',
+                            textAlign: 'center',
+                            marginBottom: 8,
+                            paddingHorizontal: 8,
+                          }}
+                        >
+                          {isArabicLang
+                            ? 'هؤلاء القراء يدعمون تحديد الآية أثناء التلاوة. لمزيد من القراء انتقل إلى تبويب "استماع".'
+                            : 'These reciters support per-ayah highlighting. For more reciters, see the Listen tab.'}
+                        </Text>
+                        {/* Note: Mushaf playback requires per-ayah sync, so only 🟢 reciters
+                            are listed here. Continuous-only (🟡) reciters appear in the
+                            Listen tab (recitations) where they work fully. */}
                         <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                          {reciters.map(r => {
+                          {reciters.filter(r => hasPerAyahSync(r.identifier)).map(r => {
                             const isActive = currentReciter === r.identifier;
+                            const isLoadingThis = isActive && playbackState.isLoading;
                             return (
                               <TouchableOpacity
                                 key={r.identifier}
@@ -2166,10 +2239,18 @@ export default function SurahScreen() {
                                 }}
                               >
                                 <View style={{ flex: 1 }}>
-                                  <Text style={[stg.reciterName, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{isArabicLang ? r.name : (r.englishName || r.name)}</Text>
-                                  <Text style={[stg.reciterSub, { color: settingsIsLight ? '#666' : '#aaa' }]}>{isArabicLang ? r.englishName : r.name}</Text>
+                                  <Text style={[stg.reciterName, { color: settingsIsLight ? '#1a1a2e' : '#fff' }]}>{isArabicLang ? (r.name || r.englishName) : (r.englishName || r.name)}</Text>
+                                  {isLoadingThis && (
+                                    <Text style={{ color: settingsIsLight ? '#888' : '#aaa', fontSize: 11, marginTop: 2, fontFamily: 'Cairo-Regular', textAlign: isRTL ? 'right' : 'left' }}>
+                                      {isArabicLang ? 'جارٍ التحميل من الإنترنت…' : 'Streaming over network…'}
+                                    </Text>
+                                  )}
                                 </View>
-                                {isActive && <MaterialCommunityIcons name="check-circle" size={22} color={goldenColor} />}
+                                {isLoadingThis ? (
+                                  <ActivityIndicator size="small" color={goldenColor} />
+                                ) : isActive ? (
+                                  <MaterialCommunityIcons name="check-circle" size={22} color={goldenColor} />
+                                ) : null}
                               </TouchableOpacity>
                             );
                           })}
@@ -2241,6 +2322,8 @@ export default function SurahScreen() {
               categoryLabel={shareData.title}
               arabicText={shareData.text}
               sourceText={shareData.reference}
+              qcfGlyphs={shareData.qcfGlyphs}
+              qcfFontFamily={shareData.qcfFontFamily}
             />
           )}
 
@@ -2271,7 +2354,17 @@ const _s = StyleSheet.create({
   },
   pageIndicator: { fontSize: 16, fontFamily: 'Amiri-Bold', lineHeight: 28, includeFontPadding: false },
 
-  // Share watermark (visible in captures)
+  // Share footer band (visible in captures) — reserved bottom strip so the
+  // logo never overlaps the Mushaf verses.
+  shareFooter: {
+    height: 160,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareFooterLogo: { width: 110, height: 110, opacity: 0.95 },
+
+  // Legacy share watermark — kept temporarily for any external reference; unused.
   shareWatermark: {
     position: 'absolute',
     bottom: 40,

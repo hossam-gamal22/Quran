@@ -224,6 +224,102 @@ async function cachePrayerTimes(key: string, data: PrayerTimesResponse[]): Promi
 
 const FETCH_TIMEOUT_MS = 8000;
 
+// Phase 1.G: Multi-source fallback chain. Order matters — try fastest/most accurate first.
+const ALADHAN_MIRRORS = [
+  'https://api.aladhan.com/v1',
+  'https://api.aladhan.com/v1', // future: secondary mirror if Aladhan adds one
+];
+
+/**
+ * يحاول جلب البيانات الشهرية من Aladhan + mirrors. لو كل شيء فشل، يرفع exception
+ * لكي تتولى `calculateMonthlyLocally()` الفولباك.
+ */
+async function fetchFromAladhanWithMirrors(
+  latitude: number,
+  longitude: number,
+  month: number,
+  year: number,
+  method: number,
+  school: number,
+): Promise<PrayerTimesResponse[]> {
+  let lastError: unknown = null;
+  for (const baseUrl of ALADHAN_MIRRORS) {
+    try {
+      const url = `${baseUrl}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}&school=${school}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await response.json();
+      if (data.code === 200 && Array.isArray(data.data) && data.data.length > 0) {
+        return data.data;
+      }
+      throw new Error(`Aladhan returned code=${data.code}`);
+    } catch (e) {
+      lastError = e;
+      console.warn(`[prayer-api] Mirror failed (${baseUrl}):`, e);
+    }
+  }
+  throw lastError ?? new Error('All Aladhan mirrors failed');
+}
+
+/**
+ * Phase 1.G: حساب محلي بمكتبة `adhan` (offline 100%، لا يفشل أبداً ما دامت
+ * الإحداثيات صحيحة). يبني response يحاكي شكل Aladhan API لكي يعمل rest of pipeline
+ * بدون تعديل.
+ */
+async function calculateMonthlyLocally(
+  latitude: number,
+  longitude: number,
+  month: number,
+  year: number,
+  method: number,
+  school: number,
+): Promise<PrayerTimesResponse[]> {
+  const { calculateLocalPrayerTimes } = await import('./country-prayer-defaults');
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const result: PrayerTimesResponse[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day, 12, 0, 0);
+    const t = calculateLocalPrayerTimes(latitude, longitude, date, method, school === 1 ? 1 : 0);
+    result.push({
+      timings: {
+        Fajr: t.fajr,
+        Sunrise: t.sunrise,
+        Dhuhr: t.dhuhr,
+        Asr: t.asr,
+        Maghrib: t.maghrib,
+        Isha: t.isha,
+      },
+      date: {
+        readable: `${day} ${month} ${year}`,
+        timestamp: String(Math.floor(date.getTime() / 1000)),
+        gregorian: {
+          date: `${String(day).padStart(2, '0')}-${String(month).padStart(2, '0')}-${year}`,
+          day: String(day),
+          weekday: { en: '' },
+          month: { number: month, en: '' },
+          year: String(year),
+        },
+        hijri: {
+          date: '', day: '',
+          weekday: { en: '', ar: '' },
+          month: { number: 0, en: '', ar: '' },
+          year: '',
+          designation: { abbreviated: 'AH', expanded: 'بعد الهجرة' },
+        },
+      },
+      meta: {
+        latitude,
+        longitude,
+        timezone: 'UTC',
+        method: { id: method, name: 'Local (adhan)' },
+      },
+    });
+  }
+  return result;
+}
+
 export async function fetchMonthlyPrayerTimes(
   latitude: number,
   longitude: number,
@@ -234,34 +330,34 @@ export async function fetchMonthlyPrayerTimes(
 ): Promise<PrayerTimesResponse[]> {
   const cacheKey = prayerCacheKey(latitude, longitude, month, year, method, school);
 
+  // ─── Layer 1: Aladhan (mirrors) ─────────────────────────────────────────
   try {
-    const url = `${ALADHAN_API_BASE}/calendar/${year}/${month}?latitude=${latitude}&longitude=${longitude}&method=${method}&school=${school}`;
+    const data = await fetchFromAladhanWithMirrors(latitude, longitude, month, year, method, school);
+    cachePrayerTimes(cacheKey, data);
+    console.log(`[prayer-api] ✅ Aladhan API: ${data.length} days for ${month}/${year}`);
+    return data;
+  } catch (apiError) {
+    console.warn('[prayer-api] All Aladhan mirrors failed:', apiError);
+  }
 
-    // Fetch with timeout — never block scheduling for more than 8 seconds
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  // ─── Layer 2: Cache ─────────────────────────────────────────────────────
+  const cached = await getCachedPrayerTimes(cacheKey);
+  if (cached && cached.length > 0) {
+    console.log(`[prayer-api] ✅ Using cached prayer times for ${month}/${year} (${cached.length} days)`);
+    return cached;
+  }
 
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    const data = await response.json();
-
-    if (data.code === 200) {
-      // Cache successful response for offline use
-      cachePrayerTimes(cacheKey, data.data);
-      return data.data;
-    }
-    throw new Error('Failed to fetch monthly prayer times');
-  } catch (error) {
-    console.warn('[prayer-api] Network fetch failed, trying cache:', error);
-    // Fallback: return cached data if available
-    const cached = await getCachedPrayerTimes(cacheKey);
-    if (cached) {
-      console.log(`[prayer-api] ✅ Using cached prayer times for ${month}/${year} (${cached.length} days)`);
-      return cached;
-    }
-    console.error('[prayer-api] ❌ No cache available, fetch failed:', error);
-    throw error;
+  // ─── Layer 3: Local astronomical calculation (adhan lib) ────────────────
+  // هذه الطبقة لا تفشل أبداً — تعمل offline بحساب فلكي محلي.
+  try {
+    const local = await calculateMonthlyLocally(latitude, longitude, month, year, method, school);
+    console.log(`[prayer-api] ✅ Local calculation (adhan lib): ${local.length} days for ${month}/${year}`);
+    // Cache as well so next time we have data even before recompute
+    cachePrayerTimes(cacheKey, local);
+    return local;
+  } catch (localError) {
+    console.error('[prayer-api] ❌ Even local calculation failed:', localError);
+    throw localError;
   }
 }
 

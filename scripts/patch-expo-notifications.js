@@ -111,7 +111,7 @@ function patch() {
     patched = true;
   } else if (source.includes('setAlarmClock')) {
     // Also update existing setAlarmClock patch to remove canScheduleExactAlarms guard
-    if (source.includes('canScheduleExactAlarms')) {
+    if (source.includes('alarmManager.canScheduleExactAlarms()')) {
       const guardedPattern = /private fun setupAlarm[\s\S]*?^  \}/m;
       const newBody = NEW_SETUP_ALARM.slice(2); // trim leading whitespace
       source = source.replace(guardedPattern, newBody);
@@ -127,6 +127,27 @@ function patch() {
   // ────────────────────────────────────────────────────────────────
   // Patch B: Replace triggerNotification() with direct presentation
   // ────────────────────────────────────────────────────────────────
+  const START_FULL_ADHAN_PLAYBACK = `      val contentData = notificationRequest.content.body
+      val shouldPlayFullAdhan = contentData?.let {
+        it.optString("type") == "prayer" && it.optString("androidFullAdhan") == "true"
+      } ?: false
+      if (shouldPlayFullAdhan) {
+        try {
+          val serviceIntent = android.content.Intent().setClassName(
+            context.packageName,
+            "com.rooh.almuslim.adhan.AdhanPlaybackService"
+          ).apply {
+            action = "com.rooh.almuslim.adhan.PLAY"
+            putExtra("soundType", contentData?.optString("soundType", "makkah") ?: "makkah")
+            putExtra("prayerName", notificationRequest.content.title ?: contentData?.optString("prayer", "") ?: "")
+          }
+          androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
+          Log.i("expo-notifications", "Started full adhan playback service for: $identifier")
+        } catch (adhanError: Exception) {
+          Log.w("expo-notifications", "Could not start full adhan playback for $identifier: \${adhanError.message}")
+        }
+      }`;
+
   const OLD_TRIGGER = `  override fun triggerNotification(identifier: String) {
     try {
       val notificationRequest: NotificationRequest = store.getNotificationRequest(identifier)!!
@@ -151,6 +172,8 @@ function patch() {
     try {
       val notificationRequest: NotificationRequest = store.getNotificationRequest(identifier)!!
       val notification = Notification(notificationRequest)
+
+${START_FULL_ADHAN_PLAYBACK}
 
       // DIRECT PRESENTATION: Build and post the Android notification immediately
       // without going through the multi-broadcast chain (receive → doWork →
@@ -243,6 +266,18 @@ function patch() {
     }
   } else {
     console.warn('[patch-expo-notifications] ⚠️ Patch B: triggerNotification() signature not found');
+  }
+
+  if (source.includes('Direct-presented notification') &&
+      !source.includes('AdhanPlaybackService')) {
+    source = source.replace(
+      '      val notification = Notification(notificationRequest)\\n\\n      // DIRECT PRESENTATION:',
+      `      val notification = Notification(notificationRequest)\\n\\n${START_FULL_ADHAN_PLAYBACK}\\n\\n      // DIRECT PRESENTATION:`
+    );
+    console.log('[patch-expo-notifications] ✅ Patch C: full adhan foreground playback');
+    patched = true;
+  } else if (source.includes('AdhanPlaybackService')) {
+    console.log('[patch-expo-notifications] Patch C already applied — skipping');
   }
 
   if (patched) {

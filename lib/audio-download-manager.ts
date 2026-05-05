@@ -3,7 +3,7 @@
 
 import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getSurahAudioUrl } from './quran-cache';
+import { getSurahAudioUrl, getSurahAudioUrls } from './quran-cache';
 
 const DOWNLOADS_KEY = '@downloaded_surahs';
 const BASE_DIR = (FileSystem.documentDirectory || '') + 'quran-audio/';
@@ -99,44 +99,70 @@ export async function downloadSurah(
 
   await ensureDir(reciterId);
 
-  const url = getSurahAudioUrl(reciterId, surahNumber);
+  const candidateUrls = getSurahAudioUrls(reciterId, surahNumber);
+  if (candidateUrls.length === 0) {
+    // Fallback to throwing helper (preserves ReciterUnavailableError behavior).
+    getSurahAudioUrl(reciterId, surahNumber);
+  }
   const destPath = getFilePath(surahNumber, reciterId);
 
   activeDownloads.add(key);
 
   try {
-    const downloadResumable = FileSystem.createDownloadResumable(
-      url,
-      destPath,
-      {},
-      (downloadProgress) => {
-        if (onProgress && downloadProgress.totalBytesExpectedToWrite > 0) {
-          const pct = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-          onProgress(Math.min(pct, 1));
+    let lastError: unknown = null;
+    for (const url of candidateUrls) {
+      try {
+        const downloadResumable = FileSystem.createDownloadResumable(
+          url,
+          destPath,
+          {},
+          (downloadProgress) => {
+            if (onProgress && downloadProgress.totalBytesExpectedToWrite > 0) {
+              const pct = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+              onProgress(Math.min(pct, 1));
+            }
+          }
+        );
+
+        const result = await downloadResumable.downloadAsync();
+        if (!result?.uri) throw new Error('فشل التحميل');
+
+        // Reject HTTP errors (createDownloadResumable doesn't throw on 4xx/5xx).
+        const status = (result as any).status;
+        if (typeof status === 'number' && status >= 400) {
+          try { await FileSystem.deleteAsync(result.uri, { idempotent: true }); } catch {}
+          throw new Error(`HTTP ${status} from ${url}`);
         }
+
+        const fileInfo = await FileSystem.getInfoAsync(result.uri);
+        const fileSize = (fileInfo as any).size || 0;
+        // Sanity check: a real surah mp3 is well above 10 KB. Anything tiny
+        // is almost certainly an error page or empty body from a stale CDN.
+        if (fileSize < 10 * 1024) {
+          try { await FileSystem.deleteAsync(result.uri, { idempotent: true }); } catch {}
+          throw new Error(`Downloaded file too small (${fileSize}B) from ${url}`);
+        }
+
+        const entry: DownloadedSurah = {
+          surahNumber,
+          reciterId,
+          fileUri: result.uri,
+          fileSize,
+          downloadedAt: Date.now(),
+        };
+
+        const registry = await loadRegistry();
+        const filtered = registry.filter(d => !(d.surahNumber === surahNumber && d.reciterId === reciterId));
+        filtered.push(entry);
+        await saveRegistry(filtered);
+
+        return entry;
+      } catch (e) {
+        lastError = e;
+        console.warn('[audio-download] Candidate failed, trying next:', e);
       }
-    );
-
-    const result = await downloadResumable.downloadAsync();
-    if (!result?.uri) throw new Error('فشل التحميل');
-
-    const fileInfo = await FileSystem.getInfoAsync(result.uri);
-    const fileSize = (fileInfo as any).size || 0;
-
-    const entry: DownloadedSurah = {
-      surahNumber,
-      reciterId,
-      fileUri: result.uri,
-      fileSize,
-      downloadedAt: Date.now(),
-    };
-
-    const registry = await loadRegistry();
-    const filtered = registry.filter(d => !(d.surahNumber === surahNumber && d.reciterId === reciterId));
-    filtered.push(entry);
-    await saveRegistry(filtered);
-
-    return entry;
+    }
+    throw lastError ?? new Error('فشل التحميل');
   } finally {
     activeDownloads.delete(key);
   }

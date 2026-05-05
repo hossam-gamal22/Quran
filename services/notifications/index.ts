@@ -1,4 +1,5 @@
 export {
+  ANDROID_FULL_ADHAN_CHANNEL_ID,
   ADHAN_SOUND_FILES,
   NOTIFICATION_SOUND_FILES,
   initializeAllNotificationChannels,

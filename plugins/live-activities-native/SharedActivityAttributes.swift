@@ -12,6 +12,7 @@ struct PrayerActivityAttributes: ActivityAttributes {
         var nextPrayerNameAr: String
         var nextPrayerTime: String
         var timeRemainingMinutes: Int
+        var nextPrayerDate: Date  // absolute timestamp for Text(timerInterval:) live countdown
         var hijriDate: String
         var allPrayers: [PrayerItem]
         var style: String

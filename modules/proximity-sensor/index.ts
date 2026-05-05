@@ -1,15 +1,13 @@
-import { requireNativeModule, EventEmitter } from 'expo-modules-core';
+import { requireNativeModule } from 'expo-modules-core';
 
 interface ProximitySensorEvents {
   onProximityChange: { isNear: boolean };
 }
 
 let ProximitySensorNative: any = null;
-let emitter: any = null;
 
 try {
   ProximitySensorNative = requireNativeModule('ProximitySensor');
-  emitter = new EventEmitter(ProximitySensorNative);
 } catch {
   // Not available in Expo Go — will use accelerometer fallback
   console.log('[ProximitySensor] Native module not available');
@@ -44,7 +42,12 @@ export const ProximitySensor = {
   },
 
   addListener: (callback: (event: { isNear: boolean }) => void) => {
-    if (!ProximitySensorNative || !emitter) return { remove: () => {} };
-    return emitter.addListener('onProximityChange', callback);
+    if (!ProximitySensorNative?.addListener) return { remove: () => {} };
+    try {
+      // In Expo SDK 52+, the native module itself is the EventEmitter
+      return ProximitySensorNative.addListener('onProximityChange', callback);
+    } catch {
+      return { remove: () => {} };
+    }
   },
 };

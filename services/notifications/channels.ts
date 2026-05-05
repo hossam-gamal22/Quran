@@ -21,7 +21,22 @@ import { t } from '@/lib/i18n';
 // Bump this whenever channel config changes (sounds, importance, etc.)
 // Forces a delete+recreate of all channels on next app launch.
 const CHANNELS_VERSION_KEY = 'notificationChannelsVersion';
-const CURRENT_CHANNELS_VERSION = '17';
+// v18: Replaced duplicated notif_wakeup.mp3 / notif_sleep.mp3 (were identical
+// files causing wakeup adhkar to play sleep sound) and replaced duplicated
+// morning_adhkar.mp3 / general_reminder.mp3. Channel sounds are immutable on
+// Android once created — bumping this version forces channels to be deleted
+// and recreated with the corrected audio files.
+// v19: Added dedicated `reminder_notif_khatma` channel and removed the
+// redundant `default` channel (functionally identical to `general`).
+// v20: Added a silent visual prayer channel for Android full-adhan playback.
+// The notification itself stays quiet while a foreground media service plays
+// the full adhan.
+// v21: Full-adhan playback is now opt-in via the `useFullAdhan` setting (was
+// erroneously forced on for all Android users in v20, leaving them with
+// silent prayer notifications because the service was never invoked).
+const CURRENT_CHANNELS_VERSION = '21';
+
+export const ANDROID_FULL_ADHAN_CHANNEL_ID = 'adhan_full_visual';
 
 // ─── Adhan sound filename map (all files in assets/sounds/) ─────────────────
 export const ADHAN_SOUND_FILES: Record<string, string> = {
@@ -52,6 +67,7 @@ export const NOTIFICATION_SOUND_FILES: Record<string, string> = {
   notif_after_prayer:  'notif_after_prayer.mp3',
   notif_daily_summary: 'notif_daily_summary.mp3',
   notif_kahf:          'notif_kahf.mp3',
+  notif_khatma:        'notif_khatma.mp3',
   notif_sleep:         'notif_sleep.mp3',
   notif_verse:         'notif_verse.mp3',
   notif_wakeup:        'notif_wakeup.mp3',
@@ -151,6 +167,26 @@ export async function initializeAllNotificationChannels(): Promise<void> {
     }
   }
 
+  // --- FULL ADHAN VISUAL CHANNEL ---
+  // Android full-adhan playback is handled by a foreground media service.
+  // This channel intentionally has no sound so the short notification sound
+  // does not overlap with the full MediaPlayer audio.
+  try {
+    await Notifications.setNotificationChannelAsync(ANDROID_FULL_ADHAN_CHANNEL_ID, {
+      name: 'الأذان الكامل',
+      groupId: 'prayer',
+      importance: Notifications.AndroidImportance.MAX,
+      sound: null,
+      vibrationPattern: [0, 500, 250, 500],
+      enableVibrate: true,
+      lightColor: '#1B5E20',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
+    });
+  } catch (e) {
+    console.warn(`[Channels] Failed to create ${ANDROID_FULL_ADHAN_CHANNEL_ID}:`, e);
+  }
+
   // --- REMINDER CHANNELS (one per notification sound file) ---
   for (const [key, filename] of Object.entries(NOTIFICATION_SOUND_FILES)) {
     const channelId = `reminder_${key}`;
@@ -164,6 +200,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
         vibrationPattern: [0, 250, 250, 250],
         enableVibrate: true,
         lightColor: '#1B5E20',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
     } catch (e) {
       console.warn(`[Channels] Failed to create ${channelId}:`, e);
@@ -177,6 +214,7 @@ export async function initializeAllNotificationChannels(): Promise<void> {
       importance: Notifications.AndroidImportance.HIGH,
       sound: null,
       enableVibrate: false,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
   } catch (e) {
     console.warn('[Channels] Failed to create silent:', e);
@@ -189,24 +227,57 @@ export async function initializeAllNotificationChannels(): Promise<void> {
       importance: Notifications.AndroidImportance.HIGH,
       sound: 'default',
       enableVibrate: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     });
   } catch (e) {
     console.warn('[Channels] Failed to create general:', e);
   }
 
-  // --- DEFAULT CHANNEL (fallback) ---
-  try {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'الافتراضي',
-      importance: Notifications.AndroidImportance.HIGH,
-      sound: 'default',
-      enableVibrate: true,
-    });
-  } catch (e) {
-    console.warn('[Channels] Failed to create default:', e);
-  }
+  // Note: A redundant 'default' channel was removed in v19 — the 'general'
+  // channel above plays the same role (system default sound).
 
   console.log('[Channels] All notification channels initialized successfully');
+}
+
+// ─── Runtime Sanity Check ───────────────────────────────────────────────────
+
+/**
+ * Diagnostic: walk every Android channel after initialization and warn if
+ * any non-silent channel ended up with a null sound URI (which can happen
+ * if the bundled sound failed to package via app.json sounds[]).
+ *
+ * Safe no-op on iOS. Call once at app startup right after
+ * initializeAllNotificationChannels() resolves.
+ */
+export async function verifyNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  try {
+    const channels = await Notifications.getNotificationChannelsAsync();
+    if (!channels || channels.length === 0) {
+      console.warn('[NotifHealth] No notification channels found');
+      return;
+    }
+
+    const issues: string[] = [];
+    for (const channel of channels) {
+      if (
+        channel.sound === null &&
+        channel.id !== 'silent' &&
+        channel.id !== ANDROID_FULL_ADHAN_CHANNEL_ID
+      ) {
+        issues.push(`Channel "${channel.id}" (${channel.name}) has null sound`);
+      }
+    }
+
+    if (issues.length > 0) {
+      console.warn('[NotifHealth] Channel issues detected:', issues);
+    } else {
+      console.log(`[NotifHealth] ✅ All ${channels.length} channels verified`);
+    }
+  } catch (error) {
+    console.warn('[NotifHealth] Check failed:', error);
+  }
 }
 
 // ─── Version-Based Channel Reset ────────────────────────────────────────────

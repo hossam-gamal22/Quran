@@ -39,6 +39,7 @@ import { ADHAN_SOUNDS as ADHAN_SOUND_FILES, NOTIFICATION_SOUNDS as NOTIFICATION_
 import { getSurahName } from '@/lib/quran-api';
 import { fetchDownloadableSounds, getDownloadedSounds, downloadSound, isSoundDownloaded, type DownloadableSound, type DownloadedSound } from '@/lib/downloadable-sounds';
 import { sendTestNotification } from '@/lib/notifications-manager';
+import { checkExactAlarmPermission, openExactAlarmSettings } from '@/services/notifications/permissions';
 
 
 // Removed: interstitial ads on sound download to reduce user frustration
@@ -439,6 +440,40 @@ export default function NotificationsScreen() {
       await requestPermissions();
     } else {
       await updateNotifications({ enabled });
+    }
+  };
+
+  // Layer 4: when enabling Full Adhan on Android, ensure SCHEDULE_EXACT_ALARM
+  // is granted so AlarmManager.setExactAndAllowWhileIdle works reliably.
+  // Without it, alarms fall back to inexact mode (up to 15-min delay).
+  // Toggle is still applied either way — Layer 2 (sounded notification) is the
+  // safety net so the user always hears at least the short adhan.
+  const handleFullAdhanToggle = async (next: boolean) => {
+    const currentVoice = settings.notifications.adhanSoundType || 'makkah';
+    const voiceLocked = !isPremium && !FREE_ADHAN_IDS.includes(currentVoice);
+    await updateNotifications({
+      useFullAdhan: next,
+      ...(next && voiceLocked ? { adhanSoundType: 'makkah' as AdhanSoundType } : {}),
+    });
+
+    if (!next || Platform.OS !== 'android') return;
+    try {
+      const granted = await checkExactAlarmPermission();
+      if (granted) return;
+      Alert.alert(
+        t('notificationSounds.exactAlarmTitle') || 'إذن المنبهات الدقيقة',
+        t('notificationSounds.exactAlarmMessage') ||
+          'لضمان تشغيل الأذان الكامل في وقته بالضبط حتى لو كان التطبيق مغلقاً، يحتاج التطبيق إلى إذن "المنبهات والتذكيرات". بدون هذا الإذن قد يتأخر الأذان حتى 15 دقيقة.',
+        [
+          { text: t('common.cancel') || 'إلغاء', style: 'cancel' },
+          {
+            text: t('notificationSounds.grantPermission') || 'منح الإذن',
+            onPress: () => openExactAlarmSettings(),
+          },
+        ],
+      );
+    } catch (e) {
+      console.warn('[notifications] Failed to check exact alarm permission:', e);
     }
   };
 
@@ -984,6 +1019,45 @@ export default function NotificationsScreen() {
           </View>
         </>
       )}
+
+      {/* Full Adhan toggle — plays the complete adhan recording at prayer time. On iOS, playback will be cut automatically at ~29s by the system. */}
+      <View style={[styles.adhanSoundSection, { paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.divider }]}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            const next = !(settings.notifications.useFullAdhan === true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            handleFullAdhanToggle(next);
+          }}
+          style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 12 }}
+        >
+          <MaterialCommunityIcons
+            name={settings.notifications.useFullAdhan ? 'volume-vibrate' : 'volume-medium'}
+            size={22}
+            color={'#0d8e62'}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{
+              color: colors.text,
+              fontFamily: fontSemiBold(),
+              fontSize: 15,
+              textAlign: isRTL ? 'right' : 'left',
+              writingDirection: isRTL ? 'rtl' : 'ltr',
+            }}>
+              {t('notificationSounds.useFullAdhan')}
+            </Text>
+          </View>
+          <Switch
+            value={settings.notifications.useFullAdhan === true}
+            onValueChange={(next) => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              handleFullAdhanToggle(next);
+            }}
+            trackColor={{ false: colors.divider, true: '#0d8e62' }}
+            thumbColor="#fff"
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Adhan sound selection */}
       <View style={styles.adhanSoundSection}>

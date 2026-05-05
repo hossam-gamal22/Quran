@@ -9,6 +9,7 @@ import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Modal, TextInput, Alert, ActivityIndicator, Platform,
   ScrollView, Share, LayoutAnimation, UIManager, Image, Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { fontBold, fontRegular, fontSemiBold } from '@/lib/fonts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +26,7 @@ import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { BackButton } from '@/components/ui';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { NativeTabs } from '@/components/ui/NativeTabs';
-import { getBookmarks, removeBookmark, Bookmark, addBookmark } from '@/lib/storage';
+import { getBookmarks, removeBookmark, Bookmark, updateBookmarkNote } from '@/lib/storage';
 import { getSurahName } from '@/lib/quran-api';
 import * as Haptics from 'expo-haptics';
 import ViewShot, { captureRef } from 'react-native-view-shot';
@@ -48,7 +49,7 @@ import { ALLAH_NAMES, type AllahName } from '@/app/names';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { useAppIdentity } from '@/hooks/use-app-identity';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { getVerseQcfData, getQcfFontSize } from '@/lib/qcf-page-data';
+import { getVerseQcfData, getPageQcfData, getQcfFontSize, getFirstAyahOnPage } from '@/lib/qcf-page-data';
 import { loadPageFont, getPageFontFamily, isPageFontLoaded } from '@/lib/qcf-font-loader';
 
 const basmalaImg = require('@/assets/images/quran/basmala.png');
@@ -80,18 +81,20 @@ function ExportCard({ bookmark, theme, cardRef, t, logoSource, isPremium }: Expo
   const [qcfPage, setQcfPage] = useState<number>(0);
   const isPageBookmark = bookmark.id.startsWith('page_');
 
-  // Load QCF font for verse bookmarks
+  // Load QCF font for both verse AND page bookmarks
   useEffect(() => {
-    if (isPageBookmark || !bookmark.surahNumber || !bookmark.ayahNumber) return;
-    const verseData = getVerseQcfData(bookmark.surahNumber, bookmark.ayahNumber);
-    if (!verseData) return;
-    setQcfGlyphs(verseData.glyphs);
-    setQcfPage(verseData.page);
-    if (isPageFontLoaded(verseData.page, false)) {
+    if (!bookmark.surahNumber || !bookmark.ayahNumber) return;
+    const data = isPageBookmark
+      ? getPageQcfData(bookmark.ayahNumber)
+      : getVerseQcfData(bookmark.surahNumber, bookmark.ayahNumber);
+    if (!data) return;
+    setQcfGlyphs(data.glyphs);
+    setQcfPage(data.page);
+    if (isPageFontLoaded(data.page, false)) {
       setQcfReady(true);
       return;
     }
-    loadPageFont(verseData.page, false)
+    loadPageFont(data.page, false)
       .then(() => setQcfReady(true))
       .catch(() => setQcfReady(false));
   }, [bookmark.surahNumber, bookmark.ayahNumber, isPageBookmark]);
@@ -191,6 +194,80 @@ function ExportCard({ bookmark, theme, cardRef, t, logoSource, isPremium }: Expo
   );
 }
 
+// ─── Quran Bookmark Text — renders ayah/page in QCF Mushaf font ──────────────
+const SCREEN_W = Dimensions.get('window').width;
+
+function QuranBookmarkText({
+  bookmark,
+  color,
+  isDarkMode,
+}: {
+  bookmark: Bookmark;
+  color: string;
+  isDarkMode: boolean;
+}) {
+  const isPageBookmark = bookmark.id.startsWith('page_');
+  const [ready, setReady] = useState(false);
+  const [glyphs, setGlyphs] = useState<string[] | null>(null);
+  const [page, setPage] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    // For page bookmarks, render only the FIRST ayah on that page (Mushaf-style
+    // thumbnail) instead of all glyphs of the whole page concatenated.
+    let data: { page: number; glyphs: string[] } | null = null;
+    if (isPageBookmark) {
+      const first = getFirstAyahOnPage(bookmark.ayahNumber);
+      data = first
+        ? getVerseQcfData(first.surah, first.ayah)
+        : getPageQcfData(bookmark.ayahNumber);
+    } else if (bookmark.surahNumber && bookmark.ayahNumber) {
+      data = getVerseQcfData(bookmark.surahNumber, bookmark.ayahNumber);
+    }
+    if (!data) return;
+    setGlyphs(data.glyphs);
+    setPage(data.page);
+    if (isPageFontLoaded(data.page, isDarkMode)) {
+      setReady(true);
+      return;
+    }
+    setReady(false);
+    loadPageFont(data.page, isDarkMode)
+      .then(() => { if (!cancelled) setReady(true); })
+      .catch(() => { if (!cancelled) setReady(false); });
+    return () => { cancelled = true; };
+  }, [bookmark.id, bookmark.surahNumber, bookmark.ayahNumber, isPageBookmark, isDarkMode]);
+
+  // Placeholder while QCF font loads — keeps layout stable, no Amiri fallback.
+  if (!glyphs || !ready || !page) {
+    return (
+      <View style={{ minHeight: 80, paddingHorizontal: 16, paddingBottom: 12, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="small" color={color} />
+      </View>
+    );
+  }
+
+  const fontFamily = getPageFontFamily(page, isDarkMode);
+  const fontSize = getQcfFontSize(page, SCREEN_W - 32, 0);
+  return (
+    <Text
+      allowFontScaling={false}
+      style={{
+        fontFamily,
+        fontSize,
+        lineHeight: fontSize * 1.85,
+        color,
+        textAlign: 'center',
+        writingDirection: 'rtl',
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+      }}
+    >
+      {glyphs.join('')}
+    </Text>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 // Fallback route for favorites without a saved route
 function getFallbackRoute(item: FavoriteItem): string | null {
@@ -239,6 +316,8 @@ export default function FavoritesScreen() {
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'surah'>('date');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  // QCF data for IslamicShareCard (loaded when a bookmark is selected for share/export)
+  const [shareCardQcf, setShareCardQcf] = useState<{ glyphs: string[]; fontFamily: string } | null>(null);
   const cardRef = useRef<ViewShot>(null!);
   const islamicCardRef = useRef<IslamicShareCardHandle>(null);
 
@@ -291,9 +370,36 @@ export default function FavoritesScreen() {
 
   useFocusEffect(useCallback(() => { loadBookmarks(); }, [loadBookmarks]));
 
-  const sortedBookmarks = [...bookmarks].sort((a, b) =>
-    sortBy === 'date' ? b.createdAt - a.createdAt : a.surahNumber - b.surahNumber
-  );
+  // Load QCF glyphs + page font for the currently selected bookmark so that
+  // the IslamicShareCard renders the verse/page in the Mushaf font (no Amiri).
+  useEffect(() => {
+    if (!selectedBookmark) { setShareCardQcf(null); return; }
+    const isPage = selectedBookmark.id.startsWith('page_');
+    const data = isPage
+      ? getPageQcfData(selectedBookmark.ayahNumber)
+      : (selectedBookmark.surahNumber && selectedBookmark.ayahNumber)
+        ? getVerseQcfData(selectedBookmark.surahNumber, selectedBookmark.ayahNumber)
+        : null;
+    if (!data) { setShareCardQcf(null); return; }
+    let cancelled = false;
+    const apply = () => {
+      if (cancelled) return;
+      setShareCardQcf({ glyphs: data.glyphs, fontFamily: getPageFontFamily(data.page, false) });
+    };
+    if (isPageFontLoaded(data.page, false)) {
+      apply();
+    } else {
+      setShareCardQcf(null);
+      loadPageFont(data.page, false).then(apply).catch(() => {});
+    }
+    return () => { cancelled = true; };
+  }, [selectedBookmark]);
+
+  const sortedBookmarks = [...bookmarks].sort((a, b) => {
+    if (sortBy === 'date') return b.createdAt - a.createdAt;
+    // Mushaf order: by surah, then by ayah/page number within the same surah.
+    return (a.surahNumber - b.surahNumber) || (a.ayahNumber - b.ayahNumber);
+  });
 
   // Navigate to Quran ayah or page
   const navigateToAyah = useCallback((bookmark: Bookmark) => {
@@ -332,22 +438,25 @@ export default function FavoritesScreen() {
     );
   }, [loadBookmarks, t]);
 
-  // Save note
+  // Save note — update note field in-place to preserve original id (especially
+  // for page bookmarks with `page_{n}` ids). Optimistic UI: update local state
+  // immediately, close modal, then persist asynchronously without re-loading
+  // (which would briefly remove the card during the loading state).
   const handleSaveNote = useCallback(async () => {
     if (!editingBookmark) return;
-    const updated: Bookmark = { ...editingBookmark, note: noteText.trim() };
-    // Remove old and re-add with note
-    await removeBookmark(editingBookmark.id);
-    await addBookmark({
-      surahNumber: updated.surahNumber,
-      ayahNumber: updated.ayahNumber,
-      surahName: updated.surahName,
-      ayahText: updated.ayahText,
-      note: updated.note,
-    });
-    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const trimmed = noteText.trim();
+    const targetId = editingBookmark.id;
+    setBookmarks(prev => prev.map(b => (b.id === targetId ? { ...b, note: trimmed } : b)));
     setShowNoteModal(false);
-    loadBookmarks();
+    setEditingBookmark(null);
+    setNoteText('');
+    try {
+      await updateBookmarkNote(targetId, trimmed);
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      // On failure, reload from storage to resync
+      loadBookmarks();
+    }
   }, [editingBookmark, noteText, loadBookmarks]);
 
   // Export as image
@@ -360,8 +469,13 @@ export default function FavoritesScreen() {
       const canShare = await Sharing.isAvailableAsync();
 
       if (Platform.OS === 'ios' || Platform.OS === 'android') {
-        // Ask permission for media library
-        const { status } = await MediaLibrary.requestPermissionsAsync();
+        // Android: scoped storage; no runtime permission needed for app-generated writes.
+        // iOS: still requires Photo Library Add permission.
+        let canSave = true;
+        if (Platform.OS === 'ios') {
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          canSave = status === 'granted';
+        }
 
         Alert.alert(
           t('favorites.exportVerse'),
@@ -370,10 +484,14 @@ export default function FavoritesScreen() {
             {
               text: t('favorites.exportImage'),
               onPress: async () => {
-                if (status === 'granted') {
-                  await MediaLibrary.saveToLibraryAsync(uri);
-                  if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  Alert.alert('✅', t('favorites.saved'));
+                if (canSave) {
+                  try {
+                    await MediaLibrary.saveToLibraryAsync(uri);
+                    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    Alert.alert('✅', t('favorites.saved'));
+                  } catch {
+                    Alert.alert(t('common.error'), t('favorites.exportFailed'));
+                  }
                 } else {
                   Alert.alert(t('common.error'), t('favorites.exportFailed'));
                 }
@@ -527,7 +645,6 @@ export default function FavoritesScreen() {
     },
     ayahText: {
       fontSize: 20,
-      fontFamily: 'Amiri-Regular',
       color: colors.foreground,
       lineHeight: 42,
       paddingHorizontal: 16,
@@ -721,13 +838,18 @@ export default function FavoritesScreen() {
       fontFamily: fontBold(),
       color: '#fff',
     },
-    // Note modal
+    // Note modal — fully opaque solid background to prevent see-through on iOS
     noteModalCard: {
-      backgroundColor: colors.card,
+      backgroundColor: isDarkMode ? '#1a222a' : '#ffffff',
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       padding: 24,
-      paddingBottom: 40,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 16,
     },
     noteHandle: {
       width: 40,
@@ -802,13 +924,19 @@ export default function FavoritesScreen() {
               onPress={() => navigateToAyah(item)}
             >
               <Text style={s.surahBadgeText}>
-                {item.surahName} • {item.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} {item.ayahNumber}
+                {item.id.startsWith('page_')
+                  ? `${item.surahName} • ${t('quran.page')} ${item.ayahNumber} • ${t('favorites.verse')} ${getFirstAyahOnPage(item.ayahNumber).ayah}`
+                  : `${item.surahName} • ${t('favorites.verse')} ${item.ayahNumber}`}
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Ayah Text */}
-          <Text style={[s.ayahText, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{item.ayahText}</Text>
+          {/* Ayah Text — rendered with QCF Mushaf font */}
+          <QuranBookmarkText
+            bookmark={item}
+            color={colors.foreground}
+            isDarkMode={isDarkMode === true}
+          />
 
           {/* Note */}
           {item.note ? (
@@ -842,14 +970,6 @@ export default function FavoritesScreen() {
           >
             <MaterialCommunityIcons name="image-outline" size={18} color={accent} />
             <Text style={[s.actionText, { color: accent }]}>{t('favorites.image')}</Text>
-          </TouchableOpacity>
-          <View style={s.actionDivider} />
-          <TouchableOpacity
-            style={[s.actionBtn, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}
-            onPress={() => handleShareText(item)}
-          >
-            <MaterialCommunityIcons name="share-variant-outline" size={18} color={accent} />
-            <Text style={[s.actionText, { color: accent }]}>{t('common.share')}</Text>
           </TouchableOpacity>
           <View style={s.actionDivider} />
           <TouchableOpacity
@@ -975,6 +1095,7 @@ export default function FavoritesScreen() {
             }
           />
         ) : activeTab === 'azkar' ? (
+
           <FlatList
             data={azkarFavorites}
             keyExtractor={item => String(item.id)}
@@ -1215,11 +1336,15 @@ export default function FavoritesScreen() {
         animationType="slide"
         onRequestClose={() => setShowNoteModal(false)}
       >
-        <TouchableOpacity
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-          activeOpacity={1}
-          onPress={() => setShowNoteModal(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.75)' }}
         >
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowNoteModal(false)}
+          />
           <View style={s.noteModalCard}>
             <View style={s.noteHandle} />
             <Text style={[s.noteTitle, { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>{t('favorites.addNote')}</Text>
@@ -1236,12 +1361,13 @@ export default function FavoritesScreen() {
               onChangeText={setNoteText}
               multiline
               returnKeyType="done"
+              autoFocus
             />
             <TouchableOpacity style={s.noteSaveBtn} onPress={handleSaveNote}>
               <Text style={s.noteSaveBtnText}>{t('favorites.saveNote')}</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Premium Islamic share card (hidden, for image export) */}
@@ -1250,6 +1376,8 @@ export default function FavoritesScreen() {
           ref={islamicCardRef}
           categoryLabel={t('common.favorites')}
           arabicText={selectedBookmark.ayahText || ''}
+          qcfGlyphs={shareCardQcf?.glyphs}
+          qcfFontFamily={shareCardQcf?.fontFamily}
           sourceText={`﴿ ${selectedBookmark.surahName} • ${selectedBookmark.id.startsWith('page_') ? t('quran.page') : t('favorites.verse')} ${selectedBookmark.ayahNumber} ﴾`}
           showBasmala
           noteText={selectedBookmark.note || undefined}

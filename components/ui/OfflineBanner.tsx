@@ -29,10 +29,16 @@ let _triggerModal: (() => void) | null = null;
 export async function showOfflineModal() {
   try {
     const state = await NetInfo.fetch();
-    const online = state.isConnected && state.isInternetReachable !== false;
-    if (online) return;
+    // Only show modal when device is definitively offline.
+    // Treat unknown isInternetReachable (null/undefined) as online to avoid
+    // false positives from transient reachability checks.
+    const definitelyOffline =
+      state.isConnected === false ||
+      (state.isConnected === true && state.isInternetReachable === false);
+    if (!definitelyOffline) return;
   } catch {
-    // If NetInfo itself fails, fall through to showing the modal
+    // If NetInfo itself fails, do not show the modal — likely a non-network error
+    return;
   }
   _triggerModal?.();
 }
@@ -57,11 +63,32 @@ export function OfflineModal() {
   const [visible, setVisible] = useState(false);
   const dismissed = useRef(false);
   const connectionRestored = useRef(false);
+  // Startup grace period — iOS NetInfo briefly reports isInternetReachable:false
+  // right after app launch before reachability is confirmed. Don't show modal
+  // during this window to avoid a false flash.
+  const startupGraceUntil = useRef(Date.now() + 4000);
+  // Require 2 consecutive offline readings before considering truly offline
+  // to filter out transient flickers during foreground/background transitions.
+  const offlineReadingsRef = useRef(0);
 
   // NetInfo listener
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
-      const offline = !(state.isConnected && state.isInternetReachable !== false);
+      // Only treat as offline if isConnected is explicitly false, OR
+      // isConnected is true but isInternetReachable is explicitly false
+      // (and not null/undefined which means "still determining").
+      const definitelyOffline =
+        state.isConnected === false ||
+        (state.isConnected === true && state.isInternetReachable === false);
+
+      if (definitelyOffline) {
+        offlineReadingsRef.current += 1;
+      } else {
+        offlineReadingsRef.current = 0;
+      }
+
+      // Require 2 consecutive offline readings to debounce flickers
+      const offline = offlineReadingsRef.current >= 2;
       setIsOffline(offline);
 
       if (!offline) {
@@ -79,6 +106,8 @@ export function OfflineModal() {
   // Show modal when offline (re-triggerable after connection cycle)
   useEffect(() => {
     if (isOffline && !dismissed.current && !connectionRestored.current) {
+      // Honor startup grace period
+      if (Date.now() < startupGraceUntil.current) return;
       setVisible(true);
     }
   }, [isOffline]);
@@ -87,6 +116,7 @@ export function OfflineModal() {
   useEffect(() => {
     _triggerModal = () => {
       if (!dismissed.current && !connectionRestored.current) {
+        if (Date.now() < startupGraceUntil.current) return;
         setVisible(true);
       }
     };

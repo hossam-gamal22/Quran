@@ -1,5 +1,5 @@
 // lib/country-prayer-defaults.ts
-// فولباك أوقات الصلاة بناءً على دولة الجهاز — يعمل بدون إنترنت
+// فولباك أوقات الصلاة — يعمل بدون إنترنت
 // يستخدم adhan npm package لحساب فلكي محلي دقيق
 
 import {
@@ -10,13 +10,12 @@ import {
   Madhab,
 } from 'adhan';
 import type { PrayerTimes } from '@/lib/prayer-times';
-import { detectUserCountry } from '@/services/hijriCalendarService';
 
 // ────────────────────────────────────────────
 // Country Defaults Map
 // ────────────────────────────────────────────
 
-interface CountryDefaults {
+export interface CountryDefaults {
   lat: number;
   lng: number;
   cityNameAr: string;
@@ -26,6 +25,16 @@ interface CountryDefaults {
   /** 0 = Shafi, 1 = Hanafi */
   asrSchool: 0 | 1;
 }
+
+export const MAKKAH_FALLBACK_COUNTRY_CODE = 'SA';
+export const MAKKAH_FALLBACK_DEFAULTS: CountryDefaults = {
+  lat: 21.4225,
+  lng: 39.8262,
+  cityNameAr: 'مكة المكرمة',
+  cityNameEn: 'Makkah',
+  method: 4,
+  asrSchool: 0,
+};
 
 /**
  * Maps aladhan.com method IDs to adhan npm CalculationMethod factories.
@@ -63,7 +72,7 @@ function getAdhanCalcParams(methodId: number) {
 /** 30+ countries with capital coords and correct calculation method */
 export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   // Gulf & Saudi
-  SA: { lat: 21.4225, lng: 39.8262, cityNameAr: 'مكة المكرمة', cityNameEn: 'Makkah', method: 4, asrSchool: 0 },
+  SA: MAKKAH_FALLBACK_DEFAULTS,
   AE: { lat: 25.2048, lng: 55.2708, cityNameAr: 'دبي', cityNameEn: 'Dubai', method: 16, asrSchool: 0 },
   KW: { lat: 29.3759, lng: 47.9774, cityNameAr: 'الكويت', cityNameEn: 'Kuwait City', method: 9, asrSchool: 0 },
   QA: { lat: 25.2854, lng: 51.5310, cityNameAr: 'الدوحة', cityNameEn: 'Doha', method: 10, asrSchool: 0 },
@@ -148,17 +157,10 @@ export const COUNTRY_DEFAULTS: Record<string, CountryDefaults> = {
   BE: { lat: 50.8503, lng: 4.3517, cityNameAr: 'بروكسل', cityNameEn: 'Brussels', method: 3, asrSchool: 0 },
 };
 
-// Default for unknown country codes — MWL is the most internationally recognized standard
-const DEFAULT_COUNTRY: CountryDefaults = {
-  lat: 21.4225, lng: 39.8262,
-  cityNameAr: 'مكة المكرمة', cityNameEn: 'Makkah',
-  method: 3, asrSchool: 0,
-};
-
 /**
  * Resolve the AlAdhan calculation method + Asr school for a given country code.
  * Returns `null` when the code is empty/unknown so callers can decide to fall back
- * to MWL or keep existing settings.
+ * to Makkah or keep existing settings.
  */
 export function applyCountryPrayerDefaults(
   countryCode: string | undefined | null,
@@ -171,7 +173,7 @@ export function applyCountryPrayerDefaults(
 
 /**
  * Like `applyCountryPrayerDefaults` but always returns a value — falling back to
- * the Muslim World League method (3) when the country is unknown. Used to seed
+ * Makkah/Umm Al-Qura when the country is unknown. Used to seed
  * initial settings for a fresh install.
  */
 export function getCountryPrayerDefaultsOrFallback(
@@ -179,8 +181,8 @@ export function getCountryPrayerDefaultsOrFallback(
 ): { method: number; asrSchool: 0 | 1 } {
   return (
     applyCountryPrayerDefaults(countryCode) ?? {
-      method: DEFAULT_COUNTRY.method,
-      asrSchool: DEFAULT_COUNTRY.asrSchool,
+      method: MAKKAH_FALLBACK_DEFAULTS.method,
+      asrSchool: MAKKAH_FALLBACK_DEFAULTS.asrSchool,
     }
   );
 }
@@ -236,12 +238,11 @@ export interface CountryFallbackResult {
 }
 
 /**
- * Get prayer times for a given date based on the device's country.
+ * Get approximate prayer times for a given date using the app-wide Makkah fallback.
  * Uses purely local calculation — no internet required.
  */
 export function getCountryFallbackPrayerTimes(date?: Date): CountryFallbackResult {
-  const countryCode = detectUserCountry();
-  const defaults = COUNTRY_DEFAULTS[countryCode] || DEFAULT_COUNTRY;
+  const defaults = MAKKAH_FALLBACK_DEFAULTS;
   const targetDate = date || new Date();
 
   const times = calculateLocalPrayerTimes(
@@ -256,7 +257,7 @@ export function getCountryFallbackPrayerTimes(date?: Date): CountryFallbackResul
     times,
     cityNameAr: defaults.cityNameAr,
     cityNameEn: defaults.cityNameEn,
-    countryCode,
+    countryCode: MAKKAH_FALLBACK_COUNTRY_CODE,
     source: 'countryFallback',
   };
 }
@@ -269,8 +270,7 @@ export function getCountryFallbackTimesRange(
   startDate: Date,
   days: number,
 ): Array<{ date: string; times: PrayerTimes }> {
-  const countryCode = detectUserCountry();
-  const defaults = COUNTRY_DEFAULTS[countryCode] || DEFAULT_COUNTRY;
+  const defaults = MAKKAH_FALLBACK_DEFAULTS;
 
   const result: Array<{ date: string; times: PrayerTimes }> = [];
   for (let i = 0; i < days; i++) {

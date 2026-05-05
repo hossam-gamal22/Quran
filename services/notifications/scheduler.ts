@@ -14,6 +14,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { ADHAN_SOUND_FILES, NOTIFICATION_SOUND_FILES, getAdhanChannelId, getReminderChannelId } from './channels';
+import { resolveSoundKeyWithDowngrade } from '../../lib/sound-downgrade';
 
 /**
  * Resolve a sound key to the correct platform value for notification content.
@@ -54,8 +55,19 @@ export async function schedulePrayerNotification({
   // Don't schedule past times
   if (prayerTime <= new Date()) return '';
 
-  const soundValue = resolveSoundValue(selectedSound, ADHAN_SOUND_FILES);
-  const channelId = getAdhanChannelId(selectedSound);
+  // Phase 1.G: auto-downgrade لو اختار المستخدم صوت بريميوم وانتهى الاشتراك
+  const downgradedSound = await resolveSoundKeyWithDowngrade(selectedSound, 'adhan');
+  const effectiveSoundKey = (!downgradedSound || downgradedSound === 'default')
+    ? 'makkah'
+    : downgradedSound.replace(/\.mp3$/, '');
+  // Layer 2 safety net: always play short adhan via the system notification.
+  // Patched expo-notifications additionally starts AdhanPlaybackService when
+  // androidFullAdhan='true' so the full recording plays via STREAM_ALARM.
+  const shouldUseAndroidFullAdhan =
+    Platform.OS === 'android' &&
+    effectiveSoundKey !== 'silent';
+  const soundValue = resolveSoundValue(effectiveSoundKey, ADHAN_SOUND_FILES);
+  const channelId = getAdhanChannelId(effectiveSoundKey);
 
   try {
     const id = await Notifications.scheduleNotificationAsync({
@@ -64,7 +76,13 @@ export async function schedulePrayerNotification({
         body: '\u0627\u0636\u063A\u0637 \u0644\u0644\u0641\u062A\u062D',
         sound: soundValue,
         priority: Notifications.AndroidNotificationPriority.MAX,
-        data: { prayerName, type: 'prayer', isFajr },
+        data: {
+          prayerName,
+          type: 'prayer',
+          isFajr,
+          soundType: effectiveSoundKey,
+          ...(shouldUseAndroidFullAdhan && { androidFullAdhan: 'true' }),
+        },
         ...(Platform.OS === 'android' && { channelId }),
         ...(Platform.OS === 'ios' && { interruptionLevel: 'timeSensitive' as const }),
       },
@@ -101,10 +119,12 @@ export async function scheduleReminderNotification({
   // Don't schedule past times
   if (triggerDate <= new Date()) return '';
 
-  const soundValue = resolveSoundValue(selectedSound, NOTIFICATION_SOUND_FILES);
+  // Phase 1.G: auto-downgrade لو الصوت بريميوم وانتهى الاشتراك
+  const effectiveSound = await resolveSoundKeyWithDowngrade(selectedSound, 'reminder');
+  const soundValue = resolveSoundValue(effectiveSound, NOTIFICATION_SOUND_FILES);
 
   try {
-    const channelId = getReminderChannelId(selectedSound);
+    const channelId = getReminderChannelId(effectiveSound);
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title,

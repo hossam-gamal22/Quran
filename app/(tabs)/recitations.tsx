@@ -4,7 +4,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Pressable,
   Modal, ActivityIndicator, ScrollView, Platform, Animated,
   TextInput, Alert,
 } from 'react-native';
@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { getSurahName, RECITERS, getSurahAudioUrl } from '@/lib/quran-api';
+import { LEGACY_RECITER_ID_MAP, hasPerAyahSync, hasPerSurahAudio } from '@/lib/reciters-registry';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
@@ -93,6 +94,10 @@ export default function RecitationsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<number[]>([]);
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
+  // Identifier of a reciter that is currently being switched to (audio reloading).
+  // Used to render a spinner next to the row in the picker so users know it's
+  // streaming over the network.
+  const [loadingReciter, setLoadingReciter] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [downloadedSet, setDownloadedSet] = useState<Set<number>>(new Set());
@@ -108,7 +113,19 @@ export default function RecitationsScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY_RECITER).then(v => {
-      if (v) setSelectedReciter(RECITERS.find(r => r.identifier === v) || RECITERS[0]);
+      if (!v) return;
+      // Migrate legacy ids (e.g. 'ar.alafasy') → new registry ids ('mishary_alafasy').
+      const migrated = LEGACY_RECITER_ID_MAP[v] ?? v;
+      let found = RECITERS.find(r => r.identifier === migrated) || RECITERS[0];
+      // If the saved reciter no longer has a working per-surah source, fall back
+      // to the first available reciter so playback never throws on launch.
+      if (!hasPerSurahAudio(found.identifier)) {
+        found = RECITERS.find(r => hasPerSurahAudio(r.identifier)) || RECITERS[0];
+      }
+      setSelectedReciter(found);
+      if (found.identifier !== v) {
+        AsyncStorage.setItem(STORAGE_KEY_RECITER, found.identifier).catch(() => {});
+      }
     });
     AsyncStorage.getItem('@recitation_favs').then(v => {
       if (v) try { setFavorites(JSON.parse(v)); } catch {}
@@ -126,10 +143,44 @@ export default function RecitationsScreen() {
     }
   }, [isPlaying]);
 
-  const saveReciter = (r: typeof RECITERS[0]) => {
+  // Switch reciter. If audio is currently playing, automatically restart the
+  // same surah with the new reciter so the choice takes effect immediately
+  // (previously the new reciter was only saved and would not load until the
+  // user manually pressed play again — felt like "nothing happened").
+  const saveReciter = useCallback(async (r: typeof RECITERS[0]) => {
+    if (r.identifier === selectedReciter.identifier) return;
     setSelectedReciter(r);
-    AsyncStorage.setItem(STORAGE_KEY_RECITER, r.identifier);
-  };
+    AsyncStorage.setItem(STORAGE_KEY_RECITER, r.identifier).catch(() => {});
+
+    const playing = nowPlaying;
+    if (!playing) return;
+
+    // Reload the same surah with the new reciter
+    setLoadingReciter(r.identifier);
+    try {
+      const localUri = await getLocalUri(playing.surahNum, r.identifier);
+      const url = localUri || getSurahAudioUrl(playing.surahNum, r.identifier);
+
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync().catch(() => {});
+        soundRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
+      soundRef.current = sound;
+      setAudioUrl(url);
+      setIsPlaying(true);
+      setNowPlaying({
+        ...playing,
+        reciter: r.name,
+        reciterAr: isArabic ? r.nameAr : r.name,
+      });
+    } catch (e) {
+      console.warn('Reciter switch error:', e);
+      Alert.alert(t('common.error'), t('messages.networkError'));
+    } finally {
+      setLoadingReciter(null);
+    }
+  }, [selectedReciter.identifier, nowPlaying, isArabic]);
 
   // Load downloaded surahs for current reciter
   const loadDownloaded = useCallback(async () => {
@@ -340,7 +391,8 @@ export default function RecitationsScreen() {
     controlBtn: { padding: 8 },
     sectionTitle: { fontSize: 14, fontWeight: '800', color: colors.muted, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' },
     modalWrap: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '75%' },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject },
+    modalSheet: { backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, height: '90%', flexDirection: 'column' },
     modalHandle: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, alignSelf: 'center', marginTop: 10 },
     modalTitle: { fontSize: 17, fontWeight: '800', color: colors.foreground, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border },
     reciterItem: {
@@ -518,30 +570,92 @@ export default function RecitationsScreen() {
       )}
 
       <Modal visible={showReciterModal} transparent animationType="slide" onRequestClose={() => setShowReciterModal(false)}>
-        <TouchableOpacity style={s.modalWrap} activeOpacity={1} onPress={() => setShowReciterModal(false)}>
+        <View style={s.modalWrap}>
+          <Pressable style={s.modalBackdrop} onPress={() => setShowReciterModal(false)} />
           <View style={s.modalSheet}>
             <View style={s.modalHandle} />
             <Text style={s.modalTitle}>{t('quran.chooseReciter')}</Text>
-            <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 16 }}>
-              {RECITERS.map(r => (
+            {/* Legend explaining the dot colours */}
+            <View
+              style={{
+                flexDirection: isRTL ? 'row-reverse' : 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                gap: 14,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                marginBottom: 6,
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderRadius: 12,
+                marginHorizontal: 12,
+              }}
+            >
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialCommunityIcons name="circle" size={10} color="#22C55E" />
+                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Cairo-SemiBold' }}>
+                  {isArabic ? 'تحديد الآية أثناء التلاوة' : 'Per-ayah highlighting'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialCommunityIcons name="circle" size={10} color="#F59E0B" />
+                <Text style={{ color: colors.text, fontSize: 12, fontFamily: 'Cairo-SemiBold' }}>
+                  {isArabic ? 'تشغيل متواصل بدون تحديد' : 'Continuous play only'}
+                </Text>
+              </View>
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }} showsVerticalScrollIndicator nestedScrollEnabled>
+              {RECITERS.filter(r => hasPerSurahAudio(r.identifier)).map(r => {
+                const sync = hasPerAyahSync(r.identifier);
+                const isSelected = selectedReciter.identifier === r.identifier;
+                const isLoadingThis = loadingReciter === r.identifier;
+                return (
                 <TouchableOpacity
                   key={r.identifier}
-                  style={[s.reciterItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, selectedReciter.identifier === r.identifier && { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => { saveReciter(r); setShowReciterModal(false); }}
+                  disabled={!!loadingReciter}
+                  style={[s.reciterItem, { flexDirection: isRTL ? 'row-reverse' : 'row' }, isSelected && { backgroundColor: colors.primary + '20' }, !!loadingReciter && !isLoadingThis && { opacity: 0.5 }]}
+                  onPress={() => {
+                    saveReciter(r);
+                    // Keep the modal open while audio is loading so the spinner is visible.
+                    if (!nowPlaying) setShowReciterModal(false);
+                  }}
                   activeOpacity={0.7}
                 >
-                  {selectedReciter.identifier === r.identifier && (
+                  {isLoadingThis ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : isSelected ? (
                     <IconSymbol name="checkmark.circle.fill" size={20} color={colors.primary} />
+                  ) : (
+                    <View style={{ width: 20 }} />
                   )}
                   <View style={s.reciterItemInfo}>
-                    <Text style={[s.reciterItemAr, selectedReciter.identifier === r.identifier && { color: colors.primaryText }]}>{isArabic ? r.nameAr : r.name}</Text>
-                    <Text style={s.reciterItemEn}>{isArabic ? r.name : r.nameAr}</Text>
+                    <Text style={[s.reciterItemAr, isSelected && { color: colors.primaryText }]}>{isArabic ? (r.nameAr || r.name) : (r.name || r.nameAr)}</Text>
+                    {isLoadingThis && (
+                      <Text style={{ color: colors.muted, fontSize: 11, marginTop: 2, fontFamily: 'Cairo-Regular', textAlign: isRTL ? 'right' : 'left' }}>
+                        {isArabic ? 'جارٍ التحميل من الإنترنت…' : 'Streaming over network…'}
+                      </Text>
+                    )}
+                  </View>
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 10,
+                      backgroundColor: sync ? '#22C55E22' : '#F59E0B22',
+                      marginHorizontal: 6,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    accessibilityLabel={sync ? 'تحديد الآية تلقائياً' : 'تشغيل متواصل فقط'}
+                  >
+                    <MaterialCommunityIcons name="circle" size={10} color={sync ? '#22C55E' : '#F59E0B'} />
                   </View>
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
     </ScreenContainer>
   );

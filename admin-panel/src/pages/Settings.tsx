@@ -51,7 +51,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 // إصدار التطبيق المنشور حاليًا — لا تحاول إجبار التحديث على رقم أعلى منه
-const CURRENT_PUBLISHED_VERSION = '1.2.0';
+const CURRENT_PUBLISHED_VERSION = '1.2.1';
 
 function isVersionGreaterThan(a: string, b: string): boolean {
   const aP = a.split('.').map(Number);

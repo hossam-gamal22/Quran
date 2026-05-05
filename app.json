@@ -2,7 +2,7 @@
   "expo": {
     "name": "روح المسلم",
     "slug": "rooh-almuslim",
-    "version": "1.2.0",
+    "version": "1.2.2",
     "orientation": "default",
     "icon": "./assets/images/icons/icon.png",
     "scheme": "rooh-almuslim",
@@ -26,7 +26,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.rooh.almuslim",
-      "buildNumber": "7",
+      "buildNumber": "96",
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.rooh.almuslim"
@@ -83,7 +83,7 @@
         "monochromeImage": "./assets/images/icons/android-icon-monochrome.png"
       },
       "package": "com.rooh.almuslim",
-      "versionCode": 15,
+      "versionCode": 74,
       "permissions": [
         "INTERNET",
         "VIBRATE",
@@ -128,6 +128,9 @@
       [
         "expo-build-properties",
         {
+          "ios": {
+            "deploymentTarget": "16.1"
+          },
           "android": {
             "usesCleartextTraffic": true
           }
@@ -169,7 +172,22 @@
             "./assets/sounds/notif_after_prayer.mp3",
             "./assets/sounds/notif_verse.mp3",
             "./assets/sounds/notif_kahf.mp3",
-            "./assets/sounds/notif_daily_summary.mp3"
+            "./assets/sounds/notif_khatma.mp3",
+            "./assets/sounds/notif_daily_summary.mp3",
+            "./assets/sounds/adhan_full/adhan_full_makkah.mp3",
+            "./assets/sounds/adhan_full/adhan_full_madinah.mp3",
+            "./assets/sounds/adhan_full/adhan_full_alaqsa.mp3",
+            "./assets/sounds/adhan_full/adhan_full_mishary.mp3",
+            "./assets/sounds/adhan_full/adhan_full_abdulbasit.mp3",
+            "./assets/sounds/adhan_full/adhan_full_sudais.mp3",
+            "./assets/sounds/adhan_full/adhan_full_egypt.mp3",
+            "./assets/sounds/adhan_full/adhan_full_dosari.mp3",
+            "./assets/sounds/adhan_full/adhan_full_ajman.mp3",
+            "./assets/sounds/adhan_full/adhan_full_ali_mulla.mp3",
+            "./assets/sounds/adhan_full/adhan_full_naqshbandi.mp3",
+            "./assets/sounds/adhan_full/adhan_full_sharif.mp3",
+            "./assets/sounds/adhan_full/adhan_full_mansoor_zahrani.mp3",
+            "./assets/sounds/adhan_full/adhan_full_haramain.mp3"
           ]
         }
       ],
@@ -299,6 +317,7 @@
       "./plugins/with-ios-widgets",
       "./plugins/with-live-activities",
       "./plugins/with-android-gradle-fix",
+      "./plugins/with-android-full-adhan",
       [
         "./plugins/with-notification-large-icon",
         {
@@ -369,7 +388,7 @@
       }
     },
     "owner": "hossamgamal",
-    "runtimeVersion": "1.2.0",
+    "runtimeVersion": "1.2.1",
     "updates": {
       "url": "https://u.expo.dev/12ffec15-6357-43b4-a309-8e71cc2afc8c",
       "enabled": true,

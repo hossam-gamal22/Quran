@@ -16,6 +16,7 @@ import {
   Modal,
   TextInput,
   KeyboardAvoidingView,
+  DevSettings,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontBold, fontMedium, fontRegular, fontSemiBold } from '@/lib/fonts';
@@ -32,8 +33,12 @@ import { useScaledStyles } from '@/hooks/use-font-scale';
 import BackgroundWrapper from '@/components/ui/BackgroundWrapper';
 import { useIsRTL } from '@/hooks/use-is-rtl';
 import { Spacing } from '@/constants/theme';
-import { db } from '@/config/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, auth } from '@/config/firebase';
+import { collection, addDoc, serverTimestamp, doc, deleteDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import * as SecureStore from 'expo-secure-store';
+import * as Updates from 'expo-updates';
 import { getStoreUrls, fetchAppConfig } from '@/lib/app-config-api';
 import ShareAppModal from '@/components/ui/ShareAppModal';
 import { getDisplayName, setDisplayName, getUserId, getOriginalDeviceUserId, syncUserProfileFromFirestore } from '@/lib/firebase-user';
@@ -183,7 +188,7 @@ export default function SettingsScreen() {
   const styles = useScaledStyles(_styles, colors.fs);
   const { isPremium } = useSubscription();
 
-  const appVersion = Constants.expoConfig?.version || '1.2.0';
+  const appVersion = Constants.expoConfig?.version || '1.2.1';
 
   // مشاركة التطبيق — modal
   const [shareModalVisible, setShareModalVisible] = useState(false);
@@ -271,6 +276,116 @@ export default function SettingsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSuggestionText('');
     setSuggestModalVisible(true);
+  };
+
+  // حذف الحساب (Apple 5.1.1(v) compliance) — wipes all local data, deletes Firestore user doc, and reloads the app.
+  const handleDeleteAccount = () => {
+    console.log('DELETE TAPPED');
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      const title = t('settings.deleteAccountTitle') || 'Delete Account';
+      const message = t('settings.deleteAccountMessage') || 'Are you sure? All data will be deleted.';
+      const cancelText = t('common.cancel') || 'Cancel';
+      const confirmText = t('settings.deleteAccountConfirm') || 'Delete';
+      console.log('DELETE: showing alert', { title, confirmText });
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: cancelText, style: 'cancel', onPress: () => console.log('DELETE: cancelled') },
+          {
+            text: confirmText,
+            style: 'destructive',
+            onPress: async () => {
+              console.log('DELETE: confirmed, starting wipe');
+            try {
+              // 1. Delete Firestore user docs (current uid + original device id)
+              try {
+                const currentId = await getUserId();
+                if (currentId) await deleteDoc(doc(db, 'users', currentId));
+              } catch (e) {
+                console.warn('deleteAccount: failed to delete current user doc', e);
+              }
+              try {
+                const originalId = await getOriginalDeviceUserId();
+                if (originalId) await deleteDoc(doc(db, 'users', originalId));
+              } catch (e) {
+                console.warn('deleteAccount: failed to delete original device user doc', e);
+              }
+
+              // 2. Cancel all scheduled notifications
+              try {
+                await Notifications.cancelAllScheduledNotificationsAsync();
+              } catch (e) {
+                console.warn('deleteAccount: failed to cancel notifications', e);
+              }
+
+              // 3. Clear SecureStore deviceId
+              try {
+                await SecureStore.deleteItemAsync('deviceId');
+              } catch (e) {
+                // SecureStore may be unavailable on some platforms
+              }
+
+              // 4. Clear AsyncStorage (all local data + onboarding flag)
+              try {
+                await AsyncStorage.clear();
+              } catch (e) {
+                console.warn('deleteAccount: failed to clear AsyncStorage', e);
+              }
+
+              // 5. Delete Firebase anonymous user (may require reauth on some accounts)
+              try {
+                if (auth?.currentUser) {
+                  await auth.currentUser.delete();
+                }
+              } catch (e) {
+                console.warn('deleteAccount: failed to delete Firebase user', e);
+              }
+
+              // 6. Reload app — user lands on onboarding
+              console.log('DELETE: wipe complete, reloading app');
+              // Try Updates.reloadAsync (production builds)
+              let reloaded = false;
+              try {
+                await Updates.reloadAsync();
+                reloaded = true;
+              } catch (e) {
+                console.warn('deleteAccount: Updates.reloadAsync failed', e);
+              }
+              // Fallback: DevSettings.reload (dev builds)
+              if (!reloaded && __DEV__) {
+                try {
+                  DevSettings.reload();
+                  reloaded = true;
+                } catch (e) {
+                  console.warn('deleteAccount: DevSettings.reload failed', e);
+                }
+              }
+              // Final fallback: router navigation to onboarding
+              if (!reloaded) {
+                try {
+                  router.replace('/onboarding');
+                } catch (e) {
+                  console.warn('deleteAccount: router.replace failed', e);
+                  Alert.alert(
+                    t('settings.deleteAccountTitle'),
+                    'تم حذف الحساب. يرجى إعادة تشغيل التطبيق يدوياً.'
+                  );
+                }
+              }
+            } catch (error) {
+              console.error('Account deletion failed:', error);
+              Alert.alert(t('common.error'), t('settings.deleteAccountMessage'));
+            }
+            },
+          },
+        ]
+      );
+    } catch (outerError) {
+      console.error('DELETE TAPPED outer error:', outerError);
+      Alert.alert('Error', String((outerError as Error)?.message || outerError));
+    }
   };
 
   const handleSendSuggestion = async () => {
@@ -530,6 +645,18 @@ export default function SettingsScreen() {
             title={t('settings.suggestFeature')}
             showArrow={false}
             onPress={handleSuggestFeature}
+            colors={colors}
+          />
+        </SettingSection>
+
+        {/* 8. منطقة الخطر (Danger Zone) — Apple 5.1.1(v) account deletion */}
+        <SettingSection title={t('settings.dangerZone')} index={8} colors={colors}>
+          <SettingItem
+            icon="trash-can-outline"
+            iconColor="#E53935"
+            title={t('settings.deleteAccount')}
+            showArrow={false}
+            onPress={handleDeleteAccount}
             colors={colors}
           />
         </SettingSection>

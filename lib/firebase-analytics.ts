@@ -26,7 +26,7 @@ const LOCAL_STATS_KEY = '@rooh_local_stats';
 
 /** Get current app version for per-version stats doc */
 const getVersionDocPath = (): string => {
-  const version = Constants.expoConfig?.version || '1.2.0';
+  const version = Constants.expoConfig?.version || '1.2.1';
   return `stats/${version}`;
 };
 

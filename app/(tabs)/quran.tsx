@@ -55,6 +55,7 @@ import {
   getDownloadedForReciter,
   deleteDownload,
 } from '@/lib/audio-download-manager';
+import { hasPerSurahAudio } from '@/lib/reciters-registry';
 
 import {
   Spacing,
@@ -310,6 +311,10 @@ export default function QuranScreen() {
   const quranSegmentKeys = useMemo(() => quranSegments.map((segment) => segment.key as 'surahs' | 'juz' | 'listen'), [quranSegments]);
   const quranSegmentLabels = useMemo(() => quranSegments.map((segment) => segment.label), [quranSegments]);
   const quranSelectedIndex = Math.max(0, quranSegmentKeys.indexOf(activeTab));
+  const fullSurahReciters = useMemo(
+    () => reciters.filter((r: Reciter) => hasPerSurahAudio(r.identifier)),
+    [reciters]
+  );
 
   // Reset to surahs if current tab is no longer available (e.g. listen tab hidden for non-Arabic)
   React.useEffect(() => {
@@ -1172,11 +1177,12 @@ export default function QuranScreen() {
 
                   {/* قائمة القراء */}
                   <FlatList
-                    data={reciters}
+                    style={{ flex: 1 }}
+                    data={fullSurahReciters}
                     renderItem={renderReciterItem}
                     keyExtractor={(item) => item.identifier}
                     contentContainerStyle={styles.recitersList}
-                    showsVerticalScrollIndicator={false}
+                    showsVerticalScrollIndicator={true}
                   />
                 </View>
               </BlurView>
@@ -1710,18 +1716,19 @@ const _styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    maxHeight: '72%',
+    height: '85%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
   },
   modalBlur: {
+    flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',
   },
   modalContent: {
-    paddingBottom: Spacing.xl,
+    flex: 1,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -1759,7 +1766,7 @@ const _styles = StyleSheet.create({
     justifyContent: 'center',
   },
   recitersList: {
-    paddingBottom: Spacing.xl,
+    paddingBottom: 80,
   },
   reciterItem: {
     flexDirection: 'row',

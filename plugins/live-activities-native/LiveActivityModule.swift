@@ -3,10 +3,13 @@
 // Requires iOS 16.1+ and ActivityKit
 
 import Foundation
+import os.log
 
 #if canImport(ActivityKit)
 import ActivityKit
 #endif
+
+private let laLog = OSLog(subsystem: "com.rooh.almuslim", category: "LiveActivity")
 
 @objc(LiveActivityModule)
 class LiveActivityModule: NSObject {
@@ -23,38 +26,52 @@ class LiveActivityModule: NSObject {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.1, *) {
+        if #available(iOS 16.2, *) {
             guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-                resolve(false)
+                os_log(.info, log: laLog, "areActivitiesEnabled = false (user disabled in Settings)")
+                reject("DISABLED", "Live Activities are disabled in iOS Settings", nil)
                 return
             }
-
-            // End any existing activities first
-            endAllActivities()
 
             guard let contentState = parseContentState(from: data) else {
-                reject("PARSE_ERROR", "Failed to parse Live Activity data", nil)
+                os_log(.error, log: laLog, "parseContentState returned nil — missing required fields")
+                reject("PARSE_ERROR", "Failed to parse Live Activity data — missing required fields (nextPrayerName, nextPrayerNameAr, nextPrayerTime, timeRemainingMinutes, hijriDate, style)", nil)
                 return
             }
 
-            let attributes = PrayerActivityAttributes()
+            // Compute stale date: prefer next-prayer time + 5 min, fallback to +30 min
+            let staleDate = self.computeStaleDate(from: data)
 
-            do {
-                let content = ActivityContent(state: contentState, staleDate: Calendar.current.date(byAdding: .minute, value: 30, to: Date()))
-                let _ = try Activity<PrayerActivityAttributes>.request(
-                    attributes: attributes,
-                    content: content,
-                    pushType: nil
-                )
-                resolve(true)
-            } catch {
-                reject("START_ERROR", "Failed to start Live Activity: \(error.localizedDescription)", error)
+            // End existing first, then request — sequenced inside one Task to avoid race
+            Task {
+                await self.endAllActivitiesAsync()
+                do {
+                    let content: ActivityContent<PrayerActivityAttributes.ContentState>
+                    if #available(iOS 16.2, *) {
+                        content = ActivityContent(state: contentState, staleDate: staleDate, relevanceScore: 100)
+                    } else {
+                        content = ActivityContent(state: contentState, staleDate: staleDate)
+                    }
+                    let attributes = PrayerActivityAttributes()
+                    let activity = try Activity<PrayerActivityAttributes>.request(
+                        attributes: attributes,
+                        content: content,
+                        pushType: nil
+                    )
+                    os_log(.info, log: laLog, "Live Activity started successfully (id=%{public}@)", activity.id)
+                    resolve(true)
+                } catch {
+                    let nsErr = error as NSError
+                    os_log(.error, log: laLog, "Activity.request failed: %{public}@ (domain=%{public}@ code=%{public}d)",
+                           error.localizedDescription, nsErr.domain, nsErr.code)
+                    reject("START_ERROR", "Failed to start Live Activity: \(error.localizedDescription) (domain=\(nsErr.domain) code=\(nsErr.code))", error)
+                }
             }
         } else {
-            resolve(false)
+            reject("UNSUPPORTED", "iOS 16.2+ required for Live Activities", nil)
         }
         #else
-        resolve(false)
+        reject("UNSUPPORTED", "ActivityKit framework not available", nil)
         #endif
     }
 
@@ -66,24 +83,38 @@ class LiveActivityModule: NSObject {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.1, *) {
+        if #available(iOS 16.2, *) {
             guard let contentState = parseContentState(from: data) else {
                 reject("PARSE_ERROR", "Failed to parse Live Activity data", nil)
                 return
             }
 
+            let staleDate = self.computeStaleDate(from: data)
+
             Task {
-                let content = ActivityContent(state: contentState, staleDate: Calendar.current.date(byAdding: .minute, value: 30, to: Date()))
-                for activity in Activity<PrayerActivityAttributes>.activities {
+                let content: ActivityContent<PrayerActivityAttributes.ContentState>
+                if #available(iOS 16.2, *) {
+                    content = ActivityContent(state: contentState, staleDate: staleDate, relevanceScore: 100)
+                } else {
+                    content = ActivityContent(state: contentState, staleDate: staleDate)
+                }
+                let activities = Activity<PrayerActivityAttributes>.activities
+                if activities.isEmpty {
+                    // No active activity to update — caller should fall back to start
+                    os_log(.info, log: laLog, "updatePrayerLiveActivity: no active activities, returning false so JS calls start")
+                    resolve(false)
+                    return
+                }
+                for activity in activities {
                     await activity.update(content)
                 }
                 resolve(true)
             }
         } else {
-            resolve(false)
+            reject("UNSUPPORTED", "iOS 16.2+ required for Live Activities", nil)
         }
         #else
-        resolve(false)
+        reject("UNSUPPORTED", "ActivityKit framework not available", nil)
         #endif
     }
 
@@ -94,9 +125,9 @@ class LiveActivityModule: NSObject {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.1, *) {
+        if #available(iOS 16.2, *) {
             Task {
-                endAllActivities()
+                await self.endAllActivitiesAsync()
                 resolve(true)
             }
         } else {
@@ -114,7 +145,7 @@ class LiveActivityModule: NSObject {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.1, *) {
+        if #available(iOS 16.2, *) {
             let hasActive = !Activity<PrayerActivityAttributes>.activities.isEmpty
             resolve(hasActive)
         } else {
@@ -132,7 +163,7 @@ class LiveActivityModule: NSObject {
         rejecter reject: @escaping RCTPromiseRejectBlock
     ) {
         #if canImport(ActivityKit)
-        if #available(iOS 16.1, *) {
+        if #available(iOS 16.2, *) {
             resolve(ActivityAuthorizationInfo().areActivitiesEnabled)
         } else {
             resolve(false)
@@ -144,15 +175,22 @@ class LiveActivityModule: NSObject {
 
     // MARK: - Helpers
 
-    @available(iOS 16.1, *)
-    private func endAllActivities() {
+    @available(iOS 16.2, *)
+    private func endAllActivitiesAsync() async {
         #if canImport(ActivityKit)
-        Task {
-            for activity in Activity<PrayerActivityAttributes>.activities {
-                await activity.end(nil, dismissalPolicy: .immediate)
-            }
+        for activity in Activity<PrayerActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
         }
         #endif
+    }
+
+    private func computeStaleDate(from data: NSDictionary) -> Date {
+        // Use timeRemainingMinutes + 5 min buffer when available; clamp to >= 5 min
+        if let mins = data["timeRemainingMinutes"] as? Int, mins > 0 {
+            let total = max(mins + 5, 5)
+            return Calendar.current.date(byAdding: .minute, value: total, to: Date()) ?? Date().addingTimeInterval(1800)
+        }
+        return Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date().addingTimeInterval(1800)
     }
 
     private func parseContentState(from data: NSDictionary) -> PrayerActivityAttributes.ContentState? {
@@ -183,6 +221,7 @@ class LiveActivityModule: NSObject {
             nextPrayerNameAr: nextPrayerNameAr,
             nextPrayerTime: nextPrayerTime,
             timeRemainingMinutes: timeRemainingMinutes,
+            nextPrayerDate: Date(timeIntervalSinceNow: TimeInterval(max(0, timeRemainingMinutes) * 60)),
             hijriDate: hijriDate,
             allPrayers: prayerItems,
             style: style,

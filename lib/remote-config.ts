@@ -57,7 +57,7 @@ export interface AppConfig {
 // ==================== Default Values ====================
 
 const DEFAULT_CONFIG: AppConfig = {
-  app_version: '1.2.0',
+  app_version: '1.2.1',
   min_supported_version: '1.2.0',
   force_update: false,
   maintenance_mode: false,

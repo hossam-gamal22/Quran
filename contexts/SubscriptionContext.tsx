@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, Alert } from 'react-native';
+import Constants from 'expo-constants';
 
 import {
   SubscriptionState,
@@ -33,8 +34,15 @@ import {
 } from '@/lib/paywall-trigger';
 
 // ==================== Safe IAP import ====================
-// react-native-iap requires native modules. On Expo Go or web, import fails.
-// We dynamically require it and fallback gracefully.
+// react-native-iap v14 depends on react-native-nitro-modules, which throws
+// "NitroModules are not supported in Expo Go!" the moment any of its native
+// methods are touched. The plain `require()` succeeds in Expo Go, but later
+// calls (e.g. initConnection, listeners) crash the app. So we additionally
+// detect Expo Go and force-disable IAP entirely there.
+
+const IS_EXPO_GO =
+  Constants.appOwnership === 'expo' ||
+  (Constants as any).executionEnvironment === 'storeClient';
 
 let IAP: {
   initConnection: () => Promise<any>;
@@ -48,10 +56,14 @@ let IAP: {
   flushFailedPurchasesCachedAsPendingAndroid?: () => Promise<any>;
 } | null = null;
 
-try {
-  IAP = require('react-native-iap');
-} catch {
-  console.log('⚠️ react-native-iap not available (Expo Go or web). Subscriptions disabled.');
+if (!IS_EXPO_GO) {
+  try {
+    IAP = require('react-native-iap');
+  } catch {
+    console.log('⚠️ react-native-iap not available. Subscriptions disabled.');
+  }
+} else {
+  console.log('⚠️ Running in Expo Go — react-native-iap disabled (no Nitro support).');
 }
 
 // ==================== Context Type ====================
@@ -189,6 +201,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                               : 'تم منحك نسخة مميزة من الإدارة 🌟',
                             sound: 'default',
                             data: { type: 'premium_granted' },
+                            ...(Platform.OS === 'android' && { channelId: 'general' }),
                           },
                           trigger: null,
                         }).catch(() => {});
@@ -397,6 +410,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
                   body: `ينتهي اشتراكك خلال ${Math.ceil(daysUntilExpiry)} ${Math.ceil(daysUntilExpiry) === 1 ? 'يوم' : 'أيام'}. جدد اشتراكك للاستمرار بدون إعلانات.`,
                   sound: 'default',
                   data: { type: 'subscription_expiry' },
+                  ...(Platform.OS === 'android' && { channelId: 'general' }),
                 },
                 trigger: null,
               }).catch(() => {});

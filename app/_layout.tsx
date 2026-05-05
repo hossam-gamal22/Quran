@@ -70,15 +70,17 @@ import { consumePendingDeepLink, consumeInitialURL, subscribeToDeepLinks, wasDee
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadInstalledSoundsCache } from '@/lib/notification-sound-installer';
 import { ensureNotificationIconsCached } from '@/lib/notification-icons';
-import { initializeAllNotificationChannels, resetChannelsIfOutdated } from '@/services/notifications/channels';
+import { initializeAllNotificationChannels, resetChannelsIfOutdated, verifyNotificationChannels } from '@/services/notifications/channels';
 import {
   requestNotificationPermissions as requestNewNotifPermissions,
 } from '@/services/notifications/permissions';
-import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezoneChange } from '@/lib/notifications-manager';
+import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezoneChange, forceRescheduleAllFromStorage } from '@/lib/notifications-manager';
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
 import { prefetchDailyVideos } from '@/lib/daily-video-prefetch';
+import { prefetchNatureImages } from '@/lib/nature-image-prefetch';
+import { NATURE_BG_URLS } from '@/constants/nature-backgrounds';
 import { uploadToCloud } from '@/lib/cloud-sync';
 import * as Auth from '@/lib/_core/auth';
 import {
@@ -128,6 +130,12 @@ LogBox.ignoreLogs([
   'aps-environment',
   'getValueWithKeyAsync',
   'getRegistrationInfoAsync',
+  // Expo Go race condition: vector-icon components mount and call
+  // Font.loadAsync() in parallel with our top-level useFonts() preload.
+  // expo-asset's native module rejects one of the duplicate downloads
+  // even though Metro returns 200 OK and the icons render correctly.
+  // Harmless in dev — does not occur in standalone builds.
+  'Unable to download asset from url',
 ]);
 
 // Configure notification handler at the top level (before any component renders)
@@ -517,8 +525,10 @@ export default function RootLayout() {
     'KFGQPCUthmanic': require('../assets/fonts/KFGQPC-Uthmanic-Script.ttf'),
     'Orbitron-Bold': require('../assets/fonts/Orbitron-Bold.ttf'),
     'Orbitron-Regular': require('../assets/fonts/Orbitron-Regular.ttf'),
-    // Required for VectorIcon in NativeTabs bottom navigation
-    'MaterialCommunityIcons': require('@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf'),
+    // NOTE: vector-icon fonts (MaterialCommunityIcons, Ionicons) are NOT
+    // preloaded here — `@expo/vector-icons` lazy-loads them when an Icon
+    // component mounts. Preloading via useFonts() spread breaks in Expo Go
+    // because expo-asset fails to download the bundled TTF reliably.
   });
 
   useEffect(() => {
@@ -577,6 +587,9 @@ export default function RootLayout() {
 
         await initializeAllNotificationChannels();
         console.log('[Notifications] initializeAllNotificationChannels complete');
+
+        // Sanity check: warn if any non-silent channel ended up with null sound
+        verifyNotificationChannels().catch(() => {});
 
         // Load installed custom sounds cache BEFORE unblocking scheduling.
         // SettingsContext awaits channelsReadyPromise before scheduling —
@@ -639,6 +652,17 @@ export default function RootLayout() {
       ensureFirebaseUser().catch((e) => {
         if (__DEV__) console.warn('⚠️ ensureFirebaseUser failed (non-fatal):', e);
       });
+
+      // Phase 2: ارفع موقع وإعدادات الصلاة لـ Firestore عشان FCM Push fallback
+      // (Cloud Function تحسب الصلاة محلياً وترسل push احتياطي لو local scheduling فشل)
+      setTimeout(() => {
+        AsyncStorage.getItem('@user_id').then((uid) => {
+          if (!uid) return;
+          import('@/lib/fcm-prayer-sync').then(({ syncPrayerDataToFirestore }) => {
+            syncPrayerDataToFirestore(uid).catch(() => {});
+          });
+        }).catch(() => {});
+      }, 8000);
 
       // Initialize TrackPlayer in parallel (non-blocking) — runs alongside Firebase inits
       // so its startup cost doesn't gate the splash screen hide.
@@ -758,6 +782,11 @@ export default function RootLayout() {
       // Not inside Promise.all to avoid blocking Firebase init completion.
       // The story screen falls back to CDN streaming if not cached yet.
       prefetchDailyVideos().catch(() => {});
+
+      // Nature background images for "آية اليوم" — throttled internally to once/day.
+      // Caches Unsplash photos to persistent storage so they work offline
+      // even if the user never opens the daily-ayah screen while online.
+      prefetchNatureImages(NATURE_BG_URLS).catch(() => {});
     };
 
     initFirebase();
@@ -771,13 +800,38 @@ export default function RootLayout() {
 
     // Auto-start/refresh Live Activity for prayer countdown (iOS only)
     initWithTimeout(
-      () => refreshLiveActivityIfEnabled(),
+      async () => { await refreshLiveActivityIfEnabled(); },
       'Live Activity refresh',
       5000
     );
 
     // Schedule midnight refresh for daily verse/dhikr widget content
     const cleanupMidnight = scheduleMidnightRefresh();
+
+    // Phase 1.D: Detect device reboot and force-reschedule FullAdhan AlarmManager
+    // entries (which DON'T survive reboot, unlike expo-notifications which BootReceiver
+    // restores). If the boot flag is set, run forceRescheduleAllFromStorage().
+    if (Platform.OS === 'android') {
+      initWithTimeout(
+        async () => {
+          try {
+            const { NativeModules } = require('react-native');
+            const FullAdhan = (NativeModules as any).FullAdhanModule;
+            if (FullAdhan?.consumeBootPendingReschedule) {
+              const wasBoot = await FullAdhan.consumeBootPendingReschedule();
+              if (wasBoot) {
+                console.log('🔄 [Boot] Device rebooted — forcing full reschedule (FullAdhan AlarmManager lost)');
+                await forceRescheduleAllFromStorage();
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ [Boot] consumeBootPendingReschedule failed:', e);
+          }
+        },
+        'Boot reschedule check',
+        8000
+      );
+    }
 
     // Sync app icon to match saved language on launch
     initWithTimeout(
@@ -885,6 +939,16 @@ export default function RootLayout() {
       if (!splashHidden.current) {
         splashHidden.current = true;
         setAppReady(true);
+      }
+      // Preload ALL 604 QCF Mushaf page fonts in the background so any place in
+      // the app that renders Quran (deep-link from favorites, daily-ayah, ayat-kursi,
+      // tafsir, share card, etc.) finds the correct per-page font already in memory.
+      try {
+        const { preloadAllPagesInBackground } = require('@/lib/qcf-font-loader');
+        preloadAllPagesInBackground(false);
+        preloadAllPagesInBackground(true);
+      } catch (err) {
+        console.warn('⚠️ QCF background preload failed to start:', err);
       }
     }
   }, [fontsLoaded, fontError]);

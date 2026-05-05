@@ -4,7 +4,7 @@
 // Android: the same package's native-looking JS fallback.
 // Scrollable variant: horizontal chip row (used when there are too many tabs to fit).
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ViewStyle,
   Platform,
   ScrollView,
+  LayoutChangeEvent,
 } from 'react-native';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import * as Haptics from 'expo-haptics';
@@ -69,8 +70,9 @@ function SegmentedTabs({ tabs, selected, onSelect, indicatorColor, style }: Nati
   );
 
   // Borderless: no explicit backgroundColor so the native control picks up its parent.
-  // Selected segment: primary green tint. Inactive label: white on dark, primary on light.
-  const inactiveLabel = isDark ? '#FFFFFF' : activeColor;
+  // Selected segment: primary green tint. Inactive label: theme text color (NOT activeColor —
+  // using activeColor on near-white surfaces renders as faded "silver" green, hard to read).
+  const inactiveLabel = isDark ? '#FFFFFF' : (colors.text ?? '#1C1C1E');
 
   return (
     <View style={style}>
@@ -127,13 +129,62 @@ function ScrollableChipTabs({
   const isRTL = useIsRTL();
   const activeColor = indicatorColor ?? colors.primary;
   const isDark = isDarkMode || colors.hasBgOverride;
+  const scrollRef = useRef<ScrollView>(null);
 
-  // RTL is handled by `flexDirection: row-reverse` below — do NOT also reverse
-  // the array, the two cancel out and the first tab ends up on the wrong side.
+  // Track viewport + content + per-chip layouts so we can:
+  //   1. Anchor the first tab to the visual start (right edge in RTL, left in LTR).
+  //   2. Scroll the currently-selected tab into view when `selected` changes.
+  const viewportWidthRef = useRef(0);
+  const contentWidthRef = useRef(0);
+  const chipLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+
+  const anchorToStart = useCallback(() => {
+    const vp = viewportWidthRef.current;
+    const cw = contentWidthRef.current;
+    if (!vp || !cw) return;
+    if (isRTL) {
+      // First tab is rendered last visually (row-reverse) — its layout x is at the
+      // far right of content. Scroll so the right edge of content is visible.
+      const x = Math.max(0, cw - vp);
+      scrollRef.current?.scrollTo({ x, animated: false });
+    } else {
+      scrollRef.current?.scrollTo({ x: 0, animated: false });
+    }
+  }, [isRTL]);
+
+  const scrollSelectedIntoView = useCallback(
+    (key: string) => {
+      const layout = chipLayoutsRef.current[key];
+      const vp = viewportWidthRef.current;
+      if (!layout || !vp) return;
+      // Center the chip within the viewport when possible.
+      const target = Math.max(0, layout.x + layout.width / 2 - vp / 2);
+      const cw = contentWidthRef.current;
+      const maxX = Math.max(0, cw - vp);
+      scrollRef.current?.scrollTo({ x: Math.min(target, maxX), animated: true });
+    },
+    []
+  );
+
+  // When selection changes programmatically (not from a tap), keep it visible.
+  useEffect(() => {
+    scrollSelectedIntoView(selected);
+  }, [selected, scrollSelectedIntoView]);
+
   return (
     <ScrollView
+      ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      onLayout={(e: LayoutChangeEvent) => {
+        viewportWidthRef.current = e.nativeEvent.layout.width;
+        anchorToStart();
+      }}
+      onContentSizeChange={(w) => {
+        contentWidthRef.current = w;
+        // Re-anchor whenever content size changes (font load, locale switch, tab list change).
+        anchorToStart();
+      }}
       contentContainerStyle={[
         chipStyles.row,
         { flexDirection: isRTL ? 'row-reverse' : 'row' },
@@ -151,6 +202,10 @@ function ScrollableChipTabs({
         return (
           <Pressable
             key={tab.key}
+            onLayout={(e: LayoutChangeEvent) => {
+              const { x, width } = e.nativeEvent.layout;
+              chipLayoutsRef.current[tab.key] = { x, width };
+            }}
             onPress={() => {
               if (Platform.OS === 'ios') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onSelect(tab.key);
@@ -158,12 +213,23 @@ function ScrollableChipTabs({
             style={[
               chipStyles.chip,
               {
-                backgroundColor: isActive ? activeColor : 'transparent',
+                backgroundColor: isActive
+                  ? activeColor
+                  : isDark
+                    ? 'rgba(255,255,255,0.18)'
+                    : 'rgba(0,0,0,0.08)',
                 borderColor: isActive
                   ? activeColor
                   : isDark
-                    ? 'rgba(255,255,255,0.15)'
-                    : 'rgba(0,0,0,0.1)',
+                    ? 'rgba(255,255,255,0.45)'
+                    : 'rgba(0,0,0,0.28)',
+              },
+              isActive && {
+                shadowColor: activeColor,
+                shadowOpacity: 0.45,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 4,
               },
             ]}
           >
@@ -171,7 +237,7 @@ function ScrollableChipTabs({
               style={[
                 chipStyles.chipLabel,
                 {
-                  color: isActive ? '#FFFFFF' : isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.7)',
+                  color: isActive ? '#FFFFFF' : isDark ? '#FFFFFF' : 'rgba(0,0,0,0.88)',
                   fontFamily: isActive ? fontBold() : fontSemiBold(),
                 },
               ]}
@@ -199,7 +265,7 @@ const _chipStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    borderWidth: 1,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },

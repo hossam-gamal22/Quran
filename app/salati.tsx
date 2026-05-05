@@ -74,115 +74,50 @@ interface PrayerTimesMap {
   isha?: string;
 }
 
-// Prayer order for determining "next prayer"
-const PRAYER_ORDER_LIST: SalatiPrayerType[] = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
-
-const parseTimeToMinutes = (timeValue?: string): number | null => {
-  if (!timeValue) return null;
-  const normalized = timeValue.trim();
-
-  // Supports 24h format HH:mm
-  const hhmmMatch = normalized.match(/^(\d{1,2}):(\d{2})$/);
-  if (hhmmMatch) {
-    const hours = Number(hhmmMatch[1]);
-    const minutes = Number(hhmmMatch[2]);
-    if (Number.isFinite(hours) && Number.isFinite(minutes) && hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
-      return (hours * 60) + minutes;
-    }
-  }
-
-  // Supports locale strings with AM/PM as fallback
-  const date = new Date(`1970-01-01 ${normalized}`);
-  if (!Number.isNaN(date.getTime())) {
-    return (date.getHours() * 60) + date.getMinutes();
-  }
-
-  return null;
-};
+import {
+  getPrayerWindowState,
+  getSuggestedStatus,
+  parseTimeToMinutes,
+} from '@/lib/prayer-availability';
 
 /**
- * Check if a prayer is available for tracking
- * - Before Fajr: Isha available (still in window), other prayers available as qada, but NOT Fajr (hasn't started yet)
- * - After Fajr starts: Each prayer available once its time has started
+ * Returns true when no prayer times are available (offline + no cached times).
+ * In this case we allow the user to manually pick & start any prayer.
+ */
+const hasNoPrayerTimes = (prayerTimes: PrayerTimesMap): boolean =>
+  parseTimeToMinutes(prayerTimes.fajr) === null;
+
+/**
+ * Check if a prayer is available for tracking (wraps the shared smart-window helper).
  */
 const isPrayerAvailable = (
   prayer: SalatiPrayerType,
   prayerTimes: PrayerTimesMap,
-  nowMinutes: number
+  _nowMinutes: number
 ): boolean => {
-  const fajrMinutes = parseTimeToMinutes(prayerTimes.fajr);
-  const prayerMinutes = parseTimeToMinutes(prayerTimes[prayer]);
-
-  // If we don't have prayer times data, disable tracking (no valid times to compare)
-  if (fajrMinutes === null || prayerMinutes === null) {
-    return false;
-  }
-
-  // Before Fajr time (midnight to Fajr):
-  if (nowMinutes < fajrMinutes) {
-    // Only Isha is still in its window (extends until Fajr)
-    if (prayer === 'isha') {
-      return true;
-    }
-    // Fajr hasn't started, and Dhuhr/Asr/Maghrib belong to the previous day — disable them
-    return false;
-  }
-
-  // After Fajr: Prayer is available if its time has started
-  return nowMinutes >= prayerMinutes;
+  // Offline / no cached times: allow all prayers so the feature still works.
+  if (hasNoPrayerTimes(prayerTimes)) return true;
+  // Need at least the prayer's own time and Fajr to compute the window correctly.
+  if (parseTimeToMinutes(prayerTimes.fajr) === null) return false;
+  if (parseTimeToMinutes(prayerTimes[prayer]) === null) return false;
+  const state = getPrayerWindowState(prayer, prayerTimes);
+  return state === 'onTime' || state === 'lateOnly' || state === 'expired';
 };
 
 /**
- * Determine the prayer status based on timing
- * - If within the prayer's window (before next prayer): "prayed" (on time)
- * - If past the next prayer's start time: "late"
+ * Determine the prayer status (`prayed` if on time, `late` otherwise) using the
+ * shared window helper.
  */
 const determinePrayerStatus = (
   prayer: SalatiPrayerType,
   prayerTimes: PrayerTimesMap,
-  nowMinutes: number
+  _nowMinutes: number
 ): 'prayed' | 'late' => {
-  const prayerIndex = PRAYER_ORDER_LIST.indexOf(prayer);
-  const nextPrayerKey = PRAYER_ORDER_LIST[prayerIndex + 1]; // undefined for isha
-
-  const prayerMinutes = parseTimeToMinutes(prayerTimes[prayer]);
-  const fajrMinutes = parseTimeToMinutes(prayerTimes.fajr);
-
-  // If we don't have data, assume on time
-  if (prayerMinutes === null) {
-    return 'prayed';
-  }
-
-  // Before Fajr time (midnight to Fajr): Anything tracked is considered "late" (qada)
-  // EXCEPT if we're tracking a prayer from tonight (isha)
-  if (fajrMinutes !== null && nowMinutes < fajrMinutes) {
-    // If tracking isha before fajr, it's still the isha window
-    if (prayer === 'isha') {
-      return 'prayed'; // Isha window extends until Fajr
-    }
-    // Other prayers tracked before Fajr are qada (late)
-    return 'late';
-  }
-
-  // For Isha: window extends until next day's Fajr (so always on time if after isha)
-  if (prayer === 'isha') {
-    const ishaMinutes = parseTimeToMinutes(prayerTimes.isha);
-    if (ishaMinutes !== null && nowMinutes >= ishaMinutes) {
-      return 'prayed';
-    }
-    // Before isha time but after fajr? Shouldn't happen normally
-    return 'late';
-  }
-
-  // For other prayers: check if before next prayer's time
-  if (nextPrayerKey) {
-    const nextMinutes = parseTimeToMinutes(prayerTimes[nextPrayerKey]);
-    if (nextMinutes !== null && nowMinutes < nextMinutes) {
-      return 'prayed'; // Within the prayer's window
-    }
-  }
-
-  return 'late'; // Past the prayer's window
+  // Without prayer times we can't decide late vs on-time → treat as on-time.
+  if (hasNoPrayerTimes(prayerTimes)) return 'prayed';
+  const state = getPrayerWindowState(prayer, prayerTimes);
+  const suggested = getSuggestedStatus(state);
+  return suggested === 'prayed' ? 'prayed' : 'late';
 };
 
 // ---------------------------------------------------------------------------

@@ -105,7 +105,7 @@ function withAlarmClockScheduling(config) {
         source = source.replace(OLD_SETUP_ALARM, NEW_SETUP_ALARM);
         console.log('[with-alarm-clock-scheduling] \u2705 Patch A: setupAlarm() \u2192 setAlarmClock() (no guard)');
       } else if (source.includes('setAlarmClock')) {
-        if (source.includes('canScheduleExactAlarms')) {
+        if (source.includes('alarmManager.canScheduleExactAlarms()')) {
           const guardedPattern = /private fun setupAlarm[\s\S]*?^  \}/m;
           const newBody = NEW_SETUP_ALARM.slice(2);
           source = source.replace(guardedPattern, newBody);
@@ -118,6 +118,27 @@ function withAlarmClockScheduling(config) {
       }
 
       // ── 3. Patch B: Replace triggerNotification() with direct presentation
+      const START_FULL_ADHAN_PLAYBACK = `      val contentData = notificationRequest.content.body
+      val shouldPlayFullAdhan = contentData?.let {
+        it.optString("type") == "prayer" && it.optString("androidFullAdhan") == "true"
+      } ?: false
+      if (shouldPlayFullAdhan) {
+        try {
+          val serviceIntent = android.content.Intent().setClassName(
+            context.packageName,
+            "com.rooh.almuslim.adhan.AdhanPlaybackService"
+          ).apply {
+            action = "com.rooh.almuslim.adhan.PLAY"
+            putExtra("soundType", contentData?.optString("soundType", "makkah") ?: "makkah")
+            putExtra("prayerName", notificationRequest.content.title ?: contentData?.optString("prayer", "") ?: "")
+          }
+          androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent)
+          Log.i("expo-notifications", "Started full adhan playback service for: $identifier")
+        } catch (adhanError: Exception) {
+          Log.w("expo-notifications", "Could not start full adhan playback for $identifier: \${adhanError.message}")
+        }
+      }`;
+
       const OLD_TRIGGER = `  override fun triggerNotification(identifier: String) {
     try {
       val notificationRequest: NotificationRequest = store.getNotificationRequest(identifier)!!
@@ -142,6 +163,8 @@ function withAlarmClockScheduling(config) {
     try {
       val notificationRequest: NotificationRequest = store.getNotificationRequest(identifier)!!
       val notification = Notification(notificationRequest)
+
+${START_FULL_ADHAN_PLAYBACK}
 
       // DIRECT PRESENTATION: Build and post the Android notification immediately
       // without going through the multi-broadcast chain (receive → doWork →
@@ -225,6 +248,17 @@ function withAlarmClockScheduling(config) {
         }
       } else {
         console.warn('[with-alarm-clock-scheduling] ⚠️ Patch B: triggerNotification() not found');
+      }
+
+      if (source.includes('Direct-presented notification') &&
+          !source.includes('AdhanPlaybackService')) {
+        source = source.replace(
+          '      val notification = Notification(notificationRequest)\\n\\n      // DIRECT PRESENTATION:',
+          `      val notification = Notification(notificationRequest)\\n\\n${START_FULL_ADHAN_PLAYBACK}\\n\\n      // DIRECT PRESENTATION:`
+        );
+        console.log('[with-alarm-clock-scheduling] ✅ Patch C: full adhan foreground playback');
+      } else if (source.includes('AdhanPlaybackService')) {
+        console.log('[with-alarm-clock-scheduling] Patch C already applied');
       }
 
       writeFileSync(delegatePath, source, 'utf-8');

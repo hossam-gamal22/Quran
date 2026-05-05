@@ -57,6 +57,7 @@ import { useIsRTL } from '@/hooks/use-is-rtl';
 import { safeIcon } from '@/lib/safe-icon';
 import { useScaledStyles } from '@/hooks/use-font-scale';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
+import { PermissionBanner } from '@/components/notifications/PermissionBanner';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -229,6 +230,7 @@ const HOME_SECTIONS: HomeSectionDef[] = [
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
       { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), route: '/ruqya' },
       { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), route: '/quran-dua-daily' },
+      { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
     ],
   },
   {
@@ -319,6 +321,7 @@ const MODAL_CATEGORIES: ModalCategoryDef[] = [
       { id: 'daily_hadith', labelKey: 'home.hadithOfDay', ...PAGE_CONFIGS.daily_hadith, route: '/hadith-of-day' },
       { id: 'ruqya', labelKey: 'azkar.ruqya', ...getAzkarCategoryData('34'), route: '/ruqya' },
       { id: 'quran_duas', labelKey: 'azkar.quranDuas', ...getAzkarCategoryData('26'), route: '/quran-dua-daily' },
+      { id: 'famous_duas', labelKey: 'home.famousDuas', icon: 'star-circle', color: '#0d8e62', route: '/famous-duas' },
     ],
   },
   {
@@ -791,6 +794,7 @@ export default function HomeScreen() {
         }
         // No cache — try to fetch using saved location, or request location
         const { getStoredLocation, fetchPrayerTimes, parsePrayerTimes, saveLocation, cachePrayerTimes } = await import('@/lib/prayer-times');
+        const { MAKKAH_FALLBACK_DEFAULTS } = await import('@/lib/country-prayer-defaults');
         let loc = await getStoredLocation();
         if (!loc) {
           // No stored location — try to get current location
@@ -806,7 +810,12 @@ export default function HomeScreen() {
             }).catch(() => {});
           } else {
             // Fallback to Makkah coordinates
-            loc = { latitude: 21.4225, longitude: 39.8262, city: 'مكة المكرمة', country: 'السعودية' };
+            loc = {
+              latitude: MAKKAH_FALLBACK_DEFAULTS.lat,
+              longitude: MAKKAH_FALLBACK_DEFAULTS.lng,
+              city: MAKKAH_FALLBACK_DEFAULTS.cityNameAr,
+              country: 'السعودية',
+            };
           }
         }
         if (loc) {
@@ -1523,6 +1532,9 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </Animated.View>
         )}
+
+        {/* Permission Recovery Banner — يظهر فقط لو في إذن مفقود */}
+        <PermissionBanner />
 
         {/* Daily Highlights */}
         <CollapsibleSection title={t('home.highlights')} icon="star-circle" iconColor="#c07b10" sectionId="highlights" collapsedSections={collapsedSections} toggleSection={toggleSection} isDarkMode={isDarkMode}>

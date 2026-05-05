@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { fontBold, fontMedium, fontRegular } from '@/lib/fonts';
 import { Stack, useRouter } from 'expo-router';
@@ -341,6 +342,31 @@ export default function SubscriptionScreen() {
           )}
         </TouchableOpacity>
 
+        {/* Legal Links: Terms of Use & Privacy Policy (Apple Guideline 3.1.2) */}
+        <View style={styles.legalLinksRow}>
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.legalLinkText, { color: colors.textLight }]}>
+              {t('subscription.termsOfUse')}
+            </Text>
+          </TouchableOpacity>
+          <Text style={[styles.legalLinkSeparator, { color: colors.textLight }]}> | </Text>
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL('https://hossamgamal.web.app/p/rooh-almuslim-privacy-policy')
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.legalLinkText, { color: colors.textLight }]}>
+              {t('subscription.privacyPolicy')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </ScreenContainer>
@@ -496,6 +522,27 @@ const _styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontMedium(),
     lineHeight: 22,
+    includeFontPadding: false,
+  },
+  legalLinksRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingHorizontal: 16,
+    flexWrap: 'wrap',
+  },
+  legalLinkText: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    textDecorationLine: 'underline',
+    opacity: 0.8,
+    includeFontPadding: false,
+  },
+  legalLinkSeparator: {
+    fontSize: 12,
+    fontFamily: fontRegular(),
+    opacity: 0.6,
     includeFontPadding: false,
   },
   // Seasonal offer banner

@@ -77,6 +77,9 @@ import AzkarQcfVerse from '@/components/AzkarQcfVerse';
 import { getListenModeBackgrounds } from '@/constants/pexels-backgrounds';
 import { LinearGradient } from 'expo-linear-gradient';
 import { showOfflineModal } from '@/components/ui/OfflineBanner';
+import { useQuran } from '@/contexts/QuranContext';
+import { getAyahAudioUrl } from '@/lib/quran-cache';
+import { expandQuranAudioMarker, getSurahArabicName } from '@/lib/azkar-quran-audio';
 
 // Map azkar category IDs → worship tracker keys
 const WORSHIP_AZKAR_MAP: Partial<Record<AzkarCategoryType, keyof Omit<DailyAzkarRecord, 'date' | 'zikrCount'>>> = {
@@ -650,7 +653,7 @@ export default function CategoryAzkarScreen() {
     if (audioQueue.length === 0) return;
     const filenames = audioQueue
       .map(item => item.zikr.audio)
-      .filter((f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:)/i.test(f));
+      .filter((f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:|quran:)/i.test(f));
     if (filenames.length === 0) return;
     prefetchAzkarFiles(filenames).catch(err =>
       console.warn('[azkar] prefetch failed:', err),
@@ -661,7 +664,7 @@ export default function CategoryAzkarScreen() {
   // Shows an alert and returns false if offline + uncached.
   const ensureAudioReachable = useCallback(async (filenames: (string | undefined)[]): Promise<boolean> => {
     const needed = filenames.filter(
-      (f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:)/i.test(f),
+      (f): f is string => !!f && !/^(https?:|file:|asset:|content:|data:|quran:)/i.test(f),
     );
     if (needed.length === 0) return true;
     // If any needed file is missing from cache, we require network
@@ -683,17 +686,46 @@ export default function CategoryAzkarScreen() {
     return false;
   }, []);
 
-  // Build GlobalAudioContext-compatible track list
+  // Build GlobalAudioContext-compatible track list.
+  // For "quran:S:A-B" markers, expand into one AudioTrack per ayah using the
+  // user's selected Quran reciter; otherwise pass through the legacy m4a flow.
+  const { currentReciter } = useQuran();
   const audioTracks: AudioTrack[] = React.useMemo(() => {
-    return audioQueue.map((item, index) => ({
-      id: String(item.zikr.id),
-      title: item.zikr.arabic?.substring(0, 60) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })),
-      subtitle: categoryInfo ? getCategoryName(categoryInfo, language) : '',
-      url: item.zikr.audio!,
-      localSource: getAzkarAudioSource(item.zikr.audio) ?? undefined,
-      categoryId: String(categoryInfo?.id || category),
-    }));
-  }, [audioQueue, categoryInfo, category]);
+    const subtitle = categoryInfo ? getCategoryName(categoryInfo, language) : '';
+    const categoryId = String(categoryInfo?.id || category);
+    const result: AudioTrack[] = [];
+    audioQueue.forEach((item, index) => {
+      const audio = item.zikr.audio || '';
+      if (audio.startsWith('quran:')) {
+        // Parse surah for the title; default Arabic surah name.
+        const parts = audio.split(':');
+        const surahNum = Number(parts[1]) || 0;
+        const expanded = expandQuranAudioMarker(
+          item.zikr.id,
+          audio,
+          currentReciter,
+          getSurahArabicName(surahNum),
+          subtitle,
+          categoryId,
+        );
+        if (expanded.length > 0) {
+          result.push(...expanded);
+          return;
+        }
+        // Fall through to skip (no playable URL)
+        return;
+      }
+      result.push({
+        id: String(item.zikr.id),
+        title: item.zikr.arabic?.substring(0, 60) || (category?.includes('duas') ? t('azkar.duaNumber', { num: String(index + 1) }) : t('azkar.dhikrNumber', { num: String(index + 1) })),
+        subtitle,
+        url: audio,
+        localSource: getAzkarAudioSource(audio) ?? undefined,
+        categoryId,
+      });
+    });
+    return result;
+  }, [audioQueue, categoryInfo, category, currentReciter, language]);
 
   // Play a single zikr from its index in the full azkar array
   const handlePlayZikrAudio = useCallback(async (zikr: Zikr) => {

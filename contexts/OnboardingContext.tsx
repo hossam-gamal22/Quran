@@ -5,10 +5,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { I18nManager } from 'react-native';
+import { doc, getDoc } from 'firebase/firestore';
 import { setLanguage, getLanguage } from '@/lib/i18n';
 import { useSettings } from '@/contexts/SettingsContext';
 import { saveDisplayName } from '@/lib/rewards-manager';
-import { getUserId } from '@/lib/firebase-user';
+import { getUserId, getOriginalDeviceUserId } from '@/lib/firebase-user';
+import { db } from '@/lib/firebase-config';
 
 // ========================================
 // الأنواع
@@ -62,6 +64,8 @@ interface OnboardingContextType {
   currentStep: OnboardingStep;
   progress: OnboardingProgress;
   preferences: UserPreferences;
+  /** True when the user landed on the name step via server fallback (returning user without displayName). Hides the back button. */
+  skippedToNameStep: boolean;
   
   // التنقل
   goToNextStep: () => void;
@@ -149,6 +153,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
   const [progress, setProgress] = useState<OnboardingProgress>(DEFAULT_PROGRESS);
   const [preferences, setPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES);
+  const [skippedToNameStep, setSkippedToNameStep] = useState(false);
 
   // ========================================
   // تحميل البيانات
@@ -166,8 +171,53 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
       const completeFlag = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETE);
       if (completeFlag === 'true') {
         setIsOnboardingComplete(true);
-        setIsLoading(false);
         return;
+      }
+
+      // ====== Server fallback for returning users ======
+      // If a profile already exists for this device on Firestore, restore name
+      // and skip onboarding (or jump to the name step). 5s timeout so offline /
+      // slow networks fall through to the normal local-only flow.
+      try {
+        const serverCheck = async (): Promise<{ displayName?: string } | null> => {
+          const userId = await getOriginalDeviceUserId();
+          const userSnap = await getDoc(doc(db, 'users', userId));
+          if (!userSnap.exists()) return null;
+          const data = userSnap.data() as { displayName?: string; placeholder?: boolean; mergedInto?: string };
+          // Defer merged accounts to syncUserProfileFromFirestore (handles chains)
+          if (data.placeholder && data.mergedInto) return null;
+          return { displayName: data.displayName };
+        };
+
+        const serverResult = await Promise.race<{ displayName?: string } | null>([
+          serverCheck(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+        ]);
+
+        if (serverResult) {
+          const restoredName = serverResult.displayName?.trim();
+          if (restoredName) {
+            // Returning user with name on server — restore everything, skip onboarding entirely
+            await AsyncStorage.setItem('@rooh_display_name', restoredName);
+            await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETE, 'true');
+            setIsOnboardingComplete(true);
+            console.log('[onboarding] server check: returning user, name restored', restoredName);
+            return;
+          }
+          // Returning user without displayName — jump straight to name step
+          const jumpProgress: OnboardingProgress = {
+            ...DEFAULT_PROGRESS,
+            currentStep: 'name',
+            completedSteps: ['language', 'welcome', 'prize'],
+          };
+          setProgress(jumpProgress);
+          setSkippedToNameStep(true);
+          await saveProgress(jumpProgress);
+          console.log('[onboarding] server check: profile exists, no name → jump to name step');
+          return;
+        }
+      } catch (serverErr) {
+        console.warn('[onboarding] server check failed/timeout, using local state', serverErr);
       }
 
       // تحميل التقدم المحفوظ
@@ -450,6 +500,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     currentStep: progress.currentStep,
     progress,
     preferences,
+    skippedToNameStep,
     goToNextStep,
     goToPreviousStep,
     goToStep,

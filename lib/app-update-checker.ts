@@ -15,6 +15,7 @@ import { Platform, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
+import { resolveNotificationSound } from './resolve-notification-sound';
 
 const LAST_NOTIFIED_VERSION_KEY = '@update_notified_version';
 const UPDATE_NOTIFICATION_ID = 'app_update_available';
@@ -77,7 +78,7 @@ export async function checkAndNotifyUpdate(
   if (Platform.OS === 'web') return;
   if (!latestVersion) return;
 
-  const currentVersion = Constants.expoConfig?.version || '1.2.0';
+  const currentVersion = Constants.expoConfig?.version || '1.2.1';
 
   // No update available
   if (!isNewerVersion(currentVersion, latestVersion)) return;
@@ -104,7 +105,7 @@ export async function checkAndNotifyUpdate(
       content: {
         title: dirText(t('notifications.updateAvailableTitle') || '🎉 تحديث جديد متاح'),
         body: dirText(t('notifications.updateAvailableBody') || 'يتوفر إصدار جديد من روح المسلم. حدّث الآن للحصول على أفضل تجربة.'),
-        sound: 'default',
+        sound: resolveNotificationSound('general_reminder', true),
         data: {
           type: 'app_update',
           storeUrl: storeUrl || '',
