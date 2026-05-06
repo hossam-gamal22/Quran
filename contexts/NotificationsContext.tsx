@@ -28,6 +28,7 @@ import { doc, updateDoc, increment } from 'firebase/firestore';
 import { getAyahSoundUri } from '@/lib/notification-sound-cache';
 import { handleNotificationNavigation } from '@/lib/notification-router';
 import { handleDidYouPrayResponse } from '@/lib/did-you-pray-handler';
+import { recordTelemetryEvent } from '@/lib/notification-telemetry';
 import { useRouter } from 'expo-router';
 
 // ==================== Types ====================
@@ -161,6 +162,11 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
       async (notification) => {
         console.log('Notification received:', notification);
         const data = notification.request.content.data;
+        const notifId = notification.request.identifier;
+        // Phase 9: telemetry — record received event
+        recordTelemetryEvent('received', notifId, {
+          prayer: typeof data?.prayer === 'string' ? data.prayer : undefined,
+        }).catch(() => {});
         // Play ayah audio when custom reminder with ayah content arrives in foreground
         if (data?.type === 'custom' && data?.contentType === 'ayah') {
           try {
@@ -190,33 +196,46 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({
     responseListener.current = addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
       const notifId = response.notification.request.identifier;
+      const actionId = response.actionIdentifier;
 
-      // Handle "هل صليت؟" action buttons. Returns true if consumed (prayed / will_pray),
-      // in which case we skip navigation — the user didn't tap the notification body.
-      handleDidYouPrayResponse(response).then((consumed) => {
-        if (consumed) return;
+      // Phase 9: telemetry — سجّل opened أو action
+      const isAction = actionId && actionId !== 'default' && actionId !== 'expo.modules.notifications.actions.DEFAULT';
+      recordTelemetryEvent(isAction ? 'action' : 'opened', notifId, {
+        action: isAction ? actionId : undefined,
+        prayer: typeof data?.prayer === 'string' ? data.prayer : undefined,
       }).catch(() => {});
 
-      // Track notification open in Firestore
-      if (data?.notificationDocId) {
-        updateDoc(doc(db, 'notifications', data.notificationDocId as string), {
-          openedCount: increment(1),
-        }).catch(() => {});
-      }
+      // Phase 6: ينتظر النتيجة فعلياً قبل الـ navigation
+      // قبل: كان يستدعي then() async ثم يكمل بـ navigation فوراً ⇒ race condition
+      //      المستخدم يضغط "نعم صليت" → التطبيق يفتح صفحة الصلاة بالخطأ
+      handleDidYouPrayResponse(response)
+        .then((consumed) => {
+          if (consumed) return; // الـ action تمّ معالجته — لا navigation
 
-      // Skip navigation for action-button presses on did_you_pray
-      if (data?.type === 'did_you_pray' && response.actionIdentifier !== 'default') {
-        return;
-      }
+          // تتبّع فتح الإشعار في Firestore
+          if (data?.notificationDocId) {
+            updateDoc(doc(db, 'notifications', data.notificationDocId as string), {
+              openedCount: increment(1),
+            }).catch(() => {});
+          }
 
-      const result = handleNotificationNavigation(data, router, notifId);
+          // Skip navigation لو ضغط زر action على did_you_pray (الـ default tap فقط يُفتح)
+          if (data?.type === 'did_you_pray' && response.actionIdentifier !== 'default') {
+            return;
+          }
 
-      // Play audio after navigation transition (e.g. Kahf ayah, custom ayah)
-      if (result.audioUrl) {
-        setTimeout(() => {
-          playAndCleanup(result.audioUrl!, result.audioLabel || 'notification tap');
-        }, 1500);
-      }
+          const result = handleNotificationNavigation(data, router, notifId);
+
+          // Play audio after navigation transition (e.g. Kahf ayah, custom ayah)
+          if (result.audioUrl) {
+            setTimeout(() => {
+              playAndCleanup(result.audioUrl!, result.audioLabel || 'notification tap');
+            }, 1500);
+          }
+        })
+        .catch((e) => {
+          console.warn('[notifications] response handler failed:', e);
+        });
     });
 
     return () => {

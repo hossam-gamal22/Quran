@@ -187,6 +187,8 @@ export interface NotificationSettings {
   istighfarReminderTimes?: string[];
   customReminderTimes?: string[];
   quranReadingReminderTimes?: string[];
+  // Phase 7: ربط أذكار الصباح/المساء/النوم/الاستيقاظ بأوقات الصلاة الفعلية تلقائياً
+  azkarAutoAnchor?: boolean;
   // Per-category admin override tracking (true = user customized, skip admin sync)
   notifOverrides?: Record<string, boolean>;
 }
@@ -362,6 +364,8 @@ const defaultNotifications: NotificationSettings = {
   sleepSoundType: 'notif_sleep',
   wakeupSoundType: 'notif_wakeup',
   kahfSoundType: 'notif_kahf',
+  // Phase 7: ربط الأذكار بأوقات الصلاة (افتراضي: معطّل — اختياري للمستخدم)
+  azkarAutoAnchor: false,
 };
 
 const defaultDisplay: DisplaySettings = {
@@ -766,6 +770,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
             worshipWeeklyReportTime: n.worshipWeeklyReportTime ?? '21:00',
             kahfReminder: n.kahfReminder,
             kahfTime: n.kahfTime,
+            // Phase 7
+            azkarAutoAnchor: n.azkarAutoAnchor === true,
           }).then(() => {
             // Mark initial scheduling complete so admin sync can safely proceed
             setInitialSchedulingDone(true);
@@ -1047,6 +1053,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       worshipWeeklyReportTime: n.worshipWeeklyReportTime ?? '21:00',
       kahfReminder: n.kahfReminder,
       kahfTime: n.kahfTime,
+      // Phase 7
+      azkarAutoAnchor: n.azkarAutoAnchor === true,
     });
   }, [settings]);
 

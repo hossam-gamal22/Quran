@@ -395,9 +395,64 @@ export const STORIES: Story[] = [
 // ========================================
 
 export function getStoryById(id: string): Story | undefined {
-  return STORIES.find((s) => s.id === id);
+  const list = _storiesOverride && _storiesOverride.length ? _storiesOverride : STORIES;
+  return list.find((s) => s.id === id);
 }
 
 export function getStoriesByType(type: 'prophet' | 'companion'): Story[] {
-  return STORIES.filter((s) => s.type === type);
+  const list = _storiesOverride && _storiesOverride.length ? _storiesOverride : STORIES;
+  return list.filter((s) => s.type === type);
+}
+
+// ========================================
+// C2: Firestore override hydration
+// Admin panel may populate `prophetStories` collection.
+// Falls back to bundled STORIES when collection is empty/unreachable.
+// ========================================
+
+import AsyncStorageStories from '@react-native-async-storage/async-storage';
+
+const STORIES_CACHE_KEY = '@stories_firestore_cache';
+const STORIES_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let _storiesOverride: Story[] | null = null;
+
+interface StoriesCacheEnv {
+  ts: number;
+  data: Story[];
+}
+
+export async function hydrateStoriesFromFirestore(): Promise<void> {
+  try {
+    const cached = await AsyncStorageStories.getItem(STORIES_CACHE_KEY);
+    if (cached) {
+      try {
+        const env = JSON.parse(cached) as StoriesCacheEnv;
+        if (env?.data?.length) {
+          _storiesOverride = env.data;
+          if (Date.now() - env.ts < STORIES_CACHE_TTL_MS) return;
+        }
+      } catch { /* corrupted */ }
+    }
+  } catch { /* AsyncStorage unavailable */ }
+
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const firebaseModulePath = '@/config/firebase';
+    const { db } = await import(/* @vite-ignore */ firebaseModulePath);
+    const snap = await getDocs(collection(db, 'prophetStories'));
+    if (snap.empty) return;
+    const items: Story[] = snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as Story))
+      .filter(s => typeof s.id === 'string' && (s.type === 'prophet' || s.type === 'companion') && Array.isArray(s.sections));
+    if (!items.length) return;
+    _storiesOverride = items;
+    try {
+      await AsyncStorageStories.setItem(
+        STORIES_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data: items } as StoriesCacheEnv)
+      );
+    } catch { /* cache write failed */ }
+  } catch (err) {
+    console.warn('[stories] hydrate failed, using bundled fallback:', err);
+  }
 }

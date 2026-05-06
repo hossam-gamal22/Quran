@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAdminSession = exports.verifyAdminPassword = exports.selectMonthlyWinners = exports.pushNotificationsTestEndpoint = exports.sendPushNotifications = void 0;
+exports.cleanupFcmPrayerDedupe = exports.sendPrayerPushFallback = exports.validateAdminSession = exports.verifyAdminPassword = exports.selectMonthlyWinners = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 const scheduler_1 = require("firebase-functions/v2/scheduler");
@@ -52,187 +52,25 @@ const EXPO_PUSH_APIS = [
 ];
 const EXPO_REQUEST_TIMEOUT_MS = 15000;
 /**
- * Cloud Function: Send push notifications via Expo
- * Called by admin panel instead of calling Expo directly
- * Operates from server, bypassing browser CORS restrictions
+ * ⚠️ Deprecated and removed in Phase A2 (Security hardening).
  *
- * Accepts either:
- *   { messages: ExpoPushMessage[] }  — pre-built per-user messages (multi-language)
- *   { tokens, title, body, ... }     — flat payload (single language, legacy)
+ * Push notifications are sent via the Netlify proxy `expo-push.ts`, which is
+ * authenticated using an admin session token (HMAC-signed by `verify-admin`).
+ *
+ * The previous `sendPushNotifications` callable function only checked
+ * `context.auth != null`, which was insufficient because:
+ *   • Any anonymously-signed Firebase user could invoke it
+ *   • The admin panel does NOT use Firebase Auth (it uses Netlify password +
+ *     localStorage session token), so the function was unreachable from admin
+ *     anyway and existed only as an attack surface.
+ *
+ * The previous `pushNotificationsTestEndpoint` HTTP endpoint had
+ * `Access-Control-Allow-Origin: *` and NO authentication — anyone with the
+ * URL could send arbitrary push notifications to any token.
+ *
+ * Both are removed. If a server-side push path is needed in the future, it
+ * MUST verify a custom admin claim (`request.auth.token.admin === true`).
  */
-exports.sendPushNotifications = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onCall(async (data, context) => {
-    try {
-        // Verify caller is admin
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated to send notifications');
-        }
-        let messages;
-        if (data.messages && data.messages.length > 0) {
-            // New path: pre-built messages (admin panel sends per-user translated messages)
-            messages = data.messages;
-        }
-        else {
-            // Legacy path: flat tokens + single title/body
-            const { tokens, title, body, data: notifData, sound, ttl } = data;
-            if (!tokens || tokens.length === 0) {
-                throw new functions.https.HttpsError('invalid-argument', 'Tokens list or messages array cannot be empty');
-            }
-            if (!title && !body) {
-                throw new functions.https.HttpsError('invalid-argument', 'Title or body is required');
-            }
-            messages = tokens.map((token) => ({
-                to: token,
-                title,
-                body,
-                ...(notifData && { data: notifData }),
-                ...(sound && { sound }),
-                ...(ttl && { ttl }),
-                priority: 'high',
-            }));
-        }
-        logger.info(`Sending ${messages.length} push notifications`);
-        // Send via Expo with failover
-        let lastError = null;
-        // Build auth headers
-        const token = expoAccessToken.value();
-        const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-        };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-        for (const endpoint of EXPO_PUSH_APIS) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(messages),
-                    signal: controller.signal,
-                });
-                clearTimeout(timeoutId);
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    logger.warn(`Expo endpoint ${endpoint} returned HTTP ${response.status}`, {
-                        errorText,
-                    });
-                    lastError = new Error(`HTTP ${response.status}`);
-                    continue; // Try next endpoint
-                }
-                const result = await response.json();
-                logger.info(`Successfully sent via ${endpoint}`, {
-                    messageCount: messages.length,
-                    successCount: result.data.filter((t) => t.status === 'ok').length,
-                });
-                return {
-                    success: true,
-                    endpoint,
-                    sentCount: messages.length,
-                    tickets: result.data,
-                };
-            }
-            catch (error) {
-                lastError = error instanceof Error ? error : new Error(String(error));
-                logger.warn(`Expo endpoint ${endpoint} failed: ${lastError.message}`);
-                // Continue to next endpoint
-            }
-        }
-        // All endpoints failed
-        logger.error('All Expo endpoints failed', { lastError });
-        throw new functions.https.HttpsError('unavailable', 'Failed to reach Expo Push API from all endpoints. ' +
-            'Last error: ' +
-            (lastError?.message || 'Unknown error'));
-    }
-    catch (error) {
-        logger.error('sendPushNotifications error:', error);
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        }
-        throw new functions.https.HttpsError('internal', String(error));
-    }
-});
-/**
- * HTTP Endpoint for testing (development only)
- * Remove in production or add security checks
- */
-exports.pushNotificationsTestEndpoint = functions.runWith({ secrets: ['EXPO_ACCESS_TOKEN'] }).https.onRequest(async (req, res) => {
-    // CORS headers
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-    if (req.method === 'OPTIONS') {
-        res.status(204).send('');
-        return;
-    }
-    if (req.method !== 'POST') {
-        res.status(405).send('Method not allowed');
-        return;
-    }
-    try {
-        const { tokens, title, body, data: notifData } = req.body;
-        if (!tokens || tokens.length === 0) {
-            res.status(400).json({ error: 'Tokens list cannot be empty' });
-            return;
-        }
-        if (!title && !body) {
-            res.status(400).json({ error: 'Title or body is required' });
-            return;
-        }
-        logger.info(`[HTTP] Sending test notifications to ${tokens.length} tokens`);
-        const messages = tokens.map((token) => ({
-            to: token,
-            title,
-            body,
-            ...(notifData && { data: notifData }),
-            priority: 'high',
-        }));
-        // Build auth headers
-        const token = expoAccessToken.value();
-        const authHeaders = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-        };
-        if (token) {
-            authHeaders['Authorization'] = `Bearer ${token}`;
-        }
-        // Try both endpoints
-        for (const endpoint of EXPO_PUSH_APIS) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: authHeaders,
-                    body: JSON.stringify(messages),
-                    signal: controller.signal,
-                });
-                clearTimeout(timeoutId);
-                if (!response.ok) {
-                    logger.warn(`HTTP endpoint ${endpoint} failed with status ${response.status}`);
-                    continue;
-                }
-                const result = await response.json();
-                logger.info(`HTTP endpoint ${endpoint} succeeded`);
-                res.status(200).json({
-                    success: true,
-                    endpoint,
-                    tickets: result.data,
-                });
-                return;
-            }
-            catch (error) {
-                logger.warn(`HTTP endpoint ${endpoint} error: ${error}`);
-            }
-        }
-        res.status(503).json({ error: 'All Expo endpoints failed' });
-    }
-    catch (error) {
-        logger.error('HTTP endpoint error:', error);
-        res.status(500).json({ error: String(error) });
-    }
-});
 // ==================== Monthly Honor Board Winner Selection ====================
 /**
  * Scheduled Cloud Function: runs at 00:05 on the 1st of every month.
@@ -458,5 +296,212 @@ exports.validateAdminSession = functions.https.onCall(async (data) => {
     catch (error) {
         logger.error('validateAdminSession error:', error);
         return { valid: false };
+    }
+});
+// ==================== Phase 2: FCM Prayer Push Fallback ====================
+/**
+ * Helper: send batch of Expo push messages with retry across mirror endpoints.
+ */
+async function sendExpoBatch(messages, token) {
+    if (messages.length === 0)
+        return 0;
+    const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    };
+    if (token)
+        headers['Authorization'] = `Bearer ${token}`;
+    for (const endpoint of EXPO_PUSH_APIS) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), EXPO_REQUEST_TIMEOUT_MS);
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(messages),
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            if (!res.ok)
+                continue;
+            const json = (await res.json());
+            const okCount = json.data.filter((t) => t.status === 'ok').length;
+            return okCount;
+        }
+        catch (e) {
+            logger.warn(`[fcm-prayer] endpoint ${endpoint} failed:`, e);
+        }
+    }
+    return 0;
+}
+/**
+ * Map app calculation method ID to adhan lib CalculationParameters.
+ */
+function buildAdhanParams(methodId, asrSchool) {
+    // Lazy require so cold starts don't load adhan unless this function runs
+    const adhan = require('adhan');
+    let params;
+    switch (methodId) {
+        case 1:
+            params = adhan.CalculationMethod.Karachi();
+            break;
+        case 2:
+            params = adhan.CalculationMethod.NorthAmerica();
+            break;
+        case 3:
+            params = adhan.CalculationMethod.MuslimWorldLeague();
+            break;
+        case 4:
+            params = adhan.CalculationMethod.UmmAlQura();
+            break;
+        case 5:
+            params = adhan.CalculationMethod.Egyptian();
+            break;
+        case 8:
+            params = adhan.CalculationMethod.Dubai();
+            break;
+        case 9:
+            params = adhan.CalculationMethod.Kuwait();
+            break;
+        case 10:
+            params = adhan.CalculationMethod.Qatar();
+            break;
+        case 11:
+            params = adhan.CalculationMethod.Singapore();
+            break;
+        case 13:
+            params = adhan.CalculationMethod.Turkey();
+            break;
+        default: params = adhan.CalculationMethod.MuslimWorldLeague();
+    }
+    params.madhab = asrSchool === 1 ? adhan.Madhab.Hanafi : adhan.Madhab.Shafi;
+    return params;
+}
+const PRAYER_NAMES_AR = {
+    fajr: 'الفجر',
+    dhuhr: 'الظهر',
+    asr: 'العصر',
+    maghrib: 'المغرب',
+    isha: 'العشاء',
+};
+/**
+ * Scheduled Cloud Function: runs every 15 minutes.
+ * For every user with fcmToken + prayerLocation in Firestore:
+ *   - compute next prayer using adhan lib
+ *   - if prayer falls within next 15 minutes, send Expo push
+ *   - mark sent so we don't duplicate within 30 min
+ *
+ * هذا "حزام أمان" — الجدولة المحلية لا تزال الأساسية، لكن لو فشلت
+ * (force-stop, OEM kill, exact alarm denied) المستخدم يستلم push من السيرفر.
+ */
+exports.sendPrayerPushFallback = (0, scheduler_1.onSchedule)({ schedule: '*/15 * * * *', timeZone: 'UTC', secrets: ['EXPO_ACCESS_TOKEN'], memory: '512MiB' }, async () => {
+    const startedAt = Date.now();
+    try {
+        const token = expoAccessToken.value();
+        const settingsSnap = await db.collection('userPrayerSettings').get();
+        logger.info(`[fcm-prayer] فحص ${settingsSnap.size} مستخدم`);
+        const adhan = require('adhan');
+        const now = new Date();
+        const messages = [];
+        const updates = [];
+        for (const docSnap of settingsSnap.docs) {
+            const uid = docSnap.id;
+            const s = docSnap.data();
+            if (s.disabled)
+                continue;
+            if (typeof s.latitude !== 'number' || typeof s.longitude !== 'number')
+                continue;
+            // اقرأ FCM token من users/{uid}
+            let fcmToken;
+            try {
+                const userDoc = await db.doc(`users/${uid}`).get();
+                fcmToken = userDoc.data()?.fcmToken;
+                // احترم تعطيل الإشعارات من المستخدم
+                const notifEnabled = userDoc.data()?.notificationsEnabled !== false;
+                if (!notifEnabled)
+                    continue;
+            }
+            catch {
+                continue;
+            }
+            if (!fcmToken || !fcmToken.startsWith('ExponentPushToken'))
+                continue;
+            try {
+                const coords = new adhan.Coordinates(s.latitude, s.longitude);
+                const params = buildAdhanParams(s.calculationMethod || 4, s.asrJuristic || 0);
+                const todayPrayers = new adhan.PrayerTimes(coords, now, params);
+                const tomorrowPrayers = new adhan.PrayerTimes(coords, new Date(now.getTime() + 24 * 60 * 60 * 1000), params);
+                const next = todayPrayers.nextPrayer();
+                const nextTime = next === adhan.Prayer.None
+                    ? tomorrowPrayers.fajr
+                    : todayPrayers.timeForPrayer(next);
+                if (!nextTime)
+                    continue;
+                const minutesUntil = (nextTime.getTime() - now.getTime()) / 60000;
+                // ضمن 15 دقيقة قبل الصلاة بالضبط (نحن نشتغل كل 15 دقيقة → exactly one match)
+                if (minutesUntil < 0 || minutesUntil > 15)
+                    continue;
+                // De-duplication: تجاهل لو أرسلنا نفس الصلاة لنفس المستخدم خلال 30 دقيقة
+                const prayerKey = String(next).toLowerCase();
+                const dedupeId = `${uid}_${prayerKey}_${nextTime.toISOString().slice(0, 13)}`;
+                const dedupeRef = db.doc(`fcmPrayerSent/${dedupeId}`);
+                const dedupeSnap = await dedupeRef.get();
+                if (dedupeSnap.exists)
+                    continue;
+                const nameAr = PRAYER_NAMES_AR[prayerKey] ?? prayerKey;
+                messages.push({
+                    to: fcmToken,
+                    title: `🕌 ${nameAr}`,
+                    body: `حان الآن وقت صلاة ${nameAr}`,
+                    sound: 'default',
+                    priority: 'high',
+                    data: {
+                        type: 'prayer_fallback',
+                        prayer: prayerKey,
+                        source: 'fcm',
+                    },
+                });
+                updates.push(dedupeRef.set({
+                    uid,
+                    prayer: prayerKey,
+                    sentAt: admin.firestore.FieldValue.serverTimestamp(),
+                    expireAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
+                }));
+            }
+            catch (e) {
+                logger.warn(`[fcm-prayer] فشل حساب ${uid}:`, e);
+            }
+        }
+        // أرسل في batches من 100
+        let sent = 0;
+        for (let i = 0; i < messages.length; i += 100) {
+            sent += await sendExpoBatch(messages.slice(i, i + 100), token);
+        }
+        await Promise.allSettled(updates);
+        logger.info(`[fcm-prayer] أُرسل ${sent}/${messages.length} push في ${Date.now() - startedAt}ms`);
+    }
+    catch (e) {
+        logger.error('[fcm-prayer] failed:', e);
+    }
+});
+/**
+ * Cleanup function: حذف dedupe records الأقدم من 24 ساعة.
+ * يشتغل يومياً عشان firestore ما يمتلئ.
+ */
+exports.cleanupFcmPrayerDedupe = (0, scheduler_1.onSchedule)({ schedule: '0 3 * * *', timeZone: 'UTC' }, async () => {
+    try {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const snap = await db
+            .collection('fcmPrayerSent')
+            .where('expireAt', '<', cutoff)
+            .limit(500)
+            .get();
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        logger.info(`[fcm-prayer-cleanup] حذف ${snap.size} سجل`);
+    }
+    catch (e) {
+        logger.error('[fcm-prayer-cleanup] failed:', e);
     }
 });

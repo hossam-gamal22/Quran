@@ -243,17 +243,32 @@ const getTranslationForUser = (
  * إرسال دفعة من الإشعارات.
  * - في بيئة التطوير (localhost): يستخدم Vite proxy لتجاوز CORS
  * - في الإنتاج: يستخدم Netlify serverless function
+ *
+ * Phase A1 (Security): يرسل admin session token في Authorization header
+ *   لمنع أي شخص من استدعاء الـ proxy مباشرة من خارج الـ admin panel.
  */
+const ADMIN_SESSION_KEY = 'rooh_admin_session';
+
 const sendBatch = async (messages: ExpoPushMessage[]): Promise<BatchResult> => {
   // Both dev (Vite proxy) and production (Netlify function) use the same path pattern
   const pushUrl = import.meta.env.DEV ? '/expo-push' : '/api/expo-push';
+  const sessionToken = (typeof localStorage !== 'undefined'
+    ? localStorage.getItem(ADMIN_SESSION_KEY)
+    : null) || '';
 
   try {
     const res = await fetch(pushUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
       body: JSON.stringify(messages),
     });
+    if (res.status === 401) {
+      throw new Error('غير مصرح — جلسة الإدارة منتهية. الرجاء تسجيل الدخول مرة أخرى.');
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
     const result = await res.json();
     let ok = 0, fail = 0;

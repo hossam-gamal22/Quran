@@ -3,6 +3,7 @@
   "description": "Firebase Cloud Functions for روح المسلم app",
   "version": "1.0.0",
   "private": true,
+  "main": "lib/index.js",
   "engines": {
     "node": "20"
   },
@@ -24,4 +25,3 @@
     "typescript": "^5.9.3"
   }
 }
-    "version": "1.2.0",

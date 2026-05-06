@@ -424,6 +424,60 @@ export const FAMOUS_DUAS: FamousDua[] = [
 export function getFamousDuasByCategory(
   category?: FamousDuaCategory | 'all'
 ): FamousDua[] {
-  if (!category || category === 'all') return FAMOUS_DUAS;
-  return FAMOUS_DUAS.filter((d) => d.category === category);
+  const list = _famousDuasOverride && _famousDuasOverride.length ? _famousDuasOverride : FAMOUS_DUAS;
+  if (!category || category === 'all') return list;
+  return list.filter((d) => d.category === category);
+}
+
+// ===================================================
+// C3: Firestore override hydration
+// Admin panel may populate `famousDuas` collection.
+// Falls back to bundled FAMOUS_DUAS when collection is empty/unreachable.
+// ===================================================
+
+import AsyncStorageFD from '@react-native-async-storage/async-storage';
+
+const FAMOUS_DUAS_CACHE_KEY = '@famous_duas_firestore_cache';
+const FAMOUS_DUAS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let _famousDuasOverride: FamousDua[] | null = null;
+
+interface FamousCacheEnv {
+  ts: number;
+  data: FamousDua[];
+}
+
+export async function hydrateFamousDuasFromFirestore(): Promise<void> {
+  try {
+    const cached = await AsyncStorageFD.getItem(FAMOUS_DUAS_CACHE_KEY);
+    if (cached) {
+      try {
+        const env = JSON.parse(cached) as FamousCacheEnv;
+        if (env?.data?.length) {
+          _famousDuasOverride = env.data;
+          if (Date.now() - env.ts < FAMOUS_DUAS_CACHE_TTL_MS) return;
+        }
+      } catch { /* corrupted */ }
+    }
+  } catch { /* AsyncStorage unavailable */ }
+
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const firebaseModulePath = '@/config/firebase';
+    const { db } = await import(/* @vite-ignore */ firebaseModulePath);
+    const snap = await getDocs(collection(db, 'famousDuas'));
+    if (snap.empty) return;
+    const items: FamousDua[] = snap.docs
+      .map(d => ({ id: d.id, ...d.data() } as FamousDua))
+      .filter(d => typeof d.arabic === 'string' && typeof d.category === 'string');
+    if (!items.length) return;
+    _famousDuasOverride = items;
+    try {
+      await AsyncStorageFD.setItem(
+        FAMOUS_DUAS_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data: items } as FamousCacheEnv)
+      );
+    } catch { /* cache write failed */ }
+  } catch (err) {
+    console.warn('[famous-duas] hydrate failed, using bundled fallback:', err);
+  }
 }

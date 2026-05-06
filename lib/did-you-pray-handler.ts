@@ -96,19 +96,60 @@ export async function handleDidYouPrayResponse(
   return false;
 }
 
+// Phase 6: حد أقصى لعدد مرات "سأصلي قريباً" لكل صلاة في نفس اليوم
+// عشان المستخدم ما يدوس snooze 50 مرة ويملا iOS slots
+const MAX_SNOOZE_PER_PRAYER = 4;
+
+async function getSnoozeCount(prayer: PrayerName): Promise<number> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = await AsyncStorage.getItem(`@dyp_snooze_${today}_${prayer}`);
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function incrementSnoozeCount(prayer: PrayerName): Promise<number> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `@dyp_snooze_${today}_${prayer}`;
+    const current = await getSnoozeCount(prayer);
+    const next = current + 1;
+    await AsyncStorage.setItem(key, String(next));
+    return next;
+  } catch {
+    return 0;
+  }
+}
+
 async function scheduleDidYouPrayIn(prayer: PrayerName, minutes: number): Promise<void> {
+  // حد snooze: لو المستخدم ضغط "سأصلي قريباً" 4 مرات، توقّف
+  const count = await getSnoozeCount(prayer);
+  if (count >= MAX_SNOOZE_PER_PRAYER) {
+    console.log(`[did-you-pray] تجاوز حد snooze لصلاة ${prayer} (${count}/${MAX_SNOOZE_PER_PRAYER})`);
+    return;
+  }
+  await incrementSnoozeCount(prayer);
+
   const trigger = new Date(Date.now() + minutes * 60 * 1000);
   const channelId = getReminderChannelId('notif_after_prayer');
   const sound = resolveNotificationSound('notif_after_prayer', true);
   const mosqueAttachments = await getNotificationIconAttachment('mosque');
   const identifier = `did_you_pray_${prayer}`;
+
+  // Dedupe: ألغِ أي snooze سابق بنفس ID قبل جدولة الجديد
+  try { await Notifications.cancelScheduledNotificationAsync(identifier); } catch {}
+
   try {
     await Notifications.scheduleNotificationAsync({
       identifier,
       content: {
         title: dirText(t('notifications.didYouPray')),
         body: dirText(t('notifications.didYouPrayBody')),
-        data: { type: 'did_you_pray', prayer, snoozeMinutes: minutes },
+        data: { type: 'did_you_pray', prayer, snoozeMinutes: minutes, snoozeCount: count + 1 },
         sound,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         categoryIdentifier: DID_YOU_PRAY_CATEGORY,

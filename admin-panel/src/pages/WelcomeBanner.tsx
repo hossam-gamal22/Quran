@@ -263,8 +263,6 @@ export default function WelcomeBanner() {
     setSaveStatus('idle');
     try {
       const docRef = doc(db, FIRESTORE_DOC);
-      const docSnap = await getDoc(docRef);
-      const existingData = docSnap.exists() ? docSnap.data() : {};
 
       // Ensure titles/subtitles ar field is synced with title/subtitle
       const bannerToSave = {
@@ -279,10 +277,10 @@ export default function WelcomeBanner() {
         },
       };
 
-      await setDoc(docRef, {
-        ...existingData,
-        welcomeBanner: bannerToSave,
-      });
+      // Phase B7: use merge:true to avoid race conditions with NavigationUI
+      // (both pages write to the same doc but to different top-level fields).
+      // Previously we did read-then-spread which could clobber concurrent writes.
+      await setDoc(docRef, { welcomeBanner: bannerToSave }, { merge: true });
 
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);

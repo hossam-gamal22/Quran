@@ -17,7 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const DISMISS_KEY_PREFIX = '@perm_banner_dismissed_';
 const DISMISS_DURATION_MS = 24 * 60 * 60 * 1000; // 24 ساعة
 
-export type PermissionKey = 'notifications' | 'location' | 'exactAlarm' | 'batteryOptimization' | 'oemAutoStart' | 'dndAccess';
+export type PermissionKey = 'notifications' | 'location' | 'exactAlarm' | 'batteryOptimization' | 'oemAutoStart' | 'dndAccess' | 'backgroundRefresh';
 
 export interface PermissionStatus {
   notifications: 'granted' | 'denied' | 'undetermined';
@@ -29,6 +29,8 @@ export interface PermissionStatus {
   // Phase 4: bypass DND لا يعمل إلا بإذن صريح من المستخدم
   dndAccess: 'granted' | 'denied' | 'unsupported';
   dndActive: boolean;
+  // Phase 5: Background App Refresh (iOS) — بدونه لا نُعيد جدولة الإشعارات
+  backgroundRefresh: 'granted' | 'denied' | 'restricted' | 'unsupported';
 }
 
 export interface PermissionIssue {
@@ -53,6 +55,7 @@ export async function checkAllPermissions(): Promise<PermissionStatus> {
     manufacturer: 'unknown',
     dndAccess: 'unsupported',
     dndActive: false,
+    backgroundRefresh: 'unsupported',
   };
 
   if (Platform.OS === 'web') {
@@ -125,6 +128,23 @@ export async function checkAllPermissions(): Promise<PermissionStatus> {
       }
     } catch (e) {
       console.warn('⚠️ [perm-recovery] DND check failed:', e);
+    }
+  }
+
+  // Phase 5: فحص Background App Refresh على iOS
+  // بدونه، expo-background-task لا يشتغل ⇒ الإشعارات تنتهي بعد 3 أيام
+  if (Platform.OS === 'ios') {
+    try {
+      const BackgroundTask = await import('expo-background-task');
+      if (BackgroundTask.getStatusAsync) {
+        const status = await BackgroundTask.getStatusAsync();
+        // 1 = Restricted (Parental controls), 2 = Denied, 3 = Available
+        if (status === 3) result.backgroundRefresh = 'granted';
+        else if (status === 2) result.backgroundRefresh = 'denied';
+        else if (status === 1) result.backgroundRefresh = 'restricted';
+      }
+    } catch (e) {
+      console.warn('⚠️ [perm-recovery] background refresh check failed:', e);
     }
   }
 
@@ -279,6 +299,19 @@ export async function getPermissionIssues(status?: PermissionStatus): Promise<Pe
       bodyAr: 'وضع عدم الإزعاج مفعّل حالياً. اسمح للأذان بتجاوزه حتى لا يُكتم في وقت الصلاة.',
       actionLabelAr: 'منح الإذن',
       action: openDndAccessSettings,
+    });
+  }
+
+  // Phase 5: Background App Refresh معطّل (iOS)
+  // بدونه expo-background-task لا يجدد الإشعارات تلقائياً
+  if (s.backgroundRefresh === 'denied' && (await shouldShowBanner('backgroundRefresh'))) {
+    issues.push({
+      key: 'backgroundRefresh',
+      severity: 'warning',
+      titleAr: 'تحديث التطبيق في الخلفية معطّل',
+      bodyAr: 'بدون "تحديث التطبيق في الخلفية" قد لا تتجدد إشعارات الصلاة بعد عدة أيام. فعّله من الإعدادات.',
+      actionLabelAr: 'فتح الإعدادات',
+      action: openAppSettings,
     });
   }
 

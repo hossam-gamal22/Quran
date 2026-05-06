@@ -58,6 +58,11 @@ import { refreshLiveActivityIfEnabled } from '@/lib/live-activity-sync';
 import { checkAndClearCacheOnUpdate } from '@/lib/cache-manager';
 import { ensureFirebaseUser } from '@/config/firebase';
 import { initTranslationOverrides } from '@/lib/auto-translate';
+import { hydrateAzkarFromFirestore } from '@/lib/azkar-api';
+import { hydrateFontSettings } from '@/hooks/use-font-config';
+import { hydrateDailyDuasFromFirestore } from '@/data/daily-duas';
+import { hydrateFamousDuasFromFirestore } from '@/data/famous-duas';
+import { hydrateStoriesFromFirestore } from '@/data/stories';
 import { initRemoteTranslations } from '@/lib/remote-translations';
 import { fontRegular } from '@/lib/fonts';
 import { toWesternDigits } from '@/lib/format-number';
@@ -75,6 +80,8 @@ import {
   requestNotificationPermissions as requestNewNotifPermissions,
 } from '@/services/notifications/permissions';
 import { rescheduleAllFromStorage, ensurePrayerNotificationsExist, checkTimezoneChange, forceRescheduleAllFromStorage } from '@/lib/notifications-manager';
+import { runScheduleHealthCheck } from '@/lib/schedule-health-check';
+import { maybeUploadTelemetry } from '@/lib/notification-telemetry';
 // Import at module scope to register the background task definition (required by expo-task-manager)
 import '@/lib/background-notification-task';
 import { registerBackgroundNotificationTask } from '@/lib/background-notification-task';
@@ -153,6 +160,13 @@ try {
 } catch (e) {
   // Silently ignore — Expo Go doesn't support push notifications
 }
+
+// Phase 6: سجّل category الـ "هل صليت؟" مبكراً جداً (module scope)
+// عشان أزرار الإجابة تكون متاحة من أول لحظة بعد cold-start، حتى لو
+// ما تمت أي عملية إعادة جدولة بعد. iOS تحفظها في النظام دائماً.
+import('@/lib/did-you-pray-handler')
+  .then(({ registerDidYouPrayCategory }) => registerDidYouPrayCategory())
+  .catch(() => {});
 
 try {
   // Prevent auto-hide - we control when to hide via SplashGate
@@ -791,6 +805,37 @@ export default function RootLayout() {
 
     initFirebase();
 
+    // B3: hydrate adhkar from Firestore admin overrides (background, with cache)
+    initWithTimeout(
+      () => hydrateAzkarFromFirestore(),
+      'Azkar Firestore hydrate',
+      6000
+    );
+
+    // B9: hydrate admin-managed font settings (background, with cache)
+    initWithTimeout(
+      async () => { await hydrateFontSettings(); },
+      'Font settings hydrate',
+      5000
+    );
+
+    // C1/C2/C3: hydrate dynamic content from Firestore (background, with cache + bundled fallback)
+    initWithTimeout(
+      () => hydrateDailyDuasFromFirestore(),
+      'Daily duas hydrate',
+      6000
+    );
+    initWithTimeout(
+      () => hydrateFamousDuasFromFirestore(),
+      'Famous duas hydrate',
+      6000
+    );
+    initWithTimeout(
+      () => hydrateStoriesFromFirestore(),
+      'Stories hydrate',
+      6000
+    );
+
     // Sync widget data to native storage on launch
     initWithTimeout(
       () => syncWidgetDataToNative(),
@@ -807,6 +852,14 @@ export default function RootLayout() {
 
     // Schedule midnight refresh for daily verse/dhikr widget content
     const cleanupMidnight = scheduleMidnightRefresh();
+
+    // Phase 8: cold-start schedule health check (throttled internally to 6h)
+    // يفحص لو الإشعارات اختفت من النظام بعد OEM kill أو system restore
+    initWithTimeout(
+      async () => { await runScheduleHealthCheck(); },
+      'Schedule health check',
+      8000,
+    );
 
     // Phase 1.D: Detect device reboot and force-reschedule FullAdhan AlarmManager
     // entries (which DON'T survive reboot, unlike expo-notifications which BootReceiver
@@ -873,6 +926,10 @@ export default function RootLayout() {
         // Refresh the 7-day DATE trigger window for all notification categories.
         // rescheduleAllFromStorage is internally throttled (60s) to avoid excessive work.
         rescheduleAllFromStorage().catch((e) => console.warn('⚠️ [AppResume] rescheduleAllFromStorage:', e?.message));
+        // Phase 8: فحص دوري (كل 6س) لصحة الإشعارات + auto-heal
+        runScheduleHealthCheck().catch((e) => console.warn('⚠️ [AppResume] scheduleHealthCheck:', e?.message));
+        // Phase 9: رفع تقرير telemetry لـ Firestore (throttled 24س داخلياً)
+        maybeUploadTelemetry().catch((e) => console.warn('⚠️ [AppResume] uploadTelemetry:', e?.message));
         recordSessionStart();
       } else if (nextAppState === 'background') {
         syncLocalStats().catch((e) => console.warn('⚠️ [AppBackground] syncLocalStats:', e?.message));

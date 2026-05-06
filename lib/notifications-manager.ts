@@ -18,6 +18,7 @@ import { getReminderChannelId, getAdhanChannelId } from '../services/notificatio
 import { t } from './i18n';
 import { dirText } from './notification-text-direction';
 import { safeParseTime } from './safe-parse-time';
+import { maybeAnchorTimes } from './azkar-auto-anchor';
 import { resolveNotificationSound } from './resolve-notification-sound';
 import { fetchNotificationTexts, getNotifText } from './notification-texts';
 export { resolveNotificationSound } from './resolve-notification-sound';
@@ -668,6 +669,8 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
   istighfarReminderTimes?: string[];
   customReminderTimes?: string[];
   quranReadingReminderTimes?: string[];
+  // Phase 7: ربط ذكي بأوقات الصلاة
+  azkarAutoAnchor?: boolean;
 }): Promise<void> {
   // ─── Mutex Guard: Prevent concurrent scheduling ───────────────────────────
   // Multiple code paths call this function on cold start (loadSettings,
@@ -856,6 +859,10 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
             },
           });
           scheduledCount++;
+          // Phase 9: telemetry — record scheduled event (best-effort)
+          import('./notification-telemetry')
+            .then(({ recordTelemetryEvent }) => recordTelemetryEvent('scheduled', identifier))
+            .catch(() => {});
         }
         console.log(`🔔 Scheduled ${baseId} × ${scheduledCount} (${hour}:${String(minute).padStart(2,'0')}, channel: ${resolvedChannelId})`);
       } catch (err) {
@@ -951,7 +958,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule morning wird if enabled
     if (notifSettings.morningAzkar) {
-      const morningTimes = clampTimes(getTimesArray(notifSettings.morningAzkarTimes, notifSettings.morningAzkarTime, '06:00'), 'morning');
+      const rawMorning = getTimesArray(notifSettings.morningAzkarTimes, notifSettings.morningAzkarTime, '06:00');
+      const anchoredMorning = await maybeAnchorTimes('morning', rawMorning, notifSettings.azkarAutoAnchor === true);
+      const morningTimes = clampTimes(anchoredMorning, 'morning');
       const morningText = getNotifText('morning', t('settings.morningWirdTitle'), t('settings.morningWirdBody'), lang);
       await scheduleMultiTime(
         'wird_morning',
@@ -971,7 +980,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule evening wird if enabled
     if (notifSettings.eveningAzkar) {
-      const eveningTimes = clampTimes(getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '18:00'), 'evening');
+      const rawEvening = getTimesArray(notifSettings.eveningAzkarTimes, notifSettings.eveningAzkarTime, '18:00');
+      const anchoredEvening = await maybeAnchorTimes('evening', rawEvening, notifSettings.azkarAutoAnchor === true);
+      const eveningTimes = clampTimes(anchoredEvening, 'evening');
       const eveningText = getNotifText('evening', t('settings.eveningWirdTitle'), t('settings.eveningWirdBody'), lang);
       await scheduleMultiTime(
         'wird_evening',
@@ -991,7 +1002,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule sleep azkar if enabled
     if (notifSettings.sleepAzkar) {
-      const sleepTimes = clampTimes(getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00'), 'sleep');
+      const rawSleep = getTimesArray(notifSettings.sleepAzkarTimes, notifSettings.sleepAzkarTime, '22:00');
+      const anchoredSleep = await maybeAnchorTimes('sleep', rawSleep, notifSettings.azkarAutoAnchor === true);
+      const sleepTimes = clampTimes(anchoredSleep, 'sleep');
       const sleepText = getNotifText('sleep', t('notifications.sleepAzkarTitle'), t('notifications.sleepAzkarBody'), lang);
       const sleepSound = notifSettings.sleepSoundType || 'notif_sleep';
       await scheduleMultiTime(
@@ -1012,7 +1025,9 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
 
     // Schedule wakeup azkar if enabled
     if (notifSettings.wakeupAzkar) {
-      const wakeupTimes = clampTimes(getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00'), 'wakeup');
+      const rawWakeup = getTimesArray(notifSettings.wakeupAzkarTimes, notifSettings.wakeupAzkarTime, '10:00');
+      const anchoredWakeup = await maybeAnchorTimes('wakeup', rawWakeup, notifSettings.azkarAutoAnchor === true);
+      const wakeupTimes = clampTimes(anchoredWakeup, 'wakeup');
       const wakeupText = getNotifText('wakeup', t('settings.wakeupAzkarTitle'), t('settings.wakeupAzkarBody'), lang);
       const wakeupSound = notifSettings.wakeupSoundType || 'notif_wakeup';
       await scheduleMultiTime(
@@ -1493,6 +1508,17 @@ export async function scheduleNotificationsFromSettings(notifSettings: {
           general: generalSound,
         },
       });
+
+      // Phase 5: تدقيق حد iOS الصارم (64 إشعار)
+      // إذا تجاوزنا الحد، iOS سيرفض الإشعارات الجديدة بصمت ⇒ حاسم لاكتشافه
+      try {
+        if (Platform.OS === 'ios') {
+          const { auditIosNotificationBudget } = await import('./ios-notification-budget');
+          await auditIosNotificationBudget();
+        }
+      } catch (auditErr) {
+        console.warn('[POST-SCHEDULE] iOS budget audit failed:', auditErr);
+      }
     } catch (verifyErr) {
       console.warn('[POST-SCHEDULE] Verification failed:', verifyErr);
     }
@@ -1705,6 +1731,8 @@ export async function rescheduleAllFromStorage(): Promise<void> {
       worshipStreakAlerts: n.worshipStreakAlerts,
       worshipWeeklyReport: n.worshipWeeklyReport,
       kahfReminder: n.kahfReminder,
+      // Phase 7: تمرير flag الربط التلقائي
+      azkarAutoAnchor: n.azkarAutoAnchor === true,
     });
     console.log('🔄 Rescheduled notifications from storage (app foreground)');
   } catch (e) {

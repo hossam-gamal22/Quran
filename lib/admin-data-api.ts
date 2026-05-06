@@ -142,6 +142,47 @@ export interface GoogleCalendarEvent {
   importance?: 'major' | 'minor';
 }
 
+// ==================== Font Settings (B9) ====================
+
+export interface AdminFontSettings {
+  arabicFont: string;
+  latinFont: string;
+  quranFont: string;
+  baseFontSize: number;
+  headingScale: number;
+}
+
+export const DEFAULT_FONT_SETTINGS: AdminFontSettings = {
+  arabicFont: 'Cairo',
+  latinFont: 'Cairo',
+  quranFont: 'UthmanicHafs',
+  baseFontSize: 16,
+  headingScale: 1.25,
+};
+
+/**
+ * Fetch admin-managed font settings from `appConfig/fontSettings`.
+ * Falls back to bundled defaults. Cached for 24h.
+ */
+export async function fetchFontSettings(): Promise<AdminFontSettings> {
+  return fetchWithCache<AdminFontSettings>(
+    '@admin_font_settings',
+    async () => {
+      const snap = await getDoc(doc(db, 'appConfig', 'fontSettings'));
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      return {
+        arabicFont: typeof data.arabicFont === 'string' ? data.arabicFont : DEFAULT_FONT_SETTINGS.arabicFont,
+        latinFont: typeof data.latinFont === 'string' ? data.latinFont : DEFAULT_FONT_SETTINGS.latinFont,
+        quranFont: typeof data.quranFont === 'string' ? data.quranFont : DEFAULT_FONT_SETTINGS.quranFont,
+        baseFontSize: typeof data.baseFontSize === 'number' ? data.baseFontSize : DEFAULT_FONT_SETTINGS.baseFontSize,
+        headingScale: typeof data.headingScale === 'number' ? data.headingScale : DEFAULT_FONT_SETTINGS.headingScale,
+      };
+    },
+    DEFAULT_FONT_SETTINGS,
+  );
+}
+
 interface GoogleCalendarSyncConfig {
   calendarId: string;
   apiKey: string;

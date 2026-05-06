@@ -47,21 +47,78 @@ service cloud.firestore {
     }
 
     // Users - public read/write for device-based registration
+    //
+    // ⚠️ KNOWN ATTACK VECTOR (deferred to Phase B0.5):
+    //   This collection accepts unauthenticated writes because:
+    //     1. The mobile app has no Firebase Auth — users are identified by
+    //        a device-generated `userId` stored in AsyncStorage.
+    //     2. The admin panel writes `adminPremium` directly from the browser
+    //        (Subscriptions.tsx + Rewards.tsx) using a Netlify session token
+    //        that Firestore cannot verify.
+    //
+    //   Consequence: a malicious client can grant itself premium by writing
+    //   `adminPremium: { granted: true, plan: 'lifetime' }` to its own user
+    //   doc. Risk is bounded (no PII leak, no destructive action).
+    //
+    //   Fix in Phase B0.5: route ALL admin writes through a Netlify function
+    //   that validates the session token + uses Firebase Admin SDK
+    //   (which bypasses these rules). Then we can lock this down to:
+    //     allow update: if !affectedKeys.hasAny(['adminPremium', 'role', ...])
+    //
+    // For now: keep open, accept the risk (matches current production behavior).
     match /users/{userId} {
       allow read, write: if true;
     }
 
     // Phase 2: FCM Prayer Push Fallback
     // الـ app يكتب موقع وإعدادات الصلاة، Cloud Function تقرأ
+    //
+    // Phase A3 (security): schema validation — only known fields allowed,
+    // hard cap on key count to prevent doc bloat / abuse.
     match /userPrayerSettings/{userId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if
+        request.resource.data.keys().hasOnly([
+          // location & calc
+          'latitude', 'longitude', 'timezone',
+          'calculationMethod', 'madhab',
+          // adjustments
+          'fajrAdjust', 'sunriseAdjust', 'dhuhrAdjust',
+          'asrAdjust', 'maghribAdjust', 'ishaAdjust',
+          // toggles
+          'enabled', 'notifyFajr', 'notifySunrise', 'notifyDhuhr',
+          'notifyAsr', 'notifyMaghrib', 'notifyIsha',
+          // sounds (per-prayer)
+          'soundFajr', 'soundDhuhr', 'soundAsr', 'soundMaghrib', 'soundIsha',
+          // metadata
+          'fcmToken', 'language', 'country', 'updatedAt',
+          'lastSyncedAt', 'platform', 'appVersion', 'deviceId'
+        ])
+        && request.resource.data.size() <= 32;
     }
     // dedupe records — Cloud Function only
     match /fcmPrayerSent/{docId} {
       allow read, write: if false;
     }
 
+    // Phase 9: Notification telemetry — app writes its own report (no PII)
+    //
+    // Phase A3 (security): cap keys to prevent abuse / billing impact.
+    // Allowed top-level fields are loose because telemetry stores nested
+    // counters per channel + per category, but the overall key count
+    // must stay sane.
+    match /notificationTelemetry/{userId} {
+      allow read: if true;
+      allow write: if request.resource.data.size() <= 50;
+    }
+
     // Notifications - history and tracking from admin panel
+    //
+    // Phase A3: app should NEVER write to this collection (only the admin
+    // panel does, via direct Firestore writes from the browser session).
+    // We can't enforce admin-only without Firebase Auth on the admin side,
+    // so this stays open for now and will be locked down in B0.5 once the
+    // admin write proxy lands. App reads are safe (history viewing).
     match /notifications/{docId} {
       allow read, write: if true;
     }

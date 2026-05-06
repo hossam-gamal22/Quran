@@ -2,6 +2,8 @@
 // 366 curated duas (one per day of the year) from Quran and Sunnah
 // Deterministically picked based on day of year
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export interface DailyDua {
   arabic: string;
   translation: string;
@@ -143,14 +145,19 @@ const DAILY_DUAS: DailyDua[] = [
  * Returns the same dua for the same calendar day.
  */
 export function getDuaOfTheDay(): DailyDua {
+  const list = getDuas();
   const now = new Date();
   const start = new Date(now.getFullYear(), 0, 0);
   const diff = now.getTime() - start.getTime();
   const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-  return DAILY_DUAS[dayOfYear % DAILY_DUAS.length];
+  return list[dayOfYear % list.length];
 }
 
-/** Total number of available duas */
+/** Total number of available duas (reflects Firestore override when hydrated) */
+export function getTotalDuas(): number {
+  return getDuas().length;
+}
+/** @deprecated Use getTotalDuas() to reflect Firestore overrides */
 export const TOTAL_DUAS = DAILY_DUAS.length;
 
 /**
@@ -158,16 +165,75 @@ export const TOTAL_DUAS = DAILY_DUAS.length;
  * Returns { dua, index } so the caller can track which one was shown.
  */
 export function getRandomDua(excludeIndex?: number): { dua: DailyDua; index: number } {
+  const list = getDuas();
   let idx: number;
   do {
-    idx = Math.floor(Math.random() * DAILY_DUAS.length);
-  } while (idx === excludeIndex && DAILY_DUAS.length > 1);
-  return { dua: DAILY_DUAS[idx], index: idx };
+    idx = Math.floor(Math.random() * list.length);
+  } while (idx === excludeIndex && list.length > 1);
+  return { dua: list[idx], index: idx };
 }
 
 /**
  * Get a dua by index (clamped to valid range).
  */
 export function getDuaByIndex(index: number): DailyDua {
-  return DAILY_DUAS[((index % DAILY_DUAS.length) + DAILY_DUAS.length) % DAILY_DUAS.length];
+  const list = getDuas();
+  return list[((index % list.length) + list.length) % list.length];
+}
+
+// ===================================================
+// C1: Firestore override hydration
+// Admin panel may populate `dailyDuas` collection (each doc = one DailyDua).
+// Falls back to bundled DAILY_DUAS array when collection is empty/unreachable.
+// ===================================================
+
+const DAILY_DUAS_CACHE_KEY = '@daily_duas_firestore_cache';
+const DAILY_DUAS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+let _duasOverride: DailyDua[] | null = null;
+
+interface CacheEnv {
+  ts: number;
+  data: DailyDua[];
+}
+
+function getDuas(): DailyDua[] {
+  return _duasOverride && _duasOverride.length ? _duasOverride : DAILY_DUAS;
+}
+
+export async function hydrateDailyDuasFromFirestore(): Promise<void> {
+  try {
+    const cached = await AsyncStorage.getItem(DAILY_DUAS_CACHE_KEY);
+    if (cached) {
+      try {
+        const env = JSON.parse(cached) as CacheEnv;
+        if (env?.data?.length) {
+          _duasOverride = env.data;
+          if (Date.now() - env.ts < DAILY_DUAS_CACHE_TTL_MS) return;
+        }
+      } catch { /* corrupted */ }
+    }
+  } catch { /* AsyncStorage unavailable */ }
+
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const firebaseModulePath = '@/config/firebase';
+    const { db } = await import(/* @vite-ignore */ firebaseModulePath);
+    const snap = await getDocs(collection(db, 'dailyDuas'));
+    if (snap.empty) return;
+    const items: DailyDua[] = snap.docs
+      .map(d => d.data() as Partial<DailyDua>)
+      .filter((d): d is DailyDua =>
+        typeof d.arabic === 'string' && typeof d.translation === 'string' && typeof d.reference === 'string'
+      );
+    if (!items.length) return;
+    _duasOverride = items;
+    try {
+      await AsyncStorage.setItem(
+        DAILY_DUAS_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data: items } as CacheEnv)
+      );
+    } catch { /* cache write failed */ }
+  } catch (err) {
+    console.warn('[daily-duas] hydrate failed, using bundled fallback:', err);
+  }
 }

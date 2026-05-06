@@ -62,12 +62,10 @@ const SOUND_CATEGORIES: { value: SoundCategory; label: string; icon: string }[] 
   { value: 'effect', label: 'مؤثرات', icon: '🎵' },
 ];
 
-const NOTIFICATION_TYPES: { key: keyof SoundAssignments['notifications']; label: string; icon: string }[] = [
-  { key: 'prayer', label: 'إشعار الصلاة', icon: '🕌' },
-  { key: 'azkarReminder', label: 'تذكير الأذكار', icon: '📿' },
-  { key: 'salawat', label: 'الصلاة على النبي', icon: '☪️' },
-  { key: 'general', label: 'إشعارات عامة', icon: '🔔' },
-];
+// Phase B10: NOTIFICATION_TYPES removed (was used by deleted notifications tab).
+// SoundAssignments.notifications shape is preserved in DEFAULT_ASSIGNMENTS for
+// backward compatibility with existing Firestore data, but the UI no longer
+// surfaces it. Build-time bundled sounds are configured via BundledSoundsManager.
 
 const PAGE_EVENT_TYPES: { key: keyof SoundAssignments['pageEvents']; label: string; icon: string }[] = [
   { key: 'tasbihComplete', label: 'إتمام التسبيح', icon: '📿' },
@@ -130,7 +128,14 @@ const BUNDLED_SOUNDS: BundledSound[] = [
   { id: 'silent', name: 'صامت', category: 'adhan' },
 ];
 
-type ActiveTab = 'library' | 'notifications' | 'events';
+// Phase B10: 'notifications' tab removed.
+// Reason: iOS/Android only play notification sounds that are bundled into
+// the app binary at build time. Uploading a sound and assigning it from
+// the admin panel cannot affect device notification sounds — that pipeline
+// is handled by the build-time `BundledSoundsManager` instead.
+// In-app sound playback (azkar reciter, adhan preview) still uses uploaded
+// sounds via the 'events' tab below.
+type ActiveTab = 'library' | 'events';
 
 // ==================== Component ====================
 
@@ -364,8 +369,7 @@ export default function SoundManager() {
 
   const tabs: { key: ActiveTab; label: string; icon: React.ReactNode }[] = [
     { key: 'library', label: 'مكتبة الأصوات', icon: <Music className="w-4 h-4" /> },
-    { key: 'notifications', label: 'أصوات الإشعارات', icon: <Volume2 className="w-4 h-4" /> },
-    { key: 'events', label: 'أصوات الأحداث', icon: <Music className="w-4 h-4" /> },
+    { key: 'events', label: 'أصوات داخل التطبيق', icon: <Music className="w-4 h-4" /> },
   ];
 
   return (
@@ -382,7 +386,7 @@ export default function SoundManager() {
           </div>
         </div>
 
-        {(activeTab === 'notifications' || activeTab === 'events') && (
+        {activeTab === 'events' && (
           <button
             onClick={handleSaveAssignments}
             disabled={isSaving}
@@ -660,98 +664,6 @@ export default function SoundManager() {
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* ==================== Notification Sound Assignment ==================== */}
-      {activeTab === 'notifications' && (
-        <div className="space-y-4">
-          <div className="bg-admin-surface rounded-2xl p-4 border border-admin-border">
-            <p className="text-sm text-slate-400">
-              اختر الصوت المناسب لكل نوع من الإشعارات. سيتم تطبيق التغييرات على جميع مستخدمي التطبيق.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {NOTIFICATION_TYPES.map(type => {
-              const selectedSoundId = assignments.notifications[type.key];
-              const selectedSound = sounds.find(s => s.id === selectedSoundId);
-
-              return (
-                <div
-                  key={type.key}
-                  className="bg-admin-surface rounded-2xl border border-admin-border p-4"
-                >
-                  <div className="flex items-center gap-4">
-                    {/* Icon / Label */}
-                    <div className="w-10 h-10 bg-admin-surface-light rounded-xl flex items-center justify-center text-xl">
-                      {type.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium">{type.label}</p>
-                      {selectedSound && (
-                        <p className="text-xs text-slate-500 mt-0.5">{selectedSound.name}</p>
-                      )}
-                    </div>
-
-                    {/* Dropdown */}
-                    <select
-                      value={selectedSoundId}
-                      onChange={(e) =>
-                        setAssignments(prev => ({
-                          ...prev,
-                          notifications: { ...prev.notifications, [type.key]: e.target.value },
-                        }))
-                      }
-                      className="bg-admin-surface-light text-white px-4 py-2 rounded-xl border border-admin-border text-sm focus:border-accent focus:outline-none min-w-[200px]"
-                      aria-label={`صوت ${type.label}`}
-                    >
-                      <option value="">— غير محدد —</option>
-                      <optgroup label="🔔 إشعارات مدمجة">
-                        {BUNDLED_SOUNDS.filter(s => s.category === 'notification').map(s => (
-                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="🕌 أذان مدمج">
-                        {BUNDLED_SOUNDS.filter(s => s.category === 'adhan').map(s => (
-                          <option key={`bundled-${s.id}`} value={s.id}>{s.name}</option>
-                        ))}
-                      </optgroup>
-                      {sounds.length > 0 && (
-                        <optgroup label="📤 أصوات مرفوعة">
-                          {sounds.map(s => (
-                            <option key={s.id} value={s.id}>
-                              {SOUND_CATEGORIES.find(c => c.value === s.category)?.icon} {s.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
-
-                    {/* Preview */}
-                    {selectedSound && (
-                      <button
-                        onClick={() => togglePlay(selectedSound)}
-                        className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                          playingId === selectedSound.id
-                            ? 'bg-red-500/20 text-red-400'
-                            : 'bg-accent/20 text-accent-light'
-                        }`}
-                        aria-label={playingId === selectedSound.id ? 'إيقاف المعاينة' : 'معاينة الصوت'}
-                        title={playingId === selectedSound.id ? 'إيقاف' : 'معاينة'}
-                      >
-                        {playingId === selectedSound.id ? (
-                          <Pause className="w-4 h-4" />
-                        ) : (
-                          <Play className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
 

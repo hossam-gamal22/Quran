@@ -109,7 +109,6 @@ import UsersPage from './pages/Users';
 import Subscriptions from './pages/Subscriptions';
 import Ads from './pages/Ads';
 import WelcomeBanner from './pages/WelcomeBanner';
-import HighlightsManager from './pages/HighlightsManager';
 import NavigationUI from './pages/NavigationUI';
 import HomePageManager from './pages/HomePageManager';
 import SoundManager from './pages/SoundManager';
@@ -127,7 +126,6 @@ import PdfTemplatesManager from './pages/PdfTemplatesManager';
 import Rewards from './pages/Rewards';
 import TranslationOverrides from './pages/TranslationOverrides';
 import ContentManager from './pages/ContentManager';
-import RadioManager from './pages/RadioManager';
 import HijriOverrides from './pages/HijriOverrides';
 import AppIconManager from './pages/AppIconManager';
 import SuggestionsPage from './pages/Suggestions';
@@ -136,10 +134,8 @@ import PurchaseHistory from './pages/PurchaseHistory';
 import QAManager from './pages/QAManager';
 import UserQuestions from './pages/UserQuestions';
 import ThemesPage from './pages/Themes';
-import BackgroundManager from './pages/BackgroundManager';
 import OnboardingManager from './pages/OnboardingManager';
 import Pricing from './pages/Pricing';
-import WidgetDesignManager from './pages/WidgetDesignManager';
 import RouteGuide from './pages/RouteGuide';
 import AppContentManager from './pages/AppContentManager';
 import MobilePreview from './components/MobilePreview';
@@ -156,7 +152,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/home-page', icon: LayoutDashboard, label: 'إدارة الرئيسية' },
       { path: '/welcome-banner', icon: Megaphone, label: 'الرسالة الترحيبية' },
-      { path: '/highlights', icon: Sparkles, label: 'الهايلايتس' },
     ],
   },
   {
@@ -206,7 +201,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/sounds', icon: Volume2, label: 'إعدادات الأصوات' },
       { path: '/bundled-sounds', icon: Music, label: 'أصوات الإشعارات' },
-      // { path: '/radio', icon: Radio, label: 'الراديو' }, // hidden: app/radio.tsx uses bundled list, doesn't read Firestore
     ],
   },
   {
@@ -256,7 +250,6 @@ const NAV_GROUPS: NavGroup[] = [
       { path: '/feature-gating', icon: Shield, label: 'بوابة الميزات' },
       { path: '/app-icons', icon: ImageIcon, label: 'أيقونات التطبيق' },
       { path: '/photo-backgrounds', icon: ImageIcon, label: 'خلفيات الصور' },
-      { path: '/backgrounds', icon: ImageIcon, label: 'خلفيات التطبيق' },
       { path: '/onboarding', icon: Smartphone, label: 'شاشات الترحيب' },
       { path: '/app-content', icon: FileText, label: 'محتوى التطبيق' },
       { path: '/settings', icon: Settings, label: 'الإعدادات العامة' },
@@ -278,7 +271,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { path: '/sdui', icon: LayoutGrid, label: 'واجهات SDUI' },
       { path: '/pdf-templates', icon: FileText, label: 'قوالب PDF' },
-      // { path: '/widget-design', icon: Smartphone, label: 'تصميم الودجات' }, // hidden: native widgets use bundled assets, no app reader for widgetDesigns
       { path: '/route-guide', icon: Globe, label: 'دليل المسارات' },
     ],
   },
@@ -512,7 +504,6 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/welcome-banner" element={<WelcomeBanner />} />
-              <Route path="/highlights" element={<HighlightsManager />} />
 
               <Route path="/daily-content" element={<DailyContentManager />} />
               <Route path="/daily-dhikr" element={<DailyDhikrManager />} />
@@ -536,7 +527,6 @@ const App: React.FC = () => {
               <Route path="/home-page" element={<HomePageManager />} />
               <Route path="/sounds" element={<SoundManager />} />
               <Route path="/bundled-sounds" element={<BundledSoundsManager />} />
-              <Route path="/radio" element={<RadioManager />} />
               <Route path="/pdf-templates" element={<PdfTemplatesManager />} />
               <Route path="/temp-pages" element={<TempPagesManager />} />
               <Route path="/sdui" element={<SDUIManager />} />
@@ -549,10 +539,8 @@ const App: React.FC = () => {
               <Route path="/qa-manager" element={<QAManager />} />
               <Route path="/user-questions" element={<UserQuestions />} />
               <Route path="/themes" element={<ThemesPage />} />
-              <Route path="/backgrounds" element={<BackgroundManager />} />
               <Route path="/onboarding" element={<OnboardingManager />} />
               <Route path="/pricing" element={<Pricing />} />
-              <Route path="/widget-design" element={<WidgetDesignManager />} />
               <Route path="/route-guide" element={<RouteGuide />} />
               <Route path="/app-content" element={<AppContentManager />} />
               <Route path="*" element={<Navigate to="/" replace />} />

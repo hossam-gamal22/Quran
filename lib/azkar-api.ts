@@ -75,6 +75,68 @@ const STORAGE_KEYS = {
 const DEFAULT_LANGUAGE: Language = 'ar';
 
 // ===================================================
+// Firestore override cache (B3)
+// Admin panel writes to top-level `azkar/{id}` collection.
+// We hydrate a module-level override at startup; getAllAzkar()
+// returns the override if present, falling back to bundled JSON.
+// ===================================================
+
+const AZKAR_CACHE_KEY = '@azkar_firestore_cache';
+const AZKAR_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+let _azkarOverride: Zikr[] | null = null;
+
+interface AzkarCacheEnvelope {
+  ts: number;
+  data: Zikr[];
+}
+
+/**
+ * Loads admin-managed adhkar from Firestore (or AsyncStorage cache).
+ * Safe to call at app startup. Failures fall back silently to bundled JSON.
+ */
+export const hydrateAzkarFromFirestore = async (): Promise<void> => {
+  // 1) Try cache first (instant, avoids network on cold start)
+  try {
+    const cached = await AsyncStorage.getItem(AZKAR_CACHE_KEY);
+    if (cached) {
+      try {
+        const env = JSON.parse(cached) as AzkarCacheEnvelope;
+        if (env?.data?.length && Date.now() - env.ts < AZKAR_CACHE_TTL_MS) {
+          _azkarOverride = env.data;
+          return; // fresh cache, skip network
+        }
+        if (env?.data?.length) {
+          _azkarOverride = env.data; // stale but usable while we revalidate
+        }
+      } catch {
+        // corrupted cache — ignore, refetch
+      }
+    }
+  } catch {
+    // AsyncStorage unavailable — ignore
+  }
+
+  // 2) Fetch from Firestore in the background
+  try {
+    const snap = await getDocs(collection(db, 'azkar'));
+    if (snap.empty) return; // collection empty — keep bundled fallback
+    const items: Zikr[] = snap.docs.map(d => d.data() as Zikr).filter(z => z && typeof z.id === 'number');
+    if (!items.length) return;
+    _azkarOverride = items;
+    try {
+      await AsyncStorage.setItem(
+        AZKAR_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data: items } as AzkarCacheEnvelope)
+      );
+    } catch {
+      // ignore cache write failure
+    }
+  } catch (err) {
+    console.warn('[azkar-api] hydrateAzkarFromFirestore failed, using bundled JSON:', err);
+  }
+};
+
+// ===================================================
 // تحميل البيانات
 // ===================================================
 
@@ -82,6 +144,8 @@ const DEFAULT_LANGUAGE: Language = 'ar';
  * الحصول على جميع الأذكار
  */
 export const getAllAzkar = (): Zikr[] => {
+  // Admin override takes precedence when hydrated
+  if (_azkarOverride && _azkarOverride.length) return _azkarOverride;
   // التحقق من بنية البيانات
   if (Array.isArray(azkarData)) {
     return azkarData as Zikr[];

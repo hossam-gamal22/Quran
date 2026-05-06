@@ -1132,7 +1132,7 @@ export default function NotificationsScreen() {
             </View>
           );
         })()}
-        {adhanListExpanded && ADHAN_SOUNDS.map((sound) => {
+        {adhanListExpanded && ADHAN_SOUNDS.filter(s => !disabledSoundIds.has(s.id)).map((sound) => {
           const isSelected = settings.notifications.adhanSoundType === sound.id;
           const isSoundLocked = !isPremium && !FREE_ADHAN_IDS.includes(sound.id);
           return (
@@ -1213,6 +1213,32 @@ export default function NotificationsScreen() {
 
   const renderAzkarExpanded = () => (
     <View style={styles.expandedContent}>
+      {/* Phase 7: Auto-anchor toggle — يربط أوقات الأذكار بأوقات الصلاة الفعلية */}
+      <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row', flex: 1 }]}>
+          <MaterialCommunityIcons name="link-variant" size={18} color="#0d8e62" />
+          <View style={{ flex: 1, marginHorizontal: 8 }}>
+            <Text style={[styles.innerSettingTitle, { color: colors.text, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              ربط بأوقات الصلاة تلقائياً
+            </Text>
+            <Text style={[{ color: colors.textLight, fontSize: 11, marginTop: 2, textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' }]}>
+              صباح: بعد الفجر بنصف ساعة • مساء: بعد العصر بربع ساعة
+            </Text>
+          </View>
+        </View>
+        <Switch
+          value={settings.notifications.azkarAutoAnchor === true}
+          onValueChange={(val) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            updateNotifications({ azkarAutoAnchor: val });
+          }}
+          trackColor={{ false: isDarkMode ? '#39393D' : '#E9E9EB', true: '#0d8e62' }}
+          thumbColor={Platform.OS === 'android' ? '#fff' : undefined}
+          ios_backgroundColor={isDarkMode ? '#39393D' : '#E9E9EB'}
+          disabled={!isEnabled}
+        />
+      </View>
+
       {/* Morning Azkar */}
       <View style={[styles.innerSettingRow, { borderBottomColor: colors.divider, flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
         <View style={[styles.innerSettingInfo, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1897,6 +1923,11 @@ export default function NotificationsScreen() {
             />
           </View>
         </Animated.View>
+
+        {/* Phase 10: Health Dashboard link — FULLY HIDDEN from UI.
+            Background telemetry + auto-heal continue to run silently.
+            The screen itself remains routable via deep link
+            `/settings/notifications-health` for internal/manual QA only. */}
 
         {/* Notification Categories */}
         <Animated.View entering={FadeInDown.delay(200).duration(500)}>
