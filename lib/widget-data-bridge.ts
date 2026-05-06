@@ -180,13 +180,31 @@ export async function updateWidgetData(prayerTimes?: PrayerTimes | null, locatio
       } catch {}
     }
 
-    const [prayerData, azkarData, verseData, dhikrData, prayerCompletion] = await Promise.all([
+    const settledResults = await Promise.allSettled([
       preparePrayerWidgetData(effectivePrayerTimes, location, lang),
       prepareAzkarWidgetData(lang, settings.azkarWidget.categories),
       prepareVerseWidgetData(lang, { showTranslation: settings.verseWidget.showTranslation }),
       prepareDhikrWidgetData(lang, { showTranslation: settings.dhikrWidget.showTranslation, showBenefit: settings.dhikrWidget.showBenefit }),
       getPrayerCompletion(),
     ]);
+
+    settledResults.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.warn(`⚠️ Widget data slice ${i} failed:`, r.reason);
+      }
+    });
+
+    // If any critical slice failed, abort to keep last-known-good shared data intact
+    if (settledResults.some(r => r.status === 'rejected')) {
+      console.warn('⚠️ Skipping widget data write due to partial failure');
+      return;
+    }
+
+    const prayerData = (settledResults[0] as PromiseFulfilledResult<any>).value;
+    const azkarData = (settledResults[1] as PromiseFulfilledResult<any>).value;
+    const verseData = (settledResults[2] as PromiseFulfilledResult<any>).value;
+    const dhikrData = (settledResults[3] as PromiseFulfilledResult<any>).value;
+    const prayerCompletion = (settledResults[4] as PromiseFulfilledResult<any>).value;
 
     const sharedData: SharedWidgetData = {
       prayer: prayerData,
